@@ -15,7 +15,7 @@
 
 import itertools
 import urllib.parse
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from unittest.mock import patch
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -1068,85 +1068,28 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
 
 
 class BundledAggregationsTestCase(BaseRelationsTestCase):
-    @unittest.override_config({"experimental_features": {"msc3666_enabled": True}})
-    def test_bundled_aggregations(self) -> None:
+    """
+    See RelationsTestCase.test_edit for a similar test for edits.
+
+    Note that this doesn't test against /relations since only thread relations
+    get bundled via that API. See test_aggregation_get_event_for_thread.
+    """
+
+    def _test_bundled_aggregations(
+        self, relation_type: str, assertion_callable: Callable[[JsonDict], None]
+    ) -> None:
         """
-        Test that annotations, references, and threads get correctly bundled.
-
-        Note that this doesn't test against /relations since only thread relations
-        get bundled via that API. See test_aggregation_get_event_for_thread.
-
-        See test_edit for a similar test for edits.
+        Makes requests to various endpoints which should include bundled aggregations
+        and then calls an assertion function on the bundled aggregations.
         """
-        # Setup by sending a variety of relations.
-        self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
-        self._send_relation(
-            RelationTypes.ANNOTATION, "m.reaction", "a", access_token=self.user2_token
-        )
-        self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "b")
-
-        channel = self._send_relation(RelationTypes.REFERENCE, "m.room.test")
-        reply_1 = channel.json_body["event_id"]
-
-        channel = self._send_relation(RelationTypes.REFERENCE, "m.room.test")
-        reply_2 = channel.json_body["event_id"]
-
-        self._send_relation(RelationTypes.THREAD, "m.room.test")
-        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
-        thread_2 = channel.json_body["event_id"]
 
         def assert_bundle(event_json: JsonDict) -> None:
             """Assert the expected values of the bundled aggregations."""
             relations_dict = event_json["unsigned"].get("m.relations")
 
             # Ensure the fields are as expected.
-            self.assertCountEqual(
-                relations_dict.keys(),
-                (
-                    RelationTypes.ANNOTATION,
-                    RelationTypes.REFERENCE,
-                    RelationTypes.THREAD,
-                ),
-            )
-
-            # Check the values of each field.
-            self.assertEqual(
-                {
-                    "chunk": [
-                        {"type": "m.reaction", "key": "a", "count": 2},
-                        {"type": "m.reaction", "key": "b", "count": 1},
-                    ]
-                },
-                relations_dict[RelationTypes.ANNOTATION],
-            )
-
-            self.assertEqual(
-                {"chunk": [{"event_id": reply_1}, {"event_id": reply_2}]},
-                relations_dict[RelationTypes.REFERENCE],
-            )
-
-            self.assertEqual(
-                2,
-                relations_dict[RelationTypes.THREAD].get("count"),
-            )
-            self.assertTrue(
-                relations_dict[RelationTypes.THREAD].get("current_user_participated")
-            )
-            # The latest thread event has some fields that don't matter.
-            self.assert_dict(
-                {
-                    "content": {
-                        "m.relates_to": {
-                            "event_id": self.parent_id,
-                            "rel_type": RelationTypes.THREAD,
-                        }
-                    },
-                    "event_id": thread_2,
-                    "sender": self.user_id,
-                    "type": "m.room.test",
-                },
-                relations_dict[RelationTypes.THREAD].get("latest_event"),
-            )
+            self.assertCountEqual(relations_dict.keys(), (relation_type,))
+            assertion_callable(relations_dict[relation_type])
 
         # Request the event directly.
         channel = self.make_request(
@@ -1176,7 +1119,11 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         assert_bundle(channel.json_body["event"])
 
         # Request sync.
-        channel = self.make_request("GET", "/sync", access_token=self.user_token)
+        # bundled aggregations).
+        filter = urllib.parse.quote_plus(b'{"room": {"timeline": {"limit": 4}}}')
+        channel = self.make_request(
+            "GET", f"/sync?filter={filter}", access_token=self.user_token
+        )
         self.assertEqual(200, channel.code, channel.json_body)
         room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
         self.assertTrue(room_timeline["limited"])
@@ -1198,6 +1145,80 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
             ]
         ]
         assert_bundle(self._find_event_in_chunk(chunk))
+
+    @unittest.override_config({"experimental_features": {"msc3666_enabled": True}})
+    def test_annotation(self) -> None:
+        """
+        Test that annotations get correctly bundled.
+        """
+        # Setup by sending a variety of relations.
+        self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
+        self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "a", access_token=self.user2_token
+        )
+        self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "b")
+
+        def assert_annotations(bundled_aggregations: JsonDict) -> None:
+            self.assertEqual(
+                {
+                    "chunk": [
+                        {"type": "m.reaction", "key": "a", "count": 2},
+                        {"type": "m.reaction", "key": "b", "count": 1},
+                    ]
+                },
+                bundled_aggregations,
+            )
+
+        self._test_bundled_aggregations(RelationTypes.ANNOTATION, assert_annotations)
+
+    @unittest.override_config({"experimental_features": {"msc3666_enabled": True}})
+    def test_reference(self) -> None:
+        """
+        Test that references get correctly bundled.
+        """
+        channel = self._send_relation(RelationTypes.REFERENCE, "m.room.test")
+        reply_1 = channel.json_body["event_id"]
+
+        channel = self._send_relation(RelationTypes.REFERENCE, "m.room.test")
+        reply_2 = channel.json_body["event_id"]
+
+        def assert_annotations(bundled_aggregations: JsonDict) -> None:
+            self.assertEqual(
+                {"chunk": [{"event_id": reply_1}, {"event_id": reply_2}]},
+                bundled_aggregations,
+            )
+
+        self._test_bundled_aggregations(RelationTypes.REFERENCE, assert_annotations)
+
+    @unittest.override_config({"experimental_features": {"msc3666_enabled": True}})
+    def test_thread(self) -> None:
+        """
+        Test that threads get correctly bundled.
+        """
+        self._send_relation(RelationTypes.THREAD, "m.room.test")
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        thread_2 = channel.json_body["event_id"]
+
+        def assert_annotations(bundled_aggregations: JsonDict) -> None:
+            self.assertEqual(2, bundled_aggregations.get("count"))
+            self.assertTrue(bundled_aggregations.get("current_user_participated"))
+            # The latest thread event has some fields that don't matter.
+            self.assert_dict(
+                {
+                    "content": {
+                        "m.relates_to": {
+                            "event_id": self.parent_id,
+                            "rel_type": RelationTypes.THREAD,
+                        }
+                    },
+                    "event_id": thread_2,
+                    "sender": self.user_id,
+                    "type": "m.room.test",
+                },
+                bundled_aggregations.get("latest_event"),
+            )
+
+        self._test_bundled_aggregations(RelationTypes.THREAD, assert_annotations)
 
     def test_aggregation_get_event_for_annotation(self) -> None:
         """Test that annotations do not get bundled aggregations included
