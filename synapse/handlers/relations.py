@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, Iterable, Optional, cast
+from typing import TYPE_CHECKING, Dict, FrozenSet, Iterable, Optional, cast
 
 import attr
 from frozendict import frozendict
@@ -159,7 +159,7 @@ class RelationsHandler:
         return return_value
 
     async def _get_bundled_aggregation_for_event(
-        self, event: EventBase, user_id: str
+        self, event: EventBase, ignored_users: FrozenSet[str]
     ) -> Optional[BundledAggregations]:
         """Generate bundled aggregations for an event.
 
@@ -167,7 +167,7 @@ class RelationsHandler:
 
         Args:
             event: The event to calculate bundled aggregations for.
-            user_id: The user requesting the bundled aggregations.
+            ignored_users: The users ignored by the requesting user.
 
         Returns:
             The bundled aggregations for an event, if bundled aggregations are
@@ -191,7 +191,7 @@ class RelationsHandler:
         aggregations = BundledAggregations()
 
         annotations = await self._main_store.get_aggregation_groups_for_event(
-            event_id, room_id
+            event_id, room_id, ignored_users=ignored_users
         )
         if annotations.chunk:
             aggregations.annotations = await annotations.to_dict(
@@ -230,9 +230,14 @@ class RelationsHandler:
         # event ID -> bundled aggregation in non-serialized form.
         results: Dict[str, BundledAggregations] = {}
 
+        # Fetch any ignored users of the requesting user.
+        ignored_users = await self._main_store.ignored_users(user_id)
+
         # Fetch other relations per event.
         for event in events_by_id.values():
-            event_result = await self._get_bundled_aggregation_for_event(event, user_id)
+            event_result = await self._get_bundled_aggregation_for_event(
+                event, ignored_users
+            )
             if event_result:
                 results[event.event_id] = event_result
 

@@ -17,6 +17,7 @@ from typing import (
     TYPE_CHECKING,
     Collection,
     Dict,
+    FrozenSet,
     Iterable,
     List,
     Optional,
@@ -260,6 +261,7 @@ class RelationsWorkerStore(SQLBaseStore):
         direction: str = "b",
         from_token: Optional[AggregationPaginationToken] = None,
         to_token: Optional[AggregationPaginationToken] = None,
+        ignored_users: FrozenSet[str] = frozenset(),
     ) -> PaginationChunk:
         """Get a list of annotations on the event, grouped by event type and
         aggregation key, sorted by count.
@@ -276,6 +278,7 @@ class RelationsWorkerStore(SQLBaseStore):
                 the lowest count first (`"f"`).
             from_token: Fetch rows from the given token, or from the start if None.
             to_token: Fetch rows up to the given token, or up to the end if None.
+            ignored_users: The users ignored by the requesting user.
 
         Returns:
             List of groups of annotations that match. Each row is a dict with
@@ -292,6 +295,16 @@ class RelationsWorkerStore(SQLBaseStore):
         if event_type:
             where_clause.append("type = ?")
             where_args.append(event_type)
+
+        if ignored_users:
+            (
+                ignored_users_clause_sql,
+                ignored_users_clause_args,
+            ) = make_in_list_sql_clause(
+                self.database_engine, "sender", ignored_users, include=False
+            )
+            where_clause.append(ignored_users_clause_sql)
+            where_args.extend(ignored_users_clause_args)
 
         having_clause = generate_pagination_where_clause(
             direction=direction,

@@ -2171,7 +2171,10 @@ class DatabasePool:
 
 
 def make_in_list_sql_clause(
-    database_engine: BaseDatabaseEngine, column: str, iterable: Collection[Any]
+    database_engine: BaseDatabaseEngine,
+    column: str,
+    iterable: Collection[Any],
+    include: bool = True,
 ) -> Tuple[str, list]:
     """Returns an SQL clause that checks the given column is in the iterable.
 
@@ -2184,6 +2187,8 @@ def make_in_list_sql_clause(
         database_engine
         column: Name of the column
         iterable: The values to check the column against.
+        include: True if the resulting rows must include one of the given values,
+            False if it must exclude them.
 
     Returns:
         A tuple of SQL query and the args
@@ -2192,9 +2197,18 @@ def make_in_list_sql_clause(
     if database_engine.supports_using_any_list:
         # This should hopefully be faster, but also makes postgres query
         # stats easier to understand.
-        return "%s = ANY(?)" % (column,), [list(iterable)]
+        if include:
+            sql = f"{column} = ANY(?)"
+        else:
+            sql = f"{column} != ANY(?)"
+        return sql, [list(iterable)]
     else:
-        return "%s IN (%s)" % (column, ",".join("?" for _ in iterable)), list(iterable)
+        values = ",".join("?" for _ in iterable)
+        if include:
+            sql = f"{column} IN ({values})"
+        else:
+            sql = f"{column} NOT IN ({values})"
+        return sql, list(iterable)
 
 
 KV = TypeVar("KV")

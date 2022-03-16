@@ -134,10 +134,9 @@ class RelationAggregationPaginationServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
+        user_id = requester.user.to_string()
         await self.auth.check_user_in_room_or_world_readable(
-            room_id,
-            requester.user.to_string(),
-            allow_departed_users=True,
+            room_id, user_id, allow_departed_users=True
         )
 
         # This checks that a) the event exists and b) the user is allowed to
@@ -164,6 +163,8 @@ class RelationAggregationPaginationServlet(RestServlet):
         if to_token_str:
             to_token = AggregationPaginationToken.from_string(to_token_str)
 
+        ignored_users = await self.store.ignored_users(user_id)
+
         pagination_chunk = await self.store.get_aggregation_groups_for_event(
             event_id=parent_id,
             room_id=room_id,
@@ -171,6 +172,7 @@ class RelationAggregationPaginationServlet(RestServlet):
             limit=limit,
             from_token=from_token,
             to_token=to_token,
+            ignored_users=ignored_users,
         )
 
         return 200, await pagination_chunk.to_dict(self.store)
