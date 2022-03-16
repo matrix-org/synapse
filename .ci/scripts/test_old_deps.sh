@@ -67,6 +67,8 @@ python3 -c "$REMOVE_DEV_DEPENDENCIES"
 # Helpfully, pip doesn't indicate the error; it returns 0.
 # TODO: bump pyasn to >=0.4.6?
 pipx install poetry==1.1.12
-~/.local/bin/poetry lock
-~/.local/bin/poetry install -E "all test"
-~/.local/bin/poetry run trial -j2 tests
+~/.local/bin/poetry run pip install .[all,test]
+
+# Run the tests. Since we didn't install in editable mode, we have to invoke trial
+# with `python -m` so that the working directory contains `tests/`.
+~/.local/bin/poetry run python -m twisted.trial -j2 tests
