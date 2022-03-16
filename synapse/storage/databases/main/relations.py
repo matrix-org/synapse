@@ -74,6 +74,7 @@ class RelationsWorkerStore(SQLBaseStore):
         direction: str = "b",
         from_token: Optional[StreamToken] = None,
         to_token: Optional[StreamToken] = None,
+        ignored_users: FrozenSet[str] = frozenset(),
     ) -> PaginationChunk:
         """Get a list of relations for an event, ordered by topological ordering.
 
@@ -89,6 +90,7 @@ class RelationsWorkerStore(SQLBaseStore):
                 oldest first (`"f"`).
             from_token: Fetch rows from the given token, or from the start if None.
             to_token: Fetch rows up to the given token, or up to the end if None.
+            ignored_users: The users ignored by the requesting user.
 
         Returns:
             List of event IDs that match relations requested. The rows are of
@@ -113,6 +115,16 @@ class RelationsWorkerStore(SQLBaseStore):
         if aggregation_key:
             where_clause.append("aggregation_key = ?")
             where_args.append(aggregation_key)
+
+        if ignored_users:
+            (
+                ignored_users_clause_sql,
+                ignored_users_clause_args,
+            ) = make_in_list_sql_clause(
+                self.database_engine, "sender", ignored_users, include=False
+            )
+            where_clause.append(ignored_users_clause_sql)
+            where_args.extend(ignored_users_clause_args)
 
         pagination_clause = generate_pagination_where_clause(
             direction=direction,

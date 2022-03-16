@@ -116,6 +116,9 @@ class RelationsHandler:
         if event is None:
             raise SynapseError(404, "Unknown parent event.")
 
+        # Note that ignored users are not passed into get_relations_for_event
+        # below. Ignored users are handled in filter_events_for_client (and by
+        # noy passing them in here we should get a better cache hit rate).
         pagination_chunk = await self._main_store.get_relations_for_event(
             event_id=event_id,
             event=event,
@@ -199,7 +202,12 @@ class RelationsHandler:
             )
 
         references = await self._main_store.get_relations_for_event(
-            event_id, event, room_id, RelationTypes.REFERENCE, direction="f"
+            event_id,
+            event,
+            room_id,
+            RelationTypes.REFERENCE,
+            direction="f",
+            ignored_users=ignored_users,
         )
         if references.chunk:
             aggregations.references = await references.to_dict(cast("DataStore", self))
