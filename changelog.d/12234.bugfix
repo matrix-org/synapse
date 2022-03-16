@@ -1,0 +1,1 @@
+Fix a long-standing bug when a `filter` argument with `event_fields` supplied but not including the `unsigned` field could result in a 500 error on `/sync`.
