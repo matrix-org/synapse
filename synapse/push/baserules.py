@@ -293,7 +293,7 @@ BASE_APPEND_UNDERRIDE_RULES: List[Dict[str, Any]] = [
     # rules take precedence, so if you enable bot notifications (by modifying
     # this rule) notifications will not be sent for muted rooms.
     {
-        "rule_id": "global/override/.m.rule.suppress_notices",
+        "rule_id": "global/underride/.m.rule.suppress_notices",
         "conditions": [
             {
                 "kind": "event_match",
