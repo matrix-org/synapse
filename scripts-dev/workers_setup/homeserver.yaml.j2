@@ -1,38 +1,72 @@
 
+server_name: {{ server_name }}
+
+report_stats: false
+
+signing_key_path: "{{ worker_dir }}/../signing.key"
+
+macaroon_secret_key: "{{ macaroon_secret_key }}"
+
+redis:
+  enabled: true
+  #host: localhost
+  #port: 6379
+
+trusted_key_servers: []
+
+database:
+  name: psycopg2
+  args:
+    # Comment out user, password and host to use UNIX socket auth.
+    # For testing, create a database owned by your Postgres user that is logged
+    # in with your UNIX user
+    #user: "synapse"
+    #password:
+    database: "{{ server_name }}"
+    #host: "localhost"
+    cp_min: 5
+    cp_max: 10
+
 instance_map:
-{% for worker in all_workers %}
+{-% for worker in all_workers %}
   {{ worker.name }}:
     host: {{ worker.ip }}
     port: 9090
 {% endfor %}
 
- stream_writers:
+stream_writers:
   events:
-{% for worker in all_workers %}
-{% if worker.kind == "event_persister" %}
+{% for worker in all_workers %-}
+{-% if worker.kind == "event_persister" %}
     - {{ worker.name }}
-{% endif %}
+{% endif %-}
+{-% endfor %}
 
-  typing:
-{% for worker in all_workers %}
-{% if worker.kind == "typing" %}
+typing:
+{% for worker in all_workers %-}
+{-% if worker.kind == "typing" %}
     - {{ worker.name }}
-{% endif %}
+{% endif %-}
+{-% endfor %}
 
 
 start_pushers: false
 
 pusher_instances:
-{% if worker.kind == "pusher" %}
+{% for worker in all_workers %-}
+{-% if worker.kind == "pusher" %}
     - {{ worker.name }}
-{% endif %}
+{% endif %-}
+{-% endfor %}
 
 notify_appservices: False
 
 federation_sender_instances:
-{% if worker.kind == "federation_sender" %}
+{% for worker in all_workers %-}
+{-% if worker.kind == "federation_sender" %}
     - {{ worker.name }}
-{% endif %}
+{% endif %-}
+{-% endfor %}
 
 enable_media_repo: False
 
@@ -40,3 +74,4 @@ media_instance_running_background_jobs: "media1"
 
 update_user_directory: False
 
+pid_file: "{{ logs_dir }}/main.pid"

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Copyright 2022 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -59,7 +60,7 @@ def make_workers(workers: Iterable[Tuple[str, int]]) -> List[Worker]:
     result = []
     worker_overall_num = 0
     for worker_type, worker_type_count in workers:
-        for worker_idx in range(worker_type_count):
+        for worker_idx in range(1, worker_type_count + 1):
             worker_overall_num += 1
             if worker_type == "main":
                 worker_name = "main"
@@ -73,7 +74,7 @@ def make_workers(workers: Iterable[Tuple[str, int]]) -> List[Worker]:
     return result
 
 
-def generate(worker_counts: Tuple[Tuple[str, int], ...], target_path: Path) -> None:
+def generate(worker_counts: Tuple[Tuple[str, int], ...], target_path: Path, server_name: str) -> None:
     if target_path.exists():
         print("Target path already exists. Won't overwrite.")
         return
@@ -85,6 +86,8 @@ def generate(worker_counts: Tuple[Tuple[str, int], ...], target_path: Path) -> N
     with open(target_path.joinpath("signing.key"), "w") as fout:
         write_signing_keys(fout, key)
 
+    macaroon_secret_key = random_string(32)
+
     env = Environment(loader=FileSystemLoader(dirname(__file__) + "/workers_setup"))
     hs_template = env.get_template("homeserver.yaml.j2")
     worker_template = env.get_template("worker.yaml.j2")
@@ -92,6 +95,8 @@ def generate(worker_counts: Tuple[Tuple[str, int], ...], target_path: Path) -> N
 
     worker_dir = target_path.joinpath("workers")
     worker_dir.mkdir()
+    worker_logging_dir = target_path.joinpath("workers.logging")
+    worker_logging_dir.mkdir()
     worker_dir = worker_dir.resolve()
 
     logs_dir = target_path.joinpath("logs")
@@ -102,6 +107,21 @@ def generate(worker_counts: Tuple[Tuple[str, int], ...], target_path: Path) -> N
     workers_by_name = {worker.name: worker for worker in all_workers}
 
     for worker in all_workers:
+        log_config_path = worker_logging_dir.joinpath(f"{worker.name}.logging.yaml")
+        log_config = logging_template.render(
+            worker=worker,
+            worker_dir=worker_dir,
+            logs_dir=logs_dir,
+            all_workers=all_workers,
+            workers_by_name=workers_by_name
+        )
+        with open(log_config_path, "w") as fout:
+            fout.write(log_config)
+
+        if worker.name == "main":
+            # Main can't use a worker file.
+            continue
+
         worker_config_path = worker_dir.joinpath(f"{worker.name}.yaml")
         worker_config = worker_template.render(
             worker=worker,
@@ -113,31 +133,23 @@ def generate(worker_counts: Tuple[Tuple[str, int], ...], target_path: Path) -> N
         with open(worker_config_path, "w") as fout:
             fout.write(worker_config)
 
-        log_config_path = worker_dir.joinpath(f"{worker.name}.logging.yaml")
-        log_config = logging_template.render(
-            worker=worker,
-            worker_dir=worker_dir,
-            logs_dir=logs_dir,
-            all_workers=all_workers,
-            workers_by_name=workers_by_name
-        )
-        with open(log_config_path, "w") as fout:
-            fout.write(log_config)
-
     hs_config_path = target_path.joinpath("homeserver.yaml")
     hs_config = hs_template.render(
         all_workers=all_workers,
         worker_dir=worker_dir,
-        logs_dir=logs_dir
+        logs_dir=logs_dir,
+        server_name=server_name,
+        macaroon_secret_key=macaroon_secret_key
     )
     with open(hs_config_path, "w") as fout:
         fout.write(hs_config)
 
 
-def main(target_path: Path) -> None:
-    generate(DESIRED_WORKERS, target_path)
+def main(target_path: Path, server_name: str) -> None:
+    generate(DESIRED_WORKERS, target_path, server_name)
 
 
 if __name__ == '__main__':
     target_path = Path(sys.argv[1])
-    main(target_path)
+    server_name = sys.argv[2]
+    main(target_path, server_name)
