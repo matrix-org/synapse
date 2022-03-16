@@ -1267,8 +1267,14 @@ class RelationsTestCase(BaseRelationsTestCase):
             [annotation_event_id_good, thread_event_id],
         )
 
-    def test_bundled_aggregations_with_filter(self):
-        """If unsigned is not a returned field, the bundled aggregations still get added."""
+    def test_bundled_aggregations_with_filter(self) -> None:
+        """
+        If "unsigned" is an omitted field (due to filtering), adding the bundled
+        aggregations should not break.
+
+        Note that the spec allows for a server to return additional fields beyond
+        what is specified.
+        """
         self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
 
         # Note that the sync filter does not include "unsigned" as a field.
