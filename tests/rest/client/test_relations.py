@@ -1076,11 +1076,21 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
     """
 
     def _test_bundled_aggregations(
-        self, relation_type: str, assertion_callable: Callable[[JsonDict], None]
+        self,
+        relation_type: str,
+        assertion_callable: Callable[[JsonDict], None],
+        expected_db_txn_for_event: int,
     ) -> None:
         """
         Makes requests to various endpoints which should include bundled aggregations
         and then calls an assertion function on the bundled aggregations.
+
+        Args:
+            relation_type: The field to search for in the `m.relations` field in unsigned.
+            assertion_callable: Called with the contents of unsigned["m.relations"][relation_type]
+                for relation-specific assertions.
+            expected_db_txn_for_event: The number of database transactions which
+                are expected for a call to /event/.
         """
 
         def assert_bundle(event_json: JsonDict) -> None:
@@ -1099,6 +1109,8 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         )
         self.assertEqual(200, channel.code, channel.json_body)
         assert_bundle(channel.json_body)
+        assert channel.resource_usage is not None
+        self.assertEqual(channel.resource_usage.db_txn_count, expected_db_txn_for_event)
 
         # Request the room messages.
         channel = self.make_request(
@@ -1169,7 +1181,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations,
             )
 
-        self._test_bundled_aggregations(RelationTypes.ANNOTATION, assert_annotations)
+        self._test_bundled_aggregations(RelationTypes.ANNOTATION, assert_annotations, 7)
 
     @unittest.override_config({"experimental_features": {"msc3666_enabled": True}})
     def test_reference(self) -> None:
@@ -1188,7 +1200,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations,
             )
 
-        self._test_bundled_aggregations(RelationTypes.REFERENCE, assert_annotations)
+        self._test_bundled_aggregations(RelationTypes.REFERENCE, assert_annotations, 7)
 
     @unittest.override_config({"experimental_features": {"msc3666_enabled": True}})
     def test_thread(self) -> None:
@@ -1218,7 +1230,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations.get("latest_event"),
             )
 
-        self._test_bundled_aggregations(RelationTypes.THREAD, assert_annotations)
+        self._test_bundled_aggregations(RelationTypes.THREAD, assert_annotations, 9)
 
     def test_aggregation_get_event_for_annotation(self) -> None:
         """Test that annotations do not get bundled aggregations included
