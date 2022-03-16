@@ -166,7 +166,7 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
     # NOTE: this rule must be a higher prio than .m.rule.invite_for_me because
     # that will also match the same events.
     {
-        "rule_id": "global/override/com.beeper.suppress_auto_invite",
+        "rule_id": "global/override/.com.beeper.suppress_auto_invite",
         "conditions": [
             {  # member event
                 "kind": "event_match",
@@ -410,7 +410,7 @@ BASE_APPEND_UNDERRIDE_RULES: List[Dict[str, Any]] = [
     },
     # Enable notifications for reactions
     {
-        "rule_id": "global/override/com.beeper.reaction",
+        "rule_id": "global/underride/.com.beeper.reaction",
         "conditions": [
             {
                 "kind": "event_match",
