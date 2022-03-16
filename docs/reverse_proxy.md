@@ -191,6 +191,7 @@ frontend https
   acl matrix-host hdr(host) -i matrix.example.com matrix.example.com:443
   acl matrix-path path_beg /_matrix
   acl matrix-path path_beg /_synapse/client
+  acl matrix-path path_beg /_synapse/admin
 
   use_backend matrix if matrix-host matrix-path
 
