@@ -1328,15 +1328,26 @@ class RelationIgnoredUserTestCase(BaseRelationsTestCase):
     """Relations sent from an ignored user should be ignored."""
 
     def _test_ignored_user(
-        self, allowed_event_ids: List[str], ignored_event_ids: List[str]
-    ) -> None:
+        self,
+        relation_type: str,
+        allowed_event_ids: List[str],
+        ignored_event_ids: List[str],
+    ) -> Tuple[JsonDict, JsonDict]:
         """
         Fetch the relations and ensure they're all there, then ignore user2, and
         repeat.
+
+        Returns:
+            A tuple of two JSON dictionaries, each are bundled aggregations, the
+            first is from before the user is ignored, and the second is after.
         """
         # Get the relations.
         event_ids = self._get_related_events()
         self.assertCountEqual(event_ids, allowed_event_ids + ignored_event_ids)
+
+        # And the bundled aggregations.
+        before_aggregations = self._get_bundled_aggregations()
+        self.assertIn(relation_type, before_aggregations)
 
         # Ignore user2 and re-do the requests.
         self.get_success(
@@ -1350,6 +1361,12 @@ class RelationIgnoredUserTestCase(BaseRelationsTestCase):
         # Get the relations.
         event_ids = self._get_related_events()
         self.assertCountEqual(event_ids, allowed_event_ids)
+
+        # And the bundled aggregations.
+        after_aggregations = self._get_bundled_aggregations()
+        self.assertIn(relation_type, after_aggregations)
+
+        return before_aggregations[relation_type], after_aggregations[relation_type]
 
     def test_annotation(self) -> None:
         """Annotations should ignore"""
@@ -1375,7 +1392,26 @@ class RelationIgnoredUserTestCase(BaseRelationsTestCase):
         )
         ignored_event_ids.append(channel.json_body["event_id"])
 
-        self._test_ignored_user(allowed_event_ids, ignored_event_ids)
+        before_aggregations, after_aggregations = self._test_ignored_user(
+            RelationTypes.ANNOTATION, allowed_event_ids, ignored_event_ids
+        )
+
+        self.assertCountEqual(
+            before_aggregations["chunk"],
+            [
+                {"type": "m.reaction", "key": "a", "count": 2},
+                {"type": "m.reaction", "key": "b", "count": 1},
+                {"type": "m.reaction", "key": "c", "count": 1},
+            ],
+        )
+
+        self.assertCountEqual(
+            after_aggregations["chunk"],
+            [
+                {"type": "m.reaction", "key": "a", "count": 1},
+                {"type": "m.reaction", "key": "b", "count": 1},
+            ],
+        )
 
     def test_reference(self) -> None:
         """Annotations should ignore"""
@@ -1387,7 +1423,18 @@ class RelationIgnoredUserTestCase(BaseRelationsTestCase):
         )
         ignored_event_ids = [channel.json_body["event_id"]]
 
-        self._test_ignored_user(allowed_event_ids, ignored_event_ids)
+        before_aggregations, after_aggregations = self._test_ignored_user(
+            RelationTypes.REFERENCE, allowed_event_ids, ignored_event_ids
+        )
+
+        self.assertCountEqual(
+            [e["event_id"] for e in before_aggregations["chunk"]],
+            allowed_event_ids + ignored_event_ids,
+        )
+
+        self.assertCountEqual(
+            [e["event_id"] for e in after_aggregations["chunk"]], allowed_event_ids
+        )
 
     def test_thread(self) -> None:
         """Annotations should ignore"""
@@ -1399,7 +1446,23 @@ class RelationIgnoredUserTestCase(BaseRelationsTestCase):
         )
         ignored_event_ids = [channel.json_body["event_id"]]
 
-        self._test_ignored_user(allowed_event_ids, ignored_event_ids)
+        before_aggregations, after_aggregations = self._test_ignored_user(
+            RelationTypes.THREAD, allowed_event_ids, ignored_event_ids
+        )
+
+        self.assertEqual(before_aggregations["count"], 2)
+        self.assertTrue(before_aggregations["current_user_participated"])
+        # The latest thread event has some fields that don't matter.
+        self.assertEqual(
+            before_aggregations["latest_event"]["event_id"], ignored_event_ids[0]
+        )
+
+        self.assertEqual(after_aggregations["count"], 1)
+        self.assertTrue(after_aggregations["current_user_participated"])
+        # The latest thread event has some fields that don't matter.
+        self.assertEqual(
+            after_aggregations["latest_event"]["event_id"], allowed_event_ids[0]
+        )
 
 
 class RelationRedactionTestCase(BaseRelationsTestCase):
