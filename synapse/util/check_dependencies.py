@@ -25,6 +25,7 @@ from typing import Iterable, NamedTuple, Optional
 
 from packaging.requirements import Requirement
 
+logger = logging.getLogger(__name__)
 DISTRIBUTION_NAME = "matrix-synapse"
 
 try:
@@ -164,6 +165,10 @@ def check_requirements(extra: Optional[str] = None) -> None:
                 errors.append(_not_installed(requirement, extra))
         else:
             # We specify prereleases=True to allow prereleases such as RCs.
+            logger.warning(
+                "DEP CHECK: %s, %s, %s, %r",
+                requirement, must_be_installed, dist, dist.version,
+            )
             if not requirement.specifier.contains(dist.version, prereleases=True):
                 deps_unfulfilled.append(requirement.name)
                 errors.append(_incorrect_version(requirement, dist.version, extra))
