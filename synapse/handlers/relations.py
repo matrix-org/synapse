@@ -250,6 +250,9 @@ class RelationsHandler:
                 results[event.event_id] = event_result
 
         # Fetch any edits (but not for redacted events).
+        #
+        # Note that there is no use in limiting edits by ignored users since the
+        # parent event should be ignored in the first place if the user is ignored.
         edits = await self._main_store.get_applicable_edits(
             [
                 event_id
