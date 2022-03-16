@@ -253,7 +253,9 @@ class RelationsHandler:
             results.setdefault(event_id, BundledAggregations()).replace = edit
 
         # Fetch thread summaries.
-        summaries = await self._main_store.get_thread_summaries(events_by_id.keys())
+        summaries = await self._main_store.get_thread_summaries(
+            events_by_id.keys(), ignored_users
+        )
         # Only fetch participated for a limited selection based on what had
         # summaries.
         participated = await self._main_store.get_threads_participated(

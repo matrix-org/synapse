@@ -452,18 +452,21 @@ class RelationsWorkerStore(SQLBaseStore):
             for original_event_id in event_ids
         }
 
-    @cached()
-    def get_thread_summary(self, event_id: str) -> Optional[Tuple[int, EventBase]]:
+    @cached(tree=True)
+    def get_thread_summary(
+        self, event_id: str, ignored_users: FrozenSet[str]
+    ) -> Optional[Tuple[int, EventBase]]:
         raise NotImplementedError()
 
     @cachedList(cached_method_name="get_thread_summary", list_name="event_ids")
     async def get_thread_summaries(
-        self, event_ids: Collection[str]
+        self, event_ids: Collection[str], ignored_users: FrozenSet[str]
     ) -> Dict[str, Optional[Tuple[int, EventBase, Optional[EventBase]]]]:
         """Get the number of threaded replies, the latest reply (if any), and the latest edit for that reply for the given event.
 
         Args:
             event_ids: Summarize the thread related to this event ID.
+            ignored_users: The users ignored by the requesting user.
 
         Returns:
             A map of the thread summary each event. A missing event implies there
@@ -515,6 +518,16 @@ class RelationsWorkerStore(SQLBaseStore):
                 txn.database_engine, "relates_to_id", event_ids
             )
 
+            if ignored_users:
+                (
+                    ignored_users_clause_sql,
+                    ignored_users_clause_args,
+                ) = make_in_list_sql_clause(
+                    self.database_engine, "child.sender", ignored_users, include=False
+                )
+                clause += " AND " + ignored_users_clause_sql
+                args.extend(ignored_users_clause_args)
+
             if self._msc3440_enabled:
                 relations_clause = "(relation_type = ? OR relation_type = ?)"
                 args.extend((RelationTypes.THREAD, RelationTypes.UNSTABLE_THREAD))
@@ -551,6 +564,9 @@ class RelationsWorkerStore(SQLBaseStore):
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "relates_to_id", latest_event_ids.keys()
             )
+            if ignored_users:
+                clause += " AND " + ignored_users_clause_sql
+                args.extend(ignored_users_clause_args)
 
             if self._msc3440_enabled:
                 relations_clause = "(relation_type = ? OR relation_type = ?)"
