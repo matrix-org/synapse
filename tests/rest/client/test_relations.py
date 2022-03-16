@@ -1267,6 +1267,28 @@ class RelationsTestCase(BaseRelationsTestCase):
             [annotation_event_id_good, thread_event_id],
         )
 
+    def test_bundled_aggregations_with_filter(self):
+        """If unsigned is not a returned field, the bundled aggregations still get added."""
+        self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
+
+        # Note that the sync filter does not include "unsigned" as a field.
+        filter = urllib.parse.quote_plus(
+            b'{"event_fields": ["content", "event_id"], "room": {"timeline": {"limit": 3}}}'
+        )
+        channel = self.make_request(
+            "GET", f"/sync?filter={filter}", access_token=self.user_token
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+
+        # Ensure the timeline is limited, find the parent event.
+        room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
+        self.assertTrue(room_timeline["limited"])
+        parent_event = self._find_event_in_chunk(room_timeline["events"])
+
+        # Ensure there's bundled aggregations on it.
+        self.assertIn("unsigned", parent_event)
+        self.assertIn("m.relations", parent_event["unsigned"])
+
 
 class RelationRedactionTestCase(BaseRelationsTestCase):
     """
