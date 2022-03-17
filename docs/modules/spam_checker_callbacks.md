@@ -172,7 +172,7 @@ any of the subsequent implementations of this callback.
 _First introduced in Synapse v1.37.0_
 
 ```python
-async def check_username_for_spam(user_profile: Dict[str, str]) -> bool
+async def check_username_for_spam(user_profile: synapse.types.UserProfile) -> bool
 ```
 
 Called when computing search results in the user directory. The module must return a
@@ -180,11 +180,13 @@ Called when computing search results in the user directory. The module must retu
 searches. Return `True` to indicate that the user is spammy and exclude them from 
 search results; otherwise return `False`.
 
-The profile is represented as a dictionary with the following keys:
+The profile is represented as a dictionary with the following keys.
 
-* `user_id`: The Matrix ID for this user.
-* `display_name`: The user's display name.
-* `avatar_url`: The `mxc://` URL to the user's avatar.
+* `user_id: str`. The Matrix ID for this user.
+* `display_name: Optional[str]`. The user's display name, or `None` if this user
+  has not set a display name.
+* `avatar_url: Optional[str]`. The `mxc://` URL to the user's avatar, or `None`
+  if this user has not set an avatar.
 
 The module is given a copy of the original dictionary, so modifying it from within the
 module cannot modify a user's profile when included in user directory search results.
