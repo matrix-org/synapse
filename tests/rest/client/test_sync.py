@@ -662,7 +662,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(0)
 
     @override_config({"experimental_features": {"msc2285_enabled": True}})
-    def test_doesnt_reverse_read_receipts(self) -> None:
+    def test_read_receipts_only_go_down(self) -> None:
         # Join the new user
         self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
 
@@ -680,7 +680,8 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.json_body)
         self._check_unread_count(0)
 
-        # Make sure neither m.read not org.matrix.msc2285.read.private reverse
+        # Make sure neither m.read nor org.matrix.msc2285.read.private make the
+        # read receipt go up to an older event
         channel = self.make_request(
             "POST",
             f"/rooms/{self.room_id}/receipt/org.matrix.msc2285.read.private/{res1['event_id']}",
