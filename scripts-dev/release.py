@@ -436,14 +436,16 @@ Hi everyone. Synapse {current_version} has just been released.
 [pypi](https://pypi.org/project/matrix-synapse/{current_version}/)"""
     )
 
-    if False and "rc" in tag_name:
-        click.echo("""
+    if "rc" in tag_name:
+        click.echo(
+            """
 Announce the RC in
 - #homeowners:matrix.org (Synapse Announcements)
 - #synapse-dev:matrix.org"""
         )
     else:
-        click.echo("""
+        click.echo(
+            """
 Announce the release in
 - #homeowners:matrix.org (Synapse Announcements), bumping the version in the topic
 - #synapse:matrix.org (Synapse Admins), bumping the version in the topic
