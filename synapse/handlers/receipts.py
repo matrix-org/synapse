@@ -181,9 +181,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
             new_event = event.copy()
             new_event["content"] = {}
 
-            for event_id in content.keys():
-                event_content = content.get(event_id, {})
-
+            for event_id, event_content in content.items():
                 receipt_event = {}
                 for receipt_type, receipt_content in event_content.items():
                     if receipt_type == ReceiptTypes.READ_PRIVATE:
