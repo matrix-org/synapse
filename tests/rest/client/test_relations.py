@@ -79,6 +79,7 @@ class BaseRelationsTestCase(unittest.HomeserverTestCase):
         content: Optional[dict] = None,
         access_token: Optional[str] = None,
         parent_id: Optional[str] = None,
+        expected_response_code: int = 200,
     ) -> FakeChannel:
         """Helper function to send a relation pointing at `self.parent_id`
 
@@ -115,16 +116,50 @@ class BaseRelationsTestCase(unittest.HomeserverTestCase):
             content,
             access_token=access_token,
         )
+        self.assertEqual(expected_response_code, channel.code, channel.json_body)
         return channel
+
+    def _get_related_events(self) -> List[str]:
+        """
+        Requests /relations on the parent ID and returns a list of event IDs.
+        """
+        # Request the relations of the event.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        return [ev["event_id"] for ev in channel.json_body["chunk"]]
+
+    def _get_bundled_aggregations(self) -> JsonDict:
+        """
+        Requests /event on the parent ID and returns the m.relations field (from unsigned), if it exists.
+        """
+        # Fetch the bundled aggregations of the event.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/event/{self.parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        return channel.json_body["unsigned"].get("m.relations", {})
+
+    def _get_aggregations(self) -> List[JsonDict]:
+        """Request /aggregations on the parent ID and includes the returned chunk."""
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        return channel.json_body["chunk"]
 
 
 class RelationsTestCase(BaseRelationsTestCase):
     def test_send_relation(self) -> None:
         """Tests that sending a relation works."""
-
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="👍")
-        self.assertEqual(200, channel.code, channel.json_body)
-
         event_id = channel.json_body["event_id"]
 
         channel = self.make_request(
@@ -151,13 +186,13 @@ class RelationsTestCase(BaseRelationsTestCase):
 
     def test_deny_invalid_event(self) -> None:
         """Test that we deny relations on non-existant events"""
-        channel = self._send_relation(
+        self._send_relation(
             RelationTypes.ANNOTATION,
             EventTypes.Message,
             parent_id="foo",
             content={"body": "foo", "msgtype": "m.text"},
+            expected_response_code=400,
         )
-        self.assertEqual(400, channel.code, channel.json_body)
 
         # Unless that event is referenced from another event!
         self.get_success(
@@ -171,13 +206,12 @@ class RelationsTestCase(BaseRelationsTestCase):
                 desc="test_deny_invalid_event",
             )
         )
-        channel = self._send_relation(
+        self._send_relation(
             RelationTypes.THREAD,
             EventTypes.Message,
             parent_id="foo",
             content={"body": "foo", "msgtype": "m.text"},
         )
-        self.assertEqual(200, channel.code, channel.json_body)
 
     def test_deny_invalid_room(self) -> None:
         """Test that we deny relations on non-existant events"""
@@ -187,18 +221,20 @@ class RelationsTestCase(BaseRelationsTestCase):
         parent_id = res["event_id"]
 
         # Attempt to send an annotation to that event.
-        channel = self._send_relation(
-            RelationTypes.ANNOTATION, "m.reaction", parent_id=parent_id, key="A"
+        self._send_relation(
+            RelationTypes.ANNOTATION,
+            "m.reaction",
+            parent_id=parent_id,
+            key="A",
+            expected_response_code=400,
         )
-        self.assertEqual(400, channel.code, channel.json_body)
 
     def test_deny_double_react(self) -> None:
         """Test that we deny relations on membership events"""
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="a")
-        self.assertEqual(200, channel.code, channel.json_body)
-
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
-        self.assertEqual(400, channel.code, channel.json_body)
+        self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="a")
+        self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "a", expected_response_code=400
+        )
 
     def test_deny_forked_thread(self) -> None:
         """It is invalid to start a thread off a thread."""
@@ -208,316 +244,24 @@ class RelationsTestCase(BaseRelationsTestCase):
             content={"msgtype": "m.text", "body": "foo"},
             parent_id=self.parent_id,
         )
-        self.assertEqual(200, channel.code, channel.json_body)
         parent_id = channel.json_body["event_id"]
 
-        channel = self._send_relation(
+        self._send_relation(
             RelationTypes.THREAD,
             "m.room.message",
             content={"msgtype": "m.text", "body": "foo"},
             parent_id=parent_id,
+            expected_response_code=400,
         )
-        self.assertEqual(400, channel.code, channel.json_body)
-
-    def test_basic_paginate_relations(self) -> None:
-        """Tests that calling pagination API correctly the latest relations."""
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
-        self.assertEqual(200, channel.code, channel.json_body)
-        first_annotation_id = channel.json_body["event_id"]
-
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "b")
-        self.assertEqual(200, channel.code, channel.json_body)
-        second_annotation_id = channel.json_body["event_id"]
-
-        channel = self.make_request(
-            "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1",
-            access_token=self.user_token,
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
-
-        # We expect to get back a single pagination result, which is the latest
-        # full relation event we sent above.
-        self.assertEqual(len(channel.json_body["chunk"]), 1, channel.json_body)
-        self.assert_dict(
-            {
-                "event_id": second_annotation_id,
-                "sender": self.user_id,
-                "type": "m.reaction",
-            },
-            channel.json_body["chunk"][0],
-        )
-
-        # We also expect to get the original event (the id of which is self.parent_id)
-        self.assertEqual(
-            channel.json_body["original_event"]["event_id"], self.parent_id
-        )
-
-        # Make sure next_batch has something in it that looks like it could be a
-        # valid token.
-        self.assertIsInstance(
-            channel.json_body.get("next_batch"), str, channel.json_body
-        )
-
-        # Request the relations again, but with a different direction.
-        channel = self.make_request(
-            "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/relations"
-            f"/{self.parent_id}?limit=1&org.matrix.msc3715.dir=f",
-            access_token=self.user_token,
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
-
-        # We expect to get back a single pagination result, which is the earliest
-        # full relation event we sent above.
-        self.assertEqual(len(channel.json_body["chunk"]), 1, channel.json_body)
-        self.assert_dict(
-            {
-                "event_id": first_annotation_id,
-                "sender": self.user_id,
-                "type": "m.reaction",
-            },
-            channel.json_body["chunk"][0],
-        )
-
-    def test_repeated_paginate_relations(self) -> None:
-        """Test that if we paginate using a limit and tokens then we get the
-        expected events.
-        """
-
-        expected_event_ids = []
-        for idx in range(10):
-            channel = self._send_relation(
-                RelationTypes.ANNOTATION, "m.reaction", chr(ord("a") + idx)
-            )
-            self.assertEqual(200, channel.code, channel.json_body)
-            expected_event_ids.append(channel.json_body["event_id"])
-
-        prev_token = ""
-        found_event_ids: List[str] = []
-        for _ in range(20):
-            from_token = ""
-            if prev_token:
-                from_token = "&from=" + prev_token
-
-            channel = self.make_request(
-                "GET",
-                f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1{from_token}",
-                access_token=self.user_token,
-            )
-            self.assertEqual(200, channel.code, channel.json_body)
-
-            found_event_ids.extend(e["event_id"] for e in channel.json_body["chunk"])
-            next_batch = channel.json_body.get("next_batch")
-
-            self.assertNotEqual(prev_token, next_batch)
-            prev_token = next_batch
-
-            if not prev_token:
-                break
-
-        # We paginated backwards, so reverse
-        found_event_ids.reverse()
-        self.assertEqual(found_event_ids, expected_event_ids)
-
-    def test_pagination_from_sync_and_messages(self) -> None:
-        """Pagination tokens from /sync and /messages can be used to paginate /relations."""
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "A")
-        self.assertEqual(200, channel.code, channel.json_body)
-        annotation_id = channel.json_body["event_id"]
-        # Send an event after the relation events.
-        self.helper.send(self.room, body="Latest event", tok=self.user_token)
-
-        # Request /sync, limiting it such that only the latest event is returned
-        # (and not the relation).
-        filter = urllib.parse.quote_plus(b'{"room": {"timeline": {"limit": 1}}}')
-        channel = self.make_request(
-            "GET", f"/sync?filter={filter}", access_token=self.user_token
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
-        room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
-        sync_prev_batch = room_timeline["prev_batch"]
-        self.assertIsNotNone(sync_prev_batch)
-        # Ensure the relation event is not in the batch returned from /sync.
-        self.assertNotIn(
-            annotation_id, [ev["event_id"] for ev in room_timeline["events"]]
-        )
-
-        # Request /messages, limiting it such that only the latest event is
-        # returned (and not the relation).
-        channel = self.make_request(
-            "GET",
-            f"/rooms/{self.room}/messages?dir=b&limit=1",
-            access_token=self.user_token,
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
-        messages_end = channel.json_body["end"]
-        self.assertIsNotNone(messages_end)
-        # Ensure the relation event is not in the chunk returned from /messages.
-        self.assertNotIn(
-            annotation_id, [ev["event_id"] for ev in channel.json_body["chunk"]]
-        )
-
-        # Request /relations with the pagination tokens received from both the
-        # /sync and /messages responses above, in turn.
-        #
-        # This is a tiny bit silly since the client wouldn't know the parent ID
-        # from the requests above; consider the parent ID to be known from a
-        # previous /sync.
-        for from_token in (sync_prev_batch, messages_end):
-            channel = self.make_request(
-                "GET",
-                f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?from={from_token}",
-                access_token=self.user_token,
-            )
-            self.assertEqual(200, channel.code, channel.json_body)
-
-            # The relation should be in the returned chunk.
-            self.assertIn(
-                annotation_id, [ev["event_id"] for ev in channel.json_body["chunk"]]
-            )
-
-    def test_aggregation_pagination_groups(self) -> None:
-        """Test that we can paginate annotation groups correctly."""
-
-        # We need to create ten separate users to send each reaction.
-        access_tokens = [self.user_token, self.user2_token]
-        idx = 0
-        while len(access_tokens) < 10:
-            user_id, token = self._create_user("test" + str(idx))
-            idx += 1
-
-            self.helper.join(self.room, user=user_id, tok=token)
-            access_tokens.append(token)
-
-        idx = 0
-        sent_groups = {"👍": 10, "a": 7, "b": 5, "c": 3, "d": 2, "e": 1}
-        for key in itertools.chain.from_iterable(
-            itertools.repeat(key, num) for key, num in sent_groups.items()
-        ):
-            channel = self._send_relation(
-                RelationTypes.ANNOTATION,
-                "m.reaction",
-                key=key,
-                access_token=access_tokens[idx],
-            )
-            self.assertEqual(200, channel.code, channel.json_body)
-
-            idx += 1
-            idx %= len(access_tokens)
-
-        prev_token: Optional[str] = None
-        found_groups: Dict[str, int] = {}
-        for _ in range(20):
-            from_token = ""
-            if prev_token:
-                from_token = "&from=" + prev_token
-
-            channel = self.make_request(
-                "GET",
-                f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}?limit=1{from_token}",
-                access_token=self.user_token,
-            )
-            self.assertEqual(200, channel.code, channel.json_body)
-
-            self.assertEqual(len(channel.json_body["chunk"]), 1, channel.json_body)
-
-            for groups in channel.json_body["chunk"]:
-                # We only expect reactions
-                self.assertEqual(groups["type"], "m.reaction", channel.json_body)
-
-                # We should only see each key once
-                self.assertNotIn(groups["key"], found_groups, channel.json_body)
-
-                found_groups[groups["key"]] = groups["count"]
-
-            next_batch = channel.json_body.get("next_batch")
-
-            self.assertNotEqual(prev_token, next_batch)
-            prev_token = next_batch
-
-            if not prev_token:
-                break
-
-        self.assertEqual(sent_groups, found_groups)
-
-    def test_aggregation_pagination_within_group(self) -> None:
-        """Test that we can paginate within an annotation group."""
-
-        # We need to create ten separate users to send each reaction.
-        access_tokens = [self.user_token, self.user2_token]
-        idx = 0
-        while len(access_tokens) < 10:
-            user_id, token = self._create_user("test" + str(idx))
-            idx += 1
-
-            self.helper.join(self.room, user=user_id, tok=token)
-            access_tokens.append(token)
-
-        idx = 0
-        expected_event_ids = []
-        for _ in range(10):
-            channel = self._send_relation(
-                RelationTypes.ANNOTATION,
-                "m.reaction",
-                key="👍",
-                access_token=access_tokens[idx],
-            )
-            self.assertEqual(200, channel.code, channel.json_body)
-            expected_event_ids.append(channel.json_body["event_id"])
-
-            idx += 1
-
-        # Also send a different type of reaction so that we test we don't see it
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="a")
-        self.assertEqual(200, channel.code, channel.json_body)
-
-        prev_token = ""
-        found_event_ids: List[str] = []
-        encoded_key = urllib.parse.quote_plus("👍".encode())
-        for _ in range(20):
-            from_token = ""
-            if prev_token:
-                from_token = "&from=" + prev_token
-
-            channel = self.make_request(
-                "GET",
-                f"/_matrix/client/unstable/rooms/{self.room}"
-                f"/aggregations/{self.parent_id}/{RelationTypes.ANNOTATION}"
-                f"/m.reaction/{encoded_key}?limit=1{from_token}",
-                access_token=self.user_token,
-            )
-            self.assertEqual(200, channel.code, channel.json_body)
-
-            self.assertEqual(len(channel.json_body["chunk"]), 1, channel.json_body)
-
-            found_event_ids.extend(e["event_id"] for e in channel.json_body["chunk"])
-
-            next_batch = channel.json_body.get("next_batch")
-
-            self.assertNotEqual(prev_token, next_batch)
-            prev_token = next_batch
-
-            if not prev_token:
-                break
-
-        # We paginated backwards, so reverse
-        found_event_ids.reverse()
-        self.assertEqual(found_event_ids, expected_event_ids)
 
     def test_aggregation(self) -> None:
         """Test that annotations get correctly aggregated."""
 
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
-        self.assertEqual(200, channel.code, channel.json_body)
-
-        channel = self._send_relation(
+        self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
+        self._send_relation(
             RelationTypes.ANNOTATION, "m.reaction", "a", access_token=self.user2_token
         )
-        self.assertEqual(200, channel.code, channel.json_body)
-
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "b")
-        self.assertEqual(200, channel.code, channel.json_body)
+        self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "b")
 
         channel = self.make_request(
             "GET",
@@ -558,30 +302,21 @@ class RelationsTestCase(BaseRelationsTestCase):
         See test_edit for a similar test for edits.
         """
         # Setup by sending a variety of relations.
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
-        self.assertEqual(200, channel.code, channel.json_body)
-
-        channel = self._send_relation(
+        self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
+        self._send_relation(
             RelationTypes.ANNOTATION, "m.reaction", "a", access_token=self.user2_token
         )
-        self.assertEqual(200, channel.code, channel.json_body)
-
-        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "b")
-        self.assertEqual(200, channel.code, channel.json_body)
+        self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "b")
 
         channel = self._send_relation(RelationTypes.REFERENCE, "m.room.test")
-        self.assertEqual(200, channel.code, channel.json_body)
         reply_1 = channel.json_body["event_id"]
 
         channel = self._send_relation(RelationTypes.REFERENCE, "m.room.test")
-        self.assertEqual(200, channel.code, channel.json_body)
         reply_2 = channel.json_body["event_id"]
 
-        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
-        self.assertEqual(200, channel.code, channel.json_body)
+        self._send_relation(RelationTypes.THREAD, "m.room.test")
 
         channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
-        self.assertEqual(200, channel.code, channel.json_body)
         thread_2 = channel.json_body["event_id"]
 
         def assert_bundle(event_json: JsonDict) -> None:
@@ -693,14 +428,12 @@ class RelationsTestCase(BaseRelationsTestCase):
         when directly requested.
         """
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
-        self.assertEqual(200, channel.code, channel.json_body)
         annotation_id = channel.json_body["event_id"]
 
         # Annotate the annotation.
-        channel = self._send_relation(
+        self._send_relation(
             RelationTypes.ANNOTATION, "m.reaction", "a", parent_id=annotation_id
         )
-        self.assertEqual(200, channel.code, channel.json_body)
 
         channel = self.make_request(
             "GET",
@@ -713,14 +446,12 @@ class RelationsTestCase(BaseRelationsTestCase):
     def test_aggregation_get_event_for_thread(self) -> None:
         """Test that threads get bundled aggregations included when directly requested."""
         channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
-        self.assertEqual(200, channel.code, channel.json_body)
         thread_id = channel.json_body["event_id"]
 
         # Annotate the annotation.
-        channel = self._send_relation(
+        self._send_relation(
             RelationTypes.ANNOTATION, "m.reaction", "a", parent_id=thread_id
         )
-        self.assertEqual(200, channel.code, channel.json_body)
 
         channel = self.make_request(
             "GET",
@@ -877,8 +608,6 @@ class RelationsTestCase(BaseRelationsTestCase):
             "m.room.message",
             content={"msgtype": "m.text", "body": "foo", "m.new_content": new_body},
         )
-        self.assertEqual(200, channel.code, channel.json_body)
-
         edit_event_id = channel.json_body["event_id"]
 
         def assert_bundle(event_json: JsonDict) -> None:
@@ -954,7 +683,7 @@ class RelationsTestCase(BaseRelationsTestCase):
         shouldn't be allowed, are correctly handled.
         """
 
-        channel = self._send_relation(
+        self._send_relation(
             RelationTypes.REPLACE,
             "m.room.message",
             content={
@@ -963,7 +692,6 @@ class RelationsTestCase(BaseRelationsTestCase):
                 "m.new_content": {"msgtype": "m.text", "body": "First edit"},
             },
         )
-        self.assertEqual(200, channel.code, channel.json_body)
 
         new_body = {"msgtype": "m.text", "body": "I've been edited!"}
         channel = self._send_relation(
@@ -971,11 +699,9 @@ class RelationsTestCase(BaseRelationsTestCase):
             "m.room.message",
             content={"msgtype": "m.text", "body": "foo", "m.new_content": new_body},
         )
-        self.assertEqual(200, channel.code, channel.json_body)
-
         edit_event_id = channel.json_body["event_id"]
 
-        channel = self._send_relation(
+        self._send_relation(
             RelationTypes.REPLACE,
             "m.room.message.WRONG_TYPE",
             content={
@@ -984,7 +710,6 @@ class RelationsTestCase(BaseRelationsTestCase):
                 "m.new_content": {"msgtype": "m.text", "body": "Edit, but wrong type"},
             },
         )
-        self.assertEqual(200, channel.code, channel.json_body)
 
         channel = self.make_request(
             "GET",
@@ -1015,7 +740,6 @@ class RelationsTestCase(BaseRelationsTestCase):
             "m.room.message",
             content={"msgtype": "m.text", "body": "A reply!"},
         )
-        self.assertEqual(200, channel.code, channel.json_body)
         reply = channel.json_body["event_id"]
 
         new_body = {"msgtype": "m.text", "body": "I've been edited!"}
@@ -1025,8 +749,6 @@ class RelationsTestCase(BaseRelationsTestCase):
             content={"msgtype": "m.text", "body": "foo", "m.new_content": new_body},
             parent_id=reply,
         )
-        self.assertEqual(200, channel.code, channel.json_body)
-
         edit_event_id = channel.json_body["event_id"]
 
         channel = self.make_request(
@@ -1071,7 +793,6 @@ class RelationsTestCase(BaseRelationsTestCase):
             "m.room.message",
             content={"msgtype": "m.text", "body": "A threaded reply!"},
         )
-        self.assertEqual(200, channel.code, channel.json_body)
         threaded_event_id = channel.json_body["event_id"]
 
         new_body = {"msgtype": "m.text", "body": "I've been edited!"}
@@ -1081,7 +802,6 @@ class RelationsTestCase(BaseRelationsTestCase):
             content={"msgtype": "m.text", "body": "foo", "m.new_content": new_body},
             parent_id=threaded_event_id,
         )
-        self.assertEqual(200, channel.code, channel.json_body)
 
         # Fetch the thread root, to get the bundled aggregation for the thread.
         channel = self.make_request(
@@ -1113,7 +833,6 @@ class RelationsTestCase(BaseRelationsTestCase):
                 "m.new_content": new_body,
             },
         )
-        self.assertEqual(200, channel.code, channel.json_body)
         edit_event_id = channel.json_body["event_id"]
 
         # Edit the edit event.
@@ -1127,7 +846,6 @@ class RelationsTestCase(BaseRelationsTestCase):
             },
             parent_id=edit_event_id,
         )
-        self.assertEqual(200, channel.code, channel.json_body)
 
         # Request the original event.
         channel = self.make_request(
@@ -1154,7 +872,6 @@ class RelationsTestCase(BaseRelationsTestCase):
     def test_unknown_relations(self) -> None:
         """Unknown relations should be accepted."""
         channel = self._send_relation("m.relation.test", "m.room.test")
-        self.assertEqual(200, channel.code, channel.json_body)
         event_id = channel.json_body["event_id"]
 
         channel = self.make_request(
@@ -1208,15 +925,12 @@ class RelationsTestCase(BaseRelationsTestCase):
     def test_background_update(self) -> None:
         """Test the event_arbitrary_relations background update."""
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="👍")
-        self.assertEqual(200, channel.code, channel.json_body)
         annotation_event_id_good = channel.json_body["event_id"]
 
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="A")
-        self.assertEqual(200, channel.code, channel.json_body)
         annotation_event_id_bad = channel.json_body["event_id"]
 
         channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
-        self.assertEqual(200, channel.code, channel.json_body)
         thread_event_id = channel.json_body["event_id"]
 
         # Clean-up the table as if the inserts did not happen during event creation.
@@ -1267,6 +981,315 @@ class RelationsTestCase(BaseRelationsTestCase):
             [annotation_event_id_good, thread_event_id],
         )
 
+    def test_bundled_aggregations_with_filter(self) -> None:
+        """
+        If "unsigned" is an omitted field (due to filtering), adding the bundled
+        aggregations should not break.
+
+        Note that the spec allows for a server to return additional fields beyond
+        what is specified.
+        """
+        self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
+
+        # Note that the sync filter does not include "unsigned" as a field.
+        filter = urllib.parse.quote_plus(
+            b'{"event_fields": ["content", "event_id"], "room": {"timeline": {"limit": 3}}}'
+        )
+        channel = self.make_request(
+            "GET", f"/sync?filter={filter}", access_token=self.user_token
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+
+        # Ensure the timeline is limited, find the parent event.
+        room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
+        self.assertTrue(room_timeline["limited"])
+        parent_event = self._find_event_in_chunk(room_timeline["events"])
+
+        # Ensure there's bundled aggregations on it.
+        self.assertIn("unsigned", parent_event)
+        self.assertIn("m.relations", parent_event["unsigned"])
+
+
+class RelationPaginationTestCase(BaseRelationsTestCase):
+    def test_basic_paginate_relations(self) -> None:
+        """Tests that calling pagination API correctly the latest relations."""
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
+        first_annotation_id = channel.json_body["event_id"]
+
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "b")
+        second_annotation_id = channel.json_body["event_id"]
+
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+
+        # We expect to get back a single pagination result, which is the latest
+        # full relation event we sent above.
+        self.assertEqual(len(channel.json_body["chunk"]), 1, channel.json_body)
+        self.assert_dict(
+            {
+                "event_id": second_annotation_id,
+                "sender": self.user_id,
+                "type": "m.reaction",
+            },
+            channel.json_body["chunk"][0],
+        )
+
+        # We also expect to get the original event (the id of which is self.parent_id)
+        self.assertEqual(
+            channel.json_body["original_event"]["event_id"], self.parent_id
+        )
+
+        # Make sure next_batch has something in it that looks like it could be a
+        # valid token.
+        self.assertIsInstance(
+            channel.json_body.get("next_batch"), str, channel.json_body
+        )
+
+        # Request the relations again, but with a different direction.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/rooms/{self.room}/relations"
+            f"/{self.parent_id}?limit=1&org.matrix.msc3715.dir=f",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+
+        # We expect to get back a single pagination result, which is the earliest
+        # full relation event we sent above.
+        self.assertEqual(len(channel.json_body["chunk"]), 1, channel.json_body)
+        self.assert_dict(
+            {
+                "event_id": first_annotation_id,
+                "sender": self.user_id,
+                "type": "m.reaction",
+            },
+            channel.json_body["chunk"][0],
+        )
+
+    def test_repeated_paginate_relations(self) -> None:
+        """Test that if we paginate using a limit and tokens then we get the
+        expected events.
+        """
+
+        expected_event_ids = []
+        for idx in range(10):
+            channel = self._send_relation(
+                RelationTypes.ANNOTATION, "m.reaction", chr(ord("a") + idx)
+            )
+            expected_event_ids.append(channel.json_body["event_id"])
+
+        prev_token = ""
+        found_event_ids: List[str] = []
+        for _ in range(20):
+            from_token = ""
+            if prev_token:
+                from_token = "&from=" + prev_token
+
+            channel = self.make_request(
+                "GET",
+                f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1{from_token}",
+                access_token=self.user_token,
+            )
+            self.assertEqual(200, channel.code, channel.json_body)
+
+            found_event_ids.extend(e["event_id"] for e in channel.json_body["chunk"])
+            next_batch = channel.json_body.get("next_batch")
+
+            self.assertNotEqual(prev_token, next_batch)
+            prev_token = next_batch
+
+            if not prev_token:
+                break
+
+        # We paginated backwards, so reverse
+        found_event_ids.reverse()
+        self.assertEqual(found_event_ids, expected_event_ids)
+
+    def test_pagination_from_sync_and_messages(self) -> None:
+        """Pagination tokens from /sync and /messages can be used to paginate /relations."""
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "A")
+        annotation_id = channel.json_body["event_id"]
+        # Send an event after the relation events.
+        self.helper.send(self.room, body="Latest event", tok=self.user_token)
+
+        # Request /sync, limiting it such that only the latest event is returned
+        # (and not the relation).
+        filter = urllib.parse.quote_plus(b'{"room": {"timeline": {"limit": 1}}}')
+        channel = self.make_request(
+            "GET", f"/sync?filter={filter}", access_token=self.user_token
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
+        sync_prev_batch = room_timeline["prev_batch"]
+        self.assertIsNotNone(sync_prev_batch)
+        # Ensure the relation event is not in the batch returned from /sync.
+        self.assertNotIn(
+            annotation_id, [ev["event_id"] for ev in room_timeline["events"]]
+        )
+
+        # Request /messages, limiting it such that only the latest event is
+        # returned (and not the relation).
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/messages?dir=b&limit=1",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        messages_end = channel.json_body["end"]
+        self.assertIsNotNone(messages_end)
+        # Ensure the relation event is not in the chunk returned from /messages.
+        self.assertNotIn(
+            annotation_id, [ev["event_id"] for ev in channel.json_body["chunk"]]
+        )
+
+        # Request /relations with the pagination tokens received from both the
+        # /sync and /messages responses above, in turn.
+        #
+        # This is a tiny bit silly since the client wouldn't know the parent ID
+        # from the requests above; consider the parent ID to be known from a
+        # previous /sync.
+        for from_token in (sync_prev_batch, messages_end):
+            channel = self.make_request(
+                "GET",
+                f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?from={from_token}",
+                access_token=self.user_token,
+            )
+            self.assertEqual(200, channel.code, channel.json_body)
+
+            # The relation should be in the returned chunk.
+            self.assertIn(
+                annotation_id, [ev["event_id"] for ev in channel.json_body["chunk"]]
+            )
+
+    def test_aggregation_pagination_groups(self) -> None:
+        """Test that we can paginate annotation groups correctly."""
+
+        # We need to create ten separate users to send each reaction.
+        access_tokens = [self.user_token, self.user2_token]
+        idx = 0
+        while len(access_tokens) < 10:
+            user_id, token = self._create_user("test" + str(idx))
+            idx += 1
+
+            self.helper.join(self.room, user=user_id, tok=token)
+            access_tokens.append(token)
+
+        idx = 0
+        sent_groups = {"👍": 10, "a": 7, "b": 5, "c": 3, "d": 2, "e": 1}
+        for key in itertools.chain.from_iterable(
+            itertools.repeat(key, num) for key, num in sent_groups.items()
+        ):
+            self._send_relation(
+                RelationTypes.ANNOTATION,
+                "m.reaction",
+                key=key,
+                access_token=access_tokens[idx],
+            )
+
+            idx += 1
+            idx %= len(access_tokens)
+
+        prev_token: Optional[str] = None
+        found_groups: Dict[str, int] = {}
+        for _ in range(20):
+            from_token = ""
+            if prev_token:
+                from_token = "&from=" + prev_token
+
+            channel = self.make_request(
+                "GET",
+                f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}?limit=1{from_token}",
+                access_token=self.user_token,
+            )
+            self.assertEqual(200, channel.code, channel.json_body)
+
+            self.assertEqual(len(channel.json_body["chunk"]), 1, channel.json_body)
+
+            for groups in channel.json_body["chunk"]:
+                # We only expect reactions
+                self.assertEqual(groups["type"], "m.reaction", channel.json_body)
+
+                # We should only see each key once
+                self.assertNotIn(groups["key"], found_groups, channel.json_body)
+
+                found_groups[groups["key"]] = groups["count"]
+
+            next_batch = channel.json_body.get("next_batch")
+
+            self.assertNotEqual(prev_token, next_batch)
+            prev_token = next_batch
+
+            if not prev_token:
+                break
+
+        self.assertEqual(sent_groups, found_groups)
+
+    def test_aggregation_pagination_within_group(self) -> None:
+        """Test that we can paginate within an annotation group."""
+
+        # We need to create ten separate users to send each reaction.
+        access_tokens = [self.user_token, self.user2_token]
+        idx = 0
+        while len(access_tokens) < 10:
+            user_id, token = self._create_user("test" + str(idx))
+            idx += 1
+
+            self.helper.join(self.room, user=user_id, tok=token)
+            access_tokens.append(token)
+
+        idx = 0
+        expected_event_ids = []
+        for _ in range(10):
+            channel = self._send_relation(
+                RelationTypes.ANNOTATION,
+                "m.reaction",
+                key="👍",
+                access_token=access_tokens[idx],
+            )
+            expected_event_ids.append(channel.json_body["event_id"])
+
+            idx += 1
+
+        # Also send a different type of reaction so that we test we don't see it
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="a")
+
+        prev_token = ""
+        found_event_ids: List[str] = []
+        encoded_key = urllib.parse.quote_plus("👍".encode())
+        for _ in range(20):
+            from_token = ""
+            if prev_token:
+                from_token = "&from=" + prev_token
+
+            channel = self.make_request(
+                "GET",
+                f"/_matrix/client/unstable/rooms/{self.room}"
+                f"/aggregations/{self.parent_id}/{RelationTypes.ANNOTATION}"
+                f"/m.reaction/{encoded_key}?limit=1{from_token}",
+                access_token=self.user_token,
+            )
+            self.assertEqual(200, channel.code, channel.json_body)
+
+            self.assertEqual(len(channel.json_body["chunk"]), 1, channel.json_body)
+
+            found_event_ids.extend(e["event_id"] for e in channel.json_body["chunk"])
+
+            next_batch = channel.json_body.get("next_batch")
+
+            self.assertNotEqual(prev_token, next_batch)
+            prev_token = next_batch
+
+            if not prev_token:
+                break
+
+        # We paginated backwards, so reverse
+        found_event_ids.reverse()
+        self.assertEqual(found_event_ids, expected_event_ids)
+
 
 class RelationRedactionTestCase(BaseRelationsTestCase):
     """
@@ -1294,46 +1317,6 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         )
         self.assertEqual(200, channel.code, channel.json_body)
 
-    def _make_relation_requests(self) -> Tuple[List[str], JsonDict]:
-        """
-        Makes requests and ensures they result in a 200 response, returns a
-        tuple of results:
-
-        1. `/relations` -> Returns a list of event IDs.
-        2. `/event` -> Returns the response's m.relations field (from unsigned),
-            if it exists.
-        """
-
-        # Request the relations of the event.
-        channel = self.make_request(
-            "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}",
-            access_token=self.user_token,
-        )
-        self.assertEquals(200, channel.code, channel.json_body)
-        event_ids = [ev["event_id"] for ev in channel.json_body["chunk"]]
-
-        # Fetch the bundled aggregations of the event.
-        channel = self.make_request(
-            "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/event/{self.parent_id}",
-            access_token=self.user_token,
-        )
-        self.assertEquals(200, channel.code, channel.json_body)
-        bundled_relations = channel.json_body["unsigned"].get("m.relations", {})
-
-        return event_ids, bundled_relations
-
-    def _get_aggregations(self) -> List[JsonDict]:
-        """Request /aggregations on the parent ID and includes the returned chunk."""
-        channel = self.make_request(
-            "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/aggregations/{self.parent_id}",
-            access_token=self.user_token,
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
-        return channel.json_body["chunk"]
-
     def test_redact_relation_annotation(self) -> None:
         """
         Test that annotations of an event are properly handled after the
@@ -1343,17 +1326,16 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         the response to relations.
         """
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
-        self.assertEqual(200, channel.code, channel.json_body)
         to_redact_event_id = channel.json_body["event_id"]
 
         channel = self._send_relation(
             RelationTypes.ANNOTATION, "m.reaction", "a", access_token=self.user2_token
         )
-        self.assertEqual(200, channel.code, channel.json_body)
         unredacted_event_id = channel.json_body["event_id"]
 
         # Both relations should exist.
-        event_ids, relations = self._make_relation_requests()
+        event_ids = self._get_related_events()
+        relations = self._get_bundled_aggregations()
         self.assertCountEqual(event_ids, [to_redact_event_id, unredacted_event_id])
         self.assertEquals(
             relations["m.annotation"],
@@ -1368,7 +1350,8 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self._redact(to_redact_event_id)
 
         # The unredacted relation should still exist.
-        event_ids, relations = self._make_relation_requests()
+        event_ids = self._get_related_events()
+        relations = self._get_bundled_aggregations()
         self.assertEquals(event_ids, [unredacted_event_id])
         self.assertEquals(
             relations["m.annotation"],
@@ -1391,7 +1374,6 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
             EventTypes.Message,
             content={"body": "reply 1", "msgtype": "m.text"},
         )
-        self.assertEqual(200, channel.code, channel.json_body)
         unredacted_event_id = channel.json_body["event_id"]
 
         # Note that the *last* event in the thread is redacted, as that gets
@@ -1401,11 +1383,11 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
             EventTypes.Message,
             content={"body": "reply 2", "msgtype": "m.text"},
         )
-        self.assertEqual(200, channel.code, channel.json_body)
         to_redact_event_id = channel.json_body["event_id"]
 
         # Both relations exist.
-        event_ids, relations = self._make_relation_requests()
+        event_ids = self._get_related_events()
+        relations = self._get_bundled_aggregations()
         self.assertEquals(event_ids, [to_redact_event_id, unredacted_event_id])
         self.assertDictContainsSubset(
             {
@@ -1424,7 +1406,8 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self._redact(to_redact_event_id)
 
         # The unredacted relation should still exist.
-        event_ids, relations = self._make_relation_requests()
+        event_ids = self._get_related_events()
+        relations = self._get_bundled_aggregations()
         self.assertEquals(event_ids, [unredacted_event_id])
         self.assertDictContainsSubset(
             {
@@ -1444,7 +1427,7 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         is redacted.
         """
         # Add a relation
-        channel = self._send_relation(
+        self._send_relation(
             RelationTypes.REPLACE,
             "m.room.message",
             parent_id=self.parent_id,
@@ -1454,10 +1437,10 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
                 "m.new_content": {"msgtype": "m.text", "body": "First edit"},
             },
         )
-        self.assertEqual(200, channel.code, channel.json_body)
 
         # Check the relation is returned
-        event_ids, relations = self._make_relation_requests()
+        event_ids = self._get_related_events()
+        relations = self._get_bundled_aggregations()
         self.assertEqual(len(event_ids), 1)
         self.assertIn(RelationTypes.REPLACE, relations)
 
@@ -1465,7 +1448,8 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self._redact(self.parent_id)
 
         # The relations are not returned.
-        event_ids, relations = self._make_relation_requests()
+        event_ids = self._get_related_events()
+        relations = self._get_bundled_aggregations()
         self.assertEqual(len(event_ids), 0)
         self.assertEqual(relations, {})
 
@@ -1475,11 +1459,11 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         """
         # Add a relation
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="👍")
-        self.assertEqual(200, channel.code, channel.json_body)
         related_event_id = channel.json_body["event_id"]
 
         # The relations should exist.
-        event_ids, relations = self._make_relation_requests()
+        event_ids = self._get_related_events()
+        relations = self._get_bundled_aggregations()
         self.assertEqual(len(event_ids), 1)
         self.assertIn(RelationTypes.ANNOTATION, relations)
 
@@ -1491,7 +1475,8 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self._redact(self.parent_id)
 
         # The relations are returned.
-        event_ids, relations = self._make_relation_requests()
+        event_ids = self._get_related_events()
+        relations = self._get_bundled_aggregations()
         self.assertEquals(event_ids, [related_event_id])
         self.assertEquals(
             relations["m.annotation"],
@@ -1512,14 +1497,14 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
             EventTypes.Message,
             content={"body": "reply 1", "msgtype": "m.text"},
         )
-        self.assertEqual(200, channel.code, channel.json_body)
         related_event_id = channel.json_body["event_id"]
 
         # Redact one of the reactions.
         self._redact(self.parent_id)
 
         # The unredacted relation should still exist.
-        event_ids, relations = self._make_relation_requests()
+        event_ids = self._get_related_events()
+        relations = self._get_bundled_aggregations()
         self.assertEquals(len(event_ids), 1)
         self.assertDictContainsSubset(
             {

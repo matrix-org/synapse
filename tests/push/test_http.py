@@ -11,15 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from unittest.mock import Mock
 
 from twisted.internet.defer import Deferred
+from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.logging.context import make_deferred_yieldable
 from synapse.push import PusherConfigException
 from synapse.rest.client import login, push_rule, receipts, room
+from synapse.server import HomeServer
+from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase, override_config
 
@@ -35,13 +39,13 @@ class HTTPPusherTests(HomeserverTestCase):
     user_id = True
     hijack_auth = False
 
-    def default_config(self):
+    def default_config(self) -> Dict[str, Any]:
         config = super().default_config()
         config["start_pushers"] = True
         return config
 
-    def make_homeserver(self, reactor, clock):
-        self.push_attempts: List[tuple[Deferred, str, dict]] = []
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+        self.push_attempts: List[Tuple[Deferred, str, dict]] = []
 
         m = Mock()
 
@@ -56,7 +60,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         return hs
 
-    def test_invalid_configuration(self):
+    def test_invalid_configuration(self) -> None:
         """Invalid push configurations should be rejected."""
         # Register the user who gets notified
         user_id = self.register_user("user", "pass")
@@ -68,7 +72,7 @@ class HTTPPusherTests(HomeserverTestCase):
         )
         token_id = user_tuple.token_id
 
-        def test_data(data):
+        def test_data(data: Optional[JsonDict]) -> None:
             self.get_failure(
                 self.hs.get_pusherpool().add_pusher(
                     user_id=user_id,
@@ -95,7 +99,7 @@ class HTTPPusherTests(HomeserverTestCase):
         # A url with an incorrect path isn't accepted.
         test_data({"url": "http://example.com/foo"})
 
-    def test_sends_http(self):
+    def test_sends_http(self) -> None:
         """
         The HTTP pusher will send pushes for each message to a HTTP endpoint
         when configured to do so.
@@ -200,7 +204,7 @@ class HTTPPusherTests(HomeserverTestCase):
         self.assertEqual(len(pushers), 1)
         self.assertTrue(pushers[0].last_stream_ordering > last_stream_ordering)
 
-    def test_sends_high_priority_for_encrypted(self):
+    def test_sends_high_priority_for_encrypted(self) -> None:
         """
         The HTTP pusher will send pushes at high priority if they correspond
         to an encrypted message.
@@ -321,7 +325,7 @@ class HTTPPusherTests(HomeserverTestCase):
         )
         self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "high")
 
-    def test_sends_high_priority_for_one_to_one_only(self):
+    def test_sends_high_priority_for_one_to_one_only(self) -> None:
         """
         The HTTP pusher will send pushes at high priority if they correspond
         to a message in a one-to-one room.
@@ -404,7 +408,7 @@ class HTTPPusherTests(HomeserverTestCase):
         # check that this is low-priority
         self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "low")
 
-    def test_sends_high_priority_for_mention(self):
+    def test_sends_high_priority_for_mention(self) -> None:
         """
         The HTTP pusher will send pushes at high priority if they correspond
         to a message containing the user's display name.
@@ -480,7 +484,7 @@ class HTTPPusherTests(HomeserverTestCase):
         # check that this is low-priority
         self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "low")
 
-    def test_sends_high_priority_for_atroom(self):
+    def test_sends_high_priority_for_atroom(self) -> None:
         """
         The HTTP pusher will send pushes at high priority if they correspond
         to a message that contains @room.
@@ -563,7 +567,7 @@ class HTTPPusherTests(HomeserverTestCase):
         # check that this is low-priority
         self.assertEqual(self.push_attempts[1][2]["notification"]["prio"], "low")
 
-    def test_push_unread_count_group_by_room(self):
+    def test_push_unread_count_group_by_room(self) -> None:
         """
         The HTTP pusher will group unread count by number of unread rooms.
         """
@@ -576,7 +580,7 @@ class HTTPPusherTests(HomeserverTestCase):
         self._check_push_attempt(6, 1)
 
     @override_config({"push": {"group_unread_count_by_room": False}})
-    def test_push_unread_count_message_count(self):
+    def test_push_unread_count_message_count(self) -> None:
         """
         The HTTP pusher will send the total unread message count.
         """
@@ -589,7 +593,7 @@ class HTTPPusherTests(HomeserverTestCase):
         # last read receipt
         self._check_push_attempt(6, 3)
 
-    def _test_push_unread_count(self):
+    def _test_push_unread_count(self) -> None:
         """
         Tests that the correct unread count appears in sent push notifications
 
@@ -681,7 +685,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         self.helper.send(room_id, body="HELLO???", tok=other_access_token)
 
-    def _advance_time_and_make_push_succeed(self, expected_push_attempts):
+    def _advance_time_and_make_push_succeed(self, expected_push_attempts: int) -> None:
         self.pump()
         self.push_attempts[expected_push_attempts - 1][0].callback({})
 
@@ -708,7 +712,9 @@ class HTTPPusherTests(HomeserverTestCase):
             expected_unread_count_last_push,
         )
 
-    def _send_read_request(self, access_token, message_event_id, room_id):
+    def _send_read_request(
+        self, access_token: str, message_event_id: str, room_id: str
+    ) -> None:
         # Now set the user's read receipt position to the first event
         #
         # This will actually trigger a new notification to be sent out so that
@@ -748,7 +754,7 @@ class HTTPPusherTests(HomeserverTestCase):
 
         return user_id, access_token
 
-    def test_dont_notify_rule_overrides_message(self):
+    def test_dont_notify_rule_overrides_message(self) -> None:
         """
         The override push rule will suppress notification
         """

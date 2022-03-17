@@ -1,1 +1,0 @@
-Add cancellation support to `@cached` and `@cachedList` decorators.
