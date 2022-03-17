@@ -45,40 +45,6 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             [],
         )
 
-    def test_does_not_filter_out_our_hidden_receipt(self):
-        self._test_filters_hidden(
-            [
-                {
-                    "content": {
-                        "$1435641916hfgh4394fHBLK:matrix.org": {
-                            ReceiptTypes.READ_PRIVATE: {
-                                "@me:server.org": {
-                                    "ts": 1436451550453,
-                                },
-                            }
-                        }
-                    },
-                    "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
-                }
-            ],
-            [
-                {
-                    "content": {
-                        "$1435641916hfgh4394fHBLK:matrix.org": {
-                            ReceiptTypes.READ_PRIVATE: {
-                                "@me:server.org": {
-                                    "ts": 1436451550453,
-                                },
-                            }
-                        }
-                    },
-                    "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
-                }
-            ],
-        )
-
     def test_filters_out_hidden_receipt_and_ignores_rest(self):
         self._test_filters_hidden(
             [
