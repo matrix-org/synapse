@@ -1,0 +1,24 @@
+{
+  # Prevents Caddy from asking for sudo password to install a root cert that
+  # we don't even want to use here.
+  skip_install_trust
+}
+
+# If you want TLS, you can add https:// schemes and configure the TLS cert... somehow.
+http://{{ server_name }}:{{ port }}, http://{{ http_ip }}:{{ port }} {
+  {%- for route_group_name, routes, route_servers in routing %}
+    @{{ route_group_name }} {
+      {%- for route in routes %}
+      path_regexp {{ route }}
+      {%- endfor %}
+    }
+    route @{{ route_group_name }} {
+      reverse_proxy {% for server in route_servers %} {{ server }} {% endfor %}
+    }
+  {%- endfor %}
+
+  # fallback to main
+  route {
+    reverse_proxy {{ main_server }}
+  }
+}

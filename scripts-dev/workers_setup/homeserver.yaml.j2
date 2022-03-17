@@ -7,12 +7,28 @@ signing_key_path: "{{ worker_dir }}/../signing.key"
 
 macaroon_secret_key: "{{ macaroon_secret_key }}"
 
+enable_registration: true
+
 redis:
   enabled: true
   #host: localhost
   #port: 6379
 
 trusted_key_servers: []
+
+listeners:
+  - port: 8080
+    bind_address: {{ workers_by_name.main.ip }}
+    type: http
+    resources:
+      - names: [client, federation]
+
+  # The HTTP replication port
+  - port: 9090
+    bind_address: {{ workers_by_name.main.ip }}
+    type: http
+    resources:
+      - names: [replication]
 
 database:
   name: psycopg2
@@ -28,45 +44,44 @@ database:
     cp_max: 10
 
 instance_map:
-{-% for worker in all_workers %}
+{%- for worker in all_workers %}
   {{ worker.name }}:
     host: {{ worker.ip }}
     port: 9090
-{% endfor %}
+{%- endfor %}
 
 stream_writers:
   events:
-{% for worker in all_workers %-}
-{-% if worker.kind == "event_persister" %}
+{%- for worker in all_workers %}
+{%- if worker.kind == "event_persister" %}
     - {{ worker.name }}
-{% endif %-}
-{-% endfor %}
-
-typing:
-{% for worker in all_workers %-}
-{-% if worker.kind == "typing" %}
+{%- endif %}
+{%- endfor %}
+  typing:
+{%- for worker in all_workers %}
+{%- if worker.kind == "typing" %}
     - {{ worker.name }}
-{% endif %-}
-{-% endfor %}
+{%- endif %}
+{%- endfor %}
 
 
 start_pushers: false
 
 pusher_instances:
-{% for worker in all_workers %-}
-{-% if worker.kind == "pusher" %}
+{% for worker in all_workers -%}
+{%- if worker.kind == "pusher" %}
     - {{ worker.name }}
-{% endif %-}
-{-% endfor %}
+{%- endif %}
+{%- endfor %}
 
 notify_appservices: False
 
 federation_sender_instances:
-{% for worker in all_workers %-}
-{-% if worker.kind == "federation_sender" %}
+{% for worker in all_workers -%}
+{%- if worker.kind == "federation_sender" %}
     - {{ worker.name }}
-{% endif %-}
-{-% endfor %}
+{% endif -%}
+{% endfor %}
 
 enable_media_repo: False
 
@@ -75,3 +90,5 @@ media_instance_running_background_jobs: "media1"
 update_user_directory: False
 
 pid_file: "{{ logs_dir }}/main.pid"
+
+log_config: '{{ worker_dir }}.logging/main.logging.yaml'
