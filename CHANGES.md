@@ -1,3 +1,88 @@
+Synapse 1.55.0rc1 (2022-03-15)
+==============================
+
+This release removes a workaround introduced in Synapse 1.50.0 for Mjolnir compatibility. **This breaks compatibility with Mjolnir 1.3.1 and earlier. ([\#11700](https://github.com/matrix-org/synapse/issues/11700))**; Mjolnir users should upgrade Mjolnir before upgrading Synapse to this version.
+
+Features
+--------
+
+- Add third-party rules callbacks `check_can_shutdown_room` and `check_can_deactivate_user`. ([\#12028](https://github.com/matrix-org/synapse/issues/12028))
+- Improve performance of logging in for large accounts. ([\#12132](https://github.com/matrix-org/synapse/issues/12132))
+- Add experimental env var `SYNAPSE_ASYNC_IO_REACTOR` that causes Synapse to use the asyncio reactor for Twisted. ([\#12135](https://github.com/matrix-org/synapse/issues/12135))
+- Support the stable identifiers from [MSC3440](https://github.com/matrix-org/matrix-doc/pull/3440): threads. ([\#12151](https://github.com/matrix-org/synapse/issues/12151))
+- Add a new Jinja2 template filter to extract the local part of an email address. ([\#12212](https://github.com/matrix-org/synapse/issues/12212))
+
+
+Bugfixes
+--------
+
+- Use the proper serialization format for bundled thread aggregations. The bug has existed since Synapse v1.48.0. ([\#12090](https://github.com/matrix-org/synapse/issues/12090))
+- Fix a long-standing bug when redacting events with relations. ([\#12113](https://github.com/matrix-org/synapse/issues/12113), [\#12121](https://github.com/matrix-org/synapse/issues/12121), [\#12130](https://github.com/matrix-org/synapse/issues/12130), [\#12189](https://github.com/matrix-org/synapse/issues/12189))
+- Fix a bug introduced in Synapse 1.7.2 whereby background updates are never run with the default background batch size. ([\#12157](https://github.com/matrix-org/synapse/issues/12157))
+- Fix a bug where non-standard information was returned from the `/hierarchy` API. Introduced in Synapse v1.41.0. ([\#12175](https://github.com/matrix-org/synapse/issues/12175))
+- Fix a bug introduced in Synapse 1.54.0 that broke background updates on sqlite homeservers while search was disabled. ([\#12215](https://github.com/matrix-org/synapse/issues/12215))
+- Fix a long-standing bug when a `filter` argument with `event_fields` which did not include the `unsigned` field could result in a 500 error on `/sync`. ([\#12234](https://github.com/matrix-org/synapse/issues/12234))
+
+
+Improved Documentation
+----------------------
+
+- Fix complexity checking config example in [Resource Constrained Devices](https://matrix-org.github.io/synapse/v1.54/other/running_synapse_on_single_board_computers.html) docs page. ([\#11998](https://github.com/matrix-org/synapse/issues/11998))
+- Improve documentation for demo scripts. ([\#12143](https://github.com/matrix-org/synapse/issues/12143))
+- Updates to the Room DAG concepts development document. ([\#12179](https://github.com/matrix-org/synapse/issues/12179))
+- Document that the `typing`, `to_device`, `account_data`, `receipts`, and `presence` stream writer can only be used on a single worker. ([\#12196](https://github.com/matrix-org/synapse/issues/12196))
+- Document that contributors can sign off privately by email. ([\#12204](https://github.com/matrix-org/synapse/issues/12204))
+
+
+Deprecations and Removals
+-------------------------
+
+- **Remove workaround introduced in Synapse 1.50.0 for Mjolnir compatibility. Breaks compatibility with Mjolnir 1.3.1 and earlier. ([\#11700](https://github.com/matrix-org/synapse/issues/11700))**
+- Remove backwards compatibilty with pagination tokens from the `/relations` and `/aggregations` endpoints generated from Synapse < v1.52.0. ([\#12138](https://github.com/matrix-org/synapse/issues/12138))
+- The groups/communities feature in Synapse has been deprecated. ([\#12200](https://github.com/matrix-org/synapse/issues/12200))
+
+
+Internal Changes
+----------------
+
+- Simplify the `ApplicationService` class' set of public methods related to interest checking. ([\#11915](https://github.com/matrix-org/synapse/issues/11915))
+- Add config settings for background update parameters. ([\#11980](https://github.com/matrix-org/synapse/issues/11980))
+- Correct type hints for txredis. ([\#12042](https://github.com/matrix-org/synapse/issues/12042))
+- Limit the size of `aggregation_key` on annotations. ([\#12101](https://github.com/matrix-org/synapse/issues/12101))
+- Add type hints to tests files. ([\#12108](https://github.com/matrix-org/synapse/issues/12108), [\#12146](https://github.com/matrix-org/synapse/issues/12146), [\#12207](https://github.com/matrix-org/synapse/issues/12207), [\#12208](https://github.com/matrix-org/synapse/issues/12208))
+- Move scripts to Synapse package and expose as setuptools entry points. ([\#12118](https://github.com/matrix-org/synapse/issues/12118))
+- Add support for cancellation to `ReadWriteLock`. ([\#12120](https://github.com/matrix-org/synapse/issues/12120))
+- Fix data validation to compare to lists, not sequences. ([\#12128](https://github.com/matrix-org/synapse/issues/12128))
+- Fix CI not attaching source distributions and wheels to the GitHub releases. ([\#12131](https://github.com/matrix-org/synapse/issues/12131))
+- Remove unused mocks from `test_typing`. ([\#12136](https://github.com/matrix-org/synapse/issues/12136))
+- Give `scripts-dev` scripts suffixes for neater CI config. ([\#12137](https://github.com/matrix-org/synapse/issues/12137))
+- Move `synctl` into `synapse._scripts` and expose as an entry point. ([\#12140](https://github.com/matrix-org/synapse/issues/12140))
+- Move the snapcraft configuration file to `contrib`. ([\#12142](https://github.com/matrix-org/synapse/issues/12142))
+- Enable [MSC3030](https://github.com/matrix-org/matrix-doc/pull/3030) Complement tests in CI. ([\#12144](https://github.com/matrix-org/synapse/issues/12144))
+- Enable [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) Complement tests in CI. ([\#12145](https://github.com/matrix-org/synapse/issues/12145))
+- Add test for `ObservableDeferred`'s cancellation behaviour. ([\#12149](https://github.com/matrix-org/synapse/issues/12149))
+- Use `ParamSpec` in type hints for `synapse.logging.context`. ([\#12150](https://github.com/matrix-org/synapse/issues/12150))
+- Prune unused jobs from `tox` config. ([\#12152](https://github.com/matrix-org/synapse/issues/12152))
+- Move CI checks out of tox, to facilitate a move to using poetry. ([\#12153](https://github.com/matrix-org/synapse/issues/12153))
+- Avoid generating state groups for local out-of-band leaves. ([\#12154](https://github.com/matrix-org/synapse/issues/12154))
+- Avoid trying to calculate the state at outlier events. ([\#12155](https://github.com/matrix-org/synapse/issues/12155), [\#12173](https://github.com/matrix-org/synapse/issues/12173), [\#12202](https://github.com/matrix-org/synapse/issues/12202))
+- Fix some type annotations. ([\#12156](https://github.com/matrix-org/synapse/issues/12156))
+- Add type hints for `ObservableDeferred` attributes. ([\#12159](https://github.com/matrix-org/synapse/issues/12159))
+- Use a prebuilt Action for the `tests-done` CI job. ([\#12161](https://github.com/matrix-org/synapse/issues/12161))
+- Reduce number of DB queries made during processing of `/sync`. ([\#12163](https://github.com/matrix-org/synapse/issues/12163))
+- Add `delay_cancellation` utility function, which behaves like `stop_cancellation` but waits until the original `Deferred` resolves before raising a `CancelledError`. ([\#12180](https://github.com/matrix-org/synapse/issues/12180))
+- Retry HTTP replication failures, this should prevent 502's when restarting stateful workers (main, event persisters, stream writers). Contributed by Nick @ Beeper. ([\#12182](https://github.com/matrix-org/synapse/issues/12182))
+- Add cancellation support to `@cached` and `@cachedList` decorators. ([\#12183](https://github.com/matrix-org/synapse/issues/12183))
+- Remove unused variables. ([\#12187](https://github.com/matrix-org/synapse/issues/12187))
+- Add combined test for HTTP pusher and push rule. Contributed by Nick @ Beeper. ([\#12188](https://github.com/matrix-org/synapse/issues/12188))
+- Rename `HomeServer.get_tcp_replication` to `get_replication_command_handler`. ([\#12192](https://github.com/matrix-org/synapse/issues/12192))
+- Remove some dead code. ([\#12197](https://github.com/matrix-org/synapse/issues/12197))
+- Fix a misleading comment in the function `check_event_for_spam`. ([\#12203](https://github.com/matrix-org/synapse/issues/12203))
+- Remove unnecessary `pass` statements. ([\#12206](https://github.com/matrix-org/synapse/issues/12206))
+- Update the SSO username picker template to comply with SIWA guidelines. ([\#12210](https://github.com/matrix-org/synapse/issues/12210))
+- Improve code documentation for the typing stream over replication. ([\#12211](https://github.com/matrix-org/synapse/issues/12211))
+
+
 Synapse 1.54.0 (2022-03-08)
 ===========================
 
