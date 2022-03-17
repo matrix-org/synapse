@@ -342,7 +342,7 @@ class SyncKnockTestCase(
         # Knock on a room
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/knock/%s" % (self.room_id,),
+            f"/_matrix/client/r0/knock/{self.room_id}",
             b"{}",
             self.knocker_tok,
         )
@@ -410,8 +410,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         # Send a read receipt to tell the server the first user's message was read
         channel = self.make_request(
             "POST",
-            "/rooms/%s/receipt/org.matrix.msc2285.read.private/%s"
-            % (self.room_id, res["event_id"]),
+            f"/rooms/{self.room_id}/receipt/org.matrix.msc2285.read.private/{res['event_id']}",
             {},
             access_token=self.tok2,
         )
@@ -450,7 +449,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         # Send a read receipt for this message with an empty body
         channel = self.make_request(
             "POST",
-            "/rooms/%s/receipt/m.read/%s" % (self.room_id, res["event_id"]),
+            f"/rooms/{self.room_id}/receipt/m.read/{res['event_id']}",
             access_token=self.tok2,
             custom_headers=[("User-Agent", user_agent)],
         )
@@ -555,7 +554,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         body = json.dumps({"m.read": res["event_id"]}).encode("utf8")
         channel = self.make_request(
             "POST",
-            "/rooms/%s/read_markers" % self.room_id,
+            f"/rooms/{self.room_id}/read_markers",
             body,
             access_token=self.tok,
         )
@@ -571,8 +570,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         # Send a read receipt to tell the server we've read the latest event.
         channel = self.make_request(
             "POST",
-            "/rooms/%s/receipt/org.matrix.msc2285.read.private/%s"
-            % (self.room_id, res["event_id"]),
+            f"/rooms/{self.room_id}/receipt/org.matrix.msc2285.read.private/{res['event_id']}",
             {},
             access_token=self.tok,
         )
@@ -647,7 +645,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         # Make sure both m.read and org.matrix.msc2285.read.private advance
         channel = self.make_request(
             "POST",
-            "/rooms/%s/receipt/m.read/%s" % (self.room_id, res1["event_id"]),
+            f"/rooms/{self.room_id}/receipt/m.read/{res1['event_id']}",
             {},
             access_token=self.tok,
         )
@@ -656,8 +654,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            "/rooms/%s/receipt/org.matrix.msc2285.read.private/%s"
-            % (self.room_id, res2["event_id"]),
+            f"/rooms/{self.room_id}/receipt/org.matrix.msc2285.read.private/{res2['event_id']}",
             {},
             access_token=self.tok,
         )
@@ -676,7 +673,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         # Read last event
         channel = self.make_request(
             "POST",
-            "/rooms/%s/receipt/m.read/%s" % (self.room_id, res2["event_id"]),
+            f"/rooms/{self.room_id}/receipt/m.read/{res2['event_id']}",
             {},
             access_token=self.tok,
         )
@@ -686,8 +683,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         # Make sure neither m.read not org.matrix.msc2285.read.private reverse
         channel = self.make_request(
             "POST",
-            "/rooms/%s/receipt/org.matrix.msc2285.read.private/%s"
-            % (self.room_id, res1["event_id"]),
+            f"/rooms/{self.room_id}/receipt/org.matrix.msc2285.read.private/{res1['event_id']}",
             {},
             access_token=self.tok,
         )
@@ -696,7 +692,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            "/rooms/%s/receipt/m.read/%s" % (self.room_id, res1["event_id"]),
+            f"/rooms/{self.room_id}/receipt/m.read/{res1['event_id']}",
             {},
             access_token=self.tok,
         )
