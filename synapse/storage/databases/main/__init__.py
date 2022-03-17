@@ -33,7 +33,7 @@ from .account_data import AccountDataStore
 from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
 from .cache import CacheInvalidationWorkerStore
 from .censor_events import CensorEventsStore
-from .client_ips import ClientIpStore
+from .client_ips import ClientIpWorkerStore
 from .deviceinbox import DeviceInboxStore
 from .devices import DeviceStore
 from .directory import DirectoryStore
@@ -112,7 +112,7 @@ class DataStore(
     AccountDataStore,
     EventPushActionsStore,
     OpenIdStore,
-    ClientIpStore,
+    ClientIpWorkerStore,
     DeviceStore,
     DeviceInboxStore,
     UserDirectoryStore,
