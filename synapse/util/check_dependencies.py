@@ -128,6 +128,21 @@ def _incorrect_version(
         )
 
 
+def _no_reported_version(
+    requirement: Requirement, extra: Optional[str] = None
+):
+    if extra:
+        return (
+            f"Synapse {VERSION} needs {requirement} for {extra}, "
+            f"but can't determine {requirement.name}'s version."
+        )
+    else:
+        return (
+            f"Synapse {VERSION} needs {requirement},"
+            f"but can't determine {requirement.name}'s version"
+        )
+
+
 def check_requirements(extra: Optional[str] = None) -> None:
     """Check Synapse's dependencies are present and correctly versioned.
 
@@ -163,8 +178,14 @@ def check_requirements(extra: Optional[str] = None) -> None:
                 deps_unfulfilled.append(requirement.name)
                 errors.append(_not_installed(requirement, extra))
         else:
+            if dist.version is None:
+                # This shouldn't happen---it suggests a borked virtualenv. (See #12223)
+                # Try to give a vaguely helpful error message anyway.
+                deps_unfulfilled.append(requirement.name)
+                errors.append(_no_reported_version(requirement, extra))
+
             # We specify prereleases=True to allow prereleases such as RCs.
-            if not requirement.specifier.contains(dist.version, prereleases=True):
+            elif not requirement.specifier.contains(dist.version, prereleases=True):
                 deps_unfulfilled.append(requirement.name)
                 errors.append(_incorrect_version(requirement, dist.version, extra))
 
