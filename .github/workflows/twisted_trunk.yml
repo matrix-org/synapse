@@ -59,6 +59,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+      - uses: matrix-org/setup-python-poetry@dmr/try-extras
+        with:
+          python-version: "3.x"
+          extras: "all"
       - name: Patch dependencies
         run: .ci/patch_for_twisted_trunk.sh
         working-directory: /src
