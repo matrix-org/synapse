@@ -547,6 +547,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
                         rt == ReceiptTypes.READ
                         and receipt_type == ReceiptTypes.READ_PRIVATE
                     )
+                    or (
+                        rt == ReceiptTypes.READ_PRIVATE
+                        and receipt_type == ReceiptTypes.READ
+                    )
                 ):
                     logger.debug(
                         "Ignoring new receipt for %s in favour of existing "
