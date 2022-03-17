@@ -233,7 +233,6 @@ class HttpServer(Protocol):
             servlet_classname (str): The name of the handler to be used in prometheus
                 and opentracing logs.
         """
-        pass
 
 
 class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):

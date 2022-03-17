@@ -775,3 +775,124 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         self.assertEqual(args[0], user_id)
         self.assertFalse(args[1])
         self.assertTrue(args[2])
+
+    def test_check_can_deactivate_user(self) -> None:
+        """Tests that the on_user_deactivation_status_changed module callback is called
+        correctly when processing a user's deactivation.
+        """
+        # Register a mocked callback.
+        deactivation_mock = Mock(return_value=make_awaitable(False))
+        third_party_rules = self.hs.get_third_party_event_rules()
+        third_party_rules._check_can_deactivate_user_callbacks.append(
+            deactivation_mock,
+        )
+
+        # Register a user that we'll deactivate.
+        user_id = self.register_user("altan", "password")
+        tok = self.login("altan", "password")
+
+        # Deactivate that user.
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/v3/account/deactivate",
+            {
+                "auth": {
+                    "type": LoginType.PASSWORD,
+                    "password": "password",
+                    "identifier": {
+                        "type": "m.id.user",
+                        "user": user_id,
+                    },
+                },
+                "erase": True,
+            },
+            access_token=tok,
+        )
+
+        # Check that the deactivation was blocked
+        self.assertEqual(channel.code, 403, channel.json_body)
+
+        # Check that the mock was called once.
+        deactivation_mock.assert_called_once()
+        args = deactivation_mock.call_args[0]
+
+        # Check that the mock was called with the right user ID
+        self.assertEqual(args[0], user_id)
+
+        # Check that the request was not made by an admin
+        self.assertEqual(args[1], False)
+
+    def test_check_can_deactivate_user_admin(self) -> None:
+        """Tests that the on_user_deactivation_status_changed module callback is called
+        correctly when processing a user's deactivation triggered by a server admin.
+        """
+        # Register a mocked callback.
+        deactivation_mock = Mock(return_value=make_awaitable(False))
+        third_party_rules = self.hs.get_third_party_event_rules()
+        third_party_rules._check_can_deactivate_user_callbacks.append(
+            deactivation_mock,
+        )
+
+        # Register an admin user.
+        self.register_user("admin", "password", admin=True)
+        admin_tok = self.login("admin", "password")
+
+        # Register a user that we'll deactivate.
+        user_id = self.register_user("altan", "password")
+
+        # Deactivate the user.
+        channel = self.make_request(
+            "PUT",
+            "/_synapse/admin/v2/users/%s" % user_id,
+            {"deactivated": True},
+            access_token=admin_tok,
+        )
+
+        # Check that the deactivation was blocked
+        self.assertEqual(channel.code, 403, channel.json_body)
+
+        # Check that the mock was called once.
+        deactivation_mock.assert_called_once()
+        args = deactivation_mock.call_args[0]
+
+        # Check that the mock was called with the right user ID
+        self.assertEqual(args[0], user_id)
+
+        # Check that the mock was made by an admin
+        self.assertEqual(args[1], True)
+
+    def test_check_can_shutdown_room(self) -> None:
+        """Tests that the check_can_shutdown_room module callback is called
+        correctly when processing an admin's shutdown room request.
+        """
+        # Register a mocked callback.
+        shutdown_mock = Mock(return_value=make_awaitable(False))
+        third_party_rules = self.hs.get_third_party_event_rules()
+        third_party_rules._check_can_shutdown_room_callbacks.append(
+            shutdown_mock,
+        )
+
+        # Register an admin user.
+        admin_user_id = self.register_user("admin", "password", admin=True)
+        admin_tok = self.login("admin", "password")
+
+        # Shutdown the room.
+        channel = self.make_request(
+            "DELETE",
+            "/_synapse/admin/v2/rooms/%s" % self.room_id,
+            {},
+            access_token=admin_tok,
+        )
+
+        # Check that the shutdown was blocked
+        self.assertEqual(channel.code, 403, channel.json_body)
+
+        # Check that the mock was called once.
+        shutdown_mock.assert_called_once()
+        args = shutdown_mock.call_args[0]
+
+        # Check that the mock was called with the right user ID
+        self.assertEqual(args[0], admin_user_id)
+
+        # Check that the mock was called with the right room ID
+        self.assertEqual(args[1], self.room_id)
