@@ -27,6 +27,7 @@ from typing import (
     Optional,
     Tuple,
     Type,
+    TypedDict,
     TypeVar,
     Union,
 )
@@ -63,6 +64,10 @@ MutableStateMap = MutableMapping[StateKey, T]
 # JSON types. These could be made stronger, but will do for now.
 # A JSON-serialisable dict.
 JsonDict = Dict[str, Any]
+# A JSON-serialisable mapping; roughly speaking an immutable JSONDict.
+# Useful when you have a TypedDict which isn't going to be mutated and you don't want
+# to cast to JsonDict everywhere.
+JsonMapping = Mapping[str, Any]
 # A JSON-serialisable object.
 JsonSerializable = object
 
@@ -791,3 +796,9 @@ class UserInfo:
     is_deactivated: bool
     is_guest: bool
     is_shadow_banned: bool
+
+
+class UserProfile(TypedDict):
+    user_id: str
+    display_name: Optional[str]
+    avatar_url: Optional[str]
