@@ -1,1 +1,1 @@
-Remove incorrect `api/v1` prefixes in the worker documentation for some endpoints.
+Remove incorrect prefixes in the worker documentation for some endpoints.
