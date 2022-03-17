@@ -198,6 +198,13 @@ class HttpPusher(Pusher):
         )
 
         for push_action in unprocessed:
+            logger.info(
+                "Processing push action for user %s, event %s, actions %s",
+                self.user_id,
+                push_action.event_id,
+                push_action.actions,
+            )
+
             with opentracing.start_active_span(
                 "http-push",
                 tags={
