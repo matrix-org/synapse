@@ -25,7 +25,9 @@ from synapse.storage.database import (
     LoggingTransaction,
     make_tuple_comparison_clause,
 )
-from synapse.storage.databases.main.monthly_active_users import MonthlyActiveUsersStore
+from synapse.storage.databases.main.monthly_active_users import (
+    MonthlyActiveUsersWorkerStore,
+)
 from synapse.types import JsonDict, UserID
 from synapse.util.caches.lrucache import LruCache
 
@@ -540,7 +542,7 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore):
         ]
 
 
-class ClientIpStore(ClientIpWorkerStore, MonthlyActiveUsersStore):
+class ClientIpStore(ClientIpWorkerStore, MonthlyActiveUsersWorkerStore):
     def __init__(
         self,
         database: DatabasePool,
