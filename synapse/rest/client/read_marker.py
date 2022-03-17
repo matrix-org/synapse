@@ -35,6 +35,7 @@ class ReadMarkerRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
+        self.config = hs.config
         self.receipts_handler = hs.get_receipts_handler()
         self.read_marker_handler = hs.get_read_marker_handler()
         self.presence_handler = hs.get_presence_handler()
@@ -58,7 +59,7 @@ class ReadMarkerRestServlet(RestServlet):
             )
 
         read_private_event_id = body.get(ReceiptTypes.READ_PRIVATE, None)
-        if read_private_event_id:
+        if read_private_event_id and self.config.experimental.msc2285_enabled:
             await self.receipts_handler.received_client_receipt(
                 room_id,
                 ReceiptTypes.READ_PRIVATE,
