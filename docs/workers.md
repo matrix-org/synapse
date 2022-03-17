@@ -397,23 +397,23 @@ the stream writer for the `typing` stream:
 The following endpoints should be routed directly to the worker configured as
 the stream writer for the `to_device` stream:
 
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/sendToDevice/
+    ^/_matrix/client/(r0|v3|unstable)/sendToDevice/
 
 ##### The `account_data` stream
 
 The following endpoints should be routed directly to the worker configured as
 the stream writer for the `account_data` stream:
 
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/tags
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/account_data
+    ^/_matrix/client/(r0|v3|unstable)/.*/tags
+    ^/_matrix/client/(r0|v3|unstable)/.*/account_data
 
 ##### The `receipts` stream
 
 The following endpoints should be routed directly to the worker configured as
 the stream writer for the `receipts` stream:
 
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/receipt
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/read_markers
+    ^/_matrix/client/(r0|v3|unstable)/rooms/.*/receipt
+    ^/_matrix/client/(r0|v3|unstable)/rooms/.*/read_markers
 
 ##### The `presence` stream
 
@@ -540,7 +540,7 @@ Proxies some frequently-requested client endpoints to add caching and remove
 load from the main synapse. It can handle REST endpoints matching the following
 regular expressions:
 
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/upload
+    ^/_matrix/client/(r0|v3|unstable)/keys/upload
 
 If `use_presence` is False in the homeserver config, it can also handle REST
 endpoints matching the following regular expressions:
