@@ -1,2 +1,1 @@
-Fix bug: Server notices user profile (display_name/avatar_url) are not updated when changed after server restart.
-Contributed by Jorge Florian.
+Fix a long-standing bug that updating the server notices user profile (display name/avatar URL) in the configuration would not be applied to pre-existing rooms. Contributed by Jorge Florian.

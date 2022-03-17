@@ -91,7 +91,14 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
-    @override_config({"server_notices": {"system_mxid_localpart": "notices"}})
+    @override_config(
+        {
+            "server_notices": {
+                "system_mxid_localpart": "notices",
+                "system_mxid_display_name": "new display name",
+            }
+        }
+    )
     def test_user_is_not_local(self) -> None:
         """
         Tests that a lookup for a user that is not a local returns a HTTPStatus.BAD_REQUEST
@@ -242,7 +249,14 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(messages[1]["content"]["body"], "test msg two")
         self.assertEqual(messages[1]["sender"], "@notices:test")
 
-    @override_config({"server_notices": {"system_mxid_localpart": "notices"}})
+    @override_config(
+        {
+            "server_notices": {
+                "system_mxid_localpart": "notices",
+                "system_mxid_display_name": "display name",
+            }
+        }
+    )
     def test_send_server_notice_leave_room(self) -> None:
         """
         Tests that sending a server notices is successfully.
@@ -415,6 +429,110 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         # second room has new ID
         self.assertNotEqual(first_room_id, second_room_id)
 
+    @override_config(
+        {
+            "server_notices": {
+                "system_mxid_localpart": "notices",
+                "system_mxid_display_name": "display name",
+                "system_mxid_avatar_url": "test/url",
+            }
+        }
+    )
+    def test_update_notice_user_name_when_changed(self) -> None:
+        """
+        Tests that existing server notices user name in room is updated after
+        server notice config changes.
+        """
+        server_notice_request_content = {
+            "user_id": self.other_user,
+            "content": {"msgtype": "m.text", "body": "test msg one"},
+        }
+
+        self.make_request(
+            "POST",
+            self.url,
+            access_token=self.admin_user_tok,
+            content=server_notice_request_content,
+        )
+
+        # simulates a change in server config after a server restart.
+        new_display_name = "new display name"
+        self.server_notices_manager._config.servernotices.server_notices_mxid_display_name = (
+            new_display_name
+        )
+        self.server_notices_manager.get_or_create_notice_room_for_user.cache.invalidate_all()
+
+        self.make_request(
+            "POST",
+            self.url,
+            access_token=self.admin_user_tok,
+            content=server_notice_request_content,
+        )
+
+        invited_rooms = self._check_invite_and_join_status(self.other_user, 1, 0)
+        notice_room_id = invited_rooms[0].room_id
+        self.helper.join(
+            room=notice_room_id, user=self.other_user, tok=self.other_user_token
+        )
+
+        member_states = self._sync_and_get_member_state(
+            notice_room_id, self.other_user_token, "@notices:test"
+        )
+
+        self.assertEqual(member_states[0]["content"]["displayname"], new_display_name)
+
+    @override_config(
+        {
+            "server_notices": {
+                "system_mxid_localpart": "notices",
+                "system_mxid_display_name": "display name",
+                "system_mxid_avatar_url": "test/url",
+            }
+        }
+    )
+    def test_update_notice_user_avatar_when_changed(self) -> None:
+        """
+        Tests that existing server notices user avatar in room is updated when is
+        different from the one in homeserver config.
+        """
+        server_notice_request_content = {
+            "user_id": self.other_user,
+            "content": {"msgtype": "m.text", "body": "test msg one"},
+        }
+
+        self.make_request(
+            "POST",
+            self.url,
+            access_token=self.admin_user_tok,
+            content=server_notice_request_content,
+        )
+
+        # simulates a change in server config after a server restart.
+        new_avatar_url = "test/new-url"
+        self.server_notices_manager._config.servernotices.server_notices_mxid_avatar_url = (
+            new_avatar_url
+        )
+        self.server_notices_manager.get_or_create_notice_room_for_user.cache.invalidate_all()
+
+        self.make_request(
+            "POST",
+            self.url,
+            access_token=self.admin_user_tok,
+            content=server_notice_request_content,
+        )
+
+        invited_rooms = self._check_invite_and_join_status(self.other_user, 1, 0)
+        notice_room_id = invited_rooms[0].room_id
+        self.helper.join(
+            room=notice_room_id, user=self.other_user, tok=self.other_user_token
+        )
+
+        member_states = self._sync_and_get_member_state(
+            notice_room_id, self.other_user_token, "@notices:test"
+        )
+
+        self.assertEqual(member_states[0]["content"]["avatar_url"], new_avatar_url)
+
     def _check_invite_and_join_status(
         self, user_id: str, expected_invites: int, expected_memberships: int
     ) -> List[RoomsForUser]:
@@ -460,3 +578,18 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             x for x in room["timeline"]["events"] if x["type"] == "m.room.message"
         ]
         return messages
+
+    def _sync_and_get_member_state(
+        self, room_id: str, token: str, member_id: str
+    ) -> List[JsonDict]:
+        channel = self.make_request(
+            "GET", "/_matrix/client/r0/sync", access_token=token
+        )
+        self.assertEqual(channel.code, HTTPStatus.OK)
+
+        room = channel.json_body["rooms"]["join"][room_id]
+        return [
+            x
+            for x in room["timeline"]["events"]
+            if x["type"] == "m.room.member" and x["state_key"] == member_id
+        ]

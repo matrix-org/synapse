@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Optional
 
 from synapse.api.constants import EventTypes, Membership, RoomCreationPreset
 from synapse.events import EventBase
@@ -65,21 +65,13 @@ class ServerNoticesManager:
             is_state_event: Is the event a state event
             txn_id: The transaction ID.
         """
-        (room_id, room_created) = await self.get_or_create_notice_room_for_user(user_id)
+        room_id = await self.get_or_create_notice_room_for_user(user_id)
         await self.maybe_invite_user_to_room(user_id, room_id)
 
         assert self.server_notices_mxid is not None
         requester = create_requester(
             self.server_notices_mxid, authenticated_entity=self._server_name
         )
-
-        if not room_created:
-            await self._update_notice_user_profile_if_changed(
-                requester,
-                room_id,
-                self._config.servernotices.server_notices_mxid_display_name,
-                self._config.servernotices.server_notices_mxid_avatar_url,
-            )
 
         logger.info("Sending server notice to %s", user_id)
 
@@ -99,9 +91,7 @@ class ServerNoticesManager:
         return event
 
     @cached()
-    async def get_or_create_notice_room_for_user(
-        self, user_id: str
-    ) -> Tuple[str, bool]:
+    async def get_or_create_notice_room_for_user(self, user_id: str) -> str:
         """Get the room for notices for a given user
 
         If we have not yet created a notice room for this user, create it, but don't
@@ -111,12 +101,16 @@ class ServerNoticesManager:
             user_id: complete user id for the user we want a room for
 
         Returns:
-            room id of notice room and flag indicating weather room was created.
+            room id of notice room.
         """
         if self.server_notices_mxid is None:
             raise Exception("Server notices not enabled")
 
         assert self._is_mine_id(user_id), "Cannot send server notices to remote users"
+
+        requester = create_requester(
+            self.server_notices_mxid, authenticated_entity=self._server_name
+        )
 
         rooms = await self._store.get_rooms_for_local_user_where_membership_is(
             user_id, [Membership.INVITE, Membership.JOIN]
@@ -136,7 +130,13 @@ class ServerNoticesManager:
                     room.room_id,
                     user_id,
                 )
-                return room.room_id, False
+                await self._update_notice_user_profile_if_changed(
+                    requester,
+                    room.room_id,
+                    self._config.servernotices.server_notices_mxid_display_name,
+                    self._config.servernotices.server_notices_mxid_avatar_url,
+                )
+                return room.room_id
 
         # apparently no existing notice room: create a new one
         logger.info("Creating server notices room for %s", user_id)
@@ -154,9 +154,6 @@ class ServerNoticesManager:
                 "avatar_url": self._config.servernotices.server_notices_mxid_avatar_url,
             }
 
-        requester = create_requester(
-            self.server_notices_mxid, authenticated_entity=self._server_name
-        )
         info, _ = await self._room_creation_handler.create_room(
             requester,
             config={
@@ -175,7 +172,7 @@ class ServerNoticesManager:
         self._notifier.on_new_event("account_data_key", max_id, users=[user_id])
 
         logger.info("Created server notices room %s for %s", room_id, user_id)
-        return room_id, True
+        return room_id
 
     async def maybe_invite_user_to_room(self, user_id: str, room_id: str) -> None:
         """Invite the given user to the given server room, unless the user has already
