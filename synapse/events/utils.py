@@ -530,9 +530,12 @@ class EventClientSerializer:
 
         # Include the bundled aggregations in the event.
         if serialized_aggregations:
-            serialized_event["unsigned"].setdefault("m.relations", {}).update(
-                serialized_aggregations
-            )
+            # There is likely already an "unsigned" field, but a filter might
+            # have stripped it off (via the event_fields option). The server is
+            # allowed to return additional fields, so add it back.
+            serialized_event.setdefault("unsigned", {}).setdefault(
+                "m.relations", {}
+            ).update(serialized_aggregations)
 
     def serialize_events(
         self,
