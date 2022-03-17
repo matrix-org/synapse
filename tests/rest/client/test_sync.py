@@ -412,7 +412,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         # Send a message as the first user
         res = self.helper.send(self.room_id, body="hello", tok=self.tok)
 
-        # Send a read receipt to tell the server the first user's message was read
+        # Send a private read receipt to tell the server the first user's message was read
         channel = self.make_request(
             "POST",
             f"/rooms/{self.room_id}/receipt/org.matrix.msc2285.read.private/{res['event_id']}",
@@ -421,7 +421,19 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 200)
 
-        # Test that the first user can't see the other user's hidden read receipt
+        # Test that the first user can't see the other user's private read receipt
+        self.assertEqual(self._get_read_receipt(), None)
+
+        # Send a public read receipt to tell the server the first user's message was read
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/m.read/{res['event_id']}",
+            {},
+            access_token=self.tok2,
+        )
+        self.assertEqual(channel.code, 200)
+
+        # Test that we didn't override the private read receipt
         self.assertEqual(self._get_read_receipt(), None)
 
     @parameterized.expand(
@@ -477,6 +489,9 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
 
         # Store the next batch for the next request.
         self.next_batch = channel.json_body["next_batch"]
+
+        if channel.json_body.get("rooms", None) is None:
+            return None
 
         # Return the read receipt
         ephemeral_events = channel.json_body["rooms"]["join"][self.room_id][
