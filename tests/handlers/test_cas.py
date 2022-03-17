@@ -16,8 +16,8 @@ from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.server import HomeServer
 from synapse.handlers.cas import CasResponse
+from synapse.server import HomeServer
 from synapse.util import Clock
 
 from tests.test_utils import simple_async_mock
