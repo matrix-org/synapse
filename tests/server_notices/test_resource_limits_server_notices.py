@@ -75,7 +75,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         self.user_id = "@user_id:test"
 
         self._rlsn._server_notices_manager.get_or_create_notice_room_for_user = Mock(
-            return_value=defer.succeed(("!something:localhost", False))
+            return_value=defer.succeed("!something:localhost")
         )
         self._rlsn._store.add_tag_to_room = Mock(return_value=defer.succeed(None))
         self._rlsn._store.get_tags_for_room = Mock(return_value=make_awaitable({}))
@@ -270,7 +270,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
 
         # Now lets get the last load of messages in the service notice room and
         # check that there is only one server notice
-        (room_id, _) = self.get_success(
+        room_id = self.get_success(
             self.server_notices_manager.get_or_create_notice_room_for_user(self.user_id)
         )
 
