@@ -546,7 +546,9 @@ class GroupServerWorkerStore(SQLBaseStore):
             "get_all_groups_for_user", _get_all_groups_for_user_txn
         )
 
-    async def get_groups_changes_for_user(self, user_id: str, from_token: int, to_token: int) -> List[JsonDict]:
+    async def get_groups_changes_for_user(
+        self, user_id: str, from_token: int, to_token: int
+    ) -> List[JsonDict]:
         from_token = int(from_token)
         has_changed = self._group_updates_stream_cache.has_entity_changed(  # type: ignore[attr-defined]
             user_id, from_token
@@ -554,7 +556,7 @@ class GroupServerWorkerStore(SQLBaseStore):
         if not has_changed:
             return []
 
-        def _get_groups_changes_for_user_txn(txn: LoggingTransaction):
+        def _get_groups_changes_for_user_txn(txn: LoggingTransaction) -> List[JsonDict]:
             sql = """
                 SELECT group_id, membership, type, u.content
                 FROM local_group_updates AS u
@@ -606,7 +608,9 @@ class GroupServerWorkerStore(SQLBaseStore):
         if not has_changed:
             return [], current_id, False
 
-        def _get_all_groups_changes_txn(txn: LoggingTransaction) -> Tuple[List[Tuple[int, tuple]], int, bool]:
+        def _get_all_groups_changes_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[List[Tuple[int, tuple]], int, bool]:
             sql = """
                 SELECT stream_id, group_id, user_id, type, content
                 FROM local_group_updates
