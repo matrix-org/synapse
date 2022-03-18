@@ -27,10 +27,11 @@ from typing import (
     Optional,
     Tuple,
     Type,
-    TypedDict,
     TypeVar,
     Union,
 )
+
+from typing_extensions import TypedDict
 
 import attr
 from frozendict import frozendict
