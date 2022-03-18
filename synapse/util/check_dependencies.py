@@ -128,9 +128,7 @@ def _incorrect_version(
         )
 
 
-def _no_reported_version(
-    requirement: Requirement, extra: Optional[str] = None
-) -> str:
+def _no_reported_version(requirement: Requirement, extra: Optional[str] = None) -> str:
     if extra:
         return (
             f"Synapse {VERSION} needs {requirement} for {extra}, "
