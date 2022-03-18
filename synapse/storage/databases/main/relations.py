@@ -857,7 +857,9 @@ class RelationsWorkerStore(SQLBaseStore):
         summaries = await self._get_thread_summaries(events_by_id.keys())
         # Only fetch participated for a limited selection based on what had
         # summaries.
-        participated = await self._get_threads_participated(summaries.keys(), user_id)
+        participated = await self._get_threads_participated(
+            [event_id for event_id, summary in summaries.items() if summary], user_id
+        )
         for event_id, summary in summaries.items():
             if summary:
                 thread_count, latest_thread_event, edit = summary
