@@ -23,9 +23,10 @@ from typing import (
     Sequence,
     Set,
     Tuple,
-    TypedDict,
     cast,
 )
+
+from typing_extensions import TypedDict
 
 from synapse.api.errors import StoreError
 
