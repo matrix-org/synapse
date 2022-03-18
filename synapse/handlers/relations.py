@@ -245,7 +245,7 @@ class RelationsHandler:
         # Only fetch participated for a limited selection based on what had
         # summaries.
         participated = await self._main_store.get_threads_participated(
-            summaries.keys(), user_id
+            [event_id for event_id, summary in summaries.items() if summary], user_id
         )
         for event_id, summary in summaries.items():
             if summary:
