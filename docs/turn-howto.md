@@ -249,6 +249,24 @@ After updating the homeserver configuration, you must restart synapse:
 ... and then reload any clients (or wait an hour for them to refresh their
 settings).
 
+## Setting up TURN Server from Open Relay Project
+
+[Open Relay Project](https://www.metered.ca/tools/openrelay/) is a completely free WebRTC TURN Server provided by [Metered Video SDK](https://www.metered.ca/).
+
+Here is the working configuration that you can use:
+
+```
+turn_uris: [ "turn:staticauth.openrelay.metered.ca:80?transport=udp", "turn:staticauth.openrelay.metered.ca:80?transport=tcp" ]
+turn_shared_secret: "openrelayprojectsecret"
+turn_user_lifetime: 86400000
+turn_allow_guests: True
+```
+
+For the `turn_uris` you can use `staticauth.openrelay.metered.ca:80?transport=udp` `staticauth.openrelay.metered.ca:443?transport=tcp` and for shared secret you can use `openrelayprojectsecret`
+
+The Open Relay TURN Server runs on port 80 and 443 to bypass most firewalls.
+
+
 ## Troubleshooting
 
 The normal symptoms of a misconfigured TURN server are that calls between
