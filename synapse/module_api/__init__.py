@@ -111,6 +111,7 @@ from synapse.types import (
     StateMap,
     UserID,
     UserInfo,
+    UserProfile,
     create_requester,
 )
 from synapse.util import Clock
@@ -150,6 +151,7 @@ __all__ = [
     "EventBase",
     "StateMap",
     "ProfileInfo",
+    "UserProfile",
 ]
 
 logger = logging.getLogger(__name__)
