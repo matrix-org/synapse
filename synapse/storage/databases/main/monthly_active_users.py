@@ -265,7 +265,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore, RegistrationWorkerS
         #    run this at startup?
 
         for tp in threepids:
-            user_id = self.get_user_id_by_threepid_txn(txn, tp["medium"], tp["address"])  # type: ignore[attr-defined]
+            user_id = self.get_user_id_by_threepid_txn(txn, tp["medium"], tp["address"])
 
             if user_id:
                 is_support = self.is_support_user_txn(txn, user_id)
@@ -334,11 +334,11 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore, RegistrationWorkerS
             values={"timestamp": int(self._clock.time_msec())},
         )
 
-        self._invalidate_cache_and_stream(txn, self.get_monthly_active_count, ())  # type: ignore[attr-defined]
-        self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
+        self._invalidate_cache_and_stream(txn, self.get_monthly_active_count, ())
+        self._invalidate_cache_and_stream(
             txn, self.get_monthly_active_count_by_service, ()
         )
-        self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
+        self._invalidate_cache_and_stream(
             txn, self.user_last_seen_monthly_active, (user_id,)
         )
 
