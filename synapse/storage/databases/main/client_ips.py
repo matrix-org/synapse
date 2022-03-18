@@ -412,17 +412,17 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
 
         self.user_ips_max_age = hs.config.server.user_ips_max_age
 
+        # (user_id, access_token, ip,) -> last_seen
+        self.client_ip_last_seen = LruCache[Tuple[str, str, str], int](
+            cache_name="client_ip_last_seen", max_size=50000
+        )
+
         if hs.config.worker.run_background_tasks and self.user_ips_max_age:
             self._clock.looping_call(self._prune_old_user_ips, 5 * 1000)
 
         if self._update_on_this_worker:
             # This is the designated worker that can write to the client IP
             # tables.
-
-            # (user_id, access_token, ip,) -> last_seen
-            self.client_ip_last_seen = LruCache[Tuple[str, str, str], int](
-                cache_name="client_ip_last_seen", max_size=50000
-            )
 
             # (user_id, access_token, ip,) -> (user_agent, device_id, last_seen)
             self._batch_row_update: Dict[
@@ -573,10 +573,6 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
         device_id: Optional[str],
         now: Optional[int] = None,
     ) -> None:
-        assert (
-            self._update_on_this_worker
-        ), "This worker is not designated to update client IPs"
-
         if not now:
             now = int(self._clock.time_msec())
         key = (user_id, access_token, ip)
@@ -585,14 +581,21 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
             last_seen = self.client_ip_last_seen.get(key)
         except KeyError:
             last_seen = None
-        await self.populate_monthly_active_users(user_id)
+
         # Rate-limited inserts
         if last_seen is not None and (now - last_seen) < LAST_SEEN_GRANULARITY:
             return
 
         self.client_ip_last_seen.set(key, now)
 
-        self._batch_row_update[key] = (user_agent, device_id, now)
+        if self._update_on_this_worker:
+            await self.populate_monthly_active_users(user_id)
+            self._batch_row_update[key] = (user_agent, device_id, now)
+        else:
+            # We are not the designated writer-worker, so stream over replication
+            self.hs.get_replication_command_handler().send_user_ip(
+                user_id, access_token, ip, user_agent, device_id, now
+            )
 
     @wrap_as_background_process("update_client_ips")
     async def _update_client_ips_batch(self) -> None:
