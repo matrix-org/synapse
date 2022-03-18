@@ -147,7 +147,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         entries exist.
         """
 
-        def _reap_users(txn: LoggingTransaction, reserved_users: List[str]):
+        def _reap_users(txn: LoggingTransaction, reserved_users: List[str]) -> None:
             """
             Args:
                 reserved_users (tuple): reserved users to preserve
