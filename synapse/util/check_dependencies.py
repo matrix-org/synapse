@@ -138,7 +138,7 @@ def _no_reported_version(
         )
     else:
         return (
-            f"Synapse {VERSION} needs {requirement},"
+            f"Synapse {VERSION} needs {requirement}, "
             f"but can't determine {requirement.name}'s version"
         )
 
