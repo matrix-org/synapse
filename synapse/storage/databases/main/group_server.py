@@ -549,7 +549,6 @@ class GroupServerWorkerStore(SQLBaseStore):
     async def get_groups_changes_for_user(
         self, user_id: str, from_token: int, to_token: int
     ) -> List[JsonDict]:
-        from_token = int(from_token)
         has_changed = self._group_updates_stream_cache.has_entity_changed(  # type: ignore[attr-defined]
             user_id, from_token
         )
