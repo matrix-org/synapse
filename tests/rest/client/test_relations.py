@@ -1131,7 +1131,6 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         assert_bundle(channel.json_body["event"])
 
         # Request sync.
-        # bundled aggregations).
         filter = urllib.parse.quote_plus(b'{"room": {"timeline": {"limit": 4}}}')
         channel = self.make_request(
             "GET", f"/sync?filter={filter}", access_token=self.user_token
