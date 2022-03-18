@@ -712,7 +712,7 @@ class ReplicationCommandHandler:
         access_token: str,
         ip: str,
         user_agent: str,
-        device_id: str,
+        device_id: Optional[str],
         last_seen: int,
     ) -> None:
         """Tell the master that the user made a request."""
