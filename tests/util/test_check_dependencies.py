@@ -60,8 +60,13 @@ class TestDependencyChecker(TestCase):
             "synapse.util.check_dependencies.metadata.requires",
             return_value=["dummypkg >= 1"],
         ):
-            with self.mock_installed_package(distribution_with_no_version):
+            with self.mock_installed_package(None):
                 self.assertRaises(DependencyException, check_requirements)
+            with self.mock_installed_package(old):
+                self.assertRaises(DependencyException, check_requirements)
+            with self.mock_installed_package(new):
+                # should not raise
+                check_requirements()
 
     def test_version_reported_as_None(self) -> None:
         """Complain if importlib.metadata.version() returns None.
@@ -70,18 +75,10 @@ class TestDependencyChecker(TestCase):
         """
         with patch(
             "synapse.util.check_dependencies.metadata.requires",
-            return_value=["dummypkg >= 1; extra == 'mypy'"],
-        ), patch("synapse.util.check_dependencies.RUNTIME_EXTRAS", {"cool-extra"}):
-            # We're testing that none of these calls raise.
-            with self.mock_installed_package(None):
-                check_requirements()
-                check_requirements("cool-extra")
-            with self.mock_installed_package(old):
-                check_requirements()
-                check_requirements("cool-extra")
-            with self.mock_installed_package(new):
-                check_requirements()
-                check_requirements("cool-extra")
+            return_value=["dummypkg >= 1"],
+        ):
+            with self.mock_installed_package(distribution_with_no_version):
+                self.assertRaises(DependencyException, check_requirements)
 
     def test_checks_ignore_dev_dependencies(self) -> None:
         """Bot generic and per-extra checks should ignore dev dependencies."""
