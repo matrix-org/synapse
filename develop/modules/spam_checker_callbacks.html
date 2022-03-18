@@ -302,7 +302,7 @@ callback that does not return <code>True</code> will be used. If this happens, S
 any of the subsequent implementations of this callback.</p>
 <h3 id="check_username_for_spam"><a class="header" href="#check_username_for_spam"><code>check_username_for_spam</code></a></h3>
 <p><em>First introduced in Synapse v1.37.0</em></p>
-<pre><code class="language-python">async def check_username_for_spam(user_profile: Dict[str, str]) -&gt; bool
+<pre><code class="language-python">async def check_username_for_spam(user_profile: synapse.module_api.UserProfile) -&gt; bool
 </code></pre>
 <p>Called when computing search results in the user directory. The module must return a
 <code>bool</code> indicating whether the given user should be excluded from user directory 
@@ -310,9 +310,11 @@ searches. Return <code>True</code> to indicate that the user is spammy and exclu
 search results; otherwise return <code>False</code>.</p>
 <p>The profile is represented as a dictionary with the following keys:</p>
 <ul>
-<li><code>user_id</code>: The Matrix ID for this user.</li>
-<li><code>display_name</code>: The user's display name.</li>
-<li><code>avatar_url</code>: The <code>mxc://</code> URL to the user's avatar.</li>
+<li><code>user_id: str</code>. The Matrix ID for this user.</li>
+<li><code>display_name: Optional[str]</code>. The user's display name, or <code>None</code> if this user
+has not set a display name.</li>
+<li><code>avatar_url: Optional[str]</code>. The <code>mxc://</code> URL to the user's avatar, or <code>None</code>
+if this user has not set an avatar.</li>
 </ul>
 <p>The module is given a copy of the original dictionary, so modifying it from within the
 module cannot modify a user's profile when included in user directory search results.</p>
