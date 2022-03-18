@@ -22,6 +22,7 @@ from synapse.storage.database import (
     LoggingTransaction,
     make_in_list_sql_clause,
 )
+from synapse.storage.databases.main.registration import RegistrationWorkerStore
 from synapse.util.caches.descriptors import cached
 from synapse.util.threepids import canonicalise_email
 
@@ -222,7 +223,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         )
 
 
-class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
+class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore, RegistrationWorkerStore):
     def __init__(
         self,
         database: DatabasePool,
@@ -267,7 +268,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
             user_id = self.get_user_id_by_threepid_txn(txn, tp["medium"], tp["address"])  # type: ignore[attr-defined]
 
             if user_id:
-                is_support = self.is_support_user_txn(txn, user_id)  # type: ignore[attr-defined]
+                is_support = self.is_support_user_txn(txn, user_id)
                 if not is_support:
                     # We do this manually here to avoid hitting #6791
                     self.db_pool.simple_upsert_txn(
@@ -294,7 +295,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
         # _initialise_reserved_users reasoning that it would be very strange to
         #  include a support user in this context.
 
-        is_support = await self.is_support_user(user_id)  # type: ignore[attr-defined]
+        is_support = await self.is_support_user(user_id)
         if is_support:
             return
 
@@ -353,7 +354,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
             is_guest = await self.is_guest(user_id)  # type: ignore[attr-defined]
             if is_guest:
                 return
-            is_trial = await self.is_trial_user(user_id)  # type: ignore[attr-defined]
+            is_trial = await self.is_trial_user(user_id)
             if is_trial:
                 return
 
