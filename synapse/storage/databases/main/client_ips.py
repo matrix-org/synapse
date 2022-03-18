@@ -634,20 +634,29 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
         ):
             self.database_engine.lock_table(txn, "user_ips")
 
+        # Keys and values for the `user_ips` upsert.
+        key_columns = "user_id", "access_token", "ip"
+        keys = []
+        value_columns = "user_agent", "device_id", "last_seen"
+        values = []
+
         for entry in to_update.items():
             (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
+            keys.append((user_id, access_token, ip))
+            values.append((user_agent, device_id, last_seen))
 
-            self.db_pool.simple_upsert_txn(
-                txn,
-                table="user_ips",
-                keyvalues={"user_id": user_id, "access_token": access_token, "ip": ip},
-                values={
-                    "user_agent": user_agent,
-                    "device_id": device_id,
-                    "last_seen": last_seen,
-                },
-                lock=False,
-            )
+        self.db_pool.simple_upsert_many_txn(
+            txn,
+            table="user_ips",
+            key_names=key_columns,
+            key_values=keys,
+            value_names=value_columns,
+            value_values=values,
+            # TODO lock=False
+        )
+
+        for entry in to_update.items():
+            (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
 
             # Technically an access token might not be associated with
             # a device so we need to check.
