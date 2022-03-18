@@ -772,7 +772,7 @@ class GroupServerStore(GroupServerWorkerStore):
                 WHERE group_id = ? AND category_id = ?
             """
             txn.execute(sql, (group_id, category_id))
-            (order,) = cast(Tuple[Optional[int]], txn.fetchone())
+            (order,) = cast(Tuple[int], txn.fetchone())
 
         if existing:
             to_update = {}
@@ -1011,7 +1011,7 @@ class GroupServerStore(GroupServerWorkerStore):
                 WHERE group_id = ? AND role_id = ?
             """
             txn.execute(sql, (group_id, role_id))
-            (order,) = cast(Tuple[Optional[int]], txn.fetchone())
+            (order,) = cast(Tuple[int], txn.fetchone())
 
         if existing:
             to_update = {}
