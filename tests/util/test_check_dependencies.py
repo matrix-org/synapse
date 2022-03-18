@@ -68,7 +68,7 @@ class TestDependencyChecker(TestCase):
                 # should not raise
                 check_requirements()
 
-    def test_version_reported_as_None(self) -> None:
+    def test_version_reported_as_none(self) -> None:
         """Complain if importlib.metadata.version() returns None.
 
         This shouldn't normally happen, but it was seen in the wild (#12223).
