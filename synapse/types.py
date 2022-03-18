@@ -31,11 +31,10 @@ from typing import (
     Union,
 )
 
-from typing_extensions import TypedDict
-
 import attr
 from frozendict import frozendict
 from signedjson.key import decode_verify_key_bytes
+from typing_extensions import TypedDict
 from unpaddedbase64 import decode_base64
 from zope.interface import Interface
 
