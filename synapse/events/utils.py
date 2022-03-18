@@ -38,8 +38,8 @@ from synapse.util.frozenutils import unfreeze
 from . import EventBase
 
 if TYPE_CHECKING:
+    from synapse.handlers.relations import BundledAggregations
     from synapse.server import HomeServer
-    from synapse.storage.databases.main.relations import BundledAggregations
 
 
 # Split strings on "." but not "\." This uses a negative lookbehind assertion for '\'
