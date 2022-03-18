@@ -130,7 +130,7 @@ def _incorrect_version(
 
 def _no_reported_version(
     requirement: Requirement, extra: Optional[str] = None
-):
+) -> str:
     if extra:
         return (
             f"Synapse {VERSION} needs {requirement} for {extra}, "
@@ -181,7 +181,10 @@ def check_requirements(extra: Optional[str] = None) -> None:
             if dist.version is None:
                 # This shouldn't happen---it suggests a borked virtualenv. (See #12223)
                 # Try to give a vaguely helpful error message anyway.
-                deps_unfulfilled.append(requirement.name)
+                # Type-ignore: the annotations don't reflect reality: see
+                #     https://github.com/python/typeshed/issues/7513
+                #     https://bugs.python.org/issue47060
+                deps_unfulfilled.append(requirement.name)  # type: ignore[unreachable]
                 errors.append(_no_reported_version(requirement, extra))
 
             # We specify prereleases=True to allow prereleases such as RCs.
