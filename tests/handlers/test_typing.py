@@ -46,7 +46,7 @@ OTHER_ROOM_ID = "another-room"
 
 
 def _expect_edu_transaction(
-    edu_type: str, content: JsonDict, origin="test"
+    edu_type: str, content: JsonDict, origin: str = "test"
 ) -> JsonDict:
     return {
         "origin": origin,
