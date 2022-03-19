@@ -43,10 +43,18 @@ class UserSharedRoomsServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
         self.user_directory_active = hs.config.server.update_user_directory
+        self.hs = hs
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
+
+        if not self.hs.config.userdirectory.user_directory_search_enabled:
+            raise SynapseError(
+                code=400,
+                msg="User directory searching is disabled",
+                errcode=Codes.UNKNOWN,
+            )
 
         UserID.from_string(user_id)
 
