@@ -68,7 +68,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
     ) -> None:
         super().__init__(database, db_conn, hs)
 
-        self.server_name = hs.hostname
+        self.server_name: str = hs.hostname
 
         self.db_pool.updates.register_background_update_handler(
             "populate_user_directory_createtables",
