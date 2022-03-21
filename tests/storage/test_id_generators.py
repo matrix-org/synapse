@@ -500,7 +500,7 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
     def _insert_row(self, instance_name: str, stream_id: int) -> None:
         """Insert one row as the given instance with given stream_id."""
 
-        def _insert(txn: LoggingTransaction):
+        def _insert(txn: LoggingTransaction) -> None:
             txn.execute(
                 "INSERT INTO foobar VALUES (?, ?)",
                 (
