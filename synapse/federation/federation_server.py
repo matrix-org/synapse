@@ -22,7 +22,6 @@ from typing import (
     Callable,
     Collection,
     Dict,
-    Iterable,
     List,
     Optional,
     Tuple,
@@ -577,10 +576,10 @@ class FederationServer(FederationBase):
     async def _on_context_state_request_compute(
         self, room_id: str, event_id: Optional[str]
     ) -> Dict[str, list]:
+        pdus: Collection[EventBase]
         if event_id:
-            pdus: Iterable[EventBase] = await self.handler.get_state_for_pdu(
-                room_id, event_id
-            )
+            event_ids = await self.handler.get_state_ids_for_pdu(room_id, event_id)
+            pdus = await self.store.get_events_as_list(event_ids)
         else:
             pdus = (await self.state.get_current_state(room_id)).values()
 
