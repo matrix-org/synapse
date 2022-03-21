@@ -261,7 +261,10 @@ class SynapseHomeServer(HomeServer):
             resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
         if name == "metrics" and self.config.metrics.enable_metrics:
-            resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
+            metrics_resource: Resource = MetricsResource(RegistryProxy)
+            if compress:
+                metrics_resource = gz_wrap(metrics_resource)
+            resources[METRICS_PREFIX] = metrics_resource
 
         if name == "replication":
             resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
