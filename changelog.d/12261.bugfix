@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.52 where admins could not deactivate and GDPR-eerase a user if Synapse was configured with limits on avatars.
