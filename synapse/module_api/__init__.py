@@ -659,7 +659,8 @@ class ModuleApi:
     def record_user_external_id(
         self, auth_provider_id: str, remote_user_id: str, registered_user_id: str
     ) -> defer.Deferred:
-        """Record a mapping from an external user id to a mxid
+        """Record a mapping between an external user id from a single sign-on provider
+        and a mxid.
 
         Added in Synapse v1.9.0.
 
@@ -1281,7 +1282,7 @@ class ModuleApi:
 
         The association must already exist on the remote identity server.
 
-        Added in Synapse v1.55.0.
+        Added in Synapse v1.56.0.
 
         Args:
             user_id: The user ID that's been associated with the 3PID.
@@ -1289,6 +1290,12 @@ class ModuleApi:
                 "email").
             address: The address of the 3PID.
             id_server: The identity server the 3PID association has been registered on.
+                This should only be the domain (or IP address, optionally with the port
+                number) for the identity server. This will be used to reach out to the
+                identity server using HTTPS (unless specified otherwise by Synapse's
+                configuration) when attempting to unbind the third-party identifier.
+
+
         """
         await self._store.add_user_bound_threepid(user_id, medium, address, id_server)
 
