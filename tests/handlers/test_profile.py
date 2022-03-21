@@ -268,6 +268,12 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertTrue(res)
 
     @unittest.override_config({"max_avatar_size": 50})
+    def test_avatar_constraints_allow_empty_avatar_url(self) -> None:
+        """An empty avatar is always permitted."""
+        res = self.get_success(self.handler.check_avatar_size_and_mime_type(""))
+        self.assertTrue(res)
+
+    @unittest.override_config({"max_avatar_size": 50})
     def test_avatar_constraints_missing(self) -> None:
         """Tests that an avatar isn't allowed if the file at the given MXC URI couldn't
         be found.
