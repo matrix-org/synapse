@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest.mock import Mock
+from unittest.mock import patch
 
 from synapse.storage.database import make_conn
 from synapse.storage.engines._base import IncorrectDatabaseSetup
@@ -21,8 +21,9 @@ from tests.unittest import HomeserverTestCase
 
 
 class UnsafeLocaleTest(HomeserverTestCase):
-    def test_unsafe_locale(self):
-        PostgresEngine.get_db_locale = Mock(return_value=("B", "B"))  # type: ignore[assignment]
+    @patch("synapse.storage.engines.postgres.PostgresEngine.get_db_locale")
+    def test_unsafe_locale(self, mock_db_locale):
+        mock_db_locale.return_value = ("B", "B")
         database = self.hs.get_datastores().databases[0]
 
         # Only run this on postgres databases
