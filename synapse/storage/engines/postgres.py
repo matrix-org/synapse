@@ -83,6 +83,10 @@ class PostgresEngine(BaseDatabaseEngine):
 
             collation, ctype = self.get_db_locale(txn)
             if collation != "C":
+                logger.warning(
+                    "Database has incorrect collation of %r. Should be 'C'",
+                    collation,
+                )
                 if not allow_unsafe_locale:
                     raise IncorrectDatabaseSetup(
                         "Database has incorrect collation of %r. Should be 'C'\n"
@@ -93,6 +97,10 @@ class PostgresEngine(BaseDatabaseEngine):
 
             if ctype != "C":
                 if not allow_unsafe_locale:
+                    logger.warning(
+                        "Database has incorrect ctype of %r. Should be 'C'",
+                        ctype,
+                    )
                     raise IncorrectDatabaseSetup(
                         "Database has incorrect ctype of %r. Should be 'C'\n"
                         "See docs/postgres.md for more information. You can override this check by"
