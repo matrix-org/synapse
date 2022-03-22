@@ -616,6 +616,7 @@ class ModuleApi:
         """Registers a new user with given localpart and optional displayname, emails.
 
         Added in Synapse v1.2.0.
+        Changed in Synapse v1.56.0: add 'admin' argument to register the user as admin.
 
         Args:
             localpart: The localpart of the new user.
