@@ -62,7 +62,7 @@ function validateUsername(username) {
     usernameField.parentElement.classList.remove("invalid");
     usernameOutput.classList.remove("error");
     if (!username) {
-        return reportError("Please provide a username");
+        return reportError("This is required. Please provide a username");
     }
     if (username.length > 255) {
         return reportError("Too long, please choose something shorter");
