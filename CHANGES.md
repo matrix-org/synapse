@@ -1,3 +1,12 @@
+Synapse 1.55.0 (2022-03-22)
+===========================
+
+Internal Changes
+----------------
+
+- Tweak copy for default sso account details template to better adhere to mobile app store guidelines. ([\#12265](https://github.com/matrix-org/synapse/issues/12265), [\#12260](https://github.com/matrix-org/synapse/issues/12260))
+
+
 Synapse 1.55.0rc1 (2022-03-15)
 ==============================
 
