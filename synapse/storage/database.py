@@ -288,7 +288,7 @@ class LoggingTransaction:
         """
 
         if isinstance(self.database_engine, PostgresEngine):
-            from psycopg2.extras import execute_batch  # type: ignore
+            from psycopg2.extras import execute_batch
 
             self._do_execute(lambda *x: execute_batch(self.txn, *x), sql, args)
         else:
@@ -302,7 +302,7 @@ class LoggingTransaction:
         rows (e.g. INSERTs).
         """
         assert isinstance(self.database_engine, PostgresEngine)
-        from psycopg2.extras import execute_values  # type: ignore
+        from psycopg2.extras import execute_values
 
         return self._do_execute(
             # Type ignore: mypy is unhappy because if `x` is a 5-tuple, then there will
