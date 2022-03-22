@@ -63,6 +63,14 @@ _MEMBERSHIP_PROFILE_UPDATE_NAME = "room_membership_profile_update"
 _CURRENT_STATE_MEMBERSHIP_UPDATE_NAME = "current_state_events_membership"
 
 
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class EventIdMembership:
+    """Returned by `get_membership_from_event_ids`"""
+
+    user_id: str
+    membership: str
+
+
 class RoomMemberWorkerStore(EventsWorkerStore):
     def __init__(
         self,
@@ -1002,10 +1010,10 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     async def get_membership_from_event_ids(
         self, member_event_ids: Iterable[str]
-    ) -> List[dict]:
+    ) -> Dict[str, EventIdMembership]:
         """Get user_id and membership of a set of event IDs."""
 
-        return await self.db_pool.simple_select_many_batch(
+        rows = await self.db_pool.simple_select_many_batch(
             table="room_memberships",
             column="event_id",
             iterable=member_event_ids,
@@ -1014,6 +1022,13 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             batch_size=500,
             desc="get_membership_from_event_ids",
         )
+
+        return {
+            row["event_id"]: EventIdMembership(
+                membership=row["memebrship"], user_id=row["user_id"]
+            )
+            for row in rows
+        }
 
     async def is_local_host_in_room_ignoring_users(
         self, room_id: str, ignore_users: Collection[str]

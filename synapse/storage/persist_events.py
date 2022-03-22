@@ -1023,8 +1023,12 @@ class EventsPersistenceStorage:
 
         # Check if any of the changes that we don't have events for are joins.
         if events_to_check:
-            rows = await self.main_store.get_membership_from_event_ids(events_to_check)
-            is_still_joined = any(row["membership"] == Membership.JOIN for row in rows)
+            members = await self.main_store.get_membership_from_event_ids(
+                events_to_check
+            )
+            is_still_joined = any(
+                member.membership == Membership.JOIN for member in members.values()
+            )
             if is_still_joined:
                 return True
 
@@ -1060,9 +1064,11 @@ class EventsPersistenceStorage:
             ), event_id in current_state.items()
             if typ == EventTypes.Member and not self.is_mine_id(state_key)
         ]
-        rows = await self.main_store.get_membership_from_event_ids(remote_event_ids)
+        members = await self.main_store.get_membership_from_event_ids(remote_event_ids)
         potentially_left_users.update(
-            row["user_id"] for row in rows if row["membership"] == Membership.JOIN
+            member.user_id
+            for member in members.values()
+            if member.membership == Membership.JOIN
         )
 
         return False
