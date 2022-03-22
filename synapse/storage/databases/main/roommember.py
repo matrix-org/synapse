@@ -1008,6 +1008,15 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return set(room_ids)
 
+    @cached(max_entries=5000)
+    async def _get_membership_from_event_id(
+        self, member_event_id: str
+    ) -> EventIdMembership:
+        raise NotImplementedError()
+
+    @cachedList(
+        cached_method_name="_get_membership_from_event_id", list_name="member_event_ids"
+    )
     async def get_membership_from_event_ids(
         self, member_event_ids: Iterable[str]
     ) -> Dict[str, EventIdMembership]:
@@ -1025,7 +1034,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return {
             row["event_id"]: EventIdMembership(
-                membership=row["memebrship"], user_id=row["user_id"]
+                membership=row["membership"], user_id=row["user_id"]
             )
             for row in rows
         }
