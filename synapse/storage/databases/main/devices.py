@@ -688,6 +688,7 @@ class DeviceWorkerStore(SQLBaseStore):
     ) -> Set[str]:
         """Get set of users whose devices have changed since `from_key` that
         are in the given list of user_ids.
+
         Args:
             from_key: The minimum device lists stream token to query device list changes for,
                 exclusive.
@@ -695,6 +696,7 @@ class DeviceWorkerStore(SQLBaseStore):
                 Otherwise changes from all users are returned.
             to_key: The maximum device lists stream token to query device list changes for,
                 inclusive.
+
         Returns:
             The set of user_ids whose devices have changed since `from_key` (exclusive)
                 until `to_key` (inclusive).
