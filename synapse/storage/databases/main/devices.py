@@ -723,7 +723,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
             if to_key:
                 stream_id_where_clause += " AND stream_id <= ?"
-                sql_args += [to_key]
+                sql_args.append(to_key)
 
             sql = f"""
                 SELECT DISTINCT user_id FROM device_lists_stream
@@ -736,9 +736,7 @@ class DeviceWorkerStore(SQLBaseStore):
                 clause, args = make_in_list_sql_clause(
                     txn.database_engine, "user_id", chunk
                 )
-                sql_args += args
-
-                txn.execute(sql + clause, sql_args)
+                txn.execute(sql + clause, sql_args + args)
                 changes.update(user_id for user_id, in txn)
 
             return changes

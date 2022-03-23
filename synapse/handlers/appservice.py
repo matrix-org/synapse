@@ -608,7 +608,7 @@ class ApplicationServicesHandler:
         # Fetch the users who have modified their device list since then.
         users_with_changed_device_lists = (
             await self.store.get_users_whose_devices_changed(
-                from_key, user_ids=None, to_key=new_key
+                from_key, to_key=new_key
             )
         )
 

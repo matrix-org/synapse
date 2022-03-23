@@ -240,19 +240,15 @@ class _ServiceQueuer:
                     #   * Remove them from the existing "left" set if necessary
                     #     (as we need to start tracking them again)
                     #   * Add them to the existing "changed" set if necessary.
-                    for user_id in summary.changed:
-                        if user_id in device_list_summary.left:
-                            device_list_summary.left.remove(user_id)
-                        device_list_summary.changed.add(user_id)
+                    device_list_summary.left -= summary.changed
+                    device_list_summary.changed.update(summary.changed)
 
                     # For every user in the incoming "left" set:
                     #   * Remove them from the existing "changed" set if necessary
                     #     (we no longer need to track them)
                     #   * Add them to the existing "left" set if necessary.
-                    for user_id in summary.left:
-                        if user_id in device_list_summary.changed:
-                            device_list_summary.changed.remove(user_id)
-                        device_list_summary.left.add(user_id)
+                    device_list_summary.changed -= summary.left
+                    device_list_summary.left.update(summary.left)
 
                 if (
                     not events
