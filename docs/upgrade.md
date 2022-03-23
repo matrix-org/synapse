@@ -88,8 +88,10 @@ process, for example:
 # Upgrading to v1.55.0
 
 ## Open registration without verification is now disabled by default
+
 Synapse will refuse to start if registration is enabled without email, captcha, or token-based verification unless the new config 
 flag `enable_registration_without_verification` is set to "true".
+
 
 ## `synctl` script has been moved
 
