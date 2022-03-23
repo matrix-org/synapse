@@ -1,4 +1,3 @@
-include synctl
 include LICENSE
 include VERSION
 include *.rst
@@ -17,7 +16,6 @@ recursive-include synapse/storage *.txt
 recursive-include synapse/storage *.md
 
 recursive-include docs *
-recursive-include scripts *
 recursive-include scripts-dev *
 recursive-include synapse *.pyi
 recursive-include tests *.py
@@ -53,5 +51,4 @@ prune contrib
 prune debian
 prune demo/etc
 prune docker
-prune snap
 prune stubs

@@ -47,7 +47,7 @@ this document.
     3.  Restart Synapse:
 
         ```bash
-        ./synctl restart
+        synctl restart
         ```
 
 To check whether your update was successful, you can check the running
@@ -84,6 +84,49 @@ process, for example:
     wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
+
+# Upgrading to v1.56.0
+
+## Groups/communities feature has been deprecated
+
+The non-standard groups/communities feature in Synapse has been deprecated and will
+be disabled by default in Synapse v1.58.0.
+
+You can test disabling it by adding the following to your homeserver configuration:
+
+```yaml
+experimental_features:
+  groups_enabled: false
+```
+
+# Upgrading to v1.55.0
+
+## `synctl` script has been moved
+
+The `synctl` script
+[has been made](https://github.com/matrix-org/synapse/pull/12140) an
+[entry point](https://packaging.python.org/en/latest/specifications/entry-points/)
+and no longer exists at the root of Synapse's source tree. If you wish to use
+`synctl` to manage your homeserver, you should invoke `synctl` directly, e.g. 
+`synctl start` instead of `./synctl start` or `/path/to/synctl start`. 
+
+You will need to ensure `synctl` is on your `PATH`.
+  - This is automatically the case when using
+    [Debian packages](https://packages.matrix.org/debian/) or
+    [docker images](https://hub.docker.com/r/matrixdotorg/synapse)
+    provided by Matrix.org.
+  - When installing from a wheel, sdist, or PyPI, a `synctl` executable is added 
+    to your Python installation's `bin`. This should be on your `PATH`
+    automatically, though you might need to activate a virtual environment
+    depending on how you installed Synapse.
+
+
+## Compatibility dropped for Mjolnir 1.3.1 and earlier
+
+Synapse v1.55.0 drops support for Mjolnir 1.3.1 and earlier.
+If you use the Mjolnir module to moderate your homeserver,
+please upgrade Mjolnir to version 1.3.2 or later before upgrading Synapse.
+
 
 # Upgrading to v1.54.0
 

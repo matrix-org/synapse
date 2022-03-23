@@ -1069,6 +1069,9 @@ class EventCreationHandler:
         if relation_type == RelationTypes.ANNOTATION:
             aggregation_key = relation["key"]
 
+            if len(aggregation_key) > 500:
+                raise SynapseError(400, "Aggregation key is too long")
+
             already_exists = await self.store.has_user_annotated_event(
                 relates_to, event.type, aggregation_key, event.sender
             )
@@ -1076,7 +1079,10 @@ class EventCreationHandler:
                 raise SynapseError(400, "Can't send same reaction twice")
 
         # Don't attempt to start a thread if the parent event is a relation.
-        elif relation_type == RelationTypes.THREAD:
+        elif (
+            relation_type == RelationTypes.THREAD
+            or relation_type == RelationTypes.UNSTABLE_THREAD
+        ):
             if await self.store.event_includes_relation(relates_to):
                 raise SynapseError(
                     400, "Cannot start threads from an event with a relation"

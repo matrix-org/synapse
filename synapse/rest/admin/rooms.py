@@ -75,6 +75,7 @@ class RoomRestV2Servlet(RestServlet):
         self._auth = hs.get_auth()
         self._store = hs.get_datastores().main
         self._pagination_handler = hs.get_pagination_handler()
+        self._third_party_rules = hs.get_third_party_event_rules()
 
     async def on_DELETE(
         self, request: SynapseRequest, room_id: str
@@ -112,6 +113,14 @@ class RoomRestV2Servlet(RestServlet):
         if not RoomID.is_valid(room_id):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST, "%s is not a legal room ID" % (room_id,)
+            )
+
+        # Check this here, as otherwise we'll only fail after the background job has been started.
+        if not await self._third_party_rules.check_can_shutdown_room(
+            requester.user.to_string(), room_id
+        ):
+            raise SynapseError(
+                403, "Shutdown of this room is forbidden", Codes.FORBIDDEN
             )
 
         delete_id = self._pagination_handler.start_shutdown_and_purge_room(

@@ -31,7 +31,7 @@ jobs:
           # if we're running from a tag, get the full list of distros; otherwise just use debian:sid
           dists='["debian:sid"]'
           if [[ $GITHUB_REF == refs/tags/* ]]; then
-              dists=$(scripts-dev/build_debian_packages --show-dists-json)
+              dists=$(scripts-dev/build_debian_packages.py --show-dists-json)
           fi
           echo "::set-output name=distros::$dists"
     # map the step outputs to job outputs
@@ -74,7 +74,7 @@ jobs:
         # see https://github.com/docker/build-push-action/issues/252
         # for the cache magic here
         run: |
-          ./src/scripts-dev/build_debian_packages \
+          ./src/scripts-dev/build_debian_packages.py \
             --docker-build-arg=--cache-from=type=local,src=/tmp/.buildx-cache \
             --docker-build-arg=--cache-to=type=local,mode=max,dest=/tmp/.buildx-cache-new \
             --docker-build-arg=--progress=plain \
@@ -112,7 +112,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: |
-            python-dist/*
+            Sdist/*
+            Wheel/*
             debs.tar.xz
           # if it's not already published, keep the release as a draft.
           draft: true

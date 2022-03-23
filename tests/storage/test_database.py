@@ -13,24 +13,8 @@
 # limitations under the License.
 
 from synapse.storage.database import make_tuple_comparison_clause
-from synapse.storage.engines import BaseDatabaseEngine
 
 from tests import unittest
-
-
-def _stub_db_engine(**kwargs) -> BaseDatabaseEngine:
-    # returns a DatabaseEngine, circumventing the abc mechanism
-    # any kwargs are set as attributes on the class before instantiating it
-    t = type(
-        "TestBaseDatabaseEngine",
-        (BaseDatabaseEngine,),
-        dict(BaseDatabaseEngine.__dict__),
-    )
-    # defeat the abc mechanism
-    t.__abstractmethods__ = set()
-    for k, v in kwargs.items():
-        setattr(t, k, v)
-    return t(None, None)
 
 
 class TupleComparisonClauseTestCase(unittest.TestCase):

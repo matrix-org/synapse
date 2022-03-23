@@ -28,7 +28,7 @@ This can be extracted from postgres with::
 
 To use, pipe the above into::
 
-    PYTHON_PATH=. ./scripts/move_remote_media_to_new_store.py <source repo> <dest repo>
+    PYTHON_PATH=. synapse/_scripts/move_remote_media_to_new_store.py <source repo> <dest repo>
 """
 
 import argparse

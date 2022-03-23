@@ -82,6 +82,7 @@
   - [Release Cycle](development/releases.md)
   - [Git Usage](development/git.md)
   - [Testing]()
+    - [Demo scripts](development/demo.md)
   - [OpenTracing](opentracing.md)
   - [Database Schemas](development/database_schema.md)
   - [Experimental features](development/experimental_features.md)

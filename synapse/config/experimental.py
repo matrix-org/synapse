@@ -76,3 +76,6 @@ class ExperimentalConfig(Config):
 
         # MSC3720 (Account status endpoint)
         self.msc3720_enabled: bool = experimental.get("msc3720_enabled", False)
+
+        # The deprecated groups feature.
+        self.groups_enabled: bool = experimental.get("groups_enabled", True)

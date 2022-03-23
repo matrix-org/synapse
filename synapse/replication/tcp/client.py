@@ -380,7 +380,7 @@ class FederationSenderHandler:
             # changes.
             hosts = {row.entity for row in rows if not row.entity.startswith("@")}
             for host in hosts:
-                self.federation_sender.send_device_messages(host)
+                self.federation_sender.send_device_messages(host, immediate=False)
 
         elif stream_name == ToDeviceStream.NAME:
             # The to_device stream includes stuff to be pushed to both local
@@ -462,6 +462,8 @@ class FederationSenderHandler:
 
                 # We ACK this token over replication so that the master can drop
                 # its in memory queues
-                self._hs.get_tcp_replication().send_federation_ack(current_position)
+                self._hs.get_replication_command_handler().send_federation_ack(
+                    current_position
+                )
         except Exception:
             logger.exception("Error updating federation stream position")

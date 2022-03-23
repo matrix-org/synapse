@@ -270,7 +270,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         # Then filter down to rooms that the AS can read
         events = []
         for room_id, event in rooms_to_events.items():
-            if not await service.matches_user_in_member_list(room_id, self.store):
+            if not await service.is_interested_in_room(room_id, self.store):
                 continue
 
             events.append(event)

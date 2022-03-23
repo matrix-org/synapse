@@ -194,7 +194,7 @@ class StateHandler:
         }
 
     async def get_current_state_ids(
-        self, room_id: str, latest_event_ids: Optional[Iterable[str]] = None
+        self, room_id: str, latest_event_ids: Optional[Collection[str]] = None
     ) -> StateMap[str]:
         """Get the current state, or the state at a set of events, for a room
 
@@ -243,7 +243,7 @@ class StateHandler:
         return await self.get_hosts_in_room_at_events(room_id, event_ids)
 
     async def get_hosts_in_room_at_events(
-        self, room_id: str, event_ids: Iterable[str]
+        self, room_id: str, event_ids: Collection[str]
     ) -> Set[str]:
         """Get the hosts that were in a room at the given event ids
 
@@ -404,7 +404,7 @@ class StateHandler:
 
     @measure_func()
     async def resolve_state_groups_for_events(
-        self, room_id: str, event_ids: Iterable[str]
+        self, room_id: str, event_ids: Collection[str]
     ) -> _StateCacheEntry:
         """Given a list of event_ids this method fetches the state at each
         event, resolves conflicts between them and returns them.
