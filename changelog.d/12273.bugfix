@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse v1.48.0 the latest event provided in bundled aggregations where it did not include bundled aggregations.
