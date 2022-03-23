@@ -365,11 +365,12 @@ new line, it is inserted before:</p>
 </code></pre>
 <h3 id="fixing-incorrect-collate-or-ctype"><a class="header" href="#fixing-incorrect-collate-or-ctype">Fixing incorrect <code>COLLATE</code> or <code>CTYPE</code></a></h3>
 <p>Synapse will refuse to set up a new database if it has the wrong values of
-<code>COLLATE</code> and <code>CTYPE</code> set, and will log warnings on existing databases. Using
-different locales can cause issues if the locale library is updated from
+<code>COLLATE</code> and <code>CTYPE</code> set. Synapse will also refuse to start an existing database with incorrect values
+of <code>COLLATE</code> and <code>CTYPE</code> unless the config flag <code>allow_unsafe_locale</code>, found in the 
+<code>database</code> section of the config, is set to true. Using different locales can cause issues if the locale library is updated from
 underneath the database, or if a different version of the locale is used on any
 replicas.</p>
-<p>The safest way to fix the issue is to dump the database and recreate it with
+<p>If you have a databse with an unsafe locale, the safest way to fix the issue is to dump the database and recreate it with
 the correct locale parameter (as shown above). It is also possible to change the
 parameters on a live database and run a <code>REINDEX</code> on the entire database,
 however extreme care must be taken to avoid database corruption.</p>

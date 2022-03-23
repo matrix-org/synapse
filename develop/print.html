@@ -851,11 +851,12 @@ new line, it is inserted before:</p>
 </code></pre>
 <h3 id="fixing-incorrect-collate-or-ctype"><a class="header" href="#fixing-incorrect-collate-or-ctype">Fixing incorrect <code>COLLATE</code> or <code>CTYPE</code></a></h3>
 <p>Synapse will refuse to set up a new database if it has the wrong values of
-<code>COLLATE</code> and <code>CTYPE</code> set, and will log warnings on existing databases. Using
-different locales can cause issues if the locale library is updated from
+<code>COLLATE</code> and <code>CTYPE</code> set. Synapse will also refuse to start an existing database with incorrect values
+of <code>COLLATE</code> and <code>CTYPE</code> unless the config flag <code>allow_unsafe_locale</code>, found in the 
+<code>database</code> section of the config, is set to true. Using different locales can cause issues if the locale library is updated from
 underneath the database, or if a different version of the locale is used on any
 replicas.</p>
-<p>The safest way to fix the issue is to dump the database and recreate it with
+<p>If you have a databse with an unsafe locale, the safest way to fix the issue is to dump the database and recreate it with
 the correct locale parameter (as shown above). It is also possible to change the
 parameters on a live database and run a <code>REINDEX</code> on the entire database,
 however extreme care must be taken to avoid database corruption.</p>
@@ -3733,6 +3734,12 @@ caches:
 #
 # 'txn_limit' gives the maximum number of transactions to run per connection
 # before reconnecting. Defaults to 0, which means no limit.
+#
+# 'allow_unsafe_locale' is an option specific to Postgres. Under the default behavior, Synapse will refuse to
+# start if the postgres db is set to a non-C locale. You can override this behavior (which is *not* recommended)
+# by setting 'allow_unsafe_locale' to true. Note that doing so may corrupt your database. You can find more information
+# here: https://matrix-org.github.io/synapse/latest/postgres.html#fixing-incorrect-collate-or-ctype and here:
+# https://wiki.postgresql.org/wiki/Locale_data_changes
 #
 # 'args' gives options which are passed through to the database engine,
 # except for options starting 'cp_', which are used to configure the Twisted
