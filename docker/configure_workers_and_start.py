@@ -29,6 +29,7 @@
 import os
 import subprocess
 import sys
+from typing import Dict, Set, cast
 
 import jinja2
 import yaml
@@ -339,7 +340,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     # base shared worker jinja2 template.
     #
     # This config file will be passed to all workers, included Synapse's main process.
-    shared_config = {"listeners": listeners}
+    shared_config: dict = {"listeners": listeners}
 
     # The supervisord config. The contents of which will be inserted into the
     # base supervisord jinja2 template.
@@ -355,7 +356,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     #   worker_type: {1234, 1235, ...}}
     # }
     # and will be used to construct 'upstream' nginx directives.
-    nginx_upstreams = {}
+    nginx_upstreams: Dict[str, Set[int]] = {}
 
     # A map of: {"endpoint": "upstream"}, where "upstream" is a str representing what will be
     # placed after the proxy_pass directive. The main benefit to representing this data as a
@@ -384,7 +385,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     # A counter of worker_type -> int. Used for determining the name for a given
     # worker type when generating its config file, as each worker's name is just
     # worker_type + instance #
-    worker_type_counter = {}
+    worker_type_counter: Dict[str, int] = {}
 
     # For each worker type specified by the user, create config values
     for worker_type in worker_types:
@@ -404,11 +405,11 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
         # e.g. federation_reader1
         worker_name = worker_type + str(new_worker_count)
         worker_config.update(
-            {"name": worker_name, "port": worker_port, "config_path": config_path}
+            {"name": worker_name, "port": str(worker_port), "config_path": config_path}
         )
 
         # Update the shared config with any worker-type specific options
-        shared_config.update(worker_config["shared_extra_conf"])
+        shared_config.update(cast(dict, worker_config["shared_extra_config"]))
 
         # Check if more than one instance of this worker type has been specified
         worker_type_total_count = worker_types.count(worker_type)
