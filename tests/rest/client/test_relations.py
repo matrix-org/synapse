@@ -610,12 +610,13 @@ class RelationsTestCase(BaseRelationsTestCase):
         threaded_event_id = channel.json_body["event_id"]
 
         new_body = {"msgtype": "m.text", "body": "I've been edited!"}
-        self._send_relation(
+        channel = self._send_relation(
             RelationTypes.REPLACE,
             "m.room.message",
             content={"msgtype": "m.text", "body": "foo", "m.new_content": new_body},
             parent_id=threaded_event_id,
         )
+        edit_event_id = channel.json_body["event_id"]
 
         # Fetch the thread root, to get the bundled aggregation for the thread.
         channel = self.make_request(
@@ -634,6 +635,11 @@ class RelationsTestCase(BaseRelationsTestCase):
         self.assertIn("latest_event", thread_summary)
         latest_event_in_thread = thread_summary["latest_event"]
         self.assertEqual(latest_event_in_thread["content"]["body"], "I've been edited!")
+        # The event should also have edit appear under the bundled aggregations.
+        self.assertDictContainsSubset(
+            {"event_id": edit_event_id, "sender": "@alice:test"},
+            latest_event_in_thread["unsigned"]["m.relations"][RelationTypes.REPLACE],
+        )
 
     def test_edit_edit(self) -> None:
         """Test that an edit cannot be edited."""

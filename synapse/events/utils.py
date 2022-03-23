@@ -32,13 +32,13 @@ from frozendict import frozendict
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersion
+from synapse.handlers.relations import BundledAggregations
 from synapse.types import JsonDict
 from synapse.util.frozenutils import unfreeze
 
 from . import EventBase
 
 if TYPE_CHECKING:
-    from synapse.handlers.relations import BundledAggregations
     from synapse.server import HomeServer
 
 
@@ -515,8 +515,12 @@ class EventClientSerializer:
             )
             # Manually apply an edit, if one exists.
             if thread.latest_edit:
-                self._apply_edit(
-                    thread.latest_event, serialized_latest_event, thread.latest_edit
+                self._inject_bundled_aggregations(
+                    thread.latest_event,
+                    time_now,
+                    config,
+                    BundledAggregations(replace=thread.latest_edit),
+                    serialized_latest_event,
                 )
 
             thread_summary = {
