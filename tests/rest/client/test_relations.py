@@ -1192,7 +1192,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations.get("latest_event"),
             )
 
-        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 11)
+        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 10)
 
     @unittest.override_config({"experimental_features": {"msc3666_enabled": True}})
     def test_thread_with_bundled_aggregations_for_latest(self) -> None:
@@ -1239,7 +1239,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations["latest_event"].get("unsigned"),
             )
 
-        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 11)
+        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 10)
 
     def test_thread_loop(self) -> None:
         """Ensure that bogus events do not cause the bundled aggregations code to iterate forever."""

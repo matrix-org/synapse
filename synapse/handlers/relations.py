@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, Iterable, Optional, cast
+from typing import TYPE_CHECKING, Dict, Iterable, Optional, Tuple, cast
 
 import attr
 from frozendict import frozendict
@@ -151,7 +151,7 @@ class RelationsHandler:
 
     async def _get_bundled_aggregation_for_event(
         self, event: EventBase, user_id: str
-    ) -> Optional[BundledAggregations]:
+    ) -> Tuple[Optional[JsonDict], Optional[JsonDict]]:
         """Generate bundled aggregations for an event.
 
         Note that this does not use a cache, but depends on cached methods.
@@ -171,46 +171,36 @@ class RelationsHandler:
         if isinstance(relates_to, (dict, frozendict)):
             relation_type = relates_to.get("rel_type")
             if relation_type in (RelationTypes.ANNOTATION, RelationTypes.REPLACE):
-                return None
+                return None, None
 
         event_id = event.event_id
         room_id = event.room_id
 
-        # The bundled aggregations to include, a mapping of relation type to a
-        # type-specific value. Some types include the direct return type here
-        # while others need more processing during serialization.
-        aggregations = BundledAggregations()
-
         annotations = await self._main_store.get_aggregation_groups_for_event(
             event_id, room_id
         )
+        serialized_annotations = None
         if annotations.chunk:
-            aggregations.annotations = await annotations.to_dict(
-                cast("DataStore", self)
-            )
+            serialized_annotations = await annotations.to_dict(cast("DataStore", self))
 
         references = await self._main_store.get_relations_for_event(
             event_id, event, room_id, RelationTypes.REFERENCE, direction="f"
         )
+        serialized_references = None
         if references.chunk:
-            aggregations.references = await references.to_dict(cast("DataStore", self))
+            serialized_references = await references.to_dict(cast("DataStore", self))
 
         # Store the bundled aggregations in the event metadata for later use.
-        return aggregations
+        return serialized_annotations, serialized_references
 
     async def get_bundled_aggregations(
-        self,
-        events: Iterable[EventBase],
-        user_id: str,
-        fetch_bundled_aggregations_for_threads: bool = True,
+        self, events: Iterable[EventBase], user_id: str
     ) -> Dict[str, BundledAggregations]:
         """Generate bundled aggregations for events.
 
         Args:
             events: The iterable of events to calculate bundled aggregations for.
             user_id: The user requesting the bundled aggregations.
-            fetch_bundled_aggregations_for_threads: True to recurse to fetch the
-                bundled aggregations for the latest event in threads.
 
         Returns:
             A map of event ID to the bundled aggregation for the event.
@@ -231,11 +221,51 @@ class RelationsHandler:
         # event ID -> bundled aggregation in non-serialized form.
         results: Dict[str, BundledAggregations] = {}
 
+        # Threads are special as the latest event of a thread might cause additional
+        # events to be fetched. Thus, we check those first!
+
+        # Fetch thread summaries (but only for the directly requested events).
+        #
+        # Note that you can't have threads off of other related events, but it is
+        # possible for a malicious homeserver to inject them anyway.
+        summaries = await self._main_store.get_thread_summaries(events_by_id.keys())
+        # Only fetch participated for a limited selection based on what had
+        # summaries.
+        participated = await self._main_store.get_threads_participated(
+            [event_id for event_id, summary in summaries.items() if summary],
+            user_id,
+        )
+        for event_id, summary in summaries.items():
+            if summary:
+                thread_count, latest_thread_event = summary
+
+                # If the latest event in a thread is not already being fetched,
+                # add it to the events. (Note that we don't mo
+                if (
+                    latest_thread_event
+                    and latest_thread_event.event_id not in events_by_id
+                ):
+                    events_by_id[latest_thread_event.event_id] = latest_thread_event
+
+                results.setdefault(
+                    event_id, BundledAggregations()
+                ).thread = _ThreadAggregation(
+                    latest_event=latest_thread_event,
+                    count=thread_count,
+                    # If there's a thread summary it must also exist in the
+                    # participated dictionary.
+                    current_user_participated=participated[event_id],
+                )
+
         # Fetch other relations per event.
         for event in events_by_id.values():
-            event_result = await self._get_bundled_aggregation_for_event(event, user_id)
-            if event_result:
-                results[event.event_id] = event_result
+            annotations, references = await self._get_bundled_aggregation_for_event(
+                event, user_id
+            )
+            if annotations or references:
+                aggregations = results.setdefault(event.event_id, BundledAggregations())
+                aggregations.annotations = annotations
+                aggregations.references = references
 
         # Fetch any edits (but not for redacted events).
         edits = await self._main_store.get_applicable_edits(
@@ -247,51 +277,5 @@ class RelationsHandler:
         )
         for event_id, edit in edits.items():
             results.setdefault(event_id, BundledAggregations()).replace = edit
-
-        # Fetch thread summaries (but only for the directly requested events).
-        #
-        # Note that you can't have threads off of other related events, but it is
-        # possible for a malicious homeserver to inject them anyway.
-        if fetch_bundled_aggregations_for_threads:
-            summaries = await self._main_store.get_thread_summaries(events_by_id.keys())
-            # Only fetch participated for a limited selection based on what had
-            # summaries.
-            participated = await self._main_store.get_threads_participated(
-                [event_id for event_id, summary in summaries.items() if summary],
-                user_id,
-            )
-            # Additional events to check for bundled aggregations (i.e. the
-            # latest events in the threads).
-            additional_events = set()
-            for event_id, summary in summaries.items():
-                if summary:
-                    thread_count, latest_thread_event = summary
-
-                    # If the latest event in a thread is not already being fetched,
-                    # add it to the events.
-                    if (
-                        latest_thread_event
-                        and latest_thread_event.event_id not in events_by_id
-                    ):
-                        additional_events.add(latest_thread_event)
-
-                    results.setdefault(
-                        event_id, BundledAggregations()
-                    ).thread = _ThreadAggregation(
-                        latest_event=latest_thread_event,
-                        count=thread_count,
-                        # If there's a thread summary it must also exist in the
-                        # participated dictionary.
-                        current_user_participated=participated[event_id],
-                    )
-
-            if additional_events:
-                results.update(
-                    await self.get_bundled_aggregations(
-                        additional_events,
-                        user_id,
-                        fetch_bundled_aggregations_for_threads=False,
-                    )
-                )
 
         return results
