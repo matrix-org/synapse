@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional
 
 from typing_extensions import TypedDict
 
-from synapse.api.errors import Codes, LoginError, SynapseError
+from synapse.api.errors import Codes, LoginError, SynapseError, UserDeactivatedError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.appservice import ApplicationService
@@ -319,6 +319,12 @@ class LoginRestServlet(RestServlet):
                 canonical_uid = await self.registration_handler.register_user(
                     localpart=UserID.from_string(user_id).localpart
                 )
+            else: # check if user deactivated
+                deactivated = await self.hs.get_datastore().get_user_deactivated_status(canonical_uid)
+                if deactivated:
+                    raise UserDeactivatedError("This account has been deactivated") 
+                                   
+
             user_id = canonical_uid
 
         device_id = login_submission.get("device_id")
