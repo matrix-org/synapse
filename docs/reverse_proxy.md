@@ -182,11 +182,9 @@ matrix.example.com {
 
 ```
 frontend https
-  bind :::443 v4v6 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
-  http-request set-header X-Forwarded-Proto https if { ssl_fc }
-  http-request set-header X-Forwarded-Proto http if !{ ssl_fc }
-  http-request set-header X-Forwarded-For %[src]
-
+  # Uncomment the line in the end to disable TLS <= v1.2 
+  bind *:443,[::]:443 ssl crt /path/to/certificate.pem alpn h2,http/1.1 # ssl-min-ver TLSv1.2
+  
   # Matrix client traffic
   acl matrix-host hdr(host) -i matrix.example.com matrix.example.com:443
   acl matrix-path path_beg /_matrix
@@ -195,17 +193,23 @@ frontend https
   use_backend matrix if matrix-host matrix-path
 
 frontend matrix-federation
-  bind :::8448 v4v6 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1
-  http-request set-header X-Forwarded-Proto https if { ssl_fc }
-  http-request set-header X-Forwarded-Proto http if !{ ssl_fc }
-  http-request set-header X-Forwarded-For %[src]
-
+  # Uncomment the line in the end to disable TLS <= v1.2
+  bind *:8448,[::]:8448 ssl crt /path/to/certificate.pem alpn h2,http/1.1 # ssl-min-ver TLSv1.2
+  
   default_backend matrix
 
 backend matrix
-  server matrix 127.0.0.1:8008
+  option forwardfor
+  http-request set-header X-Forwarded-Proto https
+  server matrix localhost:8008 # 127.0.0.1:8008 or [::1]:8008 should also work
 ```
-
+[Delegation](delegate.md) example:
+```
+frontend https
+  # Add this anywhere in your frontend config
+  http-request return status 200 content-type application/json lf-string '{"m.server": "matrix.example.com:443"}' if { path -i -m str /.well-known/matrix/server }
+  http-request return status 200 content-type application/json lf-string '{"m.server": {"base_url": "matrix.example.com:443"}}' if { path -i -m str /.well-known/matrix/client }
+```
 ### Relayd
 
 ```
