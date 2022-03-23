@@ -9276,9 +9276,16 @@ and you must configure a single instance to run the background tasks, e.g.:</p>
 the following regular expressions:</p>
 <pre><code>^/_matrix/client/(r0|v3|unstable)/user_directory/search$
 </code></pre>
-<p>When using this worker you must also set <code>update_user_directory: False</code> in the
+<p>When using this worker you must also set <code>update_user_directory: false</code> in the
 shared configuration file to stop the main synapse running background
 jobs related to updating the user directory.</p>
+<p>Above endpoint is not <em>required</em> to be routed to this worker. By default,
+<code>update_user_directory</code> is set to <code>true</code>, which means the main process
+will handle updates. All workers configured with <code>client</code> can handle the above
+endpoint as long as either this worker or the main process are configured to
+handle it, and are online.</p>
+<p>If <code>update_user_directory</code> is set to <code>false</code>, and this worker is not running,
+the above endpoint may give outdated results.</p>
 <h3 id="synapseappfrontend_proxy"><a class="header" href="#synapseappfrontend_proxy"><code>synapse.app.frontend_proxy</code></a></h3>
 <p>Proxies some frequently-requested client endpoints to add caching and remove
 load from the main synapse. It can handle REST endpoints matching the following
