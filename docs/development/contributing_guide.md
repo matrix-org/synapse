@@ -261,7 +261,7 @@ This configuration should generally cover your needs.
 - To run with Postgres, supply the `-e POSTGRES=1 -e MULTI_POSTGRES=1` environment flags.
 - To run with Synapse in worker mode, supply the `-e WORKERS=1 -e REDIS=1` environment flags (in addition to the Postgres flags).
 
-For more details about other configurations, see [documentation in the SyTest repo](https://github.com/matrix-org/sytest/blob/develop/docker/README.md).
+For more details about other configurations, see the [Docker-specific documentation in the SyTest repo](https://github.com/matrix-org/sytest/blob/develop/docker/README.md).
 
 
 ## Run the integration tests ([Complement](https://github.com/matrix-org/complement)).
