@@ -274,7 +274,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
                 # have an event_search_fts_idx; unfortunately postgres 9.4
                 # doesn't support CREATE INDEX IF EXISTS so we just catch the
                 # exception and ignore it.
-                import psycopg2  # type: ignore
+                import psycopg2
 
                 try:
                     c.execute(
