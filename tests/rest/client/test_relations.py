@@ -1192,7 +1192,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations.get("latest_event"),
             )
 
-        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 12)
+        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 11)
 
     @unittest.override_config({"experimental_features": {"msc3666_enabled": True}})
     def test_thread_with_bundled_aggregations_for_latest(self) -> None:
@@ -1239,7 +1239,34 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations["latest_event"].get("unsigned"),
             )
 
-        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 12)
+        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 11)
+
+    def test_thread_loop(self) -> None:
+        """Ensure that bogus events do not cause the bundled aggregations code to iterate forever."""
+        last_event = self.parent_id
+
+        # Disable the validation to pretend this came over federation.
+        with patch(
+            "synapse.handlers.message.EventCreationHandler._validate_event_relation",
+            new=lambda self, event: make_awaitable(None),
+        ):
+            for _ in range(2):
+                channel = self._send_relation(
+                    RelationTypes.THREAD, "m.room.test", parent_id=last_event
+                )
+                last_event = channel.json_body["event_id"]
+
+        # Fetch the thread root, to get the bundled aggregation for the thread.
+        relations = self._get_bundled_aggregations()
+
+        # The latest event should have bundled aggregations.
+        self.assertIn(RelationTypes.THREAD, relations)
+        thread_summary = relations[RelationTypes.THREAD]
+        self.assertIn("latest_event", thread_summary)
+
+        # The latest event should not have any bundled aggregations (since it
+        # only has a thread attached.
+        self.assertNotIn("m.relations", thread_summary["latest_event"]["unsigned"])
 
     def test_thread_edit_latest_event(self) -> None:
         """Test that editing the latest event in a thread works."""

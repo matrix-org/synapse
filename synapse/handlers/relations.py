@@ -199,13 +199,18 @@ class RelationsHandler:
         return aggregations
 
     async def get_bundled_aggregations(
-        self, events: Iterable[EventBase], user_id: str
+        self,
+        events: Iterable[EventBase],
+        user_id: str,
+        fetch_bundled_aggregations_for_threads: bool = True,
     ) -> Dict[str, BundledAggregations]:
         """Generate bundled aggregations for events.
 
         Args:
             events: The iterable of events to calculate bundled aggregations for.
             user_id: The user requesting the bundled aggregations.
+            fetch_bundled_aggregations_for_threads: True to recurse to fetch the
+                bundled aggregations for the latest event in threads.
 
         Returns:
             A map of event ID to the bundled aggregation for the event.
@@ -243,39 +248,50 @@ class RelationsHandler:
         for event_id, edit in edits.items():
             results.setdefault(event_id, BundledAggregations()).replace = edit
 
-        # Fetch thread summaries.
-        summaries = await self._main_store.get_thread_summaries(events_by_id.keys())
-        # Only fetch participated for a limited selection based on what had
-        # summaries.
-        participated = await self._main_store.get_threads_participated(
-            [event_id for event_id, summary in summaries.items() if summary], user_id
-        )
-        additional_events = set()
-        for event_id, summary in summaries.items():
-            if summary:
-                thread_count, latest_thread_event = summary
-
-                # If the latest event in a thread is not already being fetched,
-                # add it to the events.
-                if (
-                    latest_thread_event
-                    and latest_thread_event.event_id not in events_by_id
-                ):
-                    additional_events.add(latest_thread_event)
-
-                results.setdefault(
-                    event_id, BundledAggregations()
-                ).thread = _ThreadAggregation(
-                    latest_event=latest_thread_event,
-                    count=thread_count,
-                    # If there's a thread summary it must also exist in the
-                    # participated dictionary.
-                    current_user_participated=participated[event_id],
-                )
-
-        if additional_events:
-            results.update(
-                await self.get_bundled_aggregations(additional_events, user_id)
+        # Fetch thread summaries (but only for the directly requested events).
+        #
+        # Note that you can't have threads off of other related events, but it is
+        # possible for a malicious homeserver to inject them anyway.
+        if fetch_bundled_aggregations_for_threads:
+            summaries = await self._main_store.get_thread_summaries(events_by_id.keys())
+            # Only fetch participated for a limited selection based on what had
+            # summaries.
+            participated = await self._main_store.get_threads_participated(
+                [event_id for event_id, summary in summaries.items() if summary],
+                user_id,
             )
+            # Additional events to check for bundled aggregations (i.e. the
+            # latest events in the threads).
+            additional_events = set()
+            for event_id, summary in summaries.items():
+                if summary:
+                    thread_count, latest_thread_event = summary
+
+                    # If the latest event in a thread is not already being fetched,
+                    # add it to the events.
+                    if (
+                        latest_thread_event
+                        and latest_thread_event.event_id not in events_by_id
+                    ):
+                        additional_events.add(latest_thread_event)
+
+                    results.setdefault(
+                        event_id, BundledAggregations()
+                    ).thread = _ThreadAggregation(
+                        latest_event=latest_thread_event,
+                        count=thread_count,
+                        # If there's a thread summary it must also exist in the
+                        # participated dictionary.
+                        current_user_participated=participated[event_id],
+                    )
+
+            if additional_events:
+                results.update(
+                    await self.get_bundled_aggregations(
+                        additional_events,
+                        user_id,
+                        fetch_bundled_aggregations_for_threads=False,
+                    )
+                )
 
         return results
