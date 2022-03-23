@@ -42,7 +42,9 @@ class UserMutualRoomsServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
-        self.user_directory_search_enabled = hs.config.userdirectory.user_directory_search_enabled
+        self.user_directory_search_enabled = (
+            hs.config.userdirectory.user_directory_search_enabled
+        )
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
