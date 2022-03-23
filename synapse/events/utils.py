@@ -428,13 +428,12 @@ class EventClientSerializer:
 
         # Check if there are any bundled aggregations to include with the event.
         if bundle_aggregations:
-            event_aggregations = bundle_aggregations.get(event.event_id)
-            if event_aggregations:
+            if event.event_id in bundle_aggregations:
                 self._inject_bundled_aggregations(
                     event,
                     time_now,
                     config,
-                    bundle_aggregations[event.event_id],
+                    bundle_aggregations,
                     serialized_event,
                 )
 
@@ -472,7 +471,7 @@ class EventClientSerializer:
         event: EventBase,
         time_now: int,
         config: SerializeEventConfig,
-        aggregations: "BundledAggregations",
+        bundled_aggregations: Dict[str, "BundledAggregations"],
         serialized_event: JsonDict,
     ) -> None:
         """Potentially injects bundled aggregations into the unsigned portion of the serialized event.
@@ -487,15 +486,22 @@ class EventClientSerializer:
         """
         serialized_aggregations = {}
 
-        if aggregations.annotations:
-            serialized_aggregations[RelationTypes.ANNOTATION] = aggregations.annotations
+        # The aggregations must exist for this event.
+        event_aggregations = bundled_aggregations[event.event_id]
 
-        if aggregations.references:
-            serialized_aggregations[RelationTypes.REFERENCE] = aggregations.references
+        if event_aggregations.annotations:
+            serialized_aggregations[
+                RelationTypes.ANNOTATION
+            ] = event_aggregations.annotations
 
-        if aggregations.replace:
+        if event_aggregations.references:
+            serialized_aggregations[
+                RelationTypes.REFERENCE
+            ] = event_aggregations.references
+
+        if event_aggregations.replace:
             # If there is an edit, apply it to the event.
-            edit = aggregations.replace
+            edit = event_aggregations.replace
             self._apply_edit(event, serialized_event, edit)
 
             # Include information about it in the relations dict.
@@ -506,22 +512,16 @@ class EventClientSerializer:
             }
 
         # If this event is the start of a thread, include a summary of the replies.
-        if aggregations.thread:
-            thread = aggregations.thread
+        if event_aggregations.thread:
+            thread = event_aggregations.thread
 
             # Don't bundle aggregations as this could recurse forever.
-            serialized_latest_event = serialize_event(
-                thread.latest_event, time_now, config=config
+            serialized_latest_event = self.serialize_event(
+                thread.latest_event,
+                time_now,
+                config=config,
+                bundle_aggregations=bundled_aggregations,
             )
-            # Manually apply an edit, if one exists.
-            if thread.latest_edit:
-                self._inject_bundled_aggregations(
-                    thread.latest_event,
-                    time_now,
-                    config,
-                    BundledAggregations(replace=thread.latest_edit),
-                    serialized_latest_event,
-                )
 
             thread_summary = {
                 "latest_event": serialized_latest_event,

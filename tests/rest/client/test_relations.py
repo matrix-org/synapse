@@ -1173,7 +1173,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
         thread_2 = channel.json_body["event_id"]
 
-        def assert_annotations(bundled_aggregations: JsonDict) -> None:
+        def assert_thread(bundled_aggregations: JsonDict) -> None:
             self.assertEqual(2, bundled_aggregations.get("count"))
             self.assertTrue(bundled_aggregations.get("current_user_participated"))
             # The latest thread event has some fields that don't matter.
@@ -1192,9 +1192,56 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations.get("latest_event"),
             )
 
-        self._test_bundled_aggregations(RelationTypes.THREAD, assert_annotations, 9)
+        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 12)
 
-    def test_edit_thread(self) -> None:
+    @unittest.override_config({"experimental_features": {"msc3666_enabled": True}})
+    def test_thread_with_bundled_aggregations_for_latest(self) -> None:
+        """
+        Bundled aggregations should get applied to the latest thread event.
+        """
+        self._send_relation(RelationTypes.THREAD, "m.room.test")
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        thread_2 = channel.json_body["event_id"]
+
+        self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "a", parent_id=thread_2
+        )
+
+        def assert_thread(bundled_aggregations: JsonDict) -> None:
+            self.assertEqual(2, bundled_aggregations.get("count"))
+            self.assertTrue(bundled_aggregations.get("current_user_participated"))
+            # The latest thread event has some fields that don't matter.
+            self.assert_dict(
+                {
+                    "content": {
+                        "m.relates_to": {
+                            "event_id": self.parent_id,
+                            "rel_type": RelationTypes.THREAD,
+                        }
+                    },
+                    "event_id": thread_2,
+                    "sender": self.user_id,
+                    "type": "m.room.test",
+                },
+                bundled_aggregations.get("latest_event"),
+            )
+            # Check the unsigned field on the latest event.
+            self.assert_dict(
+                {
+                    "m.relations": {
+                        RelationTypes.ANNOTATION: {
+                            "chunk": [
+                                {"type": "m.reaction", "key": "a", "count": 1},
+                            ]
+                        },
+                    }
+                },
+                bundled_aggregations["latest_event"].get("unsigned"),
+            )
+
+        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 12)
+
+    def test_thread_edit_latest_event(self) -> None:
         """Test that editing the latest event in a thread works."""
 
         # Create a thread and edit the last event.
@@ -1262,7 +1309,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
         thread_id = channel.json_body["event_id"]
 
-        # Annotate the annotation.
+        # Annotate the thread.
         self._send_relation(
             RelationTypes.ANNOTATION, "m.reaction", "a", parent_id=thread_id
         )

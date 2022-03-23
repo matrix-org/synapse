@@ -34,8 +34,6 @@ logger = logging.getLogger(__name__)
 class _ThreadAggregation:
     # The latest event in the thread.
     latest_event: EventBase
-    # The latest edit to the latest event in the thread.
-    latest_edit: Optional[EventBase]
     # The total number of events in the thread.
     count: int
     # True if the current user has sent an event to the thread.
@@ -210,8 +208,13 @@ class RelationsHandler:
             user_id: The user requesting the bundled aggregations.
 
         Returns:
-            A map of event ID to the bundled aggregation for the event. Not all
-            events may have bundled aggregations in the results.
+            A map of event ID to the bundled aggregation for the event.
+
+            Not all requested events may exist in the results (if they don't have
+            bundled aggregations).
+
+            The results may include additional events which are related to the
+            requested events.
         """
         # De-duplicate events by ID to handle the same event requested multiple times.
         #
@@ -247,18 +250,32 @@ class RelationsHandler:
         participated = await self._main_store.get_threads_participated(
             [event_id for event_id, summary in summaries.items() if summary], user_id
         )
+        additional_events = set()
         for event_id, summary in summaries.items():
             if summary:
-                thread_count, latest_thread_event, edit = summary
+                thread_count, latest_thread_event = summary
+
+                # If the latest event in a thread is not already being fetched,
+                # add it to the events.
+                if (
+                    latest_thread_event
+                    and latest_thread_event.event_id not in events_by_id
+                ):
+                    additional_events.add(latest_thread_event)
+
                 results.setdefault(
                     event_id, BundledAggregations()
                 ).thread = _ThreadAggregation(
                     latest_event=latest_thread_event,
-                    latest_edit=edit,
                     count=thread_count,
                     # If there's a thread summary it must also exist in the
                     # participated dictionary.
                     current_user_participated=participated[event_id],
                 )
+
+        if additional_events:
+            results.update(
+                await self.get_bundled_aggregations(additional_events, user_id)
+            )
 
         return results
