@@ -364,7 +364,6 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
                 "captcha, or token-based verification. Otherwise this check can be removed by setting the "
                 "`enable_registration_without_verification` config option to `true`."
             )
-            sys.exit(1)
 
     hs = SynapseHomeServer(
         config.server.server_name,
