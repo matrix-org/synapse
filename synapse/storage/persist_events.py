@@ -1027,7 +1027,8 @@ class EventsPersistenceStorage:
                 events_to_check
             )
             is_still_joined = any(
-                member.membership == Membership.JOIN for member in members.values()
+                member and member.membership == Membership.JOIN
+                for member in members.values()
             )
             if is_still_joined:
                 return True
@@ -1068,7 +1069,7 @@ class EventsPersistenceStorage:
         potentially_left_users.update(
             member.user_id
             for member in members.values()
-            if member.membership == Membership.JOIN
+            if member and member.membership == Membership.JOIN
         )
 
         return False

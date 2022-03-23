@@ -293,7 +293,7 @@ def _condition_checker(
     return True
 
 
-MemberMap = Dict[str, EventIdMembership]
+MemberMap = Dict[str, Optional[EventIdMembership]]
 Rule = Dict[str, dict]
 RulesByUser = Dict[str, List[Rule]]
 StateGroup = Union[object, int]
@@ -521,7 +521,7 @@ class RulesForRoom:
         joined_user_ids = {
             entry.user_id
             for entry in members.values()
-            if entry.membership == Membership.JOIN
+            if entry and entry.membership == Membership.JOIN
         }
 
         logger.debug("Joined: %r", joined_user_ids)

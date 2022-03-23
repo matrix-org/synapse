@@ -1011,7 +1011,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     @cached(max_entries=5000)
     async def _get_membership_from_event_id(
         self, member_event_id: str
-    ) -> EventIdMembership:
+    ) -> Optional[EventIdMembership]:
         raise NotImplementedError()
 
     @cachedList(
@@ -1019,8 +1019,13 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     )
     async def get_membership_from_event_ids(
         self, member_event_ids: Iterable[str]
-    ) -> Dict[str, EventIdMembership]:
-        """Get user_id and membership of a set of event IDs."""
+    ) -> Dict[str, Optional[EventIdMembership]]:
+        """Get user_id and membership of a set of event IDs.
+
+        Returns:
+            Mapping from event ID to `EventIdMembership` if the event is a
+            membership event, otherwise the value is None.
+        """
 
         rows = await self.db_pool.simple_select_many_batch(
             table="room_memberships",
