@@ -1792,6 +1792,25 @@ class DatabasePool:
 
         return txn.rowcount
 
+    async def simple_update_many(
+        self,
+        table: str,
+        key_names: Collection[str],
+        key_values: Collection[Iterable[Any]],
+        value_names: Collection[str],
+        value_values: Iterable[Iterable[Any]],
+        desc: str,
+    ) -> None:
+        return await self.runInteraction(
+            desc,
+            self.simple_update_many_txn,
+            table,
+            key_names,
+            key_values,
+            value_names,
+            value_values,
+        )
+
     @staticmethod
     def simple_update_many_txn(
         txn: LoggingTransaction,
