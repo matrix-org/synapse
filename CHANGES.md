@@ -7,7 +7,7 @@ Internal Changes
 ----------------
 
 - Pin Jinja to <3.1.0, as Synapse fails to start with Jinja 3.1.0. ([\#12297](https://github.com/matrix-org/synapse/issues/12297))
-- Revert changes from 1.55.1 as they caused problems with older versions of Jinja.
+- Revert changes from 1.55.1 as they caused problems with older versions of Jinja ([\#12296](https://github.com/matrix-org/synapse/issues/12296))
 
 
 Synapse 1.55.1 (2022-03-24)
