@@ -528,9 +528,18 @@ the following regular expressions:
 
     ^/_matrix/client/(r0|v3|unstable)/user_directory/search$
 
-When using this worker you must also set `update_user_directory: False` in the
+When using this worker you must also set `update_user_directory: false` in the
 shared configuration file to stop the main synapse running background
 jobs related to updating the user directory.
+
+Above endpoint is not *required* to be routed to this worker. By default,
+`update_user_directory` is set to `true`, which means the main process
+will handle updates. All workers configured with `client` can handle the above
+endpoint as long as either this worker or the main process are configured to
+handle it, and are online.
+
+If `update_user_directory` is set to `false`, and this worker is not running,
+the above endpoint may give outdated results.
 
 ### `synapse.app.frontend_proxy`
 

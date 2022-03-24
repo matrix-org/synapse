@@ -676,6 +676,10 @@ class ServerConfig(Config):
         ):
             raise ConfigError("'custom_template_directory' must be a string")
 
+        self.use_account_validity_in_account_status: bool = (
+            config.get("use_account_validity_in_account_status") or False
+        )
+
         self.identity_server_rewrite_map: Dict[str, str] = (
             config.get("rewrite_identity_server_base_urls") or {}
         )
