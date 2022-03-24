@@ -101,7 +101,7 @@ experimental_features:
 
 ## Change in behaviour for PostgreSQL databases with unsafe locale
 
-Synapse now refuses to start when using PostgreSQL with incorrect values of `COLLATE` and
+Synapse now refuses to start when using PostgreSQL with non-`C` values for `COLLATE` and
 `CTYPE` unless the config flag `allow_unsafe_locale`, found in the database section of
 the configuration file, is set to `true`. See the [PostgreSQL documentation](https://matrix-org.github.io/synapse/latest/postgres.html#fixing-incorrect-collate-or-ctype)
 for more information and instructions on how to fix a database with incorrect values.
