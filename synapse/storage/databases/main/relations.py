@@ -275,7 +275,7 @@ class RelationsWorkerStore(SQLBaseStore):
         ]
 
         sql = """
-            SELECT type, aggregation_key, COUNT(DISTINCT sender), MAX(stream_ordering)
+            SELECT type, aggregation_key, COUNT(DISTINCT sender)
             FROM event_relations
             INNER JOIN events USING (event_id)
             WHERE relates_to_id = ? AND room_id = ? AND relation_type = ?
