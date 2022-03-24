@@ -676,6 +676,14 @@ class ServerConfig(Config):
         ):
             raise ConfigError("'custom_template_directory' must be a string")
 
+        self.identity_server_rewrite_map: Dict[str, str] = (
+            config.get("rewrite_identity_server_base_urls") or {}
+        )
+        if not isinstance(self.identity_server_rewrite_map, dict):
+            raise ConfigError(
+                "'rewrite_identity_server_base_urls' must be a dictionary"
+            )
+
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
 
@@ -1230,6 +1238,23 @@ class ServerConfig(Config):
           # information about using custom templates.
           #
           #custom_template_directory: /path/to/custom/templates/
+
+        # Base URLs to substitute when making requests to identity servers from Synapse.
+        # This can be useful if an identity server exists under a different name or
+        # address within an internal network than on the Internet.
+        #
+        # The first half of each line is the domain or address on which the identity
+        # server is publicly accessible (without a protocol scheme) and the second half
+        # is the base URL (i.e. protocol scheme and domain or address) to use for this
+        # identity server.
+        #
+        # This list does not need to be exhaustive: if Synapse needs to send a request to
+        # an identity server that isn't in this list it will just use its public name or
+        # address.
+        #
+        #rewrite_identity_server_base_urls:
+        #   public.example.com: http://public.int.example.com
+        #   vip.example.com: http://vip.int.example.com
         """
             % locals()
         )

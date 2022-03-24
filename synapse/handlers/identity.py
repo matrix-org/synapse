@@ -62,6 +62,7 @@ class IdentityHandler:
         self.hs = hs
 
         self._web_client_location = hs.config.email.invite_client_location
+        self._identity_server_rewrite_map = hs.config.server.identity_server_rewrite_map
 
         # Ratelimiters for `/requestToken` endpoints.
         self._3pid_validation_ratelimiter_ip = Ratelimiter(
@@ -131,6 +132,7 @@ class IdentityHandler:
 
         query_params = {"sid": session_id, "client_secret": client_secret}
 
+        id_server = self._rewrite_is_url(id_server)
         url = id_server + "/_matrix/identity/api/v1/3pid/getValidated3pid"
 
         try:
@@ -200,11 +202,12 @@ class IdentityHandler:
         # Decide which API endpoint URLs to use
         headers = {}
         bind_data = {"sid": sid, "client_secret": client_secret, "mxid": mxid}
+        base_url = self._rewrite_is_url(id_server)
         if use_v2:
-            bind_url = "https://%s/_matrix/identity/v2/3pid/bind" % (id_server,)
+            bind_url = "%s/_matrix/identity/v2/3pid/bind" % (base_url,)
             headers["Authorization"] = create_id_access_token_header(id_access_token)  # type: ignore
         else:
-            bind_url = "https://%s/_matrix/identity/api/v1/3pid/bind" % (id_server,)
+            bind_url = "%s/_matrix/identity/api/v1/3pid/bind" % (base_url,)
 
         try:
             # Use the blacklisting http client as this call is only to identity servers
@@ -300,7 +303,8 @@ class IdentityHandler:
                 "id_server must be a valid hostname with optional port and path components",
             )
 
-        url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
+        base_url = self._rewrite_is_url(id_server)
+        url = "%s/_matrix/identity/api/v1/3pid/unbind" % (base_url,)
         url_bytes = b"/_matrix/identity/api/v1/3pid/unbind"
 
         content = {
@@ -464,6 +468,8 @@ class IdentityHandler:
         if next_link:
             params["next_link"] = next_link
 
+        id_server = self._rewrite_is_url(id_server)
+
         try:
             data = await self.http_client.post_json_get_json(
                 id_server + "/_matrix/identity/api/v1/validate/email/requestToken",
@@ -507,6 +513,8 @@ class IdentityHandler:
         }
         if next_link:
             params["next_link"] = next_link
+
+        id_server = self._rewrite_is_url(id_server)
 
         try:
             data = await self.http_client.post_json_get_json(
@@ -598,6 +606,8 @@ class IdentityHandler:
         """
         body = {"client_secret": client_secret, "sid": sid, "token": token}
 
+        id_server = self._rewrite_is_url(id_server)
+
         try:
             return await self.http_client.post_json_get_json(
                 id_server + "/_matrix/identity/api/v1/validate/msisdn/submitToken",
@@ -666,9 +676,10 @@ class IdentityHandler:
         Returns:
             the matrix ID of the 3pid, or None if it is not recognized.
         """
+        base_url = self._rewrite_is_url(id_server)
         try:
             data = await self.blacklisting_http_client.get_json(
-                "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server),
+                "%s/_matrix/identity/api/v1/lookup" % (base_url,),
                 {"medium": medium, "address": address},
             )
 
@@ -700,9 +711,10 @@ class IdentityHandler:
             the matrix ID of the 3pid, or None if it is not recognised.
         """
         # Check what hashing details are supported by this identity server
+        base_url = self._rewrite_is_url(id_server)
         try:
             hash_details = await self.blacklisting_http_client.get_json(
-                "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
+                "%s/_matrix/identity/v2/hash_details" % (base_url,),
                 {"access_token": id_access_token},
             )
         except RequestTimedOutError:
@@ -769,7 +781,7 @@ class IdentityHandler:
 
         try:
             lookup_results = await self.blacklisting_http_client.post_json_get_json(
-                "%s%s/_matrix/identity/v2/lookup" % (id_server_scheme, id_server),
+                "%s/_matrix/identity/v2/lookup" % (base_url,),
                 {
                     "addresses": [lookup_value],
                     "algorithm": lookup_algorithm,
@@ -868,13 +880,11 @@ class IdentityHandler:
         # Add the identity service access token to the JSON body and use the v2
         # Identity Service endpoints if id_access_token is present
         data = None
-        base_url = "%s%s/_matrix/identity" % (id_server_scheme, id_server)
+        base_is_url = self._rewrite_is_url(id_server)
+        base_url = "%s/_matrix/identity" % (base_is_url,)
 
         if id_access_token:
-            key_validity_url = "%s%s/_matrix/identity/v2/pubkey/isvalid" % (
-                id_server_scheme,
-                id_server,
-            )
+            key_validity_url = "%s/_matrix/identity/v2/pubkey/isvalid" % (base_is_url,)
 
             # Attempt a v2 lookup
             url = base_url + "/v2/store-invite"
@@ -892,9 +902,8 @@ class IdentityHandler:
                     raise e
 
         if data is None:
-            key_validity_url = "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (
-                id_server_scheme,
-                id_server,
+            key_validity_url = "%s/_matrix/identity/api/v1/pubkey/isvalid" % (
+                base_is_url,
             )
             url = base_url + "/api/v1/store-invite"
 
@@ -945,6 +954,33 @@ class IdentityHandler:
             public_keys.append(fallback_public_key)
         display_name = data["display_name"]
         return token, public_keys, fallback_public_key, display_name
+
+    def _rewrite_is_url(self, id_server: str) -> str:
+        """Replaces the base URL to an identity server using instructions from the config.
+
+        If no replacement is found for this URL, just returns the original URL with an
+        HTTPS protocol scheme appended to it if there isn't already one.
+
+        Args:
+            id_server: The identity server to optionally replace the base URL for. Might
+                include a protocol scheme.
+
+        Returns:
+            The base URL to use (with a protocol scheme). If no match can be found and
+            the provided identity server address already includes a protocol scheme, just
+            returns it as is. Otherwise, if no HTTP(S) protocol scheme can be found,
+            prepends an HTTPS protocol scheme to the address before returning it.
+        """
+        if id_server.startswith("https://"):
+            default_base_url = id_server
+            id_server = id_server.replace("https://", "")
+        elif id_server.startswith("http://"):
+            default_base_url = id_server
+            id_server = id_server.replace("https://", "")
+        else:
+            default_base_url = id_server_scheme + id_server
+
+        return self._identity_server_rewrite_map.get(id_server, default_base_url)
 
 
 def create_id_access_token_header(id_access_token: str) -> List[str]:

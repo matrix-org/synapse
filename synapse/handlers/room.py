@@ -87,8 +87,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-id_server_scheme = "https://"
-
 FIVE_MINUTES_IN_MS = 5 * 60 * 1000
 
 
