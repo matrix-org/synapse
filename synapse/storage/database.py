@@ -288,7 +288,7 @@ class LoggingTransaction:
         """
 
         if isinstance(self.database_engine, PostgresEngine):
-            from psycopg2.extras import execute_batch  # type: ignore
+            from psycopg2.extras import execute_batch
 
             self._do_execute(lambda *x: execute_batch(self.txn, *x), sql, args)
         else:
@@ -302,10 +302,18 @@ class LoggingTransaction:
         rows (e.g. INSERTs).
         """
         assert isinstance(self.database_engine, PostgresEngine)
-        from psycopg2.extras import execute_values  # type: ignore
+        from psycopg2.extras import execute_values
 
         return self._do_execute(
-            lambda *x: execute_values(self.txn, *x, fetch=fetch), sql, *args
+            # Type ignore: mypy is unhappy because if `x` is a 5-tuple, then there will
+            # be two values for `fetch`: one given positionally, and another given
+            # as a keyword argument. We might be able to fix this by
+            # - propagating the signature of psycopg2.extras.execute_values to this
+            #   function, or
+            # - changing `*args: Any` to `values: T` for some appropriate T.
+            lambda *x: execute_values(self.txn, *x, fetch=fetch),  # type: ignore[misc]
+            sql,
+            *args,
         )
 
     def execute(self, sql: str, *args: Any) -> None:
