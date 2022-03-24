@@ -268,7 +268,6 @@ class RelationsWorkerStore(SQLBaseStore):
             `type`, `key` and `count` fields.
         """
 
-        where_clause = ["relates_to_id = ?", "room_id = ?", "relation_type = ?"]
         where_args: List[Union[str, int]] = [
             event_id,
             room_id,
@@ -279,13 +278,11 @@ class RelationsWorkerStore(SQLBaseStore):
             SELECT type, aggregation_key, COUNT(DISTINCT sender), MAX(stream_ordering)
             FROM event_relations
             INNER JOIN events USING (event_id)
-            WHERE {where_clause}
+            WHERE relates_to_id = ? AND room_id = ? AND relation_type = ?
             GROUP BY relation_type, type, aggregation_key
             ORDER BY COUNT(*) DESC, MAX(stream_ordering) DESC
             LIMIT ?
-        """.format(
-            where_clause=" AND ".join(where_clause)
-        )
+        """
 
         def _get_aggregation_groups_for_event_txn(
             txn: LoggingTransaction,
