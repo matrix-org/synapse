@@ -12,12 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""This class implements the proposed relation APIs from MSC 1849.
-
-Since the MSC has not been approved all APIs here are unstable and may change at
-any time to reflect changes in the MSC.
-"""
-
 import logging
 from typing import TYPE_CHECKING, Optional, Tuple
 
