@@ -26,8 +26,6 @@ from typing import (
     cast,
 )
 
-import attr
-
 from synapse.api.constants import RelationTypes
 from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore
@@ -252,14 +250,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
     @cached(tree=True)
     async def get_aggregation_groups_for_event(
-        self,
-        event_id: str,
-        room_id: str,
-        event_type: Optional[str] = None,
-        limit: int = 5,
-        direction: str = "b",
-        from_token: Optional[AggregationPaginationToken] = None,
-        to_token: Optional[AggregationPaginationToken] = None,
+        self, event_id: str, room_id: str, limit: int = 5
     ) -> PaginationChunk:
         """Get a list of annotations on the event, grouped by event type and
         aggregation key, sorted by count.
@@ -270,12 +261,7 @@ class RelationsWorkerStore(SQLBaseStore):
         Args:
             event_id: Fetch events that relate to this event ID.
             room_id: The room the event belongs to.
-            event_type: Only fetch events with this event type, if given.
             limit: Only fetch the `limit` groups.
-            direction: Whether to fetch the highest count first (`"b"`) or
-                the lowest count first (`"f"`).
-            from_token: Fetch rows from the given token, or from the start if None.
-            to_token: Fetch rows up to the given token, or up to the end if None.
 
         Returns:
             List of groups of annotations that match. Each row is a dict with
@@ -289,41 +275,16 @@ class RelationsWorkerStore(SQLBaseStore):
             RelationTypes.ANNOTATION,
         ]
 
-        if event_type:
-            where_clause.append("type = ?")
-            where_args.append(event_type)
-
-        having_clause = generate_pagination_where_clause(
-            direction=direction,
-            column_names=("COUNT(*)", "MAX(stream_ordering)"),
-            from_token=attr.astuple(from_token) if from_token else None,  # type: ignore[arg-type]
-            to_token=attr.astuple(to_token) if to_token else None,  # type: ignore[arg-type]
-            engine=self.database_engine,
-        )
-
-        if direction == "b":
-            order = "DESC"
-        else:
-            order = "ASC"
-
-        if having_clause:
-            having_clause = "HAVING " + having_clause
-        else:
-            having_clause = ""
-
         sql = """
             SELECT type, aggregation_key, COUNT(DISTINCT sender), MAX(stream_ordering)
             FROM event_relations
             INNER JOIN events USING (event_id)
             WHERE {where_clause}
             GROUP BY relation_type, type, aggregation_key
-            {having_clause}
-            ORDER BY COUNT(*) {order}, MAX(stream_ordering) {order}
+            ORDER BY COUNT(*) DESC, MAX(stream_ordering) DESC
             LIMIT ?
         """.format(
-            where_clause=" AND ".join(where_clause),
-            order=order,
-            having_clause=having_clause,
+            where_clause=" AND ".join(where_clause)
         )
 
         def _get_aggregation_groups_for_event_txn(
@@ -340,9 +301,7 @@ class RelationsWorkerStore(SQLBaseStore):
             if len(events) <= limit:
                 next_batch = None
 
-            return PaginationChunk(
-                chunk=list(events[:limit]), next_batch=next_batch, prev_batch=from_token
-            )
+            return PaginationChunk(chunk=list(events[:limit]), next_batch=next_batch)
 
         return await self.db_pool.runInteraction(
             "get_aggregation_groups_for_event", _get_aggregation_groups_for_event_txn
