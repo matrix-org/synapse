@@ -37,8 +37,8 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.stream import generate_pagination_where_clause
 from synapse.storage.engines import PostgresEngine
-from synapse.storage.relations import AggregationPaginationToken, PaginationChunk
-from synapse.types import RoomStreamToken, StreamToken
+from synapse.storage.relations import PaginationChunk
+from synapse.types import JsonDict, RoomStreamToken, StreamToken
 from synapse.util.caches.descriptors import cached, cachedList
 
 if TYPE_CHECKING:
@@ -251,7 +251,7 @@ class RelationsWorkerStore(SQLBaseStore):
     @cached(tree=True)
     async def get_aggregation_groups_for_event(
         self, event_id: str, room_id: str, limit: int = 5
-    ) -> PaginationChunk:
+    ) -> Tuple[List[JsonDict], bool]:
         """Get a list of annotations on the event, grouped by event type and
         aggregation key, sorted by count.
 
@@ -289,19 +289,13 @@ class RelationsWorkerStore(SQLBaseStore):
 
         def _get_aggregation_groups_for_event_txn(
             txn: LoggingTransaction,
-        ) -> PaginationChunk:
+        ) -> Tuple[List[JsonDict], bool]:
             txn.execute(sql, where_args + [limit + 1])
 
-            next_batch = None
-            events = []
-            for row in txn:
-                events.append({"type": row[0], "key": row[1], "count": row[2]})
-                next_batch = AggregationPaginationToken(row[2], row[3])
+            events = [{"type": row[0], "key": row[1], "count": row[2]} for row in txn]
+            limited = len(events) > limit
 
-            if len(events) <= limit:
-                next_batch = None
-
-            return PaginationChunk(chunk=list(events[:limit]), next_batch=next_batch)
+            return events[:limit], limited
 
         return await self.db_pool.runInteraction(
             "get_aggregation_groups_for_event", _get_aggregation_groups_for_event_txn

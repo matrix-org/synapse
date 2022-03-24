@@ -13,11 +13,10 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import attr
 
-from synapse.api.errors import SynapseError
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -52,33 +51,3 @@ class PaginationChunk:
             d["prev_batch"] = await self.prev_batch.to_string(store)
 
         return d
-
-
-@attr.s(frozen=True, slots=True, auto_attribs=True)
-class AggregationPaginationToken:
-    """Pagination token for relation aggregation pagination API.
-
-    As the results are order by count and then MAX(stream_ordering) of the
-    aggregation groups, we can just use them as our pagination token.
-
-    Attributes:
-        count: The count of relations in the boundary group.
-        stream: The MAX stream ordering in the boundary group.
-    """
-
-    count: int
-    stream: int
-
-    @staticmethod
-    def from_string(string: str) -> "AggregationPaginationToken":
-        try:
-            c, s = string.split("-")
-            return AggregationPaginationToken(int(c), int(s))
-        except ValueError:
-            raise SynapseError(400, "Invalid aggregation pagination token")
-
-    async def to_string(self, store: "DataStore") -> str:
-        return "%d-%d" % (self.count, self.stream)
-
-    def as_tuple(self) -> Tuple[Any, ...]:
-        return attr.astuple(self)
