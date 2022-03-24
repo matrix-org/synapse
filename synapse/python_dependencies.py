@@ -75,6 +75,7 @@ REQUIREMENTS = [
     "attrs>=19.2.0,!=21.1.0",
     "netaddr>=0.7.18",
     "Jinja2>=2.9",
+    "MarkupSafe<=3.0.0",
     "bleach>=1.4.3",
     # We use `ParamSpec`, which was added in `typing-extensions` 3.10.0.0.
     "typing-extensions>=3.10.0",
