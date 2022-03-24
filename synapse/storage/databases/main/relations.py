@@ -27,6 +27,8 @@ from typing import (
     cast,
 )
 
+import attr
+
 from synapse.api.constants import RelationTypes
 from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore
@@ -45,6 +47,12 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class _RelatedEvent:
+    event_id: str
+    sender: str
 
 
 class RelationsWorkerStore(SQLBaseStore):
@@ -71,8 +79,7 @@ class RelationsWorkerStore(SQLBaseStore):
         direction: str = "b",
         from_token: Optional[StreamToken] = None,
         to_token: Optional[StreamToken] = None,
-        ignored_users: FrozenSet[str] = frozenset(),
-    ) -> Tuple[List[str], Optional[StreamToken]]:
+    ) -> Tuple[List[_RelatedEvent], Optional[StreamToken]]:
         """Get a list of relations for an event, ordered by topological ordering.
 
         Args:
@@ -87,11 +94,10 @@ class RelationsWorkerStore(SQLBaseStore):
                 oldest first (`"f"`).
             from_token: Fetch rows from the given token, or from the start if None.
             to_token: Fetch rows up to the given token, or up to the end if None.
-            ignored_users: The users ignored by the requesting user.
 
         Returns:
             A tuple of:
-                A list of related event IDs
+                A list of related event IDs & their senders.
 
                 The next stream token, if one exists.
         """
@@ -115,16 +121,6 @@ class RelationsWorkerStore(SQLBaseStore):
             where_clause.append("aggregation_key = ?")
             where_args.append(aggregation_key)
 
-        if ignored_users:
-            (
-                ignored_users_clause_sql,
-                ignored_users_clause_args,
-            ) = make_in_list_sql_clause(
-                self.database_engine, "sender", ignored_users, include=False
-            )
-            where_clause.append(ignored_users_clause_sql)
-            where_args.extend(ignored_users_clause_args)
-
         pagination_clause = generate_pagination_where_clause(
             direction=direction,
             column_names=("topological_ordering", "stream_ordering"),
@@ -144,7 +140,7 @@ class RelationsWorkerStore(SQLBaseStore):
             order = "ASC"
 
         sql = """
-            SELECT event_id, relation_type, topological_ordering, stream_ordering
+            SELECT event_id, relation_type, sender, topological_ordering, stream_ordering
             FROM event_relations
             INNER JOIN events USING (event_id)
             WHERE %s
@@ -158,23 +154,23 @@ class RelationsWorkerStore(SQLBaseStore):
 
         def _get_recent_references_for_event_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[List[str], Optional[StreamToken]]:
+        ) -> Tuple[List[_RelatedEvent], Optional[StreamToken]]:
             txn.execute(sql, where_args + [limit + 1])
 
             last_topo_id = None
             last_stream_id = None
-            event_ids = []
+            events = []
             for row in txn:
                 # Do not include edits for redacted events as they leak event
                 # content.
                 if not is_redacted or row[1] != RelationTypes.REPLACE:
-                    event_ids.append(row[0])
-                last_topo_id = row[2]
-                last_stream_id = row[3]
+                    events.append(_RelatedEvent(row[0], row[2]))
+                last_topo_id = row[3]
+                last_stream_id = row[4]
 
             # If there are more events, generate the next pagination key.
             next_token = None
-            if len(event_ids) > limit and last_topo_id and last_stream_id:
+            if len(events) > limit and last_topo_id and last_stream_id:
                 next_key = RoomStreamToken(last_topo_id, last_stream_id)
                 if from_token:
                     next_token = from_token.copy_and_replace("room_key", next_key)
@@ -191,7 +187,7 @@ class RelationsWorkerStore(SQLBaseStore):
                         groups_key=0,
                     )
 
-            return event_ids[:limit], next_token
+            return events[:limit], next_token
 
         return await self.db_pool.runInteraction(
             "get_recent_references_for_event", _get_recent_references_for_event_txn

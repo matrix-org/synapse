@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, FrozenSet, Iterable, Optional
+from typing import TYPE_CHECKING, Dict, FrozenSet, Iterable, List, Optional, Tuple
 
 import attr
 from frozendict import frozendict
@@ -20,6 +20,7 @@ from frozendict import frozendict
 from synapse.api.constants import RelationTypes
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
+from synapse.storage.databases.main.relations import _RelatedEvent
 from synapse.types import JsonDict, Requester, StreamToken
 from synapse.visibility import filter_events_for_client
 
@@ -117,7 +118,7 @@ class RelationsHandler:
 
         # Note that ignored users are not passed into get_relations_for_event
         # below. Ignored users are handled in filter_events_for_client (and by
-        # noy passing them in here we should get a better cache hit rate).
+        # not passing them in here we should get a better cache hit rate).
         related_events, next_token = await self._main_store.get_relations_for_event(
             event_id=event_id,
             event=event,
@@ -131,7 +132,9 @@ class RelationsHandler:
             to_token=to_token,
         )
 
-        events = await self._main_store.get_events_as_list(related_events)
+        events = await self._main_store.get_events_as_list(
+            [e.event_id for e in related_events]
+        )
 
         events = await filter_events_for_client(
             self._storage, user_id, events, is_peeking=(member_event_id is None)
@@ -164,6 +167,38 @@ class RelationsHandler:
             return_value["prev_batch"] = await from_token.to_string(self._main_store)
 
         return return_value
+
+    async def get_references_for_event(
+        self,
+        event_id: str,
+        event: EventBase,
+        room_id: str,
+        ignored_users: FrozenSet[str] = frozenset(),
+    ) -> Tuple[List[_RelatedEvent], Optional[StreamToken]]:
+        """Get a list of events which relate to an event by reference, ordered by topological ordering.
+
+        Args:
+            event_id: Fetch events that relate to this event ID.
+            event: The matching EventBase to event_id.
+            room_id: The room the event belongs to.
+            ignored_users: The users ignored by the requesting user.
+
+        Returns:
+            List of event IDs that match relations requested. The rows are of
+            the form `{"event_id": "..."}`.
+        """
+
+        # Call the underlying storage method, which is cached.
+        related_events, next_token = await self._main_store.get_relations_for_event(
+            event_id, event, room_id, RelationTypes.REFERENCE, direction="f"
+        )
+
+        # Filter out ignored users and convert to the expected format.
+        related_events = [
+            event for event in related_events if event.sender not in ignored_users
+        ]
+
+        return related_events, next_token
 
     async def _get_bundled_aggregation_for_event(
         self, event: EventBase, ignored_users: FrozenSet[str]
@@ -203,17 +238,15 @@ class RelationsHandler:
         if annotations:
             aggregations.annotations = {"chunk": annotations}
 
-        references, next_token = await self._main_store.get_relations_for_event(
+        references, next_token = await self.get_references_for_event(
             event_id,
             event,
             room_id,
-            RelationTypes.REFERENCE,
-            direction="f",
             ignored_users=ignored_users,
         )
         if references:
             aggregations.references = {
-                "chunk": [{"event_id": event_id} for event_id in references]
+                "chunk": [{"event_id": event.event_id} for event in references]
             }
 
             if next_token:
