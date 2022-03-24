@@ -1,3 +1,15 @@
+Synapse 1.55.2 (2022-03-24)
+===========================
+
+This patch version reverts the earlier fixes from Synapse 1.55.1, which could cause problems in certain deployments, and instead adds a cap to the version of Jinja to be installed. Again, this is to fix an incompatibility with version 3.1.0 of the [Jinja](https://pypi.org/project/Jinja2/) library, and again, deployments of Synapse using the `matrixdotorg/synapse` Docker image or Debian packages from packages.matrix.org are not affected.
+
+Internal Changes
+----------------
+
+- Pin Jinja to <3.1.0, as Synapse fails to start with Jinja 3.1.0. ([\#12297](https://github.com/matrix-org/synapse/issues/12297))
+- Revert changes from 1.55.1 as they caused problems with older versions of Jinja.
+
+
 Synapse 1.55.1 (2022-03-24)
 ===========================
 
