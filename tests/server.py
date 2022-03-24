@@ -181,7 +181,7 @@ class FakeChannel:
             self.resource_usage = _self.logcontext.get_resource_usage()
 
     def getPeer(self):
-        # We give an address so that getClientIP returns a non null entry,
+        # We give an address so that getClientAddress/getClientIP returns a non null entry,
         # causing us to record the MAU
         return address.IPv4Address("TCP", self._ip, 3423)
 

@@ -187,7 +187,7 @@ class Auth:
         Once get_user_by_req has set up the opentracing span, this does the actual work.
         """
         try:
-            ip_addr = request.getClientIP()
+            ip_addr = request.getClientAddress().host
             user_agent = get_request_user_agent(request)
 
             access_token = self.get_access_token_from_request(request)
@@ -356,7 +356,7 @@ class Auth:
             return None, None, None
 
         if app_service.ip_range_whitelist:
-            ip_address = IPAddress(request.getClientIP())
+            ip_address = IPAddress(request.getClientAddress().host)
             if ip_address not in app_service.ip_range_whitelist:
                 return None, None, None
 
