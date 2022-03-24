@@ -99,6 +99,12 @@ experimental_features:
   groups_enabled: false
 ```
 
+## Change in behaviour for PostgreSQL databases with unsafe locale
+
+Synapse now refuses to start when using PostgreSQL with incorrect values of `COLLATE` and
+`CTYPE` unless the config flag `allow_unsafe_locale`, found in the database section of
+the configuration file, is set to `true`.
+
 # Upgrading to v1.55.0
 
 ## `synctl` script has been moved
