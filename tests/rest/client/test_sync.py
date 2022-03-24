@@ -497,6 +497,11 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         receipts.register_servlets,
     ]
 
+    def default_config(self) -> JsonDict:
+        config = super().default_config()
+        config["experimental_features"] = {"msc2654_enabled": True}
+        return config
+
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.url = "/sync?since=%s"
         self.next_batch = "s0"
