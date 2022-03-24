@@ -506,7 +506,7 @@ class RulesForRoom:
             member_event_ids.values()
         )
 
-        # If the event is a join event then it will be in current state evnts
+        # If the event is a join event then it will be in current state events
         # map but not in the DB, so we have to explicitly insert it.
         if event.type == EventTypes.Member:
             for event_id in member_event_ids.values():
