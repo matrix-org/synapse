@@ -63,7 +63,7 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 # python 3 does not have a maximum int value
-MAX_TXN_ID = 2**63 - 1
+MAX_TXN_ID = 2 ** 63 - 1
 
 logger = logging.getLogger(__name__)
 
@@ -1791,6 +1791,54 @@ class DatabasePool:
         txn.execute(update_sql, list(updatevalues.values()) + list(keyvalues.values()))
 
         return txn.rowcount
+
+    @staticmethod
+    def simple_update_many_txn(
+        txn: LoggingTransaction,
+        table: str,
+        key_names: Collection[str],
+        key_values: Collection[Iterable[Any]],
+        value_names: Collection[str],
+        value_values: Iterable[Iterable[Any]],
+    ) -> None:
+        """
+        Update, many times, using batching where possible.
+
+        Args:
+            table: The table to upsert into
+            key_names: The key column names.
+            key_values: A list of each row's key column values.
+            value_names: The names of value columns to update.
+            value_values: A list of each row's value column values.
+        """
+
+        # List of value names, then key names
+        allnames: List[str] = []
+        allnames.extend(value_names)
+        allnames.extend(key_names)
+
+        # List of tuples of (value values, then key values)
+        # (This matches the order of `allnames` and the order of the query)
+        args = [tuple(x) + tuple(y) for x, y in zip(value_values, key_values)]
+
+        for ks, vs in zip(key_values, value_values):
+            args.append(tuple(vs) + tuple(ks))
+
+        # 'col1 = ?, col2 = ?, ...'
+        set_clause = ", ".join(f"{n} = ?" for n in value_names)
+
+        if key_names:
+            # 'WHERE col3 = ? AND col4 = ? AND col5 = ?'
+            where_clause = "WHERE " + (" AND ".join(f"{n} = ?" for n in key_names))
+        else:
+            where_clause = ""
+
+        # UPDATE mytable SET col1 = ?, col2 = ? WHERE col3 = ? AND col4 = ?
+        sql = f"""
+            UPDATE {table} SET {set_clause} {where_clause}
+        """
+
+        txn.execute_batch(sql, args)
 
     async def simple_update_one(
         self,
