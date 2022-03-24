@@ -80,6 +80,7 @@ class IdentityTestCase(unittest.HomeserverTestCase):
                 }
             )
         )
+        mock_client.get_json = Mock(return_value=make_awaitable({}))
 
         self.hs.get_identity_handler().blacklisting_http_client = mock_client
 
