@@ -1,0 +1,1 @@
+Remove uses of the long-deprecated `Jinja2.Markup` which would prevent Synapse from starting with Jinja2 3.1.0 or above installed. This does not affect deployments of Synapse using our Docker images or Debian packages.

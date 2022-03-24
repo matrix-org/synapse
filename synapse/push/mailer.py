@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, TypeVar
 
 import bleach
 import jinja2
+from markupsafe import Markup
 
 from synapse.api.constants import EventTypes, Membership, RoomTypes
 from synapse.api.errors import StoreError
@@ -867,7 +868,7 @@ class Mailer:
         )
 
 
-def safe_markup(raw_html: str) -> jinja2.Markup:
+def safe_markup(raw_html: str) -> Markup:
     """
     Sanitise a raw HTML string to a set of allowed tags and attributes, and linkify any bare URLs.
 
@@ -877,7 +878,7 @@ def safe_markup(raw_html: str) -> jinja2.Markup:
     Returns:
         A Markup object ready to safely use in a Jinja template.
     """
-    return jinja2.Markup(
+    return Markup(
         bleach.linkify(
             bleach.clean(
                 raw_html,
@@ -891,7 +892,7 @@ def safe_markup(raw_html: str) -> jinja2.Markup:
     )
 
 
-def safe_text(raw_text: str) -> jinja2.Markup:
+def safe_text(raw_text: str) -> Markup:
     """
     Sanitise text (escape any HTML tags), and then linkify any bare URLs.
 
@@ -901,7 +902,7 @@ def safe_text(raw_text: str) -> jinja2.Markup:
     Returns:
         A Markup object ready to safely use in a Jinja template.
     """
-    return jinja2.Markup(
+    return Markup(
         bleach.linkify(bleach.clean(raw_text, tags=[], attributes=[], strip=False))
     )
 
