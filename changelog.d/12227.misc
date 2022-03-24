@@ -1,1 +1,0 @@
-Refactor the relations endpoints to add a `RelationsHandler`.
