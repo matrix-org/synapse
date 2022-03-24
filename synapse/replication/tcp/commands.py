@@ -389,6 +389,12 @@ class UserIpCommand(Command):
             )
         )
 
+    def __repr__(self) -> str:
+        return (
+            f"UserIpCommand({self.user_id!r}, .., {self.ip!r}, "
+            f"{self.user_agent!r}, {self.device_id!r}, {self.last_seen})"
+        )
+
 
 class RemoteServerUpCommand(_SimpleCommand):
     """Sent when a worker has detected that a remote server is no longer
