@@ -15,13 +15,8 @@
 
 import atexit
 import os
-from unittest.mock import Mock, patch
-from urllib import parse as urlparse
-
-from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import CodeMessageException, cs_error
 from synapse.api.room_versions import RoomVersions
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import DEFAULT_ROOM_VERSION
