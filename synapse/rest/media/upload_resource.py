@@ -42,7 +42,6 @@ class UploadResource(RestServlet):
         self.clock = hs.get_clock()
         self.auth = hs.get_auth()
         self.max_upload_size = hs.config.media.max_upload_size
-        self.clock = hs.get_clock()
 
     async def on_POST(self, request: SynapseRequest) -> None:
         requester = await self.auth.get_user_by_req(request)
