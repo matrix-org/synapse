@@ -625,12 +625,6 @@ class EventCreationHandler:
             state_event_ids=state_event_ids,
             depth=depth,
         )
-        logger.info(
-            "create_new_client_event %s event=%s state_group=%s",
-            event.type,
-            event.event_id,
-            context._state_group,
-        )
 
         # In an ideal world we wouldn't need the second part of this condition. However,
         # this behaviour isn't spec'd yet, meaning we should be able to deactivate this
@@ -1025,8 +1019,9 @@ class EventCreationHandler:
             and state_event_ids
             and builder.internal_metadata.is_historical()
         ):
-            # Add explicit state to the insertion event so the rest of the batch
-            # can inherit the same state and state_group
+            # Add explicit state to the insertion event so it has state to derive
+            # from even though it's floating with no `prev_events`. The rest of
+            # the batch can derive from this state and state_group.
             #
             # TODO(faster_joins): figure out how this works, and make sure that the
             #   old state is complete.
