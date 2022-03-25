@@ -428,24 +428,18 @@ class ReplicationCommandHandler:
         and/or the background worker.
         """
         if self._is_master:
-            await self._handle_user_ip_as_master(cmd)
+            assert self._server_notices_sender is not None
+            await self._server_notices_sender.on_user_ip(cmd.user_id)
 
         if self._should_insert_client_ips:
-            await self._handle_user_ip_as_background_worker(cmd)
-
-    async def _handle_user_ip_as_master(self, cmd: UserIpCommand) -> None:
-        assert self._server_notices_sender is not None
-        await self._server_notices_sender.on_user_ip(cmd.user_id)
-
-    async def _handle_user_ip_as_background_worker(self, cmd: UserIpCommand) -> None:
-        await self._store.insert_client_ip(
-            cmd.user_id,
-            cmd.access_token,
-            cmd.ip,
-            cmd.user_agent,
-            cmd.device_id,
-            cmd.last_seen,
-        )
+            await self._store.insert_client_ip(
+                cmd.user_id,
+                cmd.access_token,
+                cmd.ip,
+                cmd.user_agent,
+                cmd.device_id,
+                cmd.last_seen,
+            )
 
     def on_RDATA(self, conn: IReplicationConnection, cmd: RdataCommand) -> None:
         if cmd.instance_name == self._instance_name:
