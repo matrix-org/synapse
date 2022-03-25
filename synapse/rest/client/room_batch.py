@@ -196,7 +196,11 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 ),
                 base_insertion_event_dict,
                 prev_event_ids=base_insertion_event_dict.get("prev_events"),
-                # TODO: Is state_event_ids necessary here?
+                # Also set the explicit state here because we want to resolve
+                # any `state_events_at_start` here too. It's not strictly
+                # necessary to accomplish anything but if someone asks for the
+                # state at this point, we probably want to show them the
+                # historical state that was part of this batch.
                 state_event_ids=state_event_ids,
                 historical=True,
                 depth=inherited_depth,
