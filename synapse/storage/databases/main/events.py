@@ -1745,7 +1745,7 @@ class PersistEventsStore:
                 (event.state_key,),
             )
 
-            # The `_get_joined_profile_from_event_id` is immutable, except for the
+            # The `_get_membership_from_event_id` is immutable, except for the
             # case where we look up an event *before* persisting it.
             txn.call_after(
                 self.store._get_membership_from_event_id.invalidate,
