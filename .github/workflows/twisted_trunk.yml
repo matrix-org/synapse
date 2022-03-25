@@ -59,16 +59,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - uses: matrix-org/setup-python-poetry@dmr/try-extras
-        with:
-          python-version: "3.x"
-          extras: "all"
       - name: Patch dependencies
-        run: .ci/patch_for_twisted_trunk.sh
+        run: >-
+          ln -s -T /venv /src/.venv &&
+          .ci/patch_for_twisted_trunk.sh &&
+          unlink /src/.venv
         working-directory: /src
       - name: Run SyTest
         run: /bootstrap.sh synapse
         working-directory: /src
+        env:
+          # Use offline mode to avoid reinstalling the pinned version of
+          # twisted.
+          OFFLINE: 1
       - name: Summarise results.tap
         if: ${{ always() }}
         run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
