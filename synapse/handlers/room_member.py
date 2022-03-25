@@ -300,11 +300,13 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 Should normally be left as None, which will cause them to be calculated
                 based on the room state at the prev_events.
             state_event_ids:
-                The full state at a given event. The state events will be stripped down to
-                only what's necessary to auth the given event and set as the auth_event_ids.
-                This is particularly used by the MSC2716 /batch_send endpoint. This should
-                normally be left as None, which will cause the auth_event_ids to be
-                calculated based on the room state at the prev_events.
+                The full state at a given event. This is used particularly by the MSC2716
+                /batch_send endpoint. One use case is the historical `state_events_at_start`;
+                since each is marked as an `outlier`, the `EventContext.for_outlier()` won't
+                have any `state_ids` set and therefore can't derive any state even though the
+                prev_events are set so we need to set them ourself via this argument.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
 
             txn_id:
             ratelimit:
@@ -497,11 +499,13 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 Should normally be left as None, which will cause them to be calculated
                 based on the room state at the prev_events.
             state_event_ids:
-                The full state at a given event. The state events will be stripped down to
-                only what's necessary to auth the given event and set as the auth_event_ids.
-                This is particularly used by the MSC2716 /batch_send endpoint. This should
-                normally be left as None, which will cause the auth_event_ids to be
-                calculated based on the room state at the prev_events.
+                The full state at a given event. This is used particularly by the MSC2716
+                /batch_send endpoint. One use case is the historical `state_events_at_start`;
+                since each is marked as an `outlier`, the `EventContext.for_outlier()` won't
+                have any `state_ids` set and therefore can't derive any state even though the
+                prev_events are set so we need to set them ourself via this argument.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -599,11 +603,13 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 Should normally be left as None, which will cause them to be calculated
                 based on the room state at the prev_events.
             state_event_ids:
-                The full state at a given event. The state events will be stripped down to
-                only what's necessary to auth the given event and set as the auth_event_ids.
-                This is particularly used by the MSC2716 /batch_send endpoint. This should
-                normally be left as None, which will cause the auth_event_ids to be
-                calculated based on the room state at the prev_events.
+                The full state at a given event. This is used particularly by the MSC2716
+                /batch_send endpoint. One use case is the historical `state_events_at_start`;
+                since each is marked as an `outlier`, the `EventContext.for_outlier()` won't
+                have any `state_ids` set and therefore can't derive any state even though the
+                prev_events are set so we need to set them ourself via this argument.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
 
         Returns:
             A tuple of the new event ID and stream ID.

@@ -530,13 +530,12 @@ class EventCreationHandler:
 
             state_event_ids:
                 The full state at a given event. This is used particularly by the MSC2716
-                /batch_send endpoint which shares the same state across the whole batch.
-                The state events will be stripped down to only what's necessary to auth
-                a given event and set as the auth_event_ids. For insertion events, we will
-                add all of these state events as the explicit state so the rest of the
-                historical batch can inherit the same state and state_group. This should
-                normally be left as None, which will cause the auth_event_ids to be
-                calculated based on the room state at the prev_events.
+                /batch_send endpoint. One use case is with insertion events which float at
+                the beginning of a historical batch and don't have any `prev_events` to
+                derive from; we add all of these state events as the explicit state so the
+                rest of the historical batch can inherit the same state and state_group.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
 
             require_consent: Whether to check if the requester has
                 consented to the privacy policy.
@@ -822,13 +821,12 @@ class EventCreationHandler:
                 If non-None, prev_event_ids must also be provided.
             state_event_ids:
                 The full state at a given event. This is used particularly by the MSC2716
-                /batch_send endpoint which shares the same state across the whole batch.
-                The state events will be stripped down to only what's necessary to auth
-                a given event and set as the auth_event_ids. For insertion events, we will
-                add all of these state events as the explicit state so the rest of the
-                historical batch can inherit the same state and state_group. This should
-                normally be left as None, which will cause the auth_event_ids to be
-                calculated based on the room state at the prev_events.
+                /batch_send endpoint. One use case is with insertion events which float at
+                the beginning of a historical batch and don't have any `prev_events` to
+                derive from; we add all of these state events as the explicit state so the
+                rest of the historical batch can inherit the same state and state_group.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
             ratelimit: Whether to rate limit this send.
             txn_id: The transaction ID.
             ignore_shadow_ban: True if shadow-banned users should be allowed to
@@ -948,13 +946,12 @@ class EventCreationHandler:
 
             state_event_ids:
                 The full state at a given event. This is used particularly by the MSC2716
-                /batch_send endpoint which shares the same state across the whole batch.
-                The state events will be stripped down to only what's necessary to auth
-                a given event and set as the auth_event_ids. For insertion events, we will
-                add all of these state events as the explicit state so the rest of the
-                historical batch can inherit the same state and state_group. This should
-                normally be left as None, which will cause the auth_event_ids to be
-                calculated based on the room state at the prev_events.
+                /batch_send endpoint. One use case is with insertion events which float at
+                the beginning of a historical batch and don't have any `prev_events` to
+                derive from; we add all of these state events as the explicit state so the
+                rest of the historical batch can inherit the same state and state_group.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
 
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
