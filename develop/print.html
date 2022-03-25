@@ -1654,6 +1654,9 @@ be disabled by default in Synapse v1.58.0.</p>
 the configuration file, is set to <code>true</code>. See the <a href="https://matrix-org.github.io/synapse/latest/postgres.html#fixing-incorrect-collate-or-ctype">PostgreSQL documentation</a>
 for more information and instructions on how to fix a database with incorrect values.</p>
 <h1 id="upgrading-to-v1550"><a class="header" href="#upgrading-to-v1550">Upgrading to v1.55.0</a></h1>
+<h2 id="open-registration-without-verification-is-now-disabled-by-default"><a class="header" href="#open-registration-without-verification-is-now-disabled-by-default">Open registration without verification is now disabled by default</a></h2>
+<p>Synapse will refuse to start if registration is enabled without email, captcha, or token-based verification unless the new config 
+flag <code>enable_registration_without_verification</code> is set to &quot;true&quot;.</p>
 <h2 id="synctl-script-has-been-moved"><a class="header" href="#synctl-script-has-been-moved"><code>synctl</code> script has been moved</a></h2>
 <p>The <code>synctl</code> script
 <a href="https://github.com/matrix-org/synapse/pull/12140">has been made</a> an
@@ -4175,9 +4178,17 @@ oembed:
 # Registration can be rate-limited using the parameters in the &quot;Ratelimiting&quot;
 # section of this file.
 
-# Enable registration for new users.
+# Enable registration for new users. Defaults to 'false'. It is highly recommended that if you enable registration,
+# you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration
+# without any verification, you must also set `enable_registration_without_verification`, found below.
 #
 #enable_registration: false
+
+# Enable registration without email or captcha verification. Note: this option is *not* recommended,
+# as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
+# unless `enable_registration` is also enabled.
+#
+#enable_registration_without_verification: true
 
 # Time that a user's session remains valid for, after they log in.
 #
