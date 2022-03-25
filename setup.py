@@ -108,6 +108,7 @@ CONDITIONAL_REQUIREMENTS["mypy"] = [
     "types-jsonschema>=3.2.0",
     "types-opentracing>=2.4.2",
     "types-Pillow>=8.3.4",
+    "types-psycopg2>=2.9.9",
     "types-pyOpenSSL>=20.0.7",
     "types-PyYAML>=5.4.10",
     "types-requests>=2.26.0",

@@ -124,14 +124,14 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 )
 
         # For the event we are inserting next to (`prev_event_ids_from_query`),
-        # find the most recent auth events (derived from state events) that
-        # allowed that message to be sent. We will use that as a base
-        # to auth our historical messages against.
-        auth_event_ids = await self.room_batch_handler.get_most_recent_auth_event_ids_from_event_id_list(
+        # find the most recent state events that allowed that message to be
+        # sent. We will use that as a base to auth our historical messages
+        # against.
+        state_event_ids = await self.room_batch_handler.get_most_recent_full_state_ids_from_event_id_list(
             prev_event_ids_from_query
         )
 
-        if not auth_event_ids:
+        if not state_event_ids:
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "No auth events found for given prev_event query parameter. The prev_event=%s probably does not exist."
@@ -148,13 +148,13 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 await self.room_batch_handler.persist_state_events_at_start(
                     state_events_at_start=body["state_events_at_start"],
                     room_id=room_id,
-                    initial_auth_event_ids=auth_event_ids,
+                    initial_state_event_ids=state_event_ids,
                     app_service_requester=requester,
                 )
             )
             # Update our ongoing auth event ID list with all of the new state we
             # just created
-            auth_event_ids.extend(state_event_ids_at_start)
+            state_event_ids.extend(state_event_ids_at_start)
 
         inherited_depth = await self.room_batch_handler.inherit_depth_from_prev_ids(
             prev_event_ids_from_query
@@ -196,7 +196,12 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 ),
                 base_insertion_event_dict,
                 prev_event_ids=base_insertion_event_dict.get("prev_events"),
-                auth_event_ids=auth_event_ids,
+                # Also set the explicit state here because we want to resolve
+                # any `state_events_at_start` here too. It's not strictly
+                # necessary to accomplish anything but if someone asks for the
+                # state at this point, we probably want to show them the
+                # historical state that was part of this batch.
+                state_event_ids=state_event_ids,
                 historical=True,
                 depth=inherited_depth,
             )
@@ -212,7 +217,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
             room_id=room_id,
             batch_id_to_connect_to=batch_id_to_connect_to,
             inherited_depth=inherited_depth,
-            auth_event_ids=auth_event_ids,
+            initial_state_event_ids=state_event_ids,
             app_service_requester=requester,
         )
 

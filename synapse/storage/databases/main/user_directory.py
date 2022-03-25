@@ -730,7 +730,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         users.update(rows)
         return list(users)
 
-    async def get_shared_rooms_for_users(
+    async def get_mutual_rooms_for_users(
         self, user_id: str, other_user_id: str
     ) -> Set[str]:
         """
@@ -744,7 +744,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             A set of room ID's that the users share.
         """
 
-        def _get_shared_rooms_for_users_txn(
+        def _get_mutual_rooms_for_users_txn(
             txn: LoggingTransaction,
         ) -> List[Dict[str, str]]:
             txn.execute(
@@ -768,7 +768,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             return rows
 
         rows = await self.db_pool.runInteraction(
-            "get_shared_rooms_for_users", _get_shared_rooms_for_users_txn
+            "get_mutual_rooms_for_users", _get_mutual_rooms_for_users_txn
         )
 
         return {row["room_id"] for row in rows}
