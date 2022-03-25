@@ -141,7 +141,8 @@ prometheus-client = ">=0.4.0"
 attrs = ">=19.2.0,!=21.1.0"
 netaddr = ">=0.7.18"
 # We require 3.x or higher for type hints. Previous guard was >= 2.9.
-Jinja2 = ">=3.0.0"
+# Jinja2 3.1.0 removes the deprecated jinja2.Markup class, which we rely on.
+Jinja2 = ">=3.0.0,<3.1.0"
 bleach = ">=1.4.3"
 # We use `ParamSpec`, which was added in `typing-extensions` 3.10.0.0.
 typing-extensions = ">=3.10.0"
@@ -249,6 +250,7 @@ types-bleach = ">=4.1.0"
 types-jsonschema = ">=3.2.0"
 types-opentracing = ">=2.4.2"
 types-Pillow = ">=8.3.4"
+types-psycopg2 = ">=2.9.9"
 types-pyOpenSSL = ">=20.0.7"
 types-PyYAML = ">=5.4.10"
 types-requests = ">=2.26.0"

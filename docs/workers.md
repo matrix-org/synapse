@@ -185,8 +185,8 @@ worker: refer to the [stream writers](#stream-writers) section below for further
 information.
 
     # Sync requests
-    ^/_matrix/client/(v2_alpha|r0|v3)/sync$
-    ^/_matrix/client/(api/v1|v2_alpha|r0|v3)/events$
+    ^/_matrix/client/(r0|v3)/sync$
+    ^/_matrix/client/(api/v1|r0|v3)/events$
     ^/_matrix/client/(api/v1|r0|v3)/initialSync$
     ^/_matrix/client/(api/v1|r0|v3)/rooms/[^/]+/initialSync$
 
@@ -200,13 +200,9 @@ information.
     ^/_matrix/federation/v1/query/
     ^/_matrix/federation/v1/make_join/
     ^/_matrix/federation/v1/make_leave/
-    ^/_matrix/federation/v1/send_join/
-    ^/_matrix/federation/v2/send_join/
-    ^/_matrix/federation/v1/send_leave/
-    ^/_matrix/federation/v2/send_leave/
-    ^/_matrix/federation/v1/invite/
-    ^/_matrix/federation/v2/invite/
-    ^/_matrix/federation/v1/query_auth/
+    ^/_matrix/federation/(v1|v2)/send_join/
+    ^/_matrix/federation/(v1|v2)/send_leave/
+    ^/_matrix/federation/(v1|v2)/invite/
     ^/_matrix/federation/v1/event_auth/
     ^/_matrix/federation/v1/exchange_third_party_invite/
     ^/_matrix/federation/v1/user/devices/
@@ -274,6 +270,8 @@ information.
 Additionally, the following REST endpoints can be handled for GET requests:
 
     ^/_matrix/federation/v1/groups/
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/pushrules/
+    ^/_matrix/client/(r0|v3|unstable)/groups/
 
 Pagination requests can also be handled, but all requests for a given
 room must be routed to the same instance. Additionally, care must be taken to
@@ -397,23 +395,23 @@ the stream writer for the `typing` stream:
 The following endpoints should be routed directly to the worker configured as
 the stream writer for the `to_device` stream:
 
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/sendToDevice/
+    ^/_matrix/client/(r0|v3|unstable)/sendToDevice/
 
 ##### The `account_data` stream
 
 The following endpoints should be routed directly to the worker configured as
 the stream writer for the `account_data` stream:
 
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/tags
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/.*/account_data
+    ^/_matrix/client/(r0|v3|unstable)/.*/tags
+    ^/_matrix/client/(r0|v3|unstable)/.*/account_data
 
 ##### The `receipts` stream
 
 The following endpoints should be routed directly to the worker configured as
 the stream writer for the `receipts` stream:
 
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/receipt
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/read_markers
+    ^/_matrix/client/(r0|v3|unstable)/rooms/.*/receipt
+    ^/_matrix/client/(r0|v3|unstable)/rooms/.*/read_markers
 
 ##### The `presence` stream
 
@@ -528,11 +526,20 @@ Note that if a reverse proxy is used , then `/_matrix/media/` must be routed for
 Handles searches in the user directory. It can handle REST endpoints matching
 the following regular expressions:
 
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/user_directory/search$
+    ^/_matrix/client/(r0|v3|unstable)/user_directory/search$
 
-When using this worker you must also set `update_user_directory: False` in the
+When using this worker you must also set `update_user_directory: false` in the
 shared configuration file to stop the main synapse running background
 jobs related to updating the user directory.
+
+Above endpoint is not *required* to be routed to this worker. By default,
+`update_user_directory` is set to `true`, which means the main process
+will handle updates. All workers configured with `client` can handle the above
+endpoint as long as either this worker or the main process are configured to
+handle it, and are online.
+
+If `update_user_directory` is set to `false`, and this worker is not running,
+the above endpoint may give outdated results.
 
 ### `synapse.app.frontend_proxy`
 
@@ -540,7 +547,7 @@ Proxies some frequently-requested client endpoints to add caching and remove
 load from the main synapse. It can handle REST endpoints matching the following
 regular expressions:
 
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/upload
+    ^/_matrix/client/(r0|v3|unstable)/keys/upload
 
 If `use_presence` is False in the homeserver config, it can also handle REST
 endpoints matching the following regular expressions:

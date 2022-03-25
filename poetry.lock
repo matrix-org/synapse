@@ -1405,6 +1405,14 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "types-psycopg2"
+version = "2.9.9"
+description = "Typing stubs for psycopg2"
+category = "dev"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "types-pyopenssl"
 version = "22.0.0"
 description = "Typing stubs for pyOpenSSL"
@@ -1582,7 +1590,7 @@ url_preview = ["lxml"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "0715b0d20c731251e080051ef7c3fbb21d8b15e013670591b4517939cf8ce76b"
+content-hash = "438c6786f123522daedffe0f44fefc49689cbb3e1bc5dbf05c3ff5a8ab72ad16"
 
 [metadata.files]
 appdirs = [
@@ -2633,6 +2641,10 @@ types-opentracing = [
 types-pillow = [
     {file = "types-Pillow-9.0.6.tar.gz", hash = "sha256:79b350b1188c080c27558429f1e119e69c9f020b877a82df761d9283070e0185"},
     {file = "types_Pillow-9.0.6-py3-none-any.whl", hash = "sha256:bd1e0a844fc718398aa265bf50fcad550fc520cc54f80e5ffeb7b3226b3cc507"},
+]
+types-psycopg2 = [
+    {file = "types-psycopg2-2.9.9.tar.gz", hash = "sha256:4f9d4d52eeb343dc00fd5ed4f1513a8a5c18efba0a072eb82706d15cf4f20a2e"},
+    {file = "types_psycopg2-2.9.9-py3-none-any.whl", hash = "sha256:cec9291d4318ad70b407310f8304b3d40f6d0358f09870448f7a65e3027c80af"},
 ]
 types-pyopenssl = [
     {file = "types-pyOpenSSL-22.0.0.tar.gz", hash = "sha256:d86dde7f6fe2f1ac9fe0b6282e489f649f480364bdaa9d6a4696d52505f4477e"},

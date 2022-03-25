@@ -1,0 +1,1 @@
+Refuse to start if DB has non-`C` locale, unless config flag `allow_unsafe_db_locale` is set to true.
