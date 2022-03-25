@@ -174,6 +174,7 @@ class RoomBatchHandler:
         assert app_service_requester.app_service
 
         state_event_ids_at_start = []
+        state_event_ids = initial_state_event_ids.copy()
 
         # Make the state events float off on their own by specifying no
         # prev_events for the first one in the chain so we don't have a bunch of
@@ -212,16 +213,26 @@ class RoomBatchHandler:
                     room_id=room_id,
                     action=membership,
                     content=event_dict["content"],
+                    # Mark as an outlier to disconnect it from the normal DAG
+                    # and not show up between batches of history.
                     outlier=True,
                     historical=True,
                     # Only the first event in the state chain should be floating.
                     # The rest should hang off each other in a chain.
                     allow_no_prev_events=index == 0,
                     prev_event_ids=prev_event_ids_for_state_chain,
-                    # Since the first event in the state chain is floating with
-                    # no `prev_events`, it can't derive state from anywhere
-                    # automatically. So we need to set some state explicitly.
-                    state_event_ids=initial_state_event_ids if index == 0 else None,
+                    # Since each state event is marked as an outlier, the
+                    # `EventContext.for_outlier()` won't have any `state_ids`
+                    # set and therefore can't derive any state even though the
+                    # prev_events are set. Also since the first event in the
+                    # state chain is floating with no `prev_events`, it can't
+                    # derive state from anywhere automatically. So we need to
+                    # set some state explicitly.
+                    #
+                    # Make sure to use a copy of this list because we modify it
+                    # later in the loop here. Otherwise it will be the same
+                    # reference and also update in the event when we append later.
+                    state_event_ids=state_event_ids.copy(),
                 )
             else:
                 # TODO: Add some complement tests that adds state that is not member joins
@@ -235,20 +246,31 @@ class RoomBatchHandler:
                         state_event["sender"], app_service_requester.app_service
                     ),
                     event_dict,
+                    # Mark as an outlier to disconnect it from the normal DAG
+                    # and not show up between batches of history.
                     outlier=True,
                     historical=True,
                     # Only the first event in the state chain should be floating.
                     # The rest should hang off each other in a chain.
                     allow_no_prev_events=index == 0,
                     prev_event_ids=prev_event_ids_for_state_chain,
-                    # Since the first event in the state chain is floating with
-                    # no `prev_events`, it can't derive state from anywhere
-                    # automatically. So we need to set some state explicitly.
-                    state_event_ids=initial_state_event_ids if index == 0 else None,
+                    # Since each state event is marked as an outlier, the
+                    # `EventContext.for_outlier()` won't have any `state_ids`
+                    # set and therefore can't derive any state even though the
+                    # prev_events are set. Also since the first event in the
+                    # state chain is floating with no `prev_events`, it can't
+                    # derive state from anywhere automatically. So we need to
+                    # set some state explicitly.
+                    #
+                    # Make sure to use a copy of this list because we modify it
+                    # later in the loop here. Otherwise it will be the same
+                    # reference and also update in the event when we append later.
+                    state_event_ids=state_event_ids.copy(),
                 )
                 event_id = event.event_id
 
             state_event_ids_at_start.append(event_id)
+            state_event_ids.append(event_id)
             # Connect all the state in a floating chain
             prev_event_ids_for_state_chain = [event_id]
 

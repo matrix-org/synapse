@@ -196,6 +196,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 ),
                 base_insertion_event_dict,
                 prev_event_ids=base_insertion_event_dict.get("prev_events"),
+                # TODO: Is state_event_ids necessary here?
                 state_event_ids=state_event_ids,
                 historical=True,
                 depth=inherited_depth,
@@ -212,7 +213,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
             room_id=room_id,
             batch_id_to_connect_to=batch_id_to_connect_to,
             inherited_depth=inherited_depth,
-            state_event_ids=state_event_ids,
+            initial_state_event_ids=state_event_ids,
             app_service_requester=requester,
         )
 
