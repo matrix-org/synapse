@@ -6467,6 +6467,7 @@ to install Dex.</p>
 <li>Create an application for synapse in Authentik and link it to the provider.</li>
 <li>Note the slug of your application, Client ID and Client Secret.</li>
 </ol>
+<p>Note: RSA keys must be used for signing for Authentik, ECC keys do not work.</p>
 <p>Synapse config:</p>
 <pre><code class="language-yaml">oidc_providers:
   - idp_id: authentik
@@ -6481,7 +6482,7 @@ to install Dex.</p>
       - &quot;email&quot;
     user_mapping_provider:
       config:
-        localpart_template: &quot;{{ user.preferred_username }}}&quot;
+        localpart_template: &quot;{{ user.preferred_username }}&quot;
         display_name_template: &quot;{{ user.preferred_username|capitalize }}&quot; # TO BE FILLED: If your users have names in Authentik and you want those in Synapse, this should be replaced with user.name|capitalize.
 </code></pre>
 <h3 id="lemonldap"><a class="header" href="#lemonldap">LemonLDAP</a></h3>
