@@ -151,24 +151,21 @@ class RoomBatchHandler:
         self,
         state_events_at_start: List[JsonDict],
         room_id: str,
-        initial_state_ids_at_event: List[str],
+        initial_state_event_ids: List[str],
         app_service_requester: Requester,
     ) -> List[str]:
         """Takes all `state_events_at_start` event dictionaries and creates/persists
-        them as floating state events which don't resolve into the current room state.
-        They are floating because they reference a fake prev_event which doesn't connect
-        to the normal DAG at all.
+        them in a floating state event chain which don't resolve into the current room
+        state. They are floating because they reference no prev_events and are marked
+        as outliers which disconnects them from the normal DAG.
 
         Args:
             state_events_at_start:
             room_id: Room where you want the events persisted in.
-            initial_state_ids_at_event:
-                The base set of state of the historical batch. When persisting each of
-                the events in state_events_at_start, the state will be stripped down to
-                only what's necessary to auth the given event and set as the
-                auth_event_ids. After each state event from state_events_at_start is
-                persisted, it will be added to the ongoing list of state_event_ids for
-                the next state event to be persisted with.
+            initial_state_event_ids:
+                The base set of state for the historical batch which the floating
+                state chain will derive from. This should probably be the state
+                from the `prev_event` defined by `/batch_send?prev_event_id=$abc`.
             app_service_requester: The requester of an application service.
 
         Returns:
@@ -177,7 +174,6 @@ class RoomBatchHandler:
         assert app_service_requester.app_service
 
         state_event_ids_at_start = []
-        state_event_ids = initial_state_ids_at_event.copy()
 
         # Make the state events float off on their own by specifying no
         # prev_events for the first one in the chain so we don't have a bunch of
@@ -190,9 +186,7 @@ class RoomBatchHandler:
             )
 
             logger.debug(
-                "RoomBatchSendEventRestServlet inserting state_event=%s, state_event_ids=%s",
-                state_event,
-                state_event_ids,
+                "RoomBatchSendEventRestServlet inserting state_event=%s", state_event
             )
 
             event_dict = {
@@ -220,14 +214,14 @@ class RoomBatchHandler:
                     content=event_dict["content"],
                     outlier=True,
                     historical=True,
-                    # Only the first event in the chain should be floating.
+                    # Only the first event in the state chain should be floating.
                     # The rest should hang off each other in a chain.
                     allow_no_prev_events=index == 0,
                     prev_event_ids=prev_event_ids_for_state_chain,
-                    # Make sure to use a copy of this list because we modify it
-                    # later in the loop here. Otherwise it will be the same
-                    # reference and also update in the event when we append later.
-                    state_event_ids=state_event_ids.copy(),
+                    # Since the first event in the state chain is floating with
+                    # no `prev_events`, it can't derive state from anywhere
+                    # automatically. So we need to set some state explicitly.
+                    state_event_ids=initial_state_event_ids if index == 0 else None,
                 )
             else:
                 # TODO: Add some complement tests that adds state that is not member joins
@@ -243,19 +237,18 @@ class RoomBatchHandler:
                     event_dict,
                     outlier=True,
                     historical=True,
-                    # Only the first event in the chain should be floating.
+                    # Only the first event in the state chain should be floating.
                     # The rest should hang off each other in a chain.
                     allow_no_prev_events=index == 0,
                     prev_event_ids=prev_event_ids_for_state_chain,
-                    # Make sure to use a copy of this list because we modify it
-                    # later in the loop here. Otherwise it will be the same
-                    # reference and also update in the event when we append later.
-                    state_event_ids=state_event_ids.copy(),
+                    # Since the first event in the state chain is floating with
+                    # no `prev_events`, it can't derive state from anywhere
+                    # automatically. So we need to set some state explicitly.
+                    state_event_ids=initial_state_event_ids if index == 0 else None,
                 )
                 event_id = event.event_id
 
             state_event_ids_at_start.append(event_id)
-            state_event_ids.append(event_id)
             # Connect all the state in a floating chain
             prev_event_ids_for_state_chain = [event_id]
 
@@ -266,7 +259,7 @@ class RoomBatchHandler:
         events_to_create: List[JsonDict],
         room_id: str,
         inherited_depth: int,
-        state_event_ids: List[str],
+        initial_state_event_ids: List[str],
         app_service_requester: Requester,
     ) -> List[str]:
         """Create and persists all events provided sequentially. Handles the
@@ -282,19 +275,21 @@ class RoomBatchHandler:
             room_id: Room where you want the events persisted in.
             inherited_depth: The depth to create the events at (you will
                 probably by calling inherit_depth_from_prev_ids(...)).
-            state_event_ids:
-                The full state at a given event. We share the same state across the whole
-                historical batch. The state events will be stripped down to only what's
-                necessary to auth a given event and set as the auth_event_ids. For
-                insertion events, we will add all of these state events as the explicit
-                state so the rest of the historical batch can inherit the same state and
-                state_group.
+            initial_state_event_ids:
+                This is used to set explicit state for the insertion event at
+                the start of the historical batch since it's floating with no
+                prev_events to derive state from automatically.
             app_service_requester: The requester of an application service.
 
         Returns:
             List of persisted event IDs
         """
         assert app_service_requester.app_service
+
+        # We expect the first event in a historical batch to be an insertion event
+        assert events_to_create[0]["type"] == EventTypes.MSC2716_INSERTION
+        # We expect the last event in a historical batch to be an batch event
+        assert events_to_create[-1]["type"] == EventTypes.MSC2716_BATCH
 
         # Make the historical event chain float off on its own by specifying no
         # prev_events for the first event in the chain which causes the HS to
@@ -327,11 +322,16 @@ class RoomBatchHandler:
                     ev["sender"], app_service_requester.app_service
                 ),
                 event_dict,
-                # Only the first event in the chain should be floating.
-                # The rest should hang off each other in a chain.
+                # Only the first event (which is the insertion event) in the
+                # chain should be floating. The rest should hang off each other
+                # in a chain.
                 allow_no_prev_events=index == 0,
                 prev_event_ids=event_dict.get("prev_events"),
-                state_event_ids=state_event_ids,
+                # Since the first event (which is the insertion event) in the
+                # chain is floating with no `prev_events`, it can't derive state
+                # from anywhere automatically. So we need to set some state
+                # explicitly.
+                state_event_ids=initial_state_event_ids if index == 0 else None,
                 historical=True,
                 depth=inherited_depth,
             )
@@ -349,10 +349,9 @@ class RoomBatchHandler:
             )
 
             logger.debug(
-                "RoomBatchSendEventRestServlet inserting event=%s, prev_event_ids=%s, state_event_ids=%s",
+                "RoomBatchSendEventRestServlet inserting event=%s, prev_event_ids=%s",
                 event,
                 prev_event_ids,
-                state_event_ids,
             )
 
             events_to_persist.append((event, context))
@@ -382,12 +381,12 @@ class RoomBatchHandler:
         room_id: str,
         batch_id_to_connect_to: str,
         inherited_depth: int,
-        state_event_ids: List[str],
+        initial_state_event_ids: List[str],
         app_service_requester: Requester,
     ) -> Tuple[List[str], str]:
         """
-        Handles creating and persisting all of the historical events as well
-        as insertion and batch meta events to make the batch navigable in the DAG.
+        Handles creating and persisting all of the historical events as well as
+        insertion and batch meta events to make the batch navigable in the DAG.
 
         Args:
             events_to_create: List of historical events to create in JSON
@@ -397,13 +396,13 @@ class RoomBatchHandler:
                 want this batch to connect to.
             inherited_depth: The depth to create the events at (you will
                 probably by calling inherit_depth_from_prev_ids(...)).
-            state_event_ids:
-                The full state at a given event. We share the same state across the whole
-                historical batch. The state events will be stripped down to only what's
-                necessary to auth a given event and set as the auth_event_ids. For
-                insertion events, we will add all of these state events as the explicit
-                state so the rest of the historical batch can inherit the same state and
-                state_group.
+            initial_state_event_ids:
+                This is used to set explicit state for the insertion event at
+                the start of the historical batch since it's floating with no
+                prev_events to derive state from automatically. This should
+                probably be the state from the `prev_event` defined by
+                `/batch_send?prev_event_id=$abc` plus the outcome of
+                `persist_state_events_at_start`
             app_service_requester: The requester of an application service.
 
         Returns:
@@ -449,7 +448,7 @@ class RoomBatchHandler:
             events_to_create=events_to_create,
             room_id=room_id,
             inherited_depth=inherited_depth,
-            state_event_ids=state_event_ids,
+            initial_state_event_ids=initial_state_event_ids,
             app_service_requester=app_service_requester,
         )
 

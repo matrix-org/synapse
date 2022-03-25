@@ -148,7 +148,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 await self.room_batch_handler.persist_state_events_at_start(
                     state_events_at_start=body["state_events_at_start"],
                     room_id=room_id,
-                    initial_state_ids_at_event=state_event_ids,
+                    initial_state_event_ids=state_event_ids,
                     app_service_requester=requester,
                 )
             )

@@ -626,6 +626,12 @@ class EventCreationHandler:
             state_event_ids=state_event_ids,
             depth=depth,
         )
+        logger.info(
+            "create_new_client_event %s event=%s state_group=%s",
+            event.type,
+            event.event_id,
+            context._state_group,
+        )
 
         # In an ideal world we wouldn't need the second part of this condition. However,
         # this behaviour isn't spec'd yet, meaning we should be able to deactivate this
