@@ -1,5 +1,6 @@
 import logging
-from typing import List, Tuple
+import pprint
+from typing import List, Tuple, Optional, Set
 from unittest.mock import Mock, patch
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -7,7 +8,7 @@ from twisted.test.proto_helpers import MemoryReactor
 from synapse.api.constants import EventContentFields, EventTypes
 from synapse.appservice import ApplicationService
 from synapse.rest import admin
-from synapse.rest.client import login, register, room, room_batch
+from synapse.rest.client import login, register, room, room_batch, sync
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
@@ -63,6 +64,7 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
         room.register_servlets,
         register.register_servlets,
         login.register_servlets,
+        sync.register_servlets
     ]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
@@ -178,3 +180,69 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
             "Expected a single state_group to be returned by saw state_groups=%s"
             % (state_group_map.keys(),),
         )
+
+    def _dirty_sync_helper(self, tok: str, since: Optional[str] = None) -> Tuple[str, JsonDict]:
+        """
+        Returns:
+            - sync token
+            - full body
+        """
+
+        since = f"?since={since}" if since else ""
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v3/sync{since}",
+            access_token=tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+        return channel.json_body["next_batch"], channel.json_body
+
+    @unittest.override_config({"experimental_features": {"msc2716_enabled": True}})
+    def test_reproduce_12281(self) -> None:
+        """
+        Reproduces issue 12281, where state doesn't come down sync...
+        """
+
+        # Create a user
+        self.register_user("kristina", "secret")
+        tok_kristina = self.login("kristina", "secret")
+
+        # Start kristina syncing...
+        next_sync, _ = self._dirty_sync_helper(tok_kristina)
+
+        # A room gets created by the appservice
+        room_id = self.helper.create_room_as(
+            self.appservice.sender, tok=self.appservice.token
+        )
+
+        # 6 state events come in to configure the room
+        for i in range(6):
+            self.helper.send_event(
+                room_id=room_id,
+                type=f"com.example.state.{i}",
+                content={
+                    "blah": "Blah"
+                },
+                tok=self.appservice.token,
+            )
+
+        # Invite
+        self.helper.invite(
+            room=room_id,
+            targ="@someone:test",
+            tok=self.appservice.token
+        )
+
+        # Invite kristina
+        self.helper.invite(
+            room=room_id,
+            targ="@kristina:test",
+            tok=self.appservice.token
+        )
+
+        next_sync, kristina_inv_sync = self._dirty_sync_helper(tok_kristina, next_sync)
+        pprint.pprint(kristina_inv_sync)
+        self.assertIn(room_id, kristina_inv_sync["rooms"]["invite"])
+
+
+
