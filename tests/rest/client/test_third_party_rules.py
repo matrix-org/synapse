@@ -907,7 +907,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         third_party_rules._on_threepid_bind_callbacks.append(threepid_bind_mock)
 
         # Register an admin user.
-        admin_user_id = self.register_user("admin", "password", admin=True)
+        self.register_user("admin", "password", admin=True)
         admin_tok = self.login("admin", "password")
 
         # Also register a normal user we can modify.
