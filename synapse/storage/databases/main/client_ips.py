@@ -655,25 +655,29 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
             # TODO lock=False
         )
 
+        # Keys and values for the `devices` update.
+        key_columns = "user_id", "device_id"
+        keys = []
+        value_columns = "user_agent", "last_seen", "ip"
+        values = []
+
         for entry in to_update.items():
             (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
 
             # Technically an access token might not be associated with
             # a device so we need to check.
             if device_id:
-                # this is always an update rather than an upsert: the row should
-                # already exist, and if it doesn't, that may be because it has been
-                # deleted, and we don't want to re-create it.
-                self.db_pool.simple_update_txn(
-                    txn,
-                    table="devices",
-                    keyvalues={"user_id": user_id, "device_id": device_id},
-                    updatevalues={
-                        "user_agent": user_agent,
-                        "last_seen": last_seen,
-                        "ip": ip,
-                    },
-                )
+                keys.append((user_id, device_id))
+                values.append((user_agent, last_seen, ip))
+
+        self.db_pool.simple_update_many_txn(
+            txn,
+            table="devices",
+            key_names=key_columns,
+            key_values=keys,
+            value_names=value_columns,
+            value_values=values,
+        )
 
     async def get_last_client_ip_by_device(
         self, user_id: str, device_id: Optional[str]
