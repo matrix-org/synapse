@@ -408,7 +408,13 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
     ):
         super().__init__(database, db_conn, hs)
 
-        self._update_on_this_worker = hs.config.worker.run_background_tasks
+        if hs.config.redis.redis_enabled:
+            # If we're using Redis, we can shift this update process off to
+            # the background worker
+            self._update_on_this_worker = hs.config.worker.run_background_tasks
+        else:
+            # If we're NOT using Redis, this must be handled by the master
+            self._update_on_this_worker = hs.get_instance_name() == "master"
 
         self.user_ips_max_age = hs.config.server.user_ips_max_age
 

@@ -235,7 +235,13 @@ class ReplicationCommandHandler:
         if self._is_master:
             self._server_notices_sender = hs.get_server_notices_sender()
 
-        self._is_background_worker = hs.config.worker.run_background_tasks
+        if hs.config.redis.redis_enabled:
+            # If we're using Redis, it's the background worker that should
+            # receive USER_IP commands and store the relevant client IPs.
+            self._should_insert_client_ips = hs.config.worker.run_background_tasks
+        else:
+            # If we're NOT using Redis, this must be handled by the master
+            self._should_insert_client_ips = hs.get_instance_name() == "master"
 
     def _add_command_to_stream_queue(
         self, conn: IReplicationConnection, cmd: Union[RdataCommand, PositionCommand]
@@ -403,7 +409,7 @@ class ReplicationCommandHandler:
     ) -> Optional[Awaitable[None]]:
         user_ip_cache_counter.inc()
 
-        if self._is_master or self._is_background_worker:
+        if self._is_master or self._should_insert_client_ips:
             return self._handle_user_ip(cmd)
         else:
             return None
@@ -416,7 +422,7 @@ class ReplicationCommandHandler:
         if self._is_master:
             await self._handle_user_ip_as_master(cmd)
 
-        if self._is_background_worker:
+        if self._should_insert_client_ips:
             await self._handle_user_ip_as_background_worker(cmd)
 
     async def _handle_user_ip_as_master(self, cmd: UserIpCommand) -> None:
