@@ -469,14 +469,15 @@ class DeviceHandler(DeviceWorkerHandler):
             # No changes to notify about, so this is a no-op.
             return
 
-        users_who_share_room = await self.store.get_users_who_share_room_with_user(
-            user_id
-        )
+        room_ids = await self.store.get_rooms_for_user(user_id)
 
         hosts: Set[str] = set()
         if self.hs.is_mine_id(user_id):
-            hosts.update(get_domain_from_id(u) for u in users_who_share_room)
-            hosts.discard(self.server_name)
+            for room_id in room_ids:
+                joined_users = await self.store.get_users_in_room(room_id)
+                hosts.update(get_domain_from_id(u) for u in joined_users)
+
+        hosts.discard(self.server_name)
 
         set_tag("target_hosts", hosts)
 
@@ -495,9 +496,9 @@ class DeviceHandler(DeviceWorkerHandler):
 
         # specify the user ID too since the user should always get their own device list
         # updates, even if they aren't in any rooms.
-        users_to_notify = users_who_share_room.union({user_id})
-
-        self.notifier.on_new_event("device_list_key", position, users=users_to_notify)
+        self.notifier.on_new_event(
+            "device_list_key", position, users={user_id}, rooms=room_ids
+        )
 
         if hosts:
             logger.info(
