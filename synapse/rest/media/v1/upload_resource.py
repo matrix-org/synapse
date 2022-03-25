@@ -42,7 +42,6 @@ class UploadResource(DirectServeJsonResource):
         self.server_name = hs.hostname
         self.auth = hs.get_auth()
         self.max_upload_size = hs.config.media.max_upload_size
-        self.clock = hs.get_clock()
 
     async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
         respond_with_json(request, 200, {}, send_cors=True)
