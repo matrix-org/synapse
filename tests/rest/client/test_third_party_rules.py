@@ -896,3 +896,44 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
 
         # Check that the mock was called with the right room ID
         self.assertEqual(args[1], self.room_id)
+
+    def test_on_threepid_bind(self) -> None:
+        """Tests that the on_threepid_bind module callback is called correctly after
+        associating a 3PID to an account.
+        """
+        # Register a mocked callback.
+        threepid_bind_mock = Mock(return_value=make_awaitable(None))
+        third_party_rules = self.hs.get_third_party_event_rules()
+        third_party_rules._on_threepid_bind_callbacks.append(threepid_bind_mock)
+
+        # Register an admin user.
+        admin_user_id = self.register_user("admin", "password", admin=True)
+        admin_tok = self.login("admin", "password")
+
+        # Also register a normal user we can modify.
+        user_id = self.register_user("user", "password")
+
+        # Add a 3PID to the user.
+        channel = self.make_request(
+            "PUT",
+            "/_synapse/admin/v2/users/%s" % user_id,
+            {
+                "threepids": [
+                    {
+                        "medium": "email",
+                        "address": "foo@example.com",
+                    },
+                ],
+            },
+            access_token=admin_tok,
+        )
+
+        # Check that the shutdown was blocked
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # Check that the mock was called once.
+        threepid_bind_mock.assert_called_once()
+        args = threepid_bind_mock.call_args[0]
+
+        # Check that the mock was called with the right parameters
+        self.assertEqual(args, (user_id, "email", "foo@example.com"))
