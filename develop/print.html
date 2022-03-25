@@ -1648,6 +1648,11 @@ be disabled by default in Synapse v1.58.0.</p>
 <pre><code class="language-yaml">experimental_features:
   groups_enabled: false
 </code></pre>
+<h2 id="change-in-behaviour-for-postgresql-databases-with-unsafe-locale"><a class="header" href="#change-in-behaviour-for-postgresql-databases-with-unsafe-locale">Change in behaviour for PostgreSQL databases with unsafe locale</a></h2>
+<p>Synapse now refuses to start when using PostgreSQL with non-<code>C</code> values for <code>COLLATE</code> and
+<code>CTYPE</code> unless the config flag <code>allow_unsafe_locale</code>, found in the database section of
+the configuration file, is set to <code>true</code>. See the <a href="https://matrix-org.github.io/synapse/latest/postgres.html#fixing-incorrect-collate-or-ctype">PostgreSQL documentation</a>
+for more information and instructions on how to fix a database with incorrect values.</p>
 <h1 id="upgrading-to-v1550"><a class="header" href="#upgrading-to-v1550">Upgrading to v1.55.0</a></h1>
 <h2 id="synctl-script-has-been-moved"><a class="header" href="#synctl-script-has-been-moved"><code>synctl</code> script has been moved</a></h2>
 <p>The <code>synctl</code> script
