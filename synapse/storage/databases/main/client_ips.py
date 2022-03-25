@@ -634,50 +634,57 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
         ):
             self.database_engine.lock_table(txn, "user_ips")
 
-        # Keys and values for the `user_ips` upsert.
-        key_columns = "user_id", "access_token", "ip"
-        keys = []
-        value_columns = "user_agent", "device_id", "last_seen"
-        values = []
+        def update_user_ips() -> None:
+            # Keys and values for the `user_ips` upsert.
+            key_columns = "user_id", "access_token", "ip"
+            keys = []
+            value_columns = "user_agent", "device_id", "last_seen"
+            values = []
 
-        for entry in to_update.items():
-            (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
-            keys.append((user_id, access_token, ip))
-            values.append((user_agent, device_id, last_seen))
+            for entry in to_update.items():
+                (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
+                keys.append((user_id, access_token, ip))
+                values.append((user_agent, device_id, last_seen))
 
-        self.db_pool.simple_upsert_many_txn(
-            txn,
-            table="user_ips",
-            key_names=key_columns,
-            key_values=keys,
-            value_names=value_columns,
-            value_values=values,
-            # TODO lock=False
-        )
+            self.db_pool.simple_upsert_many_txn(
+                txn,
+                table="user_ips",
+                key_names=key_columns,
+                key_values=keys,
+                value_names=value_columns,
+                value_values=values,
+                # TODO lock=False
+            )
 
-        # Keys and values for the `devices` update.
-        key_columns = "user_id", "device_id"
-        keys = []
-        value_columns = "user_agent", "last_seen", "ip"
-        values = []
+        def update_devices() -> None:
+            # Keys and values for the `devices` update.
+            key_columns = "user_id", "device_id"
+            keys = []
+            value_columns = "user_agent", "last_seen", "ip"
+            values = []
 
-        for entry in to_update.items():
-            (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
+            for entry in to_update.items():
+                (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
 
-            # Technically an access token might not be associated with
-            # a device so we need to check.
-            if device_id:
-                keys.append((user_id, device_id))
-                values.append((user_agent, last_seen, ip))
+                # Technically an access token might not be associated with
+                # a device so we need to check.
+                if device_id:
+                    keys.append((user_id, device_id))
+                    values.append((user_agent, last_seen, ip))
 
-        self.db_pool.simple_update_many_txn(
-            txn,
-            table="devices",
-            key_names=key_columns,
-            key_values=keys,
-            value_names=value_columns,
-            value_values=values,
-        )
+            self.db_pool.simple_update_many_txn(
+                txn,
+                table="devices",
+                key_names=key_columns,
+                key_values=keys,
+                value_names=value_columns,
+                value_values=values,
+            )
+
+        # This update is split into two smaller functions so that we can
+        # be sure their locals doesn't overlap
+        update_user_ips()
+        update_devices()
 
     async def get_last_client_ip_by_device(
         self, user_id: str, device_id: Optional[str]
