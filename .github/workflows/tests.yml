@@ -10,12 +10,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check-sampleconfig:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - run: pip install -e .
+      - run: scripts-dev/generate_sample_config.sh --check
+      - run: scripts-dev/config-lint.sh
+
   lint:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         toxenv:
-          - "check-sampleconfig"
           - "check_codestyle"
           - "check_isort"
           - "mypy"
@@ -43,29 +51,15 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - uses: actions/setup-python@v2
-      - run: pip install tox
-      - run: scripts-dev/check-newsfragment
+      - run: "pip install 'towncrier>=18.6.0rc1'"
+      - run: scripts-dev/check-newsfragment.sh
         env:
           PULL_REQUEST_NUMBER: ${{ github.event.number }}
-
-  lint-sdist:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-        with:
-          python-version: "3.x"
-      - run: pip install wheel
-      - run: python setup.py sdist bdist_wheel
-      - uses: actions/upload-artifact@v2
-        with:
-          name: Python Distributions
-          path: dist/*
 
   # Dummy step to gate other tests on without repeating the whole list
   linting-done:
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
-    needs: [lint, lint-crlf, lint-newsfile, lint-sdist]
+    needs: [lint, lint-crlf, lint-newsfile, check-sampleconfig]
     runs-on: ubuntu-latest
     steps:
       - run: "true"
@@ -345,7 +339,7 @@ jobs:
           path: synapse
 
       # Attempt to check out the same branch of Complement as the PR. If it
-      # doesn't exist, fallback to master.
+      # doesn't exist, fallback to HEAD.
       - name: Checkout complement
         shell: bash
         run: |
@@ -358,8 +352,8 @@ jobs:
           #    for pull requests, otherwise GITHUB_REF).
           # 2. Attempt to use the base branch, e.g. when merging into release-vX.Y
           #    (GITHUB_BASE_REF for pull requests).
-          # 3. Use the default complement branch ("master").
-          for BRANCH_NAME in "$GITHUB_HEAD_REF" "$GITHUB_BASE_REF" "${GITHUB_REF#refs/heads/}" "master"; do
+          # 3. Use the default complement branch ("HEAD").
+          for BRANCH_NAME in "$GITHUB_HEAD_REF" "$GITHUB_BASE_REF" "${GITHUB_REF#refs/heads/}" "HEAD"; do
             # Skip empty branch names and merge commits.
             if [[ -z "$BRANCH_NAME" || $BRANCH_NAME =~ ^refs/pull/.* ]]; then
               continue
@@ -383,7 +377,7 @@ jobs:
       # Run Complement
       - run: |
           set -o pipefail
-          go test -v -json -p 1 -tags synapse_blacklist,msc2403 ./tests/... 2>&1 | gotestfmt
+          go test -v -json -tags synapse_blacklist,msc2403,msc2716,msc3030 ./tests/... 2>&1 | gotestfmt
         shell: bash
         name: Run Complement Tests
         env:
@@ -394,35 +388,22 @@ jobs:
   tests-done:
     if: ${{ always() }}
     needs:
+      - check-sampleconfig
       - lint
       - lint-crlf
       - lint-newsfile
-      - lint-sdist
       - trial
       - trial-olddeps
       - sytest
+      - export-data
       - portdb
       - complement
     runs-on: ubuntu-latest
     steps:
-      - name: Set build result
-        env:
-          NEEDS_CONTEXT: ${{ toJSON(needs) }}
-        # the `jq` incantation dumps out a series of "<job> <result>" lines.
-        # we set it to an intermediate variable to avoid a pipe, which makes it
-        # hard to set $rc.
-        run: |
-          rc=0
-          results=$(jq -r 'to_entries[] | [.key,.value.result] | join(" ")' <<< $NEEDS_CONTEXT)
-          while read job result ; do
-              # The newsfile lint may be skipped on non PR builds
-              if [ $result == "skipped" ] && [ $job == "lint-newsfile" ]; then
-                continue
-              fi
+      - uses: matrix-org/done-action@v2
+        with:
+          needs: ${{ toJSON(needs) }}
 
-              if [ "$result" != "success" ]; then
-                  echo "::set-failed ::Job $job returned $result"
-                  rc=1
-              fi
-          done <<< $results
-          exit $rc
+          # The newsfile lint may be skipped on non PR builds
+          skippable:
+            lint-newsfile

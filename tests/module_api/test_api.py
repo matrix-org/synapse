@@ -41,7 +41,7 @@ class ModuleApiTestCase(HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastore()
+        self.store = homeserver.get_datastores().main
         self.module_api = homeserver.get_module_api()
         self.event_creation_handler = homeserver.get_event_creation_handler()
         self.sync_handler = homeserver.get_sync_handler()
@@ -85,6 +85,16 @@ class ModuleApiTestCase(HomeserverTestCase):
         # Check that the displayname was assigned
         displayname = self.get_success(self.store.get_profile_displayname("bob"))
         self.assertEqual(displayname, "Bobberino")
+
+    def test_can_register_admin_user(self):
+        user_id = self.get_success(
+            self.register_user(
+                "bob_module_admin", "1234", displayname="Bobberino Admin", admin=True
+            )
+        )
+        found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
+        self.assertEqual(found_user.user_id.to_string(), user_id)
+        self.assertIdentical(found_user.is_admin, True)
 
     def test_get_userinfo_by_id(self):
         user_id = self.register_user("alice", "1234")

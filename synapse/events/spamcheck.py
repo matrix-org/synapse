@@ -21,7 +21,6 @@ from typing import (
     Awaitable,
     Callable,
     Collection,
-    Dict,
     List,
     Optional,
     Tuple,
@@ -31,7 +30,7 @@ from typing import (
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
 from synapse.spam_checker_api import RegistrationBehaviour
-from synapse.types import RoomAlias
+from synapse.types import RoomAlias, UserProfile
 from synapse.util.async_helpers import maybe_awaitable
 
 if TYPE_CHECKING:
@@ -48,12 +47,9 @@ USER_MAY_JOIN_ROOM_CALLBACK = Callable[[str, str, bool], Awaitable[bool]]
 USER_MAY_INVITE_CALLBACK = Callable[[str, str, str], Awaitable[bool]]
 USER_MAY_SEND_3PID_INVITE_CALLBACK = Callable[[str, str, str, str], Awaitable[bool]]
 USER_MAY_CREATE_ROOM_CALLBACK = Callable[[str], Awaitable[bool]]
-USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK = Callable[
-    [str, List[str], List[Dict[str, str]]], Awaitable[bool]
-]
 USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[[str, RoomAlias], Awaitable[bool]]
 USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[[str, str], Awaitable[bool]]
-CHECK_USERNAME_FOR_SPAM_CALLBACK = Callable[[Dict[str, str]], Awaitable[bool]]
+CHECK_USERNAME_FOR_SPAM_CALLBACK = Callable[[UserProfile], Awaitable[bool]]
 LEGACY_CHECK_REGISTRATION_FOR_SPAM_CALLBACK = Callable[
     [
         Optional[dict],
@@ -174,9 +170,6 @@ class SpamChecker:
             USER_MAY_SEND_3PID_INVITE_CALLBACK
         ] = []
         self._user_may_create_room_callbacks: List[USER_MAY_CREATE_ROOM_CALLBACK] = []
-        self._user_may_create_room_with_invites_callbacks: List[
-            USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK
-        ] = []
         self._user_may_create_room_alias_callbacks: List[
             USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
         ] = []
@@ -198,9 +191,6 @@ class SpamChecker:
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
         user_may_send_3pid_invite: Optional[USER_MAY_SEND_3PID_INVITE_CALLBACK] = None,
         user_may_create_room: Optional[USER_MAY_CREATE_ROOM_CALLBACK] = None,
-        user_may_create_room_with_invites: Optional[
-            USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK
-        ] = None,
         user_may_create_room_alias: Optional[
             USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
         ] = None,
@@ -229,11 +219,6 @@ class SpamChecker:
         if user_may_create_room is not None:
             self._user_may_create_room_callbacks.append(user_may_create_room)
 
-        if user_may_create_room_with_invites is not None:
-            self._user_may_create_room_with_invites_callbacks.append(
-                user_may_create_room_with_invites,
-            )
-
         if user_may_create_room_alias is not None:
             self._user_may_create_room_alias_callbacks.append(
                 user_may_create_room_alias,
@@ -259,8 +244,8 @@ class SpamChecker:
         """Checks if a given event is considered "spammy" by this server.
 
         If the server considers an event spammy, then it will be rejected if
-        sent by a local user. If it is sent by a user on another server, then
-        users receive a blank event.
+        sent by a local user. If it is sent by a user on another server, the
+        event is soft-failed.
 
         Args:
             event: the event to be checked
@@ -359,34 +344,6 @@ class SpamChecker:
 
         return True
 
-    async def user_may_create_room_with_invites(
-        self,
-        userid: str,
-        invites: List[str],
-        threepid_invites: List[Dict[str, str]],
-    ) -> bool:
-        """Checks if a given user may create a room with invites
-
-        If this method returns false, the creation request will be rejected.
-
-        Args:
-            userid: The ID of the user attempting to create a room
-            invites: The IDs of the Matrix users to be invited if the room creation is
-                allowed.
-            threepid_invites: The threepids to be invited if the room creation is allowed,
-                as a dict including a "medium" key indicating the threepid's medium (e.g.
-                "email") and an "address" key indicating the threepid's address (e.g.
-                "alice@example.com")
-
-        Returns:
-            True if the user may create the room, otherwise False
-        """
-        for callback in self._user_may_create_room_with_invites_callbacks:
-            if await callback(userid, invites, threepid_invites) is False:
-                return False
-
-        return True
-
     async def user_may_create_room_alias(
         self, userid: str, room_alias: RoomAlias
     ) -> bool:
@@ -425,7 +382,7 @@ class SpamChecker:
 
         return True
 
-    async def check_username_for_spam(self, user_profile: Dict[str, str]) -> bool:
+    async def check_username_for_spam(self, user_profile: UserProfile) -> bool:
         """Checks if a user ID or display name are considered "spammy" by this server.
 
         If the server considers a username spammy, then it will not be included in

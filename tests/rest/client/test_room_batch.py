@@ -134,7 +134,7 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
         return room_id, event_id_a, event_id_b, event_id_c
 
     @unittest.override_config({"experimental_features": {"msc2716_enabled": True}})
-    def test_same_state_groups_for_whole_historical_batch(self):
+    def test_same_state_groups_for_whole_historical_batch(self) -> None:
         """Make sure that when using the `/batch_send` endpoint to import a
         bunch of historical messages, it re-uses the same `state_group` across
         the whole batch. This is an easy optimization to make sure we're getting

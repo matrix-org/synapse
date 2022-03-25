@@ -31,13 +31,6 @@ from synapse.logging import context
 if typing.TYPE_CHECKING:
     pass
 
-# FIXME Mjolnir imports glob_to_regex from this file, but it was moved to
-#       matrix_common.
-#       As a temporary workaround, we import glob_to_regex here for
-#       compatibility with current versions of Mjolnir.
-# See https://github.com/matrix-org/mjolnir/pull/174
-from matrix_common.regex import glob_to_regex  # noqa
-
 logger = logging.getLogger(__name__)
 
 
@@ -81,7 +74,9 @@ json_decoder = json.JSONDecoder(parse_constant=_reject_invalid_json)
 
 
 def unwrapFirstError(failure: Failure) -> Failure:
-    # defer.gatherResults and DeferredLists wrap failures.
+    # Deprecated: you probably just want to catch defer.FirstError and reraise
+    # the subFailure's value, which will do a better job of preserving stacktraces.
+    # (actually, you probably want to use yieldable_gather_results anyway)
     failure.trap(defer.FirstError)
     return failure.value.subFailure  # type: ignore[union-attr]  # Issue in Twisted's annotations
 

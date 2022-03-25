@@ -16,12 +16,21 @@ import logging
 
 from parameterized import parameterized
 
+from twisted.test.proto_helpers import MemoryReactor
+
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.config.server import DEFAULT_ROOM_VERSION
+from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events import make_event_from_dict
 from synapse.federation.federation_server import server_matches_acl_event
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
+from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests import unittest
+from tests.unittest import override_config
 
 
 class FederationServerTests(unittest.FederatingHomeserverTestCase):
@@ -50,7 +59,7 @@ class FederationServerTests(unittest.FederatingHomeserverTestCase):
             "/_matrix/federation/v1/get_missing_events/%s" % (room_1,),
             query_content,
         )
-        self.assertEquals(400, channel.code, channel.result)
+        self.assertEqual(400, channel.code, channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_NOT_JSON")
 
 
@@ -113,10 +122,10 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
         room_1 = self.helper.create_room_as(u1, tok=u1_token)
         self.inject_room_member(room_1, "@user:other.example.com", "join")
 
-        channel = self.make_request(
+        channel = self.make_signed_federation_request(
             "GET", "/_matrix/federation/v1/state/%s" % (room_1,)
         )
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
 
         self.assertEqual(
             channel.json_body["room_version"],
@@ -145,11 +154,150 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
 
         room_1 = self.helper.create_room_as(u1, tok=u1_token)
 
-        channel = self.make_request(
+        channel = self.make_signed_federation_request(
             "GET", "/_matrix/federation/v1/state/%s" % (room_1,)
         )
-        self.assertEquals(403, channel.code, channel.result)
+        self.assertEqual(403, channel.code, channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
+
+
+class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
+    servlets = [
+        admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
+        super().prepare(reactor, clock, hs)
+
+        # create the room
+        creator_user_id = self.register_user("kermit", "test")
+        tok = self.login("kermit", "test")
+        self._room_id = self.helper.create_room_as(
+            room_creator=creator_user_id, tok=tok
+        )
+
+        # a second member on the orgin HS
+        second_member_user_id = self.register_user("fozzie", "bear")
+        tok2 = self.login("fozzie", "bear")
+        self.helper.join(self._room_id, second_member_user_id, tok=tok2)
+
+    def _make_join(self, user_id) -> JsonDict:
+        channel = self.make_signed_federation_request(
+            "GET",
+            f"/_matrix/federation/v1/make_join/{self._room_id}/{user_id}"
+            f"?ver={DEFAULT_ROOM_VERSION}",
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        return channel.json_body
+
+    def test_send_join(self):
+        """happy-path test of send_join"""
+        joining_user = "@misspiggy:" + self.OTHER_SERVER_NAME
+        join_result = self._make_join(joining_user)
+
+        join_event_dict = join_result["event"]
+        add_hashes_and_signatures(
+            KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
+            join_event_dict,
+            signature_name=self.OTHER_SERVER_NAME,
+            signing_key=self.OTHER_SERVER_SIGNATURE_KEY,
+        )
+        channel = self.make_signed_federation_request(
+            "PUT",
+            f"/_matrix/federation/v2/send_join/{self._room_id}/x",
+            content=join_event_dict,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # we should get complete room state back
+        returned_state = [
+            (ev["type"], ev["state_key"]) for ev in channel.json_body["state"]
+        ]
+        self.assertCountEqual(
+            returned_state,
+            [
+                ("m.room.create", ""),
+                ("m.room.power_levels", ""),
+                ("m.room.join_rules", ""),
+                ("m.room.history_visibility", ""),
+                ("m.room.member", "@kermit:test"),
+                ("m.room.member", "@fozzie:test"),
+                # nb: *not* the joining user
+            ],
+        )
+
+        # also check the auth chain
+        returned_auth_chain_events = [
+            (ev["type"], ev["state_key"]) for ev in channel.json_body["auth_chain"]
+        ]
+        self.assertCountEqual(
+            returned_auth_chain_events,
+            [
+                ("m.room.create", ""),
+                ("m.room.member", "@kermit:test"),
+                ("m.room.power_levels", ""),
+                ("m.room.join_rules", ""),
+            ],
+        )
+
+        # the room should show that the new user is a member
+        r = self.get_success(
+            self.hs.get_state_handler().get_current_state(self._room_id)
+        )
+        self.assertEqual(r[("m.room.member", joining_user)].membership, "join")
+
+    @override_config({"experimental_features": {"msc3706_enabled": True}})
+    def test_send_join_partial_state(self):
+        """When MSC3706 support is enabled, /send_join should return partial state"""
+        joining_user = "@misspiggy:" + self.OTHER_SERVER_NAME
+        join_result = self._make_join(joining_user)
+
+        join_event_dict = join_result["event"]
+        add_hashes_and_signatures(
+            KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
+            join_event_dict,
+            signature_name=self.OTHER_SERVER_NAME,
+            signing_key=self.OTHER_SERVER_SIGNATURE_KEY,
+        )
+        channel = self.make_signed_federation_request(
+            "PUT",
+            f"/_matrix/federation/v2/send_join/{self._room_id}/x?org.matrix.msc3706.partial_state=true",
+            content=join_event_dict,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # expect a reduced room state
+        returned_state = [
+            (ev["type"], ev["state_key"]) for ev in channel.json_body["state"]
+        ]
+        self.assertCountEqual(
+            returned_state,
+            [
+                ("m.room.create", ""),
+                ("m.room.power_levels", ""),
+                ("m.room.join_rules", ""),
+                ("m.room.history_visibility", ""),
+            ],
+        )
+
+        # the auth chain should not include anything already in "state"
+        returned_auth_chain_events = [
+            (ev["type"], ev["state_key"]) for ev in channel.json_body["auth_chain"]
+        ]
+        self.assertCountEqual(
+            returned_auth_chain_events,
+            [
+                ("m.room.member", "@kermit:test"),
+            ],
+        )
+
+        # the room should show that the new user is a member
+        r = self.get_success(
+            self.hs.get_state_handler().get_current_state(self._room_id)
+        )
+        self.assertEqual(r[("m.room.member", joining_user)].membership, "join")
 
 
 def _create_acl_event(content):

@@ -31,7 +31,7 @@ import tests.utils
 
 class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     def test_get_prev_events_for_room(self):
         room_id = "@ROOM:local"
@@ -260,16 +260,16 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         self.assertCountEqual(auth_chain_ids, ["h", "i", "j", "k"])
 
         auth_chain_ids = self.get_success(self.store.get_auth_chain_ids(room_id, ["h"]))
-        self.assertEqual(auth_chain_ids, ["k"])
+        self.assertEqual(auth_chain_ids, {"k"})
 
         auth_chain_ids = self.get_success(self.store.get_auth_chain_ids(room_id, ["i"]))
-        self.assertEqual(auth_chain_ids, ["j"])
+        self.assertEqual(auth_chain_ids, {"j"})
 
         # j and k have no parents.
         auth_chain_ids = self.get_success(self.store.get_auth_chain_ids(room_id, ["j"]))
-        self.assertEqual(auth_chain_ids, [])
+        self.assertEqual(auth_chain_ids, set())
         auth_chain_ids = self.get_success(self.store.get_auth_chain_ids(room_id, ["k"]))
-        self.assertEqual(auth_chain_ids, [])
+        self.assertEqual(auth_chain_ids, set())
 
         # More complex input sequences.
         auth_chain_ids = self.get_success(

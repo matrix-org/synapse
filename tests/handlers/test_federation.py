@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import List
+from typing import List, cast
 from unittest import TestCase
+
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError, Codes, LimitExceededError, SynapseError
@@ -23,7 +25,9 @@ from synapse.federation.federation_base import event_from_pdu_json
 from synapse.logging.context import LoggingContext, run_in_background
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
 from synapse.types import create_requester
+from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 from tests import unittest
@@ -42,15 +46,15 @@ class FederationTestCase(unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         hs = self.setup_test_homeserver(federation_http_client=None)
         self.handler = hs.get_federation_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state_store = hs.get_storage().state
         self._event_auth_handler = hs.get_event_auth_handler()
         return hs
 
-    def test_exchange_revoked_invite(self):
+    def test_exchange_revoked_invite(self) -> None:
         user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test")
 
@@ -96,7 +100,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(failure.errcode, Codes.FORBIDDEN, failure)
         self.assertEqual(failure.msg, "You are not invited to this room.")
 
-    def test_rejected_message_event_state(self):
+    def test_rejected_message_event_state(self) -> None:
         """
         Check that we store the state group correctly for rejected non-state events.
 
@@ -126,7 +130,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
                 "content": {},
                 "room_id": room_id,
                 "sender": "@yetanotheruser:" + OTHER_SERVER,
-                "depth": join_event["depth"] + 1,
+                "depth": cast(int, join_event["depth"]) + 1,
                 "prev_events": [join_event.event_id],
                 "auth_events": [],
                 "origin_server_ts": self.clock.time_msec(),
@@ -149,7 +153,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(sg, sg2)
 
-    def test_rejected_state_event_state(self):
+    def test_rejected_state_event_state(self) -> None:
         """
         Check that we store the state group correctly for rejected state events.
 
@@ -180,7 +184,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
                 "content": {},
                 "room_id": room_id,
                 "sender": "@yetanotheruser:" + OTHER_SERVER,
-                "depth": join_event["depth"] + 1,
+                "depth": cast(int, join_event["depth"]) + 1,
                 "prev_events": [join_event.event_id],
                 "auth_events": [],
                 "origin_server_ts": self.clock.time_msec(),
@@ -203,7 +207,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(sg, sg2)
 
-    def test_backfill_with_many_backward_extremities(self):
+    def test_backfill_with_many_backward_extremities(self) -> None:
         """
         Check that we can backfill with many backward extremities.
         The goal is to make sure that when we only use a portion
@@ -262,7 +266,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             )
         self.get_success(d)
 
-    def test_backfill_floating_outlier_membership_auth(self):
+    def test_backfill_floating_outlier_membership_auth(self) -> None:
         """
         As the local homeserver, check that we can properly process a federated
         event from the OTHER_SERVER with auth_events that include a floating
@@ -377,7 +381,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
                 for ae in auth_events
             ]
 
-        self.handler.federation_client.get_event_auth = get_event_auth
+        self.handler.federation_client.get_event_auth = get_event_auth  # type: ignore[assignment]
 
         with LoggingContext("receive_pdu"):
             # Fake the OTHER_SERVER federating the message event over to our local homeserver
@@ -397,7 +401,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
     @unittest.override_config(
         {"rc_invites": {"per_user": {"per_second": 0.5, "burst_count": 3}}}
     )
-    def test_invite_by_user_ratelimit(self):
+    def test_invite_by_user_ratelimit(self) -> None:
         """Tests that invites from federation to a particular user are
         actually rate-limited.
         """
@@ -446,7 +450,9 @@ class FederationTestCase(unittest.HomeserverTestCase):
             exc=LimitExceededError,
         )
 
-    def _build_and_send_join_event(self, other_server, other_user, room_id):
+    def _build_and_send_join_event(
+        self, other_server: str, other_user: str, room_id: str
+    ) -> EventBase:
         join_event = self.get_success(
             self.handler.on_make_join_request(other_server, room_id, other_user)
         )
@@ -469,7 +475,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
 
 
 class EventFromPduTestCase(TestCase):
-    def test_valid_json(self):
+    def test_valid_json(self) -> None:
         """Valid JSON should be turned into an event."""
         ev = event_from_pdu_json(
             {
@@ -487,7 +493,7 @@ class EventFromPduTestCase(TestCase):
 
         self.assertIsInstance(ev, EventBase)
 
-    def test_invalid_numbers(self):
+    def test_invalid_numbers(self) -> None:
         """Invalid values for an integer should be rejected, all floats should be rejected."""
         for value in [
             -(2 ** 53),
@@ -512,7 +518,7 @@ class EventFromPduTestCase(TestCase):
                     RoomVersions.V6,
                 )
 
-    def test_invalid_nested(self):
+    def test_invalid_nested(self) -> None:
         """List and dictionaries are recursively searched."""
         with self.assertRaises(SynapseError):
             event_from_pdu_json(

@@ -146,7 +146,7 @@ DEFAULT_IP_RANGE_BLACKLIST = [
     "fec0::/10",
 ]
 
-DEFAULT_ROOM_VERSION = "6"
+DEFAULT_ROOM_VERSION = "9"
 
 ROOM_COMPLEXITY_TOO_GREAT = (
     "Your homeserver is unable to join rooms this large or complex. "
@@ -675,6 +675,10 @@ class ServerConfig(Config):
             self.custom_template_directory, str
         ):
             raise ConfigError("'custom_template_directory' must be a string")
+
+        self.use_account_validity_in_account_status: bool = (
+            config.get("use_account_validity_in_account_status") or False
+        )
 
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)

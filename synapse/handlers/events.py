@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Iterable, List, Optional
 from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import AuthError, SynapseError
 from synapse.events import EventBase
+from synapse.events.utils import SerializeEventConfig
 from synapse.handlers.presence import format_user_presence_state
 from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, UserID
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 class EventStreamHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.hs = hs
 
@@ -120,7 +121,7 @@ class EventStreamHandler:
             chunks = self._event_serializer.serialize_events(
                 events,
                 time_now,
-                as_client_event=as_client_event,
+                config=SerializeEventConfig(as_client_event=as_client_event),
             )
 
             chunk = {
@@ -134,7 +135,7 @@ class EventStreamHandler:
 
 class EventHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
 
     async def get_event(

@@ -246,7 +246,7 @@ Password reset
 ==============
 
 Users can reset their password through their client. Alternatively, a server admin
-can reset a users password using the `admin API <docs/admin_api/user_admin_api.rst#reset-password>`_
+can reset a users password using the `admin API <docs/admin_api/user_admin_api.md#reset-password>`_
 or by directly editing the database as shown below.
 
 First calculate the hash of the new password::
@@ -311,6 +311,9 @@ We recommend using the demo which starts 3 federated instances running on ports 
     ./demo/start.sh
 
 (to stop, you can use `./demo/stop.sh`)
+
+See the [demo documentation](https://matrix-org.github.io/synapse/develop/development/demo.html)
+for more information.
 
 If you just want to start a single instance of the app and run it directly::
 

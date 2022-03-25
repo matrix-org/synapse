@@ -17,7 +17,7 @@
 # homeservers; either as a full homeserver as a real application, or a small
 # partial one for unit test mocking.
 
-# Imports required for the default HomeServer() implementation
+
 import abc
 import functools
 import logging
@@ -62,6 +62,7 @@ from synapse.federation.sender import AbstractFederationSender, FederationSender
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
 from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
+from synapse.handlers.account import AccountHandler
 from synapse.handlers.account_data import AccountDataHandler
 from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.admin import AdminHandler
@@ -93,6 +94,7 @@ from synapse.handlers.profile import ProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.register import RegistrationHandler
+from synapse.handlers.relations import RelationsHandler
 from synapse.handlers.room import (
     RoomContextHandler,
     RoomCreationHandler,
@@ -133,7 +135,7 @@ from synapse.server_notices.worker_server_notices_sender import (
     WorkerServerNoticesSender,
 )
 from synapse.state import StateHandler, StateResolutionHandler
-from synapse.storage import Databases, DataStore, Storage
+from synapse.storage import Databases, Storage
 from synapse.streams.events import EventSources
 from synapse.types import DomainSpecificString, ISynapseReactor
 from synapse.util import Clock
@@ -144,7 +146,7 @@ from synapse.util.stringutils import random_string
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from txredisapi import RedisProtocol
+    from txredisapi import ConnectionHandler
 
     from synapse.handlers.oidc import OidcHandler
     from synapse.handlers.saml import SamlHandler
@@ -224,7 +226,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     # This is overridden in derived application classes
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
-    # instantiated during setup() for future return by get_datastore()
+    # instantiated during setup() for future return by get_datastores()
     DATASTORE_CLASS = abc.abstractproperty()
 
     tls_server_context_factory: Optional[IOpenSSLContextFactory]
@@ -233,8 +235,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         self,
         hostname: str,
         config: HomeServerConfig,
-        reactor=None,
-        version_string="Synapse",
+        reactor: Optional[ISynapseReactor] = None,
+        version_string: str = "Synapse",
     ):
         """
         Args:
@@ -244,7 +246,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         if not reactor:
             from twisted.internet import reactor as _reactor
 
-            reactor = _reactor
+            reactor = cast(ISynapseReactor, _reactor)
 
         self._reactor = reactor
         self.hostname = hostname
@@ -264,7 +266,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         self._module_web_resources: Dict[str, Resource] = {}
         self._module_web_resources_consumed = False
 
-    def register_module_web_resource(self, path: str, resource: Resource):
+    def register_module_web_resource(self, path: str, resource: Resource) -> None:
         """Allows a module to register a web resource to be served at the given path.
 
         If multiple modules register a resource for the same path, the module that
@@ -327,7 +329,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         Does nothing in this base class; overridden in derived classes to start the
         appropriate listeners.
         """
-        pass
 
     def setup_background_tasks(self) -> None:
         """
@@ -354,12 +355,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_clock(self) -> Clock:
         return Clock(self._reactor)
 
-    def get_datastore(self) -> DataStore:
-        if not self.datastores:
-            raise Exception("HomeServer.setup must be called before getting datastores")
-
-        return self.datastores.main
-
     def get_datastores(self) -> Databases:
         if not self.datastores:
             raise Exception("HomeServer.setup must be called before getting datastores")
@@ -373,7 +368,7 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_registration_ratelimiter(self) -> Ratelimiter:
         return Ratelimiter(
-            store=self.get_datastore(),
+            store=self.get_datastores().main,
             clock=self.get_clock(),
             rate_hz=self.config.ratelimiting.rc_registration.per_second,
             burst_count=self.config.ratelimiting.rc_registration.burst_count,
@@ -644,7 +639,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return ReadMarkerHandler(self)
 
     @cache_in_self
-    def get_tcp_replication(self) -> ReplicationCommandHandler:
+    def get_replication_command_handler(self) -> ReplicationCommandHandler:
         return ReplicationCommandHandler(self)
 
     @cache_in_self
@@ -726,6 +721,10 @@ class HomeServer(metaclass=abc.ABCMeta):
         return PaginationHandler(self)
 
     @cache_in_self
+    def get_relations_handler(self) -> RelationsHandler:
+        return RelationsHandler(self)
+
+    @cache_in_self
     def get_room_context_handler(self) -> RoomContextHandler:
         return RoomContextHandler(self)
 
@@ -759,7 +758,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_event_client_serializer(self) -> EventClientSerializer:
-        return EventClientSerializer()
+        return EventClientSerializer(self)
 
     @cache_in_self
     def get_password_policy_handler(self) -> PasswordPolicyHandler:
@@ -808,7 +807,11 @@ class HomeServer(metaclass=abc.ABCMeta):
         return ExternalCache(self)
 
     @cache_in_self
-    def get_outbound_redis_connection(self) -> "RedisProtocol":
+    def get_account_handler(self) -> AccountHandler:
+        return AccountHandler(self)
+
+    @cache_in_self
+    def get_outbound_redis_connection(self) -> "ConnectionHandler":
         """
         The Redis connection used for replication.
 
@@ -842,7 +845,7 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_request_ratelimiter(self) -> RequestRatelimiter:
         return RequestRatelimiter(
-            self.get_datastore(),
+            self.get_datastores().main,
             self.get_clock(),
             self.config.ratelimiting.rc_message,
             self.config.ratelimiting.rc_admin_redaction,

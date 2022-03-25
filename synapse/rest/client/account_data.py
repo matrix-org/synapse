@@ -42,7 +42,7 @@ class AccountDataServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.handler = hs.get_account_data_handler()
 
     async def on_PUT(
@@ -90,7 +90,7 @@ class RoomAccountDataServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.handler = hs.get_account_data_handler()
 
     async def on_PUT(

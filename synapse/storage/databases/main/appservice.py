@@ -20,14 +20,18 @@ from synapse.appservice import (
     ApplicationService,
     ApplicationServiceState,
     AppServiceTransaction,
+    TransactionOneTimeKeyCounts,
+    TransactionUnusedFallbackKeys,
 )
 from synapse.config.appservice import load_appservices
 from synapse.events import EventBase
-from synapse.storage._base import SQLBaseStore, db_to_json
+from synapse.storage._base import db_to_json
 from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
+from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
 from synapse.types import JsonDict
 from synapse.util import json_encoder
+from synapse.util.caches.descriptors import _CacheContext, cached
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -56,7 +60,7 @@ def _make_exclusive_regex(
     return exclusive_user_pattern
 
 
-class ApplicationServiceWorkerStore(SQLBaseStore):
+class ApplicationServiceWorkerStore(RoomMemberWorkerStore):
     def __init__(
         self,
         database: DatabasePool,
@@ -123,6 +127,18 @@ class ApplicationServiceWorkerStore(SQLBaseStore):
             if service.id == as_id:
                 return service
         return None
+
+    @cached(iterable=True, cache_context=True)
+    async def get_app_service_users_in_room(
+        self,
+        room_id: str,
+        app_service: "ApplicationService",
+        cache_context: _CacheContext,
+    ) -> List[str]:
+        users_in_room = await self.get_users_in_room(
+            room_id, on_invalidate=cache_context.invalidate
+        )
+        return list(filter(app_service.is_interested_in_user, users_in_room))
 
 
 class ApplicationServiceStore(ApplicationServiceWorkerStore):
@@ -199,6 +215,8 @@ class ApplicationServiceTransactionWorkerStore(
         events: List[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
+        one_time_key_counts: TransactionOneTimeKeyCounts,
+        unused_fallback_keys: TransactionUnusedFallbackKeys,
     ) -> AppServiceTransaction:
         """Atomically creates a new transaction for this application service
         with the given list of events. Ephemeral events are NOT persisted to the
@@ -209,6 +227,10 @@ class ApplicationServiceTransactionWorkerStore(
             events: A list of persistent events to put in the transaction.
             ephemeral: A list of ephemeral events to put in the transaction.
             to_device_messages: A list of to-device messages to put in the transaction.
+            one_time_key_counts: Counts of remaining one-time keys for relevant
+                appservice devices in the transaction.
+            unused_fallback_keys: Lists of unused fallback keys for relevant
+                appservice devices in the transaction.
 
         Returns:
             A new transaction.
@@ -244,6 +266,8 @@ class ApplicationServiceTransactionWorkerStore(
                 events=events,
                 ephemeral=ephemeral,
                 to_device_messages=to_device_messages,
+                one_time_key_counts=one_time_key_counts,
+                unused_fallback_keys=unused_fallback_keys,
             )
 
         return await self.db_pool.runInteraction(
@@ -335,12 +359,17 @@ class ApplicationServiceTransactionWorkerStore(
 
         events = await self.get_events_as_list(event_ids)
 
+        # TODO: to-device messages, one-time key counts and unused fallback keys
+        #       are not yet populated for catch-up transactions.
+        #       We likely want to populate those for reliability.
         return AppServiceTransaction(
             service=service,
             id=entry["txn_id"],
             events=events,
             ephemeral=[],
             to_device_messages=[],
+            one_time_key_counts={},
+            unused_fallback_keys={},
         )
 
     def _get_last_txn(self, txn, service_id: Optional[str]) -> int:

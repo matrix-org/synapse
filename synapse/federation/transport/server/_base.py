@@ -55,7 +55,7 @@ class Authenticator:
         self._clock = hs.get_clock()
         self.keyring = hs.get_keyring()
         self.server_name = hs.hostname
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.federation_domain_whitelist = (
             hs.config.federation.federation_domain_whitelist
         )
@@ -63,7 +63,7 @@ class Authenticator:
 
         self.replication_client = None
         if hs.config.worker.worker_app:
-            self.replication_client = hs.get_tcp_replication()
+            self.replication_client = hs.get_replication_command_handler()
 
     # A method just so we can pass 'self' as the authenticator to the Servlets
     async def authenticate_request(

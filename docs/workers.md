@@ -178,12 +178,15 @@ recommend the use of `systemd` where available: for information on setting up
 
 ### `synapse.app.generic_worker`
 
-This worker can handle API requests matching the following regular
-expressions:
+This worker can handle API requests matching the following regular expressions.
+These endpoints can be routed to any worker. If a worker is set up to handle a
+stream then, for maximum efficiency, additional endpoints should be routed to that
+worker: refer to the [stream writers](#stream-writers) section below for further
+information.
 
     # Sync requests
-    ^/_matrix/client/(v2_alpha|r0|v3)/sync$
-    ^/_matrix/client/(api/v1|v2_alpha|r0|v3)/events$
+    ^/_matrix/client/(r0|v3)/sync$
+    ^/_matrix/client/(api/v1|r0|v3)/events$
     ^/_matrix/client/(api/v1|r0|v3)/initialSync$
     ^/_matrix/client/(api/v1|r0|v3)/rooms/[^/]+/initialSync$
 
@@ -197,19 +200,14 @@ expressions:
     ^/_matrix/federation/v1/query/
     ^/_matrix/federation/v1/make_join/
     ^/_matrix/federation/v1/make_leave/
-    ^/_matrix/federation/v1/send_join/
-    ^/_matrix/federation/v2/send_join/
-    ^/_matrix/federation/v1/send_leave/
-    ^/_matrix/federation/v2/send_leave/
-    ^/_matrix/federation/v1/invite/
-    ^/_matrix/federation/v2/invite/
-    ^/_matrix/federation/v1/query_auth/
+    ^/_matrix/federation/(v1|v2)/send_join/
+    ^/_matrix/federation/(v1|v2)/send_leave/
+    ^/_matrix/federation/(v1|v2)/invite/
     ^/_matrix/federation/v1/event_auth/
     ^/_matrix/federation/v1/exchange_third_party_invite/
     ^/_matrix/federation/v1/user/devices/
     ^/_matrix/federation/v1/get_groups_publicised$
     ^/_matrix/key/v2/query
-    ^/_matrix/federation/unstable/org.matrix.msc2946/spaces/
     ^/_matrix/federation/(v1|unstable/org.matrix.msc2946)/hierarchy/
 
     # Inbound federation transaction request
@@ -222,21 +220,24 @@ expressions:
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/context/.*$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/members$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state$
-    ^/_matrix/client/unstable/org.matrix.msc2946/rooms/.*/spaces$
     ^/_matrix/client/(v1|unstable/org.matrix.msc2946)/rooms/.*/hierarchy$
     ^/_matrix/client/unstable/im.nheko.summary/rooms/.*/summary$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/account/3pid$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/devices$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/query$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/changes$
+    ^/_matrix/client/(r0|v3|unstable)/account/3pid$
+    ^/_matrix/client/(r0|v3|unstable)/devices$
     ^/_matrix/client/versions$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/voip/turnServer$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_groups$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/publicised_groups$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/publicised_groups/
+    ^/_matrix/client/(r0|v3|unstable)/joined_groups$
+    ^/_matrix/client/(r0|v3|unstable)/publicised_groups$
+    ^/_matrix/client/(r0|v3|unstable)/publicised_groups/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
+
+    # Encryption requests
+    ^/_matrix/client/(r0|v3|unstable)/keys/query$
+    ^/_matrix/client/(r0|v3|unstable)/keys/changes$
+    ^/_matrix/client/(r0|v3|unstable)/keys/claim$
+    ^/_matrix/client/(r0|v3|unstable)/room_keys/
 
     # Registration/login requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/login$
@@ -251,10 +252,26 @@ expressions:
     ^/_matrix/client/(api/v1|r0|v3|unstable)/join/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/profile/
 
+    # Device requests
+    ^/_matrix/client/(r0|v3|unstable)/sendToDevice/
+
+    # Account data requests
+    ^/_matrix/client/(r0|v3|unstable)/.*/tags
+    ^/_matrix/client/(r0|v3|unstable)/.*/account_data
+
+    # Receipts requests
+    ^/_matrix/client/(r0|v3|unstable)/rooms/.*/receipt
+    ^/_matrix/client/(r0|v3|unstable)/rooms/.*/read_markers
+
+    # Presence requests
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
+
 
 Additionally, the following REST endpoints can be handled for GET requests:
 
     ^/_matrix/federation/v1/groups/
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/pushrules/
+    ^/_matrix/client/(r0|v3|unstable)/groups/
 
 Pagination requests can also be handled, but all requests for a given
 room must be routed to the same instance. Additionally, care must be taken to
@@ -330,12 +347,13 @@ Additionally, there is *experimental* support for moving writing of specific
 streams (such as events) off of the main process to a particular worker. (This
 is only supported with Redis-based replication.)
 
-Currently supported streams are `events` and `typing`.
-
 To enable this, the worker must have a HTTP replication listener configured,
-have a `worker_name` and be listed in the `instance_map` config. For example to
-move event persistence off to a dedicated worker, the shared configuration would
-include:
+have a `worker_name` and be listed in the `instance_map` config. The same worker
+can handle multiple streams, but unless otherwise documented, each stream can only
+have a single writer.
+
+For example, to move event persistence off to a dedicated worker, the shared
+configuration would include:
 
 ```yaml
 instance_map:
@@ -347,8 +365,14 @@ stream_writers:
     events: event_persister1
 ```
 
-The `events` stream also experimentally supports having multiple writers, where
-work is sharded between them by room ID. Note that you *must* restart all worker
+Some of the streams have associated endpoints which, for maximum efficiency, should
+be routed to the workers handling that stream. See below for the currently supported
+streams and the endpoints associated with them:
+
+##### The `events` stream
+
+The `events` stream experimentally supports having multiple writers, where work
+is sharded between them by room ID. Note that you *must* restart all worker
 instances when adding or removing event persisters. An example `stream_writers`
 configuration with multiple writers:
 
@@ -358,6 +382,43 @@ stream_writers:
         - event_persister1
         - event_persister2
 ```
+
+##### The `typing` stream
+
+The following endpoints should be routed directly to the worker configured as
+the stream writer for the `typing` stream:
+
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/typing
+
+##### The `to_device` stream
+
+The following endpoints should be routed directly to the worker configured as
+the stream writer for the `to_device` stream:
+
+    ^/_matrix/client/(r0|v3|unstable)/sendToDevice/
+
+##### The `account_data` stream
+
+The following endpoints should be routed directly to the worker configured as
+the stream writer for the `account_data` stream:
+
+    ^/_matrix/client/(r0|v3|unstable)/.*/tags
+    ^/_matrix/client/(r0|v3|unstable)/.*/account_data
+
+##### The `receipts` stream
+
+The following endpoints should be routed directly to the worker configured as
+the stream writer for the `receipts` stream:
+
+    ^/_matrix/client/(r0|v3|unstable)/rooms/.*/receipt
+    ^/_matrix/client/(r0|v3|unstable)/rooms/.*/read_markers
+
+##### The `presence` stream
+
+The following endpoints should be routed directly to the worker configured as
+the stream writer for the `presence` stream:
+
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
 
 #### Background tasks
 
@@ -465,11 +526,20 @@ Note that if a reverse proxy is used , then `/_matrix/media/` must be routed for
 Handles searches in the user directory. It can handle REST endpoints matching
 the following regular expressions:
 
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/user_directory/search$
+    ^/_matrix/client/(r0|v3|unstable)/user_directory/search$
 
-When using this worker you must also set `update_user_directory: False` in the
+When using this worker you must also set `update_user_directory: false` in the
 shared configuration file to stop the main synapse running background
 jobs related to updating the user directory.
+
+Above endpoint is not *required* to be routed to this worker. By default,
+`update_user_directory` is set to `true`, which means the main process
+will handle updates. All workers configured with `client` can handle the above
+endpoint as long as either this worker or the main process are configured to
+handle it, and are online.
+
+If `update_user_directory` is set to `false`, and this worker is not running,
+the above endpoint may give outdated results.
 
 ### `synapse.app.frontend_proxy`
 
@@ -477,7 +547,7 @@ Proxies some frequently-requested client endpoints to add caching and remove
 load from the main synapse. It can handle REST endpoints matching the following
 regular expressions:
 
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/upload
+    ^/_matrix/client/(r0|v3|unstable)/keys/upload
 
 If `use_presence` is False in the homeserver config, it can also handle REST
 endpoints matching the following regular expressions:
