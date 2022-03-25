@@ -74,9 +74,11 @@ REQUIREMENTS = [
     # Note: 21.1.0 broke `/sync`, see #9936
     "attrs>=19.2.0,!=21.1.0",
     "netaddr>=0.7.18",
-    "Jinja2>=2.9",
+    # Jinja2 3.1.0 removes the deprecated jinja2.Markup class, which we rely on.
+    "Jinja2<3.1.0",
     "bleach>=1.4.3",
-    "typing-extensions>=3.7.4",
+    # We use `ParamSpec`, which was added in `typing-extensions` 3.10.0.0.
+    "typing-extensions>=3.10.0",
     # We enforce that we have a `cryptography` version that bundles an `openssl`
     # with the latest security patches.
     "cryptography>=3.4.7",

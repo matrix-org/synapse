@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Optional
 
 from synapse.api.errors import SynapseError
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import Requester, UserID, create_requester
+from synapse.types import Codes, Requester, UserID, create_requester
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -42,6 +42,7 @@ class DeactivateAccountHandler:
 
         # Flag that indicates whether the process to part users from rooms is running
         self._user_parter_running = False
+        self._third_party_rules = hs.get_third_party_event_rules()
 
         # Start the user parter loop so it can resume parting users from rooms where
         # it left off (if it has work left to do).
@@ -74,6 +75,15 @@ class DeactivateAccountHandler:
         Returns:
             True if identity server supports removing threepids, otherwise False.
         """
+
+        # Check if this user can be deactivated
+        if not await self._third_party_rules.check_can_deactivate_user(
+            user_id, by_admin
+        ):
+            raise SynapseError(
+                403, "Deactivation of this user is forbidden", Codes.FORBIDDEN
+            )
+
         # FIXME: Theoretically there is a race here wherein user resets
         # password using threepid.
 

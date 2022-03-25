@@ -1,0 +1,1 @@
+Fix a long-standing bug where events from ignored users were still considered for relations.

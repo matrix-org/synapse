@@ -54,6 +54,8 @@ from synapse.events.spamcheck import (
     USER_MAY_SEND_3PID_INVITE_CALLBACK,
 )
 from synapse.events.third_party_rules import (
+    CHECK_CAN_DEACTIVATE_USER_CALLBACK,
+    CHECK_CAN_SHUTDOWN_ROOM_CALLBACK,
     CHECK_EVENT_ALLOWED_CALLBACK,
     CHECK_THREEPID_CAN_BE_INVITED_CALLBACK,
     CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK,
@@ -109,6 +111,7 @@ from synapse.types import (
     StateMap,
     UserID,
     UserInfo,
+    UserProfile,
     create_requester,
 )
 from synapse.util import Clock
@@ -148,6 +151,7 @@ __all__ = [
     "EventBase",
     "StateMap",
     "ProfileInfo",
+    "UserProfile",
 ]
 
 logger = logging.getLogger(__name__)
@@ -283,6 +287,8 @@ class ModuleApi:
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = None,
         on_new_event: Optional[ON_NEW_EVENT_CALLBACK] = None,
+        check_can_shutdown_room: Optional[CHECK_CAN_SHUTDOWN_ROOM_CALLBACK] = None,
+        check_can_deactivate_user: Optional[CHECK_CAN_DEACTIVATE_USER_CALLBACK] = None,
         on_profile_update: Optional[ON_PROFILE_UPDATE_CALLBACK] = None,
         on_user_deactivation_status_changed: Optional[
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
@@ -298,6 +304,8 @@ class ModuleApi:
             check_threepid_can_be_invited=check_threepid_can_be_invited,
             check_visibility_can_be_modified=check_visibility_can_be_modified,
             on_new_event=on_new_event,
+            check_can_shutdown_room=check_can_shutdown_room,
+            check_can_deactivate_user=check_can_deactivate_user,
             on_profile_update=on_profile_update,
             on_user_deactivation_status_changed=on_user_deactivation_status_changed,
         )
@@ -603,15 +611,18 @@ class ModuleApi:
         localpart: str,
         displayname: Optional[str] = None,
         emails: Optional[List[str]] = None,
+        admin: bool = False,
     ) -> "defer.Deferred[str]":
         """Registers a new user with given localpart and optional displayname, emails.
 
         Added in Synapse v1.2.0.
+        Changed in Synapse v1.56.0: add 'admin' argument to register the user as admin.
 
         Args:
             localpart: The localpart of the new user.
             displayname: The displayname of the new user.
             emails: Emails to bind to the new user.
+            admin: True if the user should be registered as a server admin.
 
         Raises:
             SynapseError if there is an error performing the registration. Check the
@@ -625,6 +636,7 @@ class ModuleApi:
                 localpart=localpart,
                 default_display_name=displayname,
                 bind_emails=emails or [],
+                admin=admin,
             )
         )
 

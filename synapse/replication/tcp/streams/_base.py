@@ -316,7 +316,19 @@ class PresenceFederationStream(Stream):
 class TypingStream(Stream):
     @attr.s(slots=True, frozen=True, auto_attribs=True)
     class TypingStreamRow:
+        """
+        An entry in the typing stream.
+        Describes all the users that are 'typing' right now in one room.
+
+        When a user stops typing, it will be streamed as a new update with that
+        user absent; you can think of the `user_ids` list as overwriting the
+        entire list that was there previously.
+        """
+
+        # The room that this update is for.
         room_id: str
+
+        # All the users that are 'typing' right now in the specified room.
         user_ids: List[str]
 
     NAME = "typing"

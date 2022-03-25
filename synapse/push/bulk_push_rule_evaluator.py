@@ -213,7 +213,7 @@ class BulkPushRuleEvaluator:
         if not event.is_state():
             ignorers = await self.store.ignored_by(event.sender)
         else:
-            ignorers = set()
+            ignorers = frozenset()
 
         for uid, rules in rules_by_user.items():
             if event.sender == uid:
@@ -274,17 +274,17 @@ def _condition_checker(
     cache: Dict[str, bool],
 ) -> bool:
     for cond in conditions:
-        _id = cond.get("_id", None)
-        if _id:
-            res = cache.get(_id, None)
+        _cache_key = cond.get("_cache_key", None)
+        if _cache_key:
+            res = cache.get(_cache_key, None)
             if res is False:
                 return False
             elif res is True:
                 continue
 
         res = evaluator.matches(cond, uid, display_name)
-        if _id:
-            cache[_id] = bool(res)
+        if _cache_key:
+            cache[_cache_key] = bool(res)
 
         if not res:
             return False

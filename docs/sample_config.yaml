@@ -783,6 +783,12 @@ caches:
 # 'txn_limit' gives the maximum number of transactions to run per connection
 # before reconnecting. Defaults to 0, which means no limit.
 #
+# 'allow_unsafe_locale' is an option specific to Postgres. Under the default behavior, Synapse will refuse to
+# start if the postgres db is set to a non-C locale. You can override this behavior (which is *not* recommended)
+# by setting 'allow_unsafe_locale' to true. Note that doing so may corrupt your database. You can find more information
+# here: https://matrix-org.github.io/synapse/latest/postgres.html#fixing-incorrect-collate-or-ctype and here:
+# https://wiki.postgresql.org/wiki/Locale_data_changes
+#
 # 'args' gives options which are passed through to the database engine,
 # except for options starting 'cp_', which are used to configure the Twisted
 # connection pool. For a reference to valid arguments, see:
@@ -1947,8 +1953,14 @@ saml2_config:
 #
 #             localpart_template: Jinja2 template for the localpart of the MXID.
 #                 If this is not set, the user will be prompted to choose their
-#                 own username (see 'sso_auth_account_details.html' in the 'sso'
-#                 section of this file).
+#                 own username (see the documentation for the
+#                 'sso_auth_account_details.html' template). This template can
+#                 use the 'localpart_from_email' filter.
+#
+#             confirm_localpart: Whether to prompt the user to validate (or
+#                 change) the generated localpart (see the documentation for the
+#                 'sso_auth_account_details.html' template), instead of
+#                 registering the account right away.
 #
 #             display_name_template: Jinja2 template for the display name to set
 #                 on first login. If unset, no displayname will be set.
@@ -2729,3 +2741,35 @@ redis:
   # Optional password if configured on the Redis instance
   #
   #password: <secret_password>
+
+
+## Background Updates ##
+
+# Background updates are database updates that are run in the background in batches.
+# The duration, minimum batch size, default batch size, whether to sleep between batches and if so, how long to
+# sleep can all be configured. This is helpful to speed up or slow down the updates.
+#
+background_updates:
+    # How long in milliseconds to run a batch of background updates for. Defaults to 100. Uncomment and set
+    # a time to change the default.
+    #
+    #background_update_duration_ms: 500
+
+    # Whether to sleep between updates. Defaults to True. Uncomment to change the default.
+    #
+    #sleep_enabled: false
+
+    # If sleeping between updates, how long in milliseconds to sleep for. Defaults to 1000. Uncomment
+    # and set a duration to change the default.
+    #
+    #sleep_duration_ms: 300
+
+    # Minimum size a batch of background updates can be. Must be greater than 0. Defaults to 1. Uncomment and
+    # set a size to change the default.
+    #
+    #min_batch_size: 10
+
+    # The batch size to use for the first iteration of a new background update. The default is 100.
+    # Uncomment and set a size to change the default.
+    #
+    #default_batch_size: 50
