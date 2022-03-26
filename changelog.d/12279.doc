@@ -1,1 +1,1 @@
-HAProxy guide update. Code cleanup and new config that stops sending IPv4-mapped address to homeserver. Also added a simple Delegation guide.
+HAProxy reverse proxy guide update to stop sending IPv4-mapped address to homeserver.
