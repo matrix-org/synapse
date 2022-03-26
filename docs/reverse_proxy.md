@@ -203,7 +203,7 @@ frontend matrix-federation
   default_backend matrix
 
 backend matrix
-  server matrix localhost:8008
+  server matrix 127.0.0.1:8008
 ```
 
 ### Relayd
