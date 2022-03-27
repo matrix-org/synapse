@@ -611,15 +611,18 @@ class ModuleApi:
         localpart: str,
         displayname: Optional[str] = None,
         emails: Optional[List[str]] = None,
+        admin: bool = False,
     ) -> "defer.Deferred[str]":
         """Registers a new user with given localpart and optional displayname, emails.
 
         Added in Synapse v1.2.0.
+        Changed in Synapse v1.56.0: add 'admin' argument to register the user as admin.
 
         Args:
             localpart: The localpart of the new user.
             displayname: The displayname of the new user.
             emails: Emails to bind to the new user.
+            admin: True if the user should be registered as a server admin.
 
         Raises:
             SynapseError if there is an error performing the registration. Check the
@@ -633,6 +636,7 @@ class ModuleApi:
                 localpart=localpart,
                 default_display_name=displayname,
                 bind_emails=emails or [],
+                admin=admin,
             )
         )
 
