@@ -168,15 +168,6 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
             (as_id, txn_id, json.dumps([e.event_id for e in events])),
         )
 
-    def _set_last_txn(self, as_id, txn_id):
-        return self.db_pool.runOperation(
-            self.engine.convert_param_style(
-                "INSERT INTO application_services_state(as_id, last_txn, state) "
-                "VALUES(?,?,?)"
-            ),
-            (as_id, txn_id, ApplicationServiceState.UP.value),
-        )
-
     def test_get_appservice_state_none(
         self,
     ) -> None:
@@ -274,55 +265,17 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         self.assertEqual(txn.events, events)
         self.assertEqual(txn.service, service)
 
-    def test_create_appservice_txn_older_last_txn(
+    def test_create_appservice_txn_sequence_increment(
         self,
     ) -> None:
         service = Mock(id=self.as_list[0]["id"])
         events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
-        self.get_success(self._set_last_txn(service.id, 9643))  # AS is falling behind
         self.get_success(self._insert_txn(service.id, 9644, events))
         self.get_success(self._insert_txn(service.id, 9645, events))
         txn = self.get_success(
             self.store.create_appservice_txn(service, events, [], [], {}, {})
         )
         self.assertEqual(txn.id, 9646)
-        self.assertEqual(txn.events, events)
-        self.assertEqual(txn.service, service)
-
-    def test_create_appservice_txn_up_to_date_last_txn(
-        self,
-    ) -> None:
-        service = Mock(id=self.as_list[0]["id"])
-        events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
-        self.get_success(self._set_last_txn(service.id, 9643))
-        txn = self.get_success(
-            self.store.create_appservice_txn(service, events, [], [], {}, {})
-        )
-        self.assertEqual(txn.id, 9644)
-        self.assertEqual(txn.events, events)
-        self.assertEqual(txn.service, service)
-
-    def test_create_appservice_txn_up_fuzzing(
-        self,
-    ) -> None:
-        service = Mock(id=self.as_list[0]["id"])
-        events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
-        self.get_success(self._set_last_txn(service.id, 9643))
-
-        # dump in rows with higher IDs to make sure the queries aren't wrong.
-        self.get_success(self._set_last_txn(self.as_list[1]["id"], 119643))
-        self.get_success(self._set_last_txn(self.as_list[2]["id"], 9))
-        self.get_success(self._set_last_txn(self.as_list[3]["id"], 9643))
-        self.get_success(self._insert_txn(self.as_list[1]["id"], 119644, events))
-        self.get_success(self._insert_txn(self.as_list[1]["id"], 119645, events))
-        self.get_success(self._insert_txn(self.as_list[1]["id"], 119646, events))
-        self.get_success(self._insert_txn(self.as_list[2]["id"], 10, events))
-        self.get_success(self._insert_txn(self.as_list[3]["id"], 9643, events))
-
-        txn = self.get_success(
-            self.store.create_appservice_txn(service, events, [], [], {}, {})
-        )
-        self.assertEqual(txn.id, 9644)
         self.assertEqual(txn.events, events)
         self.assertEqual(txn.service, service)
 
@@ -359,13 +312,13 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(0, len(res))
 
-    def test_complete_appservice_txn_existing_in_state_table(
+    def test_complete_appservice_txn_updates_last_txn_state(
         self,
     ) -> None:
         service = Mock(id=self.as_list[0]["id"])
         events = [Mock(event_id="e1"), Mock(event_id="e2")]
         txn_id = 5
-        self.get_success(self._set_last_txn(service.id, 4))
+        self._set_state(self.as_list[0]["id"], ApplicationServiceState.UP)
         self.get_success(self._insert_txn(service.id, txn_id, events))
         self.get_success(
             self.store.complete_appservice_txn(txn_id=txn_id, service=service)
