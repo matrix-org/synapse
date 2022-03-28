@@ -674,7 +674,6 @@ class ApplicationServicesHandlerDeviceListsTestCase(unittest.HomeserverTestCase)
             (False, False, False),
         ]
     )
-    @unittest.override_config({"experimental_features": {"": False}})
     def test_application_service_receives_device_list_updates(
         self,
         experimental_feature_enabled: bool,
