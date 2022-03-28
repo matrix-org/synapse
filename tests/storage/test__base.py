@@ -105,3 +105,50 @@ class UpdateUpsertManyTests(unittest.HomeserverTestCase):
             set(self._dump_table_to_tuple()),
             {(1, "user1", "hello"), (2, "user2", "bleb")},
         )
+
+    def test_simple_update_many(self):
+        """
+        simple_update_many performs many updates at once.
+        """
+        # First add some data.
+        self.get_success(
+            self.storage.db_pool.simple_insert_many(
+                table=self.table_name,
+                keys=("id", "username", "value"),
+                values=[(1, "alice", "A"), (2, "bob", "B"), (3, "charlie", "C")],
+                desc="insert",
+            )
+        )
+
+        # Check the data made it to the table
+        self.assertEqual(
+            set(self._dump_table_to_tuple()),
+            {(1, "alice", "A"), (2, "bob", "B"), (3, "charlie", "C")},
+        )
+
+        # Now use simple_update_many
+        self.get_success(
+            self.storage.db_pool.simple_update_many(
+                table=self.table_name,
+                key_names=("username",),
+                key_values=(
+                    ("alice",),
+                    ("bob",),
+                    ("stranger",),
+                ),
+                value_names=("value",),
+                value_values=(
+                    ("aaa!",),
+                    ("bbb!",),
+                    ("???",),
+                ),
+                desc="update_many1",
+            )
+        )
+
+        # Check the table is how we expect:
+        # charlie has been left alone
+        self.assertEqual(
+            set(self._dump_table_to_tuple()),
+            {(1, "alice", "aaa!"), (2, "bob", "bbb!"), (3, "charlie", "C")},
+        )
