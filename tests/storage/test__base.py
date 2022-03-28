@@ -24,7 +24,7 @@ from synapse.util import Clock
 from tests import unittest
 
 
-class UpsertManyTests(unittest.HomeserverTestCase):
+class UpdateUpsertManyTests(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.storage = hs.get_datastores().main
 
@@ -46,7 +46,7 @@ class UpsertManyTests(unittest.HomeserverTestCase):
             )
         )
 
-    def _dump_to_tuple(self) -> Generator[Tuple[int, str, str], None, None]:
+    def _dump_table_to_tuple(self) -> Generator[Tuple[int, str, str], None, None]:
         res = self.get_success(
             self.storage.db_pool.simple_select_list(
                 self.table_name, None, ["id, username, value"]
@@ -80,7 +80,7 @@ class UpsertManyTests(unittest.HomeserverTestCase):
 
         # Check results are what we expect
         self.assertEqual(
-            set(self._dump_to_tuple()),
+            set(self._dump_table_to_tuple()),
             {(1, "user1", "hello"), (2, "user2", "there")},
         )
 
@@ -102,6 +102,6 @@ class UpsertManyTests(unittest.HomeserverTestCase):
 
         # Check results are what we expect
         self.assertEqual(
-            set(self._dump_to_tuple()),
+            set(self._dump_table_to_tuple()),
             {(1, "user1", "hello"), (2, "user2", "bleb")},
         )
