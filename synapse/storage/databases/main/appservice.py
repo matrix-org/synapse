@@ -75,6 +75,7 @@ class ApplicationServiceWorkerStore(RoomMemberWorkerStore):
         self.exclusive_user_regex = _make_exclusive_regex(self.services_cache)
 
         def get_max_as_txn_id(txn: Cursor) -> int:
+            logger.warning("Falling back to slow query, you should port to postgres")
             txn.execute(
                 "SELECT COALESCE(max(txn_id), 0) FROM application_services_txns"
             )
