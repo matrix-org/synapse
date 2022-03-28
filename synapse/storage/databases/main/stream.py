@@ -589,7 +589,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         user_id: str,
         from_key: RoomStreamToken,
         to_key: RoomStreamToken,
-        ignored_rooms: Optional[List[str]] = None,
+        excluded_rooms: Optional[List[str]] = None,
     ) -> List[EventBase]:
         """Fetch membership events for a given user.
 
@@ -617,11 +617,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             args: List[Any] = [user_id, min_from_id, max_to_id]
 
             ignore_room_clause = ""
-            if ignored_rooms is not None:
+            if excluded_rooms is not None and len(excluded_rooms) > 0:
                 ignore_room_clause = "AND e.room_id NOT IN (%s)" % ",".join(
-                    "?" for _ in ignored_rooms
+                    "?" for _ in excluded_rooms
                 )
-                args = args + ignored_rooms
+                args = args + excluded_rooms
 
             sql = """
                 SELECT m.event_id, instance_name, topological_ordering, stream_ordering

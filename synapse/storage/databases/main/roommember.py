@@ -364,7 +364,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         self,
         user_id: str,
         membership_list: Collection[str],
-        ignore_rooms: Optional[List[str]] = None,
+        excluded_rooms: Optional[List[str]] = None,
     ) -> List[RoomsForUser]:
         """Get all the rooms for this *local* user where the membership for this user
         matches one in the membership list.
@@ -375,7 +375,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             user_id: The user ID.
             membership_list: A list of synapse.api.constants.Membership
                 values which the user must be in.
-            ignore_rooms: A list of rooms to ignore.
+            excluded_rooms: A list of rooms to ignore.
 
         Returns:
             The RoomsForUser that the user matches the membership types.
@@ -388,6 +388,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             self._get_rooms_for_local_user_where_membership_is_txn,
             user_id,
             membership_list,
+            excluded_rooms,
         )
 
         # Now we filter out forgotten rooms
@@ -399,7 +400,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         txn,
         user_id: str,
         membership_list: List[str],
-        ignore_rooms: Optional[List[str]] = None,
+        excluded_rooms: Optional[List[str]] = None,
     ) -> List[RoomsForUser]:
         # Paranoia check.
         if not self.hs.is_mine_id(user_id):
@@ -412,9 +413,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             self.database_engine, "c.membership", membership_list
         )
 
-        if ignore_rooms is not None:
-            clause += "AND room_id NOT IN (%s)" % ",".join("?" for _ in ignore_rooms)
-            args = args + ignore_rooms
+        if excluded_rooms is not None and len(excluded_rooms) > 0:
+            clause += "AND room_id NOT IN (%s)" % ",".join("?" for _ in excluded_rooms)
+            args = args + excluded_rooms
 
         sql = """
             SELECT room_id, e.sender, c.membership, event_id, e.stream_ordering, r.room_version
