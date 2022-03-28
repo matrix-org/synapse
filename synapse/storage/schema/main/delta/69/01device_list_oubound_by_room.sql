@@ -18,7 +18,11 @@ CREATE TABLE device_lists_changes_in_room (
     room_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
     device_id TEXT NOT NULL,
+    -- We track if we've calculated the hosts in the room and updated
+    -- `device_lists_outbound_pokes`.
+    converted_to_destinations BOOLEAN NOT NULL,
     opentracing_context TEXT
 );
 
 CREATE UNIQUE INDEX device_lists_changes_in_stream_id ON device_lists_changes_in_room(stream_id);
+CREATE INDEX device_lists_changes_in_stream_id_converted ON device_lists_changes_in_room(stream_id) WHERE NOT converted_to_destinations;

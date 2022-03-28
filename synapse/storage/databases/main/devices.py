@@ -1680,6 +1680,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 "room_id",
                 "user_id",
                 "device_id",
+                "converted_to_destinations",
                 "opentracing_context",
             ),
             values=[
@@ -1688,6 +1689,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                     room_id,
                     user_id,
                     device_id,
+                    True,  # As we're updating `device_lists_outbound_pokes` at the same time.
                     json_encoder.encode(context),
                 )
                 for room_id in room_ids
