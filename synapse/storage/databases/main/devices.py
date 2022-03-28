@@ -1529,27 +1529,27 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         if not device_ids:
             return None
 
-        async with self._device_list_id_gen.get_next_mult(
-            len(device_ids)
-        ) as stream_ids:
-            await self.db_pool.runInteraction(
-                "add_device_change_to_stream",
-                self._add_device_change_to_stream_txn,
+        num_stream_ids = max(
+            len(device_ids),
+            len(room_ids) * len(device_ids),
+            len(hosts) * len(device_ids),
+        )
+
+        context = get_active_span_text_map()
+
+        def add_device_changes_txn(txn, stream_ids):
+            self._add_device_change_to_stream_txn(
+                txn,
                 user_id,
                 device_ids,
                 stream_ids,
             )
 
-        if not room_ids:
-            return stream_ids[-1]
+            if not room_ids:
+                return
 
-        context = get_active_span_text_map()
-        async with self._device_list_id_gen.get_next_mult(
-            len(room_ids) * len(device_ids)
-        ) as stream_ids:
-            await self.db_pool.runInteraction(
-                "_add_device_outbound_room_poke_txn",
-                self._add_device_outbound_room_poke_txn,
+            self._add_device_outbound_room_poke_txn(
+                txn,
                 user_id,
                 device_ids,
                 room_ids,
@@ -1557,20 +1557,23 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 context,
             )
 
-        if not hosts:
-            return stream_ids[-1]
+            if not hosts:
+                return
 
-        async with self._device_list_id_gen.get_next_mult(
-            len(hosts) * len(device_ids)
-        ) as stream_ids:
-            await self.db_pool.runInteraction(
-                "add_device_outbound_poke_to_stream",
-                self._add_device_outbound_poke_to_stream_txn,
+            self._add_device_outbound_poke_to_stream_txn(
+                txn,
                 user_id,
                 device_ids,
                 hosts,
                 stream_ids,
                 context,
+            )
+
+        async with self._device_list_id_gen.get_next_mult(num_stream_ids) as stream_ids:
+            await self.db_pool.runInteraction(
+                "add_device_change_to_stream",
+                add_device_changes_txn,
+                stream_ids,
             )
 
         return stream_ids[-1]
