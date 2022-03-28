@@ -1092,7 +1092,7 @@ class FederationServer(FederationBase):
         # has started processing).
         while True:
             async with lock:
-                logger.info("handling received PDU: %s", event)
+                logger.info("handling received PDU in room %s: %s", room_id, event)
                 try:
                     with nested_logging_context(event.event_id):
                         await self._federation_event_handler.on_receive_pdu(
