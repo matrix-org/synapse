@@ -1,0 +1,1 @@
+Correctly import `Markup` from `MarkupSafe` instead of `Jinja2`.
