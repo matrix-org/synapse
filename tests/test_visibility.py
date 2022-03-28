@@ -13,11 +13,12 @@
 # limitations under the License.
 import logging
 from typing import Optional
+from unittest.mock import patch
 
 from synapse.api.room_versions import RoomVersions
-from synapse.events import EventBase
-from synapse.types import JsonDict
-from synapse.visibility import filter_events_for_server
+from synapse.events import EventBase, make_event_from_dict
+from synapse.types import JsonDict, create_requester
+from synapse.visibility import filter_events_for_client, filter_events_for_server
 
 from tests import unittest
 from tests.utils import create_room
@@ -185,3 +186,72 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
 
         self.get_success(self.storage.persistence.persist_event(event, context))
         return event
+
+
+class FilterEventsForClientTestCase(unittest.FederatingHomeserverTestCase):
+    def test_out_of_band_invite_rejection(self):
+        # this is where we have received an invite event over federation, and then
+        # rejected it.
+        invite_pdu = {
+            "room_id": "!room:id",
+            "depth": 1,
+            "auth_events": [],
+            "prev_events": [],
+            "origin_server_ts": 1,
+            "sender": "@someone:" + self.OTHER_SERVER_NAME,
+            "type": "m.room.member",
+            "state_key": "@user:test",
+            "content": {"membership": "invite"},
+        }
+        self.add_hashes_and_signatures(invite_pdu)
+        invite_event_id = make_event_from_dict(invite_pdu, RoomVersions.V9).event_id
+
+        self.get_success(
+            self.hs.get_federation_server().on_invite_request(
+                self.OTHER_SERVER_NAME,
+                invite_pdu,
+                "9",
+            )
+        )
+
+        # stub out do_remotely_reject_invite so that we fall back to a locally-
+        # generated rejection
+        with patch.object(
+            self.hs.get_federation_handler(),
+            "do_remotely_reject_invite",
+            side_effect=Exception(),
+        ):
+            reject_event_id, _ = self.get_success(
+                self.hs.get_room_member_handler().remote_reject_invite(
+                    invite_event_id,
+                    txn_id=None,
+                    requester=create_requester("@user:test"),
+                    content={},
+                )
+            )
+
+        invite_event, reject_event = self.get_success(
+            self.hs.get_datastores().main.get_events_as_list(
+                [invite_event_id, reject_event_id]
+            )
+        )
+
+        # the invited user should be able to see both the invite and the rejection
+        self.assertEqual(
+            self.get_success(
+                filter_events_for_client(
+                    self.hs.get_storage(), "@user:test", [invite_event, reject_event]
+                )
+            ),
+            [invite_event, reject_event],
+        )
+
+        # other users should see neither
+        self.assertEqual(
+            self.get_success(
+                filter_events_for_client(
+                    self.hs.get_storage(), "@other:test", [invite_event, reject_event]
+                )
+            ),
+            [],
+        )

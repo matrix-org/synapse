@@ -46,7 +46,7 @@ from synapse.storage.roommember import (
     ProfileInfo,
     RoomsForUser,
 )
-from synapse.types import PersistedEventPosition, StateMap, get_domain_from_id
+from synapse.types import PersistedEventPosition, get_domain_from_id
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import _CacheContext, cached, cachedList
@@ -61,6 +61,14 @@ logger = logging.getLogger(__name__)
 
 _MEMBERSHIP_PROFILE_UPDATE_NAME = "room_membership_profile_update"
 _CURRENT_STATE_MEMBERSHIP_UPDATE_NAME = "current_state_events_membership"
+
+
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class EventIdMembership:
+    """Returned by `get_membership_from_event_ids`"""
+
+    user_id: str
+    membership: str
 
 
 class RoomMemberWorkerStore(EventsWorkerStore):
@@ -273,7 +281,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             txn.execute(sql, (room_id,))
             res = {}
             for count, membership in txn:
-                summary = res.setdefault(membership, MemberSummary([], count))
+                res.setdefault(membership, MemberSummary([], count))
 
             # we order by membership and then fairly arbitrarily by event_id so
             # heroes are consistent
@@ -772,7 +780,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             retcols=("user_id", "display_name", "avatar_url", "event_id"),
             keyvalues={"membership": Membership.JOIN},
             batch_size=500,
-            desc="_get_membership_from_event_ids",
+            desc="_get_joined_profiles_from_event_ids",
         )
 
         return {
@@ -839,18 +847,14 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         with Measure(self._clock, "get_joined_hosts"):
             return await self._get_joined_hosts(
-                room_id, state_group, state_entry.state, state_entry=state_entry
+                room_id, state_group, state_entry=state_entry
             )
 
     @cached(num_args=2, max_entries=10000, iterable=True)
     async def _get_joined_hosts(
-        self,
-        room_id: str,
-        state_group: int,
-        current_state_ids: StateMap[str],
-        state_entry: "_StateCacheEntry",
+        self, room_id: str, state_group: int, state_entry: "_StateCacheEntry"
     ) -> FrozenSet[str]:
-        # We don't use `state_group`, its there so that we can cache based on
+        # We don't use `state_group`, it's there so that we can cache based on
         # it. However, its important that its never None, since two
         # current_state's with a state_group of None are likely to be different.
         #
@@ -1004,12 +1008,26 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return set(room_ids)
 
+    @cached(max_entries=5000)
+    async def _get_membership_from_event_id(
+        self, member_event_id: str
+    ) -> Optional[EventIdMembership]:
+        raise NotImplementedError()
+
+    @cachedList(
+        cached_method_name="_get_membership_from_event_id", list_name="member_event_ids"
+    )
     async def get_membership_from_event_ids(
         self, member_event_ids: Iterable[str]
-    ) -> List[dict]:
-        """Get user_id and membership of a set of event IDs."""
+    ) -> Dict[str, Optional[EventIdMembership]]:
+        """Get user_id and membership of a set of event IDs.
 
-        return await self.db_pool.simple_select_many_batch(
+        Returns:
+            Mapping from event ID to `EventIdMembership` if the event is a
+            membership event, otherwise the value is None.
+        """
+
+        rows = await self.db_pool.simple_select_many_batch(
             table="room_memberships",
             column="event_id",
             iterable=member_event_ids,
@@ -1018,6 +1036,13 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             batch_size=500,
             desc="get_membership_from_event_ids",
         )
+
+        return {
+            row["event_id"]: EventIdMembership(
+                membership=row["membership"], user_id=row["user_id"]
+            )
+            for row in rows
+        }
 
     async def is_local_host_in_room_ignoring_users(
         self, room_id: str, ignore_users: Collection[str]

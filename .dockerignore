@@ -7,6 +7,5 @@
 !MANIFEST.in
 !README.rst
 !setup.py
-!synctl
 
 **/__pycache__

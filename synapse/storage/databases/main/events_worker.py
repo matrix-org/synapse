@@ -1286,7 +1286,7 @@ class EventsWorkerStore(SQLBaseStore):
         )
         return {eid for ((_rid, eid), have_event) in res.items() if have_event}
 
-    @cachedList("have_seen_event", "keys")
+    @cachedList(cached_method_name="have_seen_event", list_name="keys")
     async def _have_seen_events_dict(
         self, keys: Iterable[Tuple[str, str]]
     ) -> Dict[Tuple[str, str], bool]:
@@ -1954,7 +1954,7 @@ class EventsWorkerStore(SQLBaseStore):
             get_event_id_for_timestamp_txn,
         )
 
-    @cachedList("is_partial_state_event", list_name="event_ids")
+    @cachedList(cached_method_name="is_partial_state_event", list_name="event_ids")
     async def get_partial_state_events(
         self, event_ids: Collection[str]
     ) -> Dict[str, bool]:

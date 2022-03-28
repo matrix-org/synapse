@@ -108,6 +108,7 @@ CONDITIONAL_REQUIREMENTS["mypy"] = [
     "types-jsonschema>=3.2.0",
     "types-opentracing>=2.4.2",
     "types-Pillow>=8.3.4",
+    "types-psycopg2>=2.9.9",
     "types-pyOpenSSL>=20.0.7",
     "types-PyYAML>=5.4.10",
     "types-requests>=2.26.0",
@@ -155,6 +156,7 @@ setup(
             # Application
             "synapse_homeserver = synapse.app.homeserver:main",
             "synapse_worker = synapse.app.generic_worker:main",
+            "synctl = synapse._scripts.synctl:main",
             # Scripts
             "export_signing_key = synapse._scripts.export_signing_key:main",
             "generate_config = synapse._scripts.generate_config:main",
@@ -177,6 +179,5 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
     ],
-    scripts=["synctl"],
     cmdclass={"test": TestCommand},
 )

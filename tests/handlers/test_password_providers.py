@@ -124,7 +124,6 @@ class PasswordCustomAuthProvider:
                 ("m.login.password", ("password",)): self.check_auth,
             }
         )
-        pass
 
     def check_auth(self, *args):
         return mock_password_provider.check_auth(*args)

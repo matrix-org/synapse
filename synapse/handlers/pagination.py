@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Collection, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Set
 
 import attr
 
@@ -22,6 +22,7 @@ from twisted.python.failure import Failure
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
+from synapse.events.utils import SerializeEventConfig
 from synapse.handlers.room import ShutdownRoomResponse
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.state import StateFilter
@@ -133,6 +134,7 @@ class PaginationHandler:
         self.clock = hs.get_clock()
         self._server_name = hs.hostname
         self._room_shutdown_handler = hs.get_room_shutdown_handler()
+        self._relations_handler = hs.get_relations_handler()
 
         self.pagination_lock = ReadWriteLock()
         # IDs of rooms in which there currently an active purge *or delete* operation.
@@ -349,7 +351,7 @@ class PaginationHandler:
         """
         self._purges_in_progress_by_room.add(room_id)
         try:
-            with await self.pagination_lock.write(room_id):
+            async with self.pagination_lock.write(room_id):
                 await self.storage.purge_events.purge_history(
                     room_id, token, delete_local_events
                 )
@@ -405,7 +407,7 @@ class PaginationHandler:
             room_id: room to be purged
             force: set true to skip checking for joined users.
         """
-        with await self.pagination_lock.write(room_id):
+        async with self.pagination_lock.write(room_id):
             # first check that we have no users in this room
             if not force:
                 joined = await self.store.is_host_joined(room_id, self._server_name)
@@ -421,7 +423,7 @@ class PaginationHandler:
         pagin_config: PaginationConfig,
         as_client_event: bool = True,
         event_filter: Optional[Filter] = None,
-    ) -> Dict[str, Any]:
+    ) -> JsonDict:
         """Get messages in a room.
 
         Args:
@@ -430,6 +432,7 @@ class PaginationHandler:
             pagin_config: The pagination config rules to apply, if any.
             as_client_event: True to get events in client-server format.
             event_filter: Filter to apply to results or None
+
         Returns:
             Pagination API results
         """
@@ -447,7 +450,7 @@ class PaginationHandler:
 
         room_token = from_token.room_key
 
-        with await self.pagination_lock.read(room_id):
+        async with self.pagination_lock.read(room_id):
             (
                 membership,
                 member_event_id,
@@ -537,17 +540,21 @@ class PaginationHandler:
                 state_dict = await self.store.get_events(list(state_ids.values()))
                 state = state_dict.values()
 
-        aggregations = await self.store.get_bundled_aggregations(events, user_id)
+        aggregations = await self._relations_handler.get_bundled_aggregations(
+            events, user_id
+        )
 
         time_now = self.clock.time_msec()
+
+        serialize_options = SerializeEventConfig(as_client_event=as_client_event)
 
         chunk = {
             "chunk": (
                 self._event_serializer.serialize_events(
                     events,
                     time_now,
+                    config=serialize_options,
                     bundle_aggregations=aggregations,
-                    as_client_event=as_client_event,
                 )
             ),
             "start": await from_token.to_string(self.store),
@@ -556,7 +563,7 @@ class PaginationHandler:
 
         if state:
             chunk["state"] = self._event_serializer.serialize_events(
-                state, time_now, as_client_event=as_client_event
+                state, time_now, config=serialize_options
             )
 
         return chunk
@@ -612,7 +619,7 @@ class PaginationHandler:
 
         self._purges_in_progress_by_room.add(room_id)
         try:
-            with await self.pagination_lock.write(room_id):
+            async with self.pagination_lock.write(room_id):
                 self._delete_by_id[delete_id].status = DeleteStatus.STATUS_SHUTTING_DOWN
                 self._delete_by_id[
                     delete_id
