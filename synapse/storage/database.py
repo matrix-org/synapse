@@ -1818,7 +1818,7 @@ class DatabasePool:
         key_names: Collection[str],
         key_values: Collection[Iterable[Any]],
         value_names: Collection[str],
-        value_values: Iterable[Iterable[Any]],
+        value_values: Collection[Iterable[Any]],
     ) -> None:
         """
         Update, many times, using batching where possible.
@@ -1830,6 +1830,11 @@ class DatabasePool:
             value_names: The names of value columns to update.
             value_values: A list of each row's value column values.
         """
+
+        if len(value_values) != len(key_values):
+            raise ValueError(
+                f"{len(key_values)} key rows and {len(value_values)} value rows: should be the same number."
+            )
 
         # List of value names, then key names
         allnames: List[str] = []
