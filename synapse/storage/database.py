@@ -294,7 +294,9 @@ class LoggingTransaction:
         else:
             self.executemany(sql, args)
 
-    def execute_values(self, sql: str, *args: Any, fetch: bool = True) -> List[Tuple]:
+    def execute_values(
+        self, sql: str, args: Iterable[Iterable[Any]], fetch: bool = True
+    ) -> List[Tuple]:
         """Corresponds to psycopg2.extras.execute_values. Only available when
         using postgres.
 
@@ -305,15 +307,11 @@ class LoggingTransaction:
         from psycopg2.extras import execute_values
 
         return self._do_execute(
-            # Type ignore: mypy is unhappy because if `x` is a 5-tuple, then there will
-            # be two values for `fetch`: one given positionally, and another given
-            # as a keyword argument. We might be able to fix this by
-            # - propagating the signature of psycopg2.extras.execute_values to this
-            #   function, or
-            # - changing `*args: Any` to `values: T` for some appropriate T.
-            lambda *x: execute_values(self.txn, *x, fetch=fetch),  # type: ignore[misc]
+            lambda the_sql, the_args: execute_values(
+                self.txn, the_sql, the_args, fetch=fetch
+            ),
             sql,
-            *args,
+            args,
         )
 
     def execute(self, sql: str, *args: Any) -> None:
