@@ -264,8 +264,12 @@ class RelationsWorkerStore(SQLBaseStore):
             limit: Only fetch the `limit` groups.
 
         Returns:
-            List of groups of annotations that match. Each row is a dict with
-            `type`, `key` and `count` fields.
+            A tuple of:
+                A list of groups of annotations that match. Each row is a dict with
+                `type`, `key` and `count` fields.
+
+                A boolean indicating if the result is limited (i.e. if there are
+                additional results to return).
         """
 
         where_args: List[Union[str, int]] = [
