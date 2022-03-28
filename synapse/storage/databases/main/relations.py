@@ -280,7 +280,7 @@ class RelationsWorkerStore(SQLBaseStore):
             INNER JOIN events USING (event_id)
             WHERE relates_to_id = ? AND room_id = ? AND relation_type = ?
             GROUP BY relation_type, type, aggregation_key
-            ORDER BY COUNT(*) DESC, MAX(stream_ordering) DESC
+            ORDER BY COUNT(*) DESC
             LIMIT ?
         """
 
