@@ -371,7 +371,6 @@ class DeviceHandler(DeviceWorkerHandler):
                 log_kv(
                     {"reason": "User doesn't have device id.", "device_id": device_id}
                 )
-                pass
             else:
                 raise
 
@@ -414,7 +413,6 @@ class DeviceHandler(DeviceWorkerHandler):
                 # no match
                 set_tag("error", True)
                 set_tag("reason", "User doesn't have that device id.")
-                pass
             else:
                 raise
 
@@ -506,7 +504,7 @@ class DeviceHandler(DeviceWorkerHandler):
                 "Sending device list update notif for %r to: %r", user_id, hosts
             )
             for host in hosts:
-                self.federation_sender.send_device_messages(host)
+                self.federation_sender.send_device_messages(host, immediate=False)
                 log_kv({"message": "sent device update to host", "host": host})
 
     async def notify_user_signature_update(

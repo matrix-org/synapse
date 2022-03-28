@@ -172,6 +172,9 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         result_room_ids = []
         result_children_ids = []
         for result_room in result["rooms"]:
+            # Ensure federation results are not leaking over the client-server API.
+            self.assertNotIn("allowed_room_ids", result_room)
+
             result_room_ids.append(result_room["room_id"])
             result_children_ids.append(
                 [

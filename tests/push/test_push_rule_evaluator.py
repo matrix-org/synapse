@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict
+from typing import Dict, Optional, Union
 
 import frozendict
 
@@ -20,12 +20,13 @@ from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent
 from synapse.push import push_rule_evaluator
 from synapse.push.push_rule_evaluator import PushRuleEvaluatorForEvent
+from synapse.types import JsonDict
 
 from tests import unittest
 
 
 class PushRuleEvaluatorTestCase(unittest.TestCase):
-    def _get_evaluator(self, content):
+    def _get_evaluator(self, content: JsonDict) -> PushRuleEvaluatorForEvent:
         event = FrozenEvent(
             {
                 "event_id": "$event_id",
@@ -39,12 +40,12 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         )
         room_member_count = 0
         sender_power_level = 0
-        power_levels = {}
+        power_levels: Dict[str, Union[int, Dict[str, int]]] = {}
         return PushRuleEvaluatorForEvent(
             event, room_member_count, sender_power_level, power_levels
         )
 
-    def test_display_name(self):
+    def test_display_name(self) -> None:
         """Check for a matching display name in the body of the event."""
         evaluator = self._get_evaluator({"body": "foo bar baz"})
 
@@ -71,20 +72,20 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         self.assertTrue(evaluator.matches(condition, "@user:test", "foo bar"))
 
     def _assert_matches(
-        self, condition: Dict[str, Any], content: Dict[str, Any], msg=None
+        self, condition: JsonDict, content: JsonDict, msg: Optional[str] = None
     ) -> None:
         evaluator = self._get_evaluator(content)
         self.assertTrue(evaluator.matches(condition, "@user:test", "display_name"), msg)
 
     def _assert_not_matches(
-        self, condition: Dict[str, Any], content: Dict[str, Any], msg=None
+        self, condition: JsonDict, content: JsonDict, msg: Optional[str] = None
     ) -> None:
         evaluator = self._get_evaluator(content)
         self.assertFalse(
             evaluator.matches(condition, "@user:test", "display_name"), msg
         )
 
-    def test_event_match_body(self):
+    def test_event_match_body(self) -> None:
         """Check that event_match conditions on content.body work as expected"""
 
         # if the key is `content.body`, the pattern matches substrings.
@@ -165,7 +166,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             r"? after \ should match any character",
         )
 
-    def test_event_match_non_body(self):
+    def test_event_match_non_body(self) -> None:
         """Check that event_match conditions on other keys work as expected"""
 
         # if the key is anything other than 'content.body', the pattern must match the
@@ -241,7 +242,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             "pattern should not match before a newline",
         )
 
-    def test_no_body(self):
+    def test_no_body(self) -> None:
         """Not having a body shouldn't break the evaluator."""
         evaluator = self._get_evaluator({})
 
@@ -250,7 +251,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         }
         self.assertFalse(evaluator.matches(condition, "@user:test", "foo"))
 
-    def test_invalid_body(self):
+    def test_invalid_body(self) -> None:
         """A non-string body should not break the evaluator."""
         condition = {
             "kind": "contains_display_name",
@@ -260,7 +261,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             evaluator = self._get_evaluator({"body": body})
             self.assertFalse(evaluator.matches(condition, "@user:test", "foo"))
 
-    def test_tweaks_for_actions(self):
+    def test_tweaks_for_actions(self) -> None:
         """
         This tests the behaviour of tweaks_for_actions.
         """

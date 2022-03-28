@@ -298,6 +298,9 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 # This user has new messages sent to them. Query messages for them
                 user_ids_to_query.add(user_id)
 
+        if not user_ids_to_query:
+            return {}, to_stream_id
+
         def get_device_messages_txn(txn: LoggingTransaction):
             # Build a query to select messages from any of the given devices that
             # are between the given stream id bounds.

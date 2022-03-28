@@ -219,6 +219,16 @@ class PerDestinationQueue:
         self._pending_edus.append(edu)
         self.attempt_new_transaction()
 
+    def mark_new_data(self) -> None:
+        """Marks that the destination has new data to send, without starting a
+        new transaction.
+
+        If a transaction loop is already in progress then a new transcation will
+        be attempted when the current one finishes.
+        """
+
+        self._new_data_to_send = True
+
     def attempt_new_transaction(self) -> None:
         """Try to start a new transaction to this destination
 

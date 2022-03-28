@@ -493,6 +493,7 @@ class EventCreationHandler:
         allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
+        state_event_ids: Optional[List[str]] = None,
         require_consent: bool = True,
         outlier: bool = False,
         historical: bool = False,
@@ -526,6 +527,15 @@ class EventCreationHandler:
                 based on the room state at the prev_events.
 
                 If non-None, prev_event_ids must also be provided.
+
+            state_event_ids:
+                The full state at a given event. This is used particularly by the MSC2716
+                /batch_send endpoint. One use case is with insertion events which float at
+                the beginning of a historical batch and don't have any `prev_events` to
+                derive from; we add all of these state events as the explicit state so the
+                rest of the historical batch can inherit the same state and state_group.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
 
             require_consent: Whether to check if the requester has
                 consented to the privacy policy.
@@ -612,6 +622,7 @@ class EventCreationHandler:
             allow_no_prev_events=allow_no_prev_events,
             prev_event_ids=prev_event_ids,
             auth_event_ids=auth_event_ids,
+            state_event_ids=state_event_ids,
             depth=depth,
         )
 
@@ -772,6 +783,7 @@ class EventCreationHandler:
         allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
+        state_event_ids: Optional[List[str]] = None,
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
@@ -801,6 +813,14 @@ class EventCreationHandler:
                 based on the room state at the prev_events.
 
                 If non-None, prev_event_ids must also be provided.
+            state_event_ids:
+                The full state at a given event. This is used particularly by the MSC2716
+                /batch_send endpoint. One use case is with insertion events which float at
+                the beginning of a historical batch and don't have any `prev_events` to
+                derive from; we add all of these state events as the explicit state so the
+                rest of the historical batch can inherit the same state and state_group.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
             ratelimit: Whether to rate limit this send.
             txn_id: The transaction ID.
             ignore_shadow_ban: True if shadow-banned users should be allowed to
@@ -856,8 +876,10 @@ class EventCreationHandler:
                 requester,
                 event_dict,
                 txn_id=txn_id,
+                allow_no_prev_events=allow_no_prev_events,
                 prev_event_ids=prev_event_ids,
                 auth_event_ids=auth_event_ids,
+                state_event_ids=state_event_ids,
                 outlier=outlier,
                 historical=historical,
                 depth=depth,
@@ -893,6 +915,7 @@ class EventCreationHandler:
         allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
+        state_event_ids: Optional[List[str]] = None,
         depth: Optional[int] = None,
     ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client
@@ -915,6 +938,15 @@ class EventCreationHandler:
                 Should normally be left as None, which will cause them to be calculated
                 based on the room state at the prev_events.
 
+            state_event_ids:
+                The full state at a given event. This is used particularly by the MSC2716
+                /batch_send endpoint. One use case is with insertion events which float at
+                the beginning of a historical batch and don't have any `prev_events` to
+                derive from; we add all of these state events as the explicit state so the
+                rest of the historical batch can inherit the same state and state_group.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
+
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
                 based on the prev_events.
@@ -922,31 +954,26 @@ class EventCreationHandler:
         Returns:
             Tuple of created event, context
         """
-        # Strip down the auth_event_ids to only what we need to auth the event.
+        # Strip down the state_event_ids to only what we need to auth the event.
         # For example, we don't need extra m.room.member that don't match event.sender
-        full_state_ids_at_event = None
-        if auth_event_ids is not None:
-            # If auth events are provided, prev events must be also.
+        if state_event_ids is not None:
+            # Do a quick check to make sure that prev_event_ids is present to
+            # make the type-checking around `builder.build` happy.
             # prev_event_ids could be an empty array though.
             assert prev_event_ids is not None
 
-            # Copy the full auth state before it stripped down
-            full_state_ids_at_event = auth_event_ids.copy()
-
             temp_event = await builder.build(
                 prev_event_ids=prev_event_ids,
-                auth_event_ids=auth_event_ids,
+                auth_event_ids=state_event_ids,
                 depth=depth,
             )
-            auth_events = await self.store.get_events_as_list(auth_event_ids)
+            state_events = await self.store.get_events_as_list(state_event_ids)
             # Create a StateMap[str]
-            auth_event_state_map = {
-                (e.type, e.state_key): e.event_id for e in auth_events
-            }
-            # Actually strip down and use the necessary auth events
+            state_map = {(e.type, e.state_key): e.event_id for e in state_events}
+            # Actually strip down and only use the necessary auth events
             auth_event_ids = self._event_auth_handler.compute_auth_events(
                 event=temp_event,
-                current_state_ids=auth_event_state_map,
+                current_state_ids=state_map,
                 for_verification=False,
             )
 
@@ -989,12 +1016,16 @@ class EventCreationHandler:
             context = EventContext.for_outlier()
         elif (
             event.type == EventTypes.MSC2716_INSERTION
-            and full_state_ids_at_event
+            and state_event_ids
             and builder.internal_metadata.is_historical()
         ):
+            # Add explicit state to the insertion event so it has state to derive
+            # from even though it's floating with no `prev_events`. The rest of
+            # the batch can derive from this state and state_group.
+            #
             # TODO(faster_joins): figure out how this works, and make sure that the
             #   old state is complete.
-            old_state = await self.store.get_events_as_list(full_state_ids_at_event)
+            old_state = await self.store.get_events_as_list(state_event_ids)
             context = await self.state.compute_event_context(event, old_state=old_state)
         else:
             context = await self.state.compute_event_context(event)
@@ -1079,7 +1110,10 @@ class EventCreationHandler:
                 raise SynapseError(400, "Can't send same reaction twice")
 
         # Don't attempt to start a thread if the parent event is a relation.
-        elif relation_type == RelationTypes.THREAD:
+        elif (
+            relation_type == RelationTypes.THREAD
+            or relation_type == RelationTypes.UNSTABLE_THREAD
+        ):
             if await self.store.event_includes_relation(relates_to):
                 raise SynapseError(
                     400, "Cannot start threads from an event with a relation"
