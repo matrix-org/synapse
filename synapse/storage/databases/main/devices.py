@@ -1531,7 +1531,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
 
         num_stream_ids = max(
             len(device_ids),
-            len(room_ids) * len(device_ids),
             len(hosts) * len(device_ids),
         )
 
@@ -1670,29 +1669,27 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         stream_ids: List[str],
         context: Dict[str, str],
     ) -> None:
-        next_stream_id = iter(stream_ids)
-
         self.db_pool.simple_insert_many_txn(
             txn,
             table="device_lists_changes_in_room",
             keys=(
-                "stream_id",
-                "room_id",
                 "user_id",
                 "device_id",
+                "room_id",
+                "stream_id",
                 "converted_to_destinations",
                 "opentracing_context",
             ),
             values=[
                 (
-                    next(next_stream_id),
-                    room_id,
                     user_id,
                     device_id,
+                    room_id,
+                    stream_id,
                     True,  # As we're updating `device_lists_outbound_pokes` at the same time.
                     json_encoder.encode(context),
                 )
                 for room_id in room_ids
-                for device_id in device_ids
+                for device_id, stream_id in zip(device_ids, stream_ids)
             ],
         )
