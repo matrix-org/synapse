@@ -361,7 +361,10 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return None
 
     async def get_rooms_for_local_user_where_membership_is(
-        self, user_id: str, membership_list: Collection[str]
+        self,
+        user_id: str,
+        membership_list: Collection[str],
+        ignore_rooms: Optional[List[str]] = None,
     ) -> List[RoomsForUser]:
         """Get all the rooms for this *local* user where the membership for this user
         matches one in the membership list.
@@ -372,6 +375,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             user_id: The user ID.
             membership_list: A list of synapse.api.constants.Membership
                 values which the user must be in.
+            ignore_rooms: A list of rooms to ignore.
 
         Returns:
             The RoomsForUser that the user matches the membership types.
@@ -391,7 +395,11 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return [room for room in rooms if room.room_id not in forgotten_rooms]
 
     def _get_rooms_for_local_user_where_membership_is_txn(
-        self, txn, user_id: str, membership_list: List[str]
+        self,
+        txn,
+        user_id: str,
+        membership_list: List[str],
+        ignore_rooms: Optional[List[str]] = None,
     ) -> List[RoomsForUser]:
         # Paranoia check.
         if not self.hs.is_mine_id(user_id):
@@ -403,6 +411,10 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         clause, args = make_in_list_sql_clause(
             self.database_engine, "c.membership", membership_list
         )
+
+        if ignore_rooms is not None:
+            clause += "AND room_id NOT IN (%s)" % ",".join("?" for _ in ignore_rooms)
+            args = args + ignore_rooms
 
         sql = """
             SELECT room_id, e.sender, c.membership, event_id, e.stream_ordering, r.room_version
