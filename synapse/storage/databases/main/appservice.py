@@ -83,7 +83,7 @@ class ApplicationServiceWorkerStore(RoomMemberWorkerStore):
 
         self._as_txn_seq_gen = build_sequence_generator(
             db_conn,
-            self.database_engine,
+            database.engine,
             get_max_as_txn_id,
             "application_services_txn_id_seq",
             table="application_services_txns",
