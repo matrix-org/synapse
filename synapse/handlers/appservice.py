@@ -661,8 +661,8 @@ class ApplicationServicesHandler:
         if appservice.is_interested_in_user(user_id):
             return True
 
-        # FIXME: This is quite an expensive check. This method is called per device
-        #  list change.
+        # Determine whether any of the rooms the user is in justifies sending this
+        # device list update to the application service.
         room_ids = await self.store.get_rooms_for_user(user_id)
         for room_id in room_ids:
             # This method covers checking room members for appservice interest as well as
