@@ -20,7 +20,7 @@ from unittest.mock import patch
 
 from twisted.test.proto_helpers import MemoryReactor
 
-from synapse.api.constants import EventTypes, RelationTypes
+from synapse.api.constants import AccountDataTypes, EventTypes, RelationTypes
 from synapse.rest import admin
 from synapse.rest.client import login, register, relations, room, sync
 from synapse.server import HomeServer
@@ -1322,6 +1322,84 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         # Ensure there's bundled aggregations on it.
         self.assertIn("unsigned", parent_event)
         self.assertIn("m.relations", parent_event["unsigned"])
+
+
+class RelationIgnoredUserTestCase(BaseRelationsTestCase):
+    """Relations sent from an ignored user should be ignored."""
+
+    def _test_ignored_user(
+        self, allowed_event_ids: List[str], ignored_event_ids: List[str]
+    ) -> None:
+        """
+        Fetch the relations and ensure they're all there, then ignore user2, and
+        repeat.
+        """
+        # Get the relations.
+        event_ids = self._get_related_events()
+        self.assertCountEqual(event_ids, allowed_event_ids + ignored_event_ids)
+
+        # Ignore user2 and re-do the requests.
+        self.get_success(
+            self.store.add_account_data_for_user(
+                self.user_id,
+                AccountDataTypes.IGNORED_USER_LIST,
+                {"ignored_users": {self.user2_id: {}}},
+            )
+        )
+
+        # Get the relations.
+        event_ids = self._get_related_events()
+        self.assertCountEqual(event_ids, allowed_event_ids)
+
+    def test_annotation(self) -> None:
+        """Annotations should ignore"""
+        # Send 2 from us, 2 from the to be ignored user.
+        allowed_event_ids = []
+        ignored_event_ids = []
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="a")
+        allowed_event_ids.append(channel.json_body["event_id"])
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="b")
+        allowed_event_ids.append(channel.json_body["event_id"])
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION,
+            "m.reaction",
+            key="a",
+            access_token=self.user2_token,
+        )
+        ignored_event_ids.append(channel.json_body["event_id"])
+        channel = self._send_relation(
+            RelationTypes.ANNOTATION,
+            "m.reaction",
+            key="c",
+            access_token=self.user2_token,
+        )
+        ignored_event_ids.append(channel.json_body["event_id"])
+
+        self._test_ignored_user(allowed_event_ids, ignored_event_ids)
+
+    def test_reference(self) -> None:
+        """Annotations should ignore"""
+        channel = self._send_relation(RelationTypes.REFERENCE, "m.room.test")
+        allowed_event_ids = [channel.json_body["event_id"]]
+
+        channel = self._send_relation(
+            RelationTypes.REFERENCE, "m.room.test", access_token=self.user2_token
+        )
+        ignored_event_ids = [channel.json_body["event_id"]]
+
+        self._test_ignored_user(allowed_event_ids, ignored_event_ids)
+
+    def test_thread(self) -> None:
+        """Annotations should ignore"""
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        allowed_event_ids = [channel.json_body["event_id"]]
+
+        channel = self._send_relation(
+            RelationTypes.THREAD, "m.room.test", access_token=self.user2_token
+        )
+        ignored_event_ids = [channel.json_body["event_id"]]
+
+        self._test_ignored_user(allowed_event_ids, ignored_event_ids)
 
 
 class RelationRedactionTestCase(BaseRelationsTestCase):

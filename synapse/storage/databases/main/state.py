@@ -361,7 +361,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
     ):
         super().__init__(database, db_conn, hs)
 
-        self.server_name = hs.hostname
+        self.server_name: str = hs.hostname
 
         self.db_pool.updates.register_background_index_update(
             self.CURRENT_STATE_INDEX_UPDATE_NAME,

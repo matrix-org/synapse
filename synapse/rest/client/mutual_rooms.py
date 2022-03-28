@@ -28,13 +28,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class UserSharedRoomsServlet(RestServlet):
+class UserMutualRoomsServlet(RestServlet):
     """
-    GET /uk.half-shot.msc2666/user/shared_rooms/{user_id} HTTP/1.1
+    GET /uk.half-shot.msc2666/user/mutual_rooms/{user_id} HTTP/1.1
     """
 
     PATTERNS = client_patterns(
-        "/uk.half-shot.msc2666/user/shared_rooms/(?P<user_id>[^/]*)",
+        "/uk.half-shot.msc2666/user/mutual_rooms/(?P<user_id>[^/]*)",
         releases=(),  # This is an unstable feature
     )
 
@@ -42,17 +42,19 @@ class UserSharedRoomsServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
-        self.user_directory_active = hs.config.server.update_user_directory
+        self.user_directory_search_enabled = (
+            hs.config.userdirectory.user_directory_search_enabled
+        )
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
 
-        if not self.user_directory_active:
+        if not self.user_directory_search_enabled:
             raise SynapseError(
                 code=400,
-                msg="The user directory is disabled on this server. Cannot determine shared rooms.",
-                errcode=Codes.FORBIDDEN,
+                msg="User directory searching is disabled. Cannot determine shared rooms.",
+                errcode=Codes.UNKNOWN,
             )
 
         UserID.from_string(user_id)
@@ -64,7 +66,8 @@ class UserSharedRoomsServlet(RestServlet):
                 msg="You cannot request a list of shared rooms with yourself",
                 errcode=Codes.FORBIDDEN,
             )
-        rooms = await self.store.get_shared_rooms_for_users(
+
+        rooms = await self.store.get_mutual_rooms_for_users(
             requester.user.to_string(), user_id
         )
 
@@ -72,4 +75,4 @@ class UserSharedRoomsServlet(RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
-    UserSharedRoomsServlet(hs).register(http_server)
+    UserMutualRoomsServlet(hs).register(http_server)
