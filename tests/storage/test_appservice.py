@@ -265,20 +265,6 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         self.assertEqual(txn.events, events)
         self.assertEqual(txn.service, service)
 
-    def test_create_appservice_txn_sequence_increment(
-        self,
-    ) -> None:
-        service = Mock(id=self.as_list[0]["id"])
-        events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
-        self.get_success(self._insert_txn(service.id, 9644, events))
-        self.get_success(self._insert_txn(service.id, 9645, events))
-        txn = self.get_success(
-            self.store.create_appservice_txn(service, events, [], [], {}, {})
-        )
-        self.assertEqual(txn.id, 9646)
-        self.assertEqual(txn.events, events)
-        self.assertEqual(txn.service, service)
-
     def test_complete_appservice_txn_first_txn(
         self,
     ) -> None:
