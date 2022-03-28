@@ -482,7 +482,9 @@ class DeviceHandler(DeviceWorkerHandler):
         set_tag("target_hosts", hosts)
 
         position = await self.store.add_device_change_to_streams(
-            user_id, device_ids, list(hosts)
+            user_id,
+            device_ids,
+            hosts=hosts,
         )
 
         if not position:
