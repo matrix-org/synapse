@@ -1506,7 +1506,11 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         )
 
     async def add_device_change_to_streams(
-        self, user_id: str, device_ids: Collection[str], hosts: Collection[str]
+        self,
+        user_id: str,
+        device_ids: Collection[str],
+        hosts: Collection[str],
+        room_ids: Collection[str],
     ) -> Optional[int]:
         """Persist that a user's devices have been updated, and which hosts
         (if any) should be poked.
@@ -1516,6 +1520,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             device_ids: The IDs of any changed devices. If empty, this function will
                 return None.
             hosts: The remote destinations that should be notified of the change.
+            room_ids: The rooms that the user is in
 
         Returns:
             The maximum stream ID of device list updates that were added to the database, or
@@ -1535,10 +1540,26 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 stream_ids,
             )
 
-        if not hosts:
+        if not room_ids:
             return stream_ids[-1]
 
         context = get_active_span_text_map()
+        async with self._device_list_id_gen.get_next_mult(
+            len(room_ids) * len(device_ids)
+        ) as stream_ids:
+            await self.db_pool.runInteraction(
+                "_add_device_outbound_room_poke_txn",
+                self._add_device_outbound_room_poke_txn,
+                user_id,
+                device_ids,
+                room_ids,
+                stream_ids,
+                context,
+            )
+
+        if not hosts:
+            return stream_ids[-1]
+
         async with self._device_list_id_gen.get_next_mult(
             len(hosts) * len(device_ids)
         ) as stream_ids:
@@ -1633,6 +1654,40 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                     else "{}",
                 )
                 for destination in hosts
+                for device_id in device_ids
+            ],
+        )
+
+    def _add_device_outbound_room_poke_txn(
+        self,
+        txn: LoggingTransaction,
+        user_id: str,
+        device_ids: Iterable[str],
+        room_ids: Collection[str],
+        stream_ids: List[str],
+        context: Dict[str, str],
+    ) -> None:
+        next_stream_id = iter(stream_ids)
+
+        self.db_pool.simple_insert_many_txn(
+            txn,
+            table="device_lists_changes_in_room",
+            keys=(
+                "stream_id",
+                "room_id",
+                "user_id",
+                "device_id",
+                "opentracing_context",
+            ),
+            values=[
+                (
+                    next(next_stream_id),
+                    room_id,
+                    user_id,
+                    device_id,
+                    json_encoder.encode(context),
+                )
+                for room_id in room_ids
                 for device_id in device_ids
             ],
         )

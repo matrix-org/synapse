@@ -485,6 +485,7 @@ class DeviceHandler(DeviceWorkerHandler):
             user_id,
             device_ids,
             hosts=hosts,
+            room_ids=room_ids,
         )
 
         if not position:
