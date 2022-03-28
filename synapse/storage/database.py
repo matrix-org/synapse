@@ -324,16 +324,6 @@ class LoggingTransaction:
         "Strip newlines out of SQL so that the loggers in the DB are on one line"
         return " ".join(line.strip() for line in sql.splitlines() if line.strip())
 
-    # TODO(ParamSpec):
-    #     Once Mypy supports Concatenate, this could be written as
-    #     def _do_execute(
-    #         self,
-    #         func: Callable[Concatenate[str, P], R],
-    #         sql: str,
-    #         *args: P.args,
-    #         **kwargs: P.kwargs,
-    #     ) -> R:
-    #     so long as we also pass kwargs.
     def _do_execute(self, func: Callable[..., R], sql: str, *args: Any) -> R:
         sql = self._make_sql_one_line(sql)
 
