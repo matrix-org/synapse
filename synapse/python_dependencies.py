@@ -77,7 +77,7 @@ REQUIREMENTS = [
     # Jinja 2.x is incompatible with MarkupSafe>=2.1. To ensure that admins do not
     # end up with a broken installation, with recent MarkupSafe but old Jinja, we
     # add a lower bound to the Jinja2 dependency.
-    "Jinja2~=3.0",
+    "Jinja2>=3.0",
     "bleach>=1.4.3",
     # We use `ParamSpec`, which was added in `typing-extensions` 3.10.0.0.
     "typing-extensions>=3.10.0",
