@@ -36,7 +36,7 @@ what sort order was used:
 """
 
 import logging
-from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Collection, Dict, List, Optional, Set, Tuple
 
 import attr
 from frozendict import frozendict
@@ -614,7 +614,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             min_from_id = from_key.stream
             max_to_id = to_key.get_max_stream_pos()
 
-            args = [user_id, min_from_id, max_to_id]
+            args: List[Any] = [user_id, min_from_id, max_to_id]
 
             ignore_room_clause = ""
             if ignored_rooms is not None:

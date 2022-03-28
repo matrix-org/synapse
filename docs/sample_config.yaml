@@ -539,6 +539,12 @@ templates:
   #
   #custom_template_directory: /path/to/custom/templates/
 
+# List of rooms to exclude from sync responses.
+# No room is excluded by default.
+#
+#exclude_rooms_from_sync:
+#    - !foo:example.com
+
 
 # Message retention policy at the server level.
 #
