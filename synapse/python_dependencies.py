@@ -74,6 +74,7 @@ REQUIREMENTS = [
     # Note: 21.1.0 broke `/sync`, see #9936
     "attrs>=19.2.0,!=21.1.0",
     "netaddr>=0.7.18",
+    # Jinja 2.x is incompatible with recent versions of MarkupSafe, on which it depends.
     "Jinja2~=3.0",
     "bleach>=1.4.3",
     # We use `ParamSpec`, which was added in `typing-extensions` 3.10.0.0.
