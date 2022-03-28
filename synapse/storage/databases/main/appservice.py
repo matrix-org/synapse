@@ -287,12 +287,25 @@ class ApplicationServiceTransactionWorkerStore(
             txn_id: The transaction ID being completed.
             service: The application service which was sent this transaction.
         """
-        txn_id = int(txn_id)
 
-        await self.db_pool.simple_delete(
-            "application_services_txns",
-            {"txn_id": txn_id, "as_id": service.id},
-            "delete_completed_as_txn",
+        def _complete_appservice_txn(txn):
+            # Set current txn_id for AS to 'txn_id'
+            self.db_pool.simple_upsert_txn(
+                txn,
+                "application_services_state",
+                {"as_id": service.id},
+                {"last_txn": txn_id},
+            )
+
+            # Delete txn
+            self.db_pool.simple_delete_txn(
+                txn,
+                "application_services_txns",
+                {"txn_id": txn_id, "as_id": service.id},
+            )
+
+        await self.db_pool.runInteraction(
+            "complete_appservice_txn", _complete_appservice_txn
         )
 
     async def get_oldest_unsent_txn(
