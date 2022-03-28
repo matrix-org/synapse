@@ -1123,3 +1123,60 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 os.path.exists(path),
                 f"{os.path.relpath(path, self.media_store_path)} was not deleted",
             )
+
+    def test_oembed_iframe(self):
+        """Test an oEmbed endpoint which returns iframe via the 'rich' type."""
+
+        src = "http://test.com/preview/x"
+        width = "400px"
+
+        self.lookups["www.hulu.com"] = [(IPv4Address, "10.1.2.3")]
+
+        result = {
+            "version": "1.0",
+            "type": "rich",
+            "html": '<iframe width="{width}" src="{src}" />'.format(
+                    width=width, src=src
+            ),
+        }
+        end_content = json.dumps(result).encode("utf-8")
+
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://www.hulu.com/watch/12345",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            (
+                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                b'Content-Type: application/json; charset="utf8"\r\n\r\n'
+            )
+            % (len(end_content),)
+            + end_content
+        )
+
+        self.pump()
+
+        # The {format} should have been turned into json.
+        self.assertIn(b"/api/oembed.json", server.data)
+        # A URL parameter of format=json should be provided.
+        self.assertIn(b"format=json", server.data)
+
+        self.assertEqual(channel.code, 200)
+        body = channel.json_body
+        self.assertEqual(
+            body,
+            {
+                "og:url": "http://www.hulu.com/watch/12345",
+                "og:iframe": src,
+                "og:iframe:width": width,
+            },
+        )
+
