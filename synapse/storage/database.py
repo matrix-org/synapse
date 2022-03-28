@@ -290,7 +290,9 @@ class LoggingTransaction:
         if isinstance(self.database_engine, PostgresEngine):
             from psycopg2.extras import execute_batch
 
-            self._do_execute(lambda *x: execute_batch(self.txn, *x), sql, args)
+            self._do_execute(
+                lambda the_sql: execute_batch(self.txn, the_sql, args), sql
+            )
         else:
             self.executemany(sql, args)
 
@@ -307,11 +309,8 @@ class LoggingTransaction:
         from psycopg2.extras import execute_values
 
         return self._do_execute(
-            lambda the_sql, the_values: execute_values(
-                self.txn, the_sql, the_values, fetch=fetch
-            ),
+            lambda the_sql: execute_values(self.txn, the_sql, values, fetch=fetch),
             sql,
-            values,
         )
 
     def execute(self, sql: str, *args: Any) -> None:
