@@ -1,1 +1,1 @@
-Import `Markup` from `MarkupSafe` as importing it from `Jinja2` has been deprecated for some time and recently removed.
+Fix compatibility with the recently-released Jinja 3.1.
