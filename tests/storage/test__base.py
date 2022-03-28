@@ -46,9 +46,13 @@ class UpsertManyTests(unittest.HomeserverTestCase):
             )
         )
 
-    def _dump_to_tuple(
-        self, res: List[Dict[str, Any]]
-    ) -> Generator[Tuple[int, str, str], None, None]:
+    def _dump_to_tuple(self) -> Generator[Tuple[int, str, str], None, None]:
+        res = self.get_success(
+            self.storage.db_pool.simple_select_list(
+                self.table_name, None, ["id, username, value"]
+            )
+        )
+
         for i in res:
             yield (i["id"], i["username"], i["value"])
 
@@ -75,13 +79,8 @@ class UpsertManyTests(unittest.HomeserverTestCase):
         )
 
         # Check results are what we expect
-        res = self.get_success(
-            self.storage.db_pool.simple_select_list(
-                self.table_name, None, ["id, username, value"]
-            )
-        )
         self.assertEqual(
-            set(self._dump_to_tuple(res)),
+            set(self._dump_to_tuple()),
             {(1, "user1", "hello"), (2, "user2", "there")},
         )
 
@@ -102,12 +101,7 @@ class UpsertManyTests(unittest.HomeserverTestCase):
         )
 
         # Check results are what we expect
-        res = self.get_success(
-            self.storage.db_pool.simple_select_list(
-                self.table_name, None, ["id, username, value"]
-            )
-        )
         self.assertEqual(
-            set(self._dump_to_tuple(res)),
+            set(self._dump_to_tuple()),
             {(1, "user1", "hello"), (2, "user2", "bleb")},
         )
