@@ -1,9 +1,42 @@
-Synapse 1.55.0rc1 (2022-03-15)
-==============================
+Synapse 1.55.2 (2022-03-24)
+===========================
+
+This patch version reverts the earlier fixes from Synapse 1.55.1, which could cause problems in certain deployments, and instead adds a cap to the version of Jinja to be installed. Again, this is to fix an incompatibility with version 3.1.0 of the [Jinja](https://pypi.org/project/Jinja2/) library, and again, deployments of Synapse using the `matrixdotorg/synapse` Docker image or Debian packages from packages.matrix.org are not affected.
+
+Internal Changes
+----------------
+
+- Pin Jinja to <3.1.0, as Synapse fails to start with Jinja 3.1.0. ([\#12297](https://github.com/matrix-org/synapse/issues/12297))
+- Revert changes from 1.55.1 as they caused problems with older versions of Jinja ([\#12296](https://github.com/matrix-org/synapse/issues/12296))
+
+
+Synapse 1.55.1 (2022-03-24)
+===========================
+
+This is a patch release that fixes an incompatibility with version 3.1.0 of the [Jinja](https://pypi.org/project/Jinja2/) library, released on March 24th, 2022. Deployments of Synapse using the `matrixdotorg/synapse` Docker image or Debian packages from packages.matrix.org are not affected.
+
+Internal Changes
+----------------
+
+- Remove uses of the long-deprecated `jinja2.Markup` which would prevent Synapse from starting with Jinja 3.1.0 or above installed. ([\#12289](https://github.com/matrix-org/synapse/issues/12289))
+
+
+Synapse 1.55.0 (2022-03-22)
+===========================
 
 This release removes a workaround introduced in Synapse 1.50.0 for Mjolnir compatibility. **This breaks compatibility with Mjolnir 1.3.1 and earlier. ([\#11700](https://github.com/matrix-org/synapse/issues/11700))**; Mjolnir users should upgrade Mjolnir before upgrading Synapse to this version.
 
 This release also moves the location of the `synctl` script; see the [upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#synctl-script-has-been-moved) for more details.
+
+
+Internal Changes
+----------------
+
+- Tweak copy for default Single Sign-On account details template to better adhere to mobile app store guidelines. ([\#12265](https://github.com/matrix-org/synapse/issues/12265), [\#12260](https://github.com/matrix-org/synapse/issues/12260))
+
+
+Synapse 1.55.0rc1 (2022-03-15)
+==============================
 
 Features
 --------

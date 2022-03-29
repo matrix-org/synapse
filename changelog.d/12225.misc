@@ -1,0 +1,1 @@
+Use the `ignored_users` table in additional places instead of re-parsing the account data.
