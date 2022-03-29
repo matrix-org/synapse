@@ -23,7 +23,13 @@ from netaddr import IPSet
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.types import DeviceListUpdates, GroupID, JsonDict, UserID, get_domain_from_id
+from synapse.types import (
+    DeviceListUpdates,
+    GroupID,
+    JsonDict,
+    UserID,
+    get_domain_from_id,
+)
 from synapse.util.caches.descriptors import _CacheContext, cached
 
 if TYPE_CHECKING:

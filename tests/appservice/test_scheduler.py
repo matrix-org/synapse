@@ -367,7 +367,13 @@ class ApplicationServiceSchedulerQueuerTestCase(unittest.HomeserverTestCase):
         d.callback(service)
         # Expect the queued events to be sent
         self.txn_ctrl.send.assert_called_with(
-            service, [], event_list_2 + event_list_3, [], None, None, DeviceListUpdates()
+            service,
+            [],
+            event_list_2 + event_list_3,
+            [],
+            None,
+            None,
+            DeviceListUpdates(),
         )
         self.assertEqual(2, self.txn_ctrl.send.call_count)
 

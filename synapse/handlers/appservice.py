@@ -33,7 +33,13 @@ from synapse.metrics.background_process_metrics import (
     wrap_as_background_process,
 )
 from synapse.storage.databases.main.directory import RoomAliasMapping
-from synapse.types import DeviceListUpdates, JsonDict, RoomAlias, RoomStreamToken, UserID
+from synapse.types import (
+    DeviceListUpdates,
+    JsonDict,
+    RoomAlias,
+    RoomStreamToken,
+    UserID,
+)
 from synapse.util.async_helpers import Linearizer
 from synapse.util.metrics import Measure
 

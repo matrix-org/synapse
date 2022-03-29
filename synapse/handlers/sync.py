@@ -1357,7 +1357,9 @@ class SyncHandler:
                 if any(e.room_id in joined_rooms for e in entries):
                     newly_left_users.discard(user_id)
 
-            return DeviceListUpdates(changed=users_that_have_changed, left=newly_left_users)
+            return DeviceListUpdates(
+                changed=users_that_have_changed, left=newly_left_users
+            )
         else:
             return DeviceListUpdates()
 
