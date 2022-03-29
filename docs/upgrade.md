@@ -87,6 +87,11 @@ process, for example:
 
 # Upgrading to v1.56.0
 
+## Open registration without verification is now disabled by default
+
+Synapse will refuse to start if registration is enabled without email, captcha, or token-based verification unless the new config
+flag `enable_registration_without_verification` is set to "true".
+
 ## Groups/communities feature has been deprecated
 
 The non-standard groups/communities feature in Synapse has been deprecated and will
@@ -107,12 +112,6 @@ the configuration file, is set to `true`. See the [PostgreSQL documentation](htt
 for more information and instructions on how to fix a database with incorrect values.
 
 # Upgrading to v1.55.0
-
-## Open registration without verification is now disabled by default
-
-Synapse will refuse to start if registration is enabled without email, captcha, or token-based verification unless the new config 
-flag `enable_registration_without_verification` is set to "true".
-
 
 ## `synctl` script has been moved
 
