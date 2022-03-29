@@ -6441,4 +6441,4 @@ Internal Changes
 - Don't run CI build checks until sample config check has passed. ([\#5370](https://github.com/matrix-org/synapse/issues/5370))
 - Automatically retry buildkite builds (max twice) when an agent is lost. ([\#5380](https://github.com/matrix-org/synapse/issues/5380))
 
-**Changelogs for versions older than 1.0.0 can be found [here](CHANGES-pre-1.0.md)
+**Changelogs for versions older than 1.0.0 can be found [here](CHANGES-pre-1.0.md)**
