@@ -5,16 +5,16 @@ Features
 --------
 
 - Allow modules to store already existing 3PID associations. ([\#12195](https://github.com/matrix-org/synapse/issues/12195))
-- Allow registering admin users using the module API. Contributed by Famedly. ([\#12250](https://github.com/matrix-org/synapse/issues/12250))
+- Allow registering server administrators using the module API. Contributed by Famedly. ([\#12250](https://github.com/matrix-org/synapse/issues/12250))
 
 
 Bugfixes
 --------
 
-- Fix a long-standing bug which caused the `/_matrix/federation/v1/state` and `.../state_ids` endpoints to return incorrect or invalid data when called for an event which we have stored as an "outlier". ([\#12087](https://github.com/matrix-org/synapse/issues/12087))
-- Fix a long-standing bug where events from ignored users were still considered for relations. ([\#12227](https://github.com/matrix-org/synapse/issues/12227), [\#12232](https://github.com/matrix-org/synapse/issues/12232), [\#12285](https://github.com/matrix-org/synapse/issues/12285))
-- Fix a bug introduced in v1.53.0 where an unnecessary query could be performed when fetching bundled aggregations for threads. ([\#12228](https://github.com/matrix-org/synapse/issues/12228))
-- Fix a bug introduced in Synapse 1.52 where admins could not deactivate and GDPR-erase a user if Synapse was configured with limits on avatars. ([\#12261](https://github.com/matrix-org/synapse/issues/12261))
+- Fix a long-standing bug which caused the `/_matrix/federation/v1/state` and `/_matrix/federation/v1/state_ids` endpoints to return incorrect or invalid data when called for an event which we have stored as an "outlier". ([\#12087](https://github.com/matrix-org/synapse/issues/12087))
+- Fix a long-standing bug where events from ignored users would still be considered for relations. ([\#12227](https://github.com/matrix-org/synapse/issues/12227), [\#12232](https://github.com/matrix-org/synapse/issues/12232), [\#12285](https://github.com/matrix-org/synapse/issues/12285))
+- Fix a bug introduced in Synapse 1.53.0 where an unnecessary query could be performed when fetching bundled aggregations for threads. ([\#12228](https://github.com/matrix-org/synapse/issues/12228))
+- Fix a bug introduced in Synapse 1.52.0 where admins could not deactivate and GDPR-erase a user if Synapse was configured with limits on avatars. ([\#12261](https://github.com/matrix-org/synapse/issues/12261))
 
 
 Improved Documentation
@@ -23,7 +23,7 @@ Improved Documentation
 - Fix the link to the module documentation in the legacy spam checker warning message. ([\#12231](https://github.com/matrix-org/synapse/issues/12231))
 - Remove incorrect prefixes in the worker documentation for some endpoints. ([\#12243](https://github.com/matrix-org/synapse/issues/12243))
 - Correct `check_username_for_spam` annotations and docs. ([\#12246](https://github.com/matrix-org/synapse/issues/12246))
-- Corrected Authentik OpenID typo, added helpful note for troubleshooting. Contributed by @IronTooch. ([\#12275](https://github.com/matrix-org/synapse/issues/12275))
+- Correct Authentik OpenID typo, and add notes on troubleshooting. Contributed by @IronTooch. ([\#12275](https://github.com/matrix-org/synapse/issues/12275))
 - HAProxy reverse proxy guide update to stop sending IPv4-mapped address to homeserver. Contributed by @villepeh. ([\#12279](https://github.com/matrix-org/synapse/issues/12279))
 
 
@@ -33,26 +33,26 @@ Internal Changes
 - Rename `shared_rooms` to `mutual_rooms` (MSC2666), as per proposal changes. ([\#12036](https://github.com/matrix-org/synapse/issues/12036))
 - Remove check on `update_user_directory` for shared rooms handler (MSC2666), and update/expand documentation. ([\#12038](https://github.com/matrix-org/synapse/issues/12038))
 - Refactor `create_new_client_event` to use a new parameter, `state_event_ids`, which accurately describes the usage with [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) instead of abusing `auth_event_ids`. ([\#12083](https://github.com/matrix-org/synapse/issues/12083), [\#12304](https://github.com/matrix-org/synapse/issues/12304))
-- Refuse to start if registration is enabled without email, captcha, or token-based verification unless new config flag `enable_registration_without_verification` is set. ([\#12091](https://github.com/matrix-org/synapse/issues/12091))
+- Refuse to start if registration is enabled without email, captcha, or token-based verification unless the new config flag `enable_registration_without_verification` is set. ([\#12091](https://github.com/matrix-org/synapse/issues/12091))
 - Add tests for database transaction callbacks. ([\#12198](https://github.com/matrix-org/synapse/issues/12198))
-- Handle cancellation in `DatabasePool.runInteraction()`. ([\#12199](https://github.com/matrix-org/synapse/issues/12199))
+- Handle cancellation in `DatabasePool.runInteraction`. ([\#12199](https://github.com/matrix-org/synapse/issues/12199))
 - Add missing type hints for cache storage. ([\#12216](https://github.com/matrix-org/synapse/issues/12216))
-- Clean-up logic around rebasing URLs for URL image previews. ([\#12219](https://github.com/matrix-org/synapse/issues/12219))
+- Add missing type hints for storage. ([\#12248](https://github.com/matrix-org/synapse/issues/12248), [\#12255](https://github.com/matrix-org/synapse/issues/12255))
 - Add type hints to tests files. ([\#12224](https://github.com/matrix-org/synapse/issues/12224), [\#12240](https://github.com/matrix-org/synapse/issues/12240), [\#12256](https://github.com/matrix-org/synapse/issues/12256))
+- Use type stubs for `psycopg2`. ([\#12269](https://github.com/matrix-org/synapse/issues/12269))
+- Improve type annotations for `execute_values`. ([\#12311](https://github.com/matrix-org/synapse/issues/12311))
+- Clean-up logic around rebasing URLs for URL image previews. ([\#12219](https://github.com/matrix-org/synapse/issues/12219))
 - Use the `ignored_users` table in additional places instead of re-parsing the account data. ([\#12225](https://github.com/matrix-org/synapse/issues/12225))
 - Refactor the relations endpoints to add a `RelationsHandler`. ([\#12237](https://github.com/matrix-org/synapse/issues/12237))
 - Generate announcement links in the release script. ([\#12242](https://github.com/matrix-org/synapse/issues/12242))
 - Improve error message when dependencies check finds a broken installation. ([\#12244](https://github.com/matrix-org/synapse/issues/12244))
-- Add missing type hints for storage. ([\#12248](https://github.com/matrix-org/synapse/issues/12248), [\#12255](https://github.com/matrix-org/synapse/issues/12255))
 - Compress metrics HTTP resource when enabled. Contributed by Nick @ Beeper. ([\#12258](https://github.com/matrix-org/synapse/issues/12258))
-- Refuse to start if DB has non-`C` locale, unless config flag `allow_unsafe_db_locale` is set to true. ([\#12262](https://github.com/matrix-org/synapse/issues/12262), [\#12288](https://github.com/matrix-org/synapse/issues/12288))
+- Refuse to start if the PostgreSQL database has a non-`C` locale, unless the config flag `allow_unsafe_db_locale` is set to true. ([\#12262](https://github.com/matrix-org/synapse/issues/12262), [\#12288](https://github.com/matrix-org/synapse/issues/12288))
 - Optionally include account validity expiration information to experimental [MSC3720](https://github.com/matrix-org/matrix-doc/pull/3720) account status responses. ([\#12266](https://github.com/matrix-org/synapse/issues/12266))
-- Use type stubs for `psycopg2`. ([\#12269](https://github.com/matrix-org/synapse/issues/12269))
 - Add a new cache `_get_membership_from_event_id` to speed up push rule calculations in large rooms. ([\#12272](https://github.com/matrix-org/synapse/issues/12272))
 - Re-enable Complement concurrency in CI. ([\#12283](https://github.com/matrix-org/synapse/issues/12283))
 - Remove unused test utilities. ([\#12291](https://github.com/matrix-org/synapse/issues/12291))
 - Enhance logging for inbound federation events. ([\#12301](https://github.com/matrix-org/synapse/issues/12301))
-- Improve type annotations for `execute_values`. ([\#12311](https://github.com/matrix-org/synapse/issues/12311))
 - Fix compatibility with the recently-released Jinja 3.1. ([\#12313](https://github.com/matrix-org/synapse/issues/12313))
 - Avoid trying to calculate the state at outlier events. ([\#12314](https://github.com/matrix-org/synapse/issues/12314))
 
