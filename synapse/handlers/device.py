@@ -648,6 +648,12 @@ class DeviceHandler(DeviceWorkerHandler):
 
         self._handle_new_device_update_is_processing = True
 
+        # The stream ID we processed previous iteration (if any), and the set of
+        # hosts we've already poked about for this update. This is so that we
+        # don't poke the same remote server about the same update repeatedly.
+        current_stream_id = None
+        hosts_already_sent_to: Set[str] = set()
+
         try:
             while True:
                 self._handle_new_device_update_new_data = False
@@ -665,6 +671,10 @@ class DeviceHandler(DeviceWorkerHandler):
                     joined_user_ids = await self.store.get_users_in_room(room_id)
                     hosts = {get_domain_from_id(u) for u in joined_user_ids}
                     hosts.discard(self.server_name)
+
+                    # Check if we've already sent this update to some hosts
+                    if current_stream_id == stream_id:
+                        hosts -= hosts_already_sent_to
 
                     await self.store.add_device_list_outbound_pokes(
                         user_id=user_id,
@@ -688,6 +698,14 @@ class DeviceHandler(DeviceWorkerHandler):
                             log_kv(
                                 {"message": "sent device update to host", "host": host}
                             )
+
+                    if current_stream_id != stream_id:
+                        # Clear the set of hosts we've already sent to as we're
+                        # processing a new update.
+                        hosts_already_sent_to.clear()
+
+                    hosts_already_sent_to.update(hosts)
+                    current_stream_id = stream_id
 
         finally:
             self._handle_new_device_update_is_processing = False
