@@ -496,8 +496,8 @@ class EventFromPduTestCase(TestCase):
     def test_invalid_numbers(self) -> None:
         """Invalid values for an integer should be rejected, all floats should be rejected."""
         for value in [
-            -(2 ** 53),
-            2 ** 53,
+            -(2**53),
+            2**53,
             1.0,
             float("inf"),
             float("-inf"),
@@ -524,7 +524,7 @@ class EventFromPduTestCase(TestCase):
             event_from_pdu_json(
                 {
                     "type": EventTypes.Message,
-                    "content": {"foo": [{"bar": 2 ** 56}]},
+                    "content": {"foo": [{"bar": 2**56}]},
                     "room_id": "!room:test",
                     "sender": "@user:test",
                     "depth": 1,
