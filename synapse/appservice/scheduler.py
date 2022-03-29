@@ -72,7 +72,7 @@ from synapse.events import EventBase
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.databases.main import DataStore
-from synapse.types import DeviceLists, JsonDict
+from synapse.types import DeviceListUpdates, JsonDict
 from synapse.util import Clock
 
 if TYPE_CHECKING:
@@ -122,7 +122,7 @@ class ApplicationServiceScheduler:
         events: Optional[Collection[EventBase]] = None,
         ephemeral: Optional[Collection[JsonDict]] = None,
         to_device_messages: Optional[Collection[JsonDict]] = None,
-        device_list_summary: Optional[DeviceLists] = None,
+        device_list_summary: Optional[DeviceListUpdates] = None,
     ) -> None:
         """
         Enqueue some data to be sent off to an application service.
@@ -183,7 +183,7 @@ class _ServiceQueuer:
         # dict of {service_id: [to_device_message_json]}
         self.queued_to_device_messages: Dict[str, List[JsonDict]] = {}
         # dict of {service_id: [device_list_summary]}
-        self.queued_device_list_summaries: Dict[str, List[DeviceLists]] = {}
+        self.queued_device_list_summaries: Dict[str, List[DeviceListUpdates]] = {}
 
         # the appservices which currently have a transaction in flight
         self.requests_in_flight: Set[str] = set()
@@ -229,9 +229,9 @@ class _ServiceQueuer:
 
                 # Consolidate any pending device list summaries into a single, up-to-date
                 # summary.
-                # Note: this code assumes that in a single DeviceLists, a user will
+                # Note: this code assumes that in a single DeviceListUpdates, a user will
                 # never be in both "changed" and "left" sets.
-                device_list_summary = DeviceLists()
+                device_list_summary = DeviceListUpdates()
                 while self.queued_device_list_summaries.get(service.id, []):
                     # Pop a summary off the front of the queue
                     summary = self.queued_device_list_summaries[service.id].pop(0)
@@ -254,8 +254,8 @@ class _ServiceQueuer:
                     not events
                     and not ephemeral
                     and not to_device_messages_to_send
-                    # DeviceLists is True if easier the 'changed' or 'left' sets have at least one entry,
-                    # otherwise False 
+                    # DeviceListUpdates is True if either the 'changed' or 'left' sets have
+                    # at least one entry, otherwise False
                     and not device_list_summary
                 ):
                     return
@@ -368,7 +368,7 @@ class _TransactionController:
         to_device_messages: Optional[List[JsonDict]] = None,
         one_time_key_counts: Optional[TransactionOneTimeKeyCounts] = None,
         unused_fallback_keys: Optional[TransactionUnusedFallbackKeys] = None,
-        device_list_summary: Optional[DeviceLists] = None,
+        device_list_summary: Optional[DeviceListUpdates] = None,
     ) -> None:
         """
         Create a transaction with the given data and send to the provided
@@ -393,7 +393,7 @@ class _TransactionController:
                 to_device_messages=to_device_messages or [],
                 one_time_key_counts=one_time_key_counts or {},
                 unused_fallback_keys=unused_fallback_keys or {},
-                device_list_summary=device_list_summary or DeviceLists(),
+                device_list_summary=device_list_summary or DeviceListUpdates(),
             )
             service_is_up = await self._is_service_up(service)
             if service_is_up:

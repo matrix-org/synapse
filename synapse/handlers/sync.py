@@ -31,7 +31,7 @@ from synapse.storage.databases.main.event_push_actions import NotifCounts
 from synapse.storage.roommember import MemberSummary
 from synapse.storage.state import StateFilter
 from synapse.types import (
-    DeviceLists,
+    DeviceListUpdates,
     JsonDict,
     MutableStateMap,
     Requester,
@@ -216,7 +216,7 @@ class SyncResult:
     knocked: List[KnockedSyncResult]
     archived: List[ArchivedSyncResult]
     to_device: List[JsonDict]
-    device_lists: DeviceLists
+    device_lists: DeviceListUpdates
     device_one_time_keys_count: JsonDict
     device_unused_fallback_key_types: List[str]
     groups: Optional[GroupsSyncResult]
@@ -1238,8 +1238,8 @@ class SyncHandler:
         newly_joined_or_invited_or_knocked_users: Set[str],
         newly_left_rooms: Set[str],
         newly_left_users: Set[str],
-    ) -> DeviceLists:
-        """Generate the DeviceLists section of sync
+    ) -> DeviceListUpdates:
+        """Generate the DeviceListUpdates section of sync
 
         Args:
             sync_result_builder
@@ -1357,9 +1357,9 @@ class SyncHandler:
                 if any(e.room_id in joined_rooms for e in entries):
                     newly_left_users.discard(user_id)
 
-            return DeviceLists(changed=users_that_have_changed, left=newly_left_users)
+            return DeviceListUpdates(changed=users_that_have_changed, left=newly_left_users)
         else:
-            return DeviceLists()
+            return DeviceListUpdates()
 
     async def _generate_sync_entry_for_to_device(
         self, sync_result_builder: "SyncResultBuilder"

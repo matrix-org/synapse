@@ -28,7 +28,7 @@ from synapse.appservice import (
 from synapse.events import EventBase
 from synapse.events.utils import SerializeEventConfig, serialize_event
 from synapse.http.client import SimpleHttpClient
-from synapse.types import DeviceLists, JsonDict, ThirdPartyInstanceID
+from synapse.types import DeviceListUpdates, JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.response_cache import ResponseCache
 
 if TYPE_CHECKING:
@@ -226,7 +226,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         to_device_messages: List[JsonDict],
         one_time_key_counts: TransactionOneTimeKeyCounts,
         unused_fallback_keys: TransactionUnusedFallbackKeys,
-        device_list_summary: DeviceLists,
+        device_list_summary: DeviceListUpdates,
         txn_id: Optional[int] = None,
     ) -> bool:
         """

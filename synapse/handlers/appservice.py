@@ -33,7 +33,7 @@ from synapse.metrics.background_process_metrics import (
     wrap_as_background_process,
 )
 from synapse.storage.databases.main.directory import RoomAliasMapping
-from synapse.types import DeviceLists, JsonDict, RoomAlias, RoomStreamToken, UserID
+from synapse.types import DeviceListUpdates, JsonDict, RoomAlias, RoomStreamToken, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.metrics import Measure
 
@@ -586,7 +586,7 @@ class ApplicationServicesHandler:
         self,
         appservice: ApplicationService,
         new_key: int,
-    ) -> DeviceLists:
+    ) -> DeviceListUpdates:
         """
         Retrieve a list of users who have changed their device lists.
 
@@ -624,7 +624,7 @@ class ApplicationServicesHandler:
 
         # Create a summary of "changed" and "left" users.
         # TODO: Calculate "left" users.
-        device_list_summary = DeviceLists(
+        device_list_summary = DeviceListUpdates(
             changed=filtered_users_with_changed_device_lists
         )
 

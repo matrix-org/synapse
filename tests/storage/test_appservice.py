@@ -31,7 +31,7 @@ from synapse.storage.databases.main.appservice import (
     ApplicationServiceStore,
     ApplicationServiceTransactionStore,
 )
-from synapse.types import DeviceLists
+from synapse.types import DeviceListUpdates
 from synapse.util import Clock
 
 from tests import unittest
@@ -269,7 +269,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         txn = self.get_success(
             defer.ensureDeferred(
                 self.store.create_appservice_txn(
-                    service, events, [], [], {}, {}, DeviceLists()
+                    service, events, [], [], {}, {}, DeviceListUpdates()
                 )
             )
         )
@@ -287,7 +287,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         self.get_success(self._insert_txn(service.id, 9645, events))
         txn = self.get_success(
             self.store.create_appservice_txn(
-                service, events, [], [], {}, {}, DeviceLists()
+                service, events, [], [], {}, {}, DeviceListUpdates()
             )
         )
         self.assertEqual(txn.id, 9646)
@@ -302,7 +302,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         self.get_success(self._set_last_txn(service.id, 9643))
         txn = self.get_success(
             self.store.create_appservice_txn(
-                service, events, [], [], {}, {}, DeviceLists()
+                service, events, [], [], {}, {}, DeviceListUpdates()
             )
         )
         self.assertEqual(txn.id, 9644)
@@ -328,7 +328,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
 
         txn = self.get_success(
             self.store.create_appservice_txn(
-                service, events, [], [], {}, {}, DeviceLists()
+                service, events, [], [], {}, {}, DeviceListUpdates()
             )
         )
         self.assertEqual(txn.id, 9644)
