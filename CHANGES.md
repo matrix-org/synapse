@@ -12,6 +12,11 @@ This check can be disabled by setting the `enable_registration_without_verificat
 homeserver configuration file to `true`. More details are available in the
 [upgrade notes](https://matrix-org.github.io/synapse/v1.56/upgrade.html#open-registration-without-verification-is-now-disabled-by-default).
 
+Synapse will additionally now refuse to start when using PostgreSQL with a non-`C` values for `COLLATE` and `CTYPE`, unless
+the config flag `allow_unsafe_locale`, found in the database section of the configuration file, is set to `true`. See the
+[upgrade notes](https://matrix-org.github.io/synapse/v1.56/upgrade#change-in-behaviour-for-postgresql-databases-with-unsafe-locale)
+for details.
+
 Features
 --------
 
