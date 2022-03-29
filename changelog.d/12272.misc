@@ -1,1 +1,0 @@
-Add a new cache `_get_membership_from_event_id` to speed up push rule calculations in large rooms.
