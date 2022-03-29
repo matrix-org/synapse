@@ -254,7 +254,8 @@ class _ServiceQueuer:
                     not events
                     and not ephemeral
                     and not to_device_messages_to_send
-                    # Note that DeviceLists implements __bool__
+                    # DeviceLists is True if easier the 'changed' or 'left' sets have at least one entry,
+                    # otherwise False 
                     and not device_list_summary
                 ):
                     return
