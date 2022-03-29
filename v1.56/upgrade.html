@@ -261,6 +261,9 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </li>
 </ul>
 <h1 id="upgrading-to-v1560"><a class="header" href="#upgrading-to-v1560">Upgrading to v1.56.0</a></h1>
+<h2 id="open-registration-without-verification-is-now-disabled-by-default"><a class="header" href="#open-registration-without-verification-is-now-disabled-by-default">Open registration without verification is now disabled by default</a></h2>
+<p>Synapse will refuse to start if registration is enabled without email, captcha, or token-based verification unless the new config
+flag <code>enable_registration_without_verification</code> is set to &quot;true&quot;.</p>
 <h2 id="groupscommunities-feature-has-been-deprecated"><a class="header" href="#groupscommunities-feature-has-been-deprecated">Groups/communities feature has been deprecated</a></h2>
 <p>The non-standard groups/communities feature in Synapse has been deprecated and will
 be disabled by default in Synapse v1.58.0.</p>
@@ -274,9 +277,6 @@ be disabled by default in Synapse v1.58.0.</p>
 the configuration file, is set to <code>true</code>. See the <a href="https://matrix-org.github.io/synapse/latest/postgres.html#fixing-incorrect-collate-or-ctype">PostgreSQL documentation</a>
 for more information and instructions on how to fix a database with incorrect values.</p>
 <h1 id="upgrading-to-v1550"><a class="header" href="#upgrading-to-v1550">Upgrading to v1.55.0</a></h1>
-<h2 id="open-registration-without-verification-is-now-disabled-by-default"><a class="header" href="#open-registration-without-verification-is-now-disabled-by-default">Open registration without verification is now disabled by default</a></h2>
-<p>Synapse will refuse to start if registration is enabled without email, captcha, or token-based verification unless the new config 
-flag <code>enable_registration_without_verification</code> is set to &quot;true&quot;.</p>
 <h2 id="synctl-script-has-been-moved"><a class="header" href="#synctl-script-has-been-moved"><code>synctl</code> script has been moved</a></h2>
 <p>The <code>synctl</code> script
 <a href="https://github.com/matrix-org/synapse/pull/12140">has been made</a> an
