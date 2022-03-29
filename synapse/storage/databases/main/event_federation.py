@@ -1073,9 +1073,15 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             /* Get the depth and stream_ordering of the prev_event_id from the events table */
             INNER JOIN events
             ON prev_event_id = events.event_id
+
+            /* exclude outliers from the results (we don't have the state, so cannot
+             * verify if the requesting server can see them).
+             */
+            WHERE NOT events.outlier
+
             /* Look for an edge which matches the given event_id */
-            WHERE event_edges.event_id = ?
-            AND event_edges.is_state = ?
+            AND event_edges.event_id = ? AND NOT event_edges.is_state
+
             /* Because we can have many events at the same depth,
             * we want to also tie-break and sort on stream_ordering */
             ORDER BY depth DESC, stream_ordering DESC
@@ -1084,7 +1090,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         txn.execute(
             connected_prev_event_query,
-            (event_id, False, limit),
+            (event_id, limit),
         )
         return [
             BackfillQueueNavigationItem(
