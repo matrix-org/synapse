@@ -388,19 +388,18 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             self._get_rooms_for_local_user_where_membership_is_txn,
             user_id,
             membership_list,
-            excluded_rooms,
         )
 
-        # Now we filter out forgotten rooms
-        forgotten_rooms = await self.get_forgotten_rooms_for_user(user_id)
-        return [room for room in rooms if room.room_id not in forgotten_rooms]
+        # Now we filter out forgotten and excluded rooms
+        rooms_to_exclude: Set[str] = await self.get_forgotten_rooms_for_user(user_id)
+        rooms_to_exclude.update(set(excluded_rooms))
+        return [room for room in rooms if room.room_id not in rooms_to_exclude]
 
     def _get_rooms_for_local_user_where_membership_is_txn(
         self,
         txn,
         user_id: str,
         membership_list: List[str],
-        excluded_rooms: Optional[List[str]] = None,
     ) -> List[RoomsForUser]:
         # Paranoia check.
         if not self.hs.is_mine_id(user_id):
@@ -412,10 +411,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         clause, args = make_in_list_sql_clause(
             self.database_engine, "c.membership", membership_list
         )
-
-        if excluded_rooms is not None and len(excluded_rooms) > 0:
-            clause += "AND room_id NOT IN (%s)" % ",".join("?" for _ in excluded_rooms)
-            args = args + excluded_rooms
 
         sql = """
             SELECT room_id, e.sender, c.membership, event_id, e.stream_ordering, r.room_version

@@ -1239,7 +1239,10 @@ class ServerConfig(Config):
           #
           #custom_template_directory: /path/to/custom/templates/
 
-        # List of rooms to exclude from sync responses.
+        # List of rooms to exclude from sync responses. This is useful for server
+        # administrators wishing to group users into a room without these users being able
+        # to see it from their client.
+        #
         # By default, no room is excluded.
         #
         #exclude_rooms_from_sync:
