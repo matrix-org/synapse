@@ -1509,7 +1509,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         self,
         user_id: str,
         device_ids: Collection[str],
-        hosts: Collection[str],
+        hosts: Optional[Collection[str]],
         room_ids: Collection[str],
     ) -> Optional[int]:
         """Persist that a user's devices have been updated, and which hosts
@@ -1519,7 +1519,9 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             user_id: The ID of the user whose device changed.
             device_ids: The IDs of any changed devices. If empty, this function will
                 return None.
-            hosts: The remote destinations that should be notified of the change.
+            hosts: The remote destinations that should be notified of the change. If
+                None then the set of hosts have *not* been calculated, and will be
+                calculated later by a background task.
             room_ids: The rooms that the user is in
 
         Returns:
@@ -1529,10 +1531,9 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         if not device_ids:
             return None
 
-        num_stream_ids = max(
-            len(device_ids),
-            len(hosts) * len(device_ids),
-        )
+        num_stream_ids = len(device_ids)
+        if hosts:
+            num_stream_ids = len(hosts) * len(device_ids)
 
         context = get_active_span_text_map()
 
@@ -1554,6 +1555,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 room_ids,
                 stream_ids,
                 context,
+                hosts_have_been_calculated=hosts is not None,
             )
 
             if not hosts:
@@ -1668,7 +1670,20 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         room_ids: Collection[str],
         stream_ids: List[str],
         context: Dict[str, str],
+        hosts_have_been_calculated: bool,
     ) -> None:
+        """Record the user in the room has updated their device.
+
+        Args:
+            hosts_have_been_calculated: True if `device_lists_outbound_pokes`
+                has been updated already with the updates.
+        """
+
+        # We only need to convert to outbound pokes if they are our user.
+        converted_to_destinations = (
+            hosts_have_been_calculated or not self.hs.is_mine_id(user_id)
+        )
+
         self.db_pool.simple_insert_many_txn(
             txn,
             table="device_lists_changes_in_room",
@@ -1686,7 +1701,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                     device_id,
                     room_id,
                     stream_id,
-                    True,  # As we're updating `device_lists_outbound_pokes` at the same time.
+                    converted_to_destinations,
                     json_encoder.encode(context),
                 )
                 for room_id in room_ids
