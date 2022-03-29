@@ -64,6 +64,7 @@ from synapse.events.third_party_rules import (
     ON_PROFILE_UPDATE_CALLBACK,
     ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK,
 )
+from synapse.handlers.account_data import ON_ACCOUNT_DATA_CHANGE_CALLBACK
 from synapse.handlers.account_validity import (
     IS_USER_EXPIRED_CALLBACK,
     ON_LEGACY_ADMIN_REQUEST,
@@ -215,6 +216,7 @@ class ModuleApi:
         self._third_party_event_rules = hs.get_third_party_event_rules()
         self._password_auth_provider = hs.get_password_auth_provider()
         self._presence_router = hs.get_presence_router()
+        self._account_data_handler = hs.get_account_data_handler()
 
     #################################################################################
     # The following methods should only be called during the module's initialisation.
@@ -372,6 +374,19 @@ class ModuleApi:
                 default_batch_size=default_batch_size,
                 min_batch_size=min_batch_size,
             )
+
+    def register_account_data_callbacks(
+        self,
+        *,
+        on_account_data_change: Optional[ON_ACCOUNT_DATA_CHANGE_CALLBACK] = None,
+    ) -> None:
+        """Registers account data callbacks.
+
+        Added in Synapse 1.57.0.
+        """
+        return self._account_data_handler.register_module_callbacks(
+            on_account_data_change=on_account_data_change,
+        )
 
     def register_web_resource(self, path: str, resource: Resource) -> None:
         """Registers a web resource to be served at the given path.
