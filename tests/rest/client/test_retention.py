@@ -24,6 +24,7 @@ from synapse.util import Clock
 from synapse.visibility import filter_events_for_client
 
 from tests import unittest
+from tests.unittest import override_config
 
 one_hour_ms = 3600000
 one_day_ms = one_hour_ms * 24
@@ -38,7 +39,10 @@ class RetentionTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
-        config["retention"] = {
+
+        # merge this default retention config with anything that was specified in
+        # @override_config
+        retention_config = {
             "enabled": True,
             "default_policy": {
                 "min_lifetime": one_day_ms,
@@ -47,6 +51,8 @@ class RetentionTestCase(unittest.HomeserverTestCase):
             "allowed_lifetime_min": one_day_ms,
             "allowed_lifetime_max": one_day_ms * 3,
         }
+        retention_config.update(config.get("retention", {}))
+        config["retention"] = retention_config
 
         self.hs = self.setup_test_homeserver(config=config)
 
@@ -115,22 +121,20 @@ class RetentionTestCase(unittest.HomeserverTestCase):
 
         self._test_retention_event_purged(room_id, one_day_ms * 2)
 
+    @override_config({"retention": {"purge_jobs": [{"interval": "5d"}]}})
     def test_visibility(self) -> None:
         """Tests that synapse.visibility.filter_events_for_client correctly filters out
-        outdated events
+        outdated events, even if the purge job hasn't got to them yet.
+
+        We do this by setting a very long time between purge jobs.
         """
         store = self.hs.get_datastores().main
         storage = self.hs.get_storage()
         room_id = self.helper.create_room_as(self.user_id, tok=self.token)
-        events = []
 
         # Send a first event, which should be filtered out at the end of the test.
         resp = self.helper.send(room_id=room_id, body="1", tok=self.token)
-
-        # Get the event from the store so that we end up with a FrozenEvent that we can
-        # give to filter_events_for_client. We need to do this now because the event won't
-        # be in the database anymore after it has expired.
-        events.append(self.get_success(store.get_event(resp.get("event_id"))))
+        first_event_id = resp.get("event_id")
 
         # Advance the time by 2 days. We're using the default retention policy, therefore
         # after this the first event will still be valid.
@@ -138,16 +142,17 @@ class RetentionTestCase(unittest.HomeserverTestCase):
 
         # Send another event, which shouldn't get filtered out.
         resp = self.helper.send(room_id=room_id, body="2", tok=self.token)
-
         valid_event_id = resp.get("event_id")
-
-        events.append(self.get_success(store.get_event(valid_event_id)))
 
         # Advance the time by another 2 days. After this, the first event should be
         # outdated but not the second one.
         self.reactor.advance(one_day_ms * 2 / 1000)
 
-        # Run filter_events_for_client with our list of FrozenEvents.
+        # Fetch the events, and run filter_events_for_client on them
+        events = self.get_success(
+            store.get_events_as_list([first_event_id, valid_event_id])
+        )
+        self.assertEqual(2, len(events), "events retrieved from database")
         filtered_events = self.get_success(
             filter_events_for_client(storage, self.user_id, events)
         )

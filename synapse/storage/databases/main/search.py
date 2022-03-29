@@ -14,7 +14,7 @@
 
 import logging
 import re
-from typing import TYPE_CHECKING, Collection, Iterable, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Collection, Iterable, List, Optional, Set
 
 import attr
 
@@ -74,7 +74,7 @@ class SearchWorkerStore(SQLBaseStore):
                 " VALUES (?,?,?,to_tsvector('english', ?),?,?)"
             )
 
-            args = (
+            args1 = (
                 (
                     entry.event_id,
                     entry.room_id,
@@ -86,14 +86,14 @@ class SearchWorkerStore(SQLBaseStore):
                 for entry in entries
             )
 
-            txn.execute_batch(sql, args)
+            txn.execute_batch(sql, args1)
 
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = (
                 "INSERT INTO event_search (event_id, room_id, key, value)"
                 " VALUES (?,?,?,?)"
             )
-            args = (
+            args2 = (
                 (
                     entry.event_id,
                     entry.room_id,
@@ -102,7 +102,7 @@ class SearchWorkerStore(SQLBaseStore):
                 )
                 for entry in entries
             )
-            txn.execute_batch(sql, args)
+            txn.execute_batch(sql, args2)
 
         else:
             # This should be unreachable.
@@ -124,9 +124,6 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
         hs: "HomeServer",
     ):
         super().__init__(database, db_conn, hs)
-
-        if not hs.config.server.enable_search:
-            return
 
         self.db_pool.updates.register_background_update_handler(
             self.EVENT_SEARCH_UPDATE_NAME, self._background_reindex_search
@@ -243,9 +240,13 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
             return len(event_search_rows)
 
-        result = await self.db_pool.runInteraction(
-            self.EVENT_SEARCH_UPDATE_NAME, reindex_search_txn
-        )
+        if self.hs.config.server.enable_search:
+            result = await self.db_pool.runInteraction(
+                self.EVENT_SEARCH_UPDATE_NAME, reindex_search_txn
+            )
+        else:
+            # Don't index anything if search is not enabled.
+            result = 0
 
         if not result:
             await self.db_pool.updates._end_background_update(
@@ -426,7 +427,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         search_query = _parse_query(self.database_engine, search_term)
 
-        args = []
+        args: List[Any] = []
 
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
@@ -495,7 +496,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         # We set redact_behaviour to BLOCK here to prevent redacted events being returned in
         # search results (which is a data leak)
-        events = await self.get_events_as_list(
+        events = await self.get_events_as_list(  # type: ignore[attr-defined]
             [r["event_id"] for r in results],
             redact_behaviour=EventRedactBehaviour.BLOCK,
         )
@@ -529,7 +530,7 @@ class SearchStore(SearchBackgroundUpdateStore):
         room_ids: Collection[str],
         search_term: str,
         keys: Iterable[str],
-        limit,
+        limit: int,
         pagination_token: Optional[str] = None,
     ) -> JsonDict:
         """Performs a full text search over events with given keys.
@@ -548,7 +549,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         search_query = _parse_query(self.database_engine, search_term)
 
-        args = []
+        args: List[Any] = []
 
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
@@ -572,9 +573,9 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         if pagination_token:
             try:
-                origin_server_ts, stream = pagination_token.split(",")
-                origin_server_ts = int(origin_server_ts)
-                stream = int(stream)
+                origin_server_ts_str, stream_str = pagination_token.split(",")
+                origin_server_ts = int(origin_server_ts_str)
+                stream = int(stream_str)
             except Exception:
                 raise SynapseError(400, "Invalid pagination token")
 
@@ -653,7 +654,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         # We set redact_behaviour to BLOCK here to prevent redacted events being returned in
         # search results (which is a data leak)
-        events = await self.get_events_as_list(
+        events = await self.get_events_as_list(  # type: ignore[attr-defined]
             [r["event_id"] for r in results],
             redact_behaviour=EventRedactBehaviour.BLOCK,
         )

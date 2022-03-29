@@ -74,17 +74,21 @@ REQUIREMENTS = [
     # Note: 21.1.0 broke `/sync`, see #9936
     "attrs>=19.2.0,!=21.1.0",
     "netaddr>=0.7.18",
-    "Jinja2>=2.9",
+    # Jinja 2.x is incompatible with MarkupSafe>=2.1. To ensure that admins do not
+    # end up with a broken installation, with recent MarkupSafe but old Jinja, we
+    # add a lower bound to the Jinja2 dependency.
+    "Jinja2>=3.0",
     "bleach>=1.4.3",
-    "typing-extensions>=3.7.4",
+    # We use `ParamSpec`, which was added in `typing-extensions` 3.10.0.0.
+    "typing-extensions>=3.10.0",
     # We enforce that we have a `cryptography` version that bundles an `openssl`
     # with the latest security patches.
     "cryptography>=3.4.7",
     # ijson 3.1.4 fixes a bug with "." in property names
     "ijson>=3.1.4",
     "matrix-common~=1.1.0",
-    # For runtime introspection of our dependencies
-    "packaging~=21.3",
+    # We need packaging.requirements.Requirement, added in 16.1.
+    "packaging>=16.1",
 ]
 
 CONDITIONAL_REQUIREMENTS = {

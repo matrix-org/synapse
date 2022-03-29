@@ -17,6 +17,8 @@
 """An interactive script for doing a release. See `cli()` below.
 """
 
+import glob
+import os
 import re
 import subprocess
 import sys
@@ -64,9 +66,13 @@ def cli():
 
         ./scripts-dev/release.py tag
 
-        # ... wait for asssets to build ...
+        # ... wait for assets to build ...
 
         ./scripts-dev/release.py publish
+        ./scripts-dev/release.py upload
+
+        # Optional: generate some nice links for the announcement
+
         ./scripts-dev/release.py upload
 
     If the env var GH_TOKEN (or GITHUB_TOKEN) is set, or passed into the
@@ -209,8 +215,8 @@ def prepare():
     with open("synapse/__init__.py", "w") as f:
         f.write(parsed_synapse_ast.dumps())
 
-    # Generate changelogs
-    run_until_successful("python3 -m towncrier", shell=True)
+    # Generate changelogs.
+    generate_and_write_changelog(current_version)
 
     # Generate debian changelogs
     if parsed_new_version.pre is not None:
@@ -413,6 +419,41 @@ def upload():
     )
 
 
+@cli.command()
+def announce():
+    """Generate markdown to announce the release."""
+
+    current_version, _, _ = parse_version_from_module()
+    tag_name = f"v{current_version}"
+
+    click.echo(
+        f"""
+Hi everyone. Synapse {current_version} has just been released.
+
+[notes](https://github.com/matrix-org/synapse/releases/tag/{tag_name}) |\
+[docker](https://hub.docker.com/r/matrixdotorg/synapse/tags?name={tag_name}) | \
+[debs](https://packages.matrix.org/debian/) | \
+[pypi](https://pypi.org/project/matrix-synapse/{current_version}/)"""
+    )
+
+    if "rc" in tag_name:
+        click.echo(
+            """
+Announce the RC in
+- #homeowners:matrix.org (Synapse Announcements)
+- #synapse-dev:matrix.org"""
+        )
+    else:
+        click.echo(
+            """
+Announce the release in
+- #homeowners:matrix.org (Synapse Announcements), bumping the version in the topic
+- #synapse:matrix.org (Synapse Admins), bumping the version in the topic
+- #synapse-dev:matrix.org
+- #synapse-package-maintainers:matrix.org"""
+        )
+
+
 def parse_version_from_module() -> Tuple[
     version.Version, redbaron.RedBaron, redbaron.Node
 ]:
@@ -521,6 +562,30 @@ def get_changes_for_version(wanted_version: version.Version) -> str:
         version_changelog.extend(changes_by_line[section.start_line : section.end_line])
 
     return "\n".join(version_changelog)
+
+
+def generate_and_write_changelog(current_version: version.Version):
+    # We do this by getting a draft so that we can edit it before writing to the
+    # changelog.
+    result = run_until_successful(
+        "python3 -m towncrier --draft", shell=True, capture_output=True
+    )
+    new_changes = result.stdout.decode("utf-8")
+    new_changes = new_changes.replace(
+        "No significant changes.", f"No significant changes since {current_version}."
+    )
+
+    # Prepend changes to changelog
+    with open("CHANGES.md", "r+") as f:
+        existing_content = f.read()
+        f.seek(0, 0)
+        f.write(new_changes)
+        f.write("\n")
+        f.write(existing_content)
+
+    # Remove all the news fragments
+    for f in glob.iglob("changelog.d/*.*"):
+        os.remove(f)
 
 
 if __name__ == "__main__":

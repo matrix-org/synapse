@@ -261,7 +261,10 @@ class SynapseHomeServer(HomeServer):
             resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
         if name == "metrics" and self.config.metrics.enable_metrics:
-            resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
+            metrics_resource: Resource = MetricsResource(RegistryProxy)
+            if compress:
+                metrics_resource = gz_wrap(metrics_resource)
+            resources[METRICS_PREFIX] = metrics_resource
 
         if name == "replication":
             resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
@@ -273,7 +276,7 @@ class SynapseHomeServer(HomeServer):
             # If redis is enabled we connect via the replication command handler
             # in the same way as the workers (since we're effectively a client
             # rather than a server).
-            self.get_tcp_replication().start_replication(self)
+            self.get_replication_command_handler().start_replication(self)
 
         for listener in self.config.server.listeners:
             if listener.type == "http":
@@ -347,6 +350,23 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
 
     if config.server.gc_seconds:
         synapse.metrics.MIN_TIME_BETWEEN_GCS = config.server.gc_seconds
+
+    if (
+        config.registration.enable_registration
+        and not config.registration.enable_registration_without_verification
+    ):
+        if (
+            not config.captcha.enable_registration_captcha
+            and not config.registration.registrations_require_3pid
+            and not config.registration.registration_requires_token
+        ):
+
+            raise ConfigError(
+                "You have enabled open registration without any verification. This is a known vector for "
+                "spam and abuse. If you would like to allow public registration, please consider adding email, "
+                "captcha, or token-based verification. Otherwise this check can be removed by setting the "
+                "`enable_registration_without_verification` config option to `true`."
+            )
 
     hs = SynapseHomeServer(
         config.server.server_name,

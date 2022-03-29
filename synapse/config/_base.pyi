@@ -19,6 +19,7 @@ from synapse.config import (
     api,
     appservice,
     auth,
+    background_updates,
     cache,
     captcha,
     cas,
@@ -113,6 +114,7 @@ class RootConfig:
     caches: cache.CacheConfig
     federation: federation.FederationConfig
     retention: retention.RetentionConfig
+    background_updates: background_updates.BackgroundUpdateConfig
 
     config_classes: List[Type["Config"]] = ...
     def __init__(self) -> None: ...

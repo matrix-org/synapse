@@ -377,7 +377,7 @@ jobs:
       # Run Complement
       - run: |
           set -o pipefail
-          go test -v -json -p 1 -tags synapse_blacklist,msc2716,msc3030 ./tests/... 2>&1 | gotestfmt
+          go test -v -json -tags synapse_blacklist,msc2716,msc3030 ./tests/... 2>&1 | gotestfmt
         shell: bash
         name: Run Complement Tests
         env:
@@ -388,34 +388,22 @@ jobs:
   tests-done:
     if: ${{ always() }}
     needs:
+      - check-sampleconfig
       - lint
       - lint-crlf
       - lint-newsfile
       - trial
       - trial-olddeps
       - sytest
+      - export-data
       - portdb
       - complement
     runs-on: ubuntu-latest
     steps:
-      - name: Set build result
-        env:
-          NEEDS_CONTEXT: ${{ toJSON(needs) }}
-        # the `jq` incantation dumps out a series of "<job> <result>" lines.
-        # we set it to an intermediate variable to avoid a pipe, which makes it
-        # hard to set $rc.
-        run: |
-          rc=0
-          results=$(jq -r 'to_entries[] | [.key,.value.result] | join(" ")' <<< $NEEDS_CONTEXT)
-          while read job result ; do
-              # The newsfile lint may be skipped on non PR builds
-              if [ $result == "skipped" ] && [ $job == "lint-newsfile" ]; then
-                continue
-              fi
+      - uses: matrix-org/done-action@v2
+        with:
+          needs: ${{ toJSON(needs) }}
 
-              if [ "$result" != "success" ]; then
-                  echo "::set-failed ::Job $job returned $result"
-                  rc=1
-              fi
-          done <<< $results
-          exit $rc
+          # The newsfile lint may be skipped on non PR builds
+          skippable:
+            lint-newsfile
