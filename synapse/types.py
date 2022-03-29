@@ -421,22 +421,92 @@ class RoomStreamToken:
 
             s0    s1
             |     |
-        [0] V [1] V [2]
+        [0] ▼ [1] ▼ [2]
 
     Tokens can either be a point in the live event stream or a cursor going
     through historic events.
 
-    When traversing the live event stream events are ordered by when they
+    When traversing the live event stream, events are ordered by when they
     arrived at the homeserver.
 
-    When traversing historic events the events are ordered by their depth in
-    the event graph "topological_ordering" and then by when they arrived at the
-    homeserver "stream_ordering".
+    When traversing historic events, events are first ordered by their
+    "depth" ("topological_ordering" in the event graph) and tie-broken by
+    "stream_ordering" (when the event arrived at the homeserver).
+
+    ---
 
     Live tokens start with an "s" followed by the "stream_ordering" id of the
-    event it comes after. Historic tokens start with a "t" followed by the
-    "topological_ordering" id of the event it comes after, followed by "-",
-    followed by the "stream_ordering" id of the event it comes after.
+    event that comes after. The rest of the keys are joined together by
+    underscores in the following order and represent the position of various
+    data.
+
+    ex. `s2633508_17_338_6732159_1082514_541479_274711_265584_1`
+        1. `room_key`: `s2633508` -> `2633508` `stream_ordering`
+        2. `presence_key`: `17`
+        3. `typing_key`: `338`
+        4. `receipt_key`: `6732159`
+        5. `account_data_key`: `1082514`
+        6. `push_rules_key`: `541479`
+        7. `to_device_key`: `274711`
+        8. `device_list_key`: `265584`
+        9. `groups_key`: `1`
+
+    For example, you can see how many of these keys correspond to the various
+    fields in the "/sync" response:
+    ```
+    {
+        "next_batch": "s12_4_0_1_1_1_1_4_1",
+        "presence": {
+            "events": []
+        },
+        "device_lists": {
+            "changed": []
+        },
+        "rooms": {
+            "join": {
+                "!QrZlfIDQLNLdZHqTnt:hs1": {
+                    "timeline": {
+                        "events": [],
+                        "prev_batch": "s10_4_0_1_1_1_1_4_1",
+                        "limited": false
+                    },
+                    "state": {
+                        "events": []
+                    },
+                    "account_data": {
+                        "events": []
+                    },
+                    "ephemeral": {
+                        "events": []
+                    }
+                }
+            }
+        }
+    }
+    ```
+
+    ---
+
+    Historic tokens start with a "t" followed by the "depth"
+    ("topological_ordering" in the event graph) of the event that comes after,
+    followed by "-", followed by the "stream_ordering" id of the event it comes
+    after along with rest of the same keys from the live tokens.
+
+    You will see this type of token when using the "/messages" endpoint.
+
+    ex. `t426-2633508_17_338_6732159_1082514_541479_274711_265584_1`
+        1. `topological_ordering`: t426 -> `426` `depth`
+        2. `room_key`: `2633508` `stream_ordering`
+        3. `presence_key`: `17`
+        4. `typing_key`: `338`
+        5. `receipt_key`: `6732159`
+        6. `account_data_key`: `1082514`
+        7. `push_rules_key`: `541479`
+        8. `to_device_key`: `274711`
+        9. `device_list_key`: `265584`
+       10. `groups_key`: `1`
+
+    ---
 
     There is also a third mode for live tokens where the token starts with "m",
     which is sometimes used when using sharded event persisters. In this case
@@ -459,6 +529,8 @@ class RoomStreamToken:
     3 (these are instance IDs that can be looked up in the DB to fetch the more
     commonly used instance names) are at positions 58 and 59 respectively, and
     all other instances are at position 56.
+
+    ---
 
     Note: The `RoomStreamToken` cannot have both a topological part and an
     instance map.
