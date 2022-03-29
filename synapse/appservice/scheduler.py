@@ -232,10 +232,7 @@ class _ServiceQueuer:
                 # Note: this code assumes that in a single DeviceListUpdates, a user will
                 # never be in both "changed" and "left" sets.
                 device_list_summary = DeviceListUpdates()
-                while self.queued_device_list_summaries.get(service.id, []):
-                    # Pop a summary off the front of the queue
-                    summary = self.queued_device_list_summaries[service.id].pop(0)
-
+                for summary in self.queued_device_list_summaries.get(service.id, []):
                     # For every user in the incoming "changed" set:
                     #   * Remove them from the existing "left" set if necessary
                     #     (as we need to start tracking them again)
@@ -249,6 +246,7 @@ class _ServiceQueuer:
                     #   * Add them to the existing "left" set if necessary.
                     device_list_summary.changed -= summary.left
                     device_list_summary.left.update(summary.left)
+                self.queued_device_list_summaries.clear()
 
                 if (
                     not events
