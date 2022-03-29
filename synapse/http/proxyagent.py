@@ -41,7 +41,7 @@ from synapse.types import ISynapseReactor
 
 logger = logging.getLogger(__name__)
 
-_VALID_URI = re.compile(br"\A[\x21-\x7e]+\Z")
+_VALID_URI = re.compile(rb"\A[\x21-\x7e]+\Z")
 
 
 @implementer(IAgent)
