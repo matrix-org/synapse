@@ -44,7 +44,7 @@ Internal Changes
 - Rename `shared_rooms` to `mutual_rooms` ([MSC2666](https://github.com/matrix-org/matrix-doc/pull/2666)), as per proposal changes. ([\#12036](https://github.com/matrix-org/synapse/issues/12036))
 - Remove check on `update_user_directory` for shared rooms handler ([MSC2666](https://github.com/matrix-org/matrix-doc/pull/2666)), and update/expand documentation. ([\#12038](https://github.com/matrix-org/synapse/issues/12038))
 - Refactor `create_new_client_event` to use a new parameter, `state_event_ids`, which accurately describes the usage with [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) instead of abusing `auth_event_ids`. ([\#12083](https://github.com/matrix-org/synapse/issues/12083), [\#12304](https://github.com/matrix-org/synapse/issues/12304))
-- Refuse to start if registration is enabled without email, captcha, or token-based verification unless the new config flag `enable_registration_without_verification` is set. ([\#12091](https://github.com/matrix-org/synapse/issues/12091))
+- Refuse to start if registration is enabled without email, captcha, or token-based verification unless the new config flag `enable_registration_without_verification` is set to `true`. ([\#12091](https://github.com/matrix-org/synapse/issues/12091))
 - Add tests for database transaction callbacks. ([\#12198](https://github.com/matrix-org/synapse/issues/12198))
 - Handle cancellation in `DatabasePool.runInteraction`. ([\#12199](https://github.com/matrix-org/synapse/issues/12199))
 - Add missing type hints for cache storage. ([\#12216](https://github.com/matrix-org/synapse/issues/12216))
