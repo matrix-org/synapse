@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional
 
 import synapse.metrics
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules, Membership
@@ -27,6 +27,9 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+# Types for callbacks to be registered via the module api
+ON_SEARH_USERS_CALLBACK = Callable[[str, str, int], Awaitable[Optional[SearchResult]]]
 
 
 class UserDirectoryHandler(StateDeltasHandler):
@@ -76,6 +79,14 @@ class UserDirectoryHandler(StateDeltasHandler):
             # we start populating the user directory
             self.clock.call_later(0, self.notify_new_event)
 
+        self._on_search_users_callbacks: List[ON_SEARH_USERS_CALLBACK] = []
+
+    def register_user_directory_callbacks(
+        self, on_search_users: Optional[ON_SEARH_USERS_CALLBACK] = None
+    ) -> None:
+        if on_search_users is not None:
+            self._on_search_users_callbacks.append(on_search_users)
+
     async def search_users(
         self, user_id: str, search_term: str, limit: int
     ) -> SearchResult:
@@ -96,6 +107,23 @@ class UserDirectoryHandler(StateDeltasHandler):
                 }
         """
         results = await self.store.search_user_dir(user_id, search_term, limit)
+
+        merged_results = results["results"]
+        existing_user_ids = [user["user_id"] for user in merged_results]
+        for callback in self._on_search_users_callbacks:
+            external_users = await callback(user_id, search_term, limit)
+            if external_users is not None:
+                # for user in external_users["results"]:
+                #     if user["user_id"] not in existing_user_ids:
+                #         merged_results.append(user)
+                merged_results += [
+                    user
+                    for user in external_users["results"]
+                    if user["user_id"] not in existing_user_ids
+                ]
+
+        results["results"] = merged_results
+        results["limited"] = len(merged_results) > limit
 
         # Remove any spammy users from the results.
         non_spammy_users = []
