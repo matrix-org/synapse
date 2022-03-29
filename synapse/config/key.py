@@ -24,6 +24,7 @@ from signedjson.key import (
     NACL_ED25519,
     SigningKey,
     VerifyKey,
+    VerifyKeyWithExpiry,
     decode_signing_key_base64,
     decode_verify_key_bytes,
     generate_signing_key,
@@ -300,7 +301,7 @@ class KeyConfig(Config):
 
     def read_old_signing_keys(
         self, old_signing_keys: Optional[JsonDict]
-    ) -> Dict[str, VerifyKey]:
+    ) -> Dict[str, VerifyKeyWithExpiry]:
         if old_signing_keys is None:
             return {}
         keys = {}
@@ -308,8 +309,8 @@ class KeyConfig(Config):
             if is_signing_algorithm_supported(key_id):
                 key_base64 = key_data["key"]
                 key_bytes = decode_base64(key_base64)
-                verify_key = decode_verify_key_bytes(key_id, key_bytes)
-                verify_key.expired_ts = key_data["expired_ts"]
+                verify_key: VerifyKeyWithExpiry = decode_verify_key_bytes(key_id, key_bytes)  # type: ignore[assignment]
+                verify_key.expired = key_data["expired_ts"]
                 keys[key_id] = verify_key
             else:
                 raise ConfigError(
@@ -422,7 +423,7 @@ def _parse_key_servers(
         server_name = server["server_name"]
         result = TrustedKeyServer(server_name=server_name)
 
-        verify_keys = server.get("verify_keys")
+        verify_keys: Optional[Dict[str, str]] = server.get("verify_keys")
         if verify_keys is not None:
             result.verify_keys = {}
             for key_id, key_base64 in verify_keys.items():
