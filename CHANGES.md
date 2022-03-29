@@ -1,6 +1,18 @@
 Synapse 1.56.0rc1 (2022-03-29)
 ==============================
 
+Synapse will now refuse to start up if open registration is enabled, in order to help reduce
+the number of homeservers that have accidentally left registration publicly accessible. These
+are increasingly used as vectors of attack for spam across the federation. If you would like
+to provide registration to anyone, consider adding [email](https://github.com/matrix-org/synapse/blob/8a519f8abc6de772167c2cca101d22ee2052fafc/docs/sample_config.yaml#L1285),
+[recaptcha](https://matrix-org.github.io/synapse/v1.56/CAPTCHA_SETUP.html)
+or [token-based verification](https://matrix-org.github.io/synapse/v1.56/usage/administration/admin_api/registration_tokens.html)
+in order to prevent automated registration from bad actors.
+
+This check can be disabled by setting the `enable_registration_without_verification` option in your
+homeserver configuration file. More details are available in the
+[upgrade notes](https://matrix-org.github.io/synapse/v1.56/upgrade.html#open-registration-without-verification-is-now-disabled-by-default).
+
 Features
 --------
 
