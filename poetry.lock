@@ -1111,7 +1111,7 @@ tests = ["coverage[toml] (>=5.0.2)", "pytest"]
 
 [[package]]
 name = "signedjson"
-version = "1.1.1"
+version = "1.1.2"
 description = "Sign JSON with Ed25519 signatures"
 category = "main"
 optional = false
@@ -1119,10 +1119,13 @@ python-versions = "*"
 
 [package.dependencies]
 canonicaljson = ">=1.0.0"
-importlib_metadata = "*"
+importlib-metadata = {version = "*", markers = "python_version < \"3.8\""}
 pynacl = ">=0.3.0"
-typing_extensions = ">=3.5"
+typing-extensions = {version = ">=3.5", markers = "python_version < \"3.8\""}
 unpaddedbase64 = ">=1.0.1"
+
+[package.extras]
+dev = ["typing-extensions (>=3.5)"]
 
 [[package]]
 name = "simplejson"
@@ -1590,7 +1593,7 @@ url_preview = ["lxml"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "92465e65bef59c43c6112f332e5cf987740899801dbd34c19245db15b5c6362d"
+content-hash = "7ff6d982a9d6675cb595b216b23549ef1942d0e39cb91c97494ff6ed95a9e8d2"
 
 [metadata.files]
 appdirs = [
@@ -2437,7 +2440,8 @@ service-identity = [
     {file = "service_identity-21.1.0-py2.py3-none-any.whl", hash = "sha256:f0b0caac3d40627c3c04d7a51b6e06721857a0e10a8775f2d1d7e72901b3a7db"},
 ]
 signedjson = [
-    {file = "signedjson-1.1.1.tar.gz", hash = "sha256:350586e7570ba208f7729dcda09d43f554ead0207a15e3e3695533ef3f720009"},
+    {file = "signedjson-1.1.2-py3-none-any.whl", hash = "sha256:83903b04903ee911c14e59fc19dcde97bfdfdb05c0cd593d29a9de1710b59972"},
+    {file = "signedjson-1.1.2.tar.gz", hash = "sha256:786e5597281e94da0986e15c9c0b99b30a7f07421536f8e1c45edd29db604909"},
 ]
 simplejson = [
     {file = "simplejson-3.17.6-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:a89acae02b2975b1f8e4974cb8cdf9bf9f6c91162fb8dec50c259ce700f2770a"},
