@@ -1,0 +1,1 @@
+Fix a long-standing bug that would prevent URL previews from being generated if a blacklist is configured with a rule for port numbers.
