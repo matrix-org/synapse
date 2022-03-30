@@ -220,27 +220,6 @@ export SYNAPSE_POSTGRES_PASSWORD=mydevenvpassword
 trial
 ```
 
-#### Prebuilt container
-
-Since configuring PostgreSQL can be fiddly, we can make use of a pre-made
-Docker container to set up PostgreSQL and run our tests for us. To do so, run
-
-```shell
-scripts-dev/test_postgresql.sh
-```
-
-Any extra arguments to the script will be passed to `tox` and then to `trial`,
-so we can run a specific test in this container with e.g.
-
-```shell
-scripts-dev/test_postgresql.sh tests.replication.test_sharded_event_persister.EventPersisterShardTestCase
-```
-
-The container creates a folder in your Synapse checkout called
-`.tox-pg-container` and uses this as a tox environment. The output of any
-`trial` runs goes into `_trial_temp` in your synapse source directory — the same
-as running `trial` directly on your host machine.
-
 ## Run the integration tests ([Sytest](https://github.com/matrix-org/sytest)).
 
 The integration tests are a more comprehensive suite of tests. They
