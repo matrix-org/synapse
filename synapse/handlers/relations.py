@@ -269,7 +269,10 @@ class RelationsHandler:
 
         # Fetch other relations per event.
         for event in events_by_id.values():
-            annotations, references = await self._get_bundled_annotations_and_references_for_event(
+            (
+                annotations,
+                references,
+            ) = await self._get_bundled_annotations_and_references_for_event(
                 event, user_id
             )
             if annotations or references:
