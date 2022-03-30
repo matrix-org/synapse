@@ -28,8 +28,8 @@ from tests import unittest
 SIGNING_KEY_SEED = decode_base64("YJDBA9Xnr2sVqXD9Vj7XVUnmFZcZrlw8Md7kMW+3XA1")
 
 KEY_ALG = "ed25519"
-KEY_VER = 1
-KEY_NAME = "%s:%d" % (KEY_ALG, KEY_VER)
+KEY_VER = "1"
+KEY_NAME = "%s:%s" % (KEY_ALG, KEY_VER)
 
 HOSTNAME = "domain"
 
@@ -39,7 +39,7 @@ class EventSigningTestCase(unittest.TestCase):
         # NB: `signedjson` expects `nacl.signing.SigningKey` instances which have been
         # monkeypatched to include new `alg` and `version` attributes. This is captured
         # by the `signedjson.types.SigningKey` protocol.
-        self.signing_key: signedjson.types.SigningKey = nacl.signing.SigningKey(
+        self.signing_key: signedjson.types.SigningKey = nacl.signing.SigningKey(  # type: ignore[assignment]
             SIGNING_KEY_SEED
         )
         self.signing_key.alg = KEY_ALG

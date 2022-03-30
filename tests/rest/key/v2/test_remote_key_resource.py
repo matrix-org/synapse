@@ -76,7 +76,7 @@ class BaseRemoteKeyResourceTestCase(unittest.HomeserverTestCase):
                 "verify_keys": {
                     key_id: {
                         "key": signedjson.key.encode_verify_key_base64(
-                            signing_key.verify_key
+                            signedjson.key.get_verify_key(signing_key)
                         )
                     }
                 },
@@ -175,7 +175,7 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
                     % (
                         self.hs_signing_key.version,
                     ): signedjson.key.encode_verify_key_base64(
-                        self.hs_signing_key.verify_key
+                        signedjson.key.get_verify_key(self.hs_signing_key)
                     )
                 },
             }
@@ -229,7 +229,9 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
         assert isinstance(keyres, FetchKeyResult)
         self.assertEqual(
             signedjson.key.encode_verify_key_base64(keyres.verify_key),
-            signedjson.key.encode_verify_key_base64(testkey.verify_key),
+            signedjson.key.encode_verify_key_base64(
+                signedjson.key.get_verify_key(testkey)
+            ),
         )
 
     def test_get_notary_key(self) -> None:
@@ -251,7 +253,9 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
         assert isinstance(keyres, FetchKeyResult)
         self.assertEqual(
             signedjson.key.encode_verify_key_base64(keyres.verify_key),
-            signedjson.key.encode_verify_key_base64(testkey.verify_key),
+            signedjson.key.encode_verify_key_base64(
+                signedjson.key.get_verify_key(testkey)
+            ),
         )
 
     def test_get_notary_keyserver_key(self) -> None:
@@ -268,5 +272,7 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
         assert isinstance(keyres, FetchKeyResult)
         self.assertEqual(
             signedjson.key.encode_verify_key_base64(keyres.verify_key),
-            signedjson.key.encode_verify_key_base64(self.hs_signing_key.verify_key),
+            signedjson.key.encode_verify_key_base64(
+                signedjson.key.get_verify_key(self.hs_signing_key)
+            ),
         )

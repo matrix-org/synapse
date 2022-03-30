@@ -1,0 +1,1 @@
+HAProxy reverse proxy guide update to stop sending IPv4-mapped address to homeserver. Contributed by @villepeh.
