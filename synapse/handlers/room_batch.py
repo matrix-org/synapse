@@ -213,9 +213,6 @@ class RoomBatchHandler:
                     room_id=room_id,
                     action=membership,
                     content=event_dict["content"],
-                    # Mark as an outlier to disconnect it from the normal DAG
-                    # and not show up between batches of history.
-                    outlier=True,
                     historical=True,
                     # Only the first event in the state chain should be floating.
                     # The rest should hang off each other in a chain.
@@ -246,9 +243,6 @@ class RoomBatchHandler:
                         state_event["sender"], app_service_requester.app_service
                     ),
                     event_dict,
-                    # Mark as an outlier to disconnect it from the normal DAG
-                    # and not show up between batches of history.
-                    outlier=True,
                     historical=True,
                     # Only the first event in the state chain should be floating.
                     # The rest should hang off each other in a chain.
