@@ -392,7 +392,10 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         # Now we filter out forgotten and excluded rooms
         rooms_to_exclude: Set[str] = await self.get_forgotten_rooms_for_user(user_id)
-        rooms_to_exclude.update(set(excluded_rooms))
+
+        if excluded_rooms is not None:
+            rooms_to_exclude.update(set(excluded_rooms))
+
         return [room for room in rooms if room.room_id not in rooms_to_exclude]
 
     def _get_rooms_for_local_user_where_membership_is_txn(
