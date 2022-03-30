@@ -29,10 +29,10 @@ jobs:
       - id: set-distros
         run: |
           # if we're running from a tag, get the full list of distros; otherwise just use debian:sid
-          # dists='["debian:sid"]'
-          # if [[ $GITHUB_REF == refs/tags/* ]]; then
+          dists='["debian:sid"]'
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
               dists=$(scripts-dev/build_debian_packages.py --show-dists-json)
-          # fi
+          fi
           echo "::set-output name=distros::$dists"
     # map the step outputs to job outputs
     outputs:
