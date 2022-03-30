@@ -32,13 +32,13 @@ from frozendict import frozendict
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersion
-from synapse.handlers.relations import BundledAggregations
 from synapse.types import JsonDict
 from synapse.util.frozenutils import unfreeze
 
 from . import EventBase
 
 if TYPE_CHECKING:
+    from synapse.handlers.relations import BundledAggregations
     from synapse.server import HomeServer
 
 
@@ -479,15 +479,18 @@ class EventClientSerializer:
         Args:
             event: The event being serialized.
             time_now: The current time in milliseconds
-            aggregations: The bundled aggregation to serialize.
+            bundled_aggregations: The bundled aggregation to serialize.
             serialized_event: The serialized event which may be modified.
             config: Event serialization config
 
         """
-        serialized_aggregations = {}
 
         # We have already checked that aggregations exist for this event.
         event_aggregations = bundled_aggregations[event.event_id]
+
+        # The JSON dictionary to be added under the unsigned property of the event
+        # being serialized.
+        serialized_aggregations = {}
 
         if event_aggregations.annotations:
             serialized_aggregations[

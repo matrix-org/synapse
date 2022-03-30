@@ -149,10 +149,11 @@ class RelationsHandler:
 
         return return_value
 
-    async def _get_bundled_aggregation_for_event(
+    async def _get_bundled_annotations_and_references_for_event(
         self, event: EventBase, user_id: str
     ) -> Tuple[Optional[JsonDict], Optional[JsonDict]]:
-        """Generate bundled aggregations for an event.
+        """
+        Generate bundled aggregations for annotation and reference relations for an event.
 
         Note that this does not use a cache, but depends on cached methods.
 
@@ -161,8 +162,9 @@ class RelationsHandler:
             user_id: The user requesting the bundled aggregations.
 
         Returns:
-            The bundled aggregations for an event, if bundled aggregations are
-            enabled and the event can have bundled aggregations.
+            A tuple of the bundled aggregations for annotation and reference relations.
+            Either or both entries in the tuple might be None if no relations
+            of that type exist.
         """
 
         # Do not bundle aggregations for an event which represents an edit or an
@@ -203,7 +205,7 @@ class RelationsHandler:
             user_id: The user requesting the bundled aggregations.
 
         Returns:
-            A map of event ID to the bundled aggregation for the event.
+            A map of event ID to the bundled aggregations for the event.
 
             Not all requested events may exist in the results (if they don't have
             bundled aggregations).
@@ -240,7 +242,8 @@ class RelationsHandler:
                 thread_count, latest_thread_event = summary
 
                 # If the latest event in a thread is not already being fetched,
-                # add it to the events. (Note that we don't mo
+                # add it. This ensures that the bundled aggregations for the
+                # latest thread event is correct.
                 if (
                     latest_thread_event
                     and latest_thread_event.event_id not in events_by_id
@@ -259,7 +262,7 @@ class RelationsHandler:
 
         # Fetch other relations per event.
         for event in events_by_id.values():
-            annotations, references = await self._get_bundled_aggregation_for_event(
+            annotations, references = await self._get_bundled_annotations_and_references_for_event(
                 event, user_id
             )
             if annotations or references:
