@@ -486,7 +486,7 @@ class EventClientSerializer:
         """
         serialized_aggregations = {}
 
-        # The aggregations must exist for this event.
+        # We have already checked that aggregations exist for this event.
         event_aggregations = bundled_aggregations[event.event_id]
 
         if event_aggregations.annotations:
