@@ -274,6 +274,8 @@ class SyncHandler:
             expiry_ms=LAZY_LOADED_MEMBERS_CACHE_MAX_AGE,
         )
 
+        self.rooms_to_exclude = hs.config.server.rooms_to_exclude_from_sync
+
     async def wait_for_sync_for_user(
         self,
         requester: Requester,
@@ -1585,13 +1587,15 @@ class SyncHandler:
         ignored_users = await self.store.ignored_users(user_id)
         if since_token:
             room_changes = await self._get_rooms_changed(
-                sync_result_builder, ignored_users
+                sync_result_builder, ignored_users, self.rooms_to_exclude
             )
             tags_by_room = await self.store.get_updated_tags(
                 user_id, since_token.account_data_key
             )
         else:
-            room_changes = await self._get_all_rooms(sync_result_builder, ignored_users)
+            room_changes = await self._get_all_rooms(
+                sync_result_builder, ignored_users, self.rooms_to_exclude
+            )
             tags_by_room = await self.store.get_tags_for_user(user_id)
 
         log_kv({"rooms_changed": len(room_changes.room_entries)})
@@ -1667,7 +1671,10 @@ class SyncHandler:
         return False
 
     async def _get_rooms_changed(
-        self, sync_result_builder: "SyncResultBuilder", ignored_users: FrozenSet[str]
+        self,
+        sync_result_builder: "SyncResultBuilder",
+        ignored_users: FrozenSet[str],
+        excluded_rooms: List[str],
     ) -> _RoomChanges:
         """Determine the changes in rooms to report to the user.
 
@@ -1699,7 +1706,7 @@ class SyncHandler:
         #       _have_rooms_changed. We could keep the results in memory to avoid a
         #       second query, at the cost of more complicated source code.
         membership_change_events = await self.store.get_membership_changes_for_user(
-            user_id, since_token.room_key, now_token.room_key
+            user_id, since_token.room_key, now_token.room_key, excluded_rooms
         )
 
         mem_change_events_by_room_id: Dict[str, List[EventBase]] = {}
@@ -1900,7 +1907,10 @@ class SyncHandler:
         )
 
     async def _get_all_rooms(
-        self, sync_result_builder: "SyncResultBuilder", ignored_users: FrozenSet[str]
+        self,
+        sync_result_builder: "SyncResultBuilder",
+        ignored_users: FrozenSet[str],
+        ignored_rooms: List[str],
     ) -> _RoomChanges:
         """Returns entries for all rooms for the user.
 
@@ -1911,7 +1921,7 @@ class SyncHandler:
         Args:
             sync_result_builder
             ignored_users: Set of users ignored by user.
-
+            ignored_rooms: List of rooms to ignore.
         """
 
         user_id = sync_result_builder.sync_config.user.to_string()
@@ -1922,6 +1932,7 @@ class SyncHandler:
         room_list = await self.store.get_rooms_for_local_user_where_membership_is(
             user_id=user_id,
             membership_list=Membership.LIST,
+            excluded_rooms=ignored_rooms,
         )
 
         room_entries = []
