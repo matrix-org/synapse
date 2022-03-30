@@ -428,7 +428,7 @@ class _Recoverer:
                 "as-recoverer-%s" % (self.service.id,), self.retry
             )
 
-        delay = 2 ** self.backoff_counter
+        delay = 2**self.backoff_counter
         logger.info("Scheduling retries on %s in %fs", self.service.id, delay)
         self.clock.call_later(delay, _retry)
 

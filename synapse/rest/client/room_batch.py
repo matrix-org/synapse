@@ -123,6 +123,19 @@ class RoomBatchSendEventRestServlet(RestServlet):
                     errcode=Codes.INVALID_PARAM,
                 )
 
+        # Make sure that the prev_event_ids exist and aren't outliers - ie, they are
+        # regular parts of the room DAG where we know the state.
+        non_outlier_prev_events = await self.store.have_events_in_timeline(
+            prev_event_ids_from_query
+        )
+        for prev_event_id in prev_event_ids_from_query:
+            if prev_event_id not in non_outlier_prev_events:
+                raise SynapseError(
+                    HTTPStatus.BAD_REQUEST,
+                    "prev_event %s does not exist, or is an outlier" % (prev_event_id,),
+                    errcode=Codes.INVALID_PARAM,
+                )
+
         # For the event we are inserting next to (`prev_event_ids_from_query`),
         # find the most recent state events that allowed that message to be
         # sent. We will use that as a base to auth our historical messages
@@ -130,14 +143,6 @@ class RoomBatchSendEventRestServlet(RestServlet):
         state_event_ids = await self.room_batch_handler.get_most_recent_full_state_ids_from_event_id_list(
             prev_event_ids_from_query
         )
-
-        if not state_event_ids:
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "No auth events found for given prev_event query parameter. The prev_event=%s probably does not exist."
-                % prev_event_ids_from_query,
-                errcode=Codes.INVALID_PARAM,
-            )
 
         state_event_ids_at_start = []
         # Create and persist all of the state events that float off on their own
