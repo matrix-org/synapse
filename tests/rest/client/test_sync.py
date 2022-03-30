@@ -341,7 +341,6 @@ class SyncKnockTestCase(
             hs, self.room_id, self.user_id
         )
 
-    @override_config({"experimental_features": {"msc2403_enabled": True}})
     def test_knock_room_state(self) -> None:
         """Tests that /sync returns state from a room after knocking on it."""
         # Knock on a room
@@ -777,3 +776,65 @@ class DeviceListSyncTestCase(unittest.HomeserverTestCase):
         self.assertIn(
             self.user_id, device_list_changes, incremental_sync_channel.json_body
         )
+
+
+class ExcludeRoomTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        sync.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
+        self.user_id = self.register_user("user", "password")
+        self.tok = self.login("user", "password")
+
+        self.excluded_room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
+        self.included_room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
+
+        # We need to manually append the room ID, because we can't know the ID before
+        # creating the room, and we can't set the config after starting the homeserver.
+        self.hs.get_sync_handler().rooms_to_exclude.append(self.excluded_room_id)
+
+    def test_join_leave(self) -> None:
+        """Tests that rooms are correctly excluded from the 'join' and 'leave' sections of
+        sync responses.
+        """
+        channel = self.make_request("GET", "/sync", access_token=self.tok)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self.assertNotIn(self.excluded_room_id, channel.json_body["rooms"]["join"])
+        self.assertIn(self.included_room_id, channel.json_body["rooms"]["join"])
+
+        self.helper.leave(self.excluded_room_id, self.user_id, tok=self.tok)
+        self.helper.leave(self.included_room_id, self.user_id, tok=self.tok)
+
+        channel = self.make_request(
+            "GET",
+            "/sync?since=" + channel.json_body["next_batch"],
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self.assertNotIn(self.excluded_room_id, channel.json_body["rooms"]["leave"])
+        self.assertIn(self.included_room_id, channel.json_body["rooms"]["leave"])
+
+    def test_invite(self) -> None:
+        """Tests that rooms are correctly excluded from the 'invite' section of sync
+        responses.
+        """
+        invitee = self.register_user("invitee", "password")
+        invitee_tok = self.login("invitee", "password")
+
+        self.helper.invite(self.excluded_room_id, self.user_id, invitee, tok=self.tok)
+        self.helper.invite(self.included_room_id, self.user_id, invitee, tok=self.tok)
+
+        channel = self.make_request("GET", "/sync", access_token=invitee_tok)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self.assertNotIn(self.excluded_room_id, channel.json_body["rooms"]["invite"])
+        self.assertIn(self.included_room_id, channel.json_body["rooms"]["invite"])

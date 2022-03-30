@@ -25,6 +25,7 @@ from typing import (
     Match,
     MutableMapping,
     Optional,
+    Set,
     Tuple,
     Type,
     TypeVar,
@@ -746,6 +747,30 @@ class ReadReceipt:
     user_id: str
     event_ids: List[str]
     data: JsonDict
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class DeviceListUpdates:
+    """
+    An object containing a diff of information regarding other users' device lists, intended for
+    a recipient to carry out device list tracking.
+
+    Attributes:
+        changed: A set of users whose device lists have changed recently.
+        left: A set of users who the recipient no longer needs to track the device lists of.
+            Typically when those users no longer share any end-to-end encryption enabled rooms.
+    """
+
+    # We need to use a factory here, otherwise `set` is not evaluated at
+    # object instantiation, but instead at class definition instantiation.
+    # The latter happening only once, thus always giving you the same sets
+    # across multiple DeviceListUpdates instances.
+    # Also see: don't define mutable default arguments.
+    changed: Set[str] = attr.ib(factory=set)
+    left: Set[str] = attr.ib(factory=set)
+
+    def __bool__(self) -> bool:
+        return bool(self.changed or self.left)
 
 
 def get_verify_key_from_cross_signing_key(key_info):

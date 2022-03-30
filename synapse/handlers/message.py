@@ -782,7 +782,6 @@ class EventCreationHandler:
         event_dict: dict,
         allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
-        auth_event_ids: Optional[List[str]] = None,
         state_event_ids: Optional[List[str]] = None,
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
@@ -807,12 +806,6 @@ class EventCreationHandler:
                 The event IDs to use as the prev events.
                 Should normally be left as None to automatically request them
                 from the database.
-            auth_event_ids:
-                The event ids to use as the auth_events for the new event.
-                Should normally be left as None, which will cause them to be calculated
-                based on the room state at the prev_events.
-
-                If non-None, prev_event_ids must also be provided.
             state_event_ids:
                 The full state at a given event. This is used particularly by the MSC2716
                 /batch_send endpoint. One use case is with insertion events which float at
@@ -878,7 +871,6 @@ class EventCreationHandler:
                 txn_id=txn_id,
                 allow_no_prev_events=allow_no_prev_events,
                 prev_event_ids=prev_event_ids,
-                auth_event_ids=auth_event_ids,
                 state_event_ids=state_event_ids,
                 outlier=outlier,
                 historical=historical,
