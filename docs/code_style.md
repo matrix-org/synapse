@@ -6,13 +6,8 @@ The Synapse codebase uses a number of code formatting tools in order to
 quickly and automatically check for formatting (and sometimes logical)
 errors in code.
 
-The necessary tools are detailed below.
-
-First install them with:
-
-```sh
-pip install -e ".[lint,mypy]"
-```
+The necessary tools are detailed below. They should be installed by poetry as part
+of Synapse's dev dependencies. See [the contributing guide](https://matrix-org.github.io/synapse/develop/development/contributing_guide.html#4-install-the-dependencies) for instructions.
 
 -   **black**
 
