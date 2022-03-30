@@ -352,7 +352,13 @@ typically catch more errors.</p>
 configuration:</p>
 <pre><code class="language-sh">$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:buster
 </code></pre>
-<p>This configuration should generally cover  your needs. For more details about other configurations, see <a href="https://github.com/matrix-org/sytest/blob/develop/docker/README.md">documentation in the SyTest repo</a>.</p>
+<p>(Note that the paths must be full paths! You could also write <code>$(realpath relative/path)</code> if needed.)</p>
+<p>This configuration should generally cover your needs.</p>
+<ul>
+<li>To run with Postgres, supply the <code>-e POSTGRES=1 -e MULTI_POSTGRES=1</code> environment flags.</li>
+<li>To run with Synapse in worker mode, supply the <code>-e WORKERS=1 -e REDIS=1</code> environment flags (in addition to the Postgres flags).</li>
+</ul>
+<p>For more details about other configurations, see the <a href="https://github.com/matrix-org/sytest/blob/develop/docker/README.md">Docker-specific documentation in the SyTest repo</a>.</p>
 <h2 id="run-the-integration-tests-a-hrefhttpsgithubcommatrix-orgcomplementcomplementa"><a class="header" href="#run-the-integration-tests-a-hrefhttpsgithubcommatrix-orgcomplementcomplementa">Run the integration tests (<a href="https://github.com/matrix-org/complement">Complement</a>).</a></h2>
 <p><a href="https://github.com/matrix-org/complement">Complement</a> is a suite of black box tests that can be run on any homeserver implementation. It can also be thought of as end-to-end (e2e) tests.</p>
 <p>It's often nice to develop on Synapse and write Complement tests at the same time.
