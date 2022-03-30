@@ -85,6 +85,15 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         libpq-dev \
         xmlsec1
 
+RUN pip3 install -U \
+    pip \
+    setuptools \
+    wheel
+
+# We normally use poetry 1.1.12. However we need to use a prerelease of 1.2 here,
+# which fixes a bug in poetry export that stops us from exporting for Python 3.8 builds.
+RUN pip3 install poetry==1.2.0b1
+
 COPY --from=builder /dh-virtualenv_1.2.2-1_all.deb /
 
 # install dhvirtualenv. Update the apt cache again first, in case we got a
