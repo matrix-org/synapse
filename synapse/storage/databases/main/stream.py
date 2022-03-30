@@ -36,7 +36,7 @@ what sort order was used:
 """
 
 import logging
-from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Collection, Dict, List, Optional, Set, Tuple
 
 import attr
 from frozendict import frozendict
@@ -325,21 +325,23 @@ def filter_to_clause(event_filter: Optional[Filter]) -> Tuple[str, List[str]]:
         args.extend(event_filter.labels)
 
     # Filter on relation_senders / relation types from the joined tables.
-    if event_filter.relation_senders:
+    if event_filter.related_by_senders:
         clauses.append(
             "(%s)"
             % " OR ".join(
-                "related_event.sender = ?" for _ in event_filter.relation_senders
+                "related_event.sender = ?" for _ in event_filter.related_by_senders
             )
         )
-        args.extend(event_filter.relation_senders)
+        args.extend(event_filter.related_by_senders)
 
-    if event_filter.relation_types:
+    if event_filter.related_by_rel_types:
         clauses.append(
             "(%s)"
-            % " OR ".join("relation_type = ?" for _ in event_filter.relation_types)
+            % " OR ".join(
+                "relation_type = ?" for _ in event_filter.related_by_rel_types
+            )
         )
-        args.extend(event_filter.relation_types)
+        args.extend(event_filter.related_by_rel_types)
 
     return " AND ".join(clauses), args
 
@@ -583,7 +585,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         return ret, key
 
     async def get_membership_changes_for_user(
-        self, user_id: str, from_key: RoomStreamToken, to_key: RoomStreamToken
+        self,
+        user_id: str,
+        from_key: RoomStreamToken,
+        to_key: RoomStreamToken,
+        excluded_rooms: Optional[List[str]] = None,
     ) -> List[EventBase]:
         """Fetch membership events for a given user.
 
@@ -608,22 +614,28 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             min_from_id = from_key.stream
             max_to_id = to_key.get_max_stream_pos()
 
+            args: List[Any] = [user_id, min_from_id, max_to_id]
+
+            ignore_room_clause = ""
+            if excluded_rooms is not None and len(excluded_rooms) > 0:
+                ignore_room_clause = "AND e.room_id NOT IN (%s)" % ",".join(
+                    "?" for _ in excluded_rooms
+                )
+                args = args + excluded_rooms
+
             sql = """
                 SELECT m.event_id, instance_name, topological_ordering, stream_ordering
                 FROM events AS e, room_memberships AS m
                 WHERE e.event_id = m.event_id
                     AND m.user_id = ?
                     AND e.stream_ordering > ? AND e.stream_ordering <= ?
+                    %s
                 ORDER BY e.stream_ordering ASC
-            """
-            txn.execute(
-                sql,
-                (
-                    user_id,
-                    min_from_id,
-                    max_to_id,
-                ),
+            """ % (
+                ignore_room_clause,
             )
+
+            txn.execute(sql, args)
 
             rows = [
                 _EventDictReturn(event_id, None, stream_ordering)
@@ -1203,7 +1215,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         # If there is a filter on relation_senders and relation_types join to the
         # relations table.
         if event_filter and (
-            event_filter.relation_senders or event_filter.relation_types
+            event_filter.related_by_senders or event_filter.related_by_rel_types
         ):
             # Filtering by relations could cause the same event to appear multiple
             # times (since there's no limit on the number of relations to an event).
@@ -1211,7 +1223,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             join_clause += """
                 LEFT JOIN event_relations AS relation ON (event.event_id = relation.relates_to_id)
             """
-            if event_filter.relation_senders:
+            if event_filter.related_by_senders:
                 join_clause += """
                     LEFT JOIN events AS related_event ON (relation.event_id = related_event.event_id)
                 """

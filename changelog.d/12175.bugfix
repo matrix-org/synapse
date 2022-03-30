@@ -1,1 +1,0 @@
-Fix a bug where non-standard information was returned from the `/hierarchy` API. Introduced in Synapse v1.41.0.

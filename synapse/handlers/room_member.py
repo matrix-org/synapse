@@ -271,7 +271,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         membership: str,
         allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
-        auth_event_ids: Optional[List[str]] = None,
+        state_event_ids: Optional[List[str]] = None,
         txn_id: Optional[str] = None,
         ratelimit: bool = True,
         content: Optional[dict] = None,
@@ -294,10 +294,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 events should have a prev_event and we should only use this in special
                 cases like MSC2716.
             prev_event_ids: The event IDs to use as the prev events
-            auth_event_ids:
-                The event ids to use as the auth_events for the new event.
-                Should normally be left as None, which will cause them to be calculated
-                based on the room state at the prev_events.
+            state_event_ids:
+                The full state at a given event. This is used particularly by the MSC2716
+                /batch_send endpoint. One use case is the historical `state_events_at_start`;
+                since each is marked as an `outlier`, the `EventContext.for_outlier()` won't
+                have any `state_ids` set and therefore can't derive any state even though the
+                prev_events are set so we need to set them ourself via this argument.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
 
             txn_id:
             ratelimit:
@@ -352,7 +356,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             txn_id=txn_id,
             allow_no_prev_events=allow_no_prev_events,
             prev_event_ids=prev_event_ids,
-            auth_event_ids=auth_event_ids,
+            state_event_ids=state_event_ids,
             require_consent=require_consent,
             outlier=outlier,
             historical=historical,
@@ -455,7 +459,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         historical: bool = False,
         allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
-        auth_event_ids: Optional[List[str]] = None,
+        state_event_ids: Optional[List[str]] = None,
     ) -> Tuple[str, int]:
         """Update a user's membership in a room.
 
@@ -483,10 +487,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 events should have a prev_event and we should only use this in special
                 cases like MSC2716.
             prev_event_ids: The event IDs to use as the prev events
-            auth_event_ids:
-                The event ids to use as the auth_events for the new event.
-                Should normally be left as None, which will cause them to be calculated
-                based on the room state at the prev_events.
+            state_event_ids:
+                The full state at a given event. This is used particularly by the MSC2716
+                /batch_send endpoint. One use case is the historical `state_events_at_start`;
+                since each is marked as an `outlier`, the `EventContext.for_outlier()` won't
+                have any `state_ids` set and therefore can't derive any state even though the
+                prev_events are set so we need to set them ourself via this argument.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -525,7 +533,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     historical=historical,
                     allow_no_prev_events=allow_no_prev_events,
                     prev_event_ids=prev_event_ids,
-                    auth_event_ids=auth_event_ids,
+                    state_event_ids=state_event_ids,
                 )
 
         return result
@@ -547,7 +555,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         historical: bool = False,
         allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
-        auth_event_ids: Optional[List[str]] = None,
+        state_event_ids: Optional[List[str]] = None,
     ) -> Tuple[str, int]:
         """Helper for update_membership.
 
@@ -577,10 +585,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 events should have a prev_event and we should only use this in special
                 cases like MSC2716.
             prev_event_ids: The event IDs to use as the prev events
-            auth_event_ids:
-                The event ids to use as the auth_events for the new event.
-                Should normally be left as None, which will cause them to be calculated
-                based on the room state at the prev_events.
+            state_event_ids:
+                The full state at a given event. This is used particularly by the MSC2716
+                /batch_send endpoint. One use case is the historical `state_events_at_start`;
+                since each is marked as an `outlier`, the `EventContext.for_outlier()` won't
+                have any `state_ids` set and therefore can't derive any state even though the
+                prev_events are set so we need to set them ourself via this argument.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -707,7 +719,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 ratelimit=ratelimit,
                 allow_no_prev_events=allow_no_prev_events,
                 prev_event_ids=prev_event_ids,
-                auth_event_ids=auth_event_ids,
+                state_event_ids=state_event_ids,
                 content=content,
                 require_consent=require_consent,
                 outlier=outlier,
@@ -931,7 +943,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             txn_id=txn_id,
             ratelimit=ratelimit,
             prev_event_ids=latest_event_ids,
-            auth_event_ids=auth_event_ids,
+            state_event_ids=state_event_ids,
             content=content,
             require_consent=require_consent,
             outlier=outlier,

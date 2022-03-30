@@ -94,6 +94,7 @@ from synapse.handlers.profile import ProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.register import RegistrationHandler
+from synapse.handlers.relations import RelationsHandler
 from synapse.handlers.room import (
     RoomContextHandler,
     RoomCreationHandler,
@@ -328,7 +329,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         Does nothing in this base class; overridden in derived classes to start the
         appropriate listeners.
         """
-        pass
 
     def setup_background_tasks(self) -> None:
         """
@@ -639,7 +639,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return ReadMarkerHandler(self)
 
     @cache_in_self
-    def get_tcp_replication(self) -> ReplicationCommandHandler:
+    def get_replication_command_handler(self) -> ReplicationCommandHandler:
         return ReplicationCommandHandler(self)
 
     @cache_in_self
@@ -721,6 +721,10 @@ class HomeServer(metaclass=abc.ABCMeta):
         return PaginationHandler(self)
 
     @cache_in_self
+    def get_relations_handler(self) -> RelationsHandler:
+        return RelationsHandler(self)
+
+    @cache_in_self
     def get_room_context_handler(self) -> RoomContextHandler:
         return RoomContextHandler(self)
 
@@ -754,7 +758,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_event_client_serializer(self) -> EventClientSerializer:
-        return EventClientSerializer()
+        return EventClientSerializer(self)
 
     @cache_in_self
     def get_password_policy_handler(self) -> PasswordPolicyHandler:
