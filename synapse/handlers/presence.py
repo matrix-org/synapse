@@ -267,7 +267,6 @@ class BasePresenceHandler(abc.ABC):
             is_syncing: Whether or not the user is now syncing
             sync_time_msec: Time in ms when the user was last syncing
         """
-        pass
 
     async def update_external_syncs_clear(self, process_id: str) -> None:
         """Marks all users that had been marked as syncing by a given process
@@ -277,7 +276,6 @@ class BasePresenceHandler(abc.ABC):
 
         This is a no-op when presence is handled by a different worker.
         """
-        pass
 
     async def process_replication_rows(
         self, stream_name: str, instance_name: str, token: int, rows: list
@@ -1627,7 +1625,7 @@ class PresenceEventSource(EventSource[int, UserPresenceState]):
             # We'll actually pull the presence updates for these users at the end.
             interested_and_updated_users: Union[Set[str], FrozenSet[str]] = set()
 
-            if from_key:
+            if from_key is not None:
                 # First get all users that have had a presence update
                 updated_users = stream_change_cache.get_all_entities_changed(from_key)
 

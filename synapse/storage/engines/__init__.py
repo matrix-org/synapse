@@ -27,7 +27,7 @@ def create_engine(database_config) -> BaseDatabaseEngine:
 
     if name == "psycopg2":
         # Note that psycopg2cffi-compat provides the psycopg2 module on pypy.
-        import psycopg2  # type: ignore
+        import psycopg2
 
         return PostgresEngine(psycopg2, database_config)
 

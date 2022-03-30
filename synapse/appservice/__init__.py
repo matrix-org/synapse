@@ -1,4 +1,5 @@
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2022 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +23,13 @@ from netaddr import IPSet
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.types import GroupID, JsonDict, UserID, get_domain_from_id
+from synapse.types import (
+    DeviceListUpdates,
+    GroupID,
+    JsonDict,
+    UserID,
+    get_domain_from_id,
+)
 from synapse.util.caches.descriptors import _CacheContext, cached
 
 if TYPE_CHECKING:
@@ -400,6 +407,7 @@ class AppServiceTransaction:
         to_device_messages: List[JsonDict],
         one_time_key_counts: TransactionOneTimeKeyCounts,
         unused_fallback_keys: TransactionUnusedFallbackKeys,
+        device_list_summary: DeviceListUpdates,
     ):
         self.service = service
         self.id = id
@@ -408,6 +416,7 @@ class AppServiceTransaction:
         self.to_device_messages = to_device_messages
         self.one_time_key_counts = one_time_key_counts
         self.unused_fallback_keys = unused_fallback_keys
+        self.device_list_summary = device_list_summary
 
     async def send(self, as_api: "ApplicationServiceApi") -> bool:
         """Sends this transaction using the provided AS API interface.
@@ -424,6 +433,7 @@ class AppServiceTransaction:
             to_device_messages=self.to_device_messages,
             one_time_key_counts=self.one_time_key_counts,
             unused_fallback_keys=self.unused_fallback_keys,
+            device_list_summary=self.device_list_summary,
             txn_id=self.id,
         )
 

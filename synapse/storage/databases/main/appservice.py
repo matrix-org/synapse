@@ -31,7 +31,7 @@ from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
 from synapse.storage.types import Cursor
 from synapse.storage.util.sequence import build_sequence_generator
-from synapse.types import JsonDict
+from synapse.types import DeviceListUpdates, JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import _CacheContext, cached
 
@@ -235,6 +235,7 @@ class ApplicationServiceTransactionWorkerStore(
         to_device_messages: List[JsonDict],
         one_time_key_counts: TransactionOneTimeKeyCounts,
         unused_fallback_keys: TransactionUnusedFallbackKeys,
+        device_list_summary: DeviceListUpdates,
     ) -> AppServiceTransaction:
         """Atomically creates a new transaction for this application service
         with the given list of events. Ephemeral events are NOT persisted to the
@@ -249,6 +250,7 @@ class ApplicationServiceTransactionWorkerStore(
                 appservice devices in the transaction.
             unused_fallback_keys: Lists of unused fallback keys for relevant
                 appservice devices in the transaction.
+            device_list_summary: The device list summary to include in the transaction.
 
         Returns:
             A new transaction.
@@ -272,6 +274,7 @@ class ApplicationServiceTransactionWorkerStore(
                 to_device_messages=to_device_messages,
                 one_time_key_counts=one_time_key_counts,
                 unused_fallback_keys=unused_fallback_keys,
+                device_list_summary=device_list_summary,
             )
 
         return await self.db_pool.runInteraction(
@@ -346,8 +349,8 @@ class ApplicationServiceTransactionWorkerStore(
 
         events = await self.get_events_as_list(event_ids)
 
-        # TODO: to-device messages, one-time key counts and unused fallback keys
-        #       are not yet populated for catch-up transactions.
+        # TODO: to-device messages, one-time key counts, device list summaries and unused
+        #       fallback keys are not yet populated for catch-up transactions.
         #       We likely want to populate those for reliability.
         return AppServiceTransaction(
             service=service,
@@ -357,6 +360,7 @@ class ApplicationServiceTransactionWorkerStore(
             to_device_messages=[],
             one_time_key_counts={},
             unused_fallback_keys={},
+            device_list_summary=DeviceListUpdates(),
         )
 
     async def set_appservice_last_pos(self, pos: int) -> None:
@@ -406,7 +410,7 @@ class ApplicationServiceTransactionWorkerStore(
     async def get_type_stream_id_for_appservice(
         self, service: ApplicationService, type: str
     ) -> int:
-        if type not in ("read_receipt", "presence", "to_device"):
+        if type not in ("read_receipt", "presence", "to_device", "device_list"):
             raise ValueError(
                 "Expected type to be a valid application stream id type, got %s"
                 % (type,)
@@ -422,7 +426,8 @@ class ApplicationServiceTransactionWorkerStore(
             )
             last_stream_id = txn.fetchone()
             if last_stream_id is None or last_stream_id[0] is None:  # no row exists
-                return 0
+                # Stream tokens always start from 1, to avoid foot guns around `0` being falsey.
+                return 1
             else:
                 return int(last_stream_id[0])
 
@@ -433,7 +438,7 @@ class ApplicationServiceTransactionWorkerStore(
     async def set_appservice_stream_type_pos(
         self, service: ApplicationService, stream_type: str, pos: Optional[int]
     ) -> None:
-        if stream_type not in ("read_receipt", "presence", "to_device"):
+        if stream_type not in ("read_receipt", "presence", "to_device", "device_list"):
             raise ValueError(
                 "Expected type to be a valid application stream id type, got %s"
                 % (stream_type,)

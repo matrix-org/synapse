@@ -160,8 +160,9 @@ class FollowerTypingHandler:
         """Should be called whenever we receive updates for typing stream."""
 
         if self._latest_room_serial > token:
-            # The master has gone backwards. To prevent inconsistent data, just
-            # clear everything.
+            # The typing worker has gone backwards (e.g. it may have restarted).
+            # To prevent inconsistent data, just clear everything.
+            logger.info("Typing handler stream went backwards; resetting")
             self._reset()
 
         # Set the latest serial token to whatever the server gave us.

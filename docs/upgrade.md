@@ -85,7 +85,34 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.56.0
+
+## Groups/communities feature has been deprecated
+
+The non-standard groups/communities feature in Synapse has been deprecated and will
+be disabled by default in Synapse v1.58.0.
+
+You can test disabling it by adding the following to your homeserver configuration:
+
+```yaml
+experimental_features:
+  groups_enabled: false
+```
+
+## Change in behaviour for PostgreSQL databases with unsafe locale
+
+Synapse now refuses to start when using PostgreSQL with non-`C` values for `COLLATE` and
+`CTYPE` unless the config flag `allow_unsafe_locale`, found in the database section of
+the configuration file, is set to `true`. See the [PostgreSQL documentation](https://matrix-org.github.io/synapse/latest/postgres.html#fixing-incorrect-collate-or-ctype)
+for more information and instructions on how to fix a database with incorrect values.
+
 # Upgrading to v1.55.0
+
+## Open registration without verification is now disabled by default
+
+Synapse will refuse to start if registration is enabled without email, captcha, or token-based verification unless the new config 
+flag `enable_registration_without_verification` is set to "true".
+
 
 ## `synctl` script has been moved
 

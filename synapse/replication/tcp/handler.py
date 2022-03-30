@@ -709,7 +709,7 @@ class ReplicationCommandHandler:
         self.send_command(RemoteServerUpCommand(server))
 
     def stream_update(self, stream_name: str, token: Optional[int], data: Any) -> None:
-        """Called when a new update is available to stream to clients.
+        """Called when a new update is available to stream to Redis subscribers.
 
         We need to check if the client is interested in the stream or not
         """
