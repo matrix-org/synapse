@@ -450,6 +450,7 @@ class ApplicationServiceTransactionWorkerStore(
             )
             last_stream_id = txn.fetchone()
             if last_stream_id is None or last_stream_id[0] is None:  # no row exists
+                # Stream tokens always start from 1, to avoid foot guns around `0` being falsey.
                 return 1
             else:
                 return int(last_stream_id[0])
