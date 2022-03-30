@@ -113,9 +113,6 @@ class UserDirectoryHandler(StateDeltasHandler):
         for callback in self._on_search_users_callbacks:
             external_users = await callback(user_id, search_term, limit)
             if external_users is not None:
-                # for user in external_users["results"]:
-                #     if user["user_id"] not in existing_user_ids:
-                #         merged_results.append(user)
                 merged_results += [
                     user
                     for user in external_users["results"]
