@@ -42,7 +42,3 @@ def run_create(cur, database_engine, *args, **kwargs):
             "CREATE SEQUENCE application_services_txn_id_seq START WITH %s",
             (start_val,),
         )
-
-
-def run_upgrade(*args, **kwargs):
-    pass
