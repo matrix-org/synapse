@@ -14,7 +14,7 @@
 from unittest.mock import Mock
 
 from synapse.rest import admin
-from synapse.rest.client import account_data, login
+from synapse.rest.client import account_data, login, room
 
 from tests import unittest
 from tests.test_utils import make_awaitable
@@ -24,6 +24,7 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
     servlets = [
         admin.register_servlets,
         login.register_servlets,
+        room.register_servlets,
         account_data.register_servlets,
     ]
 
