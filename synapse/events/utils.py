@@ -49,7 +49,7 @@ if TYPE_CHECKING:
 #       the literal fields "foo\" and "bar" but will instead be treated as "foo\\.bar"
 SPLIT_FIELD_REGEX = re.compile(r"(?<!\\)\.")
 
-CANONICALJSON_MAX_INT = (2 ** 53) - 1
+CANONICALJSON_MAX_INT = (2**53) - 1
 CANONICALJSON_MIN_INT = -CANONICALJSON_MAX_INT
 
 

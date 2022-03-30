@@ -63,7 +63,7 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 # python 3 does not have a maximum int value
-MAX_TXN_ID = 2 ** 63 - 1
+MAX_TXN_ID = 2**63 - 1
 
 logger = logging.getLogger(__name__)
 
@@ -241,9 +241,17 @@ class LoggingTransaction:
         self.exception_callbacks = exception_callbacks
 
     def call_after(self, callback: Callable[..., object], *args: Any, **kwargs: Any):
-        """Call the given callback on the main twisted thread after the
-        transaction has finished. Used to invalidate the caches on the
-        correct thread.
+        """Call the given callback on the main twisted thread after the transaction has
+        finished.
+
+        Mostly used to invalidate the caches on the correct thread.
+
+        Note that transactions may be retried a few times if they encounter database
+        errors such as serialization failures. Callbacks given to `call_after`
+        will accumulate across transaction attempts and will _all_ be called once a
+        transaction attempt succeeds, regardless of whether previous transaction
+        attempts failed. Otherwise, if all transaction attempts fail, all
+        `call_on_exception` callbacks will be run instead.
         """
         # if self.after_callbacks is None, that means that whatever constructed the
         # LoggingTransaction isn't expecting there to be any callbacks; assert that
@@ -254,6 +262,15 @@ class LoggingTransaction:
     def call_on_exception(
         self, callback: Callable[..., object], *args: Any, **kwargs: Any
     ):
+        """Call the given callback on the main twisted thread after the transaction has
+        failed.
+
+        Note that transactions may be retried a few times if they encounter database
+        errors such as serialization failures. Callbacks given to `call_on_exception`
+        will accumulate across transaction attempts and will _all_ be called once the
+        final transaction attempt fails. No `call_on_exception` callbacks will be run
+        if any transaction attempt succeeds.
+        """
         # if self.exception_callbacks is None, that means that whatever constructed the
         # LoggingTransaction isn't expecting there to be any callbacks; assert that
         # is not the case.
@@ -288,13 +305,17 @@ class LoggingTransaction:
         """
 
         if isinstance(self.database_engine, PostgresEngine):
-            from psycopg2.extras import execute_batch  # type: ignore
+            from psycopg2.extras import execute_batch
 
-            self._do_execute(lambda *x: execute_batch(self.txn, *x), sql, args)
+            self._do_execute(
+                lambda the_sql: execute_batch(self.txn, the_sql, args), sql
+            )
         else:
             self.executemany(sql, args)
 
-    def execute_values(self, sql: str, *args: Any, fetch: bool = True) -> List[Tuple]:
+    def execute_values(
+        self, sql: str, values: Iterable[Iterable[Any]], fetch: bool = True
+    ) -> List[Tuple]:
         """Corresponds to psycopg2.extras.execute_values. Only available when
         using postgres.
 
@@ -302,10 +323,11 @@ class LoggingTransaction:
         rows (e.g. INSERTs).
         """
         assert isinstance(self.database_engine, PostgresEngine)
-        from psycopg2.extras import execute_values  # type: ignore
+        from psycopg2.extras import execute_values
 
         return self._do_execute(
-            lambda *x: execute_values(self.txn, *x, fetch=fetch), sql, *args
+            lambda the_sql: execute_values(self.txn, the_sql, values, fetch=fetch),
+            sql,
         )
 
     def execute(self, sql: str, *args: Any) -> None:

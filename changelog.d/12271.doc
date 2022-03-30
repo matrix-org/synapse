@@ -1,0 +1,1 @@
+Clarify documentation for running SyTest against Synapse, including use of Postgres and worker mode.

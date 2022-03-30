@@ -31,6 +31,7 @@ from synapse.storage.databases.main.appservice import (
     ApplicationServiceStore,
     ApplicationServiceTransactionStore,
 )
+from synapse.types import DeviceListUpdates
 from synapse.util import Clock
 
 from tests import unittest
@@ -267,7 +268,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
         txn = self.get_success(
             defer.ensureDeferred(
-                self.store.create_appservice_txn(service, events, [], [], {}, {})
+                self.store.create_appservice_txn(
+                    service, events, [], [], {}, {}, DeviceListUpdates()
+                )
             )
         )
         self.assertEqual(txn.id, 1)
@@ -283,7 +286,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         self.get_success(self._insert_txn(service.id, 9644, events))
         self.get_success(self._insert_txn(service.id, 9645, events))
         txn = self.get_success(
-            self.store.create_appservice_txn(service, events, [], [], {}, {})
+            self.store.create_appservice_txn(
+                service, events, [], [], {}, {}, DeviceListUpdates()
+            )
         )
         self.assertEqual(txn.id, 9646)
         self.assertEqual(txn.events, events)
@@ -296,7 +301,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         events = cast(List[EventBase], [Mock(event_id="e1"), Mock(event_id="e2")])
         self.get_success(self._set_last_txn(service.id, 9643))
         txn = self.get_success(
-            self.store.create_appservice_txn(service, events, [], [], {}, {})
+            self.store.create_appservice_txn(
+                service, events, [], [], {}, {}, DeviceListUpdates()
+            )
         )
         self.assertEqual(txn.id, 9644)
         self.assertEqual(txn.events, events)
@@ -320,7 +327,9 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         self.get_success(self._insert_txn(self.as_list[3]["id"], 9643, events))
 
         txn = self.get_success(
-            self.store.create_appservice_txn(service, events, [], [], {}, {})
+            self.store.create_appservice_txn(
+                service, events, [], [], {}, {}, DeviceListUpdates()
+            )
         )
         self.assertEqual(txn.id, 9644)
         self.assertEqual(txn.events, events)
@@ -476,12 +485,12 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
         value = self.get_success(
             self.store.get_type_stream_id_for_appservice(self.service, "read_receipt")
         )
-        self.assertEqual(value, 0)
+        self.assertEqual(value, 1)
 
         value = self.get_success(
             self.store.get_type_stream_id_for_appservice(self.service, "presence")
         )
-        self.assertEqual(value, 0)
+        self.assertEqual(value, 1)
 
     def test_get_type_stream_id_for_appservice_invalid_type(self) -> None:
         self.get_failure(
