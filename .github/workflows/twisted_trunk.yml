@@ -5,6 +5,7 @@ on:
     - cron: 0 8 * * *
 
   workflow_dispatch:
+  pull_request:
 
 jobs:
   mypy:
@@ -72,21 +73,21 @@ jobs:
             /logs/results.tap
             /logs/**/*.log*
 
-  # open an issue if the build fails, so we know about it.
-  open-issue:
-    if: failure()
-    needs:
-      - mypy
-      - trial
-      - sytest
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: JasonEtco/create-an-issue@5d9504915f79f9cc6d791934b8ef34f2353dd74d # v2.5.0, 2020-12-06
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          update_existing: true
-          filename: .ci/twisted_trunk_build_failed_issue_template.md
+#  # open an issue if the build fails, so we know about it.
+#  open-issue:
+#    if: failure()
+#    needs:
+#      - mypy
+#      - trial
+#      - sytest
+#
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#      - uses: actions/checkout@v2
+#      - uses: JasonEtco/create-an-issue@5d9504915f79f9cc6d791934b8ef34f2353dd74d # v2.5.0, 2020-12-06
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#        with:
+#          update_existing: true
+#          filename: .ci/twisted_trunk_build_failed_issue_template.md
