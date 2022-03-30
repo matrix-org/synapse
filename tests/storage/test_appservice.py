@@ -476,12 +476,12 @@ class ApplicationServiceStoreTypeStreamIds(unittest.HomeserverTestCase):
         value = self.get_success(
             self.store.get_type_stream_id_for_appservice(self.service, "read_receipt")
         )
-        self.assertEqual(value, 0)
+        self.assertEqual(value, 1)
 
         value = self.get_success(
             self.store.get_type_stream_id_for_appservice(self.service, "presence")
         )
-        self.assertEqual(value, 0)
+        self.assertEqual(value, 1)
 
     def test_get_type_stream_id_for_appservice_invalid_type(self) -> None:
         self.get_failure(
