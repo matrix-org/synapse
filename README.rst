@@ -293,24 +293,26 @@ directory of your choice::
     git clone https://github.com/matrix-org/synapse.git
     cd synapse
 
-Synapse has a number of external dependencies, that are easiest
-to install using pip and a virtualenv::
+Synapse has a number of external dependencies. We maintain a fixed development
+environment using [poetry](). First, install poetry. We recommend
 
-    python3 -m venv ./env
-    source ./env/bin/activate
-    pip install -e ".[all,dev]"
+    pip install --user pipx
+    pipx install poetry
+
+but see the `poetry installation docs <https://python-poetry.org/docs/#installation>`_
+for more details. Then ask poetry to create a virtualenvironment from the project
+and install Synapse's dependencies::
+
+    poetry install --extras "all test"
 
 This will run a process of downloading and installing all the needed
-dependencies into a virtual env. If any dependencies fail to install,
-try installing the failing modules individually::
-
-    pip install -e "module-name"
+dependencies into a virtual env.
 
 We recommend using the demo which starts 3 federated instances running on ports `8080` - `8082`
 
-    ./demo/start.sh
+    poetry run ./demo/start.sh
 
-(to stop, you can use `./demo/stop.sh`)
+(to stop, you can use `poetry run ./demo/stop.sh`)
 
 See the [demo documentation](https://matrix-org.github.io/synapse/develop/development/demo.html)
 for more information.
@@ -318,14 +320,14 @@ for more information.
 If you just want to start a single instance of the app and run it directly::
 
     # Create the homeserver.yaml config once
-    python -m synapse.app.homeserver \
+    poetry run python -m synapse.app.homeserver \
       --server-name my.domain.name \
       --config-path homeserver.yaml \
       --generate-config \
       --report-stats=[yes|no]
 
     # Start the app
-    python -m synapse.app.homeserver --config-path homeserver.yaml
+    poetry run python -m synapse.app.homeserver --config-path homeserver.yaml
 
 
 Running the unit tests
@@ -334,7 +336,7 @@ Running the unit tests
 After getting up and running, you may wish to run Synapse's unit tests to
 check that everything is installed correctly::
 
-    trial tests
+    poetry run trial tests
 
 This should end with a 'PASSED' result (note that exact numbers will
 differ)::
