@@ -251,7 +251,7 @@ class RelationsWorkerStore(SQLBaseStore):
     @cached(tree=True)
     async def get_aggregation_groups_for_event(
         self, event_id: str, room_id: str, limit: int = 5
-    ) -> Tuple[List[JsonDict], bool]:
+    ) -> List[JsonDict]:
         """Get a list of annotations on the event, grouped by event type and
         aggregation key, sorted by count.
 
@@ -264,18 +264,15 @@ class RelationsWorkerStore(SQLBaseStore):
             limit: Only fetch the `limit` groups.
 
         Returns:
-            A tuple of:
-                A list of groups of annotations that match. Each row is a dict with
-                `type`, `key` and `count` fields.
-
-                A boolean indicating if the result is limited (i.e. if there are
-                additional results to return).
+            List of groups of annotations that match. Each row is a dict with
+            `type`, `key` and `count` fields.
         """
 
-        where_args: List[Union[str, int]] = [
+        where_args = [
             event_id,
             room_id,
             RelationTypes.ANNOTATION,
+            limit,
         ]
 
         sql = """
@@ -290,13 +287,10 @@ class RelationsWorkerStore(SQLBaseStore):
 
         def _get_aggregation_groups_for_event_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[List[JsonDict], bool]:
-            txn.execute(sql, where_args + [limit + 1])
+        ) -> List[JsonDict]:
+            txn.execute(sql, where_args)
 
-            events = [{"type": row[0], "key": row[1], "count": row[2]} for row in txn]
-            limited = len(events) > limit
-
-            return events[:limit], limited
+            return [{"type": row[0], "key": row[1], "count": row[2]} for row in txn]
 
         return await self.db_pool.runInteraction(
             "get_aggregation_groups_for_event", _get_aggregation_groups_for_event_txn

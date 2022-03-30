@@ -190,11 +190,11 @@ class RelationsHandler:
         # while others need more processing during serialization.
         aggregations = BundledAggregations()
 
-        annotations, limited = await self._main_store.get_aggregation_groups_for_event(
+        annotations = await self._main_store.get_aggregation_groups_for_event(
             event_id, room_id
         )
         if annotations:
-            aggregations.annotations = {"chunk": annotations, "limited": limited}
+            aggregations.annotations = {"chunk": annotations}
 
         references = await self._main_store.get_relations_for_event(
             event_id, event, room_id, RelationTypes.REFERENCE, direction="f"

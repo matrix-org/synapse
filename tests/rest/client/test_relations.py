@@ -984,8 +984,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                     "chunk": [
                         {"type": "m.reaction", "key": "a", "count": 2},
                         {"type": "m.reaction", "key": "b", "count": 1},
-                    ],
-                    "limited": False,
+                    ]
                 },
                 bundled_aggregations,
             )
@@ -1081,8 +1080,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
             channel.json_body["unsigned"].get("m.relations"),
             {
                 RelationTypes.ANNOTATION: {
-                    "chunk": [{"count": 1, "key": "a", "type": "m.reaction"}],
-                    "limited": False,
+                    "chunk": [{"count": 1, "key": "a", "type": "m.reaction"}]
                 },
             },
         )
@@ -1101,8 +1099,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
             thread_message["unsigned"].get("m.relations"),
             {
                 RelationTypes.ANNOTATION: {
-                    "chunk": [{"count": 1, "key": "a", "type": "m.reaction"}],
-                    "limited": False,
+                    "chunk": [{"count": 1, "key": "a", "type": "m.reaction"}]
                 },
             },
         )
@@ -1262,10 +1259,7 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self.assertCountEqual(event_ids, [to_redact_event_id, unredacted_event_id])
         self.assertEquals(
             relations["m.annotation"],
-            {
-                "chunk": [{"type": "m.reaction", "key": "a", "count": 2}],
-                "limited": False,
-            },
+            {"chunk": [{"type": "m.reaction", "key": "a", "count": 2}]},
         )
 
         # Redact one of the reactions.
@@ -1277,10 +1271,7 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self.assertEquals(event_ids, [unredacted_event_id])
         self.assertEquals(
             relations["m.annotation"],
-            {
-                "chunk": [{"type": "m.reaction", "key": "a", "count": 1}],
-                "limited": False,
-            },
+            {"chunk": [{"type": "m.reaction", "key": "a", "count": 1}]},
         )
 
     def test_redact_relation_thread(self) -> None:
@@ -1397,10 +1388,7 @@ class RelationRedactionTestCase(BaseRelationsTestCase):
         self.assertEquals(event_ids, [related_event_id])
         self.assertEquals(
             relations["m.annotation"],
-            {
-                "chunk": [{"type": "m.reaction", "key": "👍", "count": 1}],
-                "limited": False,
-            },
+            {"chunk": [{"type": "m.reaction", "key": "👍", "count": 1}]},
         )
 
     @unittest.override_config({"experimental_features": {"msc3440_enabled": True}})
