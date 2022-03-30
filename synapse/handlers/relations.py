@@ -193,10 +193,8 @@ class RelationsHandler:
         annotations = await self._main_store.get_aggregation_groups_for_event(
             event_id, room_id
         )
-        if annotations.chunk:
-            aggregations.annotations = await annotations.to_dict(
-                cast("DataStore", self)
-            )
+        if annotations:
+            aggregations.annotations = {"chunk": annotations}
 
         references = await self._main_store.get_relations_for_event(
             event_id, event, room_id, RelationTypes.REFERENCE, direction="f"
