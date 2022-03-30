@@ -539,6 +539,15 @@ templates:
   #
   #custom_template_directory: /path/to/custom/templates/
 
+# List of rooms to exclude from sync responses. This is useful for server
+# administrators wishing to group users into a room without these users being able
+# to see it from their client.
+#
+# By default, no room is excluded.
+#
+#exclude_rooms_from_sync:
+#    - !foo:example.com
+
 
 # Message retention policy at the server level.
 #
@@ -1218,9 +1227,17 @@ oembed:
 # Registration can be rate-limited using the parameters in the "Ratelimiting"
 # section of this file.
 
-# Enable registration for new users.
+# Enable registration for new users. Defaults to 'false'. It is highly recommended that if you enable registration,
+# you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration
+# without any verification, you must also set `enable_registration_without_verification`, found below.
 #
 #enable_registration: false
+
+# Enable registration without email or captcha verification. Note: this option is *not* recommended,
+# as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
+# unless `enable_registration` is also enabled.
+#
+#enable_registration_without_verification: true
 
 # Time that a user's session remains valid for, after they log in.
 #

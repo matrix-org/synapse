@@ -1745,6 +1745,13 @@ class PersistEventsStore:
                 (event.state_key,),
             )
 
+            # The `_get_membership_from_event_id` is immutable, except for the
+            # case where we look up an event *before* persisting it.
+            txn.call_after(
+                self.store._get_membership_from_event_id.invalidate,
+                (event.event_id,),
+            )
+
             # We update the local_current_membership table only if the event is
             # "current", i.e., its something that has just happened.
             #

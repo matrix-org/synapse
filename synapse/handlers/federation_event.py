@@ -469,6 +469,12 @@ class FederationEventHandler:
             if context.rejected:
                 raise SynapseError(400, "Join event was rejected")
 
+            # the remote server is responsible for sending our join event to the rest
+            # of the federation. Indeed, attempting to do so will result in problems
+            # when we try to look up the state before the join (to get the server list)
+            # and discover that we do not have it.
+            event.internal_metadata.proactively_send = False
+
             return await self.persist_events_and_notify(room_id, [(event, context)])
 
     async def backfill(
