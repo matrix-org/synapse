@@ -81,7 +81,6 @@ include = [
     { path = "synmark", format="sdist" },
     { path = "sytest-blacklist", format = "sdist" },
     { path = "tests", format = "sdist" },
-    { path = "tox.ini", format = "sdist" },
     { path = "UPGRADE.rst", format = "sdist" },
 ]
 
