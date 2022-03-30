@@ -1,1 +1,1 @@
-Fix a long-standing bug that would prevent URL previews from being generated if a blacklist is configured with a rule for port numbers.
+Fix a long-standing bug affecting URL previews that would generate a 500 response instead of a 403 if the previewed URL includes a port that isn't allowed by the relevant blacklist.

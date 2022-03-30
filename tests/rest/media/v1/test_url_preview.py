@@ -17,7 +17,7 @@ import json
 import os
 import re
 from typing import Any, Dict, Optional, Sequence, Tuple, Type
-from urllib.parse import urlencode, quote
+from urllib.parse import quote, urlencode
 
 from twisted.internet._resolver import HostResolution
 from twisted.internet.address import IPv4Address, IPv6Address
@@ -1134,7 +1134,8 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         good_url = quote("http://matrix.org/foo")
 
         channel = self.make_request(
-            "GET", "preview_url?url=" + bad_url,
+            "GET",
+            "preview_url?url=" + bad_url,
             shorthand=False,
             await_result=False,
         )
