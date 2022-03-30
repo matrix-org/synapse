@@ -11,6 +11,9 @@ DIST=$(cut -d ':' -f2 <<< "${distro:?}")
 cp -aT /synapse/source /synapse/build
 cd /synapse/build
 
+# Export a requirements.txt file for the dh-virtualenv to use
+poetry export --extras "all test" -o requirements.txt
+
 # if this is a prerelease, set the Section accordingly.
 #
 # When the package is later added to the package repo, reprepro will use the
