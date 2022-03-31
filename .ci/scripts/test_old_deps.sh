@@ -20,42 +20,38 @@ export LANG="C.UTF-8"
 # Prevent virtualenv from auto-updating pip to an incompatible version
 export VIRTUALENV_NO_DOWNLOAD=1
 
+# TODO: in the future, we could use an implementation of
+#   https://github.com/python-poetry/poetry/issues/3527
+#   https://github.com/pypa/pip/issues/8085
+# to select the lowest possible versions, rather than resorting to this sed script.
+
 # Patch the project definitions in-place:
 # - Replace all lower and tilde bounds with exact bounds
-# - Make the pyopenssl 17.0, which is the oldest version that works with
-#   a `cryptography` compiled against OpenSSL 1.1.
+# - Make the pyopenssl 17.0, which can work against an
+#   OpenSSL 1.1 compiled cryptography (as older ones don't compile on Travis).
 # - Delete all lines referring to psycopg2 --- so no testing of postgres support.
 # - Omit systemd: we're not logging to journal here.
 
-# TODO: we should also replace caret bounds, see
-#    https://python-poetry.org/docs/dependency-specification/#version-constraints
-# We don't use these yet, but they are the default bound used when you `poetry add` from
-# the commandline, rather than editing pyproject.toml directly.
+# TODO: also replace caret bounds, see https://python-poetry.org/docs/dependency-specification/#version-constraints
+# We don't use these yet, but IIRC they are the default bound used when you `poetry add`.
 # The sed expression 's/\^/==/g' ought to do the trick. But it would also change
-# `python = "^3.7"` to `python = "==3.7"`, which would mean we fail because olddeps
+# `python = "^3.7"` to `python = "==3.7", which would mean we fail because olddeps
 # runs on 3.8 (#12343).
-
-# TODO: I'd prefer to use something like this
-#   https://github.com/python-poetry/poetry/issues/3527
-#   https://github.com/pypa/pip/issues/8085
-# rather than this sed script.
 
 sed -i-backup \
    -e "s/[~>]=/==/g" \
    -e "/psycopg2/d" \
    -e 's/pyOpenSSL = "==16.0.0"/pyOpenSSL = "==17.0.0"/' \
-   -e '/psycopg2/d' \
    -e '/systemd/d' \
    pyproject.toml
 
-# TODO: once pyproject.toml uses poetry-core as its build-system, we may be able to
-# simply `pip install .[all, test]` and run trial directly. (We would have to convince
-# ourselves that pip will refuse to install if the olddeps are incompatible with each
-# other: folklore contends that pip's resolver is more lax than poetry's.)
+# Use poetry to do the installation. This ensures that the versions are all mutually
+# compatible (as far the package metadata declares, anyway); pip's package resolver
+# is more lax.
 #
-# Until then, setuptools is the build system. That means we need to use `poetry` to
-# do the installation. `poetry lock` fails because of incompatibilities between dev
-# dependencies and old deps. Workaround this by removing dev dependencies entirely.
+# Rather than `poetry install --no-dev`, we drop all dev dependencies from the
+# toml file. This means we don't have to ensure compatibility between old deps and
+# dev tools.
 
 pip install --user toml
 
