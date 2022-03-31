@@ -25,12 +25,18 @@ export VIRTUALENV_NO_DOWNLOAD=1
 #   https://github.com/pypa/pip/issues/8085
 # to select the lowest possible versions, rather than resorting to this sed script.
 
-# patch the project definitions in-place
-# replace all lower bounds with exact bounds
-# but make the pyopenssl 17.0, which can work against an
-# OpenSSL 1.1 compiled cryptography (as older ones don't compile on Travis).
-# delete all lines referring to psycopg2 --- so no testing of postgres support
-# Omit systemd: we're not logging to journal here.
+# Patch the project definitions in-place:
+# - Replace all lower and tilde bounds with exact bounds
+# - Make the pyopenssl 17.0, which can work against an
+#   OpenSSL 1.1 compiled cryptography (as older ones don't compile on Travis).
+# - Delete all lines referring to psycopg2 --- so no testing of postgres support.
+# - Omit systemd: we're not logging to journal here.
+
+# TODO: also replace caret bounds, see https://python-poetry.org/docs/dependency-specification/#version-constraints
+# We don't use these yet, but IIRC they are the default bound used when you `poetry add`.
+# The sed expression 's/\^/==/g' ought to do the trick. But it would also change
+# `python = "^3.7"` to `python = "==3.7", which would mean we fail because olddeps
+# runs on 3.8 (#12343).
 
 sed -i-backup \
    -e "s/[~>]=/==/g" \
