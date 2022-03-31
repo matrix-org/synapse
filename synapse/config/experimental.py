@@ -77,7 +77,7 @@ class ExperimentalConfig(Config):
         self.msc3720_enabled: bool = experimental.get("msc3720_enabled", False)
 
         # The deprecated groups feature.
-        self.groups_enabled: bool = experimental.get("groups_enabled", True)
+        self.groups_enabled: bool = experimental.get("groups_enabled", False)
 
         # MSC2654: Unread counts
         self.msc2654_enabled: bool = experimental.get("msc2654_enabled", False)

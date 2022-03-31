@@ -85,6 +85,13 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.58.0
+
+## Groups/communities feature has been disabled by default
+
+The non-standard groups/communities feature in Synapse has been disabled by default
+and will be removed in Synapse v1.61.0.
+
 # Upgrading to v1.57.0
 
 ## Changes to database schema for application services
