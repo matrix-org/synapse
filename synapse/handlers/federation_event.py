@@ -989,7 +989,7 @@ class FederationEventHandler:
         )
 
         # we also need the event itself.
-        if not await self._store.have_seen_events(room_id, event_id):
+        if not await self._store.have_seen_event(room_id, event_id):
             await self._get_events_and_persist(
                 destination=destination, room_id=room_id, event_ids=(event_id,)
             )
