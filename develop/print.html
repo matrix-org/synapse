@@ -13218,19 +13218,6 @@ export SYNAPSE_POSTGRES_USER=postgres
 export SYNAPSE_POSTGRES_PASSWORD=mydevenvpassword
 trial
 </code></pre>
-<h4 id="prebuilt-container"><a class="header" href="#prebuilt-container">Prebuilt container</a></h4>
-<p>Since configuring PostgreSQL can be fiddly, we can make use of a pre-made
-Docker container to set up PostgreSQL and run our tests for us. To do so, run</p>
-<pre><code class="language-shell">scripts-dev/test_postgresql.sh
-</code></pre>
-<p>Any extra arguments to the script will be passed to <code>tox</code> and then to <code>trial</code>,
-so we can run a specific test in this container with e.g.</p>
-<pre><code class="language-shell">scripts-dev/test_postgresql.sh tests.replication.test_sharded_event_persister.EventPersisterShardTestCase
-</code></pre>
-<p>The container creates a folder in your Synapse checkout called
-<code>.tox-pg-container</code> and uses this as a tox environment. The output of any
-<code>trial</code> runs goes into <code>_trial_temp</code> in your synapse source directory — the same
-as running <code>trial</code> directly on your host machine.</p>
 <h2 id="run-the-integration-tests-a-hrefhttpsgithubcommatrix-orgsytestsytesta"><a class="header" href="#run-the-integration-tests-a-hrefhttpsgithubcommatrix-orgsytestsytesta">Run the integration tests (<a href="https://github.com/matrix-org/sytest">Sytest</a>).</a></h2>
 <p>The integration tests are a more comprehensive suite of tests. They
 run a full version of Synapse, including your changes, to check if
