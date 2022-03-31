@@ -688,6 +688,10 @@ class ServerConfig(Config):
             config.get("use_new_device_lists_changes_in_room") or False
         )
 
+        self.rooms_to_exclude_from_sync: List[str] = (
+            config.get("exclude_rooms_from_sync") or []
+        )
+
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
 
@@ -1242,6 +1246,15 @@ class ServerConfig(Config):
           # information about using custom templates.
           #
           #custom_template_directory: /path/to/custom/templates/
+
+        # List of rooms to exclude from sync responses. This is useful for server
+        # administrators wishing to group users into a room without these users being able
+        # to see it from their client.
+        #
+        # By default, no room is excluded.
+        #
+        #exclude_rooms_from_sync:
+        #    - !foo:example.com
         """
             % locals()
         )

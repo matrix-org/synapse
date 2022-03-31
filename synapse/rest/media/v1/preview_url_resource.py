@@ -200,12 +200,17 @@ class PreviewUrlResource(DirectServeJsonResource):
                     match = False
                     continue
 
+                # Some attributes might not be parsed as strings by urlsplit (such as the
+                # port, which is parsed as an int). Because we use match functions that
+                # expect strings, we want to make sure that's what we give them.
+                value_str = str(value)
+
                 if pattern.startswith("^"):
-                    if not re.match(pattern, getattr(url_tuple, attrib)):
+                    if not re.match(pattern, value_str):
                         match = False
                         continue
                 else:
-                    if not fnmatch.fnmatch(getattr(url_tuple, attrib), pattern):
+                    if not fnmatch.fnmatch(value_str, pattern):
                         match = False
                         continue
             if match:
