@@ -23,7 +23,7 @@ jobs:
     # This does a vanilla `poetry install` - no extras. I'm slightly anxious
     # that we might skip some typechecks on code that uses extras. However,
     # I think the right way to fix this is to turn up mypy's strictness:
-    # disallow unknown imports and be accept fewer uses of `Any`.
+    # disallow unknown imports and accept fewer uses of `Any`.
     uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v1"
 
   lint-crlf:

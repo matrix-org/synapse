@@ -36,7 +36,6 @@ sed -i-backup \
    -e "s/[~>]=/==/g" \
    -e "/psycopg2/d" \
    -e 's/pyOpenSSL = "==16.0.0"/pyOpenSSL = "==17.0.0"/' \
-   -e '/psycopg2/d' \
    -e '/systemd/d' \
    pyproject.toml
 

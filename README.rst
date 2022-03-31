@@ -294,7 +294,7 @@ directory of your choice::
     cd synapse
 
 Synapse has a number of external dependencies. We maintain a fixed development
-environment using [poetry](). First, install poetry. We recommend
+environment using [poetry](https://python-poetry.org/). First, install poetry. We recommend
 
     pip install --user pipx
     pipx install poetry
