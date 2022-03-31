@@ -37,7 +37,6 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.stream import generate_pagination_where_clause
 from synapse.storage.engines import PostgresEngine
-from synapse.storage.relations import PaginationChunk
 from synapse.types import JsonDict, RoomStreamToken, StreamToken
 from synapse.util.caches.descriptors import cached, cachedList
 
@@ -71,7 +70,7 @@ class RelationsWorkerStore(SQLBaseStore):
         direction: str = "b",
         from_token: Optional[StreamToken] = None,
         to_token: Optional[StreamToken] = None,
-    ) -> PaginationChunk:
+    ) -> Tuple[List[str], Optional[StreamToken]]:
         """Get a list of relations for an event, ordered by topological ordering.
 
         Args:
@@ -88,8 +87,10 @@ class RelationsWorkerStore(SQLBaseStore):
             to_token: Fetch rows up to the given token, or up to the end if None.
 
         Returns:
-            List of event IDs that match relations requested. The rows are of
-            the form `{"event_id": "..."}`.
+            A tuple of:
+                A list of related event IDs
+
+                The next stream token, if one exists.
         """
         # We don't use `event_id`, it's there so that we can cache based on
         # it. The `event_id` must match the `event.event_id`.
@@ -144,7 +145,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
         def _get_recent_references_for_event_txn(
             txn: LoggingTransaction,
-        ) -> PaginationChunk:
+        ) -> Tuple[List[str], Optional[StreamToken]]:
             txn.execute(sql, where_args + [limit + 1])
 
             last_topo_id = None
@@ -154,7 +155,7 @@ class RelationsWorkerStore(SQLBaseStore):
                 # Do not include edits for redacted events as they leak event
                 # content.
                 if not is_redacted or row[1] != RelationTypes.REPLACE:
-                    events.append({"event_id": row[0]})
+                    events.append(row[0])
                 last_topo_id = row[2]
                 last_stream_id = row[3]
 
@@ -177,9 +178,7 @@ class RelationsWorkerStore(SQLBaseStore):
                         groups_key=0,
                     )
 
-            return PaginationChunk(
-                chunk=list(events[:limit]), next_batch=next_token, prev_batch=from_token
-            )
+            return events[:limit], next_token
 
         return await self.db_pool.runInteraction(
             "get_recent_references_for_event", _get_recent_references_for_event_txn
