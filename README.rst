@@ -320,14 +320,14 @@ for more information.
 If you just want to start a single instance of the app and run it directly::
 
     # Create the homeserver.yaml config once
-    poetry run python -m synapse.app.homeserver \
+    poetry run synapse_homeserver \
       --server-name my.domain.name \
       --config-path homeserver.yaml \
       --generate-config \
       --report-stats=[yes|no]
 
     # Start the app
-    poetry run python -m synapse.app.homeserver --config-path homeserver.yaml
+    poetry run synapse_homeserver --config-path homeserver.yaml
 
 
 Running the unit tests
