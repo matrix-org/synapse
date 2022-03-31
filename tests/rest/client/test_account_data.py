@@ -28,12 +28,12 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
         account_data.register_servlets,
     ]
 
-    def test_on_account_data_changes_callback(self) -> None:
-        """Tests that the on_account_data_changes module callback is called correctly when
+    def test_on_account_data_updated_callback(self) -> None:
+        """Tests that the on_account_data_updated module callback is called correctly when
         a user's account data changes.
         """
         mocked_callback = Mock(return_value=make_awaitable(None))
-        self.hs.get_account_data_handler()._on_account_data_change_callbacks.append(
+        self.hs.get_account_data_handler()._on_account_data_updated_callbacks.append(
             mocked_callback
         )
 

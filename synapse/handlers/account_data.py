@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-ON_ACCOUNT_DATA_CHANGE_CALLBACK = Callable[
+ON_ACCOUNT_DATA_UPDATED_CALLBACK = Callable[
     [str, Optional[str], str, JsonDict], Awaitable
 ]
 
@@ -47,16 +47,16 @@ class AccountDataHandler:
         self._remove_tag_client = ReplicationRemoveTagRestServlet.make_client(hs)
         self._account_data_writers = hs.config.worker.writers.account_data
 
-        self._on_account_data_change_callbacks: List[
-            ON_ACCOUNT_DATA_CHANGE_CALLBACK
+        self._on_account_data_updated_callbacks: List[
+            ON_ACCOUNT_DATA_UPDATED_CALLBACK
         ] = []
 
     def register_module_callbacks(
-        self, on_account_data_change: Optional[ON_ACCOUNT_DATA_CHANGE_CALLBACK] = None
+        self, on_account_data_updated: Optional[ON_ACCOUNT_DATA_UPDATED_CALLBACK] = None
     ) -> None:
         """Register callbacks from modules."""
-        if on_account_data_change is not None:
-            self._on_account_data_change_callbacks.append(on_account_data_change)
+        if on_account_data_updated is not None:
+            self._on_account_data_updated_callbacks.append(on_account_data_updated)
 
     async def _notify_modules(
         self,
@@ -79,7 +79,7 @@ class AccountDataHandler:
             account_data_type: The type of the account data.
             content: The content that is now associated with this type.
         """
-        for callback in self._on_account_data_change_callbacks:
+        for callback in self._on_account_data_updated_callbacks:
             try:
                 await callback(user_id, room_id, account_data_type, content)
             except Exception as e:
