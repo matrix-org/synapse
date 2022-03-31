@@ -38,7 +38,7 @@ FROM base as builder
 # We install poetry as --user so that it doesn't end up in the system-wide python
 # installation. That gets copied later into the runtime image.
 RUN --mount=type=cache,target=/root/.cache/pip \
-  pip install poetry==1.1.12
+  pip install --user poetry==1.1.12
 
 # install the OS build deps
 RUN \

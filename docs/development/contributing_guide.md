@@ -48,7 +48,7 @@ can find many good git tutorials on the web.
 
 # 4. Install the dependencies
 
-Synapse uses the [poetry](https://python-poetry.org/) project to lock its dependencies
+Synapse uses the [poetry](https://python-poetry.org/) project to manage its dependencies
 and development environment. Once you have installed Python 3 and added the
 source, you should [install poetry](https://python-poetry.org/docs/#installation).
 We recommend installing `poetry` using `pipx`; see their instructions for details.
