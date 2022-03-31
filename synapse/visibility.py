@@ -381,8 +381,7 @@ async def _event_to_history_vis(
     visibility_ids = {
         vis_event_id
         for vis_event_id in (
-            state_ids.get(_HISTORY_VIS_KEY)
-            for state_ids in event_to_state_ids.values()
+            state_ids.get(_HISTORY_VIS_KEY) for state_ids in event_to_state_ids.values()
         )
         if vis_event_id
     }
