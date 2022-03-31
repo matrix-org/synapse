@@ -1,12 +1,12 @@
 # Account data callbacks
 
-Account data callbacks allow module developers to react to change with the account data
+Account data callbacks allow module developers to react to changes of the account data
 of local users. Account data callbacks can be registered using the module API's
 `register_account_data_callbacks` method.
 
 ## Callbacks
 
-The available presence router callbacks are:
+The available account data callbacks are:
 
 ### `on_account_data_change`
 
@@ -27,7 +27,7 @@ with, the type associated with the change, as well as the new content. If the ac
 data is not associated with a specific room, then the room ID is `None`.
 
 This callback is triggered when new account data is added or when the data associated with
-a given type (and optionally room) change. In Matrix, deleting account data consists in
+a given type (and optionally room) change. In Matrix, deleting account data consists of
 replacing the data associated with a given type (and optionally room) with an empty
 dictionary (`{}`).
 
