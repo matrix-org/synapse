@@ -62,6 +62,10 @@ with open('pyproject.toml', 'w') as f:
 "
 python3 -c "$REMOVE_DEV_DEPENDENCIES"
 
+echo "::group::Patched pyproject.toml"
+diff -u pyproject.toml-backup pyproject.toml
+echo "::endgroup::"
+
 pipx install poetry==1.1.12
 ~/.local/bin/poetry lock
 ~/.local/bin/poetry install -E "all test"
