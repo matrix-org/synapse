@@ -258,11 +258,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
     @cached(tree=True)
     async def get_aggregation_groups_for_event(
-        self,
-        event_id: str,
-        room_id: str,
-        limit: int = 5,
-        ignored_users: FrozenSet[str] = frozenset(),
+        self, event_id: str, room_id: str, limit: int = 5
     ) -> List[JsonDict]:
         """Get a list of annotations on the event, grouped by event type and
         aggregation key, sorted by count.
@@ -274,48 +270,77 @@ class RelationsWorkerStore(SQLBaseStore):
             event_id: Fetch events that relate to this event ID.
             room_id: The room the event belongs to.
             limit: Only fetch the `limit` groups.
-            ignored_users: The users ignored by the requesting user.
 
         Returns:
             List of groups of annotations that match. Each row is a dict with
             `type`, `key` and `count` fields.
         """
 
-        where_args: List[Union[str, int]] = [
+        args = [
             event_id,
             room_id,
             RelationTypes.ANNOTATION,
+            limit,
         ]
-
-        ignored_users_clause_sql = ""
-        if ignored_users:
-            (
-                ignored_users_clause_sql,
-                ignored_users_clause_args,
-            ) = make_in_list_sql_clause(
-                self.database_engine, "sender", ignored_users, include=False
-            )
-            ignored_users_clause_sql = " AND " + ignored_users_clause_sql
-            where_args.extend(ignored_users_clause_args)
 
         sql = """
             SELECT type, aggregation_key, COUNT(DISTINCT sender)
             FROM event_relations
             INNER JOIN events USING (event_id)
-            WHERE relates_to_id = ? AND room_id = ? AND relation_type = ? %s
+            WHERE relates_to_id = ? AND room_id = ? AND relation_type = ?
             GROUP BY relation_type, type, aggregation_key
             ORDER BY COUNT(*) DESC
             LIMIT ?
-        """ % (
-            ignored_users_clause_sql,
-        )
+        """
 
         def _get_aggregation_groups_for_event_txn(
             txn: LoggingTransaction,
         ) -> List[JsonDict]:
-            txn.execute(sql, where_args + [limit])
+            txn.execute(sql, args)
 
             return [{"type": row[0], "key": row[1], "count": row[2]} for row in txn]
+
+        return await self.db_pool.runInteraction(
+            "get_aggregation_groups_for_event", _get_aggregation_groups_for_event_txn
+        )
+
+    async def get_aggregation_groups_for_users(
+        self,
+        event_id: str,
+        room_id: str,
+        limit: int,
+        users: FrozenSet[str] = frozenset(),
+    ) -> Dict[Tuple[str, str], int]:
+        if not users:
+            return {}
+
+        args: List[Union[str, int]] = [
+            event_id,
+            room_id,
+            RelationTypes.ANNOTATION,
+        ]
+
+        users_sql, users_args = make_in_list_sql_clause(
+            self.database_engine, "sender", users
+        )
+        args.extend(users_args)
+
+        sql = f"""
+            SELECT type, aggregation_key, COUNT(DISTINCT sender)
+            FROM event_relations
+            INNER JOIN events USING (event_id)
+            WHERE relates_to_id = ? AND room_id = ? AND relation_type = ? AND {users_sql}
+            GROUP BY relation_type, type, aggregation_key
+            ORDER BY COUNT(*) DESC
+            LIMIT ?
+        """
+
+        def _get_aggregation_groups_for_event_txn(
+            txn: LoggingTransaction,
+        ) -> Dict[Tuple[str, str], int]:
+            txn.execute(sql, args + [limit])
+
+            return {(row[0], row[1]): row[2] for row in txn}
 
         return await self.db_pool.runInteraction(
             "get_aggregation_groups_for_event", _get_aggregation_groups_for_event_txn

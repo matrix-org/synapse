@@ -200,6 +200,51 @@ class RelationsHandler:
 
         return related_events, next_token
 
+    async def get_annotations_for_event(
+        self,
+        event_id: str,
+        room_id: str,
+        limit: int = 5,
+        ignored_users: FrozenSet[str] = frozenset(),
+    ) -> List[JsonDict]:
+        """Get a list of annotations on the event, grouped by event type and
+        aggregation key, sorted by count.
+
+        This is used e.g. to get the what and how many reactions have happend
+        on an event.
+
+        Args:
+            event_id: Fetch events that relate to this event ID.
+            room_id: The room the event belongs to.
+            limit: Only fetch the `limit` groups.
+            ignored_users: The users ignored by the requesting user.
+
+        Returns:
+            List of groups of annotations that match. Each row is a dict with
+            `type`, `key` and `count` fields.
+        """
+        # Get the base results for all users.
+        full_results = await self._main_store.get_aggregation_groups_for_event(
+            event_id, room_id, limit
+        )
+
+        # Then subtract off the results for any ignored users.
+        ignored_results = await self._main_store.get_aggregation_groups_for_users(
+            event_id, room_id, limit, ignored_users
+        )
+
+        filtered_results = []
+        for result in full_results:
+            key = (result["type"], result["key"])
+            if key in ignored_results:
+                result = result.copy()
+                result["count"] -= ignored_results[key]
+                if result["count"] <= 0:
+                    continue
+            filtered_results.append(result)
+
+        return filtered_results
+
     async def _get_bundled_aggregation_for_event(
         self, event: EventBase, ignored_users: FrozenSet[str]
     ) -> Optional[BundledAggregations]:
@@ -232,7 +277,7 @@ class RelationsHandler:
         # while others need more processing during serialization.
         aggregations = BundledAggregations()
 
-        annotations = await self._main_store.get_aggregation_groups_for_event(
+        annotations = await self.get_annotations_for_event(
             event_id, room_id, ignored_users=ignored_users
         )
         if annotations:
