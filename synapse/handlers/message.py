@@ -179,7 +179,6 @@ class MessageHandler:
                 room_id,
                 end_token=at_token.room_key,
                 limit=1,
-                order_by="stream",
             )
 
             if not last_events:

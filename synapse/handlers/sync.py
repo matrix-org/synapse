@@ -687,7 +687,6 @@ class SyncHandler:
             room_id,
             end_token=stream_position.room_key,
             limit=1,
-            order_by="stream",
         )
 
         if last_events:
