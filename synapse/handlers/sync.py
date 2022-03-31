@@ -684,9 +684,7 @@ class SyncHandler:
             state_filter: The state filter used to fetch state from the database.
         """
         last_events, _ = await self.store.get_recent_events_for_room(
-            room_id,
-            end_token=stream_position.room_key,
-            limit=1,
+            room_id, end_token=stream_position.room_key, limit=1
         )
 
         if last_events:

@@ -176,9 +176,7 @@ class MessageHandler:
 
         if at_token:
             last_events, _ = await self.store.get_recent_events_for_room(
-                room_id,
-                end_token=at_token.room_key,
-                limit=1,
+                room_id, end_token=at_token.room_key, limit=1
             )
 
             if not last_events:
