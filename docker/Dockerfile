@@ -26,9 +26,9 @@ FROM docker.io/python:${PYTHON_VERSION}-slim as base
 # poetry-managed environment in a docker image. For a while,
 # `poetry export | pip install -r /dev/stdin` seemed plausible but is limited by bugs
 # in `poetry export` whose fixes (scheduled for poetry 1.2) have yet to be released.
-# The best references I could find are
+# This is inspired from:
 #     https://github.com/python-poetry/poetry/discussions/1879#discussioncomment-216865
-#     https://stackoverflow.com/questions/53835198/integrating-python-poetry-with-docker?answertab=scoredesc#tab-top
+#     https://stackoverflow.com/questions/53835198/integrating-python-poetry-with-docker?answertab=scoredesc
 FROM base as builder
 
 # RUN --mount is specific to buildkit and is documented at
@@ -60,7 +60,7 @@ RUN \
 
 WORKDIR /synapse
 
-# Copy just what we need to poetry install
+# Copy just what we need to run `poetry install`
 COPY pyproject.toml poetry.lock README.rst /synapse/
 
 # Install to the Python installation which hosts `pip`. In this case, it's the system

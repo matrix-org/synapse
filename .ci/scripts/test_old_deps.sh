@@ -20,10 +20,10 @@ export LANG="C.UTF-8"
 # Prevent virtualenv from auto-updating pip to an incompatible version
 export VIRTUALENV_NO_DOWNLOAD=1
 
-# I'd prefer to use something like this
+# TODO: in the future, we could use an implementation of
 #   https://github.com/python-poetry/poetry/issues/3527
 #   https://github.com/pypa/pip/issues/8085
-# rather than this sed script. But that's an Opinion.
+# to select the lowest possible versions, rather than resorting to this sed script.
 
 # patch the project definitions in-place
 # replace all lower bounds with exact bounds
