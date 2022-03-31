@@ -38,7 +38,7 @@ If multiple modules implement this callback, Synapse runs them all in order.
 
 ## Example
 
-The example below is a module that implements the `on_account_data_change` callback, and
+The example below is a module that implements the `on_account_data_updated` callback, and
 sends an event to an audit room when a user changes their account data.
 
 ```python
