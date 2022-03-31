@@ -223,7 +223,6 @@ all = [
     "pysaml2",
     # oidc
     "authlib",
-    # systemd, omitted: this is a system-based requirement
     # url_preview
     "lxml",
     # sentry
@@ -234,8 +233,10 @@ all = [
     "pyjwt",
     #redis
     "txredisapi", "hiredis"
-    # cache_memory, omitted: this is an experimental option
-    # test, omitted: it's useful to have this separate from dev deps in the olddeps job
+    # omitted:
+    #   - cache_memory: this is an experimental option
+    #   - test: it's useful to have this separate from dev deps in the olddeps job
+    #   - systemd: this is a system-based requirement
 ]
 
 [tool.poetry.dev-dependencies]
