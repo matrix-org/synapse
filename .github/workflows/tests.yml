@@ -370,7 +370,7 @@ jobs:
       # Run Complement
       - run: |
           set -o pipefail
-          go test -v -json -tags synapse_blacklist,msc2403,msc2716,msc3030 ./tests/... 2>&1 | gotestfmt
+          go test -v -json -tags synapse_blacklist,msc2716,msc3030 ./tests/... 2>&1 | gotestfmt
         shell: bash
         name: Run Complement Tests
         env:

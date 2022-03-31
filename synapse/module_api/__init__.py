@@ -62,6 +62,7 @@ from synapse.events.third_party_rules import (
     ON_CREATE_ROOM_CALLBACK,
     ON_NEW_EVENT_CALLBACK,
     ON_PROFILE_UPDATE_CALLBACK,
+    ON_THREEPID_BIND_CALLBACK,
     ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK,
 )
 from synapse.handlers.account_validity import (
@@ -293,6 +294,7 @@ class ModuleApi:
         on_user_deactivation_status_changed: Optional[
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = None,
+        on_threepid_bind: Optional[ON_THREEPID_BIND_CALLBACK] = None,
     ) -> None:
         """Registers callbacks for third party event rules capabilities.
 
@@ -308,6 +310,7 @@ class ModuleApi:
             check_can_deactivate_user=check_can_deactivate_user,
             on_profile_update=on_profile_update,
             on_user_deactivation_status_changed=on_user_deactivation_status_changed,
+            on_threepid_bind=on_threepid_bind,
         )
 
     def register_presence_router_callbacks(
