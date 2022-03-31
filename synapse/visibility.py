@@ -43,6 +43,8 @@ MEMBERSHIP_PRIORITY = (
     Membership.BAN,
 )
 
+_HISTORY_VIS_KEY: Final[Tuple[str, str]] = (EventTypes.RoomHistoryVisibility, "")
+
 
 async def filter_events_for_client(
     storage: Storage,
@@ -77,7 +79,7 @@ async def filter_events_for_client(
     # to clients.
     events = [e for e in events if not e.internal_metadata.is_soft_failed()]
 
-    types = ((EventTypes.RoomHistoryVisibility, ""), (EventTypes.Member, user_id))
+    types = (_HISTORY_VIS_KEY, (EventTypes.Member, user_id))
 
     # we exclude outliers at this point, and then handle them separately later
     event_id_to_state = await storage.state.get_state_for_events(
@@ -160,7 +162,7 @@ async def filter_events_for_client(
         state = event_id_to_state[event.event_id]
 
         # get the room_visibility at the time of the event.
-        visibility_event = state.get((EventTypes.RoomHistoryVisibility, ""), None)
+        visibility_event = state.get(_HISTORY_VIS_KEY, None)
         if visibility_event:
             visibility = visibility_event.content.get(
                 "history_visibility", HistoryVisibility.SHARED
@@ -355,9 +357,6 @@ async def filter_events_for_server(
             to_return.append(prune_event(e))
 
     return to_return
-
-
-_HISTORY_VIS_KEY: Final[Tuple[str, str]] = (EventTypes.RoomHistoryVisibility, "")
 
 
 async def _event_to_history_vis(
