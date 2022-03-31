@@ -512,6 +512,17 @@ class ModuleApi:
         """
         return await self._store.is_server_admin(UserID.from_string(user_id))
 
+    async def set_user_admin(self, user_id: str, admin: bool) -> None:
+        """Sets if a user is a server admin.
+
+        Added in Synapse v1.56.0.
+
+        Args:
+            user_id: The Matrix ID of the user to set admin status for.
+            admin: True iff the user is to be a server admin, false otherwise.
+        """
+        await self._store.set_server_admin(UserID.from_string(user_id), admin)
+
     def get_qualified_user_id(self, username: str) -> str:
         """Qualify a user id, if necessary
 
