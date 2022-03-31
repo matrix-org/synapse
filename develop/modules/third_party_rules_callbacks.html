@@ -361,6 +361,17 @@ a server admin (and <code>False</code> otherwise). This latter <code>by_admin</c
 if the user is being reactivated, as this operation can only be performed through the
 admin API.</p>
 <p>If multiple modules implement this callback, Synapse runs them all in order.</p>
+<h3 id="on_threepid_bind"><a class="header" href="#on_threepid_bind"><code>on_threepid_bind</code></a></h3>
+<p><em>First introduced in Synapse v1.56.0</em></p>
+<pre><code class="language-python">async def on_threepid_bind(user_id: str, medium: str, address: str) -&gt; None:
+</code></pre>
+<p>Called after creating an association between a local user and a third-party identifier
+(email address, phone number). The module is given the Matrix ID of the user the
+association is for, as well as the medium (<code>email</code> or <code>msisdn</code>) and address of the
+third-party identifier.</p>
+<p>Note that this callback is <em>not</em> called after a successful association on an <em>identity
+server</em>.</p>
+<p>If multiple modules implement this callback, Synapse runs them all in order.</p>
 <h2 id="example"><a class="header" href="#example">Example</a></h2>
 <p>The example below is a module that implements the third-party rules callback
 <code>check_event_allowed</code> to censor incoming messages as dictated by a third-party service.</p>
