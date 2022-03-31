@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, FrozenSet, Iterable, Optional, cast
+from typing import TYPE_CHECKING, Dict, FrozenSet, Iterable, Optional
 
 import attr
 from frozendict import frozendict
@@ -25,7 +25,6 @@ from synapse.visibility import filter_events_for_client
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
-    from synapse.storage.databases.main import DataStore
 
 
 logger = logging.getLogger(__name__)
@@ -119,7 +118,7 @@ class RelationsHandler:
         # Note that ignored users are not passed into get_relations_for_event
         # below. Ignored users are handled in filter_events_for_client (and by
         # noy passing them in here we should get a better cache hit rate).
-        pagination_chunk = await self._main_store.get_relations_for_event(
+        related_events, next_token = await self._main_store.get_relations_for_event(
             event_id=event_id,
             event=event,
             room_id=room_id,
@@ -132,9 +131,7 @@ class RelationsHandler:
             to_token=to_token,
         )
 
-        events = await self._main_store.get_events_as_list(
-            [c["event_id"] for c in pagination_chunk.chunk]
-        )
+        events = await self._main_store.get_events_as_list(related_events)
 
         events = await filter_events_for_client(
             self._storage, user_id, events, is_peeking=(member_event_id is None)
@@ -155,9 +152,16 @@ class RelationsHandler:
             events, now, bundle_aggregations=aggregations
         )
 
-        return_value = await pagination_chunk.to_dict(self._main_store)
-        return_value["chunk"] = serialized_events
-        return_value["original_event"] = original_event
+        return_value = {
+            "chunk": serialized_events,
+            "original_event": original_event,
+        }
+
+        if next_token:
+            return_value["next_batch"] = await next_token.to_string(self._main_store)
+
+        if from_token:
+            return_value["prev_batch"] = await from_token.to_string(self._main_store)
 
         return return_value
 
@@ -199,7 +203,7 @@ class RelationsHandler:
         if annotations:
             aggregations.annotations = {"chunk": annotations}
 
-        references = await self._main_store.get_relations_for_event(
+        references, next_token = await self._main_store.get_relations_for_event(
             event_id,
             event,
             room_id,
@@ -207,8 +211,15 @@ class RelationsHandler:
             direction="f",
             ignored_users=ignored_users,
         )
-        if references.chunk:
-            aggregations.references = await references.to_dict(cast("DataStore", self))
+        if references:
+            aggregations.references = {
+                "chunk": [{"event_id": event_id} for event_id in references]
+            }
+
+            if next_token:
+                aggregations.references["next_batch"] = await next_token.to_string(
+                    self._main_store
+                )
 
         # Store the bundled aggregations in the event metadata for later use.
         return aggregations
