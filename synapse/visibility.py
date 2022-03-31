@@ -381,7 +381,7 @@ async def _event_to_history_vis(
     visibility_ids = {
         vis_event_id
         for vis_event_id in (
-            state_ids.get((EventTypes.RoomHistoryVisibility, ""))
+            state_ids.get(_HISTORY_VIS_KEY)
             for state_ids in event_to_state_ids.values()
         )
         if vis_event_id
@@ -439,7 +439,7 @@ async def _event_to_memberships(
         for key, event_id in key_to_eid.items()
     }
 
-    def include(state_key):
+    def include(state_key: str) -> bool:
         # we avoid using get_domain_from_id here for efficiency.
         idx = state_key.find(":")
         if idx == -1:
