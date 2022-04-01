@@ -292,7 +292,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         # Create a user and room to play with
         user_id = self.register_user("kermit", "monkey")
         tok = self.login("kermit", "monkey")
-        room_id = self.helper.create_room_as(user_id, tok=tok)
+        room_id = self.helper.create_room_as(user_id, tok=tok, is_public=False)
 
         # The room should not currently be in the public rooms directory
         is_in_public_rooms = self.get_success(
