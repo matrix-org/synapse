@@ -385,21 +385,7 @@ class Linearizer:
         return bool(entry.deferreds)
 
     async def queue(self, key: Hashable) -> ContextManager[None]:
-        entry = self.key_to_defer.setdefault(
-            key, _LinearizerEntry(0, collections.OrderedDict())
-        )
-
-        # If the number of things executing is greater than the maximum
-        # then add a deferred to the list of blocked items
-        # When one of the things currently executing finishes it will callback
-        # this item so that it can continue executing.
-        if entry.count >= self.max_count:
-            await self._await_lock(key)
-        else:
-            logger.debug(
-                "Acquired uncontended linearizer lock %r for key %r", self.name, key
-            )
-            entry.count += 1
+        entry = await self._acquire_lock(key)
 
         # now that we have the lock, we need to return a context manager which will
         # release the lock.
@@ -428,56 +414,72 @@ class Linearizer:
 
         return _ctx_manager()
 
-    async def _await_lock(self, key: Hashable) -> None:
-        """Helper for queue: adds a deferred to the queue
-
-        Assumes that we've already checked that we've reached the limit of the number
-        of lock-holders we allow. Creates a new deferred which is added to the list, and
-        adds some management around cancellations.
+    async def _acquire_lock(self, key: Hashable) -> _LinearizerEntry:
+        """Acquires a linearizer lock, waiting if necessary.
 
         Returns once we have secured the lock.
         """
-        entry = self.key_to_defer[key]
+        entry = self.key_to_defer.setdefault(
+            key, _LinearizerEntry(0, collections.OrderedDict())
+        )
 
-        logger.debug("Waiting to acquire linearizer lock %r for key %r", self.name, key)
+        # If the number of things executing is greater than the maximum
+        # then add a deferred to the list of blocked items
+        # When one of the things currently executing finishes it will callback
+        # this item so that it can continue executing.
+        if entry.count >= self.max_count:
+            logger.debug(
+                "Waiting to acquire linearizer lock %r for key %r", self.name, key
+            )
 
-        new_defer: "defer.Deferred[None]" = make_deferred_yieldable(defer.Deferred())
-        entry.deferreds[new_defer] = 1
+            new_defer: "defer.Deferred[None]" = make_deferred_yieldable(
+                defer.Deferred()
+            )
+            entry.deferreds[new_defer] = 1
 
-        try:
-            await new_defer
-        except Exception as e:
-            logger.info("defer %r got err %r", new_defer, e)
-            if isinstance(e, CancelledError):
-                logger.debug(
-                    "Cancelling wait for linearizer lock %r for key %r", self.name, key
-                )
+            try:
+                await new_defer
+            except Exception as e:
+                logger.info("defer %r got err %r", new_defer, e)
+                if isinstance(e, CancelledError):
+                    logger.debug(
+                        "Cancelling wait for linearizer lock %r for key %r",
+                        self.name,
+                        key,
+                    )
+                else:
+                    logger.warning(
+                        "Unexpected exception waiting for linearizer lock %r for key "
+                        "%r",
+                        self.name,
+                        key,
+                    )
 
-            else:
-                logger.warning(
-                    "Unexpected exception waiting for linearizer lock %r for key %r",
-                    self.name,
-                    key,
-                )
+                # we just have to take ourselves back out of the queue.
+                del entry.deferreds[new_defer]
+                raise
 
-            # we just have to take ourselves back out of the queue.
-            del entry.deferreds[new_defer]
-            raise
+            logger.debug("Acquired linearizer lock %r for key %r", self.name, key)
+            entry.count += 1
 
-        logger.debug("Acquired linearizer lock %r for key %r", self.name, key)
-        entry.count += 1
+            # if the code holding the lock completes synchronously, then it
+            # will recursively run the next claimant on the list. That can
+            # relatively rapidly lead to stack exhaustion. This is essentially
+            # the same problem as http://twistedmatrix.com/trac/ticket/9304.
+            #
+            # In order to break the cycle, we add a cheeky sleep(0) here to
+            # ensure that we fall back to the reactor between each iteration.
+            #
+            # (This needs to happen while we hold the lock, and the context manager's
+            # exit code must be synchronous, so this is the only sensible place.)
+            await self._clock.sleep(0)
+        else:
+            logger.debug(
+                "Acquired uncontended linearizer lock %r for key %r", self.name, key
+            )
+            entry.count += 1
 
-        # if the code holding the lock completes synchronously, then it
-        # will recursively run the next claimant on the list. That can
-        # relatively rapidly lead to stack exhaustion. This is essentially
-        # the same problem as http://twistedmatrix.com/trac/ticket/9304.
-        #
-        # In order to break the cycle, we add a cheeky sleep(0) here to
-        # ensure that we fall back to the reactor between each iteration.
-        #
-        # (This needs to happen while we hold the lock, and the context manager's exit
-        # code must be synchronous, so this is the only sensible place.)
-        await self._clock.sleep(0)
+        return entry
 
 
 class ReadWriteLock:
