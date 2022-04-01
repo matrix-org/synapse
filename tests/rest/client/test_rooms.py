@@ -982,7 +982,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
         super().prepare(reactor, clock, hs)
         # profile changes expect that the user is actually registered
         user = UserID.from_string(self.user_id)
-        self.get_success(self.register_user(user.localpart, "supersecretpassword"))
+        self.register_user(user.localpart, "supersecretpassword")
 
     @unittest.override_config(
         {"rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}}}

@@ -48,17 +48,15 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         #
 
         # before we do that, we persist some other events to act as state.
-        self.get_success(self._inject_visibility("@admin:hs", "joined"))
+        self._inject_visibility("@admin:hs", "joined")
         for i in range(0, 10):
-            self.get_success(self._inject_room_member("@resident%i:hs" % i))
+            self._inject_room_member("@resident%i:hs" % i)
 
         events_to_filter = []
 
         for i in range(0, 10):
             user = "@user%i:%s" % (i, "test_server" if i == 5 else "other_server")
-            evt = self.get_success(
-                self._inject_room_member(user, extra_content={"a": "b"})
-            )
+            evt = self._inject_room_member(user, extra_content={"a": "b"})
             events_to_filter.append(evt)
 
         filtered = self.get_success(
@@ -76,10 +74,10 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
 
     def test_filter_outlier(self) -> None:
         # outlier events must be returned, for the good of the collective federation
-        self.get_success(self._inject_room_member("@resident:remote_hs"))
-        self.get_success(self._inject_visibility("@resident:remote_hs", "joined"))
+        self._inject_room_member("@resident:remote_hs")
+        self._inject_visibility("@resident:remote_hs", "joined")
 
-        outlier = self.get_success(self._inject_outlier())
+        outlier = self._inject_outlier()
         self.assertEqual(
             self.get_success(
                 filter_events_for_server(self.storage, "remote_hs", [outlier])
@@ -88,7 +86,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         )
 
         # it should also work when there are other events in the list
-        evt = self.get_success(self._inject_message("@unerased:local_hs"))
+        evt = self._inject_message("@unerased:local_hs")
 
         filtered = self.get_success(
             filter_events_for_server(self.storage, "remote_hs", [outlier, evt])
@@ -112,19 +110,19 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         # change in the middle of them.
         events_to_filter = []
 
-        evt = self.get_success(self._inject_message("@unerased:local_hs"))
+        evt = self._inject_message("@unerased:local_hs")
         events_to_filter.append(evt)
 
-        evt = self.get_success(self._inject_message("@erased:local_hs"))
+        evt = self._inject_message("@erased:local_hs")
         events_to_filter.append(evt)
 
-        evt = self.get_success(self._inject_room_member("@joiner:remote_hs"))
+        evt = self._inject_room_member("@joiner:remote_hs")
         events_to_filter.append(evt)
 
-        evt = self.get_success(self._inject_message("@unerased:local_hs"))
+        evt = self._inject_message("@unerased:local_hs")
         events_to_filter.append(evt)
 
-        evt = self.get_success(self._inject_message("@erased:local_hs"))
+        evt = self._inject_message("@erased:local_hs")
         events_to_filter.append(evt)
 
         # the erasey user gets erased
