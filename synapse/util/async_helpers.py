@@ -395,22 +395,7 @@ class Linearizer:
             try:
                 yield
             finally:
-                logger.debug("Releasing linearizer lock %r for key %r", self.name, key)
-
-                # We've finished executing so check if there are any things
-                # blocked waiting to execute and start one of them
-                entry.count -= 1
-
-                if entry.deferreds:
-                    (next_def, _) = entry.deferreds.popitem(last=False)
-
-                    # we need to run the next thing in the sentinel context.
-                    with PreserveLoggingContext():
-                        next_def.callback(None)
-                elif entry.count == 0:
-                    # We were the last thing for this key: remove it from the
-                    # map.
-                    del self.key_to_defer[key]
+                self._release_lock(key, entry)
 
         return _ctx_manager()
 
@@ -480,6 +465,25 @@ class Linearizer:
             entry.count += 1
 
         return entry
+
+    def _release_lock(self, key: Hashable, entry: _LinearizerEntry) -> None:
+        """Releases a held linearizer lock."""
+        logger.debug("Releasing linearizer lock %r for key %r", self.name, key)
+
+        # We've finished executing so check if there are any things
+        # blocked waiting to execute and start one of them
+        entry.count -= 1
+
+        if entry.deferreds:
+            (next_def, _) = entry.deferreds.popitem(last=False)
+
+            # we need to run the next thing in the sentinel context.
+            with PreserveLoggingContext():
+                next_def.callback(None)
+        elif entry.count == 0:
+            # We were the last thing for this key: remove it from the
+            # map.
+            del self.key_to_defer[key]
 
 
 class ReadWriteLock:
