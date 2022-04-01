@@ -12,7 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, FrozenSet, Iterable, List, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    FrozenSet,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+)
 
 import attr
 from frozendict import frozendict
@@ -302,6 +311,49 @@ class RelationsHandler:
         # Store the bundled aggregations in the event metadata for later use.
         return aggregations
 
+    async def get_threads_for_events(
+        self, event_ids: Collection[str], user_id: str, ignored_users: FrozenSet[str]
+    ) -> Dict[str, _ThreadAggregation]:
+        """Get the bundled aggregations for threads for the requested events.
+
+        Args:
+            event_ids: Events to get aggregations for threads.
+            user_id: The user requesting the bundled aggregations.
+            ignored_users: The users ignored by the requesting user.
+
+        Returns:
+            A dictionary mapping event ID to the thread information.
+
+            May not contain a value for all requested event IDs.
+        """
+        # Fetch thread summaries.
+        summaries = await self._main_store.get_thread_summaries(
+            event_ids, ignored_users
+        )
+
+        # Only fetch participated for a limited selection based on what had
+        # summaries.
+        participated = await self._main_store.get_threads_participated(
+            [event_id for event_id, summary in summaries.items() if summary], user_id
+        )
+
+        # A map of event ID to the thread aggregation.
+        results = {}
+
+        for event_id, summary in summaries.items():
+            if summary:
+                thread_count, latest_thread_event, edit = summary
+                results[event_id] = _ThreadAggregation(
+                    latest_event=latest_thread_event,
+                    latest_edit=edit,
+                    count=thread_count,
+                    # If there's a thread summary it must also exist in the
+                    # participated dictionary.
+                    current_user_participated=participated[event_id],
+                )
+
+        return results
+
     async def get_bundled_aggregations(
         self, events: Iterable[EventBase], user_id: str
     ) -> Dict[str, BundledAggregations]:
@@ -350,27 +402,10 @@ class RelationsHandler:
         for event_id, edit in edits.items():
             results.setdefault(event_id, BundledAggregations()).replace = edit
 
-        # Fetch thread summaries.
-        summaries = await self._main_store.get_thread_summaries(
-            events_by_id.keys(), ignored_users
+        threads = await self.get_threads_for_events(
+            events_by_id.keys(), user_id, ignored_users
         )
-        # Only fetch participated for a limited selection based on what had
-        # summaries.
-        participated = await self._main_store.get_threads_participated(
-            [event_id for event_id, summary in summaries.items() if summary], user_id
-        )
-        for event_id, summary in summaries.items():
-            if summary:
-                thread_count, latest_thread_event, edit = summary
-                results.setdefault(
-                    event_id, BundledAggregations()
-                ).thread = _ThreadAggregation(
-                    latest_event=latest_thread_event,
-                    latest_edit=edit,
-                    count=thread_count,
-                    # If there's a thread summary it must also exist in the
-                    # participated dictionary.
-                    current_user_participated=participated[event_id],
-                )
+        for event_id, thread in threads.items():
+            results.setdefault(event_id, BundledAggregations()).thread = thread
 
         return results
