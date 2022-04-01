@@ -13,8 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Callable, Hashable, Tuple
+
 from twisted.internet import defer, reactor
-from twisted.internet.defer import CancelledError
+from twisted.internet.base import ReactorBase
+from twisted.internet.defer import CancelledError, Deferred
 
 from synapse.logging.context import LoggingContext, current_context
 from synapse.util import Clock
@@ -24,6 +27,46 @@ from tests import unittest
 
 
 class LinearizerTestCase(unittest.TestCase):
+    def _start_task(
+        self, linearizer: Linearizer, key: Hashable
+    ) -> Tuple["Deferred[None]", "Deferred[None]", Callable[[], None]]:
+        """Starts a task which acquires the linearizer lock, blocks, then completes.
+
+        Args:
+            linearizer: The `Linearizer`.
+            key: The `Linearizer` key.
+
+        Returns:
+            A tuple containing:
+             * A cancellable `Deferred` for the entire task.
+             * A `Deferred` that resolves once the task acquires the lock.
+             * A function that unblocks the task. Must be called by the caller
+               to allow the task to release the lock and complete.
+        """
+        acquired_d: "Deferred[None]" = Deferred()
+        unblock_d: "Deferred[None]" = Deferred()
+
+        async def task() -> None:
+            with await linearizer.queue(key):
+                acquired_d.callback(None)
+                await unblock_d
+
+        d = defer.ensureDeferred(task())
+
+        def unblock() -> None:
+            unblock_d.callback(None)
+            # The next task, if it exists, will acquire the lock and require a kick of
+            # the reactor to advance.
+            self._pump()
+
+        return d, acquired_d, unblock
+
+    def _pump(self) -> None:
+        """Pump the reactor to advance `Linearizer`s."""
+        assert isinstance(reactor, ReactorBase)
+        while reactor.getDelayedCalls():
+            reactor.runUntilCurrent()
+
     @defer.inlineCallbacks
     def test_linearizer(self):
         """Tests that a task is queued up behind an earlier task."""
