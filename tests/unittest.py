@@ -674,7 +674,7 @@ class HomeserverTestCase(TestCase):
         username: str,
         password: str,
         device_id: Optional[str] = None,
-        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
+        custom_headers: Optional[Iterable[CustomHeaderType]] = None,
     ) -> str:
         """
         Log in a user, and get an access token. Requires the Login API be
