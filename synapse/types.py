@@ -433,6 +433,11 @@ class RoomStreamToken:
     (`topological_ordering` in the event graph) and tie-broken by
     `stream_ordering` (when the event arrived at the homeserver).
 
+    If you're looking for more info about what a token with all of the
+    underscores means, ex.
+    `s2633508_17_338_6732159_1082514_541479_274711_265584_1`, see the docstring
+    for `StreamToken` below.
+
     ---
 
     Live tokens start with an "s" followed by the `stream_ordering` of the event
