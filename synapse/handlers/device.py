@@ -725,7 +725,7 @@ class DeviceListUpdater:
     async def _handle_device_updates(self, user_id: str) -> None:
         "Actually handle pending updates."
 
-        with (await self._remote_edu_linearizer.queue(user_id)):
+        async with self._remote_edu_linearizer.queue(user_id):
             pending_updates = self._pending_updates.pop(user_id, [])
             if not pending_updates:
                 # This can happen since we batch updates

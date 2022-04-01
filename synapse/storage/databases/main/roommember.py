@@ -888,7 +888,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             return frozenset(cache.hosts_to_joined_users)
 
         # Since we'll mutate the cache we need to lock.
-        with (await self._joined_host_linearizer.queue(room_id)):
+        async with self._joined_host_linearizer.queue(room_id):
             if state_entry.state_group == cache.state_group:
                 # Same state group, so nothing to do. We've already checked for
                 # this above, but the cache may have changed while waiting on

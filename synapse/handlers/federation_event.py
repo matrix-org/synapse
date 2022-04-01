@@ -224,7 +224,7 @@ class FederationEventHandler:
                     len(missing_prevs),
                     shortstr(missing_prevs),
                 )
-                with (await self._room_pdu_linearizer.queue(pdu.room_id)):
+                async with self._room_pdu_linearizer.queue(pdu.room_id):
                     logger.info(
                         "Acquired room lock to fetch %d missing prev_events",
                         len(missing_prevs),
