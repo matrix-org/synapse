@@ -122,7 +122,7 @@ class LinearizerTestCase(unittest.TestCase):
     def test_lots_of_queued_things(self) -> None:
         """Tests lots of fast things queued up behind a slow thing.
 
-        The stack should *not* explode when the fast thing completes.
+        The stack should *not* explode when the slow thing completes.
         """
         linearizer = Linearizer()
         key = ""
