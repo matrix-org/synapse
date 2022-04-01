@@ -193,9 +193,9 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
                     else:
                         receipt_event[receipt_type] = receipt_content.copy()
 
-                # Append receipt_event to new_event unless empty
-                if len(receipt_event.keys()) > 0:
-                    new_event["content"][event_id] = receipt_event.copy()
+                # Only include the receipt event if it is non-empty.
+                if receipt_event:
+                    new_event["content"][event_id] = receipt_event
 
             # Append new_event to visible_events unless empty
             if len(new_event["content"].keys()) > 0:
