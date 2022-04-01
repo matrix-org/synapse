@@ -451,7 +451,11 @@ class Linearizer:
             #
             # (This needs to happen while we hold the lock, and the context manager's
             # exit code must be synchronous, so this is the only sensible place.)
-            await self._clock.sleep(0)
+            try:
+                await self._clock.sleep(0)
+            except CancelledError:
+                self._release_lock(key, entry)
+                raise
         else:
             logger.debug(
                 "Acquired uncontended linearizer lock %r for key %r", self.name, key
