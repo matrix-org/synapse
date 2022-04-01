@@ -68,6 +68,22 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
 
         self.wait_for_background_updates()
 
+    def add_extremity(self, room_id: str, event_id: str) -> None:
+        """
+        Add the given event as an extremity to the room.
+        """
+        self.get_success(
+            self.hs.get_datastores().main.db_pool.simple_insert(
+                table="event_forward_extremities",
+                values={"room_id": room_id, "event_id": event_id},
+                desc="test_add_extremity",
+            )
+        )
+
+        self.hs.get_datastores().main.get_latest_event_ids_in_room.invalidate(
+            (room_id,)
+        )
+
     def test_soft_failed_extremities_handled_correctly(self):
         """Test that extremities are correctly calculated in the presence of
         soft failed events.
