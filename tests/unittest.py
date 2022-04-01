@@ -49,7 +49,7 @@ from twisted.web.resource import Resource
 from twisted.web.server import Request
 
 from synapse import events
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import DEFAULT_ROOM_VERSION
@@ -320,7 +320,7 @@ class HomeserverTestCase(TestCase):
                 )
 
         if self.needs_threadpool:
-            self.reactor.threadpool = ThreadPool()
+            self.reactor.threadpool = ThreadPool()  # type: ignore[assignment]
             self.addCleanup(self.reactor.threadpool.stop)
             self.reactor.threadpool.start()
 
@@ -715,7 +715,7 @@ class HomeserverTestCase(TestCase):
 
         return event.event_id
 
-    def inject_room_member(self, room: str, user: str, membership: Membership) -> None:
+    def inject_room_member(self, room: str, user: str, membership: str) -> None:
         """
         Inject a membership event into a room.
 
@@ -808,7 +808,7 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
             self.site,
             method=method,
             path=path,
-            content=content,
+            content=content or "",
             shorthand=False,
             await_result=await_result,
             custom_headers=custom_headers,
