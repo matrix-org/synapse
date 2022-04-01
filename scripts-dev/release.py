@@ -502,8 +502,9 @@ def find_ref(repo: git.Repo, ref_name: str) -> Optional[git.HEAD]:
 
 def update_branch(repo: git.Repo) -> None:
     """Ensure branch is up to date if it has a remote"""
-    if repo.active_branch.tracking_branch():
-        repo.git.merge(repo.active_branch.tracking_branch().name)
+    tracking_branch = repo.active_branch.tracking_branch()
+    if tracking_branch:
+        repo.git.merge(tracking_branch.name)
 
 
 def get_changes_for_version(wanted_version: version.Version) -> str:
