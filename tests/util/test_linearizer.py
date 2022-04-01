@@ -26,6 +26,7 @@ from tests import unittest
 class LinearizerTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_linearizer(self):
+        """Tests that a task is queued up behind an earlier task."""
         linearizer = Linearizer()
 
         key = object()
@@ -44,6 +45,10 @@ class LinearizerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_linearizer_is_queued(self):
+        """Tests `Linearizer.is_queued`.
+
+        Runs through the same scenario as `test_linearizer`.
+        """
         linearizer = Linearizer()
 
         key = object()
@@ -75,8 +80,10 @@ class LinearizerTestCase(unittest.TestCase):
         self.assertFalse(linearizer.is_queued(key))
 
     def test_lots_of_queued_things(self):
-        # we have one slow thing, and lots of fast things queued up behind it.
-        # it should *not* explode the stack.
+        """Tests lots of fast things queued up behind a slow thing.
+
+        The stack should *not* explode when the fast thing completes.
+        """
         linearizer = Linearizer()
 
         @defer.inlineCallbacks
@@ -97,6 +104,7 @@ class LinearizerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_multiple_entries(self):
+        """Tests a `Linearizer` with a concurrency above 1."""
         limiter = Linearizer(max_count=3)
 
         key = object()
@@ -143,6 +151,7 @@ class LinearizerTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_cancellation(self):
+        """Tests cancellation while waiting for a `Linearizer`."""
         linearizer = Linearizer()
 
         key = object()
