@@ -492,8 +492,8 @@ def parse_version_from_module() -> Tuple[
 
 def find_ref(repo: git.Repo, ref_name: str) -> Optional[git.HEAD]:
     """Find the branch/ref, looking first locally then in the remote."""
-    if ref_name in repo.refs:
-        return repo.refs[ref_name]
+    if ref_name in repo.references:
+        return repo.references[ref_name]
     elif ref_name in repo.remote().refs:
         return repo.remote().refs[ref_name]
     else:
