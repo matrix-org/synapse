@@ -512,7 +512,10 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
     def default_config(self) -> JsonDict:
         config = super().default_config()
-        config["experimental_features"] = {"msc2654_enabled": True}
+        config["experimental_features"] = {
+            "msc2654_enabled": True,
+            "msc2285_enabled": True,
+        }
         return config
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
@@ -558,7 +561,6 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             tok=self.tok,
         )
 
-    @override_config({"experimental_features": {"msc2285_enabled": True}})
     def test_unread_counts(self) -> None:
         """Tests that /sync returns the right value for the unread count (MSC2654)."""
 
@@ -685,7 +687,6 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.json_body)
         self._check_unread_count(0)
 
-    @override_config({"experimental_features": {"msc2285_enabled": True}})
     def test_read_receipts_only_go_down(self) -> None:
         # Join the new user
         self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
