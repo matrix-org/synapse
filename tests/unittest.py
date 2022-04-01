@@ -717,33 +717,6 @@ class HomeserverTestCase(TestCase):
 
         return event.event_id
 
-    def add_extremity(self, room_id, event_id):
-        """
-        Add the given event as an extremity to the room.
-        """
-        self.get_success(
-            self.hs.get_datastores().main.db_pool.simple_insert(
-                table="event_forward_extremities",
-                values={"room_id": room_id, "event_id": event_id},
-                desc="test_add_extremity",
-            )
-        )
-
-        self.hs.get_datastores().main.get_latest_event_ids_in_room.invalidate(
-            (room_id,)
-        )
-
-    def attempt_wrong_password_login(self, username, password):
-        """Attempts to login as the user with the given password, asserting
-        that the attempt *fails*.
-        """
-        body = {"type": "m.login.password", "user": username, "password": password}
-
-        channel = self.make_request(
-            "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
-        )
-        self.assertEqual(channel.code, 403, channel.result)
-
     def inject_room_member(self, room: str, user: str, membership: Membership) -> None:
         """
         Inject a membership event into a room.
