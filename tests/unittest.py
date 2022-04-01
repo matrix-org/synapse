@@ -22,7 +22,6 @@ import secrets
 import time
 from typing import (
     Any,
-    AnyStr,
     Awaitable,
     Callable,
     ClassVar,
