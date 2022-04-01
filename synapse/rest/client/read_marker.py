@@ -16,6 +16,7 @@ import logging
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.constants import ReceiptTypes
+from synapse.api.errors import SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -74,6 +75,24 @@ class ReadMarkerRestServlet(RestServlet):
                 user_id=requester.user.to_string(),
                 event_id=read_marker_event_id,
             )
+
+        for key in body.keys():
+            if self.config.experimental.msc2285_enabled and key not in [
+                ReceiptTypes.READ,
+                ReceiptTypes.READ_PRIVATE,
+                ReceiptTypes.FULLY_READ,
+            ]:
+                raise SynapseError(
+                    400,
+                    "Receipt type must be 'm.read', 'org.matrix.msc2285.read.private' or 'm.fully_read'",
+                )
+            elif not self.config.experimental.msc2285_enabled and key not in [
+                ReceiptTypes.READ,
+                ReceiptTypes.FULLY_READ,
+            ]:
+                raise SynapseError(
+                    400, "Receipt type must be 'm.read' or 'm.fully_read'"
+                )
 
         return 200, {}
 
