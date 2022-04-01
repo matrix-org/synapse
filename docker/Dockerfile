@@ -73,7 +73,7 @@ ENV POETRY_VIRTUALENVS_IN_PROJECT=true \
 # used while you develop on the source
 RUN --mount=type=cache,target=/opt/poetry/artifacts \
     --mount=type=cache,target=/opt/poetry/.cache/pypoetry/cache \
-  poetry install --no-dev --no-root --no-interaction --no-ansi --extras all
+  /root/.local/bin/poetry install --no-dev --no-root --no-interaction --no-ansi --extras all
 
 # Copy over the synapse source code.
 COPY synapse /synapse/synapse/
@@ -81,7 +81,7 @@ COPY synapse /synapse/synapse/
 # Install the synapse package itself, by omitting the --no-root argument
 RUN --mount=type=cache,target=/opt/poetry/artifacts \
     --mount=type=cache,target=/opt/poetry/cache \
-  poetry install --no-dev --no-interaction --no-ansi --extras all
+  /root/.local/bin/poetry install --no-dev --no-interaction --no-ansi --extras all
 
 ###
 ### Stage 1: runtime
