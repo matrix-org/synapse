@@ -771,7 +771,9 @@ class RoomCreationHandler:
                 % (user_id,),
             )
 
-        visibility = config.get("visibility", None)
+        # The spec says rooms should default to private visibility if
+        # `visibility` is not specified.
+        visibility = config.get("visibility", "private")
         is_public = visibility == "public"
 
         room_id = await self._generate_room_id(
