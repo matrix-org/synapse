@@ -37,6 +37,7 @@ class LinearizerTestCase(unittest.TestCase):
         d2 = linearizer.queue(key)
         self.assertFalse(d2.called)
 
+        # Once the first task is done, the second task can continue.
         with cm1:
             self.assertFalse(d2.called)
 
@@ -56,13 +57,14 @@ class LinearizerTestCase(unittest.TestCase):
         d1 = linearizer.queue(key)
         cm1 = yield d1
 
-        # Since d1 gets called immediately, "is_queued" should return false.
+        # Since the first task acquires the lock immediately, "is_queued" should return
+        # false.
         self.assertFalse(linearizer.is_queued(key))
 
         d2 = linearizer.queue(key)
         self.assertFalse(d2.called)
 
-        # Now d2 is queued up behind successful completion of cm1
+        # Now the second task is queued up behind the first.
         self.assertTrue(linearizer.is_queued(key))
 
         with cm1:
@@ -71,7 +73,7 @@ class LinearizerTestCase(unittest.TestCase):
             # cm1 still not done, so d2 still queued.
             self.assertTrue(linearizer.is_queued(key))
 
-        # And now d2 is called and nothing is in the queue again
+        # And now the second task acquires the lock and nothing is in the queue again.
         self.assertFalse(linearizer.is_queued(key))
 
         with (yield d2):
@@ -118,12 +120,14 @@ class LinearizerTestCase(unittest.TestCase):
         d3 = limiter.queue(key)
         cm3 = yield d3
 
+        # These next two tasks have to wait.
         d4 = limiter.queue(key)
         self.assertFalse(d4.called)
 
         d5 = limiter.queue(key)
         self.assertFalse(d5.called)
 
+        # Once the first task completes, the fourth task can continue.
         with cm1:
             self.assertFalse(d4.called)
             self.assertFalse(d5.called)
@@ -131,11 +135,13 @@ class LinearizerTestCase(unittest.TestCase):
         cm4 = yield d4
         self.assertFalse(d5.called)
 
+        # Once the third task completes, the fifth task can continue.
         with cm3:
             self.assertFalse(d5.called)
 
         cm5 = yield d5
 
+        # Make all tasks finish.
         with cm2:
             pass
 
@@ -145,6 +151,7 @@ class LinearizerTestCase(unittest.TestCase):
         with cm5:
             pass
 
+        # The next task shouldn't have to wait.
         d6 = limiter.queue(key)
         with (yield d6):
             pass
@@ -159,12 +166,15 @@ class LinearizerTestCase(unittest.TestCase):
         d1 = linearizer.queue(key)
         cm1 = yield d1
 
+        # Create a second task, waiting for the first task.
         d2 = linearizer.queue(key)
         self.assertFalse(d2.called)
 
+        # Create a third task, waiting for the second task.
         d3 = linearizer.queue(key)
         self.assertFalse(d3.called)
 
+        # Cancel the waiting second task.
         d2.cancel()
 
         with cm1:
@@ -177,5 +187,6 @@ class LinearizerTestCase(unittest.TestCase):
         except CancelledError:
             pass
 
+        # The third task should continue running.
         with (yield d3):
             pass
