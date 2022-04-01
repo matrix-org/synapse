@@ -687,45 +687,45 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.json_body)
         self._check_unread_count(0)
 
-    def test_read_receipts_only_go_down(self) -> None:
+    # We test for both receipt types that influence notification counts
+    @parameterized.expand([ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE])
+    def test_read_receipts_only_go_down(self, receipt_type) -> None:
         # Join the new user
         self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
 
-        # We tests this for both receipt types that influence notification counts
-        for receipt_type in [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE]:
-            # Send messages
-            res1 = self.helper.send(self.room_id, "hello", tok=self.tok2)
-            res2 = self.helper.send(self.room_id, "hello", tok=self.tok2)
+        # Send messages
+        res1 = self.helper.send(self.room_id, "hello", tok=self.tok2)
+        res2 = self.helper.send(self.room_id, "hello", tok=self.tok2)
 
-            # Read last event
-            channel = self.make_request(
-                "POST",
-                f"/rooms/{self.room_id}/receipt/{receipt_type}/{res2['event_id']}",
-                {},
-                access_token=self.tok,
-            )
-            self.assertEqual(channel.code, 200, channel.json_body)
-            self._check_unread_count(0)
+        # Read last event
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/{receipt_type}/{res2['event_id']}",
+            {},
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        self._check_unread_count(0)
 
-            # Make sure neither m.read nor org.matrix.msc2285.read.private make the
-            # read receipt go up to an older event
-            channel = self.make_request(
-                "POST",
-                f"/rooms/{self.room_id}/receipt/org.matrix.msc2285.read.private/{res1['event_id']}",
-                {},
-                access_token=self.tok,
-            )
-            self.assertEqual(channel.code, 200, channel.json_body)
-            self._check_no_room_changes()
+        # Make sure neither m.read nor org.matrix.msc2285.read.private make the
+        # read receipt go up to an older event
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/org.matrix.msc2285.read.private/{res1['event_id']}",
+            {},
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        self._check_no_room_changes()
 
-            channel = self.make_request(
-                "POST",
-                f"/rooms/{self.room_id}/receipt/m.read/{res1['event_id']}",
-                {},
-                access_token=self.tok,
-            )
-            self.assertEqual(channel.code, 200, channel.json_body)
-            self._check_no_room_changes()
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/m.read/{res1['event_id']}",
+            {},
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        self._check_no_room_changes()
 
     def _check_unread_count(self, expected_count: int) -> None:
         """Syncs and compares the unread count with the expected value."""
