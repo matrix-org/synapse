@@ -96,6 +96,20 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertEqual(found_user.user_id.to_string(), user_id)
         self.assertIdentical(found_user.is_admin, True)
 
+    def test_can_set_admin(self):
+        user_id = self.get_success(
+            self.register_user(
+                "alice_wants_admin",
+                "1234",
+                displayname="Alice Powerhungry",
+                admin=False,
+            )
+        )
+        self.get_success(self.module_api.set_user_admin(user_id, True))
+        found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
+        self.assertEqual(found_user.user_id.to_string(), user_id)
+        self.assertIdentical(found_user.is_admin, True)
+
     def test_get_userinfo_by_id(self):
         user_id = self.register_user("alice", "1234")
         found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
