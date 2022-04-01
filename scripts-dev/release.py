@@ -25,7 +25,7 @@ import sys
 import urllib.request
 from os import path
 from tempfile import TemporaryDirectory
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import attr
 import click
@@ -37,7 +37,9 @@ from github import Github
 from packaging import version
 
 
-def run_until_successful(command, *args, **kwargs):
+def run_until_successful(
+    command: str, *args: Any, **kwargs: Any
+) -> subprocess.CompletedProcess:
     while True:
         completed_process = subprocess.run(command, *args, **kwargs)
         exit_code = completed_process.returncode
@@ -51,7 +53,7 @@ def run_until_successful(command, *args, **kwargs):
 
 
 @click.group()
-def cli():
+def cli() -> None:
     """An interactive script to walk through the parts of creating a release.
 
     Requires the dev dependencies be installed, which can be done via:
@@ -82,7 +84,7 @@ def cli():
 
 
 @cli.command()
-def prepare():
+def prepare() -> None:
     """Do the initial stages of creating a release, including creating release
     branch, updating changelog and pushing to GitHub.
     """
@@ -268,7 +270,7 @@ def prepare():
 
 @cli.command()
 @click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"])
-def tag(gh_token: Optional[str]):
+def tag(gh_token: Optional[str]) -> None:
     """Tags the release and generates a draft GitHub release"""
 
     # Make sure we're in a git repo.
@@ -350,7 +352,7 @@ def tag(gh_token: Optional[str]):
 
 @cli.command()
 @click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=True)
-def publish(gh_token: str):
+def publish(gh_token: str) -> None:
     """Publish release."""
 
     # Make sure we're in a git repo.
@@ -393,7 +395,7 @@ def publish(gh_token: str):
 
 
 @cli.command()
-def upload():
+def upload() -> None:
     """Upload release to pypi."""
 
     current_version, _, _ = parse_version_from_module()
@@ -421,7 +423,7 @@ def upload():
 
 
 @cli.command()
-def announce():
+def announce() -> None:
     """Generate markdown to announce the release."""
 
     current_version, _, _ = parse_version_from_module()
@@ -498,7 +500,7 @@ def find_ref(repo: git.Repo, ref_name: str) -> Optional[git.HEAD]:
         return None
 
 
-def update_branch(repo: git.Repo):
+def update_branch(repo: git.Repo) -> None:
     """Ensure branch is up to date if it has a remote"""
     if repo.active_branch.tracking_branch():
         repo.git.merge(repo.active_branch.tracking_branch().name)
@@ -565,7 +567,7 @@ def get_changes_for_version(wanted_version: version.Version) -> str:
     return "\n".join(version_changelog)
 
 
-def generate_and_write_changelog(current_version: version.Version):
+def generate_and_write_changelog(current_version: version.Version) -> None:
     # We do this by getting a draft so that we can edit it before writing to the
     # changelog.
     result = run_until_successful(
@@ -585,8 +587,8 @@ def generate_and_write_changelog(current_version: version.Version):
         f.write(existing_content)
 
     # Remove all the news fragments
-    for f in glob.iglob("changelog.d/*.*"):
-        os.remove(f)
+    for filename in glob.iglob("changelog.d/*.*"):
+        os.remove(filename)
 
 
 if __name__ == "__main__":
