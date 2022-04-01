@@ -212,6 +212,9 @@ class LinearizerTestCase(unittest.TestCase):
         self.failureResultOf(d2, CancelledError)
 
         # The third task should continue running.
-        self.assertTrue(acquired_d3.called)
+        self.assertTrue(
+            acquired_d3.called,
+            "Third task did not get the lock after the second task was cancelled",
+        )
         unblock3()
         self.successResultOf(d3)
