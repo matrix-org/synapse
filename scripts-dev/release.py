@@ -300,7 +300,9 @@ def tag(gh_token: Optional[str]) -> None:
 
     click.echo_via_pager(changes)
     if click.confirm("Edit text?", default=False):
-        changes = click.edit(changes, require_save=False)
+        edited_changes = click.edit(changes, require_save=False)
+        assert edited_changes is not None
+        changes = edited_changes
 
     repo.create_tag(tag_name, message=changes, sign=True)
 
