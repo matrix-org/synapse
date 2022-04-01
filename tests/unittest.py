@@ -70,7 +70,13 @@ from synapse.types import JsonDict, UserID, create_requester
 from synapse.util import Clock
 from synapse.util.httpresourcetree import create_resource_tree
 
-from tests.server import FakeChannel, get_clock, make_request, setup_test_homeserver
+from tests.server import (
+    CustomHeaderType,
+    FakeChannel,
+    get_clock,
+    make_request,
+    setup_test_homeserver,
+)
 from tests.test_utils import event_injection, setup_awaitable_errors
 from tests.test_utils.logging_setup import setup_logging
 from tests.utils import default_config, setupdb
@@ -429,7 +435,7 @@ class HomeserverTestCase(TestCase):
         federation_auth_origin: Optional[bytes] = None,
         content_is_form: bool = False,
         await_result: bool = True,
-        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
+        custom_headers: Optional[Iterable[CustomHeaderType]] = None,
         client_ip: str = "127.0.0.1",
     ) -> FakeChannel:
         """
@@ -769,7 +775,7 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
         path: str,
         content: Optional[JsonDict] = None,
         await_result: bool = True,
-        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
+        custom_headers: Optional[Iterable[CustomHeaderType]] = None,
         client_ip: str = "127.0.0.1",
     ) -> FakeChannel:
         """Make an inbound signed federation request to this server
