@@ -16,7 +16,6 @@
 import gc
 import hashlib
 import hmac
-import inspect
 import json
 import logging
 import secrets
@@ -519,33 +518,23 @@ class HomeserverTestCase(TestCase):
         self.reactor.pump([by] * 100)
 
     def get_success(self, d, by=0.0):
-        if inspect.isawaitable(d):
-            d = ensureDeferred(d)
-        if not isinstance(d, Deferred):
-            return d
+        deferred: Deferred[TV] = ensureDeferred(d)
         self.pump(by=by)
-        return self.successResultOf(d)
+        return self.successResultOf(deferred)
 
     def get_failure(self, d, exc):
         """
         Run a Deferred and get a Failure from it. The failure must be of the type `exc`.
         """
-        if inspect.isawaitable(d):
-            d = ensureDeferred(d)
-        if not isinstance(d, Deferred):
-            return d
+        deferred: Deferred[Any] = ensureDeferred(d)
         self.pump()
-        return self.failureResultOf(d, exc)
+        return self.failureResultOf(deferred, exc)
 
     def get_success_or_raise(self, d, by=0.0):
         """Drive deferred to completion and return result or raise exception
         on failure.
         """
-
-        if inspect.isawaitable(d):
-            deferred = ensureDeferred(d)
-        if not isinstance(deferred, Deferred):
-            return d
+        deferred: Deferred[TV] = ensureDeferred(d)
 
         results: list = []
         deferred.addBoth(results.append)
