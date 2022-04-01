@@ -23,9 +23,11 @@ import time
 from typing import (
     Any,
     AnyStr,
+    Awaitable,
     Callable,
     ClassVar,
     Dict,
+    Generic,
     Iterable,
     List,
     Optional,
@@ -39,6 +41,7 @@ from unittest.mock import Mock, patch
 import canonicaljson
 import signedjson.key
 import unpaddedbase64
+from typing_extensions import Protocol
 
 from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.python.failure import Failure
@@ -83,6 +86,17 @@ from tests.utils import default_config, setupdb
 
 setupdb()
 setup_logging()
+
+TV = TypeVar("TV")
+_ExcType = TypeVar("_ExcType", bound=BaseException, covariant=True)
+
+
+class _TypedFailure(Generic[_ExcType], Protocol):
+    """Extension to twisted.Failure, where the 'value' has a certain type."""
+
+    @property
+    def value(self) -> _ExcType:
+        ...
 
 
 def around(target):
@@ -520,30 +534,36 @@ class HomeserverTestCase(TestCase):
 
         return hs
 
-    def pump(self, by=0.0):
+    def pump(self, by: float = 0.0) -> None:
         """
         Pump the reactor enough that Deferreds will fire.
         """
         self.reactor.pump([by] * 100)
 
-    def get_success(self, d, by=0.0):
-        deferred: Deferred[TV] = ensureDeferred(d)
+    def get_success(
+        self,
+        d: Awaitable[TV],
+        by: float = 0.0,
+    ) -> TV:
+        deferred: Deferred[TV] = ensureDeferred(d)  # type: ignore[arg-type]
         self.pump(by=by)
         return self.successResultOf(deferred)
 
-    def get_failure(self, d, exc):
+    def get_failure(
+        self, d: Awaitable[Any], exc: Type[_ExcType]
+    ) -> _TypedFailure[_ExcType]:
         """
         Run a Deferred and get a Failure from it. The failure must be of the type `exc`.
         """
-        deferred: Deferred[Any] = ensureDeferred(d)
+        deferred: Deferred[Any] = ensureDeferred(d)  # type: ignore[arg-type]
         self.pump()
         return self.failureResultOf(deferred, exc)
 
-    def get_success_or_raise(self, d, by=0.0):
+    def get_success_or_raise(self, d: Awaitable[TV], by: float = 0.0) -> TV:
         """Drive deferred to completion and return result or raise exception
         on failure.
         """
-        deferred: Deferred[TV] = ensureDeferred(d)
+        deferred: Deferred[TV] = ensureDeferred(d)  # type: ignore[arg-type]
 
         results: list = []
         deferred.addBoth(results.append)
@@ -651,11 +671,11 @@ class HomeserverTestCase(TestCase):
 
     def login(
         self,
-        username,
-        password,
-        device_id=None,
+        username: str,
+        password: str,
+        device_id: Optional[str] = None,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
-    ):
+    ) -> str:
         """
         Log in a user, and get an access token. Requires the Login API be
         registered.
@@ -677,18 +697,22 @@ class HomeserverTestCase(TestCase):
         return access_token
 
     def create_and_send_event(
-        self, room_id, user, soft_failed=False, prev_event_ids=None
-    ):
+        self,
+        room_id: str,
+        user: UserID,
+        soft_failed: bool = False,
+        prev_event_ids: Optional[List[str]] = None,
+    ) -> str:
         """
         Create and send an event.
 
         Args:
-            soft_failed (bool): Whether to create a soft failed event or not
-            prev_event_ids (list[str]|None): Explicitly set the prev events,
+            soft_failed: Whether to create a soft failed event or not
+            prev_event_ids: Explicitly set the prev events,
                 or if None just use the default
 
         Returns:
-            str: The new event's ID.
+            The new event's ID.
         """
         event_creator = self.hs.get_event_creation_handler()
         requester = create_requester(user)
@@ -885,9 +909,6 @@ def override_config(extra_config):
         return func
 
     return decorator
-
-
-TV = TypeVar("TV")
 
 
 def skip_unless(condition: bool, reason: str) -> Callable[[TV], TV]:
