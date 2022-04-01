@@ -18,19 +18,17 @@ import collections
 import inspect
 import itertools
 import logging
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import asynccontextmanager
 from typing import (
     Any,
     AsyncIterator,
     Awaitable,
     Callable,
     Collection,
-    ContextManager,
     Dict,
     Generic,
     Hashable,
     Iterable,
-    Iterator,
     List,
     Optional,
     Set,
@@ -343,7 +341,7 @@ class Linearizer:
 
     Example:
 
-        with await limiter.queue("test_key"):
+        async with limiter.queue("test_key"):
             # do some work.
 
     """
@@ -384,14 +382,10 @@ class Linearizer:
         # non-empty.
         return bool(entry.deferreds)
 
-    async def queue(self, key: Hashable) -> ContextManager[None]:
-        entry = await self._acquire_lock(key)
-
-        # now that we have the lock, we need to return a context manager which will
-        # release the lock.
-
-        @contextmanager
-        def _ctx_manager() -> Iterator[None]:
+    def queue(self, key: Hashable) -> AsyncContextManager[None]:
+        @asynccontextmanager
+        async def _ctx_manager() -> AsyncIterator[None]:
+            entry = await self._acquire_lock(key)
             try:
                 yield
             finally:
