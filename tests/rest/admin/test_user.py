@@ -1590,10 +1590,9 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
 
-        pushers = self.get_success(
-            self.store.get_pushers_by({"user_name": "@bob:test"})
+        pushers = list(
+            self.get_success(self.store.get_pushers_by({"user_name": "@bob:test"}))
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         self.assertEqual("@bob:test", pushers[0].user_name)
 
@@ -1632,10 +1631,9 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
 
-        pushers = self.get_success(
-            self.store.get_pushers_by({"user_name": "@bob:test"})
+        pushers = list(
+            self.get_success(self.store.get_pushers_by({"user_name": "@bob:test"}))
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 0)
 
     def test_set_password(self) -> None:
