@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, Hashable, Tuple
+from typing import Callable, Hashable, Optional, Tuple
 
 from twisted.internet import defer, reactor
 from twisted.internet.base import ReactorBase
@@ -70,7 +70,7 @@ class LinearizerTestCase(unittest.TestCase):
         while reactor.getDelayedCalls():
             reactor.runUntilCurrent()
 
-    def test_linearizer(self):
+    def test_linearizer(self) -> None:
         """Tests that a task is queued up behind an earlier task."""
         linearizer = Linearizer()
 
@@ -88,7 +88,7 @@ class LinearizerTestCase(unittest.TestCase):
 
         unblock2()
 
-    def test_linearizer_is_queued(self):
+    def test_linearizer_is_queued(self) -> None:
         """Tests `Linearizer.is_queued`.
 
         Runs through the same scenario as `test_linearizer`.
@@ -119,7 +119,7 @@ class LinearizerTestCase(unittest.TestCase):
         unblock2()
         self.assertFalse(linearizer.is_queued(key))
 
-    def test_lots_of_queued_things(self):
+    def test_lots_of_queued_things(self) -> None:
         """Tests lots of fast things queued up behind a slow thing.
 
         The stack should *not* explode when the fast thing completes.
@@ -127,7 +127,7 @@ class LinearizerTestCase(unittest.TestCase):
         linearizer = Linearizer()
         key = ""
 
-        async def func(i, wait_for=None) -> None:
+        async def func(i: int, wait_for: Optional["Deferred[None]"] = None) -> None:
             with LoggingContext("func(%s)" % i) as lc:
                 with (await linearizer.queue(key)):
                     self.assertEqual(current_context(), lc)
@@ -144,7 +144,7 @@ class LinearizerTestCase(unittest.TestCase):
         unblock()
         self.successResultOf(d)
 
-    def test_multiple_entries(self):
+    def test_multiple_entries(self) -> None:
         """Tests a `Linearizer` with a concurrency above 1."""
         limiter = Linearizer(max_count=3)
 
@@ -185,7 +185,7 @@ class LinearizerTestCase(unittest.TestCase):
         self.assertTrue(acquired_d6)
         unblock6()
 
-    def test_cancellation(self):
+    def test_cancellation(self) -> None:
         """Tests cancellation while waiting for a `Linearizer`."""
         linearizer = Linearizer()
 
