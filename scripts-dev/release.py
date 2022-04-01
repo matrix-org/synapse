@@ -202,7 +202,7 @@ def prepare() -> None:
             click.get_current_context().abort()
 
         # Check out the base branch and ensure it's up to date
-        repo.head.reference = base_branch
+        repo.head.set_reference(base_branch, "check out the base branch")
         repo.head.reset(index=True, working_tree=True)
         if not base_branch.is_remote():
             update_branch(repo)
