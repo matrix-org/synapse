@@ -276,6 +276,7 @@ class HomeserverTestCase(TestCase):
 
         if hasattr(self, "user_id"):
             if self.hijack_auth:
+                assert self.helper.auth_user_id is not None
 
                 # We need a valid token ID to satisfy foreign key constraints.
                 token_id = self.get_success(
@@ -288,6 +289,7 @@ class HomeserverTestCase(TestCase):
                 )
 
                 async def get_user_by_access_token(token=None, allow_guest=False):
+                    assert self.helper.auth_user_id is not None
                     return {
                         "user": UserID.from_string(self.helper.auth_user_id),
                         "token_id": token_id,
@@ -295,6 +297,7 @@ class HomeserverTestCase(TestCase):
                     }
 
                 async def get_user_by_req(request, allow_guest=False, rights="access"):
+                    assert self.helper.auth_user_id is not None
                     return create_requester(
                         UserID.from_string(self.helper.auth_user_id),
                         token_id,
