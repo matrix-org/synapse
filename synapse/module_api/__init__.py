@@ -81,6 +81,7 @@ from synapse.handlers.auth import (
     ON_LOGGED_OUT_CALLBACK,
     AuthHandler,
 )
+from synapse.handlers.user_directory import ON_SEARH_USERS_CALLBACK
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
     DirectServeHtmlResource,
@@ -216,6 +217,7 @@ class ModuleApi:
         self._third_party_event_rules = hs.get_third_party_event_rules()
         self._password_auth_provider = hs.get_password_auth_provider()
         self._presence_router = hs.get_presence_router()
+        self._user_directory_handler = hs.get_user_directory_handler()
 
     #################################################################################
     # The following methods should only be called during the module's initialisation.
@@ -355,6 +357,14 @@ class ModuleApi:
             auth_checkers=auth_checkers,
             get_username_for_registration=get_username_for_registration,
             get_displayname_for_registration=get_displayname_for_registration,
+        )
+
+    def register_user_directory_callbacks(
+        self, *, on_search_users: Optional[ON_SEARH_USERS_CALLBACK] = None
+    ) -> None:
+        """Registers callbacks for user directory capabilities."""
+        return self._user_directory_handler.register_user_directory_callbacks(
+            on_search_users=on_search_users
         )
 
     def register_background_update_controller_callbacks(
