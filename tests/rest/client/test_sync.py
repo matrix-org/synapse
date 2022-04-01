@@ -689,7 +689,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
     # We test for both receipt types that influence notification counts
     @parameterized.expand([ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE])
-    def test_read_receipts_only_go_down(self, receipt_type) -> None:
+    def test_read_receipts_only_go_down(self, receipt_type: ReceiptTypes) -> None:
         # Join the new user
         self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
 
