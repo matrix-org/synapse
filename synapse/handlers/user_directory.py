@@ -111,7 +111,13 @@ class UserDirectoryHandler(StateDeltasHandler):
         merged_results = results["results"]
         existing_user_ids = [user["user_id"] for user in merged_results]
         for callback in self._on_search_users_callbacks:
-            external_users = await callback(user_id, search_term, limit)
+            external_users = None
+            try:
+                external_users = await callback(user_id, search_term, limit)
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )
             if external_users is not None:
                 merged_results += [
                     user
