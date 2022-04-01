@@ -110,9 +110,7 @@ class PaginationTestCase(HomeserverTestCase):
     def _filter_messages(self, filter: JsonDict) -> List[EventBase]:
         """Make a request to /messages with a filter, returns the chunk of events."""
 
-        from_token = self.get_success(
-            self.hs.get_event_sources().get_current_token_for_pagination()
-        )
+        from_token = self.hs.get_event_sources().get_current_token_for_pagination()
 
         events, next_key = self.get_success(
             self.hs.get_datastores().main.paginate_room_events(
