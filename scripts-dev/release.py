@@ -165,6 +165,8 @@ def prepare() -> None:
 
     # Switch to the release branch.
     parsed_new_version = version.parse(new_version)
+    # parse() shouldn't be returning a LegacyVersion. Whatever that is.
+    assert isinstance(parsed_new_version, version.Version)
 
     # We assume for debian changelogs that we only do RCs or full releases.
     assert not parsed_new_version.is_devrelease
