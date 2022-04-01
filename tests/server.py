@@ -22,7 +22,6 @@ import warnings
 from collections import deque
 from io import SEEK_END, BytesIO
 from typing import (
-    AnyStr,
     Callable,
     Dict,
     Iterable,
@@ -85,6 +84,9 @@ from tests.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+# the type of thing that can be passed into `make_request` in the headers list
+CustomHeaderType = Tuple[Union[str, bytes], Union[str, bytes]]
 
 
 class TimedOutException(Exception):
@@ -260,7 +262,7 @@ def make_request(
     federation_auth_origin: Optional[bytes] = None,
     content_is_form: bool = False,
     await_result: bool = True,
-    custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
+    custom_headers: Optional[Iterable[CustomHeaderType]] = None,
     client_ip: str = "127.0.0.1",
 ) -> FakeChannel:
     """

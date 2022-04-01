@@ -358,6 +358,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         self.get_success(self._insert_txn(service.id, 12, other_events))
 
         txn = self.get_success(self.store.get_oldest_unsent_txn(service))
+        assert txn is not None
         self.assertEqual(service, txn.service)
         self.assertEqual(10, txn.id)
         self.assertEqual(events, txn.events)
