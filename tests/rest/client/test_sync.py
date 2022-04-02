@@ -423,16 +423,58 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         # Test that the first user can't see the other user's private read receipt
         self.assertEqual(self._get_read_receipt(), None)
 
-        # Send a public read receipt to tell the server the first user's message was read
+    @override_config({"experimental_features": {"msc2285_enabled": True}})
+    def test_public_receipt_cannot_override_private(self) -> None:
+        # Send a message as the first user
+        res = self.helper.send(self.room_id, body="hello", tok=self.tok)
+
+        # Send a private read receipt
         channel = self.make_request(
             "POST",
-            f"/rooms/{self.room_id}/receipt/m.read/{res['event_id']}",
+            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ_PRIVATE}/{res['event_id']}",
+            {},
+            access_token=self.tok2,
+        )
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(self._get_read_receipt(), None)
+
+        # Send a public read receipt
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ}/{res['event_id']}",
             {},
             access_token=self.tok2,
         )
         self.assertEqual(channel.code, 200)
 
-        # Test that we didn't override the private read receipt
+        # Test that we did override the private read receipt
+        self.assertNotEqual(self._get_read_receipt(), None)
+
+    @override_config({"experimental_features": {"msc2285_enabled": True}})
+    def test_private_receipt_cannot_override_public(self) -> None:
+        # Send a message as the first user
+        res = self.helper.send(self.room_id, body="hello", tok=self.tok)
+
+        # Send a public read receipt
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ}/{res['event_id']}",
+            {},
+            access_token=self.tok2,
+        )
+        self.assertEqual(channel.code, 200)
+        self.assertNotEqual(self._get_read_receipt(), None)
+
+        # Send a private read receipt
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ_PRIVATE}/{res['event_id']}",
+            {},
+            access_token=self.tok2,
+        )
+        self.assertEqual(channel.code, 200)
+
+        # Test that we didn't override the public read receipt
         self.assertEqual(self._get_read_receipt(), None)
 
     @parameterized.expand(
@@ -738,7 +780,9 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 200, channel.json_body)
 
-        room_entry = channel.json_body.get("rooms", {}).get("join", {}).get(self.room_id, {})
+        room_entry = (
+            channel.json_body.get("rooms", {}).get("join", {}).get(self.room_id, {})
+        )
         self.assertEqual(
             room_entry.get("org.matrix.msc2654.unread_count", 0),
             expected_count,
