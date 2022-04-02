@@ -716,7 +716,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
-        self._check_no_room_changes()
+        self._check_unread_count(0)
 
         channel = self.make_request(
             "POST",
@@ -725,7 +725,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
-        self._check_no_room_changes()
+        self._check_unread_count(0)
 
     def _check_unread_count(self, expected_count: int) -> None:
         """Syncs and compares the unread count with the expected value."""
@@ -738,29 +738,11 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 200, channel.json_body)
 
-        room_entry = channel.json_body["rooms"]["join"][self.room_id]
+        room_entry = channel.json_body.get("rooms", {}).get("join", {}).get(self.room_id, {})
         self.assertEqual(
-            room_entry["org.matrix.msc2654.unread_count"],
+            room_entry.get("org.matrix.msc2654.unread_count", 0),
             expected_count,
             room_entry,
-        )
-
-        # Store the next batch for the next request.
-        self.next_batch = channel.json_body["next_batch"]
-
-    def _check_no_room_changes(self) -> None:
-        """Syncs and makes sure the rooms part of sync is empty."""
-
-        channel = self.make_request(
-            "GET",
-            self.url % self.next_batch,
-            access_token=self.tok,
-        )
-        self.assertEqual(channel.code, 200, channel.json_body)
-        self.assertEqual(
-            channel.json_body.get("rooms", None),
-            None,
-            channel.json_body,
         )
 
         # Store the next batch for the next request.
