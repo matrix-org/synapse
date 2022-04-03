@@ -81,3 +81,6 @@ class ExperimentalConfig(Config):
 
         # MSC2654: Unread counts
         self.msc2654_enabled: bool = experimental.get("msc2654_enabled", False)
+
+        # MSC3759: Leave event metadata for deactivated users
+        self.msc3759_enabled: bool = experimental.get("msc3759_enabled", False)
