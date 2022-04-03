@@ -1,0 +1,1 @@
+Include `org.matrix.msc3759.deactivated` in deactivation leave events as specified by [MSC3759](https://github.com/matrix-org/matrix-spec-proposals/pull/3759), using unstable prefixes. The `msc3759_enabled` experimental homeserver config option must be enabled for this key to be included.
