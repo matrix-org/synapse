@@ -60,6 +60,7 @@ Changes in SCHEMA_VERSION = 68:
       new events.
 
 Changes in SCHEMA_VERSION = 69:
+    - We now write to `device_lists_changes_in_room` table.
     - Use sequence to generate future `application_services_txns.txn_id`s
 """
 
