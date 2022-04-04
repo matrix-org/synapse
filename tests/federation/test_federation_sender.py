@@ -14,7 +14,6 @@
 from typing import Optional
 from unittest.mock import Mock
 
-from parameterized import parameterized_class
 from signedjson import key, sign
 from signedjson.types import BaseKey, SigningKey
 
@@ -155,12 +154,6 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
         )
 
 
-@parameterized_class(
-    [
-        {"enable_room_poke_code_path": False},
-        {"enable_room_poke_code_path": True},
-    ]
-)
 class FederationSenderDevicesTestCases(HomeserverTestCase):
     servlets = [
         admin.register_servlets,
@@ -175,7 +168,6 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
     def default_config(self):
         c = super().default_config()
         c["send_federation"] = True
-        c["use_new_device_lists_changes_in_room"] = self.enable_room_poke_code_path
         return c
 
     def prepare(self, reactor, clock, hs):
