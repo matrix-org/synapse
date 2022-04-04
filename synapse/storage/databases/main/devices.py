@@ -1655,6 +1655,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         now = self._clock.time_msec()
         next_stream_id = iter(stream_ids)
 
+        encoded_context = json_encoder.encode(context)
         self.db_pool.simple_insert_many_txn(
             txn,
             table="device_lists_outbound_pokes",
@@ -1675,9 +1676,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                     device_id,
                     False,
                     now,
-                    json_encoder.encode(context)
-                    if whitelisted_homeserver(destination)
-                    else "{}",
+                    encoded_context if whitelisted_homeserver(destination) else "{}",
                 )
                 for destination in hosts
                 for device_id in device_ids
@@ -1706,6 +1705,8 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             hosts_have_been_calculated or not self.hs.is_mine_id(user_id)
         )
 
+        encoded_context = json_encoder.encode(context)
+
         self.db_pool.simple_insert_many_txn(
             txn,
             table="device_lists_changes_in_room",
@@ -1724,7 +1725,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                     room_id,
                     stream_id,
                     converted_to_destinations,
-                    json_encoder.encode(context),
+                    encoded_context,
                 )
                 for room_id in room_ids
                 for device_id, stream_id in zip(device_ids, stream_ids)
