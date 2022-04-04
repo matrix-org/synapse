@@ -26,4 +26,4 @@ CREATE TABLE device_lists_changes_in_room (
 );
 
 CREATE INDEX device_lists_changes_in_stream_id ON device_lists_changes_in_room(stream_id);
-CREATE INDEX device_lists_changes_in_stream_id_converted ON device_lists_changes_in_room(stream_id) WHERE NOT converted_to_destinations;
+CREATE INDEX device_lists_changes_in_stream_id_unconverted ON device_lists_changes_in_room(stream_id) WHERE NOT converted_to_destinations;
