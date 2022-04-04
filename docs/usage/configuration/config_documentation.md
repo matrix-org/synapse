@@ -72,7 +72,7 @@ apply if you want your config file to be read properly. A few helpful things to 
 
 [Server](#server)
 
-[Homeserver Blocking](#homserver-blocking)
+[Homeserver Blocking](#homeserver-blocking)
 
 [TLS](#tls)
 
