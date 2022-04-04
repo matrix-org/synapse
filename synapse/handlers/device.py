@@ -694,6 +694,9 @@ class DeviceHandler(DeviceWorkerHandler):
                         context=opentracing_context,
                     )
 
+                    # Notify replication that we've updated the device list stream.
+                    self.notifier.notify_replication()
+
                     if hosts:
                         logger.info(
                             "Sending device list update notif for %r to: %r",
