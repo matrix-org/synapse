@@ -453,8 +453,8 @@ class RoomStreamToken:
     Historic tokens start with a "t" followed by the `depth`
     (`topological_ordering` in the event graph) of the event that comes before
     the position of the token, followed by "-", followed by the
-    `stream_ordering` of the event it comes after along with rest of the same
-    keys from the live tokens. An example token is:
+    `stream_ordering` of the event that comes before the position of the token.
+    An example token is:
 
         t426-2633508
 
