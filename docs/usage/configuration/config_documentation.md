@@ -4,7 +4,9 @@ This is intended as a guide to the synapse configuration. The behavior of a Syna
 through the many configuration settings documented here-each config option is explained, 
 including what the default is, how to change the default and what sort of behavior the setting governs.
 Also included is an example configuration for each setting. If you don't want to spend a lot of time 
-thinking about options, the config as generated sets sensible defaults for all values. 
+thinking about options, the config as generated sets sensible defaults for all values. Do note however that the
+database defualts to SQLite, which is not recommended for production usage. You can read more on this subject 
+[here](../../setup/installation.md#using-postgresql).
 
 ## Config Conventions
 
@@ -120,7 +122,7 @@ apply if you want your config file to be read properly. A few helpful things to 
 
 Server admins can expand Synapse's functionality with external modules.
 
-See https://matrix-org.github.io/synapse/latest/modules/index.html for more
+See [here](../../modules/index.md) for more
 documentation on how to configure or create custom modules for Synapse.
 
 
@@ -159,7 +161,7 @@ usernames on your server would be in the format `@user:example.com`
 In most cases you should avoid using a matrix specific subdomain such as
 matrix.example.com or synapse.example.com as the `server_name` for the same
 reasons you wouldn't use user@email.example.com as your email address.
-See https://matrix-org.github.io/synapse/latest/delegate.html
+See [here](../../delegate.md)
 for information on how to host Synapse on a subdomain while preserving
 a clean `server_name`.
 
@@ -245,7 +247,7 @@ soft_file_limit: 3
 Config option: `presence`
 
 Presence tracking allows users to see the state (e.g online/offline)
-of other local and remote users. Set the `enabled` flag below `presence` to false to  
+of other local and remote users. Set the `enabled` sub-option to false to  
 disable presence tracking on this homeserver. Defaults to true. 
 This option replaces the previous top-level 'use_presence' option.
 
@@ -354,7 +356,7 @@ gc_min_interval: [0.5s, 30s, 1m]
 Config option: `filter_timeline_limit`
 
 Set the limit on the returned events in the timeline in the get
-and sync operations. Defaults to 100. -1 means no upper limit.
+and sync operations. Defaults to 100. A value of -1 means no upper limit.
 
 
 Example configuration:
@@ -444,20 +446,20 @@ Config option: `listeners`
 List of ports that Synapse should listen on, their purpose and their
 configuration.
 
-Options for each listener include:
+Sub-options for each listener include:
 
-* `port`: the TCP port to bind to
+* `port`: the TCP port to bind to. 
 
 * `bind_addresses`: a list of local addresses to listen on. The default is
        'all local interfaces'.
 
 * `type`: the type of listener. Normally `http`, but other valid options are:
     
-   * `manhole`: (see https://matrix-org.github.io/synapse/latest/manhole.html),
+   * `manhole`: (see the docs [here](../../manhole.md)),
 
-   * `metrics`: (see https://matrix-org.github.io/synapse/latest/metrics-howto.html),
+   * `metrics`: (see the docs [here](../../metrics-howto.md)),
 
-   * `replication`: (see https://matrix-org.github.io/synapse/latest/workers.html).
+   * `replication`: (see the docs [here](../../workers.md)).
 
 * `tls`: set to true to enable TLS for this listener. Will use the TLS key/cert specified in tls_private_key_path / tls_certificate_path.
 
@@ -465,7 +467,7 @@ Options for each listener include:
    behind a reverse-proxy.
 
 * `resources`: Only valid for an 'http' listener. A list of resources to host
-   on this port. Options for each resource are:
+   on this port. Sub-options for each resource are:
 
    * `names`: a list of names of HTTP resources. See below for a list of valid resource names.
 
@@ -478,7 +480,7 @@ Valid resource names are:
 
 * `client`: the client-server API (/_matrix/client), and the synapse admin API (/_synapse/admin). Also implies 'media' and 'static'.
 
-* `consent`: user consent forms (/_matrix/consent). See https://matrix-org.github.io/synapse/latest/consent_tracking.html.
+* `consent`: user consent forms (/_matrix/consent). See [here](../../consent_tracking.md) for more.
 
 * `federation`: the server-server API (/_matrix/federation). Also implies `media`, `keys`, `openid`
 
@@ -486,11 +488,11 @@ Valid resource names are:
 
 * `media`: the media API (/_matrix/media).
 
-* `metrics`: the metrics interface. See https://matrix-org.github.io/synapse/latest/metrics-howto.html.
+* `metrics`: the metrics interface. See [here](../../metrics-howto.md).
 
-* `openid`: OpenID authentication.
+* `openid`: OpenID authentication. See [here](../../openid.md).
 
-* `replication`: the HTTP replication API (/_synapse/replication). See https://matrix-org.github.io/synapse/latest/workers.html.
+* `replication`: the HTTP replication API (/_synapse/replication). See [here](../../workers.md).
 
 * `static`: static resources under synapse/static (/_matrix/static). (Mostly useful for 'fallback authentication'.)
 
@@ -543,7 +545,7 @@ listeners:
 Config option: `manhole_settings`
 
 Connection settings for the manhole. You can find more information
-on the manhole [here](../../manhole.md). Manhole settings include:
+on the manhole [here](../../manhole.md). Manhole sub-options include:
 * `username` : the username for the manhole. This defaults to 'matrix'.
 * `password`: The password for the manhole. This defaults to 'rabbithole'.
 * `ssh_priv_key_path` and `ssh_pub_key_path`: The private and public SSH key pair used to encrypt the manhole traffic.
@@ -821,7 +823,7 @@ find template files in to use to generate email or HTML page contents.
 If not set, or a file is not found within the template directory, a default 
 template from within the Synapse package will be used.
 
-See https://matrix-org.github.io/synapse/latest/templates.html for more
+See [here](../../templates.md) for more
 information about using custom templates.
 
 Example configuration:
@@ -846,7 +848,7 @@ purged are ignored and not stored again.
 
 The message retention policies feature is disabled by default.
 
-Associated options are:
+This setting has the following sub-options:
 * `default_policy`: Default retention policy. If set, Synapse will apply it to rooms that lack the
    'm.room.retention' state event. This option is further specified by the 
    `min_lifetime` and `max_lifetime` sub-options associated with it. Note that the 
@@ -857,7 +859,7 @@ Associated options are:
    which contains a `min_lifetime` or a `max_lifetime` that's out of these bounds,
    Synapse will cap the room's policy to these limits when running purge jobs.
 
-* `purge_jobs` and the associated `shortest_max_lifetime` and `longest_max_lifetime`:
+* `purge_jobs` and the associated `shortest_max_lifetime` and `longest_max_lifetime` sub-options:
    Server admins can define the settings of the background jobs purging the
    events whose lifetime has expired under the `purge_jobs` section.
    
@@ -1061,7 +1063,7 @@ Options related to caching
 Config option: `event_cache_size`
 
 The number of events to cache in memory. Not affected by
-`caches.global_factor`. Defaults to 10K
+`caches.global_factor`. Defaults to 10K.
 
 Example configuration:
 ```
@@ -1146,18 +1148,17 @@ Associated sub-options:
 * `allow_unsafe_locale` is an option specific to Postgres. Under the default behavior, Synapse will refuse to
   start if the postgres db is set to a non-C locale. You can override this behavior (which is *not* recommended)
   by setting `allow_unsafe_locale` to true. Note that doing so may corrupt your database. You can find more information
-  here: https://matrix-org.github.io/synapse/latest/postgres.html#fixing-incorrect-collate-or-ctype and here:
-  https://wiki.postgresql.org/wiki/Locale_data_changes
+  [here](../../postgres.md#fixing-incorrect-collate-or-ctype) and [here](https://wiki.postgresql.org/wiki/Locale_data_changes).
 
 * `args` gives options which are passed through to the database engine,
   except for options starting with `cp_`, which are used to configure the Twisted
   connection pool. For a reference to valid arguments, see:
-    * for sqlite: https://docs.python.org/3/library/sqlite3.html#sqlite3.connect
-    * for postgres: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS
-    * for the connection pool: https://twistedmatrix.com/documents/current/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__
+    * for [sqlite](https://docs.python.org/3/library/sqlite3.html#sqlite3.connect)
+    * for [postgres](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS)
+    * for [the connection pool](https://twistedmatrix.com/documents/current/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__)
 
 For more information on using Synapse with Postgres,
-see https://matrix-org.github.io/synapse/latest/postgres.html.
+see [here](../../postgres.md).
 
 Example SQLite configuration:
 ```
@@ -1188,8 +1189,7 @@ Config options related to logging.
 ---
 Config option: `log_config`
 
-This option specifies a yaml python logging config file as described by
-https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
+This option specifies a yaml python logging config file as described [here](https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema).
 
 Example configuration:
 ```
@@ -1286,7 +1286,7 @@ rc_admin_redaction:
 ---
 Config option: `rc_joins`
 
-This option allows for ratelimiting number of rooms a user can join. Associated sub-options are:
+This option allows for ratelimiting number of rooms a user can join. This setting has the following sub-options:
 
 * `local`: ratelimits when users are joining rooms the server is already in. 
    Defaults to `per_second: 0.1`, `burst_count: 10`.
@@ -1413,11 +1413,11 @@ Config option: `media_storage_providers`
 
 Media storage providers allow media to be stored in different
 locations. Defaults to none. Associated sub-options are:
-* `module`: type of resource, e.g. `file_system`. Each `module` has the following sub-options:
-   * `store_local`: whether to store newly uploaded local files
-   * `store_remote`: whether to store newly downloaded local files
-   * `store_synchronous`: whether to wait for successful storage for local uploads
-   * `config`: sets a path to the resource through the `directory` option 
+* `module`: type of resource, e.g. `file_system`.
+* `store_local`: whether to store newly uploaded local files
+* `store_remote`: whether to store newly downloaded local files
+* `store_synchronous`: whether to wait for successful storage for local uploads
+* `config`: sets a path to the resource through the `directory` option 
 
 Example configuration:
 ```
@@ -1436,7 +1436,7 @@ The largest allowed upload size in bytes.
 
 If you are using a reverse proxy you may also need to set this value in
 your reverse proxy's config. Defaults to 50M. Notably Nginx has a small max body size by default.
-See https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
+See [here](../../reverse_proxy.md) for more on using a reverse proxy with Synapse. 
 
 Example configuration:
 ```
@@ -1568,8 +1568,8 @@ This is more useful if you know there is an entire shape of URL that
 you know that will never want synapse to try to spider.
 
 Each list entry is a dictionary of url component attributes as returned
-by urlparse.urlsplit as applied to the absolute form of the URL.  See
-https://docs.python.org/2/library/urlparse.html#urlparse.urlsplit for more
+by urlparse.urlsplit as applied to the absolute form of the URL.  See 
+[here](https://docs.python.org/2/library/urlparse.html#urlparse.urlsplit) for more
 information. Some examples are:
 
 * `username`
@@ -1656,7 +1656,7 @@ oembed:
 ---
 ## Captcha ##
 
-See docs/CAPTCHA_SETUP.md for full details of configuring captcha.
+See [here](../../CAPTCHA_SETUP.md) for full details on setting up captcha.
 
 ---
 Config option: `recaptcha_public_key`
@@ -1897,8 +1897,7 @@ enable_3pid_lookup: false
 Config option: `registration_requires_token`
 
 Require users to submit a token during registration.
-Tokens can be managed using the admin API:
-https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/registration_tokens.html
+Tokens can be managed using the admin [API](../administration/admin_api/registration_tokens.md).
 Note that `enable_registration` must be set to true.
 Disabling this option will not delete any tokens previously generated.
 Defaults to false. Set to true to enable.  
@@ -1974,8 +1973,7 @@ identifier type, set the value to the URL of that identity server as shown in th
 examples below.
 
 Servers handling the these requests must answer the `/requestToken` endpoints defined
-by the Matrix Identity Service API specification:
-https://matrix.org/docs/spec/identity_service/latest
+by the Matrix Identity Service API [specification](https://matrix.org/docs/spec/identity_service/latest).
 
 Example usage:
 ```
@@ -2048,7 +2046,7 @@ homeserver registers.
 
 By default the auto-created rooms are publicly joinable from any federated
 server. Use the `autocreate_auto_join_rooms_federated` and
-`autocreate_auto_join_room_preset` settings below to customise this behaviour.
+`autocreate_auto_join_room_preset` settings to customise this behaviour.
 
 Setting to false means that if the rooms are not manually created,
 users cannot be auto-joined since they do not exist.
@@ -2372,7 +2370,7 @@ warning on start-up. To suppress this warning, set
 `suppress_key_server_warning` to true.
 
 Options for each entry in the list include:
-* `server_name`: the name of the server. required.
+* `server_name`: the name of the server. Required.
 * `verify_keys`: an optional map from key id to base64-encoded public key.
    If specified, we will check that the response is signed by at least
    one of the given keys.
@@ -2391,7 +2389,7 @@ trusted_key_servers:
       "ed25519:auto": "abcdefghijklmnopqrstuvwxyzabcdefghijklmopqr"
   - server_name: "my_other_trusted_server.example.com"
 ```
-Example usage #1:
+Example usage #2:
 ```
 trusted_key_servers:
   - server_name: "matrix.org"
@@ -2426,8 +2424,8 @@ provider for authentication, instead of its internal password database.
 
 You will probably also want to set the following options to false to
 disable the regular login/registration flows:
-   * enable_registration
-   * password_config.enabled
+   * `enable_registration`
+   * `password_config.enabled`
 
 You will also want to investigate the settings under the "sso" configuration
 section below.
@@ -2572,13 +2570,13 @@ saml2_config:
 Config option: `oidc_providers`
 
 List of OpenID Connect (OIDC) / OAuth 2.0 identity providers, for registration
-and login. See https://matrix-org.github.io/synapse/latest/openid.html
+and login. See [here](../../openid.md)
 for information on how to configure these options.
 
 For backwards compatibility, it is also possible to configure a single OIDC
-provider via an 'oidc_config' setting. This is now deprecated and admins are
-advised to migrate to the 'oidc_providers' format. (When doing that migration,
-use 'oidc' for the idp_id to ensure that existing users continue to be
+provider via an `oidc_config` setting. This is now deprecated and admins are
+advised to migrate to the `oidc_providers` format. (When doing that migration,
+use `oidc` for the `idp_id` to ensure that existing users continue to be
 recognised.)
 
 Options for each entry include:
@@ -2760,7 +2758,7 @@ oidc_providers:
 Config option: `cas_config`
 
 Enable Central Authentication Service (CAS) for registration and login.
-Has the following options:
+Has the following sub-options:
 * `enabled`: Set this to true to enable authorization against a CAS server.
    Defaults to false.
 * `server_url`: The URL of the CAS authorization endpoint.
@@ -2788,8 +2786,8 @@ Config option: `sso`
 Additional settings to use with single-sign on systems such as OpenID Connect,
 SAML2 and CAS.
 
-Server admins can configure custom templates for pages related to SSO. See
-https://matrix-org.github.io/synapse/latest/templates.html for more information.
+Server admins can configure custom templates for pages related to SSO. See 
+[here](../../templates.md) for more information.
 
 Options include:
 * `client_whitelist`: A list of client URLs which are whitelisted so that the user does not
@@ -2835,9 +2833,9 @@ and issued at ("iat") claims are validated if present.
 Note that this is a non-standard login type and client support is
 expected to be non-existent.
 
-See https://matrix-org.github.io/synapse/latest/jwt.html.
+See [here](../../jwt.md) for more.
 
-Additional options for this setting include:
+Additional sub-options for this setting include:
 * `enabled`: Set to true to enable authorization using JSON web
    tokens. Defaults to false.
 * `secret`: This is either the private shared secret or the public key used to
@@ -2867,10 +2865,13 @@ jwt_config:
 ---
 Config option: `password_config`
 
+Use this setting to enable password-based logins. 
+
+This setting has the following sub-options:
 * `enabled`: Defaults to true.
 * `localdb_enabled`: Set to false to disable authentication against the local password
    database. This is ignored if `enabled` is false, and is only useful
-   if you have other password_providers. Defaults to true. 
+   if you have other `password_providers`. Defaults to true. 
 * `pepper`: Set the value here to a secret random string for extra security. # Uncomment and change to a secret random string for extra security.
    DO NOT CHANGE THIS AFTER INITIAL SETUP!
 * `policy`: Define and enforce a password policy, such as minimum lengths for passwords, etc. 
@@ -2930,9 +2931,9 @@ Config option: `email`
 Configuration for sending emails from Synapse.
 
 Server admins can configure custom templates for email content. See
-https://matrix-org.github.io/synapse/latest/templates.html for more information.
+[here](../../templates.md) for more information.
 
-This option has the following subsections:
+This setting has the following sub-options:
 * `smtp_host`: The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.
 * `smtp_port`: The port on the mail server for outgoing SMTP. Defaults to 25.
 * `smtp_user` and `smtp_pass`: Username/password for authentication to the SMTP server. By default, no
@@ -3030,7 +3031,9 @@ Configuration settings related to push notifications
 ---
 Config option: `push`
 
-This option has a number of sub-options relating to push notifications. They are as follows:
+This setting defines options for push notifications. 
+
+This option has a number of sub-options. They are as follows:
 * `include_content`: Clients requesting push notifications can either have the body of
    the message sent in the notification poke along with other details
    like the sender, or just the event ID and room ID (`event_id_only`).
@@ -3041,9 +3044,7 @@ This option has a number of sub-options relating to push notifications. They are
    For modern android devices the notification content will still appear
    because it is loaded by the app. iPhone, however will send a
    notification saying only that a message arrived and who it came from.
-   # TODO: is this still correct?
-   Defaults to true. to include message details. Set to false to only
-   include the event ID and room ID in push notification payloads.
+   Defaults to true. Set to false to only include the event ID and room ID in push notification payloads.
 * `group_unread_count_by_room: false`: When a push notification is received, an unread count is also sent.
    This number can either be calculated as the number of unread messages  for the user, or the number of *rooms* the 
    user has unread messages in. Defaults to true, meaning push clients will see the number of
@@ -3068,10 +3069,10 @@ default.
 
 Possible options are "all", "invite", and "off". They are defined as:
 
-* `all`: any locally-created room
-* `invite`: any room created with the `private_chat` or `trusted_private_chat`
+* "all": any locally-created room
+* "invite": any room created with the `private_chat` or `trusted_private_chat`
    room creation presets
-* `off`: this option will take no effect
+* "off": this option will take no effect
 
 The default value is "off".
 
@@ -3096,13 +3097,15 @@ Config option: `group_creation_prefix`
 
 If enabled/present, non-server admins can only create groups with local parts
 starting with this prefix.
-# todo: can I rip out this group setting? 
+
 Example usage:
 ```
 group_creation_prefix: "unofficial_"
 ```
 ---
 Config option: `user_directory`
+
+This setting defines options related to the user directory. 
 
 This option has the following sub-options:
 * `enabled`:  Defines whether users can search the user directory. If false then
@@ -3133,8 +3136,7 @@ user_directory:
 ---
 Config option: `user_consent`
 
-For detailed instructions on user consent configuration, see
-https://matrix-org.github.io/synapse/latest/consent_tracking.html
+For detailed instructions on user consent configuration, see [here](../../consent_tracking.md).
 
 Parts of this section are required if enabling the `consent` resource under
 `listeners`, in particular `template_dir` and `version`. # TODO: link `listeners`
@@ -3185,8 +3187,8 @@ user_consent:
 ---
 Config option: `stats`
 
-Settings for local room and user statistics collection. See
-https://matrix-org.github.io/synapse/latest/room_and_user_statistics.html.
+Settings for local room and user statistics collection. See [here](../../room_and_user_statistics.md)
+for more. 
 
 * `enabled`: Set to false to disable room and user statistics. Note that doing
    so may cause certain features (such as the room directory) not to work
@@ -3208,7 +3210,7 @@ If you use this setting, you *must* define the `system_mxid_localpart`
 sub-setting, which defines the id of the user which will be used to send the
 notices.
 
-Other options for this setting include:
+Sub-options for this setting include:
 * `system_mxid_display_name`: set the display name of the "notices" user
 * `system_mxid_avatar_url`: set the avatar for the "notices" user
 * `room_name`: set the room name of the server notices room
@@ -3305,10 +3307,10 @@ including requests, key lookups etc., across any server running
 synapse or any other services which support opentracing
 (specifically those implemented with Jaeger).
 
-Options include:
+Sub-options include:
 * `enabled`: whether tracing is enabled. Set to true to enable. Disabled by default.
 * `homeserver_whitelist`: The list of homeservers we wish to send and receive span contexts and span baggage.
-   See https://matrix-org.github.io/synapse/latest/opentracing.html.
+   See [here](../../opentracing.md) for more. 
    This is a list of regexes which are matched against the `server_name` of the homeserver.
    By default, it is empty, so no servers are matched.
 * `force_tracing_for_users`: # A list of the matrix IDs of users whose requests will always be traced,
@@ -3316,7 +3318,7 @@ Options include:
     By default, the list is empty.
 * `jaeger_config`: Jaeger can be configured to sample traces at different rates.
    All configuration options provided by Jaeger can be set here. Jaeger's configuration is 
-   mostly related to trace sampling which is documented here: https://www.jaegertracing.io/docs/latest/sampling/.
+   mostly related to trace sampling which is documented [here](https://www.jaegertracing.io/docs/latest/sampling/).
 
 Example usage:
 ```
@@ -3415,9 +3417,9 @@ worker_replication_secret: "secret_secret"
 ```
 Config option: `redis`
 
-Configuration for [Redis]() # TODO add link when using workers. This *must* be enabled when
+Configuration for Redis when using workers. This *must* be enabled when
 using workers (unless using old style direct TCP configuration).
-Has the following options:
+This setting has the following sub-options:
 * `enabled`: whether to use Redis support. Defaults to false. 
 * `host` and `port`: Optional host and port to use to connect to redis. Defaults to
    localhost and 6379
@@ -3440,7 +3442,7 @@ Config option: `background_updates`
 Background updates are database updates that are run in the background in batches.
 The duration, minimum batch size, default batch size, whether to sleep between batches and if so, how long to
 sleep can all be configured. This is helpful to speed up or slow down the updates.
-Options are:
+This setting has the following sub-options:
 * `background_update_duration_ms`: How long in milliseconds to run a batch of background updates for. Defaults to 100. 
    Set a different time to change the default.
 * `sleep_enabled`: Whether to sleep between updates. Defaults to true. Set to false to change the default.
