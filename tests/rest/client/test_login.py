@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import json
+import sys
 import time
 import urllib.parse
 from typing import Any, Dict, List, Optional, Union
@@ -383,6 +384,36 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         # Now try to hard log out all of the user's sessions
         channel = self.make_request(b"POST", "/logout/all", access_token=access_token)
         self.assertEqual(channel.result["code"], b"200", channel.result)
+
+    def test_login_with_large_device_id_fails(self) -> None:
+        self.register_user("mickey", "cheese")
+
+        # create a device_id larger than 8KB
+        device_id = 1000**100000
+        self.assertGreater(sys.getsizeof(device_id), 8000)
+
+        body = {
+            "type": "m.login.password",
+            "user": "mickey",
+            "password": "cheese",
+            "device_id": device_id,
+        }
+
+        # make a login request with the bad device_id
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/login",
+            json.dumps(body).encode("utf8"),
+            custom_headers=None,
+        )
+        self.assertEqual(channel.code, 400)
+        self.assertEqual(
+            channel.json_body,
+            {
+                "errcode": "M_INVALID_PARAM",
+                "error": "Device id cannot be greater than 8KB.",
+            },
+        )
 
 
 @skip_unless(has_saml2 and HAS_OIDC, "Requires SAML2 and OIDC")
