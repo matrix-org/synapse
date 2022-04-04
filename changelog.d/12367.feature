@@ -1,1 +1,1 @@
-Reduce overhead of restarting synchrotrons
+Reduce overhead of restarting synchrotrons.
