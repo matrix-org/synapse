@@ -14,6 +14,7 @@
 
 import logging
 import re
+import sys
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -342,6 +343,16 @@ class LoginRestServlet(RestServlet):
             user_id = canonical_uid
 
         device_id = login_submission.get("device_id")
+
+        # Check that device_id is not greater than 8KB as this causes issues with Postgres indexing
+        device_id_size = sys.getsizeof(device_id)
+        if device_id_size > 8000:
+            raise LoginError(
+                400,
+                "Device id cannot be greater than 8KB.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
         initial_display_name = login_submission.get("initial_device_display_name")
         (
             device_id,
