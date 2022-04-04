@@ -1653,7 +1653,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             )
 
         now = self._clock.time_msec()
-        next_stream_id = iter(stream_ids)
+        stream_id_iterator = iter(stream_ids)
 
         encoded_context = json_encoder.encode(context)
         self.db_pool.simple_insert_many_txn(
@@ -1671,7 +1671,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             values=[
                 (
                     destination,
-                    next(next_stream_id),
+                    next(stream_id_iterator),
                     user_id,
                     device_id,
                     False,
