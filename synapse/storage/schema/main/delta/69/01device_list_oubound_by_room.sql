@@ -18,8 +18,9 @@ CREATE TABLE device_lists_changes_in_room (
     device_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
     stream_id BIGINT NOT NULL,  -- This matches `device_lists_stream.stream_id`
-    -- We track if we've calculated the hosts in the room and updated
-    -- `device_lists_outbound_pokes`.
+    -- We have a background process which goes through this table and converts
+    -- entries into rows in `device_lists_outbound_pokes`. Once we have processed
+    -- a row, we mark it as such by setting `converted_to_destinations=TRUE`.
     converted_to_destinations BOOLEAN NOT NULL,
     opentracing_context TEXT
 );
