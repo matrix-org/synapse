@@ -25,5 +25,5 @@ CREATE TABLE device_lists_changes_in_room (
     opentracing_context TEXT
 );
 
-CREATE INDEX device_lists_changes_in_stream_id ON device_lists_changes_in_room(stream_id);
+CREATE UNIQUE INDEX device_lists_changes_in_stream_id ON device_lists_changes_in_room(stream_id, room_id);
 CREATE INDEX device_lists_changes_in_stream_id_unconverted ON device_lists_changes_in_room(stream_id) WHERE NOT converted_to_destinations;
