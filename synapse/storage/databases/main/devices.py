@@ -1555,6 +1555,8 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
 
         num_stream_ids = len(device_ids)
         if hosts:
+            # The `device_lists_outbound_pokes` wants a different stream ID for
+            # each row, which is a row per host per device update.
             num_stream_ids = len(hosts) * len(device_ids)
 
         context = get_active_span_text_map()
