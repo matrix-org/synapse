@@ -2234,7 +2234,7 @@ receive invites to the room:
 - m.room.create
 - m.room.topic
 
-To change the default behavior, use the following options:
+To change the default behavior, use the following sub-options:
 * `disable_default_event_types`: set to true to disable the above defaults. If this 
    is enabled, only the event types listed in `additional_event_types` are shared.
    Defaults to false.
@@ -2439,11 +2439,13 @@ to find a full list options for configuring pysaml, read the docs [here](https:/
 
 At least one of `sp_config` or `config_path` must be set in this section to
 enable SAML login. You can either put your entire pysaml config inline using the `sp_config`
-option, or you can specify a path to a psyaml config file with the option `config_path`.
+option, or you can specify a path to a psyaml config file with the sub-option `config_path`.
+This setting has the following sub-options:
+
 * `sp_config`: the configuration for the pysaml2 Service Provider. See pysaml2 docs for format of config.
    Default values will be used for the `entityid` and `service` settings,
    so it is not normally necessary to specify them unless you need to
-   override them. Here are a few useful options for configuring pysaml:
+   override them. Here are a few useful sub-options for configuring pysaml:
    * `metadata`: Point this to the IdP's metadata. You must provide either a local
       file via the `local` attribute or (preferably) a URL via the
       `remote` attribute.
