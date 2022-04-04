@@ -29,11 +29,43 @@ messages from the database after 5 minutes, rather than 5 months.
 ## Yaml 
 The configuration file is a [YAML](https://yaml.org/) file, which means that certain syntax rules
 apply if you want your config file to be read properly. A few helpful things to know:
-* `#` before any option in the config will comment out that setting and a default (if available) will 
-  apply. Thus, in the example below, 
-```
+* `#` before any option in the config will comment out that setting and either a default (if available) will 
+   be applied or Synapse will ignore the setting. Thus, in example #1 below, the setting will be read and
+   applied, but in example #2 the setting will not be read and a default will be applied.  
 
-```
+   Example #1:
+   ```
+   pid_file: DATADIR/homeserver.pid
+   ```
+   Example #2:
+   ```
+   #pid_file: DATADIR/homeserver.pid
+   ```
+* Indentation matters! The indentation before a setting
+  will determine whether a given setting is read as part of another
+  setting, or considered on its own. Thus, in example #1, the `enabled` setting
+  is read as a sub-option of the `presence` setting, and will be properly applied.
+  
+  However, the lack of indentation before the `enabled` setting in example #2 means
+  that when reading the config, Synapse will consider both `presence` and `enabled` as
+  different settings. In this case, `presence` has no value, and thus a default applied, and `enabled`
+  is an option that Synapse doesn't recognize and thus ignores.
+  
+  Example #1: 
+  ```
+  presence:
+    enabled: false
+  ```
+  Example #2:
+  ```
+  presence:
+  enabled: false
+  ```
+  In this manual, all top-level settings (ones with no indentation) are identified 
+  at the beginning of their section (i.e. "Config option: `example_setting`") and 
+  the sub-options, if any, are identified and listed in the body of the section. 
+  In addition, each setting has an example of its usage, with the proper indentation
+  shown. 
 
 ## Index
 [Modules](#modules) 
@@ -95,8 +127,11 @@ documentation on how to configure or create custom modules for Synapse.
 ---
 Config option: `modules`
 
-Add modules under this option to extend functionality. Defaults
-to none.
+Use the `module` sub-option to add modules under this option to extend functionality. 
+The `module` setting then has a sub-option, `config`, which can be used to define some configuration
+for the `module`.
+
+Defaults to none.
 
 Example configuration:
 ```
@@ -131,6 +166,8 @@ a clean `server_name`.
 The `server_name` cannot be changed later so it is important to
 configure this correctly before you start Synapse. It should be all
 lowercase and may contain an explicit port.
+
+There is no default for this option. 
  
 Example configuration #1:
 ```
@@ -143,7 +180,7 @@ server_name: localhost:8080
 ---
 Config option: `pid_file`
 
-When running Synapse as a daemon, the file to store the pid in.
+When running Synapse as a daemon, the file to store the pid in. Defaults to none.
 
 Example configuration:
 ```
@@ -152,7 +189,7 @@ pid_file: DATADIR/homeserver.pid
 ---
 Config option: `web_client_location`
 
-The absolute URL to the web client which `/` will redirect to.
+The absolute URL to the web client which `/` will redirect to. Defaults to none. 
 
 Example configuration:
 ```
@@ -184,7 +221,7 @@ Provided `https://<server_name>/` on port 443 is routed to Synapse, this
 option configures Synapse to serve a file at `https://<server_name>/.well-known/matrix/server`. 
 This will tell other servers to send traffic to port 443 instead.
 
-This option currently defaults to 'false'.
+This option currently defaults to false.
 
 See https://matrix-org.github.io/synapse/latest/delegate.html for more
 information.
@@ -198,17 +235,19 @@ Config option: `soft_file_limit`
  
 Set the soft limit on the number of file descriptors synapse can use.
 Zero is used to indicate synapse should set the soft limit to the hard limit.
+Defaults to 0. 
 
 Example configuration:
 ```
-soft_file_limit: 0
+soft_file_limit: 3
 ```
 ---
 Config option: `presence`
 
 Presence tracking allows users to see the state (e.g online/offline)
-of other local and remote users. Uncomment the `enabled` flag below `presence` to 
-disable presence tracking on this homeserver. This option replaces the previous top-level 'use_presence' option.
+of other local and remote users. Set the `enabled` flag below `presence` to false to  
+disable presence tracking on this homeserver. Defaults to true. 
+This option replaces the previous top-level 'use_presence' option.
 
 Example configuration:
 ```
@@ -219,7 +258,7 @@ presence:
 Config option: `require_auth_for_profile_requests`
 
 Whether to require authentication to retrieve profile data (avatars, display names) of other 
-users through the client API. Defaults to 'false'. Note that profile data is also available 
+users through the client API. Defaults to false. Note that profile data is also available 
 via the federation API, unless `allow_profile_lookup_over_federation` is set to false.
 
 Example configuration:
@@ -232,7 +271,7 @@ Config option: `limit_profile_requests_to_users_who_share_rooms`
 Use this option to require a user to share a room with another user in order
 to retrieve their profile information. Only checked on Client-Server 
 requests. Profile requests from other servers should be checked by the
-requesting server. Defaults to 'false'.
+requesting server. Defaults to false.
 
 Example configuration: 
 ```
@@ -245,7 +284,7 @@ Use this option to prevent a user's profile data from being retrieved and
 displayed in a room until they have joined it. By default, a user's
 profile data is included in an invite event, regardless of the values
 of the above two settings, and whether or not the users share a server.
-Defaults to 'true'.
+Defaults to true.
 
 Example configuration:
 ```
@@ -254,9 +293,9 @@ include_profile_data_on_invite: false
 ---
 Config option: `allow_public_rooms_without_auth`
 
-If set to 'true', removes the need for authentication to access the server's
+If set to true, removes the need for authentication to access the server's
 public rooms directory through the client API, meaning that anyone can
-query the room directory. Defaults to 'false'.
+query the room directory. Defaults to false.
 
 Example configuration:
 ```
@@ -265,8 +304,8 @@ allow_public_rooms_without_auth: true
 ---
 Config option: `allow_public_rooms_without_auth`
 
-If set to 'true', allows any other homeserver to fetch the server's public
-rooms directory via federation. Defaults to 'false'.
+If set to true, allows any other homeserver to fetch the server's public
+rooms directory via federation. Defaults to false.
 
 Example configuration:
 ```
@@ -277,22 +316,22 @@ Config option: `default_room_version`
 
 The default room version for newly created rooms on this server.
 
-Known room versions are listed here:
-https://spec.matrix.org/latest/rooms/#complete-list-of-room-versions
+Known room versions are listed [here](https://spec.matrix.org/latest/rooms/#complete-list-of-room-versions)
 
 For example, for room version 1, `default_room_version` should be set
 to "1". 
 
-Currently defualts to "9".
+Currently defaults to "9".
 
 Example configuration:
 ```
-default_room_version: "9"
+default_room_version: "8"
 ```
 ---
 Config option: `gc_thresholds`
 
 The garbage collection threshold parameters to pass to `gc.set_threshold`, if defined.
+Defaults to none. 
 
 Example configuration:
 ```
@@ -326,7 +365,7 @@ filter_timeline_limit: 5000
 Config option: `block_non_admin_invites`
 
 Whether room invites to users on this server should be blocked
-(except those sent by local server admins). Defaults to 'false'.
+(except those sent by local server admins). Defaults to false.
 
 Example configuration:
 ```
@@ -335,8 +374,8 @@ block_non_admin_invites: true
 ---
 Config option: `enable_search`
 
-If disabled, new messages will not be indexed for searching and users
-will receive errors when searching for messages. Defaults to enabled.
+If set to false, new messages will not be indexed for searching and users
+will receive errors when searching for messages. Defaults to true.
 
 Example configuration:
 ```
@@ -345,7 +384,7 @@ enable_search: false
 ---
 Config option: `ip_range_blacklist`
  
-This option prevents outgoing requests from being sent to the following blacklisted IP address
+This option prevents outgoing requests from being sent to the specified blacklisted IP address
 CIDR ranges. If this option is not specified then it defaults to private IP
 address ranges (see the example below).
 
@@ -357,7 +396,7 @@ listed here, since they correspond to unroutable addresses.)
 
 This option replaces `federation_ip_range_blacklist` in Synapse v1.25.0.
 
-Note: The value is ignored when an HTTP proxy is in use
+Note: The value is ignored when an HTTP proxy is in use.
 
 Example configuration:
 ```
@@ -407,53 +446,53 @@ configuration.
 
 Options for each listener include:
 
-`port`: the TCP port to bind to
+* `port`: the TCP port to bind to
 
-`bind_addresses`: a list of local addresses to listen on. The default is
+* `bind_addresses`: a list of local addresses to listen on. The default is
        'all local interfaces'.
 
-`type`: the type of listener. Normally `http`, but other valid options are:
+* `type`: the type of listener. Normally `http`, but other valid options are:
     
-* `manhole`: (see https://matrix-org.github.io/synapse/latest/manhole.html),
+   * `manhole`: (see https://matrix-org.github.io/synapse/latest/manhole.html),
 
-* `metrics`: (see https://matrix-org.github.io/synapse/latest/metrics-howto.html),
+   * `metrics`: (see https://matrix-org.github.io/synapse/latest/metrics-howto.html),
 
-* `replication`: (see https://matrix-org.github.io/synapse/latest/workers.html).
+   * `replication`: (see https://matrix-org.github.io/synapse/latest/workers.html).
 
 * `tls`: set to true to enable TLS for this listener. Will use the TLS key/cert specified in tls_private_key_path / tls_certificate_path.
 
-`x_forwarded`: Only valid for an 'http' listener. Set to true to use the X-Forwarded-For header as the client IP. Useful when Synapse is
-behind a reverse-proxy.
+* `x_forwarded`: Only valid for an 'http' listener. Set to true to use the X-Forwarded-For header as the client IP. Useful when Synapse is
+   behind a reverse-proxy.
 
-`resources`: Only valid for an 'http' listener. A list of resources to host
-on this port. Options for each resource are:
+* `resources`: Only valid for an 'http' listener. A list of resources to host
+   on this port. Options for each resource are:
 
-* `names`: a list of names of HTTP resources. See below for a list of valid resource names.
+   * `names`: a list of names of HTTP resources. See below for a list of valid resource names.
 
-* `compress`: set to true to enable HTTP compression for this resource.
+   * `compress`: set to true to enable HTTP compression for this resource.
 
-`additional_resources`: Only valid for an 'http' listener. A map of
-additional endpoints which should be loaded via dynamic modules.
+* `additional_resources`: Only valid for an 'http' listener. A map of
+   additional endpoints which should be loaded via dynamic modules.
 
 Valid resource names are:
 
-`client`: the client-server API (/_matrix/client), and the synapse admin API (/_synapse/admin). Also implies 'media' and 'static'.
+* `client`: the client-server API (/_matrix/client), and the synapse admin API (/_synapse/admin). Also implies 'media' and 'static'.
 
-`consent`: user consent forms (/_matrix/consent). See https://matrix-org.github.io/synapse/latest/consent_tracking.html.
+* `consent`: user consent forms (/_matrix/consent). See https://matrix-org.github.io/synapse/latest/consent_tracking.html.
 
-`federation`: the server-server API (/_matrix/federation). Also implies `media`, `keys`, `openid`
+* `federation`: the server-server API (/_matrix/federation). Also implies `media`, `keys`, `openid`
 
-`keys`: the key discovery API (/_matrix/keys).
+* `keys`: the key discovery API (/_matrix/keys).
 
-`media`: the media API (/_matrix/media).
+* `media`: the media API (/_matrix/media).
 
-`metrics`: the metrics interface. See https://matrix-org.github.io/synapse/latest/metrics-howto.html.
+* `metrics`: the metrics interface. See https://matrix-org.github.io/synapse/latest/metrics-howto.html.
 
-`openid`: OpenID authentication.
+* `openid`: OpenID authentication.
 
-`replication`: the HTTP replication API (/_synapse/replication). See https://matrix-org.github.io/synapse/latest/workers.html.
+* `replication`: the HTTP replication API (/_synapse/replication). See https://matrix-org.github.io/synapse/latest/workers.html.
 
-`static`: static resources under synapse/static (/_matrix/static). (Mostly useful for 'fallback authentication'.)
+* `static`: static resources under synapse/static (/_matrix/static). (Mostly useful for 'fallback authentication'.)
 
 Example configuration #1:
 ```
@@ -471,6 +510,7 @@ listeners:
 ```
 Example configuration #2:
 ```
+listeners:
   # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
   # that unwraps TLS.
   #
@@ -543,7 +583,7 @@ Useful options for Synapse admins.
 
 Config option: `admin_contact`
 
-How to reach the server admin, used in `ResourceLimitError`.
+How to reach the server admin, used in `ResourceLimitError`. Defaults to none. 
 
 Example configuration:
 ```
@@ -552,13 +592,13 @@ admin_contact: 'mailto:admin@server.com'
 ---
 Config option: `hs_disabled` and `hs_disabled_message`
 
-Blocks users from connecting to homeserver and provides a human-readable reason
+Blocks users from connecting to the homeserver and provides a human-readable reason
 why the connection was blocked. Defaults to false. 
 
 Example configuration:
 ```
 hs_disabled: true
-hs_disabled_message: 'Human readable reason for why the HS is blocked'
+hs_disabled_message: 'Reason for why the HS is blocked'
 ```
 ---
 Config option: `limit_usage_by_mau`
@@ -576,7 +616,7 @@ limit_usage_by_mau: true
 Config option: `max_mau_value`
 
 This option sets the hard limit of monthly active users above which the server will start 
-blocking user actions if `limit_usage_by_mau` is enabled. 
+blocking user actions if `limit_usage_by_mau` is enabled. Defaults to 0.  
 
 Example configuration:
 ```
@@ -589,7 +629,7 @@ The option `mau_trial_days` is a means to add a grace period for active users. I
 means that users must be active for the specified number of days before they
 can be considered active and guards against the case where lots of users
 sign up in a short space of time never to return after their initial
-session.
+session. Defaults to 0. 
 
 Example configuration:
 ```
@@ -601,7 +641,7 @@ Config option: `mau_limit_alerting`
 The option `mau_limit_alerting` is a means of limiting client-side alerting
 should the mau limit be reached. This is useful for small instances
 where the admin has 5 mau seats (say) for 5 specific people and no
-interest increasing the mau limit further. Defaults to True, which
+interest increasing the mau limit further. Defaults to true, which
 means that alerting is enabled.
 
 Example configuration:
@@ -653,7 +693,7 @@ resource-constrained. Options for this setting include:
 * `enabled`: whether this check is enabled. Defaults to false.
 * `complexity`: the limit above which rooms cannot be joined. The default is 1.0.
 * `complexity_error`: override the error which is returned when the room is too complex with a
-custom message. 
+   custom message. 
 * `admins_can_join`: allow server admins to join complex rooms. Default is false.
 
 Room complexity is an arbitrary measure based on factors such as the number of
@@ -809,7 +849,7 @@ The message retention policies feature is disabled by default.
 Associated options are:
 * `default_policy`: Default retention policy. If set, Synapse will apply it to rooms that lack the
    'm.room.retention' state event. This option is further specified by the 
-   `min_lifetime` and `max_lifetime` options associated with it. Note that the 
+   `min_lifetime` and `max_lifetime` sub-options associated with it. Note that the 
     value of `min_lifetime` doesn't matter much because Synapse doesn't take it into account yet. 
 
 * `allowed_lifetime_min` and `allowed_lifetime_max`: Retention policy limits. If 
@@ -873,11 +913,11 @@ Config option: `tls_certificate_path`
 
 This option specifies a PEM-encoded X509 certificate for TLS.
 This certificate, as of Synapse 1.0, will need to be a valid and verifiable
-certificate, signed by a recognised Certificate Authority.
+certificate, signed by a recognised Certificate Authority. Defaults to none. 
 
 Be sure to use a `.pem` file that includes the full certificate chain including
 any intermediate certificates (for instance, if using certbot, use
-`fullchain.pem` as your certificate, not `cert.pem`).
+`fullchain.pem` as your certificate, not `cert.pem`). 
 
 Example configuration:
 ```
@@ -886,7 +926,7 @@ tls_certificate_path: "CONFDIR/SERVERNAME.tls.crt"
 ---
 Config option: `tls_private_key_path`
 
-PEM-encoded private key for TLS.
+PEM-encoded private key for TLS. Defaults to none. 
 
 Example configuration:
 ```
@@ -1034,7 +1074,7 @@ A cache 'factor' is a multiplier that can be applied to each of
 Synapse's caches in order to increase or decrease the maximum
 number of entries that can be stored.
 
-Caching can be configured through the following options:
+Caching can be configured through the following sub-options:
 
 * `global_factor`: Controls the global cache factor, which is the default cache factor
   for all caches if a specific factor for that cache is not otherwise
@@ -1095,7 +1135,7 @@ Config option: `database`
 The `database` setting defines the database that synapse uses to store all of
 its data.
 
-Associated options:
+Associated sub-options:
 
 * `name`: this option specifies the database engine to use: either `sqlite3` (for SQLite)
   or `psycopg2` (for PostgreSQL). If no name is specified Synapse will default to SQLite. 
@@ -1246,8 +1286,7 @@ rc_admin_redaction:
 ---
 Config option: `rc_joins`
 
-This option allows for ratelimiting number of rooms a user can join. It's options
-are
+This option allows for ratelimiting number of rooms a user can join. Associated sub-options are:
 
 * `local`: ratelimits when users are joining rooms the server is already in. 
    Defaults to `per_second: 0.1`, `burst_count: 10`.
@@ -1311,7 +1350,9 @@ rc_third_party_invite:
 ---
 Config option: `rc_federation`
 
-The rc_federation configuration is made up of the following settings:
+Defines limits on federation requests. 
+
+The `rc_federation` configuration has the following sub-options:
 * `window_size`: window size in milliseconds. Defaults to 1000.
 * `sleep_limit`: number of federation requests from a single server in
    a window before the server will delay processing the request. Defaults to 10.
@@ -1371,8 +1412,8 @@ media_store_path: "DATADIR/media_store"
 Config option: `media_storage_providers`
 
 Media storage providers allow media to be stored in different
-locations. Defaults to none. Associated options are:
-* `module`: type of resource, e.g. `file_system`, and associated options:
+locations. Defaults to none. Associated sub-options are:
+* `module`: type of resource, e.g. `file_system`. Each `module` has the following sub-options:
    * `store_local`: whether to store newly uploaded local files
    * `store_remote`: whether to store newly downloaded local files
    * `store_synchronous`: whether to wait for successful storage for local uploads
@@ -1391,7 +1432,7 @@ media_storage_providers:
 ---
 Config option: `max_upload_size`
 
-The largest allowed upload size in bytes
+The largest allowed upload size in bytes.
 
 If you are using a reverse proxy you may also need to set this value in
 your reverse proxy's config. Defaults to 50M. Notably Nginx has a small max body size by default.
@@ -1426,7 +1467,7 @@ dynamic_thumbnails: true
 ---
 Config option: `thumbnail_sizes`  
 
-List of thumbnails to precalculate when an image is uploaded. Associated settings are:
+List of thumbnails to precalculate when an image is uploaded. Associated sub-options are:
 * `width`
 * `height`
 * `method`: i.e. `crop`, `scale`, etc.
@@ -1509,7 +1550,7 @@ This option sets a list of IP address CIDR ranges that the URL preview spider is
 to access even if they are specified in `url_preview_ip_range_blacklist`.
 This is useful for specifying exceptions to wide-ranging blacklisted
 target IP ranges - e.g. for enabling URL previews for a specific private
-website only visible in your network.
+website only visible in your network. Defaults to none. 
 
 Example configuration:
 ```
@@ -1640,7 +1681,7 @@ recaptcha_private_key: "YOUR_PRIVATE_KEY"
 ---
 Config option: `enable_registration_captcha`
 
-Uncomment to enable ReCaptcha checks when registering, preventing signup
+Set to true to enable ReCaptcha checks when registering, preventing signup
 unless a captcha is answered. Requires a valid ReCaptcha public/private key. 
 Defaults to false.
 
@@ -1665,7 +1706,7 @@ Options related to adding a TURN server to Synapse.
 ---
 Config option: `turn_uris`
 
-The public URIs of the TURN server to give to clients
+The public URIs of the TURN server to give to clients.
 
 Example configuration:
 ```
@@ -1821,7 +1862,7 @@ registrations_require_3pid:
 Config option: `disable_msisdn_registration`
 
 Explicitly disable asking for MSISDNs from the registration
-flow (overrides `registrations_require_3pid` if MSISDNs are set as required)
+flow (overrides `registrations_require_3pid` if MSISDNs are set as required).
 
 Example usage:
 ```
@@ -1831,7 +1872,7 @@ disable_msisdn_registration: true
 Config option: `allowed_local_3pids`
 
 Mandate that users are only allowed to associate certain formats of
-3PIDs with accounts on this server, as specified by the `medium` and `pattern` settings.
+3PIDs with accounts on this server, as specified by the `medium` and `pattern` sub-options.
 
 Example usage:
 ```
@@ -1858,7 +1899,7 @@ Config option: `registration_requires_token`
 Require users to submit a token during registration.
 Tokens can be managed using the admin API:
 https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/registration_tokens.html
-Note that `enable_registration` must be set to `true`.
+Note that `enable_registration` must be set to true.
 Disabling this option will not delete any tokens previously generated.
 Defaults to false. Set to true to enable.  
 
