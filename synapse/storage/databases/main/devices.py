@@ -1567,9 +1567,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 stream_ids,
             )
 
-            if not room_ids:
-                return
-
             self._add_device_outbound_room_poke_txn(
                 txn,
                 user_id,
@@ -1580,6 +1577,9 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 hosts_have_been_calculated=hosts is not None,
             )
 
+            # If the set of hosts to send to has not been calculated yet (and so
+            # `hosts` is None) or there are no `hosts` to send to, then skip
+            # trying to persist them to the DB.
             if not hosts:
                 return
 
