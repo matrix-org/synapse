@@ -17,10 +17,16 @@ CREATE TABLE device_lists_changes_in_room (
     user_id TEXT NOT NULL,
     device_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
+
     -- This initialy matches `device_lists_stream.stream_id`. Note that we
     -- delete older values from `device_lists_stream`, so we can't use a foreign
     -- constraint here.
+    --
+    -- The table will contain rows with the same `stream_id` but different
+    -- `room_id`, as for each device update we store a row per room the user is
+    -- joined to. Therefore `(stream_id, room_id)` gives a unique index.
     stream_id BIGINT NOT NULL,
+
     -- We have a background process which goes through this table and converts
     -- entries into rows in `device_lists_outbound_pokes`. Once we have processed
     -- a row, we mark it as such by setting `converted_to_destinations=TRUE`.

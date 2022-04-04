@@ -1707,6 +1707,10 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
 
         encoded_context = json_encoder.encode(context)
 
+        # The `device_lists_changes_in_room.stream_id` column matches the
+        # corresponding `stream_id` of the update in the `device_lists_stream`
+        # table, i.e. all rows persisted for the same device update will have
+        # the same `stream_id` (but different room IDs).
         self.db_pool.simple_insert_many_txn(
             txn,
             table="device_lists_changes_in_room",
