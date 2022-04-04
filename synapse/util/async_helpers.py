@@ -451,8 +451,8 @@ class Linearizer:
         # In order to break the cycle, we add a cheeky sleep(0) here to
         # ensure that we fall back to the reactor between each iteration.
         #
-        # (This needs to happen while we hold the lock, and the context manager's
-        # exit code must be synchronous, so this is the only sensible place.)
+        # This needs to happen while we hold the lock. We could put it on the
+        # exit path, but that would slow down the uncontended case.
         await self._clock.sleep(0)
 
         return entry
