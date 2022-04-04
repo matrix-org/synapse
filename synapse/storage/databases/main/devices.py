@@ -1591,11 +1591,11 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 context,
             )
 
-        # The `device_lists_stream` wants a stream ID per device update.
+        # `device_lists_stream` wants a stream ID per device update.
         num_stream_ids = len(device_ids)
 
         if hosts:
-            # The `device_lists_outbound_pokes` wants a different stream ID for
+            # `device_lists_outbound_pokes` wants a different stream ID for
             # each row, which is a row per host per device update.
             num_stream_ids += len(hosts) * len(device_ids)
 

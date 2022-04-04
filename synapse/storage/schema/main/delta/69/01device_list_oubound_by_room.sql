@@ -18,7 +18,7 @@ CREATE TABLE device_lists_changes_in_room (
     device_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
 
-    -- This initialy matches `device_lists_stream.stream_id`. Note that we
+    -- This initially matches `device_lists_stream.stream_id`. Note that we
     -- delete older values from `device_lists_stream`, so we can't use a foreign
     -- constraint here.
     --
