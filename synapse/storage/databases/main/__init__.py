@@ -183,8 +183,18 @@ class DataStore(
         super().__init__(database, db_conn, hs)
 
         device_list_max = self._device_list_id_gen.get_current_token()
+        device_list_prefill, min_device_list_id = self.db_pool.get_cache_dict(
+            db_conn,
+            "device_lists_stream",
+            entity_column="user_id",
+            stream_column="stream_id",
+            max_value=device_list_max,
+            limit=1000,
+        )
         self._device_list_stream_cache = StreamChangeCache(
-            "DeviceListStreamChangeCache", device_list_max
+            "DeviceListStreamChangeCache",
+            min_device_list_id,
+            prefilled_cache=device_list_prefill,
         )
         self._user_signature_stream_cache = StreamChangeCache(
             "UserSignatureStreamChangeCache", device_list_max
