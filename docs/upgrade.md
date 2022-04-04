@@ -85,6 +85,19 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.57.0
+
+## Changes to database schema for application services
+
+Synapse v1.57.0 includes a [change](https://github.com/matrix-org/synapse/pull/12209) to the
+way transaction IDs are managed for application services. If your deployment uses a dedicated
+worker for application service traffic, **it must be stopped** when the database is upgraded
+(which normally happens when the main process is upgraded), to ensure the change is made safely
+without any risk of reusing transaction IDs.
+
+Deployments which do not use separate worker processes can be upgraded as normal. Similarly,
+deployments where no applciation services are in use can be upgraded as normal.
+
 # Upgrading to v1.56.0
 
 ## Groups/communities feature has been deprecated

@@ -1,0 +1,1 @@
+Switch to using a sequence to generate AS transaction IDs. Contributed by Nick Beeper. If running synapse with a dedicated appservice worker, this MUST be stopped before upgrading the main process and database.

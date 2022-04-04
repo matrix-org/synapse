@@ -33,7 +33,7 @@ from .account_data import AccountDataStore
 from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
 from .cache import CacheInvalidationWorkerStore
 from .censor_events import CensorEventsStore
-from .client_ips import ClientIpStore
+from .client_ips import ClientIpWorkerStore
 from .deviceinbox import DeviceInboxStore
 from .devices import DeviceStore
 from .directory import DirectoryStore
@@ -49,7 +49,7 @@ from .keys import KeyStore
 from .lock import LockStore
 from .media_repository import MediaRepositoryStore
 from .metrics import ServerMetricsStore
-from .monthly_active_users import MonthlyActiveUsersStore
+from .monthly_active_users import MonthlyActiveUsersWorkerStore
 from .openid import OpenIdStore
 from .presence import PresenceStore
 from .profile import ProfileStore
@@ -112,13 +112,13 @@ class DataStore(
     AccountDataStore,
     EventPushActionsStore,
     OpenIdStore,
-    ClientIpStore,
+    ClientIpWorkerStore,
     DeviceStore,
     DeviceInboxStore,
     UserDirectoryStore,
     GroupServerStore,
     UserErasureStore,
-    MonthlyActiveUsersStore,
+    MonthlyActiveUsersWorkerStore,
     StatsStore,
     RelationsStore,
     CensorEventsStore,
