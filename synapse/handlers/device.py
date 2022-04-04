@@ -491,7 +491,7 @@ class DeviceHandler(DeviceWorkerHandler):
         room_ids = await self.store.get_rooms_for_user(user_id)
 
         hosts: Optional[Set[str]] = None
-        if self.use_new_device_lists_changes_in_room:
+        if not self.use_new_device_lists_changes_in_room:
             hosts = set()
 
             if self.hs.is_mine_id(user_id):
