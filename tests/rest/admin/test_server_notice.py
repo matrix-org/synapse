@@ -214,9 +214,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(messages[0]["sender"], "@notices:test")
 
         # invalidate cache of server notices room_ids
-        self.get_success(
-            self.server_notices_manager.get_or_create_notice_room_for_user.invalidate_all()
-        )
+        self.server_notices_manager.get_or_create_notice_room_for_user.invalidate_all()
 
         # send second message
         channel = self.make_request(
@@ -291,9 +289,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         # invalidate cache of server notices room_ids
         # if server tries to send to a cached room_id the user gets the message
         # in old room
-        self.get_success(
-            self.server_notices_manager.get_or_create_notice_room_for_user.invalidate_all()
-        )
+        self.server_notices_manager.get_or_create_notice_room_for_user.invalidate_all()
 
         # send second message
         channel = self.make_request(
@@ -380,9 +376,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
 
         # invalidate cache of server notices room_ids
         # if server tries to send to a cached room_id it gives an error
-        self.get_success(
-            self.server_notices_manager.get_or_create_notice_room_for_user.invalidate_all()
-        )
+        self.server_notices_manager.get_or_create_notice_room_for_user.invalidate_all()
 
         # send second message
         channel = self.make_request(

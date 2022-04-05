@@ -59,7 +59,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.bob = UserID.from_string("@4567:test")
         self.alice = UserID.from_string("@alice:remote")
 
-        self.get_success(self.register_user(self.frank.localpart, "frankpassword"))
+        self.register_user(self.frank.localpart, "frankpassword")
 
         self.handler = hs.get_profile_handler()
 

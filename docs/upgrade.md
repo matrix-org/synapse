@@ -85,7 +85,25 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.57.0
+
+## Changes to database schema for application services
+
+Synapse v1.57.0 includes a [change](https://github.com/matrix-org/synapse/pull/12209) to the
+way transaction IDs are managed for application services. If your deployment uses a dedicated
+worker for application service traffic, **it must be stopped** when the database is upgraded
+(which normally happens when the main process is upgraded), to ensure the change is made safely
+without any risk of reusing transaction IDs.
+
+Deployments which do not use separate worker processes can be upgraded as normal. Similarly,
+deployments where no applciation services are in use can be upgraded as normal.
+
 # Upgrading to v1.56.0
+
+## Open registration without verification is now disabled by default
+
+Synapse will refuse to start if registration is enabled without email, captcha, or token-based verification unless the new config
+flag `enable_registration_without_verification` is set to "true".
 
 ## Groups/communities feature has been deprecated
 
@@ -107,12 +125,6 @@ the configuration file, is set to `true`. See the [PostgreSQL documentation](htt
 for more information and instructions on how to fix a database with incorrect values.
 
 # Upgrading to v1.55.0
-
-## Open registration without verification is now disabled by default
-
-Synapse will refuse to start if registration is enabled without email, captcha, or token-based verification unless the new config 
-flag `enable_registration_without_verification` is set to "true".
-
 
 ## `synctl` script has been moved
 

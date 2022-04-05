@@ -1,0 +1,1 @@
+Fix a spec compliance issue where requests to the `/publicRooms` federation API would specify `limit` as a string.

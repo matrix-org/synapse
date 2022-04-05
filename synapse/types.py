@@ -39,6 +39,7 @@ from typing_extensions import TypedDict
 from unpaddedbase64 import decode_base64
 from zope.interface import Interface
 
+from twisted.internet.defer import CancelledError
 from twisted.internet.interfaces import (
     IReactorCore,
     IReactorPluggableNameResolver,
@@ -422,22 +423,44 @@ class RoomStreamToken:
 
             s0    s1
             |     |
-        [0] V [1] V [2]
+        [0] ▼ [1] ▼ [2]
 
     Tokens can either be a point in the live event stream or a cursor going
     through historic events.
 
-    When traversing the live event stream events are ordered by when they
-    arrived at the homeserver.
+    When traversing the live event stream, events are ordered by
+    `stream_ordering` (when they arrived at the homeserver).
 
-    When traversing historic events the events are ordered by their depth in
-    the event graph "topological_ordering" and then by when they arrived at the
-    homeserver "stream_ordering".
+    When traversing historic events, events are first ordered by their `depth`
+    (`topological_ordering` in the event graph) and tie-broken by
+    `stream_ordering` (when the event arrived at the homeserver).
 
-    Live tokens start with an "s" followed by the "stream_ordering" id of the
-    event it comes after. Historic tokens start with a "t" followed by the
-    "topological_ordering" id of the event it comes after, followed by "-",
-    followed by the "stream_ordering" id of the event it comes after.
+    If you're looking for more info about what a token with all of the
+    underscores means, ex.
+    `s2633508_17_338_6732159_1082514_541479_274711_265584_1`, see the docstring
+    for `StreamToken` below.
+
+    ---
+
+    Live tokens start with an "s" followed by the `stream_ordering` of the event
+    that comes before the position of the token. Said another way:
+    `stream_ordering` uniquely identifies a persisted event. The live token
+    means "the position just after the event identified by `stream_ordering`".
+    An example token is:
+
+        s2633508
+
+    ---
+
+    Historic tokens start with a "t" followed by the `depth`
+    (`topological_ordering` in the event graph) of the event that comes before
+    the position of the token, followed by "-", followed by the
+    `stream_ordering` of the event that comes before the position of the token.
+    An example token is:
+
+        t426-2633508
+
+    ---
 
     There is also a third mode for live tokens where the token starts with "m",
     which is sometimes used when using sharded event persisters. In this case
@@ -463,6 +486,8 @@ class RoomStreamToken:
 
     Note: The `RoomStreamToken` cannot have both a topological part and an
     instance map.
+
+    ---
 
     For caching purposes, `RoomStreamToken`s and by extension, all their
     attributes, must be hashable.
@@ -516,6 +541,8 @@ class RoomStreamToken:
                     stream=stream,
                     instance_map=frozendict(instance_map),
                 )
+        except CancelledError:
+            raise
         except Exception:
             pass
         raise SynapseError(400, "Invalid room stream token %r" % (string,))
@@ -600,7 +627,57 @@ class RoomStreamToken:
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class StreamToken:
-    """A collection of positions within multiple streams.
+    """A collection of keys joined together by underscores in the following
+    order and which represent the position in their respective streams.
+
+    ex. `s2633508_17_338_6732159_1082514_541479_274711_265584_1`
+        1. `room_key`: `s2633508` which is a `RoomStreamToken`
+           - `RoomStreamToken`'s can also look like `t426-2633508` or `m56~2.58~3.59`
+           - See the docstring for `RoomStreamToken` for more details.
+        2. `presence_key`: `17`
+        3. `typing_key`: `338`
+        4. `receipt_key`: `6732159`
+        5. `account_data_key`: `1082514`
+        6. `push_rules_key`: `541479`
+        7. `to_device_key`: `274711`
+        8. `device_list_key`: `265584`
+        9. `groups_key`: `1`
+
+    You can see how many of these keys correspond to the various
+    fields in a "/sync" response:
+    ```json
+    {
+        "next_batch": "s12_4_0_1_1_1_1_4_1",
+        "presence": {
+            "events": []
+        },
+        "device_lists": {
+            "changed": []
+        },
+        "rooms": {
+            "join": {
+                "!QrZlfIDQLNLdZHqTnt:hs1": {
+                    "timeline": {
+                        "events": [],
+                        "prev_batch": "s10_4_0_1_1_1_1_4_1",
+                        "limited": false
+                    },
+                    "state": {
+                        "events": []
+                    },
+                    "account_data": {
+                        "events": []
+                    },
+                    "ephemeral": {
+                        "events": []
+                    }
+                }
+            }
+        }
+    }
+    ```
+
+    ---
 
     For caching purposes, `StreamToken`s and by extension, all their attributes,
     must be hashable.
@@ -631,6 +708,8 @@ class StreamToken:
             return cls(
                 await RoomStreamToken.parse(store, keys[0]), *(int(k) for k in keys[1:])
             )
+        except CancelledError:
+            raise
         except Exception:
             raise SynapseError(400, "Invalid stream token")
 
