@@ -431,7 +431,7 @@ class Linearizer:
                 )
             else:
                 logger.warning(
-                    "Unexpected exception waiting for linearizer lock %r for key " "%r",
+                    "Unexpected exception waiting for linearizer lock %r for key %r",
                     self.name,
                     key,
                 )
