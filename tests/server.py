@@ -76,6 +76,7 @@ from tests.utils import (
     POSTGRES_BASE_DB,
     POSTGRES_HOST,
     POSTGRES_PASSWORD,
+    POSTGRES_PORT,
     POSTGRES_USER,
     SQLITE_PERSIST_DB,
     USE_POSTGRES_FOR_TESTS,
@@ -747,6 +748,7 @@ def setup_test_homeserver(
                 "host": POSTGRES_HOST,
                 "password": POSTGRES_PASSWORD,
                 "user": POSTGRES_USER,
+                "port": POSTGRES_PORT,
                 "cp_min": 1,
                 "cp_max": 5,
             },
@@ -786,6 +788,7 @@ def setup_test_homeserver(
             database=POSTGRES_BASE_DB,
             user=POSTGRES_USER,
             host=POSTGRES_HOST,
+            port=POSTGRES_PORT,
             password=POSTGRES_PASSWORD,
         )
         db_conn.autocommit = True
@@ -833,6 +836,7 @@ def setup_test_homeserver(
                 database=POSTGRES_BASE_DB,
                 user=POSTGRES_USER,
                 host=POSTGRES_HOST,
+                port=POSTGRES_PORT,
                 password=POSTGRES_PASSWORD,
             )
             db_conn.autocommit = True
