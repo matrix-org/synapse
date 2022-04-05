@@ -375,7 +375,8 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         member_event.signatures = member_event_dict["signatures"]
 
         # Add the new member_event to the StateMap
-        prev_state_map[
+        updated_state_map = dict(prev_state_map)
+        updated_state_map[
             (member_event.type, member_event.state_key)
         ] = member_event.event_id
         auth_events.append(member_event)
@@ -399,7 +400,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
                 prev_event_ids=message_event_dict["prev_events"],
                 auth_event_ids=self._event_auth_handler.compute_auth_events(
                     builder,
-                    prev_state_map,
+                    updated_state_map,
                     for_verification=False,
                 ),
                 depth=message_event_dict["depth"],
