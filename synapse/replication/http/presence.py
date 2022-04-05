@@ -102,7 +102,6 @@ class ReplicationPresenceSetState(ReplicationEndpoint):
     ) -> JsonDict:
         return {
             "state": state,
-            "ignore_status_msg": ignore_status_msg,
             "force_notify": force_notify,
         }
 
