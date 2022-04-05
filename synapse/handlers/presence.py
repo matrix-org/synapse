@@ -165,6 +165,7 @@ class BasePresenceHandler(abc.ABC):
             affect_presence: If false this function will be a no-op.
                 Useful for streams that are not associated with an actual
                 client that is being used by a user.
+            presence_state: The presence state indicated in the sync request
         """
 
     @abc.abstractmethod
@@ -958,6 +959,7 @@ class PresenceHandler(BasePresenceHandler):
             affect_presence: If false this function will be a no-op.
                 Useful for streams that are not associated with an actual
                 client that is being used by a user.
+            presence_state: The presence state indicated in the sync request
         """
         # Override if it should affect the user's presence, if presence is
         # disabled.
