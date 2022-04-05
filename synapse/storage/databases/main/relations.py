@@ -497,7 +497,7 @@ class RelationsWorkerStore(SQLBaseStore):
                         AND parent.room_id = child.room_id
                     WHERE
                         %s
-                        AND %s
+                        AND relation_type = ?
                     ORDER BY parent.event_id, child.topological_ordering DESC, child.stream_ordering DESC
                 """
             else:
@@ -512,22 +512,16 @@ class RelationsWorkerStore(SQLBaseStore):
                         AND parent.room_id = child.room_id
                     WHERE
                         %s
-                        AND %s
+                        AND relation_type = ?
                     ORDER BY child.topological_ordering DESC, child.stream_ordering DESC
                 """
 
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "relates_to_id", event_ids
             )
+            args.append(RelationTypes.THREAD)
 
-            if self._msc3440_enabled:
-                relations_clause = "(relation_type = ? OR relation_type = ?)"
-                args.extend((RelationTypes.THREAD, RelationTypes.UNSTABLE_THREAD))
-            else:
-                relations_clause = "relation_type = ?"
-                args.append(RelationTypes.THREAD)
-
-            txn.execute(sql % (clause, relations_clause), args)
+            txn.execute(sql % (clause,), args)
             latest_event_ids = {}
             for parent_event_id, child_event_id in txn:
                 # Only consider the latest threaded reply (by topological ordering).
@@ -547,7 +541,7 @@ class RelationsWorkerStore(SQLBaseStore):
                     AND parent.room_id = child.room_id
                 WHERE
                     %s
-                    AND %s
+                    AND relation_type = ?
                 GROUP BY parent.event_id
             """
 
@@ -556,15 +550,9 @@ class RelationsWorkerStore(SQLBaseStore):
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "relates_to_id", latest_event_ids.keys()
             )
+            args.append(RelationTypes.THREAD)
 
-            if self._msc3440_enabled:
-                relations_clause = "(relation_type = ? OR relation_type = ?)"
-                args.extend((RelationTypes.THREAD, RelationTypes.UNSTABLE_THREAD))
-            else:
-                relations_clause = "relation_type = ?"
-                args.append(RelationTypes.THREAD)
-
-            txn.execute(sql % (clause, relations_clause), args)
+            txn.execute(sql % (clause,), args)
             counts = dict(cast(List[Tuple[str, int]], txn.fetchall()))
 
             return counts, latest_event_ids
@@ -622,7 +610,7 @@ class RelationsWorkerStore(SQLBaseStore):
                 parent.event_id = relates_to_id
                 AND parent.room_id = child.room_id
             WHERE
-                %s
+                relation_type = ?
                 AND %s
                 AND %s
             GROUP BY parent.event_id, child.sender
@@ -638,16 +626,9 @@ class RelationsWorkerStore(SQLBaseStore):
                 txn.database_engine, "relates_to_id", event_ids
             )
 
-            if self._msc3440_enabled:
-                relations_clause = "(relation_type = ? OR relation_type = ?)"
-                relations_args = [RelationTypes.THREAD, RelationTypes.UNSTABLE_THREAD]
-            else:
-                relations_clause = "relation_type = ?"
-                relations_args = [RelationTypes.THREAD]
-
             txn.execute(
-                sql % (users_sql, events_clause, relations_clause),
-                users_args + events_args + relations_args,
+                sql % (users_sql, events_clause),
+                [RelationTypes.THREAD] + users_args + events_args,
             )
             return {(row[0], row[1]): row[2] for row in txn}
 
@@ -677,7 +658,7 @@ class RelationsWorkerStore(SQLBaseStore):
             user participated in that event's thread, otherwise false.
         """
 
-        def _get_thread_summary_txn(txn: LoggingTransaction) -> Set[str]:
+        def _get_threads_participated_txn(txn: LoggingTransaction) -> Set[str]:
             # Fetch whether the requester has participated or not.
             sql = """
                 SELECT DISTINCT relates_to_id
@@ -688,28 +669,20 @@ class RelationsWorkerStore(SQLBaseStore):
                     AND parent.room_id = child.room_id
                 WHERE
                     %s
-                    AND %s
+                    AND relation_type = ?
                     AND child.sender = ?
             """
 
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "relates_to_id", event_ids
             )
+            args.extend([RelationTypes.THREAD, user_id])
 
-            if self._msc3440_enabled:
-                relations_clause = "(relation_type = ? OR relation_type = ?)"
-                args.extend((RelationTypes.THREAD, RelationTypes.UNSTABLE_THREAD))
-            else:
-                relations_clause = "relation_type = ?"
-                args.append(RelationTypes.THREAD)
-
-            args.append(user_id)
-
-            txn.execute(sql % (clause, relations_clause), args)
+            txn.execute(sql % (clause,), args)
             return {row[0] for row in txn.fetchall()}
 
         participated_threads = await self.db_pool.runInteraction(
-            "get_thread_summary", _get_thread_summary_txn
+            "get_threads_participated", _get_threads_participated_txn
         )
 
         return {event_id: event_id in participated_threads for event_id in event_ids}

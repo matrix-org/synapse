@@ -525,8 +525,6 @@ class EventClientSerializer:
                 "current_user_participated": thread.current_user_participated,
             }
             serialized_aggregations[RelationTypes.THREAD] = thread_summary
-            if self._msc3440_enabled:
-                serialized_aggregations[RelationTypes.UNSTABLE_THREAD] = thread_summary
 
         # Include the bundled aggregations in the event.
         if serialized_aggregations:
