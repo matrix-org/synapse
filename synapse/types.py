@@ -39,6 +39,7 @@ from typing_extensions import TypedDict
 from unpaddedbase64 import decode_base64
 from zope.interface import Interface
 
+from twisted.internet.defer import CancelledError
 from twisted.internet.interfaces import (
     IReactorCore,
     IReactorPluggableNameResolver,
@@ -540,6 +541,8 @@ class RoomStreamToken:
                     stream=stream,
                     instance_map=frozendict(instance_map),
                 )
+        except CancelledError:
+            raise
         except Exception:
             pass
         raise SynapseError(400, "Invalid room stream token %r" % (string,))
@@ -705,6 +708,8 @@ class StreamToken:
             return cls(
                 await RoomStreamToken.parse(store, keys[0]), *(int(k) for k in keys[1:])
             )
+        except CancelledError:
+            raise
         except Exception:
             raise SynapseError(400, "Invalid stream token")
 
