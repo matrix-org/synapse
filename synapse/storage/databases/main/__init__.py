@@ -190,7 +190,7 @@ class DataStore(
             entity_column="user_id",
             stream_column="stream_id",
             max_value=device_list_max,
-            limit=1000,
+            limit=10000,
         )
         self._device_list_stream_cache = StreamChangeCache(
             "DeviceListStreamChangeCache",
