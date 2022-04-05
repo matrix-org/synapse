@@ -748,14 +748,14 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             "get_room_event_before_stream_ordering", _f
         )
 
-    async def get_room_events_max_id(
+    async def get_current_room_stream_token_for_room_id(
         self, room_id: Optional[str] = None
     ) -> RoomStreamToken:
-        """Returns the current token for rooms stream.
+        """Returns the current position of the rooms stream.
 
-        By default, it returns the current global stream token. Specifying a
-        `room_id` causes it to return the current room specific topological
-        token.
+        By default, it returns a live token with the current global stream
+        token. Specifying a `room_id` causes it to return a historic token with
+        the room specific topological token.
         """
         stream_ordering = self.get_room_max_stream_ordering()
         if room_id is None:
