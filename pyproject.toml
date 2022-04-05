@@ -192,8 +192,6 @@ hiredis = { version = "*", optional = true }
 Pympler = { version = "*", optional = true }
 parameterized = { version = ">=0.7.4", optional = true }
 
-## Developer dependencies should not get included in "all".
-##
 [tool.poetry.extras]
 # NB: Packages that should be part of `pip install matrix-synapse[all]` need to be specified
 # twice: once here, and once in the `all` extra.
