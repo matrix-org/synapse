@@ -28,7 +28,7 @@ from tests.unittest import default_config, override_config
 FORTY_DAYS = 40 * 24 * 60 * 60
 
 
-def gen_3pids(count: int):
+def gen_3pids(count: int) -> Dict[str, Any]:
     """Generate `count` threepids as a list."""
     return [
         {"medium": "email", "address": "user%i@matrix.org" % i} for i in range(count)
