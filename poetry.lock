@@ -1593,7 +1593,7 @@ url_preview = ["lxml"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "92465e65bef59c43c6112f332e5cf987740899801dbd34c19245db15b5c6362d"
+content-hash = "7ff6d982a9d6675cb595b216b23549ef1942d0e39cb91c97494ff6ed95a9e8d2"
 
 [metadata.files]
 appdirs = [
