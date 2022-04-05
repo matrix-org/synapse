@@ -481,9 +481,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
         # events). This is a bit cheeky, but tests the logic of _check_event_relations.
 
         # Filter for a particular sender.
-        definition = {
-            "io.element.relation_senders": ["@foo:bar"],
-        }
+        definition = {"related_by_senders": ["@foo:bar"]}
 
         async def events_have_relations(*args, **kwargs):
             return ["$with_relation"]
