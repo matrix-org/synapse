@@ -2038,6 +2038,10 @@ class DatabasePool:
 
         # This may return many rows for the same entity, but the `limit` is only
         # a suggestion so we don't care that much.
+        #
+        # Note: Some stream tables can have multiple rows with the same stream
+        # ID. Instead of handling this with complicated SQL, we instead simply
+        # add one to the returned minimum stream ID to ensure correctness.
         sql = f"""
             SELECT {entity_column}, {stream_column}
             FROM {table}
@@ -2057,7 +2061,9 @@ class DatabasePool:
         txn.close()
 
         if cache:
-            min_val = min(cache.values())
+            # We add one here as we don't know if we have all rows for the
+            # minimum stream ID.
+            min_val = min(cache.values()) + 1
         else:
             min_val = max_value
 
