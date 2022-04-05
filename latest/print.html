@@ -851,11 +851,12 @@ new line, it is inserted before:</p>
 </code></pre>
 <h3 id="fixing-incorrect-collate-or-ctype"><a class="header" href="#fixing-incorrect-collate-or-ctype">Fixing incorrect <code>COLLATE</code> or <code>CTYPE</code></a></h3>
 <p>Synapse will refuse to set up a new database if it has the wrong values of
-<code>COLLATE</code> and <code>CTYPE</code> set, and will log warnings on existing databases. Using
-different locales can cause issues if the locale library is updated from
+<code>COLLATE</code> and <code>CTYPE</code> set. Synapse will also refuse to start an existing database with incorrect values
+of <code>COLLATE</code> and <code>CTYPE</code> unless the config flag <code>allow_unsafe_locale</code>, found in the 
+<code>database</code> section of the config, is set to true. Using different locales can cause issues if the locale library is updated from
 underneath the database, or if a different version of the locale is used on any
 replicas.</p>
-<p>The safest way to fix the issue is to dump the database and recreate it with
+<p>If you have a databse with an unsafe locale, the safest way to fix the issue is to dump the database and recreate it with
 the correct locale parameter (as shown above). It is also possible to change the
 parameters on a live database and run a <code>REINDEX</code> on the entire database,
 however extreme care must be taken to avoid database corruption.</p>
@@ -1019,7 +1020,7 @@ matrix.example.com {
 <p><strong>NOTE 3</strong>: Missing <code>ProxyPreserveHost on</code> can lead to a redirect loop.</p>
 <h3 id="haproxy"><a class="header" href="#haproxy">HAProxy</a></h3>
 <pre><code>frontend https
-  bind :::443 v4v6 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
+  bind *:443,[::]:443 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
   http-request set-header X-Forwarded-Proto https if { ssl_fc }
   http-request set-header X-Forwarded-Proto http if !{ ssl_fc }
   http-request set-header X-Forwarded-For %[src]
@@ -1032,7 +1033,7 @@ matrix.example.com {
   use_backend matrix if matrix-host matrix-path
 
 frontend matrix-federation
-  bind :::8448 v4v6 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1
+  bind *:8448,[::]:8448 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1
   http-request set-header X-Forwarded-Proto https if { ssl_fc }
   http-request set-header X-Forwarded-Proto http if !{ ssl_fc }
   http-request set-header X-Forwarded-For %[src]
@@ -1640,6 +1641,9 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </li>
 </ul>
 <h1 id="upgrading-to-v1560"><a class="header" href="#upgrading-to-v1560">Upgrading to v1.56.0</a></h1>
+<h2 id="open-registration-without-verification-is-now-disabled-by-default"><a class="header" href="#open-registration-without-verification-is-now-disabled-by-default">Open registration without verification is now disabled by default</a></h2>
+<p>Synapse will refuse to start if registration is enabled without email, captcha, or token-based verification unless the new config
+flag <code>enable_registration_without_verification</code> is set to &quot;true&quot;.</p>
 <h2 id="groupscommunities-feature-has-been-deprecated"><a class="header" href="#groupscommunities-feature-has-been-deprecated">Groups/communities feature has been deprecated</a></h2>
 <p>The non-standard groups/communities feature in Synapse has been deprecated and will
 be disabled by default in Synapse v1.58.0.</p>
@@ -1647,6 +1651,11 @@ be disabled by default in Synapse v1.58.0.</p>
 <pre><code class="language-yaml">experimental_features:
   groups_enabled: false
 </code></pre>
+<h2 id="change-in-behaviour-for-postgresql-databases-with-unsafe-locale"><a class="header" href="#change-in-behaviour-for-postgresql-databases-with-unsafe-locale">Change in behaviour for PostgreSQL databases with unsafe locale</a></h2>
+<p>Synapse now refuses to start when using PostgreSQL with non-<code>C</code> values for <code>COLLATE</code> and
+<code>CTYPE</code> unless the config flag <code>allow_unsafe_locale</code>, found in the database section of
+the configuration file, is set to <code>true</code>. See the <a href="https://matrix-org.github.io/synapse/latest/postgres.html#fixing-incorrect-collate-or-ctype">PostgreSQL documentation</a>
+for more information and instructions on how to fix a database with incorrect values.</p>
 <h1 id="upgrading-to-v1550"><a class="header" href="#upgrading-to-v1550">Upgrading to v1.55.0</a></h1>
 <h2 id="synctl-script-has-been-moved"><a class="header" href="#synctl-script-has-been-moved"><code>synctl</code> script has been moved</a></h2>
 <p>The <code>synctl</code> script
@@ -3734,6 +3743,12 @@ caches:
 # 'txn_limit' gives the maximum number of transactions to run per connection
 # before reconnecting. Defaults to 0, which means no limit.
 #
+# 'allow_unsafe_locale' is an option specific to Postgres. Under the default behavior, Synapse will refuse to
+# start if the postgres db is set to a non-C locale. You can override this behavior (which is *not* recommended)
+# by setting 'allow_unsafe_locale' to true. Note that doing so may corrupt your database. You can find more information
+# here: https://matrix-org.github.io/synapse/latest/postgres.html#fixing-incorrect-collate-or-ctype and here:
+# https://wiki.postgresql.org/wiki/Locale_data_changes
+#
 # 'args' gives options which are passed through to the database engine,
 # except for options starting 'cp_', which are used to configure the Twisted
 # connection pool. For a reference to valid arguments, see:
@@ -4163,9 +4178,17 @@ oembed:
 # Registration can be rate-limited using the parameters in the &quot;Ratelimiting&quot;
 # section of this file.
 
-# Enable registration for new users.
+# Enable registration for new users. Defaults to 'false'. It is highly recommended that if you enable registration,
+# you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration
+# without any verification, you must also set `enable_registration_without_verification`, found below.
 #
 #enable_registration: false
+
+# Enable registration without email or captcha verification. Note: this option is *not* recommended,
+# as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
+# unless `enable_registration` is also enabled.
+#
+#enable_registration_without_verification: true
 
 # Time that a user's session remains valid for, after they log in.
 #
@@ -6455,6 +6478,7 @@ to install Dex.</p>
 <li>Create an application for synapse in Authentik and link it to the provider.</li>
 <li>Note the slug of your application, Client ID and Client Secret.</li>
 </ol>
+<p>Note: RSA keys must be used for signing for Authentik, ECC keys do not work.</p>
 <p>Synapse config:</p>
 <pre><code class="language-yaml">oidc_providers:
   - idp_id: authentik
@@ -6469,7 +6493,7 @@ to install Dex.</p>
       - &quot;email&quot;
     user_mapping_provider:
       config:
-        localpart_template: &quot;{{ user.preferred_username }}}&quot;
+        localpart_template: &quot;{{ user.preferred_username }}&quot;
         display_name_template: &quot;{{ user.preferred_username|capitalize }}&quot; # TO BE FILLED: If your users have names in Authentik and you want those in Synapse, this should be replaced with user.name|capitalize.
 </code></pre>
 <h3 id="lemonldap"><a class="header" href="#lemonldap">LemonLDAP</a></h3>
@@ -8138,7 +8162,7 @@ callback that does not return <code>True</code> will be used. If this happens, S
 any of the subsequent implementations of this callback.</p>
 <h3 id="check_username_for_spam"><a class="header" href="#check_username_for_spam"><code>check_username_for_spam</code></a></h3>
 <p><em>First introduced in Synapse v1.37.0</em></p>
-<pre><code class="language-python">async def check_username_for_spam(user_profile: Dict[str, str]) -&gt; bool
+<pre><code class="language-python">async def check_username_for_spam(user_profile: synapse.module_api.UserProfile) -&gt; bool
 </code></pre>
 <p>Called when computing search results in the user directory. The module must return a
 <code>bool</code> indicating whether the given user should be excluded from user directory 
@@ -8146,9 +8170,11 @@ searches. Return <code>True</code> to indicate that the user is spammy and exclu
 search results; otherwise return <code>False</code>.</p>
 <p>The profile is represented as a dictionary with the following keys:</p>
 <ul>
-<li><code>user_id</code>: The Matrix ID for this user.</li>
-<li><code>display_name</code>: The user's display name.</li>
-<li><code>avatar_url</code>: The <code>mxc://</code> URL to the user's avatar.</li>
+<li><code>user_id: str</code>. The Matrix ID for this user.</li>
+<li><code>display_name: Optional[str]</code>. The user's display name, or <code>None</code> if this user
+has not set a display name.</li>
+<li><code>avatar_url: Optional[str]</code>. The <code>mxc://</code> URL to the user's avatar, or <code>None</code>
+if this user has not set an avatar.</li>
 </ul>
 <p>The module is given a copy of the original dictionary, so modifying it from within the
 module cannot modify a user's profile when included in user directory search results.</p>
@@ -8999,8 +9025,8 @@ stream then, for maximum efficiency, additional endpoints should be routed to th
 worker: refer to the <a href="workers.html#stream-writers">stream writers</a> section below for further
 information.</p>
 <pre><code># Sync requests
-^/_matrix/client/(v2_alpha|r0|v3)/sync$
-^/_matrix/client/(api/v1|v2_alpha|r0|v3)/events$
+^/_matrix/client/(r0|v3)/sync$
+^/_matrix/client/(api/v1|r0|v3)/events$
 ^/_matrix/client/(api/v1|r0|v3)/initialSync$
 ^/_matrix/client/(api/v1|r0|v3)/rooms/[^/]+/initialSync$
 
@@ -9014,13 +9040,9 @@ information.</p>
 ^/_matrix/federation/v1/query/
 ^/_matrix/federation/v1/make_join/
 ^/_matrix/federation/v1/make_leave/
-^/_matrix/federation/v1/send_join/
-^/_matrix/federation/v2/send_join/
-^/_matrix/federation/v1/send_leave/
-^/_matrix/federation/v2/send_leave/
-^/_matrix/federation/v1/invite/
-^/_matrix/federation/v2/invite/
-^/_matrix/federation/v1/query_auth/
+^/_matrix/federation/(v1|v2)/send_join/
+^/_matrix/federation/(v1|v2)/send_leave/
+^/_matrix/federation/(v1|v2)/invite/
 ^/_matrix/federation/v1/event_auth/
 ^/_matrix/federation/v1/exchange_third_party_invite/
 ^/_matrix/federation/v1/user/devices/
@@ -9086,6 +9108,8 @@ information.</p>
 </code></pre>
 <p>Additionally, the following REST endpoints can be handled for GET requests:</p>
 <pre><code>^/_matrix/federation/v1/groups/
+^/_matrix/client/(api/v1|r0|v3|unstable)/pushrules/
+^/_matrix/client/(r0|v3|unstable)/groups/
 </code></pre>
 <p>Pagination requests can also be handled, but all requests for a given
 room must be routed to the same instance. Additionally, care must be taken to
@@ -9183,19 +9207,19 @@ the stream writer for the <code>typing</code> stream:</p>
 <h5 id="the-to_device-stream"><a class="header" href="#the-to_device-stream">The <code>to_device</code> stream</a></h5>
 <p>The following endpoints should be routed directly to the worker configured as
 the stream writer for the <code>to_device</code> stream:</p>
-<pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/sendToDevice/
+<pre><code>^/_matrix/client/(r0|v3|unstable)/sendToDevice/
 </code></pre>
 <h5 id="the-account_data-stream"><a class="header" href="#the-account_data-stream">The <code>account_data</code> stream</a></h5>
 <p>The following endpoints should be routed directly to the worker configured as
 the stream writer for the <code>account_data</code> stream:</p>
-<pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/.*/tags
-^/_matrix/client/(api/v1|r0|v3|unstable)/.*/account_data
+<pre><code>^/_matrix/client/(r0|v3|unstable)/.*/tags
+^/_matrix/client/(r0|v3|unstable)/.*/account_data
 </code></pre>
 <h5 id="the-receipts-stream"><a class="header" href="#the-receipts-stream">The <code>receipts</code> stream</a></h5>
 <p>The following endpoints should be routed directly to the worker configured as
 the stream writer for the <code>receipts</code> stream:</p>
-<pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/receipt
-^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/read_markers
+<pre><code>^/_matrix/client/(r0|v3|unstable)/rooms/.*/receipt
+^/_matrix/client/(r0|v3|unstable)/rooms/.*/read_markers
 </code></pre>
 <h5 id="the-presence-stream"><a class="header" href="#the-presence-stream">The <code>presence</code> stream</a></h5>
 <p>The following endpoints should be routed directly to the worker configured as
@@ -9274,16 +9298,23 @@ and you must configure a single instance to run the background tasks, e.g.:</p>
 <h3 id="synapseappuser_dir"><a class="header" href="#synapseappuser_dir"><code>synapse.app.user_dir</code></a></h3>
 <p>Handles searches in the user directory. It can handle REST endpoints matching
 the following regular expressions:</p>
-<pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/user_directory/search$
+<pre><code>^/_matrix/client/(r0|v3|unstable)/user_directory/search$
 </code></pre>
-<p>When using this worker you must also set <code>update_user_directory: False</code> in the
+<p>When using this worker you must also set <code>update_user_directory: false</code> in the
 shared configuration file to stop the main synapse running background
 jobs related to updating the user directory.</p>
+<p>Above endpoint is not <em>required</em> to be routed to this worker. By default,
+<code>update_user_directory</code> is set to <code>true</code>, which means the main process
+will handle updates. All workers configured with <code>client</code> can handle the above
+endpoint as long as either this worker or the main process are configured to
+handle it, and are online.</p>
+<p>If <code>update_user_directory</code> is set to <code>false</code>, and this worker is not running,
+the above endpoint may give outdated results.</p>
 <h3 id="synapseappfrontend_proxy"><a class="header" href="#synapseappfrontend_proxy"><code>synapse.app.frontend_proxy</code></a></h3>
 <p>Proxies some frequently-requested client endpoints to add caching and remove
 load from the main synapse. It can handle REST endpoints matching the following
 regular expressions:</p>
-<pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/keys/upload
+<pre><code>^/_matrix/client/(r0|v3|unstable)/keys/upload
 </code></pre>
 <p>If <code>use_presence</code> is False in the homeserver config, it can also handle REST
 endpoints matching the following regular expressions:</p>
