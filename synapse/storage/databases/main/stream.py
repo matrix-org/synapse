@@ -42,6 +42,7 @@ import attr
 from frozendict import frozendict
 
 from twisted.internet import defer
+from tabulate import tabulate
 
 from synapse.api.filtering import Filter
 from synapse.events import EventBase
@@ -748,21 +749,21 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             "get_room_event_before_stream_ordering", _f
         )
 
-    async def get_room_events_max_id(self, room_id: Optional[str] = None) -> str:
+    async def get_room_events_max_id(self, room_id: Optional[str] = None) -> RoomStreamToken:
         """Returns the current token for rooms stream.
 
         By default, it returns the current global stream token. Specifying a
         `room_id` causes it to return the current room specific topological
         token.
         """
-        token = self.get_room_max_stream_ordering()
+        stream_ordering = self.get_room_max_stream_ordering()
         if room_id is None:
-            return "s%d" % (token,)
+            return RoomStreamToken(None, stream_ordering)
         else:
             topo = await self.db_pool.runInteraction(
                 "_get_max_topological_txn", self._get_max_topological_txn, room_id
             )
-            return "t%d-%d" % (topo, token)
+            return RoomStreamToken(topo, stream_ordering)
 
     def get_stream_id_for_event_txn(
         self,
@@ -807,6 +808,44 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             desc="get_topological_token_for_event",
         )
         return RoomStreamToken(row["topological_ordering"], row["stream_ordering"])
+
+    async def asdf_get_debug_events_in_room_ordered_by_depth(self, room_id: str) -> Any:
+        """Gets the topological token in a room after or at the given stream
+        ordering.
+
+        Args:
+            room_id
+        """
+        sql = (
+            "SELECT depth, stream_ordering, type, state_key, event_id FROM events"
+            " WHERE events.room_id = ?"
+            " ORDER BY depth DESC, stream_ordering DESC;"
+        )
+        rows = await self.db_pool.execute(
+            "asdf_get_debug_events_in_room_ordered_by_depth", None, sql, room_id
+        )
+
+        headers = ["depth", "stream_ordering", "type", "state_key", "event_id"]
+        return tabulate(rows, headers=headers)
+
+    async def asdf_get_debug_events_in_room_ordered_by_stream_ordering(self, room_id: str) -> Any:
+        """Gets the topological token in a room after or at the given stream
+        ordering.
+
+        Args:
+            room_id
+        """
+        sql = (
+            "SELECT depth, stream_ordering, type, state_key, event_id FROM events"
+            " WHERE events.room_id = ?"
+            " ORDER BY stream_ordering DESC, depth DESC;"
+        )
+        rows = await self.db_pool.execute(
+            "asdf_get_debug_events_in_room_ordered_by_depth", None, sql, room_id
+        )
+
+        headers = ["depth", "stream_ordering", "type", "state_key", "event_id"]
+        return tabulate(rows, headers=headers)
 
     async def get_current_topological_token(self, room_id: str, stream_key: int) -> int:
         """Gets the topological token in a room after or at the given stream

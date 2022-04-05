@@ -1444,7 +1444,7 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
     def get_current_key(self) -> RoomStreamToken:
         return self.store.get_room_max_token()
 
-    def get_current_key_for_room(self, room_id: str) -> Awaitable[str]:
+    def get_current_key_for_room(self, room_id: str) -> Awaitable[RoomStreamToken]:
         return self.store.get_room_events_max_id(room_id)
 
 
