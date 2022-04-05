@@ -39,7 +39,6 @@ from . import EventBase
 
 if TYPE_CHECKING:
     from synapse.handlers.relations import BundledAggregations
-    from synapse.server import HomeServer
 
 
 # Split strings on "." but not "\." This uses a negative lookbehind assertion for '\'
@@ -395,9 +394,6 @@ class EventClientSerializer:
     This is used for bundling extra information with any events to be sent to
     clients.
     """
-
-    def __init__(self, hs: "HomeServer"):
-        self._msc3440_enabled = hs.config.experimental.msc3440_enabled
 
     def serialize_event(
         self,
