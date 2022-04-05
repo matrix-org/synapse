@@ -319,9 +319,10 @@ useful to reproduce this locally.</p>
 following environment variables matching your configuration:</p>
 <ul>
 <li><code>SYNAPSE_POSTGRES</code> to anything nonempty</li>
-<li><code>SYNAPSE_POSTGRES_HOST</code></li>
-<li><code>SYNAPSE_POSTGRES_USER</code></li>
-<li><code>SYNAPSE_POSTGRES_PASSWORD</code></li>
+<li><code>SYNAPSE_POSTGRES_HOST</code> (optional if it's the default: UNIX socket)</li>
+<li><code>SYNAPSE_POSTGRES_PORT</code> (optional if it's the default: 5432)</li>
+<li><code>SYNAPSE_POSTGRES_USER</code> (optional if using a UNIX socket)</li>
+<li><code>SYNAPSE_POSTGRES_PASSWORD</code> (optional if using a UNIX socket)</li>
 </ul>
 <p>For example:</p>
 <pre><code class="language-shell">export SYNAPSE_POSTGRES=1
@@ -330,6 +331,10 @@ export SYNAPSE_POSTGRES_USER=postgres
 export SYNAPSE_POSTGRES_PASSWORD=mydevenvpassword
 trial
 </code></pre>
+<p>You don't need to specify the host, user, port or password if your Postgres
+server is set to authenticate you over the UNIX socket (i.e. if the <code>psql</code> command
+works without further arguments).</p>
+<p>Your Postgres account needs to be able to create databases.</p>
 <h2 id="run-the-integration-tests-a-hrefhttpsgithubcommatrix-orgsytestsytesta"><a class="header" href="#run-the-integration-tests-a-hrefhttpsgithubcommatrix-orgsytestsytesta">Run the integration tests (<a href="https://github.com/matrix-org/sytest">Sytest</a>).</a></h2>
 <p>The integration tests are a more comprehensive suite of tests. They
 run a full version of Synapse, including your changes, to check if
