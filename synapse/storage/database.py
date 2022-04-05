@@ -2050,9 +2050,9 @@ class DatabasePool:
 
         # The rows come out in reverse stream ID order, so we want to keep the
         # stream ID of the first row for each entity.
-        cache = {}
+        cache: Dict[Any, int] = {}
         for row in txn:
-            cache[0].setdefault(row[0], int(row[1]))
+            cache.setdefault(row[0], int(row[1]))
 
         txn.close()
 
