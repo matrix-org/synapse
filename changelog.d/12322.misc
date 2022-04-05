@@ -1,1 +1,0 @@
-Refuse to start if registration is enabled without email, captcha, or token-based verification unless new config flag `enable_registration_without_verification` is set to `true`.

@@ -1,5 +1,5 @@
-Synapse 1.56.0rc1 (2022-03-29)
-==============================
+Synapse 1.56.0 (2022-04-05)
+===========================
 
 Synapse will now refuse to start up if open registration is enabled, in order to help mitigate
 abuse across the federation. If you would like
@@ -16,6 +16,16 @@ Synapse will additionally now refuse to start when using PostgreSQL with a non-`
 the config flag `allow_unsafe_locale`, found in the database section of the configuration file, is set to `true`. See the
 [upgrade notes](https://matrix-org.github.io/synapse/v1.56/upgrade#change-in-behaviour-for-postgresql-databases-with-unsafe-locale)
 for details.
+
+Internal Changes
+----------------
+
+- Bump the version of `black` for compatibility with the latest `click` release. ([\#12320](https://github.com/matrix-org/synapse/issues/12320))
+- Refuse to start if registration is enabled without email, captcha, or token-based verification unless the new config flag `enable_registration_without_verification` is set to `true`. ([\#12322](https://github.com/matrix-org/synapse/issues/12322))
+
+
+Synapse 1.56.0rc1 (2022-03-29)
+==============================
 
 Features
 --------
