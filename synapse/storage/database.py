@@ -63,7 +63,7 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 # python 3 does not have a maximum int value
-MAX_TXN_ID = 2 ** 63 - 1
+MAX_TXN_ID = 2**63 - 1
 
 logger = logging.getLogger(__name__)
 
