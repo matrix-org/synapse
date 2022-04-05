@@ -89,6 +89,9 @@ REQUIREMENTS = [
     "matrix-common~=1.1.0",
     # We need packaging.requirements.Requirement, added in 16.1.
     "packaging>=16.1",
+    # At the time of writing, we only use functions from the version `importlib.metadata`
+    # which shipped in Python 3.8. This corresponds to version 1.4 of the backport.
+    "importlib_metadata>=1.4",
 ]
 
 CONDITIONAL_REQUIREMENTS = {
