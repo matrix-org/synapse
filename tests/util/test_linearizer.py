@@ -13,17 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, Hashable, Optional, Tuple
+from typing import Callable, Hashable, Tuple
 
 from twisted.internet import defer, reactor
 from twisted.internet.base import ReactorBase
 from twisted.internet.defer import CancelledError, Deferred
 
-from synapse.logging.context import (
-    LoggingContext,
-    current_context,
-    make_deferred_yieldable,
-)
+from synapse.logging.context import LoggingContext, current_context
 from synapse.util.async_helpers import Linearizer
 
 from tests import unittest
@@ -127,12 +123,10 @@ class LinearizerTestCase(unittest.TestCase):
         linearizer = Linearizer()
         key = ""
 
-        async def func(i: int, wait_for: Optional["Deferred[None]"] = None) -> None:
+        async def func(i: int) -> None:
             with LoggingContext("func(%s)" % i) as lc:
                 async with linearizer.queue(key):
                     self.assertEqual(current_context(), lc)
-                    if wait_for:
-                        await make_deferred_yieldable(wait_for)
 
                 self.assertEqual(current_context(), lc)
 

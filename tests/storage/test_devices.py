@@ -96,7 +96,9 @@ class DeviceStoreTestCase(HomeserverTestCase):
 
         # Add two device updates with sequential `stream_id`s
         self.get_success(
-            self.store.add_device_change_to_streams("user_id", device_ids, ["somehost"])
+            self.store.add_device_change_to_streams(
+                "user_id", device_ids, ["somehost"], ["!some:room"]
+            )
         )
 
         # Get all device updates ever meant for this remote
@@ -122,7 +124,9 @@ class DeviceStoreTestCase(HomeserverTestCase):
             "device_id5",
         ]
         self.get_success(
-            self.store.add_device_change_to_streams("user_id", device_ids, ["somehost"])
+            self.store.add_device_change_to_streams(
+                "user_id", device_ids, ["somehost"], ["!some:room"]
+            )
         )
 
         # Get device updates meant for this remote
@@ -144,7 +148,9 @@ class DeviceStoreTestCase(HomeserverTestCase):
         # Add some more device updates to ensure it still resumes properly
         device_ids = ["device_id6", "device_id7"]
         self.get_success(
-            self.store.add_device_change_to_streams("user_id", device_ids, ["somehost"])
+            self.store.add_device_change_to_streams(
+                "user_id", device_ids, ["somehost"], ["!some:room"]
+            )
         )
 
         # Get the next batch of device updates
@@ -220,7 +226,7 @@ class DeviceStoreTestCase(HomeserverTestCase):
 
         self.get_success(
             self.store.add_device_change_to_streams(
-                "@user_id:test", device_ids, ["somehost"]
+                "@user_id:test", device_ids, ["somehost"], ["!some:room"]
             )
         )
 

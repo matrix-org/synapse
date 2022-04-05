@@ -463,8 +463,10 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         res = e.value.code
         self.assertEqual(res, 400)
 
-        res = self.get_success(self.handler.query_local_devices({local_user: None}))
-        self.assertDictEqual(res, {local_user: {}})
+        query_res = self.get_success(
+            self.handler.query_local_devices({local_user: None})
+        )
+        self.assertDictEqual(query_res, {local_user: {}})
 
     def test_upload_signatures(self) -> None:
         """should check signatures that are uploaded"""
