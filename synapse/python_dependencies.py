@@ -89,7 +89,6 @@ REQUIREMENTS = [
     "matrix-common~=1.1.0",
     # We need packaging.requirements.Requirement, added in 16.1.
     "packaging>=16.1",
-    "tabulate>=0.8.9",
 ]
 
 CONDITIONAL_REQUIREMENTS = {

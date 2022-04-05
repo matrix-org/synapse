@@ -446,49 +446,9 @@ class PaginationHandler:
                     room_id
                 )
             )
+            # We expect `/messages` to use historic pagination tokens by default but
+            # `/messages` should still works with live tokens when manually provided.
             assert from_token.room_key.topological
-            # from_live_token = (
-            #     self.hs.get_event_sources().get_current_token_for_pagination()
-            # )
-            # # Convert the live token (sXXX) into a historic token (tXXX-XXX)
-            # # which is more suitable for /messages.
-            # current_stream_ordering = from_live_token.room_key.stream
-            # current_topographical_ordering = (
-            #     await self.store.get_current_topological_token(
-            #         room_id, current_stream_ordering
-            #     )
-            # )
-            # from_token = from_live_token.copy_and_replace(
-            #     "room_key",
-            #     RoomStreamToken(
-            #         current_topographical_ordering, current_stream_ordering
-            #     ),
-            # )
-            # logger.info(
-            #     "get_messages(room_id=%s)\n\tfrom_token=%s\n\tcurrent_stream_ordering=%s\n\tcurrent_topographical_ordering=%s\n\tfrom_live_token=%s",
-            #     room_id,
-            #     await from_token.to_string(self.store),
-            #     current_stream_ordering,
-            #     current_topographical_ordering,
-            #     await from_live_token.to_string(self.store),
-            # )
-            logger.info(
-                "get_messages(room_id=%s)\n\tfrom_token=%s",
-                room_id,
-                await from_token.to_string(self.store),
-            )
-            logger.info(
-                "asdf_get_debug_events_in_room_ordered_by_depth %s",
-                await self.store.asdf_get_debug_events_in_room_ordered_by_depth(
-                    room_id
-                ),
-            )
-            logger.info(
-                "asdf_get_debug_events_in_room_ordered_by_stream_ordering %s",
-                await self.store.asdf_get_debug_events_in_room_ordered_by_stream_ordering(
-                    room_id
-                ),
-            )
 
         if pagin_config.limit is None:
             # This shouldn't happen as we've set a default limit before this
