@@ -11,11 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any, Dict
 from unittest.mock import Mock
 
 from twisted.internet import defer
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import UserTypes
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 from tests.test_utils import make_awaitable
@@ -24,7 +28,7 @@ from tests.unittest import default_config, override_config
 FORTY_DAYS = 40 * 24 * 60 * 60
 
 
-def gen_3pids(count):
+def gen_3pids(count: int):
     """Generate `count` threepids as a list."""
     return [
         {"medium": "email", "address": "user%i@matrix.org" % i} for i in range(count)
@@ -32,7 +36,7 @@ def gen_3pids(count):
 
 
 class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
-    def default_config(self):
+    def default_config(self) -> Dict[str, Any]:
         config = default_config("test")
 
         config.update({"limit_usage_by_mau": True, "max_mau_value": 50})
@@ -44,10 +48,10 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
 
         return config
 
-    def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastores().main
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.store = hs.get_datastores().main
         # Advance the clock a bit
-        reactor.advance(FORTY_DAYS)
+        self.reactor.advance(FORTY_DAYS)
 
     @override_config({"max_mau_value": 3, "mau_limit_reserved_threepids": gen_3pids(3)})
     def test_initialise_reserved_users(self):
@@ -245,7 +249,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         )
         self.get_success(d)
 
-        self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))
+        self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))  # type: ignore[assignment]
 
         d = self.store.populate_monthly_active_users(user_id)
         self.get_success(d)
@@ -253,9 +257,9 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.store.upsert_monthly_active_user.assert_not_called()
 
     def test_populate_monthly_users_should_update(self):
-        self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))
+        self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))  # type: ignore[assignment]
 
-        self.store.is_trial_user = Mock(return_value=defer.succeed(False))
+        self.store.is_trial_user = Mock(return_value=defer.succeed(False))  # type: ignore[assignment]
 
         self.store.user_last_seen_monthly_active = Mock(
             return_value=defer.succeed(None)
@@ -266,9 +270,9 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.store.upsert_monthly_active_user.assert_called_once()
 
     def test_populate_monthly_users_should_not_update(self):
-        self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))
+        self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))  # type: ignore[assignment]
 
-        self.store.is_trial_user = Mock(return_value=defer.succeed(False))
+        self.store.is_trial_user = Mock(return_value=defer.succeed(False))  # type: ignore[assignment]
         self.store.user_last_seen_monthly_active = Mock(
             return_value=defer.succeed(self.hs.get_clock().time_msec())
         )
@@ -324,16 +328,15 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         count = self.get_success(self.store.get_monthly_active_count())
         self.assertEqual(count, 0)
 
-        d = self.store.register_user(
-            user_id=support_user_id, password_hash=None, user_type=UserTypes.SUPPORT
+        self.get_success(
+            self.store.register_user(
+                user_id=support_user_id, password_hash=None, user_type=UserTypes.SUPPORT
+            )
         )
-        self.get_success(d)
 
-        d = self.store.upsert_monthly_active_user(support_user_id)
-        self.get_success(d)
+        self.get_success(self.store.upsert_monthly_active_user(support_user_id))
 
-        d = self.store.get_monthly_active_count()
-        count = self.get_success(d)
+        count = self.get_success(self.store.get_monthly_active_count())
         self.assertEqual(count, 0)
 
     # Note that the max_mau_value setting should not matter.
@@ -352,7 +355,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
 
     @override_config({"limit_usage_by_mau": False, "mau_stats_only": False})
     def test_no_users_when_not_tracking(self):
-        self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))
+        self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))  # type: ignore[assignment]
 
         self.get_success(self.store.populate_monthly_active_users("@user:sever"))
 
@@ -388,16 +391,16 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
             self.store.register_user(user_id=native_user1, password_hash=None)
         )
 
-        count = self.get_success(self.store.get_monthly_active_count_by_service())
-        self.assertEqual(count, {})
+        count1 = self.get_success(self.store.get_monthly_active_count_by_service())
+        self.assertEqual(count1, {})
 
         self.get_success(self.store.upsert_monthly_active_user(native_user1))
         self.get_success(self.store.upsert_monthly_active_user(appservice1_user1))
         self.get_success(self.store.upsert_monthly_active_user(appservice1_user2))
         self.get_success(self.store.upsert_monthly_active_user(appservice2_user1))
 
-        count = self.get_success(self.store.get_monthly_active_count())
-        self.assertEqual(count, 1)
+        count2 = self.get_success(self.store.get_monthly_active_count())
+        self.assertEqual(count2, 1)
 
         d = self.store.get_monthly_active_count_by_service()
         result = self.get_success(d)
