@@ -46,7 +46,7 @@ class LinearizerTestCase(unittest.TestCase):
         unblock_d: "Deferred[None]" = Deferred()
 
         async def task() -> None:
-            with await linearizer.queue(key):
+            async with linearizer.queue(key):
                 acquired_d.callback(None)
                 await unblock_d
 
@@ -125,7 +125,7 @@ class LinearizerTestCase(unittest.TestCase):
 
         async def func(i: int) -> None:
             with LoggingContext("func(%s)" % i) as lc:
-                with (await linearizer.queue(key)):
+                async with linearizer.queue(key):
                     self.assertEqual(current_context(), lc)
 
                 self.assertEqual(current_context(), lc)

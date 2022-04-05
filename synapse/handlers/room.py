@@ -883,7 +883,7 @@ class RoomCreationHandler:
         #
         # we also don't need to check the requester's shadow-ban here, as we
         # have already done so above (and potentially emptied invite_list).
-        with (await self.room_member_handler.member_linearizer.queue((room_id,))):
+        async with self.room_member_handler.member_linearizer.queue((room_id,)):
             content = {}
             is_direct = config.get("is_direct", None)
             if is_direct:
