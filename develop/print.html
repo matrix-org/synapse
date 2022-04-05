@@ -4,55 +4,31 @@
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
         <title>Synapse</title>
-        
         <meta name="robots" content="noindex" />
-        
-        
-
-
         <!-- Custom HTML head -->
-        
-
-
         <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff" />
 
-        
         <link rel="icon" href="favicon.svg">
-        
-        
         <link rel="shortcut icon" href="favicon.png">
-        
         <link rel="stylesheet" href="css/variables.css">
         <link rel="stylesheet" href="css/general.css">
         <link rel="stylesheet" href="css/chrome.css">
-        
         <link rel="stylesheet" href="css/print.css" media="print">
-        
-
         <!-- Fonts -->
         <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
-        
         <link rel="stylesheet" href="fonts/fonts.css">
-        
-
         <!-- Highlight.js Stylesheets -->
         <link rel="stylesheet" href="highlight.css">
         <link rel="stylesheet" href="tomorrow-night.css">
         <link rel="stylesheet" href="ayu-highlight.css">
 
         <!-- Custom theme stylesheets -->
-        
         <link rel="stylesheet" href="docs/website_files/table-of-contents.css">
-        
         <link rel="stylesheet" href="docs/website_files/remove-nav-buttons.css">
-        
         <link rel="stylesheet" href="docs/website_files/indent-section-headers.css">
-        
-
-        
     </head>
     <body>
         <!-- Provide site root to javascript -->
@@ -109,7 +85,6 @@
         <div id="page-wrapper" class="page-wrapper">
 
             <div class="page">
-                
                 <div id="menu-bar-hover-placeholder"></div>
                 <div id="menu-bar" class="menu-bar sticky bordered">
                     <div class="left-buttons">
@@ -126,32 +101,23 @@
                             <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
                         </ul>
-                        
                         <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
                             <i class="fa fa-search"></i>
                         </button>
-                        
                     </div>
 
                     <h1 class="menu-title">Synapse</h1>
 
                     <div class="right-buttons">
-                        
                         <a href="print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
-                        
-                        
                         <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
                             <i id="git-repository-button" class="fa fa-github"></i>
                         </a>
-                        
-                        
-
                     </div>
                 </div>
 
-                
                 <div id="search-wrapper" class="hidden">
                     <form id="searchbar-outer" class="searchbar-outer">
                         <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
@@ -162,8 +128,6 @@
                         </ul>
                     </div>
                 </div>
-                
-
                 <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
                 <script type="text/javascript">
                     document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
@@ -180,7 +144,7 @@
                             <nav class="pagetoc"></nav>
                         </div>
 
-                        <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
+                        <div style="break-before: page; page-break-before: always;"></div><h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
 <p>Welcome to the documentation repository for Synapse, a 
 <a href="https://matrix.org">Matrix</a> homeserver implementation developed by the matrix.org core 
 team.</p>
@@ -265,7 +229,7 @@ reach out to us over email at: support (at) matrix.org</p>
 <p>If you've found a security issue in Synapse or any other Matrix.org Foundation
 project, please report it to us in accordance with our <a href="https://www.matrix.org/security-disclosure-policy/">Security Disclosure
 Policy</a>. Thank you!</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="installation-instructions"><a class="header" href="#installation-instructions">Installation Instructions</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="installation-instructions"><a class="header" href="#installation-instructions">Installation Instructions</a></h1>
 <h2 id="choosing-your-server-name"><a class="header" href="#choosing-your-server-name">Choosing your server name</a></h2>
 <p>It is important to choose the name for your server before you install Synapse,
 because it cannot be changed later.</p>
@@ -668,7 +632,7 @@ failing, e.g.:</p>
 </code></pre>
 <p>If you have any other problems, feel free to ask in
 <a href="https://matrix.to/#/#synapse:matrix.org">#synapse:matrix.org</a>.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="using-postgres"><a class="header" href="#using-postgres">Using Postgres</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="using-postgres"><a class="header" href="#using-postgres">Using Postgres</a></h1>
 <p>Synapse supports PostgreSQL versions 10 or later.</p>
 <h2 id="install-postgres-client-libraries"><a class="header" href="#install-postgres-client-libraries">Install postgres client libraries</a></h2>
 <p>Synapse will require the python postgres client library in order to
@@ -869,7 +833,7 @@ downgraded and then upgraded again.</p>
 <p>To fix the issue shut down Synapse (including any and all workers) and run the
 SQL command included in the error message. Once done Synapse should start
 successfully.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="using-a-reverse-proxy-with-synapse"><a class="header" href="#using-a-reverse-proxy-with-synapse">Using a reverse proxy with Synapse</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="using-a-reverse-proxy-with-synapse"><a class="header" href="#using-a-reverse-proxy-with-synapse">Using a reverse proxy with Synapse</a></h1>
 <p>It is recommended to put a reverse proxy such as
 <a href="https://nginx.org/en/docs/http/ngx_http_proxy_module.html">nginx</a>,
 <a href="https://httpd.apache.org/docs/current/mod/mod_proxy_http.html">Apache</a>,
@@ -1095,7 +1059,7 @@ Each configured HTTP listener has a <code>/health</code> endpoint which always r
 <code>/_synapse/admin</code>. These require authentication through an access token of an
 admin user. However as access to these endpoints grants the caller a lot of power,
 we do not recommend exposing them to the public internet without good reason.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="using-a-forward-proxy-with-synapse"><a class="header" href="#using-a-forward-proxy-with-synapse">Using a forward proxy with Synapse</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="using-a-forward-proxy-with-synapse"><a class="header" href="#using-a-forward-proxy-with-synapse">Using a forward proxy with Synapse</a></h1>
 <p>You can use Synapse with a forward or outbound proxy. An example of when
 this is necessary is in corporate environments behind a DMZ (demilitarized zone).
 Synapse supports routing outbound HTTP(S) requests via a proxy. Only HTTP(S)
@@ -1170,7 +1134,7 @@ in Synapse can be deactivated.</p>
 <a href="setup/../usage/configuration/homeserver_sample_config.html">homserver.yaml</a>.</p>
 <pre><code class="language-yaml">use_insecure_ssl_client_just_for_testing_do_not_use: true
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="overview-1"><a class="header" href="#overview-1">Overview</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="overview-1"><a class="header" href="#overview-1">Overview</a></h1>
 <p>This document explains how to enable VoIP relaying on your homeserver with
 TURN.</p>
 <p>The synapse Matrix homeserver supports integration with TURN server via the
@@ -1490,7 +1454,7 @@ Matrix clients!</p>
 entry in the results.</p>
 </li>
 </ul>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="delegation-of-incoming-federation-traffic"><a class="header" href="#delegation-of-incoming-federation-traffic">Delegation of incoming federation traffic</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="delegation-of-incoming-federation-traffic"><a class="header" href="#delegation-of-incoming-federation-traffic">Delegation of incoming federation traffic</a></h1>
 <p>In the following documentation, we use the term <code>server_name</code> to refer to that setting
 in your homeserver configuration file. It appears at the ends of user ids, and tells
 other homeservers where they can find your server.</p>
@@ -1562,7 +1526,7 @@ find it using delegation.</p>
 idea, since it saves handling TLS traffic in Synapse. See
 <a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a
 reverse proxy.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="upgrading-synapse"><a class="header" href="#upgrading-synapse">Upgrading Synapse</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="upgrading-synapse"><a class="header" href="#upgrading-synapse">Upgrading Synapse</a></h1>
 <p>Before upgrading check if any special steps are required to upgrade from
 the version you currently have installed to the current version of
 Synapse. The extra instructions that may be required are listed later in
@@ -2903,7 +2867,7 @@ longer to restart than usual as it reinitializes the database.</p>
 using room aliases or by being reinvited. Alternatively, if any other
 homeserver sends a message to a room that the homeserver was previously
 in the local HS will automatically rejoin the room.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="setting-up-federation"><a class="header" href="#setting-up-federation">Setting up federation</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="setting-up-federation"><a class="header" href="#setting-up-federation">Setting up federation</a></h1>
 <p>Federation is the process by which users on different servers can participate
 in the same room. For this to work, those other servers must be able to contact
 yours to send messages.</p>
@@ -2956,10 +2920,10 @@ release of Synapse.</p>
 private federation, there is a script in the <code>demo</code> directory. This is mainly
 useful just for development purposes. See
 <a href="https://matrix-org.github.io/synapse/develop/development/demo.html">demo scripts</a>.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="configuration-1"><a class="header" href="#configuration-1">Configuration</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="configuration-1"><a class="header" href="#configuration-1">Configuration</a></h1>
 <p>This section contains information on tweaking Synapse via the various options in the configuration file. A configuration
 file should have been generated when you <a href="usage/configuration/../../setup/installation.html">installed Synapse</a>.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="homeserver-sample-configuration-file"><a class="header" href="#homeserver-sample-configuration-file">Homeserver Sample Configuration File</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="homeserver-sample-configuration-file"><a class="header" href="#homeserver-sample-configuration-file">Homeserver Sample Configuration File</a></h1>
 <p>Below is a sample homeserver configuration file. The homeserver configuration file 
 can be tweaked to change the behaviour of your homeserver. A restart of the server is 
 generally required to apply any changes made to this file.</p>
@@ -5760,7 +5724,7 @@ background_updates:
     #
     #default_batch_size: 50
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="logging-sample-configuration-file"><a class="header" href="#logging-sample-configuration-file">Logging Sample Configuration File</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="logging-sample-configuration-file"><a class="header" href="#logging-sample-configuration-file">Logging Sample Configuration File</a></h1>
 <p>Below is a sample logging configuration file. This file can be tweaked to control how your
 homeserver will output logs. A restart of the server is generally required to apply any
 changes made to this file. The value of the <code>log_config</code> option in your homeserver
@@ -5853,7 +5817,7 @@ root:
 
 disable_existing_loggers: false
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="structured-logging"><a class="header" href="#structured-logging">Structured Logging</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="structured-logging"><a class="header" href="#structured-logging">Structured Logging</a></h1>
 <p>A structured logging system can be useful when your logs are destined for a
 machine to parse and process. By maintaining its machine-readable characteristics,
 it enables more efficient searching and aggregations when consumed by software
@@ -5991,7 +5955,7 @@ loggers:
 flexible. It allows for configuration that were not previously possible, such as
 sending plain logs over the network, or using different handlers for different
 modules.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="templates"><a class="header" href="#templates">Templates</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="templates"><a class="header" href="#templates">Templates</a></h1>
 <p>Synapse uses parametrised templates to generate the content of emails it sends and
 webpages it shows to users.</p>
 <p>By default, Synapse will use the templates listed <a href="https://github.com/matrix-org/synapse/tree/master/synapse/res/templates">here</a>.
@@ -6273,7 +6237,7 @@ When rendering, this template is given two variables:
 </ul>
 </li>
 </ul>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="user-authentication"><a class="header" href="#user-authentication">User Authentication</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="user-authentication"><a class="header" href="#user-authentication">User Authentication</a></h1>
 <p>Synapse supports multiple methods of authenticating users, either out-of-the-box or through custom pluggable
 authentication modules.</p>
 <p>Included in Synapse is support for authenticating users via:</p>
@@ -6286,11 +6250,11 @@ authentication modules.</p>
 </ul>
 <p>Synapse can additionally be extended to support custom authentication schemes through optional &quot;password auth provider&quot;
 modules.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="single-sign-on"><a class="header" href="#single-sign-on">Single Sign-On</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="single-sign-on"><a class="header" href="#single-sign-on">Single Sign-On</a></h1>
 <p>Synapse supports single sign-on through the SAML, Open ID Connect or CAS protocols. 
 LDAP and other login methods are supported through first and third-party password
 auth provider modules.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="configuring-synapse-to-authenticate-against-an-openid-connect-provider"><a class="header" href="#configuring-synapse-to-authenticate-against-an-openid-connect-provider">Configuring Synapse to authenticate against an OpenID Connect provider</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="configuring-synapse-to-authenticate-against-an-openid-connect-provider"><a class="header" href="#configuring-synapse-to-authenticate-against-an-openid-connect-provider">Configuring Synapse to authenticate against an OpenID Connect provider</a></h1>
 <p>Synapse can be configured to use an OpenID Connect Provider (OP) for
 authentication, instead of its own local password database.</p>
 <p>Any OP should work with Synapse, as long as it supports the authorization code
@@ -6809,19 +6773,19 @@ needed to add OAuth2 capabilities to your Django projects. It supports
         display_name_template: &quot;{{ user.first_name }} {{ user.last_name }}&quot;
         email_template: &quot;{{ user.email }}&quot;
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="saml"><a class="header" href="#saml">SAML</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="saml"><a class="header" href="#saml">SAML</a></h1>
 <p>Synapse supports authenticating users via the <a href="https://en.wikipedia.org/wiki/Security_Assertion_Markup_Language">Security Assertion
 Markup Language</a>
 (SAML) protocol natively.</p>
 <p>Please see the <code>saml2_config</code> and <code>sso</code> sections of the <a href="usage/configuration/user_authentication/single_sign_on/../../../configuration/homeserver_sample_config.html">Synapse configuration
 file</a> for more details.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="cas"><a class="header" href="#cas">CAS</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="cas"><a class="header" href="#cas">CAS</a></h1>
 <p>Synapse supports authenticating users via the <a href="https://en.wikipedia.org/wiki/Central_Authentication_Service">Central Authentication
 Service protocol</a>
 (CAS) natively.</p>
 <p>Please see the <code>cas_config</code> and <code>sso</code> sections of the <a href="usage/configuration/user_authentication/single_sign_on/../../../configuration/homeserver_sample_config.html">Synapse configuration
 file</a> for more details.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="sso-mapping-providers"><a class="header" href="#sso-mapping-providers">SSO Mapping Providers</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="sso-mapping-providers"><a class="header" href="#sso-mapping-providers">SSO Mapping Providers</a></h1>
 <p>A mapping provider is a Python class (loaded via a Python module) that
 works out how to map attributes of a SSO response to Matrix-specific
 user attributes. Details such as user ID localpart, displayname, and even avatar
@@ -7070,7 +7034,7 @@ complete registration using methods from the <code>ModuleApi</code>.</p>
 <p>Synapse has a built-in SAML mapping provider if a custom provider isn't
 specified in the config. It is located at
 <a href="https://github.com/matrix-org/synapse/blob/develop/synapse/handlers/saml.py"><code>synapse.handlers.saml.DefaultSamlMappingProvider</code></a>.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h2 style="color:red">
+<div style="break-before: page; page-break-before: always;"></div><h2 style="color:red">
 This page of the Synapse documentation is now deprecated. For up to date
 documentation on setting up or writing a password auth provider module, please see
 <a href="modules/index.html">this page</a>.
@@ -7184,7 +7148,7 @@ device ID), and the (now deactivated) access token.</p>
 wait for the <code>Awaitable</code> to complete, but the result is ignored.</p>
 </li>
 </ul>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="jwt-login-type"><a class="header" href="#jwt-login-type">JWT Login Type</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="jwt-login-type"><a class="header" href="#jwt-login-type">JWT Login Type</a></h1>
 <p>Synapse comes with a non-standard login type to support
 <a href="https://en.wikipedia.org/wiki/JSON_Web_Token">JSON Web Tokens</a>. In general the
 documentation for
@@ -7274,7 +7238,7 @@ eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0LXVzZXIifQ.Ag71GT8v01UO3w80
 </li>
 </ol>
 <p>You should now be able to use the returned access token to query the client API.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="refresh-tokens"><a class="header" href="#refresh-tokens">Refresh Tokens</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="refresh-tokens"><a class="header" href="#refresh-tokens">Refresh Tokens</a></h1>
 <p>Synapse supports refresh tokens since version 1.49 (some earlier versions had support for an earlier, experimental draft of <a href="https://github.com/matrix-org/matrix-doc/blob/main/proposals/2918-refreshtokens.md#msc2918-refresh-tokens">MSC2918</a> which is not compatible).</p>
 <h2 id="background-and-motivation"><a class="header" href="#background-and-motivation">Background and motivation</a></h2>
 <p>Synapse users' sessions are identified by <strong>access tokens</strong>; access tokens are
@@ -7396,7 +7360,7 @@ above requirements will still hold.</em></p>
 <li><code>refresh_token_lifetime</code> should be set to <code>L</code>; and</li>
 <li><code>refreshable_access_token_lifetime</code> should be set to <code>L - S</code>.</li>
 </ul>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="overview-2"><a class="header" href="#overview-2">Overview</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="overview-2"><a class="header" href="#overview-2">Overview</a></h1>
 <p>A captcha can be enabled on your homeserver to help prevent bots from registering
 accounts. Synapse currently uses Google's reCAPTCHA service which requires API keys
 from Google.</p>
@@ -7431,7 +7395,7 @@ CAPTCHA is sent. If the client is connecting through a proxy or load balancer,
 it may be required to use the <code>X-Forwarded-For</code> (XFF) header instead of the origin
 IP address. This can be configured using the <code>x_forwarded</code> directive in the
 listeners section of the <code>homeserver.yaml</code> configuration file.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="registering-an-application-service"><a class="header" href="#registering-an-application-service">Registering an Application Service</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="registering-an-application-service"><a class="header" href="#registering-an-application-service">Registering an Application Service</a></h1>
 <p>The registration of new application services depends on the homeserver used. 
 In synapse, you need to create a new configuration file for your AS and add it
 to the list specified under the <code>app_service_config_files</code> config
@@ -7457,7 +7421,7 @@ namespaces:
 <p><code>exclusive</code>: If enabled, only this application service is allowed to register users in its namespace(s).
 <code>group_id</code>: All users of this application service are dynamically joined to this group. This is useful for e.g user organisation or flairs.</p>
 <p>See the <a href="https://matrix.org/docs/spec/application_service/unstable.html">spec</a> for further details on how application services work.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="server-notices"><a class="header" href="#server-notices">Server Notices</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="server-notices"><a class="header" href="#server-notices">Server Notices</a></h1>
 <p>'Server Notices' are a new feature introduced in Synapse 0.30. They provide a
 channel whereby server administrators can send messages to users on the server.</p>
 <p>They are used as part of communication of the server polices (see
@@ -7501,7 +7465,7 @@ displayname and avatar of the Server Notices user.</p>
 <h2 id="sending-notices"><a class="header" href="#sending-notices">Sending notices</a></h2>
 <p>To send server notices to users you can use the
 <a href="admin_api/server_notices.html">admin_api</a>.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="support-in-synapse-for-tracking-agreement-to-server-terms-and-conditions"><a class="header" href="#support-in-synapse-for-tracking-agreement-to-server-terms-and-conditions">Support in Synapse for tracking agreement to server terms and conditions</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="support-in-synapse-for-tracking-agreement-to-server-terms-and-conditions"><a class="header" href="#support-in-synapse-for-tracking-agreement-to-server-terms-and-conditions">Support in Synapse for tracking agreement to server terms and conditions</a></h1>
 <p>Synapse 0.30 introduces support for tracking whether users have agreed to the
 terms and conditions set by the administrator of a server - and blocking access
 to the server until they have.</p>
@@ -7662,7 +7626,7 @@ consent uri for that user.</p>
 <p>ensure that <code>public_baseurl</code> is set in <code>homeserver.yaml</code>, and gives the base
 URI that clients use to connect to the server. (It is used to construct
 <code>consent_uri</code> in the error.)</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="url-previews-1"><a class="header" href="#url-previews-1">URL Previews</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="url-previews-1"><a class="header" href="#url-previews-1">URL Previews</a></h1>
 <p>The <code>GET /_matrix/media/r0/preview_url</code> endpoint provides a generic preview API
 for URLs which outputs <a href="https://ogp.me/">Open Graph</a> responses (with some Matrix
 specific additions).</p>
@@ -7746,7 +7710,7 @@ provider and saves the local media metadata.</li>
 <p>The in-memory cache expires after 1 hour.</p>
 <p>Expired entries in the database cache (and their associated media files) are
 deleted every 10 seconds. The default expiration time is 1 hour from download.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="user-directory-api-implementation"><a class="header" href="#user-directory-api-implementation">User Directory API Implementation</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="user-directory-api-implementation"><a class="header" href="#user-directory-api-implementation">User Directory API Implementation</a></h1>
 <p>The user directory is currently maintained based on the 'visible' users
 on this particular server - i.e. ones which your account shares a room with, or
 who are present in a publicly viewable room present on the server.</p>
@@ -7801,7 +7765,7 @@ is a local user and <code>M</code> is a local or remote user. <code>L</code> and
 different, but this isn't enforced by a constraint.</p>
 </li>
 </ul>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="message-retention-policies"><a class="header" href="#message-retention-policies">Message retention policies</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="message-retention-policies"><a class="header" href="#message-retention-policies">Message retention policies</a></h1>
 <p>Synapse admins can enable support for message retention policies on
 their homeserver. Message retention policies exist at a room level,
 follow the semantics described in
@@ -7957,7 +7921,7 @@ space, it will start writing new data into where the purged data was.</p>
 operating system, the server admin needs to run <code>VACUUM FULL;</code> (or
 <code>VACUUM;</code> for SQLite databases) on Synapse's database (see the related
 <a href="https://www.postgresql.org/docs/current/sql-vacuum.html">PostgreSQL documentation</a>).</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="modules"><a class="header" href="#modules">Modules</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="modules"><a class="header" href="#modules">Modules</a></h1>
 <p>Synapse supports extending its functionality by configuring external modules.</p>
 <p><strong>Note</strong>: When using third-party modules, you effectively allow someone else to run
 custom code on your Synapse homeserver. Server admins are encouraged to verify the
@@ -7999,7 +7963,7 @@ another part of Synapse's configuration file.</p>
 <li>presence router</li>
 <li>password auth providers</li>
 </ul>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="writing-a-module"><a class="header" href="#writing-a-module">Writing a module</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="writing-a-module"><a class="header" href="#writing-a-module">Writing a module</a></h1>
 <p>A module is a Python class that uses Synapse's module API to interact with the
 homeserver. It can register callbacks that Synapse will call on specific operations, as
 well as web resources to attach to Synapse's web server.</p>
@@ -8060,7 +8024,7 @@ the callback name as the argument name and the function as its value. A
 <code>register_[...]_callbacks</code> method exists for each category.</p>
 <p>Callbacks for each category can be found on their respective page of the
 <a href="https://matrix-org.github.io/synapse">Synapse documentation website</a>.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="spam-checker-callbacks"><a class="header" href="#spam-checker-callbacks">Spam checker callbacks</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="spam-checker-callbacks"><a class="header" href="#spam-checker-callbacks">Spam checker callbacks</a></h1>
 <p>Spam checker callbacks allow module developers to implement spam mitigation actions for
 Synapse instances. Spam checker callbacks can be registered using the module API's
 <code>register_spam_checker_callbacks</code> method.</p>
@@ -8284,7 +8248,7 @@ class ListSpamChecker:
     async def check_event_for_spam(self, event: &quot;synapse.events.EventBase&quot;) -&gt; Union[bool, str]:
         return event.sender not in self.evil_users
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="third-party-rules-callbacks"><a class="header" href="#third-party-rules-callbacks">Third party rules callbacks</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="third-party-rules-callbacks"><a class="header" href="#third-party-rules-callbacks">Third party rules callbacks</a></h1>
 <p>Third party rules callbacks allow module developers to add extra checks to verify the
 validity of incoming events. Third party event rules callbacks can be registered using
 the module API's <code>register_third_party_rules_callbacks</code> method.</p>
@@ -8504,7 +8468,7 @@ class EventCensorer:
         event_dict[&quot;content&quot;] = new_event_content
         return event_dict
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="presence-router-callbacks"><a class="header" href="#presence-router-callbacks">Presence router callbacks</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="presence-router-callbacks"><a class="header" href="#presence-router-callbacks">Presence router callbacks</a></h1>
 <p>Presence router callbacks allow module developers to specify additional users (local or remote)
 to receive certain presence updates from local users. Presence router callbacks can be 
 registered using the module API's <code>register_presence_router_callbacks</code> method.</p>
@@ -8586,7 +8550,7 @@ class CustomPresenceRouter:
 
         return set()
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="account-validity-callbacks"><a class="header" href="#account-validity-callbacks">Account validity callbacks</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="account-validity-callbacks"><a class="header" href="#account-validity-callbacks">Account validity callbacks</a></h1>
 <p>Account validity callbacks allow module developers to add extra steps to verify the
 validity on an account, i.e. see if a user can be granted access to their account on the
 Synapse instance. Account validity callbacks can be registered using the module API's
@@ -8615,7 +8579,7 @@ any of the subsequent implementations of this callback.</p>
 operations to keep track of them. (e.g. add them to a database table). The user is
 represented by their Matrix user ID.</p>
 <p>If multiple modules implement this callback, Synapse runs them all in order.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="password-auth-provider-callbacks"><a class="header" href="#password-auth-provider-callbacks">Password auth provider callbacks</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="password-auth-provider-callbacks"><a class="header" href="#password-auth-provider-callbacks">Password auth provider callbacks</a></h1>
 <p>Password auth providers offer a way for server administrators to integrate
 their Synapse installation with an external authentication system. The callbacks can be
 registered by using the Module API's <code>register_password_auth_provider_callbacks</code> method.</p>
@@ -8850,7 +8814,7 @@ class MyAuthProvider:
         if self.credentials.get(username) == login_dict.get(&quot;password&quot;):
             return self.api.get_qualified_user_id(username)
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="background-update-controller-callbacks"><a class="header" href="#background-update-controller-callbacks">Background update controller callbacks</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="background-update-controller-callbacks"><a class="header" href="#background-update-controller-callbacks">Background update controller callbacks</a></h1>
 <p>Background update controller callbacks allow module developers to control (e.g. rate-limit)
 how database background updates are run. A database background update is an operation
 Synapse runs on its database in the background after it starts. It's usually used to run
@@ -8897,7 +8861,7 @@ of the database. The module must return an integer representing the minimum numb
 elements to process in this iteration. This number must be at least 1, and is used to
 ensure that progress is always made.</p>
 <p>If this callback is not defined, Synapse will use a default value of 100.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="account-data-callbacks"><a class="header" href="#account-data-callbacks">Account data callbacks</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="account-data-callbacks"><a class="header" href="#account-data-callbacks">Account data callbacks</a></h1>
 <p>Account data callbacks allow module developers to react to changes of the account data
 of local users. Account data callbacks can be registered using the module API's
 <code>register_account_data_callbacks</code> method.</p>
@@ -8988,7 +8952,7 @@ class CustomAccountDataModule:
             }
         )
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="porting-an-existing-module-that-uses-the-old-interface"><a class="header" href="#porting-an-existing-module-that-uses-the-old-interface">Porting an existing module that uses the old interface</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="porting-an-existing-module-that-uses-the-old-interface"><a class="header" href="#porting-an-existing-module-that-uses-the-old-interface">Porting an existing module that uses the old interface</a></h1>
 <p>In order to port a module that uses Synapse's old module interface, its author needs to:</p>
 <ul>
 <li>ensure the module's callbacks are all asynchronous.</li>
@@ -9005,7 +8969,7 @@ changes to the database should now be made by the module using the module API cl
 <p>The module's author should also update any example in the module's configuration to only
 use the new <code>modules</code> section in Synapse's configuration file (see <a href="modules/index.html#using-modules">this section</a>
 for more info).</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="scaling-synapse-via-workers"><a class="header" href="#scaling-synapse-via-workers">Scaling synapse via workers</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="scaling-synapse-via-workers"><a class="header" href="#scaling-synapse-via-workers">Scaling synapse via workers</a></h1>
 <p>For small instances it recommended to run Synapse in the default monolith mode.
 For larger instances where performance is a concern it can be helpful to split
 out functionality into multiple separate python processes. These processes are
@@ -9499,7 +9463,7 @@ in systemd service files, but not required for synctl).</p>
 ====================================================================
                                                          Redis pub/sub channel
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h3 id="using-synctl-with-workers"><a class="header" href="#using-synctl-with-workers">Using synctl with workers</a></h3>
+<div style="break-before: page; page-break-before: always;"></div><h3 id="using-synctl-with-workers"><a class="header" href="#using-synctl-with-workers">Using synctl with workers</a></h3>
 <p>If you want to use <code>synctl</code> to manage your synapse processes, you will need to
 create an an additional configuration file for the main synapse process. That
 configuration should look like this:</p>
@@ -9522,7 +9486,7 @@ notifications.</p>
 <p>To manipulate a specific worker, you pass the -w option to synctl:</p>
 <pre><code class="language-sh">synctl -w $CONFIG/workers/worker1.yaml restart
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="setting-up-synapse-with-workers-and-systemd"><a class="header" href="#setting-up-synapse-with-workers-and-systemd">Setting up Synapse with Workers and Systemd</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="setting-up-synapse-with-workers-and-systemd"><a class="header" href="#setting-up-synapse-with-workers-and-systemd">Setting up Synapse with Workers and Systemd</a></h1>
 <p>This is a setup for managing synapse with systemd, including support for
 managing workers. It provides a <code>matrix-synapse</code> service for the master, as
 well as a <code>matrix-synapse-worker@</code> service template for any workers you
@@ -9614,14 +9578,14 @@ systemctl restart matrix-synapse.target
 </code></pre>
 <p>In order to see their effect, you may run <code>systemd-analyze security matrix-synapse.service</code> before and after applying the hardening options to see
 the changes being applied at a glance.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="administration"><a class="header" href="#administration">Administration</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="administration"><a class="header" href="#administration">Administration</a></h1>
 <p>This section contains information on managing your Synapse homeserver. This includes:</p>
 <ul>
 <li>Managing users, rooms and media via the Admin API.</li>
 <li>Setting up metrics and monitoring to give you insight into your homeserver's health.</li>
 <li>Configuring structured logging.</li>
 </ul>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="the-admin-api"><a class="header" href="#the-admin-api">The Admin API</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="the-admin-api"><a class="header" href="#the-admin-api">The Admin API</a></h1>
 <h2 id="authenticate-as-a-server-admin"><a class="header" href="#authenticate-as-a-server-admin">Authenticate as a server admin</a></h2>
 <p>Many of the API calls in the admin api will require an <code>access_token</code> for a
 server admin. (Note that a server admin is distinct from a room admin.)</p>
@@ -9639,7 +9603,7 @@ providing the token as either a query parameter or a request header. To add it a
 </code></pre>
 <p>For more details on access tokens in Matrix, please refer to the complete
 <a href="https://matrix.org/docs/spec/client_server/r0.6.1#using-access-tokens">matrix spec documentation</a>.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="account-validity-api"><a class="header" href="#account-validity-api">Account validity API</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="account-validity-api"><a class="header" href="#account-validity-api">Account validity API</a></h1>
 <p>This API allows a server administrator to manage the validity of an account. To
 use it, you must enable the account validity feature (under
 <code>account_validity</code>) in Synapse's configuration.</p>
@@ -9668,7 +9632,7 @@ milliseconds since epoch:</p>
     &quot;expiration_ts&quot;: 0
 }
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="background-updates-api"><a class="header" href="#background-updates-api">Background Updates API</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="background-updates-api"><a class="header" href="#background-updates-api">Background Updates API</a></h1>
 <p>This API allows a server administrator to manage the background updates being
 run against the database.</p>
 <h2 id="status"><a class="header" href="#status">Status</a></h2>
@@ -9738,7 +9702,7 @@ background updates which won't be cancelled once started.</p>
 </ul>
 </li>
 </ul>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="delete-a-local-group"><a class="header" href="#delete-a-local-group">Delete a local group</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="delete-a-local-group"><a class="header" href="#delete-a-local-group">Delete a local group</a></h1>
 <p>This API lets a server admin delete a local group. Doing so will kick all
 users out of the group so that their clients will correctly handle the group
 being deleted.</p>
@@ -9747,7 +9711,7 @@ for a server admin: see <a href="admin_api/../usage/administration/admin_api">Ad
 <p>The API is:</p>
 <pre><code>POST /_synapse/admin/v1/delete_group/&lt;group_id&gt;
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="show-reported-events"><a class="header" href="#show-reported-events">Show reported events</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="show-reported-events"><a class="header" href="#show-reported-events">Show reported events</a></h1>
 <p>This API returns information about reported events.</p>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code>
 for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
@@ -9900,7 +9864,7 @@ was reported.</li>
 have a canonical alias set.</li>
 <li><code>event_json</code>: object - Details of the original event that was reported.</li>
 </ul>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="querying-media"><a class="header" href="#querying-media">Querying media</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="querying-media"><a class="header" href="#querying-media">Querying media</a></h1>
 <p>These APIs allow extracting media information from the homeserver.</p>
 <p>Details about the format of the <code>media_id</code> and storage of the media in the file system
 are documented under <a href="admin_api/../media_repository.html">media repository</a>.</p>
@@ -10113,7 +10077,7 @@ All cached media that was last accessed before this timestamp will be removed.</
 </ul>
 <p>If the user re-requests purged remote media, synapse will re-request the media
 from the originating server.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="purge-history-api"><a class="header" href="#purge-history-api">Purge History API</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="purge-history-api"><a class="header" href="#purge-history-api">Purge History API</a></h1>
 <p>The purge history API allows server admins to purge historic events from their
 database, reclaiming disk space.</p>
 <p>Depending on the amount of history being purged a call to the API may take
@@ -10162,7 +10126,7 @@ a purge id:</p>
 <p>To reclaim the disk space and return it to the operating system, you need to run
 <code>VACUUM FULL;</code> on the database.</p>
 <p><a href="https://www.postgresql.org/docs/current/sql-vacuum.html">https://www.postgresql.org/docs/current/sql-vacuum.html</a></p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="shared-secret-registration"><a class="header" href="#shared-secret-registration">Shared-Secret Registration</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="shared-secret-registration"><a class="header" href="#shared-secret-registration">Shared-Secret Registration</a></h1>
 <p>This API allows for the creation of users in an administrative and
 non-interactive way. This is generally used for bootstrapping a Synapse
 instance with administrator accounts.</p>
@@ -10223,7 +10187,7 @@ def generate_mac(nonce, user, password, admin=False, user_type=None):
 
     return mac.hexdigest()
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="registration-tokens"><a class="header" href="#registration-tokens">Registration Tokens</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="registration-tokens"><a class="header" href="#registration-tokens">Registration Tokens</a></h1>
 <p>This API allows you to manage tokens which can be used to authenticate
 registration requests, as proposed in
 <a href="https://github.com/matrix-org/matrix-doc/blob/main/proposals/3231-token-authenticated-registration.md">MSC3231</a>.
@@ -10461,7 +10425,7 @@ the <a href="https://matrix.org/docs/spec/client_server/r0.6.1#api-standards">Ma
     &quot;error&quot;: &quot;No such registration token: 1234&quot;
 }
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="edit-room-membership-api"><a class="header" href="#edit-room-membership-api">Edit Room Membership API</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="edit-room-membership-api"><a class="header" href="#edit-room-membership-api">Edit Room Membership API</a></h1>
 <p>This API allows an administrator to join an user account with a given <code>user_id</code>
 to a room with a given <code>room_id_or_alias</code>. You can only modify the membership of
 local users. The server administrator must be in the room and have permission to
@@ -10487,7 +10451,7 @@ for a server admin: see <a href="admin_api/../usage/administration/admin_api">Ad
   &quot;room_id&quot;: &quot;!636q39766251:server.com&quot;
 }
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="list-room-api"><a class="header" href="#list-room-api">List Room API</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="list-room-api"><a class="header" href="#list-room-api">List Room API</a></h1>
 <p>The List Room admin API allows server admins to get a list of rooms on their
 server. There are various parameters available that allow for filtering and
 sorting the returned list. This API supports pagination.</p>
@@ -11296,7 +11260,7 @@ that were deleted.</p>
   ]
 }
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="server-notices-1"><a class="header" href="#server-notices-1">Server Notices</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="server-notices-1"><a class="header" href="#server-notices-1">Server Notices</a></h1>
 <p>The API to send notices is as follows:</p>
 <pre><code>POST /_synapse/admin/v1/send_server_notice
 </code></pre>
@@ -11327,7 +11291,7 @@ ignored in the same way as with <code>PUT /_matrix/client/r0/rooms/{roomId}/send
 </code></pre>
 <p>Note that server notices must be enabled in <code>homeserver.yaml</code> before this API
 can be used. See <a href="admin_api/../server_notices.html">the server notices documentation</a> for more information.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="users-media-usage-statistics"><a class="header" href="#users-media-usage-statistics">Users' media usage statistics</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="users-media-usage-statistics"><a class="header" href="#users-media-usage-statistics">Users' media usage statistics</a></h1>
 <p>Returns information about all local media usage of users. Gives the
 possibility to filter them by time and user.</p>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code>
@@ -11403,7 +11367,7 @@ about the user and their local media. Objects contain the following fields:
 <li><code>next_token</code> - integer - Opaque value used for pagination. See above.</li>
 <li><code>total</code> - integer - Total number of users after filtering.</li>
 </ul>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="user-admin-api"><a class="header" href="#user-admin-api">User Admin API</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="user-admin-api"><a class="header" href="#user-admin-api">User Admin API</a></h1>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code>
 for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <h2 id="query-user-account"><a class="header" href="#query-user-account">Query User Account</a></h2>
@@ -12382,7 +12346,7 @@ for more information.</p>
 </code></pre>
 <p>The request and response format is the same as the
 <a href="https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available">/_matrix/client/r0/register/available</a> API.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="version-api"><a class="header" href="#version-api">Version API</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="version-api"><a class="header" href="#version-api">Version API</a></h1>
 <p>This API returns the running Synapse version and the Python version
 on which Synapse is being run. This is useful when a Synapse instance
 is behind a proxy that does not forward the 'Server' header (which also
@@ -12396,7 +12360,7 @@ contains Synapse version information).</p>
     &quot;python_version&quot;: &quot;3.7.8&quot;
 }
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="federation-api"><a class="header" href="#federation-api">Federation API</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="federation-api"><a class="header" href="#federation-api">Federation API</a></h1>
 <p>This API allows a server administrator to manage Synapse's federation with other homeservers.</p>
 <p>Note: This API is new, experimental and &quot;subject to change&quot;.</p>
 <h2 id="list-of-destinations"><a class="header" href="#list-of-destinations">List of destinations</a></h2>
@@ -12568,7 +12532,7 @@ even if the API already returns the http status 200.</p>
 <ul>
 <li><code>destination</code> - Name of the remote server.</li>
 </ul>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="using-the-synapse-manhole"><a class="header" href="#using-the-synapse-manhole">Using the synapse manhole</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="using-the-synapse-manhole"><a class="header" href="#using-the-synapse-manhole">Using the synapse manhole</a></h1>
 <p>The &quot;manhole&quot; allows server administrators to access a Python shell on a running
 Synapse installation. This is a very powerful mechanism for administration and
 debugging.</p>
@@ -12635,7 +12599,7 @@ parts of the process.</p>
 &gt;&gt;&gt; defer.ensureDeferred(hs.get_datastores().main.get_event('$1416420717069yeQaw:matrix.org'))
 &lt;Deferred at 0x7ff253fc6998 current result: &lt;FrozenEvent event_id='$1416420717069yeQaw:matrix.org', type='m.room.create', state_key=''&gt;&gt;
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="how-to-monitor-synapse-metrics-using-prometheus"><a class="header" href="#how-to-monitor-synapse-metrics-using-prometheus">How to monitor Synapse metrics using Prometheus</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="how-to-monitor-synapse-metrics-using-prometheus"><a class="header" href="#how-to-monitor-synapse-metrics-using-prometheus">How to monitor Synapse metrics using Prometheus</a></h1>
 <ol>
 <li>
 <p>Install Prometheus:</p>
@@ -12875,7 +12839,7 @@ renamed.</p>
 <tr><td>python_twisted_reactor_pending_calls</td><td>reactor_pending_calls</td></tr>
 <tr><td>python_twisted_reactor_tick_time</td><td>reactor_tick_time</td></tr>
 </tbody></table>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h2 id="understanding-synapse-through-grafana-graphs"><a class="header" href="#understanding-synapse-through-grafana-graphs">Understanding Synapse through Grafana graphs</a></h2>
+<div style="break-before: page; page-break-before: always;"></div><h2 id="understanding-synapse-through-grafana-graphs"><a class="header" href="#understanding-synapse-through-grafana-graphs">Understanding Synapse through Grafana graphs</a></h2>
 <p>It is possible to monitor much of the internal state of Synapse using <a href="https://prometheus.io">Prometheus</a> 
 metrics and <a href="https://grafana.com/">Grafana</a>. 
 A guide for configuring Synapse to provide metrics is available <a href="usage/administration/../../metrics-howto.html">here</a> 
@@ -12925,7 +12889,7 @@ indicator of problems, and a symptom of other problems though, so check other gr
 tried everything you can, it may just be a lack of system resources. Consider adding
 more CPU and RAM, and make use of <a href="usage/administration/../../workers.html">worker mode</a> 
 to make use of multiple CPU cores / multiple machines for your homeserver.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h2 id="some-useful-sql-queries-for-synapse-admins"><a class="header" href="#some-useful-sql-queries-for-synapse-admins">Some useful SQL queries for Synapse Admins</a></h2>
+<div style="break-before: page; page-break-before: always;"></div><h2 id="some-useful-sql-queries-for-synapse-admins"><a class="header" href="#some-useful-sql-queries-for-synapse-admins">Some useful SQL queries for Synapse Admins</a></h2>
 <h2 id="size-of-full-matrix-db"><a class="header" href="#size-of-full-matrix-db">Size of full matrix db</a></h2>
 <p><code>SELECT pg_size_pretty( pg_database_size( 'matrix' ) );</code></p>
 <h3 id="result-example"><a class="header" href="#result-example">Result example:</a></h3>
@@ -13059,19 +13023,19 @@ WHERE room_id IN (WHERE room_id IN (
  '!YTvKGNlinIzlkMTVRl:matrix.org'
 )
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><p>This blog post by Victor Berger explains how to use many of the tools listed on this page: https://levans.fr/shrink-synapse-database.html</p>
+<div style="break-before: page; page-break-before: always;"></div><p>This blog post by Victor Berger explains how to use many of the tools listed on this page: https://levans.fr/shrink-synapse-database.html</p>
 <h1 id="list-of-useful-tools-and-scripts-for-maintenance-synapse-database"><a class="header" href="#list-of-useful-tools-and-scripts-for-maintenance-synapse-database">List of useful tools and scripts for maintenance Synapse database:</a></h1>
-<h2 id="a-hrefusageadministrationadmin_apimedia_admin_apihtmlpurge-remote-media-apipurge-remote-media-apia"><a class="header" href="#a-hrefusageadministrationadmin_apimedia_admin_apihtmlpurge-remote-media-apipurge-remote-media-apia"><a href="usage/administration/../../admin_api/media_admin_api.html#purge-remote-media-api">Purge Remote Media API</a></a></h2>
+<h2 id="purge-remote-media-api-1"><a class="header" href="#purge-remote-media-api-1"><a href="usage/administration/../../admin_api/media_admin_api.html#purge-remote-media-api">Purge Remote Media API</a></a></h2>
 <p>The purge remote media API allows server admins to purge old cached remote media.</p>
-<h2 id="a-hrefusageadministrationadmin_apimedia_admin_apihtmldelete-local-mediapurge-local-media-apia"><a class="header" href="#a-hrefusageadministrationadmin_apimedia_admin_apihtmldelete-local-mediapurge-local-media-apia"><a href="usage/administration/../../admin_api/media_admin_api.html#delete-local-media">Purge Local Media API</a></a></h2>
+<h2 id="purge-local-media-api"><a class="header" href="#purge-local-media-api"><a href="usage/administration/../../admin_api/media_admin_api.html#delete-local-media">Purge Local Media API</a></a></h2>
 <p>This API deletes the <em>local</em> media from the disk of your own server.</p>
-<h2 id="a-hrefusageadministrationadmin_apipurge_history_apihtmlpurge-history-apia"><a class="header" href="#a-hrefusageadministrationadmin_apipurge_history_apihtmlpurge-history-apia"><a href="usage/administration/../../admin_api/purge_history_api.html">Purge History API</a></a></h2>
+<h2 id="purge-history-api-1"><a class="header" href="#purge-history-api-1"><a href="usage/administration/../../admin_api/purge_history_api.html">Purge History API</a></a></h2>
 <p>The purge history API allows server admins to purge historic events from their database, reclaiming disk space.</p>
-<h2 id="a-hrefhttpsgithubcommatrix-orgrust-synapse-compress-statesynapse-compress-statea"><a class="header" href="#a-hrefhttpsgithubcommatrix-orgrust-synapse-compress-statesynapse-compress-statea"><a href="https://github.com/matrix-org/rust-synapse-compress-state">synapse-compress-state</a></a></h2>
+<h2 id="synapse-compress-state"><a class="header" href="#synapse-compress-state"><a href="https://github.com/matrix-org/rust-synapse-compress-state">synapse-compress-state</a></a></h2>
 <p>Tool for compressing (deduplicating) <code>state_groups_state</code> table.</p>
-<h2 id="a-hrefusageadministrationuseful_sql_for_adminshtmlsql-for-analyzing-synapse-postgresql-database-statsa"><a class="header" href="#a-hrefusageadministrationuseful_sql_for_adminshtmlsql-for-analyzing-synapse-postgresql-database-statsa"><a href="usage/administration/useful_sql_for_admins.html">SQL for analyzing Synapse PostgreSQL database stats</a></a></h2>
+<h2 id="sql-for-analyzing-synapse-postgresql-database-stats"><a class="header" href="#sql-for-analyzing-synapse-postgresql-database-stats"><a href="usage/administration/useful_sql_for_admins.html">SQL for analyzing Synapse PostgreSQL database stats</a></a></h2>
 <p>Some easy SQL that reports useful stats about your Synapse database.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="how-do-state-groups-work"><a class="header" href="#how-do-state-groups-work">How do State Groups work?</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="how-do-state-groups-work"><a class="header" href="#how-do-state-groups-work">How do State Groups work?</a></h1>
 <p>As a general rule, I encourage people who want to understand the deepest darkest secrets of the database schema to drop by #synapse-dev:matrix.org and ask questions.</p>
 <p>However, one question that comes up frequently is that of how &quot;state groups&quot; work, and why the <code>state_groups_state</code> table gets so big, so here's an attempt to answer that question.</p>
 <p>We need to be able to relatively quickly calculate the state of a room at any point in that room's history. In other words, we need to know the state of the room at each event in that room. This is done as follows:</p>
@@ -13084,7 +13048,7 @@ WHERE room_id IN (WHERE room_id IN (
 <p>There are various reasons that we can end up creating many more state groups than we need: see https://github.com/matrix-org/synapse/issues/3364 for more details.</p>
 <h2 id="compression-tool"><a class="header" href="#compression-tool">Compression tool</a></h2>
 <p>There is a tool at https://github.com/matrix-org/rust-synapse-compress-state which can compress the <code>state_groups_state</code> on a room by-room basis (essentially, it reduces the number of &quot;full&quot; state groups). This can result in dramatic reductions of the storage used.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="request-log-format"><a class="header" href="#request-log-format">Request log format</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="request-log-format"><a class="header" href="#request-log-format">Request log format</a></h1>
 <p>HTTP request logs are written by synapse (see <a href="usage/administration/../synapse/http/site.py"><code>site.py</code></a> for details).</p>
 <p>See the following for how to decode the dense data available from the default logging configuration.</p>
 <pre><code>2020-10-01 12:00:00,000 - synapse.access.http.8008 - 311 - INFO - PUT-1000- 192.168.0.1 - 8008 - {another-matrix-server.com} Processed request: 0.100sec/-0.000sec (0.000sec, 0.000sec) (0.001sec/0.090sec/3) 11B !200 &quot;PUT /_matrix/federation/v1/send/1600000000000 HTTP/1.1&quot; &quot;Synapse/1.20.1&quot; [0 dbevts]
@@ -13119,7 +13083,7 @@ the same data, but only the first request will report time/transactions in
 <code>KKKK</code>/<code>LLLL</code>/<code>MMMM</code>/<code>NNNN</code>/<code>OOOO</code> - the others will be awaiting the first query to return a
 response and will simultaneously return with the first request, but with very
 small processing times.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h2 id="admin-faq"><a class="header" href="#admin-faq">Admin FAQ</a></h2>
+<div style="break-before: page; page-break-before: always;"></div><h2 id="admin-faq"><a class="header" href="#admin-faq">Admin FAQ</a></h2>
 <h2 id="how-do-i-become-a-server-admin"><a class="header" href="#how-do-i-become-a-server-admin">How do I become a server admin?</a></h2>
 <p>If your server already has an admin account you should use the user admin API to promote other accounts to become admins. See <a href="usage/administration/../../admin_api/user_admin_api.html#Change-whether-a-user-is-a-server-administrator-or-not">User Admin API</a></p>
 <p>If you don't have any admin accounts yet you won't be able to use the admin API so you'll have to edit the database manually. Manually editing the database is generally not recommended so once you have an admin account, use the admin APIs to make further changes.</p>
@@ -13181,7 +13145,7 @@ LIMIT 10;
 </code></pre>
 <p>You can also use the <a href="usage/administration/../../admin_api/rooms.html#list-room-api">List Room API</a>
 and <code>order_by</code> <code>state_events</code>.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="contributing"><a class="header" href="#contributing">Contributing</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="contributing"><a class="header" href="#contributing">Contributing</a></h1>
 <p>This document aims to get you started with contributing to Synapse!</p>
 <h1 id="1-who-can-contribute-to-synapse"><a class="header" href="#1-who-can-contribute-to-synapse">1. Who can contribute to Synapse?</a></h1>
 <p>Everyone is welcome to contribute code to <a href="https://github.com/matrix-org">matrix.org
@@ -13334,7 +13298,7 @@ trial
 server is set to authenticate you over the UNIX socket (i.e. if the <code>psql</code> command
 works without further arguments).</p>
 <p>Your Postgres account needs to be able to create databases.</p>
-<h2 id="run-the-integration-tests-a-hrefhttpsgithubcommatrix-orgsytestsytesta"><a class="header" href="#run-the-integration-tests-a-hrefhttpsgithubcommatrix-orgsytestsytesta">Run the integration tests (<a href="https://github.com/matrix-org/sytest">Sytest</a>).</a></h2>
+<h2 id="run-the-integration-tests-sytest"><a class="header" href="#run-the-integration-tests-sytest">Run the integration tests (<a href="https://github.com/matrix-org/sytest">Sytest</a>).</a></h2>
 <p>The integration tests are a more comprehensive suite of tests. They
 run a full version of Synapse, including your changes, to check if
 anything was broken. They are slower than the unit tests but will
@@ -13350,7 +13314,7 @@ configuration:</p>
 <li>To run with Synapse in worker mode, supply the <code>-e WORKERS=1 -e REDIS=1</code> environment flags (in addition to the Postgres flags).</li>
 </ul>
 <p>For more details about other configurations, see the <a href="https://github.com/matrix-org/sytest/blob/develop/docker/README.md">Docker-specific documentation in the SyTest repo</a>.</p>
-<h2 id="run-the-integration-tests-a-hrefhttpsgithubcommatrix-orgcomplementcomplementa"><a class="header" href="#run-the-integration-tests-a-hrefhttpsgithubcommatrix-orgcomplementcomplementa">Run the integration tests (<a href="https://github.com/matrix-org/complement">Complement</a>).</a></h2>
+<h2 id="run-the-integration-tests-complement"><a class="header" href="#run-the-integration-tests-complement">Run the integration tests (<a href="https://github.com/matrix-org/complement">Complement</a>).</a></h2>
 <p><a href="https://github.com/matrix-org/complement">Complement</a> is a suite of black box tests that can be run on any homeserver implementation. It can also be thought of as end-to-end (e2e) tests.</p>
 <p>It's often nice to develop on Synapse and write Complement tests at the same time.
 Here is how to run your local Synapse checkout against your local Complement checkout.</p>
@@ -13553,7 +13517,7 @@ matrix together all the fragmented communication technologies out there we are
 reliant on contributions and collaboration from the community to do so. So
 please get involved - and we hope you have as much fun hacking on Matrix as we
 do!</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="code-style"><a class="header" href="#code-style">Code Style</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="code-style"><a class="header" href="#code-style">Code Style</a></h1>
 <h2 id="formatting-tools"><a class="header" href="#formatting-tools">Formatting tools</a></h2>
 <p>The Synapse codebase uses a number of code formatting tools in order to
 quickly and automatically check for formatting (and sometimes logical)
@@ -13731,7 +13695,7 @@ frobber:
 and is maintained by a script, <code>scripts-dev/generate_sample_config.sh</code>.
 Making sure that the output from this script matches the desired format
 is left as an exercise for the reader!</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="synapse-release-cycle"><a class="header" href="#synapse-release-cycle">Synapse Release Cycle</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="synapse-release-cycle"><a class="header" href="#synapse-release-cycle">Synapse Release Cycle</a></h1>
 <p>Releases of Synapse follow a two week release cycle with new releases usually
 occurring on Tuesdays:</p>
 <ul>
@@ -13761,7 +13725,7 @@ be held to be released together.</p>
 <p>In some cases, a pre-disclosure of a security release will be issued as a notice
 to Synapse operators that there is an upcoming security release. These can be
 found in the <a href="https://matrix.org/blog/category/security">security category of the Matrix blog</a>.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="some-notes-on-how-we-use-git"><a class="header" href="#some-notes-on-how-we-use-git">Some notes on how we use git</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="some-notes-on-how-we-use-git"><a class="header" href="#some-notes-on-how-we-use-git">Some notes on how we use git</a></h1>
 <h2 id="on-keeping-the-commit-history-clean"><a class="header" href="#on-keeping-the-commit-history-clean">On keeping the commit history clean</a></h2>
 <p>In an ideal world, our git commit history would be a linear progression of
 commits each of which contains a single change building on what came
@@ -13863,7 +13827,7 @@ that our active branches are ordered thus, from more-stable to less-stable:</p>
 <ul>
 <li><code>master</code> (tracks our last release).</li>
 <li><code>release-vX.Y</code> (the branch where we prepare the next release)<sup
-   id="a3"><a href="development/git.html#f3">3</a></sup>.</li>
+id="a3"><a href="development/git.html#f3">3</a></sup>.</li>
 <li>PR branches which are targeting the release.</li>
 <li><code>develop</code> (our &quot;mainline&quot; branch containing our bleeding-edge).</li>
 <li>regular PR branches.</li>
@@ -13882,7 +13846,7 @@ most intuitive name. <a href="development/git.html#a1">^</a></p>
 <p><b id="f3">[3]</b>: Very, very occasionally (I think this has happened once in
 the history of Synapse), we've had two releases in flight at once. Obviously,
 <code>release-v1.2</code> is more-stable than <code>release-v1.3</code>. <a href="development/git.html#a3">^</a></p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="synapse-demo-setup"><a class="header" href="#synapse-demo-setup">Synapse demo setup</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="synapse-demo-setup"><a class="header" href="#synapse-demo-setup">Synapse demo setup</a></h1>
 <p><strong>DO NOT USE THESE DEMO SERVERS IN PRODUCTION</strong></p>
 <p>Requires you to have a <a href="https://matrix-org.github.io/synapse/develop/development/contributing_guide.html#4-install-the-dependencies">Synapse development environment setup</a>.</p>
 <p>The demo setup allows running three federation Synapse servers, with server
@@ -13916,7 +13880,7 @@ it won't work if your HS already has a room with that name.</p>
 <p>To start a completely new set of servers, run:</p>
 <pre><code class="language-sh">./demo/stop.sh; ./demo/clean.sh &amp;&amp; ./demo/start.sh
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="opentracing"><a class="header" href="#opentracing">OpenTracing</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="opentracing"><a class="header" href="#opentracing">OpenTracing</a></h1>
 <h2 id="background"><a class="header" href="#background">Background</a></h2>
 <p>OpenTracing is a semi-standard being adopted by a number of distributed
 tracing platforms. It is a common api for facilitating vendor-agnostic
@@ -13989,7 +13953,7 @@ logged to OpenTracing's logs.</li>
 <h2 id="configuring-jaeger"><a class="header" href="#configuring-jaeger">Configuring Jaeger</a></h2>
 <p>Sampling strategies can be set as in this document:
 <a href="https://www.jaegertracing.io/docs/latest/sampling/">https://www.jaegertracing.io/docs/latest/sampling/</a>.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="synapse-database-schema-files"><a class="header" href="#synapse-database-schema-files">Synapse database schema files</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="synapse-database-schema-files"><a class="header" href="#synapse-database-schema-files">Synapse database schema files</a></h1>
 <p>Synapse's database schema is stored in the <code>synapse.storage.schema</code> module.</p>
 <h2 id="logical-databases"><a class="header" href="#logical-databases">Logical databases</a></h2>
 <p>Synapse supports splitting its datastore across multiple physical databases (which can
@@ -14151,7 +14115,7 @@ default value is the <strong>string</strong> <code>&quot;FALSE&quot;</code> - wh
 in Python, evaluates to <code>True</code>.</p>
 </li>
 </ul>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="implementing-experimental-features-in-synapse"><a class="header" href="#implementing-experimental-features-in-synapse">Implementing experimental features in Synapse</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="implementing-experimental-features-in-synapse"><a class="header" href="#implementing-experimental-features-in-synapse">Implementing experimental features in Synapse</a></h1>
 <p>It can be desirable to implement &quot;experimental&quot; features which are disabled by
 default and must be explicitly enabled via the Synapse configuration. This is
 applicable for features which:</p>
@@ -14184,7 +14148,7 @@ but one should be used if unsure.</p>
 <p>New experimental configuration flags should be added under the <code>experimental</code>
 configuration key (see the <code>synapse.config.experimental</code> file) and either explain
 (briefly) what is being enabled, or include the MSC number.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="log-contexts"><a class="header" href="#log-contexts">Log Contexts</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="log-contexts"><a class="header" href="#log-contexts">Log Contexts</a></h1>
 <p>To help track the processing of individual requests, synapse uses a
 '<code>log context</code>' to track which request it is handling at any given
 moment. This is done via a thread-local variable; a <code>logging.Filter</code> is
@@ -14480,7 +14444,7 @@ chain are dropped. Dropping the the reference to an awaitable you're
 supposed to be awaiting is bad practice, so this doesn't
 actually happen too much. Unfortunately, when it does happen, it will
 lead to leaked logcontexts which are incredibly hard to track down.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="replication-architecture"><a class="header" href="#replication-architecture">Replication Architecture</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="replication-architecture"><a class="header" href="#replication-architecture">Replication Architecture</a></h1>
 <h2 id="motivation"><a class="header" href="#motivation">Motivation</a></h2>
 <p>We'd like to be able to split some of the work that synapse does into
 multiple python processes. In theory multiple synapse processes could
@@ -14508,7 +14472,7 @@ minimal.</p>
 <p>There are read-only version of the synapse storage layer in
 <code>synapse/replication/slave/storage</code> that use the response of the
 replication API to invalidate their caches.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="tcp-replication"><a class="header" href="#tcp-replication">TCP Replication</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="tcp-replication"><a class="header" href="#tcp-replication">TCP Replication</a></h1>
 <h2 id="motivation-1"><a class="header" href="#motivation-1">Motivation</a></h2>
 <p>Previously the workers used an HTTP long poll mechanism to get updates
 from the master, which had the problem of causing a lot of duplicate
@@ -14703,7 +14667,7 @@ workers understand to mean to expand to invalidate the correct caches.</p>
 <li><code>cs_cache_fake</code> ─ invalidates caches that depend on the current
 state</li>
 </ol>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="internal-documentation"><a class="header" href="#internal-documentation">Internal Documentation</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="internal-documentation"><a class="header" href="#internal-documentation">Internal Documentation</a></h1>
 <p>This section covers implementation documentation for various parts of Synapse.</p>
 <p>If a developer is planning to make a change to a feature of Synapse, it can be useful for
 general documentation of how that feature is implemented to be available. This saves the
@@ -14712,7 +14676,7 @@ code.</p>
 <p>Documentation that would be more useful for the perspective of a system administrator,
 rather than a developer who's intending to change to code, should instead be placed
 under the Usage section of the documentation.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="how-to-test-saml-as-a-developer-without-a-server"><a class="header" href="#how-to-test-saml-as-a-developer-without-a-server">How to test SAML as a developer without a server</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="how-to-test-saml-as-a-developer-without-a-server"><a class="header" href="#how-to-test-saml-as-a-developer-without-a-server">How to test SAML as a developer without a server</a></h1>
 <p>https://fujifish.github.io/samling/samling.html (https://github.com/fujifish/samling) is a great resource for being able to tinker with the 
 SAML options within Synapse without needing to deploy and configure a complicated software stack.</p>
 <p>To make Synapse (and therefore Element) use it:</p>
@@ -14750,7 +14714,7 @@ The response must also be signed.</li>
 <p>If you try and repeat this process, you may be automatically logged in using the information you
 gave previously. To fix this, open your developer console (<code>F12</code> or <code>Ctrl+Shift+I</code>) while on the
 samling page and clear the site data. In Chrome, this will be a button on the Application tab.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="how-to-test-cas-as-a-developer-without-a-server"><a class="header" href="#how-to-test-cas-as-a-developer-without-a-server">How to test CAS as a developer without a server</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="how-to-test-cas-as-a-developer-without-a-server"><a class="header" href="#how-to-test-cas-as-a-developer-without-a-server">How to test CAS as a developer without a server</a></h1>
 <p>The <a href="https://github.com/jbittel/django-mama-cas">django-mama-cas</a> project is an
 easy to run CAS implementation built on top of Django.</p>
 <h2 id="prerequisites"><a class="header" href="#prerequisites">Prerequisites</a></h2>
@@ -14812,7 +14776,7 @@ and that the CAS server is on port 8000, both on localhost.</p>
 <li>http://localhost:8000/admin/</li>
 <li>Click &quot;logout&quot; in the top right.</li>
 </ol>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="room-dag-concepts"><a class="header" href="#room-dag-concepts">Room DAG concepts</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="room-dag-concepts"><a class="header" href="#room-dag-concepts">Room DAG concepts</a></h1>
 <h2 id="edges"><a class="header" href="#edges">Edges</a></h2>
 <p>The word &quot;edge&quot; comes from graph theory lingo. An edge is just a connection
 between two events. In Synapse, we connect events by specifying their
@@ -14900,7 +14864,7 @@ mappings of <code>event_id -&gt; state_group</code> and <code>state_group -&gt; 
 <h3 id="stage-group-edges"><a class="header" href="#stage-group-edges">Stage group edges</a></h3>
 <p>TODO: <code>state_group_edges</code> is a further optimization...
 notes from @Azrenbeth, https://pastebin.com/seUGVGeT</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="auth-chain-difference-algorithm"><a class="header" href="#auth-chain-difference-algorithm">Auth Chain Difference Algorithm</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="auth-chain-difference-algorithm"><a class="header" href="#auth-chain-difference-algorithm">Auth Chain Difference Algorithm</a></h1>
 <p>The auth chain difference algorithm is used by V2 state resolution, where a
 naive implementation can be a significant source of CPU and DB usage.</p>
 <h3 id="definitions"><a class="header" href="#definitions">Definitions</a></h3>
@@ -14991,7 +14955,7 @@ level).</li>
 </ol>
 <p>So the final result is: Bob's second join <code>(2,2)</code>, the second power level
 <code>(3,2)</code> and both of Alice's joins <code>(4,2)</code> &amp; <code>(4,3)</code>.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="media-repository"><a class="header" href="#media-repository">Media Repository</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="media-repository"><a class="header" href="#media-repository">Media Repository</a></h1>
 <p><em>Synapse implementation-specific details for the media repository</em></p>
 <p>The media repository</p>
 <ul>
@@ -15054,7 +15018,7 @@ date and <code>aaaaaaaaaaaaaaaa</code> is a random sequence of 16 case-sensitive
 <pre><code>url_cache/yyyy-mm-dd/aaaaaaaaaaaaaaaa
 url_cache_thumbnails/yyyy-mm-dd/aaaaaaaaaaaaaaaa/128-96-image-jpeg-scale
 </code></pre>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="room-and-user-statistics"><a class="header" href="#room-and-user-statistics">Room and User Statistics</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="room-and-user-statistics"><a class="header" href="#room-and-user-statistics">Room and User Statistics</a></h1>
 <p>Synapse maintains room and user statistics in various tables. These can be used
 for administrative purposes but are also used when generating the public room
 directory.</p>
@@ -15069,7 +15033,7 @@ table. Each subject can have only one.</li>
 <h3 id="overview-4"><a class="header" href="#overview-4">Overview</a></h3>
 <p>Stats correspond to the present values. Current rows contain the most up-to-date
 statistics for a room. Each subject can only have one entry.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="deprecation-policy-for-platform-dependencies"><a class="header" href="#deprecation-policy-for-platform-dependencies">Deprecation Policy for Platform Dependencies</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="deprecation-policy-for-platform-dependencies"><a class="header" href="#deprecation-policy-for-platform-dependencies">Deprecation Policy for Platform Dependencies</a></h1>
 <p>Synapse has a number of platform dependencies, including Python and PostgreSQL.
 This document outlines the policy towards which versions we support, and when we
 drop support for versions in the future.</p>
@@ -15090,7 +15054,7 @@ long process.</p>
 <p>By following the upstream support life cycles Synapse can ensure that its
 dependencies continue to get security patches, while not requiring system admins
 to constantly update their platform dependencies to the latest versions.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h2 id="summary-of-performance-impact-of-running-on-resource-constrained-devices-such-as-sbcs"><a class="header" href="#summary-of-performance-impact-of-running-on-resource-constrained-devices-such-as-sbcs">Summary of performance impact of running on resource constrained devices such as SBCs</a></h2>
+<div style="break-before: page; page-break-before: always;"></div><h2 id="summary-of-performance-impact-of-running-on-resource-constrained-devices-such-as-sbcs"><a class="header" href="#summary-of-performance-impact-of-running-on-resource-constrained-devices-such-as-sbcs">Summary of performance impact of running on resource constrained devices such as SBCs</a></h2>
 <p>I've been running my homeserver on a cubietruck at home now for some time and am often replying to statements like &quot;you need loads of ram to join large rooms&quot; with &quot;it works fine for me&quot;. I thought it might be useful to curate a summary of the issues you're likely to run into to help as a scaling-down guide, maybe highlight these for development work or end up as documentation. It seems that once you get up to about 4x1.5GHz arm64 4GiB these issues are no longer a problem.</p>
 <ul>
 <li><strong>Platform</strong>: 2x1GHz armhf 2GiB ram <a href="https://wiki.debian.org/CheapServerBoxHardware">Single-board computers</a>, SSD, postgres.</li>
@@ -15151,61 +15115,32 @@ admin@homeserver:~$ sudo --user postgres psql matrix-synapse --command 'select c
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                        
-
-                        
-
                         <div style="clear: both"></div>
                     </nav>
                 </div>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                
-
-                
             </nav>
 
         </div>
 
-        
-
-        
-
-        
-
-        
         <script type="text/javascript">
             window.playground_copyable = true;
         </script>
-        
-
-        
-
-        
         <script src="elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
         <script src="mark.min.js" type="text/javascript" charset="utf-8"></script>
         <script src="searcher.js" type="text/javascript" charset="utf-8"></script>
-        
-
         <script src="clipboard.min.js" type="text/javascript" charset="utf-8"></script>
         <script src="highlight.js" type="text/javascript" charset="utf-8"></script>
         <script src="book.js" type="text/javascript" charset="utf-8"></script>
 
         <!-- Custom JS scripts -->
-        
         <script type="text/javascript" src="docs/website_files/table-of-contents.js"></script>
-        
-
-        
-        
         <script type="text/javascript">
         window.addEventListener('load', function() {
             window.setTimeout(window.print, 100);
         });
         </script>
-        
-        
-
     </body>
 </html>
