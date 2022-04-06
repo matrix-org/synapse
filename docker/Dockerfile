@@ -16,11 +16,10 @@
 
 ARG PYTHON_VERSION=3.9
 
-FROM docker.io/python:${PYTHON_VERSION}-slim as base
-
 ###
 ### Stage 0: builder
 ###
+FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 
 # Irritatingly, there is no blessed guide on how to distribute an application with its
 # poetry-managed environment in a docker image. For a while,
@@ -29,7 +28,6 @@ FROM docker.io/python:${PYTHON_VERSION}-slim as base
 # This is inspired from:
 #     https://github.com/python-poetry/poetry/discussions/1879#discussioncomment-216865
 #     https://stackoverflow.com/questions/53835198/integrating-python-poetry-with-docker?answertab=scoredesc
-FROM base as builder
 
 # RUN --mount is specific to buildkit and is documented at
 # https://github.com/moby/buildkit/blob/master/frontend/dockerfile/docs/syntax.md#build-mounts-run---mount.
@@ -88,7 +86,7 @@ RUN --mount=type=cache,target=/opt/poetry/artifacts \
 ### Stage 1: runtime
 ###
 
-FROM base
+FROM docker.io/python:${PYTHON_VERSION}-slim
 
 LABEL org.opencontainers.image.url='https://matrix.org/docs/projects/server/synapse'
 LABEL org.opencontainers.image.documentation='https://github.com/matrix-org/synapse/blob/master/docker/README.md'
