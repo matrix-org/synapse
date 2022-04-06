@@ -102,6 +102,7 @@ class ReplicationPresenceSetState(ReplicationEndpoint):
     ) -> JsonDict:
         return {
             "state": state,
+            "ignore_status_msg": ignore_status_msg,
             "force_notify": force_notify,
         }
 
@@ -113,6 +114,7 @@ class ReplicationPresenceSetState(ReplicationEndpoint):
         await self._presence_handler.set_state(
             UserID.from_string(user_id),
             content["state"],
+            content["ignore_status_msg"],
             content["force_notify"],
         )
 

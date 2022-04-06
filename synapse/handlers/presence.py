@@ -239,6 +239,7 @@ class BasePresenceHandler(abc.ABC):
         self,
         target_user: UserID,
         state: JsonDict,
+        ignore_status_msg: bool = False,
         force_notify: bool = False,
     ) -> None:
         """Set the presence state of the user.
@@ -478,9 +479,8 @@ class WorkerPresenceHandler(BasePresenceHandler):
 
         prev_state = await self.current_state_for_user(user_id)
         if prev_state != PresenceState.BUSY:
-            # XXX: Why does this pass force_notify = True? This is copied
-            # from when the sync rest handler set the presence itself, but
-            # I don't really understand why this would be necessary.
+            # We set state here but pass ignore_status_msg = True as we don't want to
+            # cause the status message to be cleared.
             await self.set_state(
                 UserID.from_string(user_id), {"presence": presence_state}, True
             )
@@ -579,6 +579,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         self,
         target_user: UserID,
         state: JsonDict,
+        ignore_status_msg: bool = False,
         force_notify: bool = False,
     ) -> None:
         """Set the presence state of the user.
@@ -615,6 +616,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
             instance_name=self._presence_writer_instance,
             user_id=user_id,
             state=state,
+            ignore_status_msg=ignore_status_msg,
             force_notify=force_notify,
         )
 
@@ -1179,6 +1181,7 @@ class PresenceHandler(BasePresenceHandler):
         self,
         target_user: UserID,
         state: JsonDict,
+        ignore_status_msg: bool = False,
         force_notify: bool = False,
     ) -> None:
         """Set the presence state of the user.
@@ -1210,7 +1213,9 @@ class PresenceHandler(BasePresenceHandler):
         prev_state = await self.current_state_for_user(user_id)
 
         new_fields = {"state": presence}
-        new_fields["status_msg"] = status_msg
+
+        if not ignore_status_msg:
+            new_fields["status_msg"] = status_msg
 
         if presence == PresenceState.ONLINE or (
             presence == PresenceState.BUSY and self._busy_presence_enabled
