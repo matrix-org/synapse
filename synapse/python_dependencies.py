@@ -99,6 +99,8 @@ CONDITIONAL_REQUIREMENTS = {
     "postgres": [
         # we use execute_values with the fetch param, which arrived in psycopg 2.8.
         "psycopg2>=2.8 ; platform_python_implementation != 'PyPy'",
+        "psycopg2cffi>=2.8 ; platform_python_implementation == 'PyPy'",
+        "psycopg2cffi-compat==1.1 ; platform_python_implementation == 'PyPy'",
     ],
     "saml2": [
         "pysaml2>=4.5.0",

@@ -176,6 +176,8 @@ importlib_metadata = { version = ">=1.4", python = "<3.8" }
 # ---------------------
 matrix-synapse-ldap3 = { version = ">=0.1", optional = true }
 psycopg2 = { version = ">=2.8", markers = "platform_python_implementation != 'PyPy'", optional = true }
+psycopg2cffi = { version = ">=2.8", markers = "platform_python_implementation == 'PyPy'", optional = true }
+psycopg2cffi-compat = { version = "==1.1", markers = "platform_python_implementation == 'PyPy'", optional = true }
 pysaml2 = { version = ">=4.5.0", optional = true }
 authlib = { version = ">=0.14.0", optional = true }
 # systemd-python is necessary for logging to the systemd journal via
@@ -197,7 +199,7 @@ parameterized = { version = ">=0.7.4", optional = true }
 # NB: Packages that should be part of `pip install matrix-synapse[all]` need to be specified
 # twice: once here, and once in the `all` extra.
 matrix-synapse-ldap3 = ["matrix-synapse-ldap3"]
-postgres = ["psycopg2"]
+postgres = ["psycopg2", "psycopg2cffi", "psycopg2cffi-compat"]
 saml2 = ["pysaml2"]
 oidc = ["authlib"]
 # systemd-python is necessary for logging to the systemd journal via
