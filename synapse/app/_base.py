@@ -114,6 +114,9 @@ def start_worker_reactor(
 
     logger = logging.getLogger(config.worker.worker_app)
 
+    assert config.worker.worker_pid_file is not None
+    assert config.worker.worker_pid_file is not None
+
     start_reactor(
         appname,
         soft_file_limit=config.server.soft_file_limit,

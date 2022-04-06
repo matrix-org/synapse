@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any
+from typing import Any, Optional
 
 from synapse.types import JsonDict, UserID
 
@@ -65,10 +65,10 @@ class ServerNoticesConfig(Config):
 
     def __init__(self, *args: Any):
         super().__init__(*args)
-        self.server_notices_mxid = None
-        self.server_notices_mxid_display_name = None
-        self.server_notices_mxid_avatar_url = None
-        self.server_notices_room_name = None
+        self.server_notices_mxid: Optional[str] = None
+        self.server_notices_mxid_display_name: Optional[str] = None
+        self.server_notices_mxid_avatar_url: Optional[str] = None
+        self.server_notices_room_name: Optional[str] = None
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         c = config.get("server_notices")

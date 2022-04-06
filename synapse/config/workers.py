@@ -122,9 +122,16 @@ class WorkerConfig(Config):
         self.worker_listeners = [
             parse_listener_def(x) for x in config.get("worker_listeners", [])
         ]
-        self.worker_daemonize = config.get("worker_daemonize")
-        self.worker_pid_file = config.get("worker_pid_file")
-        self.worker_log_config = config.get("worker_log_config")
+        self.worker_daemonize = bool(config.get("worker_daemonize"))
+        worker_pid_file = config.get("worker_pid_file")
+        if worker_pid_file is not None and not isinstance(worker_pid_file, str):
+            raise ConfigError("worker_pid_file must be a string")
+        self.worker_pid_file = worker_pid_file
+
+        worker_log_config = config.get("worker_log_config")
+        if worker_log_config is not None and not isinstance(worker_log_config, str):
+            raise ConfigError("worker_log_config must be a string")
+        self.worker_log_config = worker_log_config
 
         # The host used to connect to the main synapse
         self.worker_replication_host = config.get("worker_replication_host", None)

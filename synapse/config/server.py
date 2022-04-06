@@ -259,8 +259,8 @@ class ServerConfig(Config):
 
         self.pid_file = self.abspath(config.get("pid_file"))
         self.soft_file_limit = config.get("soft_file_limit", 0)
-        self.daemonize = config.get("daemonize")
-        self.print_pidfile = config.get("print_pidfile")
+        self.daemonize = bool(config.get("daemonize"))
+        self.print_pidfile = bool(config.get("print_pidfile"))
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
         self.serve_server_wellknown = config.get("serve_server_wellknown", False)

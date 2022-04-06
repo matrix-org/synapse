@@ -82,9 +82,9 @@ class ConsentConfig(Config):
 
         self.user_consent_version: Optional[str] = None
         self.user_consent_template_dir: Optional[str] = None
-        self.user_consent_server_notice_content = None
+        self.user_consent_server_notice_content: Optional[JsonDict] = None
         self.user_consent_server_notice_to_guests = False
-        self.block_events_without_consent_error = None
+        self.block_events_without_consent_error: Optional[str] = None
         self.user_consent_at_registration = False
         self.user_consent_policy_name = "Privacy Policy"
 

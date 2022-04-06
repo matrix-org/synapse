@@ -16,15 +16,27 @@ from typing import Any
 
 from synapse.types import JsonDict
 
-from ._base import Config
+from ._base import Config, ConfigError
 
 
 class CaptchaConfig(Config):
     section = "captcha"
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
-        self.recaptcha_private_key = config.get("recaptcha_private_key")
-        self.recaptcha_public_key = config.get("recaptcha_public_key")
+        recaptcha_private_key = config.get("recaptcha_private_key")
+        if recaptcha_private_key is not None and not isinstance(
+            recaptcha_private_key, str
+        ):
+            raise ConfigError("recaptcha_private_key must be a string.")
+        self.recaptcha_private_key = recaptcha_private_key
+
+        recaptcha_public_key = config.get("recaptcha_public_key")
+        if recaptcha_public_key is not None and not isinstance(
+            recaptcha_public_key, str
+        ):
+            raise ConfigError("recaptcha_public_key must be a string.")
+        self.recaptcha_public_key = recaptcha_public_key
+
         self.enable_registration_captcha = config.get(
             "enable_registration_captcha", False
         )
