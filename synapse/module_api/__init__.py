@@ -1424,6 +1424,8 @@ class AccountDataManager:
         Gets some global account data, of a specified type, for the specified user.
 
         The provided user ID must be a valid user ID of a local user.
+
+        Added in Synapse v1.57.0.
         """
         self._validate_user_id(user_id)
 
@@ -1444,6 +1446,8 @@ class AccountDataManager:
 
         Please note that this will overwrite existing the account data of that type
         for that user!
+
+        Added in Synapse v1.57.0.
         """
         self._validate_user_id(user_id)
 
