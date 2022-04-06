@@ -1956,7 +1956,15 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_partial_state_events(
         self, event_ids: Collection[str]
     ) -> Dict[str, bool]:
-        """Checks which of the given events have partial state"""
+        """Checks which of the given events have partial state
+
+        Args:
+            event_ids: the events we want to check for partial state.
+
+        Returns:
+            a dict mapping from event id to partial-stateness. We return True for
+            any of the events which are unknown (or are outliers).
+        """
         result = await self.db_pool.simple_select_many_batch(
             table="partial_state_events",
             column="event_id",
