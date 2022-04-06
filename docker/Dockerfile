@@ -35,9 +35,11 @@ FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 # Here we use it to set up a cache for pip (below, for apt and poetry), to improve
 # rebuild speeds on slow connections.
 # We install poetry as --user so that it doesn't end up in the system-wide python
-# installation. That gets copied later into the runtime image.
+# installation.
+# We use the unstable 1.2.0b1 version instead of our usual 1.1.12 to incorporate
+# fixes to some bugs in `poetry export`.
 RUN --mount=type=cache,target=/root/.cache/pip \
-  pip install --user poetry==1.1.12
+  pip install --user poetry==1.2.0b1
 
 # install the OS build deps
 RUN \
