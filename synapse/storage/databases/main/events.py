@@ -200,9 +200,7 @@ class PersistEventsStore:
             if not use_negative_stream_ordering:
                 # we don't want to set the event_persisted_position to a negative
                 # stream_ordering.
-                synapse.metrics.event_persisted_position.set(
-                    events_and_contexts[-1][0].internal_metadata.stream_ordering
-                )
+                synapse.metrics.event_persisted_position.set(stream)
 
             for event, context in events_and_contexts:
                 if context.app_service:
