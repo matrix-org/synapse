@@ -476,15 +476,14 @@ class WorkerPresenceHandler(BasePresenceHandler):
         if not affect_presence or not self._presence_enabled:
             return _NullContextManager()
 
-        if affect_presence:
-            prev_state = await self.current_state_for_user(user_id)
-            if prev_state != PresenceState.BUSY:
-                # XXX: Why does this pass force_notify = True? This is copied
-                # from when the sync rest handler set the presence itself, but
-                # I don't really understand why this would be necessary.
-                await self.set_state(
-                    UserID.from_string(user_id), {"presence": presence_state}, True
-                )
+        prev_state = await self.current_state_for_user(user_id)
+        if prev_state != PresenceState.BUSY:
+            # XXX: Why does this pass force_notify = True? This is copied
+            # from when the sync rest handler set the presence itself, but
+            # I don't really understand why this would be necessary.
+            await self.set_state(
+                UserID.from_string(user_id), {"presence": presence_state}, True
+            )
 
         curr_sync = self._user_to_num_current_syncs.get(user_id, 0)
         self._user_to_num_current_syncs[user_id] = curr_sync + 1
