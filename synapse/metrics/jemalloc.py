@@ -16,9 +16,10 @@ import ctypes
 import logging
 import os
 import re
-from typing import Iterable, Literal, Optional, overload
+from typing import Iterable, Optional, overload
 
 from prometheus_client import REGISTRY, Metric
+from typing_extensions import Literal
 
 from synapse.metrics import GaugeMetricFamily
 from synapse.metrics._types import Collector
