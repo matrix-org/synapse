@@ -85,16 +85,6 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         libpq-dev \
         xmlsec1
 
-# Debian 10 (Buster)'s python3-pip package includes pip 18.1. This version was unable to
-# pull wheels. (I'd guess we need support for manylinux2010, manylinux2014 or PEP 600,
-# introduced in pip 19.0, 19.3 and 20.3 respectively.)
-# In any case, we upgrade pip rather than compile CPython extensions from source.
-RUN pip3 install -U pip
-
-# We normally use poetry 1.1.12. However we need to use a prerelease of 1.2 here,
-# which fixes a bug in poetry export that stops us from exporting for Python 3.8 builds.
-RUN pip3 install poetry==1.2.0b1
-
 COPY --from=builder /dh-virtualenv_1.2.2-1_all.deb /
 
 # install dhvirtualenv. Update the apt cache again first, in case we got a

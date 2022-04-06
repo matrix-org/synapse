@@ -30,10 +30,22 @@ case $(dpkg-architecture -q DEB_HOST_ARCH) in
         ;;
 esac
 
-# Use --builtin-venv to use the better `venv` module from CPython 3.4+ rather
-# than the 2/3 compatible `virtualenv`.
-# Use the requirements exported from poetry so that we reproduce its locked
-# environment exactly. We generate requirements.txt in build_debian.sh.
+# Manually install Poetry and export a pip-compatible `requirements.txt`
+# We need a Poetry pre-release as the export command is buggy in < 1.2
+if [ -e requirements.txt ]; then
+    # Guard against a possible future where requirements.txt lives in the repo.
+    # Otherwise, calling `poetry export` below would silently clobber it.
+    echo "requirements.txt already exists; aborting" 1>&2
+    exit 1
+fi
+TEMP_VENV="$(mktemp -d)"
+python3 -m venv "$TEMP_VENV"
+source "$TEMP_VENV/bin/activate"
+pip install -U pip
+pip install poetry==1.2.0b1
+poetry export --extras "all test" -o requirements.txt
+deactivate
+rm -rf "$TEMP_VENV"
 
 dh_virtualenv \
     --install-suffix "matrix-synapse" \
