@@ -1,1 +1,1 @@
-Fix `/messages` returning backfilled and [MSC2716](https://github.com/matrix-org/synapse/pull/12319) historic messages our of order.
+Update `/messages` to use historic pagination tokens by default.
