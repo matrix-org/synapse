@@ -16,11 +16,13 @@ import ctypes
 import logging
 import os
 import re
-from typing import Iterable, Optional
+from typing import Iterable, Optional, overload
 
-from prometheus_client import Metric
+from prometheus_client import REGISTRY, Metric
+from typing_extensions import Literal
 
-from synapse.metrics import REGISTRY, GaugeMetricFamily
+from synapse.metrics import GaugeMetricFamily
+from synapse.metrics._types import Collector
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +60,16 @@ def _setup_jemalloc_stats() -> None:
     logger.debug("Found jemalloc at %s", jemalloc_path)
 
     jemalloc = ctypes.CDLL(jemalloc_path)
+
+    @overload
+    def _mallctl(
+        name: str, read: Literal[True] = True, write: Optional[int] = None
+    ) -> int:
+        ...
+
+    @overload
+    def _mallctl(name: str, read: Literal[False], write: Optional[int] = None) -> None:
+        ...
 
     def _mallctl(
         name: str, read: bool = True, write: Optional[int] = None
@@ -134,7 +146,7 @@ def _setup_jemalloc_stats() -> None:
         except Exception as e:
             logger.warning("Failed to reload jemalloc stats: %s", e)
 
-    class JemallocCollector:
+    class JemallocCollector(Collector):
         """Metrics for internal jemalloc stats."""
 
         def collect(self) -> Iterable[Metric]:

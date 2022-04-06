@@ -200,9 +200,7 @@ class PersistEventsStore:
             if stream < 0:
                 # backfilled events have negative stream orderings, so we don't
                 # want to set the event_persisted_position to that.
-                synapse.metrics.event_persisted_position.set(
-                    events_and_contexts[-1][0].internal_metadata.stream_ordering
-                )
+                synapse.metrics.event_persisted_position.set(stream)
 
             for event, context in events_and_contexts:
                 if context.app_service:
