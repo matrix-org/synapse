@@ -8,4 +8,8 @@
 !pyproject.toml
 !poetry.lock
 
+# TODO: remove these once we have moved over to using poetry-core in pyproject.toml
+!MANIFEST.in
+!setup.py
+
 **/__pycache__
