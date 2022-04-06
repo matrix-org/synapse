@@ -69,7 +69,6 @@ from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.client import (
     account_data,
     events,
-    groups,
     initial_sync,
     login,
     presence,
@@ -319,9 +318,6 @@ class GenericWorkerServer(HomeServer):
                     user_directory.register_servlets(self, resource)
 
                     presence.register_servlets(self, resource)
-
-                    if self.config.experimental.groups_enabled:
-                        groups.register_servlets(self, resource)
 
                     resources.update({CLIENT_API_PREFIX: resource})
 
