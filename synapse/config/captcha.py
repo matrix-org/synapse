@@ -12,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any
+
+from synapse.types import JsonDict
+
 from ._base import Config
 
 
 class CaptchaConfig(Config):
     section = "captcha"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.recaptcha_private_key = config.get("recaptcha_private_key")
         self.recaptcha_public_key = config.get("recaptcha_public_key")
         self.enable_registration_captcha = config.get(
@@ -30,7 +34,7 @@ class CaptchaConfig(Config):
         )
         self.recaptcha_template = self.read_template("recaptcha.html")
 
-    def generate_config_section(self, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         ## Captcha ##
         # See docs/CAPTCHA_SETUP.md for full details of configuring this.

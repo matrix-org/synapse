@@ -99,11 +99,14 @@ class TrustedKeyServer:
 class KeyConfig(Config):
     section = "key"
 
-    def read_config(self, config, config_dir_path, **kwargs):
+    def read_config(
+        self, config: JsonDict, config_dir_path: Optional[str], **kwargs: Any
+    ) -> None:
         # the signing key can be specified inline or in a separate file
         if "signing_key" in config:
             self.signing_key = read_signing_keys([config["signing_key"]])
         else:
+            assert config_dir_path is not None
             signing_key_path = config.get("signing_key_path")
             if signing_key_path is None:
                 signing_key_path = os.path.join(
@@ -172,8 +175,12 @@ class KeyConfig(Config):
         self.form_secret = config.get("form_secret", None)
 
     def generate_config_section(
-        self, config_dir_path, server_name, generate_secrets=False, **kwargs
-    ):
+        self,
+        config_dir_path: str,
+        server_name: str,
+        generate_secrets: bool = False,
+        **kwargs: Any,
+    ) -> str:
         base_key_name = os.path.join(config_dir_path, server_name)
 
         if generate_secrets:

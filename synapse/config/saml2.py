@@ -65,7 +65,7 @@ def _dict_merge(merge_dict: dict, into_dict: dict) -> None:
 class SAML2Config(Config):
     section = "saml2"
 
-    def read_config(self, config, **kwargs) -> None:
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.saml2_enabled = False
 
         saml2_config = config.get("saml2_config")
@@ -223,7 +223,7 @@ class SAML2Config(Config):
             },
         }
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs) -> str:
+    def generate_config_section(self, config_dir_path: str, **kwargs: Any) -> str:
         return """\
         ## Single sign-on integration ##
 

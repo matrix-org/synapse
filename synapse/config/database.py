@@ -15,8 +15,10 @@
 import argparse
 import logging
 import os
+from typing import Any
 
 from synapse.config._base import Config, ConfigError
+from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
@@ -121,12 +123,12 @@ class DatabaseConnectionConfig:
 class DatabaseConfig(Config):
     section = "database"
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args: Any):
+        super().__init__(*args)
 
         self.databases = []
 
-    def read_config(self, config, **kwargs) -> None:
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         # We *experimentally* support specifying multiple databases via the
         # `databases` key. This is a map from a label to database config in the
         # same format as the `database` config option, plus an extra
@@ -170,7 +172,7 @@ class DatabaseConfig(Config):
             self.databases = [DatabaseConnectionConfig("master", database_config)]
             self.set_databasepath(database_path)
 
-    def generate_config_section(self, data_dir_path, **kwargs) -> str:
+    def generate_config_section(self, data_dir_path: str, **kwargs: Any) -> str:
         return DEFAULT_CONFIG % {
             "database_path": os.path.join(data_dir_path, "homeserver.db")
         }

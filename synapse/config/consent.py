@@ -13,9 +13,10 @@
 # limitations under the License.
 
 from os import path
-from typing import Optional
+from typing import Any, Optional
 
 from synapse.config import ConfigError
+from synapse.types import JsonDict
 
 from ._base import Config
 
@@ -76,7 +77,7 @@ class ConsentConfig(Config):
 
     section = "consent"
 
-    def __init__(self, *args):
+    def __init__(self, *args: Any):
         super().__init__(*args)
 
         self.user_consent_version: Optional[str] = None
@@ -87,7 +88,7 @@ class ConsentConfig(Config):
         self.user_consent_at_registration = False
         self.user_consent_policy_name = "Privacy Policy"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         consent_config = config.get("user_consent")
         self.terms_template = self.read_template("terms.html")
 
@@ -118,5 +119,5 @@ class ConsentConfig(Config):
             "policy_name", "Privacy Policy"
         )
 
-    def generate_config_section(self, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return DEFAULT_CONFIG

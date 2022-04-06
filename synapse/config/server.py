@@ -248,7 +248,7 @@ class LimitRemoteRoomsConfig:
 class ServerConfig(Config):
     section = "server"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.server_name = config["server_name"]
         self.server_context = config.get("server_context", None)
 
@@ -697,13 +697,13 @@ class ServerConfig(Config):
 
     def generate_config_section(
         self,
-        server_name,
-        data_dir_path,
-        open_private_ports,
-        listeners,
-        config_dir_path,
-        **kwargs,
-    ):
+        config_dir_path: str,
+        data_dir_path: str,
+        server_name: str,
+        open_private_ports: bool,
+        listeners: Optional[List[dict]],
+        **kwargs: Any,
+    ) -> str:
         ip_range_blacklist = "\n".join(
             "        #  - '%s'" % ip for ip in DEFAULT_IP_RANGE_BLACKLIST
         )
