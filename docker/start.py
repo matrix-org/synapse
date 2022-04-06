@@ -1,4 +1,4 @@
-#!/synapse/.venv/bin/python
+#!/usr/local/bin/python
 
 import codecs
 import glob

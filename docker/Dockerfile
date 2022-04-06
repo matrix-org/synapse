@@ -22,10 +22,11 @@ ARG PYTHON_VERSION=3.9
 FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 
 # Irritatingly, there is no blessed guide on how to distribute an application with its
-# poetry-managed environment in a docker image. For a while,
-# `poetry export | pip install -r /dev/stdin` seemed plausible but is limited by bugs
+# poetry-managed environment in a docker image. We have opted for
+# `poetry export | pip install -r /dev/stdin`, but there are known bugs in
 # in `poetry export` whose fixes (scheduled for poetry 1.2) have yet to be released.
-# This is inspired from:
+# In case we get bitten by those bugs in the future, the recommendations here might
+# be useful:
 #     https://github.com/python-poetry/poetry/discussions/1879#discussioncomment-216865
 #     https://stackoverflow.com/questions/53835198/integrating-python-poetry-with-docker?answertab=scoredesc
 
@@ -61,26 +62,21 @@ WORKDIR /synapse
 # Copy just what we need to run `poetry install`
 COPY pyproject.toml poetry.lock README.rst /synapse/
 
-# Install to the Python installation which hosts `pip`. In this case, it's the system
-# Python.
-ENV POETRY_VIRTUALENVS_IN_PROJECT=true \
-    POETRY_VIRTUALENVS_CREATE=true \
-    POETRY_HOME=/opt/poetry
+RUN /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt
 
 # To speed up rebuilds, install all of the dependencies before we copy over
 # the whole synapse project, so that this layer in the Docker cache can be
 # used while you develop on the source
-RUN --mount=type=cache,target=/opt/poetry/artifacts \
-    --mount=type=cache,target=/opt/poetry/.cache/pypoetry/cache \
-  /root/.local/bin/poetry install --no-dev --no-root --no-interaction --no-ansi --extras all
+#
+# This is aiming at installing the `[tool.poetry.depdendencies]` from pyproject.toml.
+RUN --mount=type=cache,target=/root/.cache/pip \
+  pip install --prefix="/install" --no-warn-script-location -r /synapse/requirements.txt
 
-# Copy over the synapse source code.
+# Copy over the rest of the synapse source code.
 COPY synapse /synapse/synapse/
 
-# Install the synapse package itself, by omitting the --no-root argument
-RUN --mount=type=cache,target=/opt/poetry/artifacts \
-    --mount=type=cache,target=/opt/poetry/cache \
-  /root/.local/bin/poetry install --no-dev --no-interaction --no-ansi --extras all
+# Install the synapse package itself.
+RUN pip install --prefix="/install" --no-deps --no-warn-script-location /synapse
 
 ###
 ### Stage 1: runtime
@@ -108,7 +104,7 @@ RUN \
     openssl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /synapse/ /synapse
+COPY --from=builder /install /usr/local
 COPY ./docker/start.py /start.py
 COPY ./docker/conf /conf
 
