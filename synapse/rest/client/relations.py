@@ -35,7 +35,7 @@ class RelationPaginationServlet(RestServlet):
     PATTERNS = client_patterns(
         "/rooms/(?P<room_id>[^/]*)/relations/(?P<parent_id>[^/]*)"
         "(/(?P<relation_type>[^/]*)(/(?P<event_type>[^/]*))?)?$",
-        releases=(),
+        releases=("v1",),
     )
 
     def __init__(self, hs: "HomeServer"):
