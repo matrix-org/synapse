@@ -311,6 +311,21 @@ class RelationsWorkerStore(SQLBaseStore):
         limit: int,
         users: FrozenSet[str] = frozenset(),
     ) -> Dict[Tuple[str, str], int]:
+        """Fetch the partial aggregations for an event for specific users.
+
+        This is used, in conjunction with get_aggregation_groups_for_event, to
+        remove information from the results for ignored users.
+
+        Args:
+            event_id: Fetch events that relate to this event ID.
+            room_id: The room the event belongs to.
+            limit: Only fetch the `limit` groups.
+            users: The users to fetch information for.
+
+        Returns:
+            A map of (event type, aggregation key) to a count of users.
+        """
+
         if not users:
             return {}
 
@@ -335,7 +350,7 @@ class RelationsWorkerStore(SQLBaseStore):
             LIMIT ?
         """
 
-        def _get_aggregation_groups_for_event_txn(
+        def _get_aggregation_groups_for_users_txn(
             txn: LoggingTransaction,
         ) -> Dict[Tuple[str, str], int]:
             txn.execute(sql, args + [limit])
@@ -343,7 +358,7 @@ class RelationsWorkerStore(SQLBaseStore):
             return {(row[0], row[1]): row[2] for row in txn}
 
         return await self.db_pool.runInteraction(
-            "get_aggregation_groups_for_event", _get_aggregation_groups_for_event_txn
+            "get_aggregation_groups_for_users", _get_aggregation_groups_for_users_txn
         )
 
     @cached()
@@ -577,6 +592,18 @@ class RelationsWorkerStore(SQLBaseStore):
         event_ids: Collection[str],
         users: FrozenSet[str] = frozenset(),
     ) -> Dict[Tuple[str, str], int]:
+        """Get the number of threaded replies for a set of users.
+
+        This is used, in conjunction with get_thread_summaries, to calculate an
+        accurate count of the replies to a thread by subtracting ignored users.
+
+        Args:
+            event_ids: The events to check for threaded replies.
+            users: The user to calculate the count of their replies.
+
+        Returns:
+            A map of the (event_id, sender) to the count of their replies.
+        """
         if not users:
             return {}
 
