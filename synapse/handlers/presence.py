@@ -482,7 +482,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
                 # XXX: Why does this pass force_notify = True? This is copied
                 # from when the sync rest handler set the presence itself, but
                 # I don't really understand why this would be necessary.
-                self.set_state(
+                await self.set_state(
                     UserID.from_string(user_id), {"presence": presence_state}, True
                 )
 
