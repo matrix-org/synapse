@@ -23,13 +23,7 @@ from netaddr import IPSet
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.types import (
-    DeviceListUpdates,
-    GroupID,
-    JsonDict,
-    UserID,
-    get_domain_from_id,
-)
+from synapse.types import DeviceListUpdates, JsonDict, UserID
 from synapse.util.caches.descriptors import _CacheContext, cached
 
 if TYPE_CHECKING:
@@ -55,7 +49,6 @@ class ApplicationServiceState(Enum):
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class Namespace:
     exclusive: bool
-    group_id: Optional[str]
     regex: Pattern[str]
 
 
@@ -141,30 +134,13 @@ class ApplicationService:
                 exclusive = regex_obj.get("exclusive")
                 if not isinstance(exclusive, bool):
                     raise ValueError("Expected bool for 'exclusive' in ns '%s'" % ns)
-                group_id = regex_obj.get("group_id")
-                if group_id:
-                    if not isinstance(group_id, str):
-                        raise ValueError(
-                            "Expected string for 'group_id' in ns '%s'" % ns
-                        )
-                    try:
-                        GroupID.from_string(group_id)
-                    except Exception:
-                        raise ValueError(
-                            "Expected valid group ID for 'group_id' in ns '%s'" % ns
-                        )
-
-                    if get_domain_from_id(group_id) != self.server_name:
-                        raise ValueError(
-                            "Expected 'group_id' to be this host in ns '%s'" % ns
-                        )
 
                 regex = regex_obj.get("regex")
                 if not isinstance(regex, str):
                     raise ValueError("Expected string for 'regex' in ns '%s'" % ns)
 
                 # Pre-compile regex.
-                result[ns].append(Namespace(exclusive, group_id, re.compile(regex)))
+                result[ns].append(Namespace(exclusive, re.compile(regex)))
 
         return result
 
@@ -368,21 +344,6 @@ class ApplicationService:
             for namespace in self.namespaces[ApplicationService.NS_USERS]
             if namespace.exclusive
         ]
-
-    def get_groups_for_user(self, user_id: str) -> Iterable[str]:
-        """Get the groups that this user is associated with by this AS
-
-        Args:
-            user_id: The ID of the user.
-
-        Returns:
-            An iterable that yields group_id strings.
-        """
-        return (
-            namespace.group_id
-            for namespace in self.namespaces[ApplicationService.NS_USERS]
-            if namespace.group_id and namespace.regex.match(user_id)
-        )
 
     def is_rate_limited(self) -> bool:
         return self.rate_limited
