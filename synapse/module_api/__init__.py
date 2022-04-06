@@ -1406,6 +1406,7 @@ class AccountDataManager:
     def __init__(self, hs: "HomeServer") -> None:
         self._hs = hs
         self._store = hs.get_datastores().main
+        self._handler = hs.get_account_data_handler()
 
     def _validate_user_id(self, user_id: str) -> None:
         """
@@ -1432,3 +1433,24 @@ class AccountDataManager:
         # We clone to prevent the module accidentally mutating the dict that
         # lives in the cache, as that could introduce nasty bugs.
         return copy.deepcopy(data)
+
+    async def put_global(
+        self, user_id: str, data_type: str, new_data: JsonDict
+    ) -> None:
+        """
+        Puts some global account data, of a specified type, for the specified user.
+
+        The provided user ID must be a valid user ID of a local user.
+
+        Please note that this will overwrite existing the account data of that type
+        for that user!
+        """
+        self._validate_user_id(user_id)
+
+        # Ensure the user exists, so we don't just write to users that aren't there.
+        if await self._store.get_userinfo_by_id(user_id) is None:
+            raise ValueError(f"User {user_id} does not exist on this server.")
+
+        # Use the account data handler to write the account data.
+        # Crucially, this makes a replication request if necessary.
+        await self._handler.add_account_data_for_user(user_id, data_type, new_data)
