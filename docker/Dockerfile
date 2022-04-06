@@ -32,6 +32,12 @@ ARG PYTHON_VERSION=3.9
 ###
 FROM docker.io/python:${PYTHON_VERSION}-slim as requirements
 
+RUN \
+   --mount=type=cache,target=/var/cache/apt,sharing=locked \
+   --mount=type=cache,target=/var/lib/apt,sharing=locked \
+ apt-get update && apt-get install -y git \
+    && rm -rf /var/lib/apt/lists/*
+
 # RUN --mount is specific to buildkit and is documented at
 # https://github.com/moby/buildkit/blob/master/frontend/dockerfile/docs/syntax.md#build-mounts-run---mount.
 # Here we use it to set up a cache for pip (and below for apt), to improve
@@ -41,7 +47,7 @@ FROM docker.io/python:${PYTHON_VERSION}-slim as requirements
 # We use the unstable 1.2.0b1 version instead of our usual 1.1.12 to incorporate
 # fixes to some bugs in `poetry export`.
 RUN --mount=type=cache,target=/root/.cache/pip \
-  pip install --user poetry==1.2.0b1
+  pip install --user git+https://github.com/python-poetry/poetry.git@3780a727f3bfebed99c68c262c53348fa12e7eb7
 
 WORKDIR /synapse
 
