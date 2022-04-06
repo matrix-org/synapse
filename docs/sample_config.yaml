@@ -2450,16 +2450,6 @@ push:
 #encryption_enabled_by_default_for_room_type: invite
 
 
-# Uncomment to allow non-server-admin users to create groups on this server
-#
-#enable_group_creation: true
-
-# If enabled, non server admins can only create groups with local parts
-# starting with this prefix
-#
-#group_creation_prefix: "unofficial_"
-
-
 
 # User Directory configuration
 #
