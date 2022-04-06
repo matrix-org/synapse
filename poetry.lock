@@ -735,29 +735,6 @@ optional = true
 python-versions = ">=3.6"
 
 [[package]]
-name = "psycopg2cffi"
-version = "2.9.0"
-description = ".. image:: https://travis-ci.org/chtd/psycopg2cffi.svg?branch=master"
-category = "main"
-optional = true
-python-versions = "*"
-
-[package.dependencies]
-cffi = ">=1.0"
-six = "*"
-
-[[package]]
-name = "psycopg2cffi-compat"
-version = "1.1"
-description = "A Simple library to enable psycopg2 compatability"
-category = "main"
-optional = true
-python-versions = "*"
-
-[package.dependencies]
-psycopg2 = "*"
-
-[[package]]
 name = "pyasn1"
 version = "0.4.8"
 description = "ASN.1 types and codecs"
@@ -1576,13 +1553,13 @@ docs = ["sphinx", "repoze.sphinx.autointerface"]
 test = ["zope.i18nmessageid", "zope.testing", "zope.testrunner"]
 
 [extras]
-all = ["matrix-synapse-ldap3", "psycopg2", "psycopg2cffi", "psycopg2cffi-compat", "pysaml2", "authlib", "lxml", "sentry-sdk", "jaeger-client", "opentracing", "pyjwt", "txredisapi", "hiredis"]
+all = ["matrix-synapse-ldap3", "psycopg2", "pysaml2", "authlib", "lxml", "sentry-sdk", "jaeger-client", "opentracing", "pyjwt", "txredisapi", "hiredis"]
 cache_memory = ["Pympler"]
 jwt = ["pyjwt"]
 matrix-synapse-ldap3 = ["matrix-synapse-ldap3"]
 oidc = ["authlib"]
 opentracing = ["jaeger-client", "opentracing"]
-postgres = ["psycopg2", "psycopg2cffi", "psycopg2cffi-compat"]
+postgres = ["psycopg2"]
 redis = ["txredisapi", "hiredis"]
 saml2 = ["pysaml2"]
 sentry = ["sentry-sdk"]
@@ -1593,7 +1570,7 @@ url_preview = ["lxml"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "7ff6d982a9d6675cb595b216b23549ef1942d0e39cb91c97494ff6ed95a9e8d2"
+content-hash = "351bc7d8214d3ccab4ae0608c83169af97f734476b6883c515bbf172f1fc7f77"
 
 [metadata.files]
 appdirs = [
@@ -2240,12 +2217,6 @@ psycopg2 = [
     {file = "psycopg2-2.9.3-cp39-cp39-win32.whl", hash = "sha256:8cf3878353cc04b053822896bc4922b194792df9df2f1ad8da01fb3043602126"},
     {file = "psycopg2-2.9.3-cp39-cp39-win_amd64.whl", hash = "sha256:06f32425949bd5fe8f625c49f17ebb9784e1e4fe928b7cce72edc36fb68e4c0c"},
     {file = "psycopg2-2.9.3.tar.gz", hash = "sha256:8e841d1bf3434da985cc5ef13e6f75c8981ced601fd70cc6bf33351b91562981"},
-]
-psycopg2cffi = [
-    {file = "psycopg2cffi-2.9.0.tar.gz", hash = "sha256:7e272edcd837de3a1d12b62185eb85c45a19feda9e62fa1b120c54f9e8d35c52"},
-]
-psycopg2cffi-compat = [
-    {file = "psycopg2cffi-compat-1.1.tar.gz", hash = "sha256:d25e921748475522b33d13420aad5c2831c743227dc1f1f2585e0fdb5c914e05"},
 ]
 pyasn1 = [
     {file = "pyasn1-0.4.8-py2.4.egg", hash = "sha256:fec3e9d8e36808a28efb59b489e4528c10ad0f480e57dcc32b4de5c9d8c9fdf3"},
