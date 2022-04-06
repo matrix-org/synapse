@@ -22,7 +22,6 @@ from typing import (
     Dict,
     Iterable,
     List,
-    NoReturn,
     Optional,
     Set,
     Tuple,
@@ -1330,10 +1329,9 @@ class EventsWorkerStore(SQLBaseStore):
         return results
 
     @cached(max_entries=100000, tree=True)
-    async def have_seen_event(self, room_id: str, event_id: str) -> NoReturn:
-        # this only exists for the benefit of the @cachedList descriptor on
-        # _have_seen_events_dict
-        raise NotImplementedError()
+    async def have_seen_event(self, room_id: str, event_id: str) -> bool:
+        res = await self._have_seen_events_dict(((room_id, event_id),))
+        return res[(room_id, event_id)]
 
     def _get_current_state_event_counts_txn(
         self, txn: LoggingTransaction, room_id: str
