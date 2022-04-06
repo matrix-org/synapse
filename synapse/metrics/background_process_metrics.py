@@ -46,7 +46,7 @@ from synapse.logging.opentracing import (
     noop_context_manager,
     start_active_span,
 )
-from synapse.metrics import Collector
+from synapse.metrics._types import Collector
 
 if TYPE_CHECKING:
     import resource

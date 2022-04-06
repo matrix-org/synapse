@@ -18,7 +18,6 @@ import logging
 import os
 import platform
 import threading
-from abc import ABC, abstractmethod
 from typing import (
     Callable,
     Dict,
@@ -54,19 +53,7 @@ from synapse.metrics._exposition import (
     start_http_server,
 )
 from synapse.metrics._gc import MIN_TIME_BETWEEN_GCS, install_gc_manager
-
-# prometheus_client.Collector is new as of prometheus 0.14. We redefine it here
-# for compatibility with earlier versions.
-try:
-    from prometheus_client.registry import Collector
-except ImportError:
-
-    class _Collector(ABC):
-        @abstractmethod
-        def collect(self) -> Iterable[Metric]:
-            pass
-
-    Collector = _Collector  # type: ignore
+from synapse.metrics._types import Collector
 
 logger = logging.getLogger(__name__)
 

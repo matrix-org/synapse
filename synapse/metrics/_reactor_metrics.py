@@ -21,7 +21,7 @@ from prometheus_client.core import REGISTRY, GaugeMetricFamily
 
 from twisted.internet import reactor
 
-from synapse.metrics import Collector
+from synapse.metrics._types import Collector
 
 #
 # Twisted reactor metrics

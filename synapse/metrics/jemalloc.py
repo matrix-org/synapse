@@ -20,7 +20,8 @@ from typing import Iterable, Literal, Optional, overload
 
 from prometheus_client import REGISTRY, Metric
 
-from synapse.metrics import Collector, GaugeMetricFamily
+from synapse.metrics import GaugeMetricFamily
+from synapse.metrics._types import Collector
 
 logger = logging.getLogger(__name__)
 

@@ -30,7 +30,7 @@ from prometheus_client.core import (
 
 from twisted.internet import task
 
-from synapse.metrics import Collector
+from synapse.metrics._types import Collector
 
 """Prometheus metrics for garbage collection"""
 
