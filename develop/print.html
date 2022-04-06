@@ -1657,7 +1657,7 @@ please upgrade Mjolnir to version 1.3.2 or later before upgrading Synapse.</p>
 <p>This release removes support for the <code>structured: true</code> logging configuration
 which was deprecated in Synapse v1.23.0. If your logging configuration contains
 <code>structured: true</code> then it should be modified based on the
-<a href="structured_logging.html">structured logging documentation</a>.</p>
+<a href="https://matrix-org.github.io/synapse/v1.56/structured_logging.html#upgrading-from-legacy-structured-logging-configuration">structured logging documentation</a>.</p>
 <h1 id="upgrading-to-v1530"><a class="header" href="#upgrading-to-v1530">Upgrading to v1.53.0</a></h1>
 <h2 id="dropping-support-for-webclient-listeners-and-non-https-web_client_location"><a class="header" href="#dropping-support-for-webclient-listeners-and-non-https-web_client_location">Dropping support for <code>webclient</code> listeners and non-HTTP(S) <code>web_client_location</code></a></h2>
 <p>Per the deprecation notice in Synapse v1.51.0, listeners of type  <code>webclient</code>
@@ -2123,7 +2123,7 @@ lock down external access to the Admin API endpoints.</p>
 <p>This release deprecates use of the <code>structured: true</code> logging
 configuration for structured logging. If your logging configuration
 contains <code>structured: true</code> then it should be modified based on the
-<a href="structured_logging.html">structured logging documentation</a>.</p>
+<a href="https://matrix-org.github.io/synapse/v1.56/structured_logging.html#upgrading-from-legacy-structured-logging-configuration">structured logging documentation</a>.</p>
 <p>The <code>structured</code> and <code>drains</code> logging options are now deprecated and
 should be replaced by standard logging configuration of <code>handlers</code> and
 <code>formatters</code>.</p>
@@ -5886,75 +5886,6 @@ loggers:
 <p>The above logging config will set Synapse as 'INFO' logging level by default,
 with the SQL layer at 'WARNING', and will log JSON formatted messages to a
 remote endpoint at 10.1.2.3:9999.</p>
-<h2 id="upgrading-from-legacy-structured-logging-configuration"><a class="header" href="#upgrading-from-legacy-structured-logging-configuration">Upgrading from legacy structured logging configuration</a></h2>
-<p>Versions of Synapse prior to v1.54.0 automatically converted the legacy
-structured logging configuration, which was deprecated in v1.23.0, to the standard
-library logging configuration.</p>
-<p>The following reference can be used to update your configuration. Based on the
-drain <code>type</code>, we can pick a new handler:</p>
-<ol>
-<li>For a type of <code>console</code>, <code>console_json</code>, or <code>console_json_terse</code>: a handler
-with a class of <code>logging.StreamHandler</code> and a <code>stream</code> of <code>ext://sys.stdout</code>
-or <code>ext://sys.stderr</code> should be used.</li>
-<li>For a type of <code>file</code> or <code>file_json</code>: a handler of <code>logging.FileHandler</code> with
-a location of the file path should be used.</li>
-<li>For a type of <code>network_json_terse</code>: a handler of <code>synapse.logging.RemoteHandler</code>
-with the host and port should be used.</li>
-</ol>
-<p>Then based on the drain <code>type</code> we can pick a new formatter:</p>
-<ol>
-<li>For a type of <code>console</code> or <code>file</code> no formatter is necessary.</li>
-<li>For a type of <code>console_json</code> or <code>file_json</code>: a formatter of
-<code>synapse.logging.JsonFormatter</code> should be used.</li>
-<li>For a type of <code>console_json_terse</code> or <code>network_json_terse</code>: a formatter of
-<code>synapse.logging.TerseJsonFormatter</code> should be used.</li>
-</ol>
-<p>For each new handler and formatter they should be added to the logging configuration
-and then assigned to either a logger or the root logger.</p>
-<p>An example legacy configuration:</p>
-<pre><code class="language-yaml">structured: true
-
-loggers:
-    synapse:
-        level: INFO
-    synapse.storage.SQL:
-        level: WARNING
-
-drains:
-    console:
-        type: console
-        location: stdout
-    file:
-        type: file_json
-        location: homeserver.log
-</code></pre>
-<p>Would be converted into a new configuration:</p>
-<pre><code class="language-yaml">version: 1
-
-formatters:
-    json:
-        class: synapse.logging.JsonFormatter
-
-handlers:
-    console:
-        class: logging.StreamHandler
-        stream: ext://sys.stdout
-    file:
-        class: logging.FileHandler
-        formatter: json
-        filename: homeserver.log
-
-loggers:
-    synapse:
-        level: INFO
-        handlers: [console, file]
-    synapse.storage.SQL:
-        level: WARNING
-</code></pre>
-<p>The new logging configuration is a bit more verbose, but significantly more
-flexible. It allows for configuration that were not previously possible, such as
-sending plain logs over the network, or using different handlers for different
-modules.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="templates"><a class="header" href="#templates">Templates</a></h1>
 <p>Synapse uses parametrised templates to generate the content of emails it sends and
 webpages it shows to users.</p>
