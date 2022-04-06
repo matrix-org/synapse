@@ -62,7 +62,7 @@ from synapse.storage.databases.main.end_to_end_keys import EndToEndKeyBackground
 from synapse.storage.databases.main.events_bg_updates import (
     EventsBackgroundUpdatesStore,
 )
-from synapse.storage.databases.main.group_server import GroupServerWorkerStore
+from synapse.storage.databases.main.group_server import GroupServerStore
 from synapse.storage.databases.main.media_repository import (
     MediaRepositoryBackgroundUpdateStore,
 )
@@ -102,14 +102,6 @@ BOOLEAN_COLUMNS = {
     "devices": ["hidden"],
     "device_lists_outbound_pokes": ["sent"],
     "users_who_share_rooms": ["share_private"],
-    "groups": ["is_public"],
-    "group_rooms": ["is_public"],
-    "group_users": ["is_public", "is_admin"],
-    "group_summary_rooms": ["is_public"],
-    "group_room_categories": ["is_public"],
-    "group_summary_users": ["is_public"],
-    "group_roles": ["is_public"],
-    "local_group_membership": ["is_publicised", "is_admin"],
     "e2e_room_keys": ["is_verified"],
     "account_validity": ["email_sent"],
     "redactions": ["have_censored"],
@@ -211,7 +203,7 @@ class Store(
     PushRuleStore,
     PusherWorkerStore,
     PresenceBackgroundUpdateStore,
-    GroupServerWorkerStore,
+    GroupServerStore,
 ):
     def execute(self, f: Callable[..., R], *args: Any, **kwargs: Any) -> Awaitable[R]:
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)
