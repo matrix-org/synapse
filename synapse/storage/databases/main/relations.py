@@ -435,21 +435,18 @@ class RelationsWorkerStore(SQLBaseStore):
             for original_event_id in event_ids
         }
 
-    @cached(tree=True)
-    def get_thread_summary(
-        self, event_id: str, ignored_users: FrozenSet[str]
-    ) -> Optional[Tuple[int, EventBase]]:
+    @cached()
+    def get_thread_summary(self, event_id: str) -> Optional[Tuple[int, EventBase]]:
         raise NotImplementedError()
 
     @cachedList(cached_method_name="get_thread_summary", list_name="event_ids")
     async def get_thread_summaries(
-        self, event_ids: Collection[str], ignored_users: FrozenSet[str]
+        self, event_ids: Collection[str]
     ) -> Dict[str, Optional[Tuple[int, EventBase, Optional[EventBase]]]]:
         """Get the number of threaded replies, the latest reply (if any), and the latest edit for that reply for the given event.
 
         Args:
             event_ids: Summarize the thread related to this event ID.
-            ignored_users: The users ignored by the requesting user.
 
         Returns:
             A map of the thread summary each event. A missing event implies there
@@ -501,16 +498,6 @@ class RelationsWorkerStore(SQLBaseStore):
                 txn.database_engine, "relates_to_id", event_ids
             )
 
-            if ignored_users:
-                (
-                    ignored_users_clause_sql,
-                    ignored_users_clause_args,
-                ) = make_in_list_sql_clause(
-                    self.database_engine, "child.sender", ignored_users, include=False
-                )
-                clause += " AND " + ignored_users_clause_sql
-                args.extend(ignored_users_clause_args)
-
             if self._msc3440_enabled:
                 relations_clause = "(relation_type = ? OR relation_type = ?)"
                 args.extend((RelationTypes.THREAD, RelationTypes.UNSTABLE_THREAD))
@@ -547,9 +534,6 @@ class RelationsWorkerStore(SQLBaseStore):
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "relates_to_id", latest_event_ids.keys()
             )
-            if ignored_users:
-                clause += " AND " + ignored_users_clause_sql
-                args.extend(ignored_users_clause_args)
 
             if self._msc3440_enabled:
                 relations_clause = "(relation_type = ? OR relation_type = ?)"
@@ -587,6 +571,55 @@ class RelationsWorkerStore(SQLBaseStore):
             summaries[parent_event_id] = summary
 
         return summaries
+
+    async def get_threaded_messages_per_user(
+        self,
+        event_ids: Collection[str],
+        users: FrozenSet[str] = frozenset(),
+    ) -> Dict[Tuple[str, str], int]:
+        if not users:
+            return {}
+
+        # Fetch the number of threaded replies.
+        sql = """
+            SELECT parent.event_id, child.sender, COUNT(child.event_id) FROM events AS child
+            INNER JOIN event_relations USING (event_id)
+            INNER JOIN events AS parent ON
+                parent.event_id = relates_to_id
+                AND parent.room_id = child.room_id
+            WHERE
+                %s
+                AND %s
+                AND %s
+            GROUP BY parent.event_id, child.sender
+        """
+
+        def _get_threaded_messages_per_user_txn(
+            txn: LoggingTransaction,
+        ) -> Dict[Tuple[str, str], int]:
+            users_sql, users_args = make_in_list_sql_clause(
+                self.database_engine, "child.sender", users
+            )
+            events_clause, events_args = make_in_list_sql_clause(
+                txn.database_engine, "relates_to_id", event_ids
+            )
+
+            if self._msc3440_enabled:
+                relations_clause = "(relation_type = ? OR relation_type = ?)"
+                relations_args = [RelationTypes.THREAD, RelationTypes.UNSTABLE_THREAD]
+            else:
+                relations_clause = "relation_type = ?"
+                relations_args = [RelationTypes.THREAD]
+
+            txn.execute(
+                sql % (users_sql, events_clause, relations_clause),
+                users_args + events_args + relations_args,
+            )
+            return {(row[0], row[1]): row[2] for row in txn}
+
+        return await self.db_pool.runInteraction(
+            "get_threaded_messages_per_user", _get_threaded_messages_per_user_txn
+        )
 
     @cached()
     def get_thread_participated(self, event_id: str, user_id: str) -> bool:

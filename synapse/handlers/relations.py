@@ -30,7 +30,7 @@ from synapse.api.constants import RelationTypes
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.storage.databases.main.relations import _RelatedEvent
-from synapse.types import JsonDict, Requester, StreamToken
+from synapse.types import JsonDict, Requester, StreamToken, UserID
 from synapse.visibility import filter_events_for_client
 
 if TYPE_CHECKING:
@@ -177,19 +177,21 @@ class RelationsHandler:
 
         return return_value
 
-    async def get_references_for_event(
+    async def get_relations_for_event(
         self,
         event_id: str,
         event: EventBase,
         room_id: str,
+        relation_type: str,
         ignored_users: FrozenSet[str] = frozenset(),
     ) -> Tuple[List[_RelatedEvent], Optional[StreamToken]]:
-        """Get a list of events which relate to an event by reference, ordered by topological ordering.
+        """Get a list of events which relate to an event, ordered by topological ordering.
 
         Args:
             event_id: Fetch events that relate to this event ID.
             event: The matching EventBase to event_id.
             room_id: The room the event belongs to.
+            relation_type: The type of relation.
             ignored_users: The users ignored by the requesting user.
 
         Returns:
@@ -199,7 +201,7 @@ class RelationsHandler:
 
         # Call the underlying storage method, which is cached.
         related_events, next_token = await self._main_store.get_relations_for_event(
-            event_id, event, room_id, RelationTypes.REFERENCE, direction="f"
+            event_id, event, room_id, relation_type, direction="f"
         )
 
         # Filter out ignored users and convert to the expected format.
@@ -292,10 +294,11 @@ class RelationsHandler:
         if annotations:
             aggregations.annotations = {"chunk": annotations}
 
-        references, next_token = await self.get_references_for_event(
+        references, next_token = await self.get_relations_for_event(
             event_id,
             event,
             room_id,
+            RelationTypes.REFERENCE,
             ignored_users=ignored_users,
         )
         if references:
@@ -326,15 +329,23 @@ class RelationsHandler:
 
             May not contain a value for all requested event IDs.
         """
+        user = UserID.from_string(user_id)
+
         # Fetch thread summaries.
-        summaries = await self._main_store.get_thread_summaries(
-            event_ids, ignored_users
-        )
+        summaries = await self._main_store.get_thread_summaries(event_ids)
 
         # Only fetch participated for a limited selection based on what had
         # summaries.
+        thread_event_ids = [
+            event_id for event_id, summary in summaries.items() if summary
+        ]
         participated = await self._main_store.get_threads_participated(
-            [event_id for event_id, summary in summaries.items() if summary], user_id
+            thread_event_ids, user_id
+        )
+
+        # Then subtract off the results for any ignored users.
+        ignored_results = await self._main_store.get_threaded_messages_per_user(
+            thread_event_ids, ignored_users
         )
 
         # A map of event ID to the thread aggregation.
@@ -343,6 +354,45 @@ class RelationsHandler:
         for event_id, summary in summaries.items():
             if summary:
                 thread_count, latest_thread_event, edit = summary
+
+                # Subtract off the count of any ignored users.
+                for ignored_user in ignored_users:
+                    thread_count -= ignored_results.get((event_id, ignored_user), 0)
+
+                # This is gnarly, but if the latest event is from an ignored user,
+                # attempt to find one that isn't from an ignored user.
+                if latest_thread_event.sender in ignored_users:
+                    room_id = latest_thread_event.room_id
+
+                    # If the root event is not found, something went wrong, do
+                    # not include a summary of the thread.
+                    event = await self._event_handler.get_event(user, room_id, event_id)
+                    if event is None:
+                        continue
+
+                    potential_events, _ = await self.get_relations_for_event(
+                        event_id,
+                        event,
+                        room_id,
+                        RelationTypes.THREAD,
+                        ignored_users,
+                    )
+
+                    # If all found events are from ignored users, do not include
+                    # a summary of the thread.
+                    if not potential_events:
+                        continue
+
+                    # The *last* event returned is the one that is cared about.
+                    #
+                    # This event shuold exist.
+                    event = await self._event_handler.get_event(
+                        user, room_id, potential_events[-1].event_id
+                    )
+                    if event is None:
+                        continue
+                    latest_thread_event = event
+
                 results[event_id] = _ThreadAggregation(
                     latest_event=latest_thread_event,
                     latest_edit=edit,
