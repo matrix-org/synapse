@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import copy
 import email.utils
 import logging
 from typing import (
@@ -1428,4 +1429,6 @@ class AccountDataManager:
         data = await self._store.get_global_account_data_by_type_for_user(
             user_id, data_type
         )
-        return data
+        # We clone to prevent the module accidentally mutating the dict that
+        # lives in the cache, as that could introduce nasty bugs.
+        return copy.deepcopy(data)
