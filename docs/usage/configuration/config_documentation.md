@@ -1,4 +1,4 @@
-## Configuring Synapse
+# Configuring Synapse
 
 This is intended as a guide to the Synapse configuration. The behavior of a Synapse instance can be modified 
 through the many configuration settings documented here — each config option is explained, 
@@ -23,7 +23,7 @@ followed by a letter. Letters have the following meanings:
 For example, setting `redaction_retention_period: 5m` would remove redacted
 messages from the database after 5 minutes, rather than 5 months.
 
-## Yaml 
+### YAML 
 The configuration file is a [YAML](https://yaml.org/) file, which means that certain syntax rules
 apply if you want your config file to be read properly. A few helpful things to know:
 * `#` before any option in the config will comment out that setting and either a default (if available) will 
@@ -31,11 +31,11 @@ apply if you want your config file to be read properly. A few helpful things to 
    applied, but in example #2 the setting will not be read and a default will be applied.  
 
    Example #1:
-   ```
+   ```yaml
    pid_file: DATADIR/homeserver.pid
    ```
    Example #2:
-   ```
+   ```yaml
    #pid_file: DATADIR/homeserver.pid
    ```
 * Indentation matters! The indentation before a setting
@@ -49,12 +49,12 @@ apply if you want your config file to be read properly. A few helpful things to 
   is an option that Synapse doesn't recognize and thus ignores.
   
   Example #1: 
-  ```
+  ```yaml
   presence:
     enabled: false
   ```
   Example #2:
-  ```
+  ```yaml
   presence:
   enabled: false
   ```
@@ -64,56 +64,8 @@ apply if you want your config file to be read properly. A few helpful things to 
   In addition, each setting has an example of its usage, with the proper indentation
   shown. 
 
-## Index
-[Modules](#modules) 
-
-[Server](#server)
-
-[Homeserver Blocking](#homeserver-blocking)
-
-[TLS](#tls)
-
-[Federation](#federation)
   
-[Caching](#caching)
-
-[Database](#database)
-
-[Logging](#logging)
-
-[Ratelimiting](#ratelimiting)
-
-[Media Store](#media-store)
-
-[Captcha](#captcha)
-
-[Turn](#turn)
-
-[Registration](#registration)
-
-[Metrics](#metrics)
-
-[API Configuration](#api-configuration)
-
-[Signing Keys](#signing-keys)
-
-[Single Sign On Integration](#single-sign-on-integration)
-
-[Push](#push)
-
-[Rooms](#rooms)
-
-[Opentracing](#opentracing)
-
-[Workers](#workers)
-
-[Background Updates](#background-updates)
-
-
-
-
-
-## Modules ##
+## Modules
 
 Server admins can expand Synapse's functionality with external modules.
 
@@ -131,7 +83,7 @@ for the `module`.
 Defaults to none.
 
 Example configuration:
-```
+```yaml
 modules:
   - module: my_super_module.MySuperClass
     config:
@@ -167,11 +119,11 @@ lowercase and may contain an explicit port.
 There is no default for this option. 
  
 Example configuration #1:
-```
+```yaml
 server_name: matrix.org 
 ```
 Example configuration #2:
-```
+```yaml
 server_name: localhost:8080
 ```
 ---
@@ -180,7 +132,7 @@ Config option: `pid_file`
 When running Synapse as a daemon, the file to store the pid in. Defaults to none.
 
 Example configuration:
-```
+```yaml
 pid_file: DATADIR/homeserver.pid
 ```
 ---
@@ -189,7 +141,7 @@ Config option: `web_client_location`
 The absolute URL to the web client which `/` will redirect to. Defaults to none. 
 
 Example configuration:
-```
+```yaml
 web_client_location: https://riot.example.com/
 ```
 ---
@@ -205,7 +157,7 @@ Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
 Defaults to `https://<server_name>/`.
 
 Example configuration:
-```
+```yaml
 public_baseurl: https://example.com/
 ```
 ---
@@ -224,7 +176,7 @@ See https://matrix-org.github.io/synapse/latest/delegate.html for more
 information.
 
 Example configuration:
-```
+```yaml
 serve_server_wellknown: true
 ```
 ---
@@ -235,7 +187,7 @@ Zero is used to indicate synapse should set the soft limit to the hard limit.
 Defaults to 0. 
 
 Example configuration:
-```
+```yaml
 soft_file_limit: 3
 ```
 ---
@@ -247,7 +199,7 @@ disable presence tracking on this homeserver. Defaults to true.
 This option replaces the previous top-level 'use_presence' option.
 
 Example configuration:
-```
+```yaml
 presence:
   enabled: false
 ```
@@ -259,7 +211,7 @@ users through the client API. Defaults to false. Note that profile data is also 
 via the federation API, unless `allow_profile_lookup_over_federation` is set to false.
 
 Example configuration:
-```
+```yaml
 require_auth_for_profile_requests: true
 ```
 ---
@@ -271,7 +223,7 @@ requests. Profile requests from other servers should be checked by the
 requesting server. Defaults to false.
 
 Example configuration: 
-```
+```yaml
 limit_profile_requests_to_users_who_share_rooms: true
 ```
 ---
@@ -284,7 +236,7 @@ of the above two settings, and whether or not the users share a server.
 Defaults to true.
 
 Example configuration:
-```
+```yaml
 include_profile_data_on_invite: false
 ```
 ---
@@ -295,7 +247,7 @@ public rooms directory through the client API, meaning that anyone can
 query the room directory. Defaults to false.
 
 Example configuration:
-```
+```yaml
 allow_public_rooms_without_auth: true
 ```
 ---
@@ -305,7 +257,7 @@ If set to true, allows any other homeserver to fetch the server's public
 rooms directory via federation. Defaults to false.
 
 Example configuration:
-```
+```yaml
 allow_public_rooms_over_federation: true
 ```
 ---
@@ -321,7 +273,7 @@ to "1".
 Currently defaults to "9".
 
 Example configuration:
-```
+```yaml
 default_room_version: "8"
 ```
 ---
@@ -331,7 +283,7 @@ The garbage collection threshold parameters to pass to `gc.set_threshold`, if de
 Defaults to none. 
 
 Example configuration:
-```
+```yaml
 gc_thresholds: [700, 10, 10]
 ```
 ---
@@ -344,7 +296,7 @@ indicates that a second must pass between consecutive generation 0 GCs, etc.
 Defaults to `[1s, 10s, 30s]`.
 
 Example configuration:
-```
+```yaml
 gc_min_interval: [0.5s, 30s, 1m]
 ```
 ---
@@ -355,7 +307,7 @@ and sync operations. Defaults to 100. A value of -1 means no upper limit.
 
 
 Example configuration:
-```
+```yaml
 filter_timeline_limit: 5000
 ```
 ---
@@ -365,7 +317,7 @@ Whether room invites to users on this server should be blocked
 (except those sent by local server admins). Defaults to false.
 
 Example configuration:
-```
+```yaml
 block_non_admin_invites: true
 ```
 ---
@@ -375,7 +327,7 @@ If set to false, new messages will not be indexed for searching and users
 will receive errors when searching for messages. Defaults to true.
 
 Example configuration:
-```
+```yaml
 enable_search: false
 ```
 ---
@@ -396,7 +348,7 @@ This option replaces `federation_ip_range_blacklist` in Synapse v1.25.0.
 Note: The value is ignored when an HTTP proxy is in use.
 
 Example configuration:
-```
+```yaml
 ip_range_blacklist:
   - '127.0.0.0/8'
   - '10.0.0.0/8'
@@ -431,7 +383,7 @@ This whitelist overrides `ip_range_blacklist` and defaults to an empty
 list.
 
 Example configuration:
-```
+```yaml
 ip_range_whitelist:
    - '192.168.1.1'
 ```
@@ -492,7 +444,7 @@ Valid resource names are:
 * `static`: static resources under synapse/static (/_matrix/static). (Mostly useful for 'fallback authentication'.)
 
 Example configuration #1:
-```
+```yaml
 listeners:
   # TLS-enabled listener: for when matrix traffic is sent directly to synapse.
   #
@@ -506,7 +458,7 @@ listeners:
       - names: [client, federation]
 ```
 Example configuration #2:
-```
+```yaml
 listeners:
   # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
   # that unwraps TLS.
@@ -548,7 +500,7 @@ on the manhole [here](../../manhole.md). Manhole sub-options include:
   which could allow traffic to be intercepted if sent over a public network.
 
 Example configuration:
-```
+```yaml
 manhole_settings:
   username: manhole
   password: mypassword
@@ -569,7 +521,7 @@ This setting defines the threshold (i.e. number of forward extremities in the ro
 The default value is 10.
 
 Example configuration:
-```
+```yaml
 dummy_events_threshold: 5
 ```
 ---
@@ -583,7 +535,7 @@ Config option: `admin_contact`
 How to reach the server admin, used in `ResourceLimitError`. Defaults to none. 
 
 Example configuration:
-```
+```yaml
 admin_contact: 'mailto:admin@server.com'
 ```
 ---
@@ -593,7 +545,7 @@ Blocks users from connecting to the homeserver and provides a human-readable rea
 why the connection was blocked. Defaults to false. 
 
 Example configuration:
-```
+```yaml
 hs_disabled: true
 hs_disabled_message: 'Reason for why the HS is blocked'
 ```
@@ -606,7 +558,7 @@ reached the server returns a `ResourceLimitError` with error type `Codes.RESOURC
 Defaults to false. If this is enabled, a value for `max_mau_value` must also be set.
 
 Example configuration:
-```
+```yaml
 limit_usage_by_mau: true 
 ```
 ---
@@ -616,7 +568,7 @@ This option sets the hard limit of monthly active users above which the server w
 blocking user actions if `limit_usage_by_mau` is enabled. Defaults to 0.  
 
 Example configuration:
-```
+```yaml
 max_mau_value: 50
 ```
 ---
@@ -629,7 +581,7 @@ sign up in a short space of time never to return after their initial
 session. Defaults to 0. 
 
 Example configuration:
-```
+```yaml
 mau_trial_days: 5
 ```
 ---
@@ -642,7 +594,7 @@ interest increasing the mau limit further. Defaults to true, which
 means that alerting is enabled.
 
 Example configuration:
-```
+```yaml
 mau_limit_alerting: false
 ```
 ---
@@ -653,7 +605,7 @@ be populated, however no one will be limited based on these numbers. If `limit_u
 is true, this is implied to be true. Defaults to false. 
 
 Example configuration:
-```
+```yaml
 mau_stats_only: true
 ```
 ---
@@ -665,7 +617,7 @@ Defaults to none. Add accounts by specifying the `medium` and `address` of the
 reserved threepid (3rd party identifier).
 
 Example configuration:
-```
+```yaml
 mau_limit_reserved_threepids:
   - medium: 'email'
     address: 'reserved_user@example.com'
@@ -677,7 +629,7 @@ This option is used by phonehome stats to group together related servers.
 Defaults to none. 
 
 Example configuration:
-```
+```yaml
 server_context: context
 ```
 ---
@@ -697,7 +649,7 @@ Room complexity is an arbitrary measure based on factors such as the number of
 users in the room. 
 
 Example configuration:
-```
+```yaml
 limit_remote_rooms:
   enabled: true
   complexity: 0.5
@@ -711,7 +663,7 @@ Whether to require a user to be in the room to add an alias to it.
 Defaults to true.
 
 Example configuration:
-```
+```yaml
 require_membership_for_aliases: false
 ```
 ---
@@ -722,7 +674,7 @@ events with profile information that differs from the target's global profile.
 Defaults to true.
 
 Example configuration:
-```
+```yaml
 allow_per_room_profiles: false
 ```
 ---
@@ -734,7 +686,7 @@ Use M for MB and K for KB.
 Note that user avatar changes will not work if this is set without using Synapse's media repository.
 
 Example configuration:
-```
+```yaml
 max_avatar_size: 10M
 ```
 ---
@@ -746,7 +698,7 @@ Note that user avatar changes will not work if this is set without
 using Synapse's media repository.
 
 Example configuration:
-```
+```yaml
 allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
 ```
 ---
@@ -758,7 +710,7 @@ this period redacted events get replaced with their redacted form in the DB.
 Defaults to `7d`. Set to `null` to disable.
 
 Example configuration:
-```
+```yaml
 redaction_retention_period: 28d
 ```
 ---
@@ -769,7 +721,7 @@ How long to track users' last seen time and IPs in the database.
 Defaults to `28d`. Set to `null` to disable clearing out of old rows.
 
 Example configuration:
-```
+```yaml
 user_ips_max_age: 14d
 ```
 ---
@@ -784,7 +736,7 @@ If this option is enabled, instead of returning an error, these endpoints will
 act as if no error happened and return a fake session ID ('sid') to clients.
 
 Example configuration:
-```
+```yaml
 request_token_inhibit_3pid_errors: true
 ```
 ---
@@ -806,7 +758,7 @@ allowed. Setting this value to an empty list will instead disallow
 all domains.
 
 Example configuration:
-```
+```yaml
 next_link_domain_whitelist: ["matrix.org"]
 ```
 ---
@@ -822,7 +774,7 @@ See [here](../../templates.md) for more
 information about using custom templates.
 
 Example configuration:
-```
+```yaml
 templates:
   custom_template_directory: /path/to/custom/templates/
 ```
@@ -886,7 +838,7 @@ This setting has the following sub-options:
   configuration).
 
 Example configuration:
-```
+```yaml
 retention:
   enabled: true
   default_policy:
@@ -903,7 +855,7 @@ retention:
 ---
 ## TLS ##
 
-Options relating to TLS
+Options related to TLS.
 
 ---
 Config option: `tls_certificate_path`
@@ -917,7 +869,7 @@ any intermediate certificates (for instance, if using certbot, use
 `fullchain.pem` as your certificate, not `cert.pem`). 
 
 Example configuration:
-```
+```yaml
 tls_certificate_path: "CONFDIR/SERVERNAME.tls.crt"
 ```
 ---
@@ -926,7 +878,7 @@ Config option: `tls_private_key_path`
 PEM-encoded private key for TLS. Defaults to none. 
 
 Example configuration:
-```
+```yaml
 tls_private_key_path: "CONFDIR/SERVERNAME.tls.key"
 ```
 ---
@@ -936,7 +888,7 @@ Whether to verify TLS server certificates for outbound federation requests.
 Defaults to true. To disable certificate verification, set the option to false.
 
 Example configuration:
-```
+```yaml
 federation_verify_certificates: false
 ```
 ---
@@ -950,7 +902,7 @@ of the public Matrix network: only configure it to `1.3` if you have an
 entirely private federation setup and you can ensure TLS 1.3 support.
 
 Example configuration:
-```
+```yaml
 federation_client_minimum_tls_version: 1.2
 ```
 ---
@@ -966,7 +918,7 @@ of homeservers, you likely want to use a private CA instead.
 Only effective if `federation_verify_certicates` is `true`.
 
 Example configuration:
-```
+```yaml
 federation_certificate_verification_whitelist:
   - lon.example.com
   - "*.domain.com"
@@ -984,7 +936,7 @@ Note that this list will replace those that are provided by your
 operating environment. Certificates must be in PEM format.
 
 Example configuration:
-```
+```yaml
 federation_custom_ca_list:
   - myCA1.pem
   - myCA2.pem
@@ -1005,7 +957,7 @@ purely on this application-layer restriction.  If not specified, the
 default is to whitelist everything.
 
 Example configuration:
-```
+```yaml
 federation_domain_whitelist:
   - lon.example.com
   - nyc.example.com
@@ -1022,7 +974,7 @@ at either end or with the intermediate network.
 By default, no domains are monitored in this way.
 
 Example configuration:
-```
+```yaml
 federation_metrics_domains:
   - matrix.org
   - example.com
@@ -1035,7 +987,7 @@ Federation API allows other homeservers to obtain profile data of any user
 on this homeserver.
 
 Example configuration:
-```
+```yaml
 allow_profile_lookup_over_federation: false
 ```
 ---
@@ -1046,7 +998,7 @@ Federation API allows other homeservers to obtain device display names of any us
 on this homeserver.
 
 Example configuration:
-```
+```yaml
 allow_device_name_lookup_over_federation: false
 ```
 ---
@@ -1061,7 +1013,7 @@ The number of events to cache in memory. Not affected by
 `caches.global_factor`. Defaults to 10K.
 
 Example configuration:
-```
+```yaml
 event_cache_size: 15K
 ```
 ---
@@ -1114,7 +1066,7 @@ Caching can be configured through the following sub-options:
 
 
 Example configuration:
-```
+```yaml
 caches:
   global_factor: 1.0
   per_cache_factors:
@@ -1187,7 +1139,7 @@ Config option: `log_config`
 This option specifies a yaml python logging config file as described [here](https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema).
 
 Example configuration:
-```
+```yaml
 log_config: "CONFDIR/SERVERNAME.log.config"
 ```
 ---
@@ -1207,7 +1159,7 @@ This is a ratelimiting option for messages that ratelimits sending based on the 
 is using. It defaults to: `per_second: 0.2`, `burst_count: 10`.
 
 Example configuration:
-```
+```yaml
 rc_message:
   per_second: 0.5
   burst_count: 15
@@ -1219,7 +1171,7 @@ This option ratelimits registration requests based on the client's IP address.
 It defaults to `per_second: 0.17`, `burst_count: 3`. 
 
 Example configuration:
-```
+```yaml
 rc_registration:
   per_second: 0.15
   burst_count: 2
@@ -1232,7 +1184,7 @@ the client's IP address.
 Defaults to `per_second: 0.1`, `burst_count: 5`.
 
 Example configuration:
-```
+```yaml
 rc_registration_token_validity:
   per_second: 0.3
   burst_count: 6
@@ -1253,7 +1205,7 @@ This option specifies several limits for login:
   attempts for this account. Defaults to `per_second: 0.17`, `burst_count: 3`.
 
 Example configuration:
-```
+```yaml
 rc_login:
   address:
     per_second: 0.15
@@ -1273,7 +1225,7 @@ set then it uses the same ratelimiting as per `rc_message`. This is useful
 to allow room admins to deal with abuse quickly. 
 
 Example configuration:
-```
+```yaml
 rc_admin_redaction:
   per_second: 1
   burst_count: 50
@@ -1291,7 +1243,7 @@ This option allows for ratelimiting number of rooms a user can join. This settin
   `per_second: 0.01`, `burst_count: 10` 
 
 Example configuration:
-```
+```yaml
 rc_joins:
   local:
     per_second: 0.2
@@ -1307,7 +1259,7 @@ This option ratelimits how often a user or IP can attempt to validate a 3PID.
 Defaults to `per_second: 0.003`, `burst_count: 5`.
 
 Example configuration:
-```
+```yaml
 rc_3pid_validation:
   per_second: 0.003
   burst_count: 5
@@ -1320,7 +1272,7 @@ specific user. `per_room` defaults to `per_second: 0.3`, `burst_count: 10` and
 `per_user` defaults to `per_second: 0.003`, `burst_count: 5`. 
 
 Example configuration:
-```
+```yaml
 rc_invites:
   per_room:
     per_second: 0.5
@@ -1337,7 +1289,7 @@ such as an email address or a phone number) based on the account that's
 sending the invite. Defaults to `per_second: 0.2`, `burst_count: 10`.
 
 Example configuration:
-```
+```yaml
 rc_third_party_invite:
   per_second: 0.2
   burst_count: 10
@@ -1359,7 +1311,7 @@ The `rc_federation` configuration has the following sub-options:
    from a single server. Defaults to 3.
 
 Example configuration:
-```
+```yaml
 rc_federation:
   window_size: 750
   sleep_limit: 15
@@ -1377,7 +1329,7 @@ If we end up trying to send out more read-receipts, they will get buffered up
 into fewer transactions. Defaults to 50. 
 
 Example configuration:
-```
+```yaml
 federation_rr_transactions_per_room_per_second: 40
 ```
 ---
@@ -1391,7 +1343,7 @@ Enable the media store service in the Synapse master. Defaults to true.
 Set to false if you are using a separate media store worker.
 
 Example configuration:
-```
+```yaml
 enable_media_repo: false
 ```
 ---
@@ -1400,7 +1352,7 @@ Config option: `media_store_path`
 Directory where uploaded images and attachments are stored.
 
 Example configuration:
-```
+```yaml
 media_store_path: "DATADIR/media_store"
 ```
 ---
@@ -1415,7 +1367,7 @@ locations. Defaults to none. Associated sub-options are:
 * `config`: sets a path to the resource through the `directory` option 
 
 Example configuration:
-```
+```yaml
 media_storage_providers:
   - module: file_system
     store_local: false
@@ -1434,7 +1386,7 @@ your reverse proxy's config. Defaults to 50M. Notably Nginx has a small max body
 See [here](../../reverse_proxy.md) for more on using a reverse proxy with Synapse. 
 
 Example configuration:
-```
+```yaml
 max_upload_size: 60M
 ```
 ---
@@ -1443,7 +1395,7 @@ Config option: `max_image_pixels`
 Maximum number of pixels that will be thumbnailed. Defaults to 32M.
 
 Example configuration:
-```
+```yaml
 max_image_pixels: 35M
 ```
 ---
@@ -1456,7 +1408,7 @@ generate a new thumbnail. If false the server will pick a thumbnail
 from a precalculated list. Defaults to false. 
 
 Example configuration:
-```
+```yaml
 dynamic_thumbnails: true
 ```
 ---
@@ -1468,7 +1420,7 @@ List of thumbnails to precalculate when an image is uploaded. Associated sub-opt
 * `method`: i.e. `crop`, `scale`, etc.
 
 Example configuration:
-```
+```yaml
 thumbnail_sizes:
   - width: 32
     height: 32
@@ -1493,7 +1445,7 @@ It is disabled by default. Set to true to enable. If enabled you must specify a
 `url_preview_ip_range_blacklist` blacklist.
 
 Example configuration:
-```
+```yaml
 url_preview_enabled: true
 ```
 ---
@@ -1516,7 +1468,7 @@ you use the following example list as a starting point.
 Note: The value is ignored when an HTTP proxy is in use.
 
 Example configuration:
-```
+```yaml
 url_preview_ip_range_blacklist:
   - '127.0.0.0/8'
   - '10.0.0.0/8'
@@ -1548,7 +1500,7 @@ target IP ranges - e.g. for enabling URL previews for a specific private
 website only visible in your network. Defaults to none. 
 
 Example configuration:
-```
+```yaml
 url_preview_ip_range_whitelist:
    - '192.168.1.1'
 ```
@@ -1579,7 +1531,7 @@ specified component matches for a given list item succeed, the URL is
 blacklisted.
 
 Example configuration:
-```
+```yaml
 url_preview_url_blacklist:
   # blacklist any URL with a username in its URI
   - username: '*'
@@ -1604,7 +1556,7 @@ Config option: `max_spider_size`
 The largest allowed URL preview spidering size in bytes. Defaults to 10M.
 
 Example configuration:
-```
+```yaml
 max_spider_size: 8M
 ```
 ---
@@ -1625,7 +1577,7 @@ using quality value syntax (;q=). '*' translates to any language.
 Defaults to "en".
 
 Example configuration:
-```
+```yaml
  url_preview_accept_language:
    - en-UK
    - en-US;q=0.9
@@ -1642,7 +1594,7 @@ these default oEmbed URLs. Use `additional_providers` to specify additional file
 should be in the form of providers.json). By default this list is empty. 
 
 Example configuration:
-```
+```yaml
 oembed:
   disable_default_providers: true
   additional_providers:
@@ -1660,7 +1612,7 @@ This homeserver's ReCAPTCHA public key. Must be specified if `enable_registratio
 enabled.
 
 Example configuration:
-```
+```yaml
 recaptcha_public_key: "YOUR_PUBLIC_KEY"
 ```
 ---
@@ -1670,7 +1622,7 @@ This homeserver's ReCAPTCHA private key. Must be specified if `enable_registrati
 enabled.
 
 Example configuration:
-```
+```yaml
 recaptcha_private_key: "YOUR_PRIVATE_KEY"
 ```
 ---
@@ -1681,7 +1633,7 @@ unless a captcha is answered. Requires a valid ReCaptcha public/private key.
 Defaults to false.
 
 Example configuration:
-```
+```yaml
 enable_registration_captcha: true
 ```
 ---
@@ -1691,7 +1643,7 @@ The API endpoint to use for verifying `m.login.recaptcha` responses.
 Defaults to `https://www.recaptcha.net/recaptcha/api/siteverify`.
 
 Example configuration:
-```
+```yaml
 recaptcha_siteverify_api: "https://my.recaptcha.site"
 ```
 ---
@@ -1704,7 +1656,7 @@ Config option: `turn_uris`
 The public URIs of the TURN server to give to clients.
 
 Example configuration:
-```
+```yaml
 turn_uris: [turn:example.org]
 ```
 ---
@@ -1713,7 +1665,7 @@ Config option: `turn_shared_secret`
 The shared secret used to compute passwords for the TURN server.
 
 Example configuration:
-```
+```yaml
 turn_shared_secret: "YOUR_SHARED_SECRET"
 ```
 ----
@@ -1722,7 +1674,7 @@ Config options: `turn_username` and `turn_password`
 The Username and password if the TURN server needs them and does not use a token.
 
 Example configuration:
-```
+```yaml
 turn_username: "TURNSERVER_USERNAME"
 turn_password: "TURNSERVER_PASSWORD"
 ```
@@ -1732,7 +1684,7 @@ Config option: `turn_user_lifetime`
 How long generated TURN credentials last. Defaults to 1h.
 
 Example configuration:
-```
+```yaml
 turn_user_lifetime: 2h
 ```
 ---
@@ -1742,8 +1694,8 @@ Whether guests should be allowed to use the TURN server. This defaults to true, 
 VoIP will be unreliable for guests. However, it does introduce a slight security risk as
 it allows users to connect to arbitrary endpoints without having first signed up for a valid account (e.g. by passing a CAPTCHA).
 
-Example usage:
-```
+Example configuration:
+```yaml
 turn_allow_guests: false
 ```
 ---
@@ -1758,8 +1710,8 @@ Enable registration for new users. Defaults to false. It is highly recommended t
 you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration 
 without any verification, you must also set `enable_registration_without_verification` to true.
 
-Example usage:
-```
+Example configuration:
+```yaml
 enable_registration: true
 ```
 ---
@@ -1768,8 +1720,8 @@ Enable registration without email or captcha verification. Note: this option is 
 as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
 unless `enable_registration` is also enabled.
 
-Example usage:
-```
+Example configuration:
+```yaml
 enable_registration_without_verification: true
 ```
 ---
@@ -1784,8 +1736,8 @@ logged in.
 
 By default, this is infinite.
 
-Example usage:
-```
+Example configuration:
+```yaml
 session_lifetime: 24h
 ```
 ----
@@ -1802,8 +1754,8 @@ existing sessions until they are refreshed.
 
 By default, this is 5 minutes.
 
-Example usage:
-```
+Example configuration:
+```yaml
 refreshable_access_token_lifetime: 10m
 ```
 ---
@@ -1819,8 +1771,8 @@ changes are not applied to existing sessions until they are refreshed.
 
 By default, this is infinite.
 
-Example usage:
-```
+Example configuration:
+```yaml
 refresh_token_lifetime: 24h
 ```
 ---
@@ -1838,8 +1790,8 @@ retrospectively to existing sessions for users that have already logged in.
 
 By default, this is infinite.
 
-Example usage:
-```
+Example configuration:
+```yaml
 nonrefreshable_access_token_lifetime: 24h
 ```
 ---
@@ -1847,8 +1799,8 @@ Config option: `registrations_require_3pid`
 
 If this is set, the user must provide all of the specified types of 3PID when registering.
 
-Example usage:
-```
+Example configuration:
+```yaml
 registrations_require_3pid:
   - email
   - msisdn
@@ -1859,8 +1811,8 @@ Config option: `disable_msisdn_registration`
 Explicitly disable asking for MSISDNs from the registration
 flow (overrides `registrations_require_3pid` if MSISDNs are set as required).
 
-Example usage:
-```
+Example configuration:
+```yaml
 disable_msisdn_registration: true
 ```
 ---
@@ -1869,8 +1821,8 @@ Config option: `allowed_local_3pids`
 Mandate that users are only allowed to associate certain formats of
 3PIDs with accounts on this server, as specified by the `medium` and `pattern` sub-options.
 
-Example usage:
-```
+Example configuration:
+```yaml
 allowed_local_3pids:
   - medium: email
     pattern: '^[^@]+@matrix\.org$'
@@ -1884,8 +1836,8 @@ Config option: `enable_3pid_lookup`
 
 Enable 3PIDs lookup requests to identity servers from this server. Defaults to true.
 
-Example usage:
-```
+Example configuration:
+```yaml
 enable_3pid_lookup: false
 ```
 ---
@@ -1897,8 +1849,8 @@ Note that `enable_registration` must be set to true.
 Disabling this option will not delete any tokens previously generated.
 Defaults to false. Set to true to enable.  
 
-Example usage:
-```
+Example configuration:
+```yaml
 registration_requires_token: true
 ```
 ---
@@ -1907,8 +1859,8 @@ Config option: `registration_shared_secret`
 If set, allows registration of standard or admin accounts by anyone who
 has the shared secret, even if registration is otherwise disabled.
 
-Example usage:
-```
+Example configuration:
+```yaml
 registration_shared_secret: <PRIVATE STRING>
 ```
 ---
@@ -1919,8 +1871,8 @@ Larger numbers increase the work factor needed to generate the hash.
 The default number is 12 (which equates to 2^12 rounds).
 N.B. that increasing this will exponentially increase the time required
 to register or login - e.g. 24 => 2^24 rounds which will take >20 mins.
-Example usage:
-```
+Example configuration:
+```yaml
 bcrypt_rounds: 14
 ```
 ---
@@ -1930,8 +1882,8 @@ Allows users to register as guests without a password/email/etc, and
 participate in rooms hosted on this server which have been made
 accessible to anonymous users. Defaults to false.
 
-Example usage:
-```
+Example configuration:
+```yaml
 allow_guest_access: true
 ```
 ---
@@ -1943,8 +1895,8 @@ in on this server.
 (By default, no suggestion is made, so it is left up to the client.
 This setting is ignored unless `public_baseurl` is also explicitly set.)
 
-Example usage:
-```
+Example configuration:
+```yaml
 default_identity_server: https://matrix.org
 ```
 ---
@@ -1970,8 +1922,8 @@ examples below.
 Servers handling the these requests must answer the `/requestToken` endpoints defined
 by the Matrix Identity Service API [specification](https://matrix.org/docs/spec/identity_service/latest).
 
-Example usage:
-```
+Example configuration:
+```yaml
 account_threepid_delegates:
     email: https://example.com     # Delegate email sending to example.com
     msisdn: http://localhost:8090  # Delegate SMS sending to this local process
@@ -1985,8 +1937,8 @@ contents of a third-party directory.
 
 Does not apply to server administrators. Defaults to true.
 
-Example usage:
-```
+Example configuration:
+```yaml
 enable_set_displayname: false
 ```
 ---
@@ -1998,8 +1950,8 @@ of a third-party directory.
 
 Does not apply to server administrators. Defaults to true.
 
-Example usage:
-```
+Example configuration:
+```yaml
 enable_set_avatar_url: false
 ```
 ---
@@ -2010,8 +1962,8 @@ Whether users can change the third-party IDs associated with their accounts
 
 Defaults to true.
 
-Example usage:
-```
+Example configuration:
+```yaml
 enable_3pid_changes: false
 ```
 ---
@@ -2026,8 +1978,8 @@ homeserver. If the room already exists, make certain it is a publicly joinable
 room, i.e. the join rule of the room must be set to 'public'. You can find more options
 relating to auto-joining rooms below. 
 
-Example usage:
-```
+Example configuration:
+```yaml
 auto_join_rooms:
   - "#exampleroom:example.com"
   - "#anotherexampleroom:example.com"
@@ -2048,8 +2000,8 @@ users cannot be auto-joined since they do not exist.
 
 Defaults to true.
 
-Example usage:
-```
+Example configuration:
+```yaml
 autocreate_auto_join_rooms: false
 ```
 ---
@@ -2065,8 +2017,8 @@ Defaults to true: the room will be joinable from other servers.
 Set to false to prevent users from other homeservers from
 joining these rooms.
 
-Example usage:
-```
+Example configuration:
+```yaml
 autocreate_auto_join_rooms_federated: false
 ```
 ---
@@ -2087,8 +2039,8 @@ If a value of "private_chat" or "trusted_private_chat" is used then
 
 Defaults to "public_chat".
 
-Example usage:
-```
+Example configuration:
+```yaml
 autocreate_auto_join_room_preset: private_chat
 ```
 ---
@@ -2111,8 +2063,8 @@ at the time of creation or subsequently).
 Note that, if the room already exists, this user must be joined and
 have the appropriate permissions to invite new members.
 
-Example usage:
-```
+Example configuration:
+```yaml
 auto_join_mxid_localpart: system
 ```
 ---
@@ -2123,8 +2075,8 @@ guest accounts from being automatically joined to the rooms.
 
 Defaults to true.
 
-Example usage:
-```
+Example configuration:
+```yaml
 auto_join_rooms_for_guests: false
 ```
 ---
@@ -2138,8 +2090,8 @@ raise an error if the registration completes and the username conflicts.
 
 Defaults to false.
 
-Example usage:
-```
+Example configuration:
+```yaml
 inhibit_user_in_use_error: true
 ```
 ---
@@ -2152,8 +2104,8 @@ Config option: `enable_metrics`
 Set to true to enable collection and rendering of performance metrics. 
 Defaults to false.
 
-Example usage:
-```
+Example configuration:
+```yaml
 enable_metrics: true
 ```
 ---
@@ -2168,8 +2120,8 @@ this option the sentry server may therefore receive sensitive
 information, and it in turn may then disseminate sensitive information
 through insecure notification channels if so configured.
 
-Example usage:
-```
+Example configuration:
+```yaml
 sentry:
     dsn: "..."
 ```
@@ -2183,8 +2135,8 @@ Currently the only option is `known_servers`, which publishes
 servers this homeserver knows about, including itself. May cause
 performance problems on large homeservers.
 
-Example usage:
-```
+Example configuration:
+```yaml
 metrics_flags:
     known_servers: true
 ```
@@ -2195,8 +2147,8 @@ Whether or not to report anonymized homeserver usage statistics. This is origina
 set when generating the config. Set this option to true or false to change the current
 behavior. 
 
-Example usage:
-```
+Example configuration:
+```yaml
 report_stats: true
 ```
 ---
@@ -2205,8 +2157,8 @@ Config option: `report_stats_endpoint`
 The endpoint to report the anonymized homeserver usage statistics to.
 Defaults to https://matrix.org/report-usage-stats/push
 
-Example usage:
-```
+Example configuration:
+```yaml
 report_stats_endpoint: https://example.com/report-usage-stats/push
 ```
 ---
@@ -2234,8 +2186,8 @@ To change the default behavior, use the following sub-options:
 * `additional_event_types`: Additional state event types to share with users when they are invited
    to a room. By default, this list is empty (so only the default event types are shared).
 
-Example usage:
-```
+Example configuration:
+```yaml
 room_prejoin_state:
    disable_default_event_types: true
    additional_event_types:
@@ -2258,8 +2210,8 @@ user. (This also means that the puppeted user will count as an "active" user
 for the purpose of monthly active user tracking - see `limit_usage_by_mau` etc
 above.)
 
-Example usage:
-```
+Example configuration:
+```yaml
 track_puppeted_user_ips: true
 ```
 ---
@@ -2267,8 +2219,8 @@ Config option: `app_service_config_files`
 
 A list of application service config files to use.
 
-Example usage:
-```
+Example configuration:
+```yaml
 app_service_config_files:
   - app_service_1.yaml
   - app_service_2.yaml
@@ -2279,8 +2231,8 @@ Config option: `track_appservice_user_ips`
 Defaults to false. Set to true to enable tracking of application service IP addresses.
 Implicitly enables MAU tracking for application service users.
 
-Example usage:
-```
+Example configuration:
+```yaml
 track_appservice_user_ips: true
 ```
 ---
@@ -2290,8 +2242,8 @@ A secret which is used to sign access tokens. If none is specified,
 the `registration_shared_secret` is used, if one is given; otherwise,
 a secret key is derived from the signing key.
 
-Example usage:
-```
+Example configuration:
+```yaml
 macaroon_secret_key: <PRIVATE STRING>
 ```
 ---
@@ -2301,8 +2253,8 @@ A secret which is used to calculate HMACs for form values, to stop
 falsification of values. Must be specified for the User Consent
 forms to work.
 
-Example usage:
-```
+Example configuration:
+```yaml
 form_secret: <PRIVATE STRING>
 ```
 ---
@@ -2314,8 +2266,8 @@ Config option: `signing_key_path`
 
 Path to the signing key to sign messages with.
 
-Example usage:
-```
+Example configuration:
+```yaml
 signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 ```
 --- 
@@ -2329,8 +2281,8 @@ it was last used.
 It is possible to build an entry from an old `signing.key` file using the
 `export_signing_key` script which is provided with synapse.
 
-Example usage:
-```
+Example configuration:
+```yaml
 old_signing_keys:
   "ed25519:id": { key: "base64string", expired_ts: 123456789123 }
 ```
@@ -2342,8 +2294,8 @@ Used to set the `valid_until_ts` in `/key/v2` APIs.
 Determines how quickly servers will query to check which keys
 are still valid. Defaults to 1d.
 
-Example usage:
-```
+Example configuration:
+```yaml
 key_refresh_interval: 2d
 ```
 ---
@@ -2376,16 +2328,16 @@ Options for each entry in the list include:
    and are sure that your network environment provides a secure connection
    to the key server, you can set this to `true` to override this behaviour.
 
-Example usage #1:
-```
+Example configuration #1:
+```yaml
 trusted_key_servers:
   - server_name: "my_trusted_server.example.com"
     verify_keys:
       "ed25519:auto": "abcdefghijklmnopqrstuvwxyzabcdefghijklmopqr"
   - server_name: "my_other_trusted_server.example.com"
 ```
-Example usage #2:
-```
+Example configuration #2:
+```yaml
 trusted_key_servers:
   - server_name: "matrix.org"
 ```
@@ -2395,8 +2347,8 @@ Config option: `suppress_key_server_warning`
 Set the following to true to disable the warning that is emitted when the
 `trusted_key_servers` include 'matrix.org'. See above.
 
-Example usage:
-```
+Example configuration:
+```yaml
 suppress_key_server_warning: true
 ```
 ---
@@ -2407,8 +2359,8 @@ defaults to the server signing key.
 
 Can contain multiple keys, one per line.
 
-Example usage:
-```
+Example configuration:
+```yaml
 key_server_signing_keys_path: "key_server_signing_keys.key"
 ```
 ---
@@ -2424,6 +2376,7 @@ disable the regular login/registration flows:
 
 You will also want to investigate the settings under the "sso" configuration
 section below.
+
 ---
 Config option: `saml2_config`
 
@@ -2489,7 +2442,7 @@ the IdP to use an ACS location of
 `https://<server>:<port>/_synapse/client/saml2/authn_response`.
 
 Example configuration:
-```
+```yaml
 saml2_config:
   sp_config:
     metadata:
@@ -2704,7 +2657,7 @@ Options for each entry include:
 It is possible to configure Synapse to only allow logins if certain attributes 
 match particular values in the OIDC userinfo. The requirements can be listed under
 `attribute_requirements` as shown here:
-```
+```yaml
 attribute_requirements:
      - attribute: family_name
        value: "Stephensson"
@@ -2721,7 +2674,7 @@ above, the `family_name` claim MUST be "Stephensson", but the `groups`
 claim MUST contain "admin".
 
 Example configuration:
-```
+```yaml
 oidc_providers:
   # Generic example
   #
@@ -2766,7 +2719,7 @@ Has the following sub-options:
    All of the listed attributes must match for the login to be permitted.
 
 Example configuration:
-```
+```yaml
 cas_config:
   enabled: true
   server_url: "https://cas-server.com"
@@ -2805,7 +2758,7 @@ Options include:
 
 
 Example configuration:
-```
+```yaml
 sso:
     client_whitelist:
       - https://riot.im/develop
@@ -2847,7 +2800,7 @@ Additional sub-options for this setting include:
    validation will fail without configuring audiences.
 
 Example configuration:
-```
+```yaml
 jwt_config:
     enabled: true 
     secret: "provided-by-your-issuer"
@@ -2883,8 +2836,8 @@ This setting has the following sub-options:
       Defaults to false.
       
 
-Example usage:
-```
+Example configuration:
+```yaml
 password_config:
    enabled: false
    localdb_enabled: false
@@ -2916,7 +2869,7 @@ adding a 3PID).
 Use the `session_timeout` sub-option here to change the time allowed for credential validation.
 
 Example configuration:
-```
+```yaml
 ui_auth:
     session_timeout: "15s"
 ```
@@ -2990,8 +2943,8 @@ This setting has the following sub-options:
      * `email_validation`: Subject to use when sending a verification email to assert an address's
         ownership. Defaults to "[%(server_name)s] Validate your email"
 
-Example usage:
-```
+Example configuration:
+```yaml
 email:
   smtp_host: mail.server
   smtp_port: 587
@@ -3046,8 +2999,8 @@ This option has a number of sub-options. They are as follows:
    rooms with unread messages in them. Set to false to instead send the number
    of unread messages.
 
-Example usage:
-```
+Example configuration:
+```yaml
 push:
   include_content: false
   group_unread_count_by_room: false
@@ -3074,8 +3027,8 @@ The default value is "off".
 Note that this option will only affect rooms created after it is set. It
 will also not affect rooms created by other servers.
 
-Example usage:
-```
+Example configuration:
+```yaml
 encryption_enabled_by_default_for_room_type: invite
 ```
 ---
@@ -3083,8 +3036,8 @@ Config option: `enable_group_creation`
 
 Set to true to allow non-server-admin users to create groups on this server
 
-Example usage:
-```
+Example configuration:
+```yaml
 enable_group_creation: true
 ```
 ---
@@ -3093,8 +3046,8 @@ Config option: `group_creation_prefix`
 If enabled/present, non-server admins can only create groups with local parts
 starting with this prefix.
 
-Example usage:
-```
+Example configuration:
+```yaml
 group_creation_prefix: "unofficial_"
 ```
 ---
@@ -3121,8 +3074,8 @@ This option has the following sub-options:
    If set to true, local users are more likely to appear above remote users when searching the 
    user directory. Defaults to false.
 
-Example usage:
-```
+Example configuration:
+```yaml
 user_directory:
     enabled: false
     search_all_users: true
@@ -3162,8 +3115,8 @@ Parts of this section are required if enabling the `consent` resource under
    for an account. Has no effect unless `require_at_registration` is enabled.
    Defaults to "Privacy Policy".
 
-Example usage:
-```
+Example configuration:
+```yaml
 user_consent:
   template_dir: res/templates/privacy
   version: 1.0
@@ -3189,8 +3142,8 @@ for more.
    so may cause certain features (such as the room directory) not to work
    correctly. Defaults to true. 
 
-Example usage:
-```
+Example configuration:
+```yaml
 stats:  
   enabled: false
 ```
@@ -3210,8 +3163,8 @@ Sub-options for this setting include:
 * `system_mxid_avatar_url`: set the avatar for the "notices" user
 * `room_name`: set the room name of the server notices room
 
-Example usage:
-```
+Example configuration:
+```yaml
 server_notices:
   system_mxid_localpart: notices
   system_mxid_display_name: "Server Notices"
@@ -3225,8 +3178,8 @@ Set to false to disable searching the public room list. When disabled
 blocks searching local and remote room lists for local and remote
 users by always returning an empty list for all queries. Defaults to true. 
 
-Example usage:
-```
+Example configuration:
+```yaml
 enable_room_list_search: false
 ```
 ---
@@ -3252,7 +3205,7 @@ Options for the rules include:
 * `action`: Whether to "allow" or "deny" the request if the rule matches. Defaults to allow. 
 
 Example configuration:
-```
+```yaml
 alias_creation_rules:
   - user_id: "bad_user"
     alias: "spammy_alias"
@@ -3282,7 +3235,7 @@ Options for the rules include:
 * `action`: Whether to "allow" or "deny" the request if the rule matches. Defaults to allow. 
 
 Example configuration:
-```
+```yaml
 room_list_publication_rules:
   - user_id: "*"
     alias: "*"
@@ -3315,8 +3268,8 @@ Sub-options include:
    All configuration options provided by Jaeger can be set here. Jaeger's configuration is 
    mostly related to trace sampling which is documented [here](https://www.jaegertracing.io/docs/latest/sampling/).
 
-Example usage:
-```
+Example configuration:
+```yaml
 opentracing:
     enabled: true
     homeserver_whitelist:
@@ -3342,8 +3295,8 @@ Config option: `send_federation`
 Controls sending of outbound federation transactions on the main process.
 Set to false if using a federation sender worker. Defaults to true. 
 
-Example usage:
-```
+Example configuration:
+```yaml
 send_federation: false
 ```
 ---
@@ -3357,8 +3310,8 @@ changed all federation sender workers must be stopped at the same time and then
 started, to ensure that all instances are running with the same config (otherwise
 events may be dropped). 
 
-Example usage:
-```
+Example configuration:
+```yaml
 federation_sender_instances:
   - federation_sender1
 ```
@@ -3368,8 +3321,8 @@ Config option: `instance_map`
 When using workers this should be a map from worker name to the
 HTTP replication listener of the worker, if configured. 
 
-Example usage:
-```
+Example configuration:
+```yaml
 instance_map:
   worker1:
     host: localhost
@@ -3382,8 +3335,8 @@ Experimental: When using workers you can define which workers should
 handle event persistence and typing notifications. Any worker
 specified here must also be in the `instance_map`.
 
-Example usage:
-```
+Example configuration:
+```yaml
 stream_writers:
   events: worker1
   typing: worker1
@@ -3394,8 +3347,8 @@ Config option: `run_background_task_on`
 The worker that is used to run background tasks (e.g. cleaning up expired
 data). If not provided this defaults to the main process.
 
-Example usage:
-```
+Example configuration:
+```yaml
 run_background_tasks_on: worker1
 ```
 ---
@@ -3406,8 +3359,8 @@ from workers.
 
 By default this is unused and traffic is not authenticated.
 
-Example usage:
-```
+Example configuration:
+```yaml
 worker_replication_secret: "secret_secret"
 ```
 Config option: `redis`
@@ -3420,8 +3373,8 @@ This setting has the following sub-options:
    localhost and 6379
 * `password`: Optional password if configured on the Redis instance.
 
-Example usage:
-```
+Example configuration:
+```yaml
 redis:
   enabled: true
   host: localhost
@@ -3449,7 +3402,7 @@ This setting has the following sub-options:
    Set a size to change the default.
 
 Example configuration: 
-```
+```yaml
 background_updates:
     background_update_duration_ms: 500
     sleep_enabled: false
