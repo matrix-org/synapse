@@ -30,7 +30,6 @@ from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
 from synapse.replication.tcp.streams import (
     AccountDataStream,
     DeviceListsStream,
-    GroupServerStream,
     PushersStream,
     PushRulesStream,
     ReceiptsStream,
@@ -181,10 +180,6 @@ class ReplicationDataHandler:
                     room_ids = await self.store.get_rooms_for_user(row.entity)
                     all_room_ids.update(room_ids)
             self.notifier.on_new_event("device_list_key", token, rooms=all_room_ids)
-        elif stream_name == GroupServerStream.NAME:
-            self.notifier.on_new_event(
-                "groups_key", token, users=[row.user_id for row in rows]
-            )
         elif stream_name == PushersStream.NAME:
             for row in rows:
                 if row.deleted:
