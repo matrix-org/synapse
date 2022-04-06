@@ -94,7 +94,10 @@ class ExternalCache:
 
         logger.debug("Caching %s %s: %r", cache_name, key, encoded_value)
 
-        with opentracing.start_active_span("ExternalCache.set"):
+        with opentracing.start_active_span(
+            "ExternalCache.set",
+            tags={opentracing.SynapseTags: cache_name},
+        ):
             with response_timer.labels("set").time():
                 return await make_deferred_yieldable(
                     self._redis_connection.set(
@@ -110,7 +113,10 @@ class ExternalCache:
         if self._redis_connection is None:
             return None
 
-        with opentracing.start_active_span("ExternalCache.get"):
+        with opentracing.start_active_span(
+            "ExternalCache.get",
+            tags={opentracing.SynapseTags: cache_name},
+        ):
             with response_timer.labels("get").time():
                 result = await make_deferred_yieldable(
                     self._redis_connection.get(self._get_redis_key(cache_name, key))
