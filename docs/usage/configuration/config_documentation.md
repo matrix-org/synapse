@@ -1,11 +1,11 @@
-## Welcome
+## Configuring Synapse
 
-This is intended as a guide to the synapse configuration. The behavior of a Synapse instance can be modified 
-through the many configuration settings documented here-each config option is explained, 
-including what the default is, how to change the default and what sort of behavior the setting governs.
+This is intended as a guide to the Synapse configuration. The behavior of a Synapse instance can be modified 
+through the many configuration settings documented here — each config option is explained, 
+including what the default is, how to change the default and what sort of behaviour the setting governs.
 Also included is an example configuration for each setting. If you don't want to spend a lot of time 
 thinking about options, the config as generated sets sensible defaults for all values. Do note however that the
-database defualts to SQLite, which is not recommended for production usage. You can read more on this subject 
+database defaults to SQLite, which is not recommended for production usage. You can read more on this subject 
 [here](../../setup/installation.md#using-postgresql).
 
 ## Config Conventions
