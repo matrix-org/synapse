@@ -96,7 +96,7 @@ class ExternalCache:
 
         with opentracing.start_active_span(
             "ExternalCache.set",
-            tags={opentracing.SynapseTags: cache_name},
+            tags={opentracing.SynapseTags.CACHE_NAME: cache_name},
         ):
             with response_timer.labels("set").time():
                 return await make_deferred_yieldable(
@@ -115,7 +115,7 @@ class ExternalCache:
 
         with opentracing.start_active_span(
             "ExternalCache.get",
-            tags={opentracing.SynapseTags: cache_name},
+            tags={opentracing.SynapseTags.CACHE_NAME: cache_name},
         ):
             with response_timer.labels("get").time():
                 result = await make_deferred_yieldable(
