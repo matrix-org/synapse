@@ -47,7 +47,6 @@ from synapse.rest.admin.federation import (
     DestinationRestServlet,
     ListDestinationsRestServlet,
 )
-from synapse.rest.admin.groups import DeleteGroupAdminRestServlet
 from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
 from synapse.rest.admin.registration_tokens import (
     ListRegistrationTokensRestServlet,
@@ -293,8 +292,6 @@ def register_servlets_for_client_rest_resource(
     ResetPasswordRestServlet(hs).register(http_server)
     SearchUsersRestServlet(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
-    if hs.config.experimental.groups_enabled:
-        DeleteGroupAdminRestServlet(hs).register(http_server)
     AccountValidityRenewServlet(hs).register(http_server)
 
     # Load the media repo ones if we're using them. Otherwise load the servlets which
