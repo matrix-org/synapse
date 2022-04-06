@@ -110,3 +110,49 @@ class ModuleApiTestCase(HomeserverTestCase):
             ),
             {"wombat": True},
         )
+
+    def test_put_global(self) -> None:
+        """
+        Tests that written account data using `put_global` can be read out again later.
+        """
+
+        self.get_success(
+            self._module_api.account_data_manager.put_global(
+                self.user_id, "test.data", {"wombat": True}
+            )
+        )
+
+        # Request that account data from the normal store; check it's as we expect.
+        self.assertEqual(
+            self.get_success(
+                self._store.get_global_account_data_by_type_for_user(
+                    self.user_id, "test.data"
+                )
+            ),
+            {"wombat": True},
+        )
+
+    def test_put_global_validation(self) -> None:
+        """
+        Tests that a module can't write account data to user IDs that don't have
+        actual users registered to them.
+        """
+
+        with self.assertRaises(SynapseError):
+            self.get_success_or_raise(
+                self._account_data_mgr.put_global(
+                    "this isn't a user id", "test.data", {}
+                )
+            )
+
+        with self.assertRaises(ValueError):
+            self.get_success_or_raise(
+                self._account_data_mgr.put_global("@valid.but:remote", "test.data", {})
+            )
+
+        with self.assertRaises(ValueError):
+            self.get_success_or_raise(
+                self._module_api.account_data_manager.put_global(
+                    "@notregistered:test", "test.data", {}
+                )
+            )
