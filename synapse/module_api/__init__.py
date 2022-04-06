@@ -211,6 +211,7 @@ class ModuleApi:
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client: SimpleHttpClient = hs.get_simple_http_client()
         self._public_room_list_manager = PublicRoomListManager(hs)
+        self._account_data_manager = AccountDataManager(hs)
 
         self._spam_checker = hs.get_spam_checker()
         self._account_validity_handler = hs.get_account_validity_handler()
@@ -430,6 +431,14 @@ class ModuleApi:
         Added in Synapse v1.22.0.
         """
         return self._public_room_list_manager
+
+    @property
+    def account_data_manager(self) -> "AccountDataManager":
+        """Allows reading and modifying users' account data.
+
+        Added in Synapse v1.57.0.
+        """
+        return self._account_data_manager
 
     @property
     def public_baseurl(self) -> str:
@@ -1386,3 +1395,37 @@ class PublicRoomListManager:
             room_id: The ID of the room.
         """
         await self._store.set_room_is_public(room_id, False)
+
+
+class AccountDataManager:
+    """
+    Allows modules to manage account data.
+    """
+
+    def __init__(self, hs: "HomeServer") -> None:
+        self._hs = hs
+        self._store = hs.get_datastores().main
+
+    def _validate_user_id(self, user_id: str) -> None:
+        """
+        Validates a user ID is valid and local.
+        Private method to be used in other account data methods.
+        """
+        user = UserID.from_string(user_id)
+        if not self._hs.is_mine(user):
+            raise ValueError(
+                f"{user_id} is not local to this homeserver; can't access account data for remote users."
+            )
+
+    async def get_global(self, user_id: str, data_type: str) -> Optional[JsonDict]:
+        """
+        Gets some global account data, of a specified type, for the specified user.
+
+        The provided user ID must be a valid user ID of a local user.
+        """
+        self._validate_user_id(user_id)
+
+        data = await self._store.get_global_account_data_by_type_for_user(
+            user_id, data_type
+        )
+        return data
