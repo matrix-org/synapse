@@ -13,17 +13,12 @@ database defaults to SQLite, which is not recommended for production usage. You 
 Configuration options that take a time period can be set using a number
 followed by a letter. Letters have the following meanings:
 
-s = second
-
-m = minute
-
-h = hour
-
-d = day
-
-w = week
-
-y = year
+* `s` = second
+* `m` = minute
+* `h` = hour
+* `d` = day
+* `w` = week
+* `y` = year
 
 For example, setting `redaction_retention_period: 5m` would remove redacted
 messages from the database after 5 minutes, rather than 5 months.
