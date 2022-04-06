@@ -315,29 +315,6 @@ class EventID(DomainSpecificString):
     SIGIL = "$"
 
 
-@attr.s(slots=True, frozen=True, repr=False)
-class GroupID(DomainSpecificString):
-    """Structure representing a group ID."""
-
-    SIGIL = "+"
-
-    @classmethod
-    def from_string(cls: Type[DS], s: str) -> DS:
-        group_id: DS = super().from_string(s)  # type: ignore
-
-        if not group_id.localpart:
-            raise SynapseError(400, "Group ID cannot be empty", Codes.INVALID_PARAM)
-
-        if contains_invalid_mxid_characters(group_id.localpart):
-            raise SynapseError(
-                400,
-                "Group ID can only contain characters a-z, 0-9, or '=_-./'",
-                Codes.INVALID_PARAM,
-            )
-
-        return group_id
-
-
 mxid_localpart_allowed_characters = set(
     "_-./=" + string.ascii_lowercase + string.digits
 )
