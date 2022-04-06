@@ -176,7 +176,8 @@ yet correlated to the DAG.</p>
 <p>Outliers typically arise when we fetch the auth chain or state for a given
 event. When that happens, we just grab the events in the state/auth chain,
 without calculating the state at those events, or backfilling their
-<code>prev_events</code>.</p>
+<code>prev_events</code>. Since we don't have the state at any events fetched in that
+way, we mark them as outliers.</p>
 <p>So, typically, we won't have the <code>prev_events</code> of an <code>outlier</code> in the database,
 (though it's entirely possible that we <em>might</em> have them for some other
 reason). Other things that make outliers different from regular events:</p>
