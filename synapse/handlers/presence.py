@@ -229,6 +229,11 @@ class BasePresenceHandler(abc.ABC):
 
         return states
 
+    async def current_state_for_user(self, user_id: str) -> UserPresenceState:
+        """Get the current presence state for a user."""
+        res = await self.current_state_for_users([user_id])
+        return res[user_id]
+
     @abc.abstractmethod
     async def set_state(
         self,
@@ -472,6 +477,16 @@ class WorkerPresenceHandler(BasePresenceHandler):
         """
         if not affect_presence or not self._presence_enabled:
             return _NullContextManager()
+
+        if affect_presence:
+            prev_state = await self.current_state_for_user(user_id)
+            if prev_state != PresenceState.BUSY:
+                # XXX: Why does this pass force_notify = True? This is copied
+                # from when the sync rest handler set the presence itself, but
+                # I don't really understand why this would be necessary.
+                self.set_state(
+                    UserID.from_string(user_id), {"presence": presence_state}, True
+                )
 
         curr_sync = self._user_to_num_current_syncs.get(user_id, 0)
         self._user_to_num_current_syncs[user_id] = curr_sync + 1
@@ -1091,11 +1106,6 @@ class PresenceHandler(BasePresenceHandler):
                 ]
             )
             self.external_process_last_updated_ms.pop(process_id, None)
-
-    async def current_state_for_user(self, user_id: str) -> UserPresenceState:
-        """Get the current presence state for a user."""
-        res = await self.current_state_for_users([user_id])
-        return res[user_id]
 
     async def _persist_and_notify(self, states: List[UserPresenceState]) -> None:
         """Persist states in the database, poke the notifier and send to
