@@ -14,13 +14,6 @@
 #    DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile --build-arg PYTHON_VERSION=3.10 .
 #
 
-ARG PYTHON_VERSION=3.9
-
-###
-### Stage 0: builder
-###
-FROM docker.io/python:${PYTHON_VERSION}-slim as builder
-
 # Irritatingly, there is no blessed guide on how to distribute an application with its
 # poetry-managed environment in a docker image. We have opted for
 # `poetry export | pip install -r /dev/stdin`, but there are known bugs in
@@ -30,16 +23,37 @@ FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 #     https://github.com/python-poetry/poetry/discussions/1879#discussioncomment-216865
 #     https://stackoverflow.com/questions/53835198/integrating-python-poetry-with-docker?answertab=scoredesc
 
+
+
+ARG PYTHON_VERSION=3.9
+
+###
+### Stage 0: generate requirements.txt
+###
+FROM docker.io/python:${PYTHON_VERSION}-slim as requirements
+
 # RUN --mount is specific to buildkit and is documented at
 # https://github.com/moby/buildkit/blob/master/frontend/dockerfile/docs/syntax.md#build-mounts-run---mount.
-# Here we use it to set up a cache for pip (below, for apt and poetry), to improve
+# Here we use it to set up a cache for pip (and below for apt), to improve
 # rebuild speeds on slow connections.
-# We install poetry as --user so that it doesn't end up in the system-wide python
-# installation.
+# We install poetry in its own build stage to avoid its dependencies conflicting with
+# synapse's dependencies.
 # We use the unstable 1.2.0b1 version instead of our usual 1.1.12 to incorporate
 # fixes to some bugs in `poetry export`.
 RUN --mount=type=cache,target=/root/.cache/pip \
   pip install --user poetry==1.2.0b1
+
+WORKDIR /synapse
+
+# Copy just what we need to run `poetry export`...
+COPY pyproject.toml poetry.lock README.rst /synapse/
+
+RUN /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt
+
+###
+### Stage 1: builder
+###
+FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 
 # install the OS build deps
 RUN \
@@ -59,33 +73,27 @@ RUN \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /synapse
-
-# Copy just what we need to run `poetry export`...
-COPY pyproject.toml poetry.lock README.rst /synapse/
-
-RUN /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt
-
 # To speed up rebuilds, install all of the dependencies before we copy over
 # the whole synapse project, so that this layer in the Docker cache can be
 # used while you develop on the source
 #
 # This is aiming at installing the `[tool.poetry.depdendencies]` from pyproject.toml.
+COPY --from=requirements /synapse/requirements.txt /synapse/
 RUN --mount=type=cache,target=/root/.cache/pip \
   pip install --prefix="/install" --no-warn-script-location -r /synapse/requirements.txt
 
 # Copy over the rest of the synapse source code.
 COPY synapse /synapse/synapse/
-# ... and the setuptools metadata needed to `pip install`.
-# TODO: once pyproject.toml declares poetry-core as its build system,
-# we can remove this COPY statement.
-COPY setup.py MANIFEST.in /synapse/
+# ... and what we need to `pip install`.
+# TODO: once pyproject.toml declares poetry-core as its build system, we'll need to copy
+# pyproject.toml here, ditching setup.py and MANIFEST.in.
+COPY setup.py MANIFEST.in README.rst /synapse/
 
 # Install the synapse package itself.
 RUN pip install --prefix="/install" --no-deps --no-warn-script-location /synapse
 
 ###
-### Stage 1: runtime
+### Stage 2: runtime
 ###
 
 FROM docker.io/python:${PYTHON_VERSION}-slim
