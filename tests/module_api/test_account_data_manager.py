@@ -13,6 +13,7 @@
 # limitations under the License.
 from synapse.api.errors import SynapseError
 from synapse.rest import admin
+
 from tests.unittest import HomeserverTestCase
 
 
@@ -72,3 +73,40 @@ class ModuleApiTestCase(HomeserverTestCase):
                 self._account_data_mgr.get_global("@valid.but:remote", "test.data")
             )
 
+    def test_get_global_no_mutability(self) -> None:
+        """
+        Tests that modules can't introduce bugs into Synapse by mutating the result
+        of `get_global`.
+        """
+        # First add some account data to set up the test.
+        self.get_success(
+            self._store.add_account_data_for_user(
+                self.user_id, "test.data", {"wombat": True}
+            )
+        )
+
+        # Request that account data from the normal store; check it's as we expect.
+        self.assertEqual(
+            self.get_success(
+                self._store.get_global_account_data_by_type_for_user(
+                    self.user_id, "test.data"
+                )
+            ),
+            {"wombat": True},
+        )
+
+        # Now, as a module, request that data and then mutate it (out of negligence or otherwise).
+        the_data = self.get_success(
+            self._account_data_mgr.get_global(self.user_id, "test.data")
+        )
+        the_data["wombat"] = False
+
+        # As Synapse, request that account data once more from the normal store; check it's as we expect.
+        self.assertEqual(
+            self.get_success(
+                self._store.get_global_account_data_by_type_for_user(
+                    self.user_id, "test.data"
+                )
+            ),
+            {"wombat": True},
+        )
