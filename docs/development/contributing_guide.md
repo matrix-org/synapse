@@ -206,9 +206,10 @@ To do so, [configure Postgres](../postgres.md) and run `trial` with the
 following environment variables matching your configuration:
 
 - `SYNAPSE_POSTGRES` to anything nonempty
-- `SYNAPSE_POSTGRES_HOST`
-- `SYNAPSE_POSTGRES_USER`
-- `SYNAPSE_POSTGRES_PASSWORD`
+- `SYNAPSE_POSTGRES_HOST` (optional if it's the default: UNIX socket)
+- `SYNAPSE_POSTGRES_PORT` (optional if it's the default: 5432)
+- `SYNAPSE_POSTGRES_USER` (optional if using a UNIX socket)
+- `SYNAPSE_POSTGRES_PASSWORD` (optional if using a UNIX socket)
 
 For example:
 
@@ -220,26 +221,12 @@ export SYNAPSE_POSTGRES_PASSWORD=mydevenvpassword
 trial
 ```
 
-#### Prebuilt container
+You don't need to specify the host, user, port or password if your Postgres
+server is set to authenticate you over the UNIX socket (i.e. if the `psql` command
+works without further arguments).
 
-Since configuring PostgreSQL can be fiddly, we can make use of a pre-made
-Docker container to set up PostgreSQL and run our tests for us. To do so, run
+Your Postgres account needs to be able to create databases.
 
-```shell
-scripts-dev/test_postgresql.sh
-```
-
-Any extra arguments to the script will be passed to `tox` and then to `trial`,
-so we can run a specific test in this container with e.g.
-
-```shell
-scripts-dev/test_postgresql.sh tests.replication.test_sharded_event_persister.EventPersisterShardTestCase
-```
-
-The container creates a folder in your Synapse checkout called
-`.tox-pg-container` and uses this as a tox environment. The output of any
-`trial` runs goes into `_trial_temp` in your synapse source directory — the same
-as running `trial` directly on your host machine.
 
 ## Run the integration tests ([Sytest](https://github.com/matrix-org/sytest)).
 
@@ -254,8 +241,14 @@ configuration:
 ```sh
 $ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:buster
 ```
+(Note that the paths must be full paths! You could also write `$(realpath relative/path)` if needed.)
 
-This configuration should generally cover  your needs. For more details about other configurations, see [documentation in the SyTest repo](https://github.com/matrix-org/sytest/blob/develop/docker/README.md).
+This configuration should generally cover your needs.
+
+- To run with Postgres, supply the `-e POSTGRES=1 -e MULTI_POSTGRES=1` environment flags.
+- To run with Synapse in worker mode, supply the `-e WORKERS=1 -e REDIS=1` environment flags (in addition to the Postgres flags).
+
+For more details about other configurations, see the [Docker-specific documentation in the SyTest repo](https://github.com/matrix-org/sytest/blob/develop/docker/README.md).
 
 
 ## Run the integration tests ([Complement](https://github.com/matrix-org/complement)).
@@ -458,6 +451,17 @@ Git allows you to add this signoff automatically when using the `-s`
 flag to `git commit`, which uses the name and email set in your
 `user.name` and `user.email` git configs.
 
+### Private Sign off
+
+If you would like to provide your legal name privately to the Matrix.org
+Foundation (instead of in a public commit or comment), you can do so
+by emailing your legal name and a link to the pull request to
+[dco@matrix.org](mailto:dco@matrix.org?subject=Private%20sign%20off).
+It helps to include "sign off" or similar in the subject line. You will then
+be instructed further.
+
+Once private sign off is complete, doing so for future contributions will not
+be required.
 
 # 10. Turn feedback into better code.
 

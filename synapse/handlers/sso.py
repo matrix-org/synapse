@@ -132,6 +132,7 @@ class UserAttributes:
     # if `None`, the mapper has not picked a userid, and the user should be prompted to
     # enter one.
     localpart: Optional[str]
+    confirm_localpart: bool = False
     display_name: Optional[str] = None
     emails: Collection[str] = attr.Factory(list)
 
@@ -429,7 +430,7 @@ class SsoHandler:
         # grab a lock while we try to find a mapping for this user. This seems...
         # optimistic, especially for implementations that end up redirecting to
         # interstitial pages.
-        with await self._mapping_lock.queue(auth_provider_id):
+        async with self._mapping_lock.queue(auth_provider_id):
             # first of all, check if we already have a mapping for this user
             user_id = await self.get_sso_user_by_remote_user_id(
                 auth_provider_id,
@@ -561,9 +562,10 @@ class SsoHandler:
         # Must provide either attributes or session, not both
         assert (attributes is not None) != (session is not None)
 
-        if (attributes and attributes.localpart is None) or (
-            session and session.chosen_localpart is None
-        ):
+        if (
+            attributes
+            and (attributes.localpart is None or attributes.confirm_localpart is True)
+        ) or (session and session.chosen_localpart is None):
             return b"/_synapse/client/pick_username/account_details"
         elif self._consent_at_registration and not (
             session and session.terms_accepted_version

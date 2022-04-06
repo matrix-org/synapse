@@ -12,21 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import List
+from typing import List, cast
 from unittest import TestCase
+
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError, Codes, LimitExceededError, SynapseError
 from synapse.api.room_versions import RoomVersions
-from synapse.events import EventBase
+from synapse.events import EventBase, make_event_from_dict
 from synapse.federation.federation_base import event_from_pdu_json
 from synapse.logging.context import LoggingContext, run_in_background
 from synapse.rest import admin
 from synapse.rest.client import login, room
-from synapse.types import create_requester
+from synapse.server import HomeServer
+from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 from tests import unittest
+from tests.test_utils import event_injection
 
 logger = logging.getLogger(__name__)
 
@@ -35,14 +39,14 @@ def generate_fake_event_id() -> str:
     return "$fake_" + random_string(43)
 
 
-class FederationTestCase(unittest.HomeserverTestCase):
+class FederationTestCase(unittest.FederatingHomeserverTestCase):
     servlets = [
         admin.register_servlets,
         login.register_servlets,
         room.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         hs = self.setup_test_homeserver(federation_http_client=None)
         self.handler = hs.get_federation_handler()
         self.store = hs.get_datastores().main
@@ -50,7 +54,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
         self._event_auth_handler = hs.get_event_auth_handler()
         return hs
 
-    def test_exchange_revoked_invite(self):
+    def test_exchange_revoked_invite(self) -> None:
         user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test")
 
@@ -96,7 +100,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(failure.errcode, Codes.FORBIDDEN, failure)
         self.assertEqual(failure.msg, "You are not invited to this room.")
 
-    def test_rejected_message_event_state(self):
+    def test_rejected_message_event_state(self) -> None:
         """
         Check that we store the state group correctly for rejected non-state events.
 
@@ -126,7 +130,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
                 "content": {},
                 "room_id": room_id,
                 "sender": "@yetanotheruser:" + OTHER_SERVER,
-                "depth": join_event["depth"] + 1,
+                "depth": cast(int, join_event["depth"]) + 1,
                 "prev_events": [join_event.event_id],
                 "auth_events": [],
                 "origin_server_ts": self.clock.time_msec(),
@@ -149,7 +153,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(sg, sg2)
 
-    def test_rejected_state_event_state(self):
+    def test_rejected_state_event_state(self) -> None:
         """
         Check that we store the state group correctly for rejected state events.
 
@@ -180,7 +184,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
                 "content": {},
                 "room_id": room_id,
                 "sender": "@yetanotheruser:" + OTHER_SERVER,
-                "depth": join_event["depth"] + 1,
+                "depth": cast(int, join_event["depth"]) + 1,
                 "prev_events": [join_event.event_id],
                 "auth_events": [],
                 "origin_server_ts": self.clock.time_msec(),
@@ -203,7 +207,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(sg, sg2)
 
-    def test_backfill_with_many_backward_extremities(self):
+    def test_backfill_with_many_backward_extremities(self) -> None:
         """
         Check that we can backfill with many backward extremities.
         The goal is to make sure that when we only use a portion
@@ -215,40 +219,76 @@ class FederationTestCase(unittest.HomeserverTestCase):
         # create the room
         user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test")
-        requester = create_requester(user_id)
 
         room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
+        room_version = self.get_success(self.store.get_room_version(room_id))
 
-        ev1 = self.helper.send(room_id, "first message", tok=tok)
+        # we need a user on the remote server to be a member, so that we can send
+        # extremity-causing events.
+        self.get_success(
+            event_injection.inject_member_event(
+                self.hs, room_id, f"@user:{self.OTHER_SERVER_NAME}", "join"
+            )
+        )
+
+        send_result = self.helper.send(room_id, "first message", tok=tok)
+        ev1 = self.get_success(
+            self.store.get_event(send_result["event_id"], allow_none=False)
+        )
+        current_state = self.get_success(
+            self.store.get_events_as_list(
+                (self.get_success(self.store.get_current_state_ids(room_id))).values()
+            )
+        )
 
         # Create "many" backward extremities. The magic number we're trying to
         # create more than is 5 which corresponds to the number of backward
         # extremities we slice off in `_maybe_backfill_inner`
+        federation_event_handler = self.hs.get_federation_event_handler()
         for _ in range(0, 8):
-            event_handler = self.hs.get_event_creation_handler()
-            event, context = self.get_success(
-                event_handler.create_event(
-                    requester,
+            event = make_event_from_dict(
+                self.add_hashes_and_signatures(
                     {
+                        "origin_server_ts": 1,
                         "type": "m.room.message",
                         "content": {
                             "msgtype": "m.text",
                             "body": "message connected to fake event",
                         },
                         "room_id": room_id,
-                        "sender": user_id,
+                        "sender": f"@user:{self.OTHER_SERVER_NAME}",
+                        "prev_events": [
+                            ev1.event_id,
+                            # We're creating an backward extremity each time thanks
+                            # to this fake event
+                            generate_fake_event_id(),
+                        ],
+                        # lazy: *everything* is an auth event
+                        "auth_events": [ev.event_id for ev in current_state],
+                        "depth": ev1.depth + 1,
                     },
-                    prev_event_ids=[
-                        ev1["event_id"],
-                        # We're creating an backward extremity each time thanks
-                        # to this fake event
-                        generate_fake_event_id(),
-                    ],
+                    room_version,
+                ),
+                room_version,
+            )
+
+            # we poke this directly into _process_received_pdu, to avoid the
+            # federation handler wanting to backfill the fake event.
+            self.get_success(
+                federation_event_handler._process_received_pdu(
+                    self.OTHER_SERVER_NAME, event, state=current_state
                 )
             )
-            self.get_success(
-                event_handler.handle_new_client_event(requester, event, context)
+
+        # we should now have 8 backwards extremities.
+        backwards_extremities = self.get_success(
+            self.store.db_pool.simple_select_list(
+                "event_backward_extremities",
+                keyvalues={"room_id": room_id},
+                retcols=["event_id"],
             )
+        )
+        self.assertEqual(len(backwards_extremities), 8)
 
         current_depth = 1
         limit = 100
@@ -262,7 +302,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             )
         self.get_success(d)
 
-    def test_backfill_floating_outlier_membership_auth(self):
+    def test_backfill_floating_outlier_membership_auth(self) -> None:
         """
         As the local homeserver, check that we can properly process a federated
         event from the OTHER_SERVER with auth_events that include a floating
@@ -335,7 +375,8 @@ class FederationTestCase(unittest.HomeserverTestCase):
         member_event.signatures = member_event_dict["signatures"]
 
         # Add the new member_event to the StateMap
-        prev_state_map[
+        updated_state_map = dict(prev_state_map)
+        updated_state_map[
             (member_event.type, member_event.state_key)
         ] = member_event.event_id
         auth_events.append(member_event)
@@ -359,7 +400,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
                 prev_event_ids=message_event_dict["prev_events"],
                 auth_event_ids=self._event_auth_handler.compute_auth_events(
                     builder,
-                    prev_state_map,
+                    updated_state_map,
                     for_verification=False,
                 ),
                 depth=message_event_dict["depth"],
@@ -377,7 +418,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
                 for ae in auth_events
             ]
 
-        self.handler.federation_client.get_event_auth = get_event_auth
+        self.handler.federation_client.get_event_auth = get_event_auth  # type: ignore[assignment]
 
         with LoggingContext("receive_pdu"):
             # Fake the OTHER_SERVER federating the message event over to our local homeserver
@@ -397,7 +438,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
     @unittest.override_config(
         {"rc_invites": {"per_user": {"per_second": 0.5, "burst_count": 3}}}
     )
-    def test_invite_by_user_ratelimit(self):
+    def test_invite_by_user_ratelimit(self) -> None:
         """Tests that invites from federation to a particular user are
         actually rate-limited.
         """
@@ -446,7 +487,9 @@ class FederationTestCase(unittest.HomeserverTestCase):
             exc=LimitExceededError,
         )
 
-    def _build_and_send_join_event(self, other_server, other_user, room_id):
+    def _build_and_send_join_event(
+        self, other_server: str, other_user: str, room_id: str
+    ) -> EventBase:
         join_event = self.get_success(
             self.handler.on_make_join_request(other_server, room_id, other_user)
         )
@@ -469,7 +512,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
 
 
 class EventFromPduTestCase(TestCase):
-    def test_valid_json(self):
+    def test_valid_json(self) -> None:
         """Valid JSON should be turned into an event."""
         ev = event_from_pdu_json(
             {
@@ -487,11 +530,11 @@ class EventFromPduTestCase(TestCase):
 
         self.assertIsInstance(ev, EventBase)
 
-    def test_invalid_numbers(self):
+    def test_invalid_numbers(self) -> None:
         """Invalid values for an integer should be rejected, all floats should be rejected."""
         for value in [
-            -(2 ** 53),
-            2 ** 53,
+            -(2**53),
+            2**53,
             1.0,
             float("inf"),
             float("-inf"),
@@ -512,13 +555,13 @@ class EventFromPduTestCase(TestCase):
                     RoomVersions.V6,
                 )
 
-    def test_invalid_nested(self):
+    def test_invalid_nested(self) -> None:
         """List and dictionaries are recursively searched."""
         with self.assertRaises(SynapseError):
             event_from_pdu_json(
                 {
                     "type": EventTypes.Message,
-                    "content": {"foo": [{"bar": 2 ** 56}]},
+                    "content": {"foo": [{"bar": 2**56}]},
                     "room_id": "!room:test",
                     "sender": "@user:test",
                     "depth": 1,

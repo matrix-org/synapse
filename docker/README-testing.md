@@ -78,7 +78,7 @@ the root of your Complement checkout and run:
 docker build -t matrixdotorg/complement-synapse-workers -f dockerfiles/SynapseWorkers.Dockerfile dockerfiles
 ```
 
-This will build an image with the tag `complement-synapse`, which can be handed to
+This will build an image with the tag `complement-synapse-workers`, which can be handed to
 Complement for testing via the `COMPLEMENT_BASE_IMAGE` environment variable. Refer to
 [Complement's documentation](https://github.com/matrix-org/complement/#running) for
 how to run the tests, as well as the various available command line flags.

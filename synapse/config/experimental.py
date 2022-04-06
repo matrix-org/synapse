@@ -59,8 +59,9 @@ class ExperimentalConfig(Config):
             "msc3202_device_masquerading", False
         )
 
-        # Portion of MSC3202 related to transaction extensions:
-        # sending one-time key counts and fallback key usage to application services.
+        # The portion of MSC3202 related to transaction extensions:
+        # sending device list changes, one-time key counts and fallback key
+        # usage to application services.
         self.msc3202_transaction_extensions: bool = experimental.get(
             "msc3202_transaction_extensions", False
         )
@@ -74,3 +75,9 @@ class ExperimentalConfig(Config):
 
         # MSC3720 (Account status endpoint)
         self.msc3720_enabled: bool = experimental.get("msc3720_enabled", False)
+
+        # The deprecated groups feature.
+        self.groups_enabled: bool = experimental.get("groups_enabled", True)
+
+        # MSC2654: Unread counts
+        self.msc2654_enabled: bool = experimental.get("msc2654_enabled", False)

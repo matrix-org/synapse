@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCHEMA_VERSION = 68  # remember to update the list below when updating
+SCHEMA_VERSION = 69  # remember to update the list below when updating
 """Represents the expectations made by the codebase about the database schema
 
 This should be incremented whenever the codebase changes its requirements on the
@@ -58,6 +58,10 @@ Changes in SCHEMA_VERSION = 68:
     - event_reference_hashes is no longer read.
     - `events` has `state_key` and `rejection_reason` columns, which are populated for
       new events.
+
+Changes in SCHEMA_VERSION = 69:
+    - We now write to `device_lists_changes_in_room` table.
+    - Use sequence to generate future `application_services_txns.txn_id`s
 """
 
 
