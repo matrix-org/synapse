@@ -453,7 +453,11 @@ class Linearizer:
         #
         # This needs to happen while we hold the lock. We could put it on the
         # exit path, but that would slow down the uncontended case.
-        await self._clock.sleep(0)
+        try:
+            await self._clock.sleep(0)
+        except CancelledError:
+            self._release_lock(key, entry)
+            raise
 
         return entry
 

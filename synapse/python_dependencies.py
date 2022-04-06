@@ -48,7 +48,7 @@ REQUIREMENTS = [
     "unpaddedbase64>=1.1.0",
     "canonicaljson>=1.4.0",
     # we use the type definitions added in signedjson 1.1.
-    "signedjson>=1.1.0,<=1.1.1",
+    "signedjson>=1.1.0",
     "pynacl>=1.2.1",
     "idna>=2.5",
     # validating SSL certs for IP addresses requires service_identity 18.1.
@@ -89,6 +89,9 @@ REQUIREMENTS = [
     "matrix-common~=1.1.0",
     # We need packaging.requirements.Requirement, added in 16.1.
     "packaging>=16.1",
+    # At the time of writing, we only use functions from the version `importlib.metadata`
+    # which shipped in Python 3.8. This corresponds to version 1.4 of the backport.
+    "importlib_metadata>=1.4",
 ]
 
 CONDITIONAL_REQUIREMENTS = {
