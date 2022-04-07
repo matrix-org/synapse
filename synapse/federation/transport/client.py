@@ -44,6 +44,7 @@ from synapse.api.urls import (
 from synapse.events import EventBase, make_event_from_dict
 from synapse.federation.units import Transaction
 from synapse.http.matrixfederationclient import ByteParser
+from synapse.http.types import QueryParams
 from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
@@ -255,7 +256,7 @@ class TransportLayerClient:
         self,
         destination: str,
         query_type: str,
-        args: dict,
+        args: QueryParams,
         retry_on_dns_fail: bool,
         ignore_backoff: bool = False,
         prefix: str = FEDERATION_V1_PREFIX,
