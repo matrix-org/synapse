@@ -240,13 +240,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(messages[1]["content"]["body"], "test msg two")
         self.assertEqual(messages[1]["sender"], "@notices:test")
 
-    @override_config(
-        {
-            "server_notices": {
-                "system_mxid_localpart": "notices",
-            }
-        }
-    )
+    @override_config({"server_notices": {"system_mxid_localpart": "notices"}})
     def test_send_server_notice_leave_room(self) -> None:
         """
         Tests that sending a server notices is successfully.
@@ -415,13 +409,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         # second room has new ID
         self.assertNotEqual(first_room_id, second_room_id)
 
-    @override_config(
-        {
-            "server_notices": {
-                "system_mxid_localpart": "notices",
-            }
-        }
-    )
+    @override_config({"server_notices": {"system_mxid_localpart": "notices"}})
     def test_update_notice_user_name_when_changed(self) -> None:
         """
         Tests that existing server notices user name in room is updated after
@@ -467,13 +455,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(notice_user_state_in_room["displayname"], new_display_name)
 
-    @override_config(
-        {
-            "server_notices": {
-                "system_mxid_localpart": "notices",
-            }
-        }
-    )
+    @override_config({"server_notices": {"system_mxid_localpart": "notices"}})
     def test_update_notice_user_avatar_when_changed(self) -> None:
         """
         Tests that existing server notices user avatar in room is updated when is
