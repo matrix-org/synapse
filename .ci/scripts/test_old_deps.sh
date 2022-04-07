@@ -27,8 +27,8 @@ export VIRTUALENV_NO_DOWNLOAD=1
 
 # Patch the project definitions in-place:
 # - Replace all lower and tilde bounds with exact bounds
-# - Make the pyopenssl 17.0, which can work against an
-#   OpenSSL 1.1 compiled cryptography (as older ones don't compile on Travis).
+# - Make the pyopenssl 17.0, which is the oldest version that works with
+#   a `cryptography` compiled against OpenSSL 1.1.
 # - Delete all lines referring to psycopg2 --- so no testing of postgres support.
 # - Omit systemd: we're not logging to journal here.
 
