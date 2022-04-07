@@ -653,7 +653,7 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
                 key_values=keys,
                 value_names=value_columns,
                 value_values=values,
-                # TODO lock=False
+                lock=False
             )
 
         def update_devices() -> None:
