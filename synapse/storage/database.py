@@ -1856,11 +1856,6 @@ class DatabasePool:
                 f"{len(key_values)} key rows and {len(value_values)} value rows: should be the same number."
             )
 
-        # List of value names, then key names
-        allnames: List[str] = []
-        allnames.extend(value_names)
-        allnames.extend(key_names)
-
         # List of tuples of (value values, then key values)
         # (This matches the order of `allnames` and the order of the query)
         args = [tuple(x) + tuple(y) for x, y in zip(value_values, key_values)]
