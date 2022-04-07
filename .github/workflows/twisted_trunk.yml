@@ -20,7 +20,10 @@ jobs:
         with:
           python-version: "3.x"
           extras: "all"
-      - run: .ci/patch_for_twisted_trunk.sh
+      - run: |
+          poetry remove twisted
+          poetry add --extras tls git+https://github.com/twisted/twisted.git#trunk
+          poetry install --no-interaction --extras "all test"
       - run: poetry run mypy
 
   trial:
@@ -33,7 +36,10 @@ jobs:
         with:
           python-version: "3.x"
           extras: "all test"
-      - run: .ci/patch_for_twisted_trunk.sh
+      - run: |
+          poetry remove twisted
+          poetry add --extras tls git+https://github.com/twisted/twisted.git#trunk
+          poetry install --no-interaction --extras "all test"
       - run: poetry run trial --jobs 2 tests
 
       - name: Dump logs
@@ -65,7 +71,9 @@ jobs:
         #       Tidying up is important because `/src` is a mounted volume.
         run: |
           ln -s -T /venv /src/.venv
-          .ci/patch_for_twisted_trunk.sh
+          poetry remove twisted
+          poetry add --extras tls git+https://github.com/twisted/twisted.git#trunk
+          poetry install --no-interaction --extras "all test"
           rm /src/.venv
         working-directory: /src
       - name: Run SyTest
