@@ -141,7 +141,7 @@ class MatrixFederationRequest:
     """A callback to generate the JSON.
     """
 
-    query: Optional[dict] = None
+    query: Optional[QueryParams] = None
     """Query arguments.
     """
 
