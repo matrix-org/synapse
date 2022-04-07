@@ -29,7 +29,7 @@
 import os
 import subprocess
 import sys
-from typing import Dict, Set, cast
+from typing import Any, Dict, Set
 
 import jinja2
 import yaml
@@ -37,7 +37,7 @@ import yaml
 MAIN_PROCESS_HTTP_LISTENER_PORT = 8080
 
 
-WORKERS_CONFIG = {
+WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
     "pusher": {
         "app": "synapse.app.pusher",
         "listener_resources": [],
@@ -340,7 +340,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     # base shared worker jinja2 template.
     #
     # This config file will be passed to all workers, included Synapse's main process.
-    shared_config: dict = {"listeners": listeners}
+    shared_config = {"listeners": listeners}
 
     # The supervisord config. The contents of which will be inserted into the
     # base supervisord jinja2 template.
@@ -409,7 +409,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
         )
 
         # Update the shared config with any worker-type specific options
-        shared_config.update(cast(dict, worker_config["shared_extra_config"]))
+        shared_config.update(worker_config["shared_extra_config"])
 
         # Check if more than one instance of this worker type has been specified
         worker_type_total_count = worker_types.count(worker_type)
