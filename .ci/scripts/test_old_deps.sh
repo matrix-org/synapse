@@ -77,4 +77,4 @@ echo "::endgroup::"
 pipx install poetry==1.1.12
 ~/.local/bin/poetry lock
 ~/.local/bin/poetry install -E "all test"
-~/.local/bin/poetry run trial -j2 tests
+~/.local/bin/poetry run trial --jobs=2 tests
