@@ -162,10 +162,7 @@ class MatrixFederationRequest:
 
         destination_bytes = self.destination.encode("ascii")
         path_bytes = self.path.encode("ascii")
-        if self.query:
-            query_bytes = encode_query_args(self.query)
-        else:
-            query_bytes = b""
+        query_bytes = encode_query_args(self.query)
 
         # The object is frozen so we can pre-compute this.
         uri = urllib.parse.urlunparse(
@@ -482,10 +479,7 @@ class MatrixFederationHttpClient:
         method_bytes = request.method.encode("ascii")
         destination_bytes = request.destination.encode("ascii")
         path_bytes = request.path.encode("ascii")
-        if request.query:
-            query_bytes = encode_query_args(request.query)
-        else:
-            query_bytes = b""
+        query_bytes = encode_query_args(request.query)
 
         scope = start_active_span(
             "outgoing-federation-request",
