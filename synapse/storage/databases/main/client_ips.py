@@ -634,25 +634,24 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
         ):
             self.database_engine.lock_table(txn, "user_ips")
 
-        def update_user_ips() -> None:
-            # Keys and values for the `user_ips` upsert.
-            keys = []
-            values = []
+        # Keys and values for the `user_ips` upsert.
+        user_ips_keys = []
+        user_ips_values = []
 
-            for entry in to_update.items():
-                (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
-                keys.append((user_id, access_token, ip))
-                values.append((user_agent, device_id, last_seen))
+        for entry in to_update.items():
+            (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
+            user_ips_keys.append((user_id, access_token, ip))
+            user_ips_values.append((user_agent, device_id, last_seen))
 
-            self.db_pool.simple_upsert_many_txn(
-                txn,
-                table="user_ips",
-                key_names=("user_id", "access_token", "ip"),
-                key_values=keys,
-                value_names=("user_agent", "device_id", "last_seen"),
-                value_values=values,
-                lock=False
-            )
+        self.db_pool.simple_upsert_many_txn(
+            txn,
+            table="user_ips",
+            key_names=("user_id", "access_token", "ip"),
+            key_values=user_ips_keys,
+            value_names=("user_agent", "device_id", "last_seen"),
+            value_values=user_ips_values,
+            lock=False,
+        )
 
         def update_devices() -> None:
             # Keys and values for the `devices` update.
