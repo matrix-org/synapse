@@ -573,7 +573,7 @@ class StateResolutionHandler:
         """
         group_names = frozenset(state_groups_ids.keys())
 
-        with (await self.resolve_linearizer.queue(group_names)):
+        async with self.resolve_linearizer.queue(group_names):
             cache = self._state_cache.get(group_names, None)
             if cache:
                 return cache

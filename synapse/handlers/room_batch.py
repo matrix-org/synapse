@@ -156,8 +156,8 @@ class RoomBatchHandler:
     ) -> List[str]:
         """Takes all `state_events_at_start` event dictionaries and creates/persists
         them in a floating state event chain which don't resolve into the current room
-        state. They are floating because they reference no prev_events and are marked
-        as outliers which disconnects them from the normal DAG.
+        state. They are floating because they reference no prev_events which disconnects
+        them from the normal DAG.
 
         Args:
             state_events_at_start:
@@ -213,31 +213,23 @@ class RoomBatchHandler:
                     room_id=room_id,
                     action=membership,
                     content=event_dict["content"],
-                    # Mark as an outlier to disconnect it from the normal DAG
-                    # and not show up between batches of history.
-                    outlier=True,
                     historical=True,
                     # Only the first event in the state chain should be floating.
                     # The rest should hang off each other in a chain.
                     allow_no_prev_events=index == 0,
                     prev_event_ids=prev_event_ids_for_state_chain,
-                    # Since each state event is marked as an outlier, the
-                    # `EventContext.for_outlier()` won't have any `state_ids`
-                    # set and therefore can't derive any state even though the
-                    # prev_events are set. Also since the first event in the
-                    # state chain is floating with no `prev_events`, it can't
-                    # derive state from anywhere automatically. So we need to
-                    # set some state explicitly.
+                    # The first event in the state chain is floating with no
+                    # `prev_events` which means it can't derive state from
+                    # anywhere automatically. So we need to set some state
+                    # explicitly.
                     #
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same
-                    # reference and also update in the event when we append later.
+                    # reference and also update in the event when we append
+                    # later.
                     state_event_ids=state_event_ids.copy(),
                 )
             else:
-                # TODO: Add some complement tests that adds state that is not member joins
-                # and will use this code path. Maybe we only want to support join state events
-                # and can get rid of this `else`?
                 (
                     event,
                     _,
@@ -246,21 +238,15 @@ class RoomBatchHandler:
                         state_event["sender"], app_service_requester.app_service
                     ),
                     event_dict,
-                    # Mark as an outlier to disconnect it from the normal DAG
-                    # and not show up between batches of history.
-                    outlier=True,
                     historical=True,
                     # Only the first event in the state chain should be floating.
                     # The rest should hang off each other in a chain.
                     allow_no_prev_events=index == 0,
                     prev_event_ids=prev_event_ids_for_state_chain,
-                    # Since each state event is marked as an outlier, the
-                    # `EventContext.for_outlier()` won't have any `state_ids`
-                    # set and therefore can't derive any state even though the
-                    # prev_events are set. Also since the first event in the
-                    # state chain is floating with no `prev_events`, it can't
-                    # derive state from anywhere automatically. So we need to
-                    # set some state explicitly.
+                    # The first event in the state chain is floating with no
+                    # `prev_events` which means it can't derive state from
+                    # anywhere automatically. So we need to set some state
+                    # explicitly.
                     #
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same

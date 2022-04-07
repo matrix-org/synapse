@@ -69,7 +69,7 @@ class EventSources:
         )
         return token
 
-    def get_current_token_for_pagination(self) -> StreamToken:
+    async def get_current_token_for_pagination(self, room_id: str) -> StreamToken:
         """Get the current token for a given room to be used to paginate
         events.
 
@@ -80,7 +80,7 @@ class EventSources:
             The current token for pagination.
         """
         token = StreamToken(
-            room_key=self.sources.room.get_current_key(),
+            room_key=await self.sources.room.get_current_key_for_room(room_id),
             presence_key=0,
             typing_key=0,
             receipt_key=0,

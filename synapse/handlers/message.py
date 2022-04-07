@@ -847,7 +847,7 @@ class EventCreationHandler:
         # a situation where event persistence can't keep up, causing
         # extremities to pile up, which in turn leads to state resolution
         # taking longer.
-        with (await self.limiter.queue(event_dict["room_id"])):
+        async with self.limiter.queue(event_dict["room_id"]):
             if txn_id and requester.access_token_id:
                 existing_event_id = await self.store.get_event_id_from_transaction_id(
                     event_dict["room_id"],

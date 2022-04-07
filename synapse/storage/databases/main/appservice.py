@@ -29,7 +29,9 @@ from synapse.storage._base import db_to_json
 from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
-from synapse.types import JsonDict
+from synapse.storage.types import Cursor
+from synapse.storage.util.sequence import build_sequence_generator
+from synapse.types import DeviceListUpdates, JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import _CacheContext, cached
 
@@ -71,6 +73,22 @@ class ApplicationServiceWorkerStore(RoomMemberWorkerStore):
             hs.hostname, hs.config.appservice.app_service_config_files
         )
         self.exclusive_user_regex = _make_exclusive_regex(self.services_cache)
+
+        def get_max_as_txn_id(txn: Cursor) -> int:
+            logger.warning("Falling back to slow query, you should port to postgres")
+            txn.execute(
+                "SELECT COALESCE(max(txn_id), 0) FROM application_services_txns"
+            )
+            return txn.fetchone()[0]  # type: ignore
+
+        self._as_txn_seq_gen = build_sequence_generator(
+            db_conn,
+            database.engine,
+            get_max_as_txn_id,
+            "application_services_txn_id_seq",
+            table="application_services_txns",
+            id_column="txn_id",
+        )
 
         super().__init__(database, db_conn, hs)
 
@@ -217,6 +235,7 @@ class ApplicationServiceTransactionWorkerStore(
         to_device_messages: List[JsonDict],
         one_time_key_counts: TransactionOneTimeKeyCounts,
         unused_fallback_keys: TransactionUnusedFallbackKeys,
+        device_list_summary: DeviceListUpdates,
     ) -> AppServiceTransaction:
         """Atomically creates a new transaction for this application service
         with the given list of events. Ephemeral events are NOT persisted to the
@@ -231,27 +250,14 @@ class ApplicationServiceTransactionWorkerStore(
                 appservice devices in the transaction.
             unused_fallback_keys: Lists of unused fallback keys for relevant
                 appservice devices in the transaction.
+            device_list_summary: The device list summary to include in the transaction.
 
         Returns:
             A new transaction.
         """
 
         def _create_appservice_txn(txn):
-            # work out new txn id (highest txn id for this service += 1)
-            # The highest id may be the last one sent (in which case it is last_txn)
-            # or it may be the highest in the txns list (which are waiting to be/are
-            # being sent)
-            last_txn_id = self._get_last_txn(txn, service.id)
-
-            txn.execute(
-                "SELECT MAX(txn_id) FROM application_services_txns WHERE as_id=?",
-                (service.id,),
-            )
-            highest_txn_id = txn.fetchone()[0]
-            if highest_txn_id is None:
-                highest_txn_id = 0
-
-            new_txn_id = max(highest_txn_id, last_txn_id) + 1
+            new_txn_id = self._as_txn_seq_gen.get_next_id_txn(txn)
 
             # Insert new txn into txn table
             event_ids = json_encoder.encode([e.event_id for e in events])
@@ -268,6 +274,7 @@ class ApplicationServiceTransactionWorkerStore(
                 to_device_messages=to_device_messages,
                 one_time_key_counts=one_time_key_counts,
                 unused_fallback_keys=unused_fallback_keys,
+                device_list_summary=device_list_summary,
             )
 
         return await self.db_pool.runInteraction(
@@ -283,25 +290,8 @@ class ApplicationServiceTransactionWorkerStore(
             txn_id: The transaction ID being completed.
             service: The application service which was sent this transaction.
         """
-        txn_id = int(txn_id)
 
         def _complete_appservice_txn(txn):
-            # Debugging query: Make sure the txn being completed is EXACTLY +1 from
-            # what was there before. If it isn't, we've got problems (e.g. the AS
-            # has probably missed some events), so whine loudly but still continue,
-            # since it shouldn't fail completion of the transaction.
-            last_txn_id = self._get_last_txn(txn, service.id)
-            if (last_txn_id + 1) != txn_id:
-                logger.error(
-                    "appservice: Completing a transaction which has an ID > 1 from "
-                    "the last ID sent to this AS. We've either dropped events or "
-                    "sent it to the AS out of order. FIX ME. last_txn=%s "
-                    "completing_txn=%s service_id=%s",
-                    last_txn_id,
-                    txn_id,
-                    service.id,
-                )
-
             # Set current txn_id for AS to 'txn_id'
             self.db_pool.simple_upsert_txn(
                 txn,
@@ -359,8 +349,8 @@ class ApplicationServiceTransactionWorkerStore(
 
         events = await self.get_events_as_list(event_ids)
 
-        # TODO: to-device messages, one-time key counts and unused fallback keys
-        #       are not yet populated for catch-up transactions.
+        # TODO: to-device messages, one-time key counts, device list summaries and unused
+        #       fallback keys are not yet populated for catch-up transactions.
         #       We likely want to populate those for reliability.
         return AppServiceTransaction(
             service=service,
@@ -370,18 +360,8 @@ class ApplicationServiceTransactionWorkerStore(
             to_device_messages=[],
             one_time_key_counts={},
             unused_fallback_keys={},
+            device_list_summary=DeviceListUpdates(),
         )
-
-    def _get_last_txn(self, txn, service_id: Optional[str]) -> int:
-        txn.execute(
-            "SELECT last_txn FROM application_services_state WHERE as_id=?",
-            (service_id,),
-        )
-        last_txn_id = txn.fetchone()
-        if last_txn_id is None or last_txn_id[0] is None:  # no row exists
-            return 0
-        else:
-            return int(last_txn_id[0])  # select 'last_txn' col
 
     async def set_appservice_last_pos(self, pos: int) -> None:
         def set_appservice_last_pos_txn(txn):
@@ -430,7 +410,7 @@ class ApplicationServiceTransactionWorkerStore(
     async def get_type_stream_id_for_appservice(
         self, service: ApplicationService, type: str
     ) -> int:
-        if type not in ("read_receipt", "presence", "to_device"):
+        if type not in ("read_receipt", "presence", "to_device", "device_list"):
             raise ValueError(
                 "Expected type to be a valid application stream id type, got %s"
                 % (type,)
@@ -446,7 +426,8 @@ class ApplicationServiceTransactionWorkerStore(
             )
             last_stream_id = txn.fetchone()
             if last_stream_id is None or last_stream_id[0] is None:  # no row exists
-                return 0
+                # Stream tokens always start from 1, to avoid foot guns around `0` being falsey.
+                return 1
             else:
                 return int(last_stream_id[0])
 
@@ -457,7 +438,7 @@ class ApplicationServiceTransactionWorkerStore(
     async def set_appservice_stream_type_pos(
         self, service: ApplicationService, stream_type: str, pos: Optional[int]
     ) -> None:
-        if stream_type not in ("read_receipt", "presence", "to_device"):
+        if stream_type not in ("read_receipt", "presence", "to_device", "device_list"):
             raise ValueError(
                 "Expected type to be a valid application stream id type, got %s"
                 % (stream_type,)

@@ -397,7 +397,7 @@ class RulesForRoom:
             self.room_push_rule_cache_metrics.inc_hits()
             return self.data.rules_by_user
 
-        with (await self.linearizer.queue(self.room_id)):
+        async with self.linearizer.queue(self.room_id):
             if state_group and self.data.state_group == state_group:
                 logger.debug("Using cached rules for %r", self.room_id)
                 self.room_push_rule_cache_metrics.inc_hits()
