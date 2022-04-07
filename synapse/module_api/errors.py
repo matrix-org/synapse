@@ -20,10 +20,15 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.config._base import ConfigError
+from synapse.rest.client.push_rule import InvalidRuleException
+from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
 
 __all__ = [
     "InvalidClientCredentialsError",
     "RedirectException",
     "SynapseError",
     "ConfigError",
+    "InvalidRuleException",
+    "RuleNotFoundException",
+    "InconsistentRuleException",
 ]

@@ -97,6 +97,14 @@ from synapse.logging.context import (
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client.login import LoginResponse
+from synapse.rest.client.push_rule import (
+    InvalidRuleException,
+    RuleSpec,
+    _check_actions,
+    _namespaced_rule_id,
+    _namespaced_rule_id_from_spec,
+    _priority_class_from_spec,
+)
 from synapse.storage import DataStore
 from synapse.storage.background_updates import (
     DEFAULT_BATCH_SIZE_CALLBACK,
@@ -192,6 +200,7 @@ class ModuleApi:
         self._clock: Clock = hs.get_clock()
         self._registration_handler = hs.get_registration_handler()
         self._send_email_handler = hs.get_send_email_handler()
+        self._notifier = hs.get_notifier()
         self.custom_template_dir = hs.config.server.custom_template_directory
 
         try:
@@ -1339,6 +1348,91 @@ class ModuleApi:
 
         """
         await self._store.add_user_bound_threepid(user_id, medium, address, id_server)
+
+    async def add_push_rule_for_user(
+        self,
+        user_id: str,
+        scope: str,
+        kind: str,
+        rule_id: str,
+        conditions: List[Dict[str, Any]],
+        actions: List[Union[str, Dict[str, str]]],
+        before: Optional[str] = None,
+        after: Optional[str] = None,
+    ) -> None:
+        """Adds a new push rule for the given user.
+
+        See https://spec.matrix.org/latest/client-server-api/#push-rules for more
+        information about the push rules syntax.
+
+        This method can only be called on the main process.
+
+        Added in Synapse v1.58.0.
+
+        Args:
+            user_id: The ID of the user to add the push rule for.
+            scope: The push rule's scope. Currently, the only supported scope is "global".
+            kind: The rule's kind.
+            rule_id: The rule's identifier.
+            conditions: The conditions to match to trigger the actions.
+            actions: The actions to trigger if all conditions are met.
+            before: If set, the new rule will be the next most important rule relative to
+                the given rule. Must be a user-defined rule (as opposed to a server-defined
+                one).
+            after: If set, the new rule will be the next least important rule relative to
+                the given rule. Must be a user-defined rule (as opposed to a server-defined
+                one).
+
+        Raises:
+            synapse.module_api.errors.SynapseError if the module attempts to add a push
+                rule on a worker, or to add a push rule for a remote user.
+            synapse.module_api.errors.InvalidRuleException if the rule is not compliant
+                with the Matrix spec.
+            synapse.module_api.errors.RuleNotFoundException if the rule referred to by
+                before or after can't be found.
+            synapse.module_api.errors.InconsistentRuleException if the priority of the
+                rule's kind is not compatible with those of the rules referred to by
+                before or after.
+        """
+        if not self.is_mine(user_id):
+            raise SynapseError(500, "Can only create push rules for local users")
+
+        if self.worker_app is not None:
+            raise SynapseError(500, "Can't create push rules on a worker")
+
+        # At this point we know we're on the main process so the store should not be a
+        # GenericWorkerSlavedStore.
+        assert isinstance(self._store, DataStore)
+
+        spec = RuleSpec(scope, kind, rule_id, None)
+        priority_class = _priority_class_from_spec(spec)
+
+        if spec.rule_id.startswith("."):
+            # Rule ids starting with '.' are reserved for server default rules.
+            raise InvalidRuleException(
+                400, "cannot add new rule_ids that start with '.'"
+            )
+
+        if before:
+            before = _namespaced_rule_id(spec, before)
+
+        if after:
+            after = _namespaced_rule_id(spec, after)
+
+        _check_actions(actions)
+
+        await self._store.add_push_rule(
+            user_id=user_id,
+            rule_id=_namespaced_rule_id_from_spec(spec),
+            priority_class=priority_class,
+            conditions=conditions,
+            actions=actions,
+            before=before,
+            after=after,
+        )
+
+        stream_id = self._store.get_max_push_rules_stream_id()
+        self._notifier.on_new_event("push_rules_key", stream_id, users=[user_id])
 
 
 class PublicRoomListManager:

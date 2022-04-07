@@ -20,7 +20,7 @@ from synapse.events import EventBase
 from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
 from synapse.rest import admin
-from synapse.rest.client import login, presence, profile, room
+from synapse.rest.client import login, notifications, presence, profile, room
 from synapse.types import create_requester
 
 from tests.events.test_presence_router import send_presence_update, sync_presence
@@ -38,6 +38,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         room.register_servlets,
         presence.register_servlets,
         profile.register_servlets,
+        notifications.register_servlets,
     ]
 
     def prepare(self, reactor, clock, homeserver):
@@ -552,6 +553,74 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertEqual(state[("org.matrix.test", "")].sender, user_id)
         self.assertEqual(state[("org.matrix.test", "")].state_key, "")
         self.assertEqual(state[("org.matrix.test", "")].content, {})
+
+    def test_add_push_rule(self) -> None:
+        """Test that a module can set a custom push rule for a user."""
+
+        # Create a room with 2 users in it. Push rules must not match if the user is the
+        # event's sender, so we need one user to send messages and one user to receive
+        # notifications.
+        user_id = self.register_user("user", "password")
+        tok = self.login("user", "password")
+
+        room_id = self.helper.create_room_as(user_id, is_public=True, tok=tok)
+
+        user_id2 = self.register_user("user2", "password")
+        tok2 = self.login("user2", "password")
+        self.helper.join(room_id, user_id2, tok=tok2)
+
+        # Set a push rule that doesn't notify for events with the word "testword" in it.
+        # This makes sense because we notify for every message by default, so to test
+        # that our change had any impact the easiest way is to not notify on something.
+        self.get_success(
+            defer.ensureDeferred(
+                self.module_api.add_push_rule_for_user(
+                    user_id=user_id,
+                    scope="global",
+                    kind="content",
+                    rule_id="test",
+                    conditions=[
+                        {
+                            "kind": "event_match",
+                            "key": "content.body",
+                            "pattern": "testword",
+                        }
+                    ],
+                    actions=["dont_notify"],
+                )
+            )
+        )
+
+        # Send a message as the second user containing this word, and check that it
+        # didn't notify.
+        self.helper.send(room_id=room_id, body="here's a testword", tok=tok2)
+
+        channel = self.make_request(
+            "GET",
+            "/notifications",
+            access_token=tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(len(channel.json_body["notifications"]), 0)
+
+        # Send a message as the second user not containing "testword" and check that it
+        # still notifies.
+        res = self.helper.send(room_id=room_id, body="here's a word", tok=tok2)
+        event_id = res["event_id"]
+
+        channel = self.make_request(
+            "GET",
+            "/notifications",
+            access_token=tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self.assertEqual(len(channel.json_body["notifications"]), 1, channel.json_body)
+        self.assertEqual(
+            channel.json_body["notifications"][0]["event"]["event_id"],
+            event_id,
+            channel.json_body,
+        )
 
 
 class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
