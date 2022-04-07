@@ -20,8 +20,10 @@ import abc
 import logging
 from typing import Optional, Tuple, Type, TypeVar
 
+import orjson
+
 from synapse.replication.tcp.streams._base import StreamRow
-from synapse.util import json_decoder, json_encoder
+from synapse.util import json_encoder
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +132,7 @@ class RdataCommand(Command):
             stream_name,
             instance_name,
             None if token == "batch" else int(token),
-            json_decoder.decode(row_json),
+            orjson.loads(row_json),
         )
 
     def to_line(self) -> str:
@@ -370,7 +372,7 @@ class UserIpCommand(Command):
     def from_line(cls: Type["UserIpCommand"], line: str) -> "UserIpCommand":
         user_id, jsn = line.split(" ", 1)
 
-        access_token, ip, user_agent, device_id, last_seen = json_decoder.decode(jsn)
+        access_token, ip, user_agent, device_id, last_seen = orjson.loads(jsn)
 
         return cls(user_id, access_token, ip, user_agent, device_id, last_seen)
 
