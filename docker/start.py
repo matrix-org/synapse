@@ -9,8 +9,6 @@ import sys
 
 import jinja2
 
-VIRTUALENV_INTERPRETER = "/synapse/.venv/bin/python"
-
 
 # Utility functions
 def log(txt):
@@ -110,7 +108,7 @@ def generate_config_from_template(config_dir, config_path, environ, ownership):
 
     # Hopefully we already have a signing key, but generate one if not.
     args = [
-        VIRTUALENV_INTERPRETER,
+        sys.executable,
         "-m",
         "synapse.app.homeserver",
         "--config-path",
@@ -160,7 +158,7 @@ def run_generate_config(environ, ownership):
 
     # generate the main config file, and a signing key.
     args = [
-        VIRTUALENV_INTERPRETER,
+        sys.executable,
         "-m",
         "synapse.app.homeserver",
         "--server-name",
@@ -177,7 +175,7 @@ def run_generate_config(environ, ownership):
         "--open-private-ports",
     ]
     # log("running %s" % (args, ))
-    os.execv(VIRTUALENV_INTERPRETER, args)
+    os.execv(sys.executable, args)
 
 
 def main(args, environ):
@@ -256,12 +254,12 @@ running with 'migrate_config'. See the README for more details.
 
     log("Starting synapse with args " + " ".join(args))
 
-    args = [VIRTUALENV_INTERPRETER] + args
+    args = [sys.executable] + args
     if ownership is not None:
         args = ["gosu", ownership] + args
         os.execve("/usr/sbin/gosu", args, environ)
     else:
-        os.execve(VIRTUALENV_INTERPRETER, args, environ)
+        os.execve(sys.executable, args, environ)
 
 
 if __name__ == "__main__":
