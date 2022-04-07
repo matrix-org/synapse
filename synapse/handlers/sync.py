@@ -1155,8 +1155,9 @@ class SyncHandler:
                 await self.store.get_e2e_unused_fallback_key_types(user_id, device_id)
             )
 
-        logger.debug("Fetching group data")
-        await self._generate_sync_entry_for_groups(sync_result_builder)
+        if self.hs_config.experimental.groups_enabled:
+            logger.debug("Fetching group data")
+            await self._generate_sync_entry_for_groups(sync_result_builder)
 
         num_events = 0
 
