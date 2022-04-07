@@ -59,10 +59,14 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Patch dependencies
-        run: >-
-          ln -s -T /venv /src/.venv &&
-          .ci/patch_for_twisted_trunk.sh &&
-          unlink /src/.venv
+        # Note: The script below runs poetry against a virtualenv in /src/.venv/
+        #       ...but the sytest-synapse container expects it to be in /venv/
+        #       So we temporarily symlink it, run poetry, then remove the link.
+        #       Tidying up is important because `/src` is a mounted volume.
+        run: |
+          ln -s -T /venv /src/.venv
+          .ci/patch_for_twisted_trunk.sh
+          rm /src/.venv
         working-directory: /src
       - name: Run SyTest
         run: /bootstrap.sh synapse
