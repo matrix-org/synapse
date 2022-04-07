@@ -100,7 +100,7 @@ class KeyConfig(Config):
     section = "key"
 
     def read_config(
-        self, config: JsonDict, config_dir_path: Optional[str], **kwargs: Any
+        self, config: JsonDict, config_dir_path: str, **kwargs: Any
     ) -> None:
         # the signing key can be specified inline or in a separate file
         if "signing_key" in config:
