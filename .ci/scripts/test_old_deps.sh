@@ -20,11 +20,6 @@ export LANG="C.UTF-8"
 # Prevent virtualenv from auto-updating pip to an incompatible version
 export VIRTUALENV_NO_DOWNLOAD=1
 
-# I'd prefer to use something like this
-#   https://github.com/python-poetry/poetry/issues/3527
-#   https://github.com/pypa/pip/issues/8085
-# rather than this sed script. But that's an Opinion.
-
 # Patch the project definitions in-place:
 # - Replace all lower and tilde bounds with exact bounds
 # - Make the pyopenssl 17.0, which is the oldest version that works with
@@ -40,6 +35,11 @@ export VIRTUALENV_NO_DOWNLOAD=1
 # `python = "^3.7"` to `python = "==3.7"`, which would mean we fail because olddeps
 # runs on 3.8 (#12343).
 
+# TODO: I'd prefer to use something like this
+#   https://github.com/python-poetry/poetry/issues/3527
+#   https://github.com/pypa/pip/issues/8085
+# rather than this sed script.
+
 sed -i-backup \
    -e "s/[~>]=/==/g" \
    -e "/psycopg2/d" \
@@ -48,13 +48,14 @@ sed -i-backup \
    -e '/systemd/d' \
    pyproject.toml
 
-# Use poetry to do the installation. This ensures that the versions are all mutually
-# compatible (as far the package metadata declares, anyway); pip's package resolver
-# is more lax.
+# TODO: once pyproject.toml uses poetry-core as its build-system, we may be able to
+# simply `pip install .[all, test]` and run trial directly. (We would have to convince
+# ourselves that pip will refuse to install if the olddeps are incompatible with each
+# other: folklore contends that pip's resolver is more lax than poetry's.)
 #
-# Rather than `poetry install --no-dev`, we drop all dev dependencies from the
-# toml file. This means we don't have to ensure compatibility between old deps and
-# dev tools.
+# Until then, setuptools is the build system. That means we need to use `poetry` to
+# do the installation. `poetry lock` fails because of incompatibilities between dev
+# dependencies and old deps. Workaround this by removing dev dependencies entirely.
 
 pip install --user toml
 
@@ -70,11 +71,15 @@ with open('pyproject.toml', 'w') as f:
 "
 python3 -c "$REMOVE_DEV_DEPENDENCIES"
 
+pipx install poetry==1.1.12
+~/.local/bin/poetry lock
+
 echo "::group::Patched pyproject.toml"
 cat pyproject.toml
 echo "::endgroup::"
+echo "::group::Lockfile after patch"
+cat poetry.lock
+echo "::endgroup::"
 
-pipx install poetry==1.1.12
-~/.local/bin/poetry lock
 ~/.local/bin/poetry install -E "all test"
 ~/.local/bin/poetry run trial --jobs=2 tests
