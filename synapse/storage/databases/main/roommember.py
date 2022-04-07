@@ -361,7 +361,10 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return None
 
     async def get_rooms_for_local_user_where_membership_is(
-        self, user_id: str, membership_list: Collection[str]
+        self,
+        user_id: str,
+        membership_list: Collection[str],
+        excluded_rooms: Optional[List[str]] = None,
     ) -> List[RoomsForUser]:
         """Get all the rooms for this *local* user where the membership for this user
         matches one in the membership list.
@@ -372,6 +375,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             user_id: The user ID.
             membership_list: A list of synapse.api.constants.Membership
                 values which the user must be in.
+            excluded_rooms: A list of rooms to ignore.
 
         Returns:
             The RoomsForUser that the user matches the membership types.
@@ -386,12 +390,19 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             membership_list,
         )
 
-        # Now we filter out forgotten rooms
-        forgotten_rooms = await self.get_forgotten_rooms_for_user(user_id)
-        return [room for room in rooms if room.room_id not in forgotten_rooms]
+        # Now we filter out forgotten and excluded rooms
+        rooms_to_exclude: Set[str] = await self.get_forgotten_rooms_for_user(user_id)
+
+        if excluded_rooms is not None:
+            rooms_to_exclude.update(set(excluded_rooms))
+
+        return [room for room in rooms if room.room_id not in rooms_to_exclude]
 
     def _get_rooms_for_local_user_where_membership_is_txn(
-        self, txn, user_id: str, membership_list: List[str]
+        self,
+        txn,
+        user_id: str,
+        membership_list: List[str],
     ) -> List[RoomsForUser]:
         # Paranoia check.
         if not self.hs.is_mine_id(user_id):
@@ -877,7 +888,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             return frozenset(cache.hosts_to_joined_users)
 
         # Since we'll mutate the cache we need to lock.
-        with (await self._joined_host_linearizer.queue(room_id)):
+        async with self._joined_host_linearizer.queue(room_id):
             if state_entry.state_group == cache.state_group:
                 # Same state group, so nothing to do. We've already checked for
                 # this above, but the cache may have changed while waiting on

@@ -22,7 +22,6 @@ import warnings
 from collections import deque
 from io import SEEK_END, BytesIO
 from typing import (
-    AnyStr,
     Callable,
     Dict,
     Iterable,
@@ -77,6 +76,7 @@ from tests.utils import (
     POSTGRES_BASE_DB,
     POSTGRES_HOST,
     POSTGRES_PASSWORD,
+    POSTGRES_PORT,
     POSTGRES_USER,
     SQLITE_PERSIST_DB,
     USE_POSTGRES_FOR_TESTS,
@@ -85,6 +85,9 @@ from tests.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+# the type of thing that can be passed into `make_request` in the headers list
+CustomHeaderType = Tuple[Union[str, bytes], Union[str, bytes]]
 
 
 class TimedOutException(Exception):
@@ -260,7 +263,7 @@ def make_request(
     federation_auth_origin: Optional[bytes] = None,
     content_is_form: bool = False,
     await_result: bool = True,
-    custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
+    custom_headers: Optional[Iterable[CustomHeaderType]] = None,
     client_ip: str = "127.0.0.1",
 ) -> FakeChannel:
     """
@@ -745,6 +748,7 @@ def setup_test_homeserver(
                 "host": POSTGRES_HOST,
                 "password": POSTGRES_PASSWORD,
                 "user": POSTGRES_USER,
+                "port": POSTGRES_PORT,
                 "cp_min": 1,
                 "cp_max": 5,
             },
@@ -784,6 +788,7 @@ def setup_test_homeserver(
             database=POSTGRES_BASE_DB,
             user=POSTGRES_USER,
             host=POSTGRES_HOST,
+            port=POSTGRES_PORT,
             password=POSTGRES_PASSWORD,
         )
         db_conn.autocommit = True
@@ -831,6 +836,7 @@ def setup_test_homeserver(
                 database=POSTGRES_BASE_DB,
                 user=POSTGRES_USER,
                 host=POSTGRES_HOST,
+                port=POSTGRES_PORT,
                 password=POSTGRES_PASSWORD,
             )
             db_conn.autocommit = True

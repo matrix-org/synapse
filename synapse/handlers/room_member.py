@@ -517,14 +517,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         # We first linearise by the application service (to try to limit concurrent joins
         # by application services), and then by room ID.
-        with (await self.member_as_limiter.queue(as_id)):
+        async with self.member_as_limiter.queue(as_id):
             diff = self.clock.time_msec() - then
 
             if diff > 80 * 1000:
                 # haproxy would have timed the request out anyway...
                 raise SynapseError(504, "took to long to process")
 
-            with (await self.member_linearizer.queue(key)):
+            async with self.member_linearizer.queue(key):
                 diff = self.clock.time_msec() - then
 
                 if diff > 80 * 1000:

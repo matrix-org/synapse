@@ -33,7 +33,7 @@ A module can implement the following static method:
 
 ```python
 @staticmethod
-def parse_config(config: dict) -> dict
+def parse_config(config: dict) -> Any
 ```
 
 This method is given a dictionary resulting from parsing the YAML configuration for the

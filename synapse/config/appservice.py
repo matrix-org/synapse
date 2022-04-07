@@ -170,6 +170,7 @@ def _load_appservice(
     # When enabled, appservice transactions contain the following information:
     #  - device One-Time Key counts
     #  - device unused fallback key usage states
+    #  - device list changes
     msc3202_transaction_extensions = as_info.get("org.matrix.msc3202", False)
     if not isinstance(msc3202_transaction_extensions, bool):
         raise ValueError(

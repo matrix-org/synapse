@@ -441,7 +441,14 @@ class PaginationHandler:
         if pagin_config.from_token:
             from_token = pagin_config.from_token
         else:
-            from_token = self.hs.get_event_sources().get_current_token_for_pagination()
+            from_token = (
+                await self.hs.get_event_sources().get_current_token_for_pagination(
+                    room_id
+                )
+            )
+            # We expect `/messages` to use historic pagination tokens by default but
+            # `/messages` should still works with live tokens when manually provided.
+            assert from_token.room_key.topological
 
         if pagin_config.limit is None:
             # This shouldn't happen as we've set a default limit before this
