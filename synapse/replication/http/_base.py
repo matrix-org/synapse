@@ -275,7 +275,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                             if attempts > cls.RETRY_ON_CONNECT_ERROR_ATTEMPTS:
                                 raise
 
-                            delay = 2 ** attempts
+                            delay = 2**attempts
                             logger.warning(
                                 "%s request connection failed; retrying in %ds: %r",
                                 cls.NAME,

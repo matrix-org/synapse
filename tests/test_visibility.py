@@ -17,6 +17,7 @@ from unittest.mock import patch
 
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase, make_event_from_dict
+from synapse.events.snapshot import EventContext
 from synapse.types import JsonDict, create_requester
 from synapse.visibility import filter_events_for_client, filter_events_for_server
 
@@ -47,17 +48,15 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         #
 
         # before we do that, we persist some other events to act as state.
-        self.get_success(self._inject_visibility("@admin:hs", "joined"))
+        self._inject_visibility("@admin:hs", "joined")
         for i in range(0, 10):
-            self.get_success(self._inject_room_member("@resident%i:hs" % i))
+            self._inject_room_member("@resident%i:hs" % i)
 
         events_to_filter = []
 
         for i in range(0, 10):
             user = "@user%i:%s" % (i, "test_server" if i == 5 else "other_server")
-            evt = self.get_success(
-                self._inject_room_member(user, extra_content={"a": "b"})
-            )
+            evt = self._inject_room_member(user, extra_content={"a": "b"})
             events_to_filter.append(evt)
 
         filtered = self.get_success(
@@ -73,24 +72,57 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
             self.assertEqual(events_to_filter[i].event_id, filtered[i].event_id)
             self.assertEqual(filtered[i].content["a"], "b")
 
+    def test_filter_outlier(self) -> None:
+        # outlier events must be returned, for the good of the collective federation
+        self._inject_room_member("@resident:remote_hs")
+        self._inject_visibility("@resident:remote_hs", "joined")
+
+        outlier = self._inject_outlier()
+        self.assertEqual(
+            self.get_success(
+                filter_events_for_server(self.storage, "remote_hs", [outlier])
+            ),
+            [outlier],
+        )
+
+        # it should also work when there are other events in the list
+        evt = self._inject_message("@unerased:local_hs")
+
+        filtered = self.get_success(
+            filter_events_for_server(self.storage, "remote_hs", [outlier, evt])
+        )
+        self.assertEqual(len(filtered), 2, f"expected 2 results, got: {filtered}")
+        self.assertEqual(filtered[0], outlier)
+        self.assertEqual(filtered[1].event_id, evt.event_id)
+        self.assertEqual(filtered[1].content, evt.content)
+
+        # ... but other servers should only be able to see the outlier (the other should
+        # be redacted)
+        filtered = self.get_success(
+            filter_events_for_server(self.storage, "other_server", [outlier, evt])
+        )
+        self.assertEqual(filtered[0], outlier)
+        self.assertEqual(filtered[1].event_id, evt.event_id)
+        self.assertNotIn("body", filtered[1].content)
+
     def test_erased_user(self) -> None:
         # 4 message events, from erased and unerased users, with a membership
         # change in the middle of them.
         events_to_filter = []
 
-        evt = self.get_success(self._inject_message("@unerased:local_hs"))
+        evt = self._inject_message("@unerased:local_hs")
         events_to_filter.append(evt)
 
-        evt = self.get_success(self._inject_message("@erased:local_hs"))
+        evt = self._inject_message("@erased:local_hs")
         events_to_filter.append(evt)
 
-        evt = self.get_success(self._inject_room_member("@joiner:remote_hs"))
+        evt = self._inject_room_member("@joiner:remote_hs")
         events_to_filter.append(evt)
 
-        evt = self.get_success(self._inject_message("@unerased:local_hs"))
+        evt = self._inject_message("@unerased:local_hs")
         events_to_filter.append(evt)
 
-        evt = self.get_success(self._inject_message("@erased:local_hs"))
+        evt = self._inject_message("@erased:local_hs")
         events_to_filter.append(evt)
 
         # the erasey user gets erased
@@ -185,6 +217,25 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         )
 
         self.get_success(self.storage.persistence.persist_event(event, context))
+        return event
+
+    def _inject_outlier(self) -> EventBase:
+        builder = self.event_builder_factory.for_room_version(
+            RoomVersions.V1,
+            {
+                "type": "m.room.member",
+                "sender": "@test:user",
+                "state_key": "@test:user",
+                "room_id": TEST_ROOM_ID,
+                "content": {"membership": "join"},
+            },
+        )
+
+        event = self.get_success(builder.build(prev_event_ids=[], auth_event_ids=[]))
+        event.internal_metadata.outlier = True
+        self.get_success(
+            self.storage.persistence.persist_event(event, EventContext.for_outlier())
+        )
         return event
 
 

@@ -289,6 +289,9 @@ class SynapseTags:
     # Uniqueish ID of a database transaction
     DB_TXN_ID = "db.txn_id"
 
+    # The name of the external cache
+    CACHE_NAME = "cache.name"
+
 
 class SynapseBaggage:
     FORCE_TRACING = "synapse-force-tracing"

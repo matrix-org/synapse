@@ -62,8 +62,10 @@ from synapse.events.third_party_rules import (
     ON_CREATE_ROOM_CALLBACK,
     ON_NEW_EVENT_CALLBACK,
     ON_PROFILE_UPDATE_CALLBACK,
+    ON_THREEPID_BIND_CALLBACK,
     ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK,
 )
+from synapse.handlers.account_data import ON_ACCOUNT_DATA_UPDATED_CALLBACK
 from synapse.handlers.account_validity import (
     IS_USER_EXPIRED_CALLBACK,
     ON_LEGACY_ADMIN_REQUEST,
@@ -215,6 +217,7 @@ class ModuleApi:
         self._third_party_event_rules = hs.get_third_party_event_rules()
         self._password_auth_provider = hs.get_password_auth_provider()
         self._presence_router = hs.get_presence_router()
+        self._account_data_handler = hs.get_account_data_handler()
 
     #################################################################################
     # The following methods should only be called during the module's initialisation.
@@ -293,6 +296,7 @@ class ModuleApi:
         on_user_deactivation_status_changed: Optional[
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = None,
+        on_threepid_bind: Optional[ON_THREEPID_BIND_CALLBACK] = None,
     ) -> None:
         """Registers callbacks for third party event rules capabilities.
 
@@ -308,6 +312,7 @@ class ModuleApi:
             check_can_deactivate_user=check_can_deactivate_user,
             on_profile_update=on_profile_update,
             on_user_deactivation_status_changed=on_user_deactivation_status_changed,
+            on_threepid_bind=on_threepid_bind,
         )
 
     def register_presence_router_callbacks(
@@ -372,6 +377,19 @@ class ModuleApi:
                 default_batch_size=default_batch_size,
                 min_batch_size=min_batch_size,
             )
+
+    def register_account_data_callbacks(
+        self,
+        *,
+        on_account_data_updated: Optional[ON_ACCOUNT_DATA_UPDATED_CALLBACK] = None,
+    ) -> None:
+        """Registers account data callbacks.
+
+        Added in Synapse 1.57.0.
+        """
+        return self._account_data_handler.register_module_callbacks(
+            on_account_data_updated=on_account_data_updated,
+        )
 
     def register_web_resource(self, path: str, resource: Resource) -> None:
         """Registers a web resource to be served at the given path.
@@ -511,6 +529,17 @@ class ModuleApi:
             True if the user is a server admin, False otherwise.
         """
         return await self._store.is_server_admin(UserID.from_string(user_id))
+
+    async def set_user_admin(self, user_id: str, admin: bool) -> None:
+        """Sets if a user is a server admin.
+
+        Added in Synapse v1.56.0.
+
+        Args:
+            user_id: The Matrix ID of the user to set admin status for.
+            admin: True iff the user is to be a server admin, false otherwise.
+        """
+        await self._store.set_server_admin(UserID.from_string(user_id), admin)
 
     def get_qualified_user_id(self, username: str) -> str:
         """Qualify a user id, if necessary
@@ -671,7 +700,8 @@ class ModuleApi:
     def record_user_external_id(
         self, auth_provider_id: str, remote_user_id: str, registered_user_id: str
     ) -> defer.Deferred:
-        """Record a mapping from an external user id to a mxid
+        """Record a mapping between an external user id from a single sign-on provider
+        and a mxid.
 
         Added in Synapse v1.9.0.
 
@@ -1285,6 +1315,30 @@ class ModuleApi:
             use.
         """
         await self._registration_handler.check_username(username)
+
+    async def store_remote_3pid_association(
+        self, user_id: str, medium: str, address: str, id_server: str
+    ) -> None:
+        """Stores an existing association between a user ID and a third-party identifier.
+
+        The association must already exist on the remote identity server.
+
+        Added in Synapse v1.56.0.
+
+        Args:
+            user_id: The user ID that's been associated with the 3PID.
+            medium: The medium of the 3PID (current supported values are "msisdn" and
+                "email").
+            address: The address of the 3PID.
+            id_server: The identity server the 3PID association has been registered on.
+                This should only be the domain (or IP address, optionally with the port
+                number) for the identity server. This will be used to reach out to the
+                identity server using HTTPS (unless specified otherwise by Synapse's
+                configuration) when attempting to unbind the third-party identifier.
+
+
+        """
+        await self._store.add_user_bound_threepid(user_id, medium, address, id_server)
 
 
 class PublicRoomListManager:

@@ -197,12 +197,10 @@ class PersistEventsStore:
             )
             persist_event_counter.inc(len(events_and_contexts))
 
-            if stream < 0:
-                # backfilled events have negative stream orderings, so we don't
-                # want to set the event_persisted_position to that.
-                synapse.metrics.event_persisted_position.set(
-                    events_and_contexts[-1][0].internal_metadata.stream_ordering
-                )
+            if not use_negative_stream_ordering:
+                # we don't want to set the event_persisted_position to a negative
+                # stream_ordering.
+                synapse.metrics.event_persisted_position.set(stream)
 
             for event, context in events_and_contexts:
                 if context.app_service:
@@ -1743,6 +1741,13 @@ class PersistEventsStore:
             txn.call_after(
                 self.store.get_invited_rooms_for_local_user.invalidate,
                 (event.state_key,),
+            )
+
+            # The `_get_membership_from_event_id` is immutable, except for the
+            # case where we look up an event *before* persisting it.
+            txn.call_after(
+                self.store._get_membership_from_event_id.invalidate,
+                (event.event_id,),
             )
 
             # We update the local_current_membership table only if the event is

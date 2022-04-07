@@ -188,7 +188,7 @@ class FederationServer(FederationBase):
     async def on_backfill_request(
         self, origin: str, room_id: str, versions: List[str], limit: int
     ) -> Tuple[int, Dict[str, Any]]:
-        with (await self._server_linearizer.queue((origin, room_id))):
+        async with self._server_linearizer.queue((origin, room_id)):
             origin_host, _ = parse_server_name(origin)
             await self.check_server_matches_acl(origin_host, room_id)
 
@@ -218,7 +218,7 @@ class FederationServer(FederationBase):
             Tuple indicating the response status code and dictionary response
             body including `event_id`.
         """
-        with (await self._server_linearizer.queue((origin, room_id))):
+        async with self._server_linearizer.queue((origin, room_id)):
             origin_host, _ = parse_server_name(origin)
             await self.check_server_matches_acl(origin_host, room_id)
 
@@ -529,7 +529,7 @@ class FederationServer(FederationBase):
         # in the cache so we could return it without waiting for the linearizer
         # - but that's non-trivial to get right, and anyway somewhat defeats
         # the point of the linearizer.
-        with (await self._server_linearizer.queue((origin, room_id))):
+        async with self._server_linearizer.queue((origin, room_id)):
             resp: JsonDict = dict(
                 await self._state_resp_cache.wrap(
                     (room_id, event_id),
@@ -883,7 +883,7 @@ class FederationServer(FederationBase):
     async def on_event_auth(
         self, origin: str, room_id: str, event_id: str
     ) -> Tuple[int, Dict[str, Any]]:
-        with (await self._server_linearizer.queue((origin, room_id))):
+        async with self._server_linearizer.queue((origin, room_id)):
             origin_host, _ = parse_server_name(origin)
             await self.check_server_matches_acl(origin_host, room_id)
 
@@ -945,7 +945,7 @@ class FederationServer(FederationBase):
         latest_events: List[str],
         limit: int,
     ) -> Dict[str, list]:
-        with (await self._server_linearizer.queue((origin, room_id))):
+        async with self._server_linearizer.queue((origin, room_id)):
             origin_host, _ = parse_server_name(origin)
             await self.check_server_matches_acl(origin_host, room_id)
 
@@ -1092,7 +1092,7 @@ class FederationServer(FederationBase):
         # has started processing).
         while True:
             async with lock:
-                logger.info("handling received PDU: %s", event)
+                logger.info("handling received PDU in room %s: %s", room_id, event)
                 try:
                     with nested_logging_context(event.event_id):
                         await self._federation_event_handler.on_receive_pdu(
