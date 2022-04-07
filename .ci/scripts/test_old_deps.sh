@@ -32,10 +32,12 @@ export VIRTUALENV_NO_DOWNLOAD=1
 # - Delete all lines referring to psycopg2 --- so no testing of postgres support.
 # - Omit systemd: we're not logging to journal here.
 
-# TODO: also replace caret bounds, see https://python-poetry.org/docs/dependency-specification/#version-constraints
-# We don't use these yet, but IIRC they are the default bound used when you `poetry add`.
+# TODO: we should also replace caret bounds, see
+#    https://python-poetry.org/docs/dependency-specification/#version-constraints
+# We don't use these yet, but they are the default bound used when you `poetry add` from
+# the commandline, rather than editing pyproject.toml directly.
 # The sed expression 's/\^/==/g' ought to do the trick. But it would also change
-# `python = "^3.7"` to `python = "==3.7", which would mean we fail because olddeps
+# `python = "^3.7"` to `python = "==3.7"`, which would mean we fail because olddeps
 # runs on 3.8 (#12343).
 
 sed -i-backup \
