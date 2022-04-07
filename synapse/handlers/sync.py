@@ -2135,19 +2135,23 @@ class SyncHandler:
             # we include a summary in room responses when we're lazy loading
             # members (as the client otherwise doesn't have enough info to form
             # the name itself).
-            if sync_config.filter_collection.lazy_load_members() and (
-                # we recalculate the summary:
-                #   if there are membership changes in the timeline, or
-                #   if membership has changed during a gappy sync, or
-                #   if this is an initial sync.
-                any(ev.type == EventTypes.Member for ev in batch.events)
-                or (
-                    # XXX: this may include false positives in the form of LL
-                    # members which have snuck into state
-                    batch.limited
-                    and any(t == EventTypes.Member for (t, k) in state)
+            if (
+                not room_builder.out_of_band
+                and sync_config.filter_collection.lazy_load_members()
+                and (
+                    # we recalculate the summary:
+                    #   if there are membership changes in the timeline, or
+                    #   if membership has changed during a gappy sync, or
+                    #   if this is an initial sync.
+                    any(ev.type == EventTypes.Member for ev in batch.events)
+                    or (
+                        # XXX: this may include false positives in the form of LL
+                        # members which have snuck into state
+                        batch.limited
+                        and any(t == EventTypes.Member for (t, k) in state)
+                    )
+                    or since_token is None
                 )
-                or since_token is None
             ):
                 summary = await self.compute_summary(
                     room_id, sync_config, batch, state, now_token
