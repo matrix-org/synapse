@@ -223,9 +223,7 @@ class ContentRepositoryConfig(Config):
                 "url_preview_accept_language"
             ) or ["en"]
 
-    def generate_config_section(
-        self, data_dir_path: Optional[str], **kwargs: Any
-    ) -> str:
+    def generate_config_section(self, data_dir_path: str, **kwargs: Any) -> str:
         assert data_dir_path is not None
         media_store = os.path.join(data_dir_path, "media_store")
 
