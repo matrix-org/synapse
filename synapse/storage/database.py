@@ -1808,6 +1808,18 @@ class DatabasePool:
         value_values: Iterable[Iterable[Any]],
         desc: str,
     ) -> None:
+        """
+        Update, many times, using batching where possible.
+        If the keys don't match anything, nothing will be updated.
+
+        Args:
+            table: The table to update
+            key_names: The key column names.
+            key_values: A list of each row's key column values.
+            value_names: The names of value columns to update.
+            value_values: A list of each row's value column values.
+        """
+
         return await self.runInteraction(
             desc,
             self.simple_update_many_txn,
@@ -1829,9 +1841,10 @@ class DatabasePool:
     ) -> None:
         """
         Update, many times, using batching where possible.
+        If the keys don't match anything, nothing will be updated.
 
         Args:
-            table: The table to upsert into
+            table: The table to update
             key_names: The key column names.
             key_values: A list of each row's key column values.
             value_names: The names of value columns to update.
