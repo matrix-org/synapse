@@ -67,6 +67,7 @@ from synapse.http.client import (
     read_body_with_max_size,
 )
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
+from synapse.http.types import QueryArgs
 from synapse.logging import opentracing
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import set_tag, start_active_span, tags
@@ -97,10 +98,6 @@ MAXINT = sys.maxsize
 
 
 _next_id = 1
-
-
-QueryArgs = Dict[str, Union[str, List[str]]]
-
 
 T = TypeVar("T")
 

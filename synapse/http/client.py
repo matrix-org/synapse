@@ -22,7 +22,6 @@ from typing import (
     BinaryIO,
     Callable,
     Dict,
-    Iterable,
     List,
     Mapping,
     Optional,
@@ -72,6 +71,7 @@ from twisted.web.iweb import (
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.http import QuieterFileBodyProducer, RequestTimedOutError, redact_uri
 from synapse.http.proxyagent import ProxyAgent
+from synapse.http.types import QueryParams
 from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.types import ISynapseReactor
@@ -96,10 +96,6 @@ RawHeaders = Union[Mapping[str, "RawHeaderValue"], Mapping[bytes, "RawHeaderValu
 # the value actually has to be a List, but List is invariant so we can't specify that
 # the entries can either be Lists or bytes.
 RawHeaderValue = Sequence[Union[str, bytes]]
-
-# the type of the query params, to be passed into `urlencode`
-QueryParamValue = Union[str, bytes, Iterable[Union[str, bytes]]]
-QueryParams = Union[Mapping[str, QueryParamValue], Mapping[bytes, QueryParamValue]]
 
 
 def check_against_blacklist(
