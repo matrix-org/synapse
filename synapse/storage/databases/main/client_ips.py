@@ -638,10 +638,20 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
         user_ips_keys = []
         user_ips_values = []
 
+        # Keys and values for the `devices` update.
+        devices_keys = []
+        devices_values = []
+
         for entry in to_update.items():
             (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
             user_ips_keys.append((user_id, access_token, ip))
             user_ips_values.append((user_agent, device_id, last_seen))
+
+            # Technically an access token might not be associated with
+            # a device so we need to check.
+            if device_id:
+                devices_keys.append((user_id, device_id))
+                devices_values.append((user_agent, last_seen, ip))
 
         self.db_pool.simple_upsert_many_txn(
             txn,
@@ -653,33 +663,14 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
             lock=False,
         )
 
-        def update_devices() -> None:
-            # Keys and values for the `devices` update.
-            keys = []
-            values = []
-
-            for entry in to_update.items():
-                (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
-
-                # Technically an access token might not be associated with
-                # a device so we need to check.
-                if device_id:
-                    keys.append((user_id, device_id))
-                    values.append((user_agent, last_seen, ip))
-
-            self.db_pool.simple_update_many_txn(
-                txn,
-                table="devices",
-                key_names=("user_id", "device_id"),
-                key_values=keys,
-                value_names=("user_agent", "last_seen", "ip"),
-                value_values=values,
-            )
-
-        # This update is split into two smaller functions so that we can
-        # be sure their locals doesn't overlap
-        update_user_ips()
-        update_devices()
+        self.db_pool.simple_update_many_txn(
+            txn,
+            table="devices",
+            key_names=("user_id", "device_id"),
+            key_values=devices_keys,
+            value_names=("user_agent", "last_seen", "ip"),
+            value_values=devices_values,
+        )
 
     async def get_last_client_ip_by_device(
         self, user_id: str, device_id: Optional[str]
