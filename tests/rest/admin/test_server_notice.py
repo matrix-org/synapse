@@ -91,14 +91,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
-    @override_config(
-        {
-            "server_notices": {
-                "system_mxid_localpart": "notices",
-                "system_mxid_display_name": "new display name",
-            }
-        }
-    )
+    @override_config({"server_notices": {"system_mxid_localpart": "notices"}})
     def test_user_is_not_local(self) -> None:
         """
         Tests that a lookup for a user that is not a local returns a HTTPStatus.BAD_REQUEST
@@ -253,7 +246,6 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         {
             "server_notices": {
                 "system_mxid_localpart": "notices",
-                "system_mxid_display_name": "display name",
             }
         }
     )
@@ -433,8 +425,6 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         {
             "server_notices": {
                 "system_mxid_localpart": "notices",
-                "system_mxid_display_name": "display name",
-                "system_mxid_avatar_url": "test/url",
             }
         }
     )
@@ -455,7 +445,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             content=server_notice_request_content,
         )
 
-        # simulates a change in server config after a server restart.
+        # simulate a change in server config after a server restart.
         new_display_name = "new display name"
         self.server_notices_manager._config.servernotices.server_notices_mxid_display_name = (
             new_display_name
@@ -475,18 +465,18 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             room=notice_room_id, user=self.other_user, tok=self.other_user_token
         )
 
-        member_states = self._sync_and_get_member_state(
-            notice_room_id, self.other_user_token, "@notices:test"
+        notice_user_state_in_room = self.helper.get_state(
+            notice_room_id,
+            "m.room.member",
+            self.other_user_token,
+            state_key="@notices:test",
         )
-
-        self.assertEqual(member_states[0]["content"]["displayname"], new_display_name)
+        self.assertEqual(notice_user_state_in_room["displayname"], new_display_name)
 
     @override_config(
         {
             "server_notices": {
                 "system_mxid_localpart": "notices",
-                "system_mxid_display_name": "display name",
-                "system_mxid_avatar_url": "test/url",
             }
         }
     )
@@ -507,7 +497,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             content=server_notice_request_content,
         )
 
-        # simulates a change in server config after a server restart.
+        # simulate a change in server config after a server restart.
         new_avatar_url = "test/new-url"
         self.server_notices_manager._config.servernotices.server_notices_mxid_avatar_url = (
             new_avatar_url
@@ -527,11 +517,13 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             room=notice_room_id, user=self.other_user, tok=self.other_user_token
         )
 
-        member_states = self._sync_and_get_member_state(
-            notice_room_id, self.other_user_token, "@notices:test"
+        notice_user_state = self.helper.get_state(
+            notice_room_id,
+            "m.room.member",
+            self.other_user_token,
+            state_key="@notices:test",
         )
-
-        self.assertEqual(member_states[0]["content"]["avatar_url"], new_avatar_url)
+        self.assertEqual(notice_user_state["avatar_url"], new_avatar_url)
 
     def _check_invite_and_join_status(
         self, user_id: str, expected_invites: int, expected_memberships: int
@@ -578,18 +570,3 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             x for x in room["timeline"]["events"] if x["type"] == "m.room.message"
         ]
         return messages
-
-    def _sync_and_get_member_state(
-        self, room_id: str, token: str, member_id: str
-    ) -> List[JsonDict]:
-        channel = self.make_request(
-            "GET", "/_matrix/client/r0/sync", access_token=token
-        )
-        self.assertEqual(channel.code, HTTPStatus.OK)
-
-        room = channel.json_body["rooms"]["join"][room_id]
-        return [
-            x
-            for x in room["timeline"]["events"]
-            if x["type"] == "m.room.member" and x["state_key"] == member_id
-        ]

@@ -211,7 +211,7 @@ class ServerNoticesManager:
         avatar_url: Optional[str],
     ) -> None:
         """
-        Updates notice user profile if it's different from what it's saved in the room.
+        Updates the notice user's profile if it's different from what is in the room.
 
         Args:
             requester: The user who is performing the update.
@@ -219,7 +219,7 @@ class ServerNoticesManager:
             display_name: The displayname of the server notice user
             avatar_url: The avatar url of the server notice user
         """
-        logger.info("Checking whether notice user profile has changed", room_id)
+        logger.debug("Checking whether notice user profile has changed for %s", room_id)
 
         assert self.server_notices_mxid is not None
 
