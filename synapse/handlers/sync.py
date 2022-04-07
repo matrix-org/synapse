@@ -1850,6 +1850,7 @@ class SyncHandler:
                         full_state=False,
                         since_token=since_token,
                         upto_token=leave_token,
+                        out_of_band=leave_event.internal_metadata.is_out_of_band_membership(),
                     )
                 )
 
@@ -2116,14 +2117,18 @@ class SyncHandler:
             ):
                 return
 
-            state = await self.compute_state_delta(
-                room_id,
-                batch,
-                sync_config,
-                since_token,
-                now_token,
-                full_state=full_state,
-            )
+            if not room_builder.out_of_band:
+                state = await self.compute_state_delta(
+                    room_id,
+                    batch,
+                    sync_config,
+                    since_token,
+                    now_token,
+                    full_state=full_state,
+                )
+            else:
+                # An out of band room won't have any state changes.
+                state = {}
 
             summary: Optional[JsonDict] = {}
 
@@ -2386,6 +2391,8 @@ class RoomSyncResultBuilder:
         full_state: Whether the full state should be sent in result
         since_token: Earliest point to return events from, or None
         upto_token: Latest point to return events from.
+        out_of_band: whether the events in the room are "out of band" events
+            and the server isn't in the room.
     """
 
     room_id: str
@@ -2395,3 +2402,5 @@ class RoomSyncResultBuilder:
     full_state: bool
     since_token: Optional[StreamToken]
     upto_token: StreamToken
+
+    out_of_band: bool = False
