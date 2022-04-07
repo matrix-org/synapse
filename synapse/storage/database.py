@@ -1268,6 +1268,7 @@ class DatabasePool:
         value_names: Collection[str],
         value_values: Collection[Collection[Any]],
         desc: str,
+        lock: bool = True,
     ) -> None:
         """
         Upsert, many times.
@@ -1279,6 +1280,7 @@ class DatabasePool:
             value_names: The value column names
             value_values: A list of each row's value column values.
                 Ignored if value_names is empty.
+            lock: True to lock the table when doing the upsert.
         """
 
         # We can autocommit if we are going to use native upserts
@@ -1294,6 +1296,7 @@ class DatabasePool:
             key_values,
             value_names,
             value_values,
+            lock=lock,
             db_autocommit=autocommit,
         )
 
@@ -1305,6 +1308,7 @@ class DatabasePool:
         key_values: Collection[Iterable[Any]],
         value_names: Collection[str],
         value_values: Iterable[Iterable[Any]],
+        lock: bool = True,
     ) -> None:
         """
         Upsert, many times.
@@ -1316,6 +1320,7 @@ class DatabasePool:
             value_names: The value column names
             value_values: A list of each row's value column values.
                 Ignored if value_names is empty.
+            lock: True to lock the table when doing the upsert.
         """
         if self.engine.can_native_upsert and table not in self._unsafe_to_upsert_tables:
             return self.simple_upsert_many_txn_native_upsert(
@@ -1323,7 +1328,7 @@ class DatabasePool:
             )
         else:
             return self.simple_upsert_many_txn_emulated(
-                txn, table, key_names, key_values, value_names, value_values
+                txn, table, key_names, key_values, value_names, value_values, lock=lock
             )
 
     def simple_upsert_many_txn_emulated(
@@ -1334,6 +1339,7 @@ class DatabasePool:
         key_values: Collection[Iterable[Any]],
         value_names: Collection[str],
         value_values: Iterable[Iterable[Any]],
+        lock: bool = True,
     ) -> None:
         """
         Upsert, many times, but without native UPSERT support or batching.
@@ -1345,6 +1351,7 @@ class DatabasePool:
             value_names: The value column names
             value_values: A list of each row's value column values.
                 Ignored if value_names is empty.
+            lock: True to lock the table when doing the upsert.
         """
         # No value columns, therefore make a blank list so that the following
         # zip() works correctly.
@@ -1355,7 +1362,7 @@ class DatabasePool:
             _keys = {x: y for x, y in zip(key_names, keyv)}
             _vals = {x: y for x, y in zip(value_names, valv)}
 
-            self.simple_upsert_txn_emulated(txn, table, _keys, _vals)
+            self.simple_upsert_txn_emulated(txn, table, _keys, _vals, lock=lock)
 
     def simple_upsert_many_txn_native_upsert(
         self,
