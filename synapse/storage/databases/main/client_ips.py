@@ -616,9 +616,10 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
         to_update = self._batch_row_update
         self._batch_row_update = {}
 
-        await self.db_pool.runInteraction(
-            "_update_client_ips_batch", self._update_client_ips_batch_txn, to_update
-        )
+        if to_update:
+            await self.db_pool.runInteraction(
+                "_update_client_ips_batch", self._update_client_ips_batch_txn, to_update
+            )
 
     def _update_client_ips_batch_txn(
         self,
@@ -663,14 +664,15 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
             lock=False,
         )
 
-        self.db_pool.simple_update_many_txn(
-            txn,
-            table="devices",
-            key_names=("user_id", "device_id"),
-            key_values=devices_keys,
-            value_names=("user_agent", "last_seen", "ip"),
-            value_values=devices_values,
-        )
+        if devices_values:
+            self.db_pool.simple_update_many_txn(
+                txn,
+                table="devices",
+                key_names=("user_id", "device_id"),
+                key_values=devices_keys,
+                value_names=("user_agent", "last_seen", "ip"),
+                value_values=devices_values,
+            )
 
     async def get_last_client_ip_by_device(
         self, user_id: str, device_id: Optional[str]
