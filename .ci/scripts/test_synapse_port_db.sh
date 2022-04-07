@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 #
 # Test script for 'synapse_port_db'.
-#   - sets up synapse and deps
+#   - configures synapse and a postgres server.
 #   - runs the port script on a prepopulated test sqlite db
 #   - also runs it against an new sqlite db
-
-# Expects Synapse to have been already installed with `poetry install -e .[postgres]
+#
+# Expects Synapse to have been already installed with `poetry install --extras postgres`.
+# Expects `poetry` to be available on the `PATH`.
 
 set -xe
 cd "$(dirname "$0")/../.."
