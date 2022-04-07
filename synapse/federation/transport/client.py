@@ -504,7 +504,7 @@ class TransportLayerClient:
         else:
             path = _create_v1_path("/publicRooms")
 
-            args: Dict[str, Any] = {
+            args: Dict[str, Union[str, Iterable[str]]] = {
                 "include_all_networks": "true" if include_all_networks else "false"
             }
             if third_party_instance_id:
