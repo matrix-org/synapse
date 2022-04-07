@@ -1,0 +1,1 @@
+Add opentracing spans to calls to external cache.
