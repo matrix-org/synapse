@@ -307,7 +307,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
 
     Args:
         environ: _Environ[str]
-        config_path: Where to output the generated Synapse main worker config file.
+        config_path: The location of the generated Synapse main worker config file.
         data_dir: The location of the synapse data directory. Where log and
             user-facing config files live.
     """
@@ -320,7 +320,8 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     # and adding a replication listener.
 
     # First read the original config file and extract the listeners block. Then we'll add
-    # another listener for replication. Later we'll write out the result.
+    # another listener for replication. Later we'll write out the result to the shared
+    # config file.
     listeners = [
         {
             "port": 9093,
@@ -386,6 +387,10 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     # worker_type + instance #
     worker_type_counter = {}
 
+    # A list of internal endpoints to healthcheck, starting with the main process
+    # which exists even if no workers do.
+    healthcheck_urls = ["http://localhost:8080/health"]
+
     # For each worker type specified by the user, create config values
     for worker_type in worker_types:
         worker_type = worker_type.strip()
@@ -409,6 +414,8 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
 
         # Update the shared config with any worker-type specific options
         shared_config.update(worker_config["shared_extra_conf"])
+
+        healthcheck_urls.append("http://localhost:%d/health" % (worker_port,))
 
         # Check if more than one instance of this worker type has been specified
         worker_type_total_count = worker_types.count(worker_type)
@@ -475,15 +482,10 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     # Determine the load-balancing upstreams to configure
     nginx_upstream_config = ""
 
-    # At the same time, prepare a list of internal endpoints to healthcheck
-    # starting with the main process which exists even if no workers do.
-    healthcheck_urls = ["http://localhost:8080/health"]
-
     for upstream_worker_type, upstream_worker_ports in nginx_upstreams.items():
         body = ""
         for port in upstream_worker_ports:
             body += "    server localhost:%d;\n" % (port,)
-            healthcheck_urls.append("http://localhost:%d/health" % (port,))
 
         # Add to the list of configured upstreams
         nginx_upstream_config += NGINX_UPSTREAM_CONFIG_BLOCK.format(
