@@ -197,7 +197,7 @@ class RegistrationConfig(Config):
         self.inhibit_user_in_use_error = config.get("inhibit_user_in_use_error", False)
 
     def generate_config_section(
-        self, generate_secrets: Optional[bool] = False, **kwargs: Any
+        self, generate_secrets: bool = False, **kwargs: Any
     ) -> str:
         if generate_secrets:
             registration_shared_secret = 'registration_shared_secret: "%s"' % (
