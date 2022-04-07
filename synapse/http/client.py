@@ -907,7 +907,7 @@ def read_body_with_max_size(
     return d
 
 
-def encode_query_args(args: Optional[Mapping[str, Union[str, List[str]]]]) -> bytes:
+def encode_query_args(args: Optional[QueryParams]) -> bytes:
     """
     Encodes a map of query arguments to bytes which can be appended to a URL.
 
@@ -920,13 +920,7 @@ def encode_query_args(args: Optional[Mapping[str, Union[str, List[str]]]]) -> by
     if args is None:
         return b""
 
-    encoded_args = {}
-    for k, vs in args.items():
-        if isinstance(vs, str):
-            vs = [vs]
-        encoded_args[k] = [v.encode("utf8") for v in vs]
-
-    query_str = urllib.parse.urlencode(encoded_args, True)
+    query_str = urllib.parse.urlencode(args, True)
 
     return query_str.encode("utf8")
 
