@@ -14,7 +14,7 @@
 
 import logging
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 from urllib.request import getproxies_environment  # type: ignore
 
 import attr
