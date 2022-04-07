@@ -883,7 +883,7 @@ class RoomCreationHandler:
         #
         # we also don't need to check the requester's shadow-ban here, as we
         # have already done so above (and potentially emptied invite_list).
-        with (await self.room_member_handler.member_linearizer.queue((room_id,))):
+        async with self.room_member_handler.member_linearizer.queue((room_id,)):
             content = {}
             is_direct = config.get("is_direct", None)
             if is_direct:
@@ -1444,8 +1444,8 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
     def get_current_key(self) -> RoomStreamToken:
         return self.store.get_room_max_token()
 
-    def get_current_key_for_room(self, room_id: str) -> Awaitable[str]:
-        return self.store.get_room_events_max_id(room_id)
+    def get_current_key_for_room(self, room_id: str) -> Awaitable[RoomStreamToken]:
+        return self.store.get_current_room_stream_token_for_room_id(room_id)
 
 
 class ShutdownRoomResponse(TypedDict):

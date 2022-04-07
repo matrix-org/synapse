@@ -330,10 +330,8 @@ class ApplicationServicesHandler:
                     continue
 
                 # Since we read/update the stream position for this AS/stream
-                with (
-                    await self._ephemeral_events_linearizer.queue(
-                        (service.id, stream_key)
-                    )
+                async with self._ephemeral_events_linearizer.queue(
+                    (service.id, stream_key)
                 ):
                     if stream_key == "receipt_key":
                         events = await self._handle_receipts(service, new_token)

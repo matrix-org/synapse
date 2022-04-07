@@ -15,6 +15,10 @@ _trial_temp*/
 .DS_Store
 __pycache__/
 
+# We do want the poetry lockfile. TODO: is there a good reason for ignoring
+# '*.lock' above? If not, let's nuke it.
+!poetry.lock
+
 # stuff that is likely to exist when you run a server locally
 /*.db
 /*.log
