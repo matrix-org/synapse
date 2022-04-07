@@ -636,9 +636,7 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
 
         def update_user_ips() -> None:
             # Keys and values for the `user_ips` upsert.
-            key_columns = "user_id", "access_token", "ip"
             keys = []
-            value_columns = "user_agent", "device_id", "last_seen"
             values = []
 
             for entry in to_update.items():
@@ -649,18 +647,16 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
             self.db_pool.simple_upsert_many_txn(
                 txn,
                 table="user_ips",
-                key_names=key_columns,
+                key_names=("user_id", "access_token", "ip"),
                 key_values=keys,
-                value_names=value_columns,
+                value_names=("user_agent", "device_id", "last_seen"),
                 value_values=values,
                 lock=False
             )
 
         def update_devices() -> None:
             # Keys and values for the `devices` update.
-            key_columns = "user_id", "device_id"
             keys = []
-            value_columns = "user_agent", "last_seen", "ip"
             values = []
 
             for entry in to_update.items():
@@ -675,9 +671,9 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
             self.db_pool.simple_update_many_txn(
                 txn,
                 table="devices",
-                key_names=key_columns,
+                key_names=("user_id", "device_id"),
                 key_values=keys,
-                value_names=value_columns,
+                value_names=("user_agent", "last_seen", "ip"),
                 value_values=values,
             )
 
