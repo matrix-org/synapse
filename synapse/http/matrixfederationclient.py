@@ -67,7 +67,7 @@ from synapse.http.client import (
     read_body_with_max_size,
 )
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
-from synapse.http.types import QueryArgs
+from synapse.http.types import QueryParams
 from synapse.logging import opentracing
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import set_tag, start_active_span, tags
@@ -743,7 +743,7 @@ class MatrixFederationHttpClient:
         self,
         destination: str,
         path: str,
-        args: Optional[QueryArgs] = None,
+        args: Optional[QueryParams] = None,
         data: Optional[JsonDict] = None,
         json_data_callback: Optional[Callable[[], JsonDict]] = None,
         long_retries: bool = False,
@@ -761,7 +761,7 @@ class MatrixFederationHttpClient:
         self,
         destination: str,
         path: str,
-        args: Optional[QueryArgs] = None,
+        args: Optional[QueryParams] = None,
         data: Optional[JsonDict] = None,
         json_data_callback: Optional[Callable[[], JsonDict]] = None,
         long_retries: bool = False,
@@ -778,7 +778,7 @@ class MatrixFederationHttpClient:
         self,
         destination: str,
         path: str,
-        args: Optional[QueryArgs] = None,
+        args: Optional[QueryParams] = None,
         data: Optional[JsonDict] = None,
         json_data_callback: Optional[Callable[[], JsonDict]] = None,
         long_retries: bool = False,
@@ -888,7 +888,7 @@ class MatrixFederationHttpClient:
         long_retries: bool = False,
         timeout: Optional[int] = None,
         ignore_backoff: bool = False,
-        args: Optional[QueryArgs] = None,
+        args: Optional[QueryParams] = None,
     ) -> Union[JsonDict, list]:
         """Sends the specified json data using POST
 
@@ -958,7 +958,7 @@ class MatrixFederationHttpClient:
         self,
         destination: str,
         path: str,
-        args: Optional[QueryArgs] = None,
+        args: Optional[QueryParams] = None,
         retry_on_dns_fail: bool = True,
         timeout: Optional[int] = None,
         ignore_backoff: bool = False,
@@ -973,7 +973,7 @@ class MatrixFederationHttpClient:
         self,
         destination: str,
         path: str,
-        args: Optional[QueryArgs] = ...,
+        args: Optional[QueryParams] = ...,
         retry_on_dns_fail: bool = ...,
         timeout: Optional[int] = ...,
         ignore_backoff: bool = ...,
@@ -987,7 +987,7 @@ class MatrixFederationHttpClient:
         self,
         destination: str,
         path: str,
-        args: Optional[QueryArgs] = None,
+        args: Optional[QueryParams] = None,
         retry_on_dns_fail: bool = True,
         timeout: Optional[int] = None,
         ignore_backoff: bool = False,
@@ -1082,7 +1082,7 @@ class MatrixFederationHttpClient:
         long_retries: bool = False,
         timeout: Optional[int] = None,
         ignore_backoff: bool = False,
-        args: Optional[QueryArgs] = None,
+        args: Optional[QueryParams] = None,
     ) -> Union[JsonDict, list]:
         """Send a DELETE request to the remote expecting some json response
 
@@ -1147,7 +1147,7 @@ class MatrixFederationHttpClient:
         destination: str,
         path: str,
         output_stream,
-        args: Optional[QueryArgs] = None,
+        args: Optional[QueryParams] = None,
         retry_on_dns_fail: bool = True,
         max_size: Optional[int] = None,
         ignore_backoff: bool = False,
