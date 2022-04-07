@@ -114,9 +114,6 @@ def start_worker_reactor(
 
     logger = logging.getLogger(config.worker.worker_app)
 
-    assert config.worker.worker_pid_file is not None
-    assert config.worker.worker_pid_file is not None
-
     start_reactor(
         appname,
         soft_file_limit=config.server.soft_file_limit,
@@ -133,7 +130,7 @@ def start_reactor(
     appname: str,
     soft_file_limit: int,
     gc_thresholds: Optional[Tuple[int, int, int]],
-    pid_file: str,
+    pid_file: Optional[str],
     daemonize: bool,
     print_pidfile: bool,
     logger: logging.Logger,
@@ -174,6 +171,8 @@ def start_reactor(
     # appearing to go backwards.
     with PreserveLoggingContext():
         if daemonize:
+            assert pid_file is not None
+
             if print_pidfile:
                 print(pid_file)
 

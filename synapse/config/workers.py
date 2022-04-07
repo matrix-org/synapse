@@ -123,10 +123,7 @@ class WorkerConfig(Config):
             parse_listener_def(x) for x in config.get("worker_listeners", [])
         ]
         self.worker_daemonize = bool(config.get("worker_daemonize"))
-        worker_pid_file = config.get("worker_pid_file")
-        if worker_pid_file is not None and not isinstance(worker_pid_file, str):
-            raise ConfigError("worker_pid_file must be a string")
-        self.worker_pid_file = worker_pid_file
+        self.worker_pid_file = config.get("worker_pid_file")
 
         worker_log_config = config.get("worker_log_config")
         if worker_log_config is not None and not isinstance(worker_log_config, str):
