@@ -215,7 +215,9 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
         # Join the room as the normal user
         self.helper.join(room_id, user_id, tok=user_tok)
 
-        # Create event to hang backfill batch from, and send batch
+        # Create event to hang backfill batch from, and send batch - historical batches
+        # must be hung from the lmost recent event after the member join event to see
+        # this failure case.
         response = self.helper.send_event(
             room_id=room_id,
             type=EventTypes.Message,
