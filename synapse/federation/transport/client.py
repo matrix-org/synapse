@@ -509,7 +509,7 @@ class TransportLayerClient:
             if third_party_instance_id:
                 args["third_party_instance_id"] = (third_party_instance_id,)
             if limit:
-                args["limit"] = [limit]
+                args["limit"] = [str(limit)]
             if since_token:
                 args["since"] = [since_token]
 
