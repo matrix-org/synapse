@@ -18,11 +18,14 @@ from typing import Dict
 from unittest.mock import ANY, Mock, call
 
 from twisted.internet import defer
+from twisted.test.proto_helpers import MemoryReactor
 from twisted.web.resource import Resource
 
 from synapse.api.errors import AuthError
 from synapse.federation.transport.server import TransportLayerServer
-from synapse.types import UserID, create_requester
+from synapse.server import HomeServer
+from synapse.types import JsonDict, UserID, create_requester
+from synapse.util import Clock
 
 from tests import unittest
 from tests.test_utils import make_awaitable
@@ -42,7 +45,9 @@ ROOM_ID = "a-room"
 OTHER_ROOM_ID = "another-room"
 
 
-def _expect_edu_transaction(edu_type, content, origin="test"):
+def _expect_edu_transaction(
+    edu_type: str, content: JsonDict, origin: str = "test"
+) -> JsonDict:
     return {
         "origin": origin,
         "origin_server_ts": 1000000,
@@ -51,12 +56,12 @@ def _expect_edu_transaction(edu_type, content, origin="test"):
     }
 
 
-def _make_edu_transaction_json(edu_type, content):
+def _make_edu_transaction_json(edu_type: str, content: JsonDict) -> bytes:
     return json.dumps(_expect_edu_transaction(edu_type, content)).encode("utf8")
 
 
 class TypingNotificationsTestCase(unittest.HomeserverTestCase):
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         # we mock out the keyring so as to skip the authentication check on the
         # federation API call.
         mock_keyring = Mock(spec=["verify_json_for_server"])
@@ -83,7 +88,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         d["/_matrix/federation"] = TransportLayerServer(self.hs)
         return d
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         mock_notifier = hs.get_notifier()
         self.on_new_event = mock_notifier.on_new_event
 
@@ -111,24 +116,24 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.room_members = []
 
-        async def check_user_in_room(room_id, user_id):
+        async def check_user_in_room(room_id: str, user_id: str) -> None:
             if user_id not in [u.to_string() for u in self.room_members]:
                 raise AuthError(401, "User is not in the room")
             return None
 
         hs.get_auth().check_user_in_room = check_user_in_room
 
-        async def check_host_in_room(room_id, server_name):
+        async def check_host_in_room(room_id: str, server_name: str) -> bool:
             return room_id == ROOM_ID
 
         hs.get_event_auth_handler().check_host_in_room = check_host_in_room
 
-        def get_joined_hosts_for_room(room_id):
+        def get_joined_hosts_for_room(room_id: str):
             return {member.domain for member in self.room_members}
 
         self.datastore.get_joined_hosts_for_room = get_joined_hosts_for_room
 
-        async def get_users_in_room(room_id):
+        async def get_users_in_room(room_id: str):
             return {str(u) for u in self.room_members}
 
         self.datastore.get_users_in_room = get_users_in_room
@@ -153,7 +158,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             lambda *args, **kwargs: make_awaitable(None)
         )
 
-    def test_started_typing_local(self):
+    def test_started_typing_local(self) -> None:
         self.room_members = [U_APPLE, U_BANANA]
 
         self.assertEqual(self.event_source.get_current_key(), 0)
@@ -187,7 +192,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         )
 
     @override_config({"send_federation": True})
-    def test_started_typing_remote_send(self):
+    def test_started_typing_remote_send(self) -> None:
         self.room_members = [U_APPLE, U_ONION]
 
         self.get_success(
@@ -217,7 +222,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             try_trailing_slash_on_400=True,
         )
 
-    def test_started_typing_remote_recv(self):
+    def test_started_typing_remote_recv(self) -> None:
         self.room_members = [U_APPLE, U_ONION]
 
         self.assertEqual(self.event_source.get_current_key(), 0)
@@ -256,7 +261,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def test_started_typing_remote_recv_not_in_room(self):
+    def test_started_typing_remote_recv_not_in_room(self) -> None:
         self.room_members = [U_APPLE, U_ONION]
 
         self.assertEqual(self.event_source.get_current_key(), 0)
@@ -292,7 +297,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(events[1], 0)
 
     @override_config({"send_federation": True})
-    def test_stopped_typing(self):
+    def test_stopped_typing(self) -> None:
         self.room_members = [U_APPLE, U_BANANA, U_ONION]
 
         # Gut-wrenching
@@ -343,7 +348,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             [{"type": "m.typing", "room_id": ROOM_ID, "content": {"user_ids": []}}],
         )
 
-    def test_typing_timeout(self):
+    def test_typing_timeout(self) -> None:
         self.room_members = [U_APPLE, U_BANANA]
 
         self.assertEqual(self.event_source.get_current_key(), 0)

@@ -351,6 +351,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self.handler.handle_local_profile_change(regular_user_id, profile_info)
         )
         profile = self.get_success(self.store.get_user_in_directory(regular_user_id))
+        assert profile is not None
         self.assertTrue(profile["display_name"] == display_name)
 
     def test_handle_local_profile_change_with_deactivated_user(self) -> None:
@@ -369,6 +370,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # profile is in directory
         profile = self.get_success(self.store.get_user_in_directory(r_user_id))
+        assert profile is not None
         self.assertTrue(profile["display_name"] == display_name)
 
         # deactivate user

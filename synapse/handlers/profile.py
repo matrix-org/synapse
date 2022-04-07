@@ -336,12 +336,18 @@ class ProfileHandler:
         """Check that the size and content type of the avatar at the given MXC URI are
         within the configured limits.
 
+        If the given `mxc` is empty, no checks are performed. (Users are always able to
+        unset their avatar.)
+
         Args:
             mxc: The MXC URI at which the avatar can be found.
 
         Returns:
              A boolean indicating whether the file can be allowed to be set as an avatar.
         """
+        if mxc == "":
+            return True
+
         if not self.max_avatar_size and not self.allowed_avatar_mimetypes:
             return True
 

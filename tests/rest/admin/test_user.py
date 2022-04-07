@@ -1050,6 +1050,25 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
 
         self._is_erased("@user:test", True)
 
+    @override_config({"max_avatar_size": 1234})
+    def test_deactivate_user_erase_true_avatar_nonnull_but_empty(self) -> None:
+        """Check we can erase a user whose avatar is the empty string.
+
+        Reproduces #12257.
+        """
+        # Patch `self.other_user` to have an empty string as their avatar.
+        self.get_success(self.store.set_profile_avatar_url("user", ""))
+
+        # Check we can still erase them.
+        channel = self.make_request(
+            "POST",
+            self.url,
+            access_token=self.admin_user_tok,
+            content={"erase": True},
+        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self._is_erased("@user:test", True)
+
     def test_deactivate_user_erase_false(self) -> None:
         """
         Test deactivating a user and set `erase` to `false`
@@ -1571,10 +1590,9 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
 
-        pushers = self.get_success(
-            self.store.get_pushers_by({"user_name": "@bob:test"})
+        pushers = list(
+            self.get_success(self.store.get_pushers_by({"user_name": "@bob:test"}))
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         self.assertEqual("@bob:test", pushers[0].user_name)
 
@@ -1613,10 +1631,9 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
 
-        pushers = self.get_success(
-            self.store.get_pushers_by({"user_name": "@bob:test"})
+        pushers = list(
+            self.get_success(self.store.get_pushers_by({"user_name": "@bob:test"}))
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 0)
 
     def test_set_password(self) -> None:
@@ -2125,6 +2142,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         # is in user directory
         profile = self.get_success(self.store.get_user_in_directory(self.other_user))
+        assert profile is not None
         self.assertTrue(profile["display_name"] == "User")
 
         # Deactivate user
@@ -2692,6 +2710,7 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
         user_tuple = self.get_success(
             self.store.get_user_by_access_token(other_user_token)
         )
+        assert user_tuple is not None
         token_id = user_tuple.token_id
 
         self.get_success(
@@ -3657,6 +3676,7 @@ class ShadowBanRestTestCase(unittest.HomeserverTestCase):
         # The user starts off as not shadow-banned.
         other_user_token = self.login("user", "pass")
         result = self.get_success(self.store.get_user_by_access_token(other_user_token))
+        assert result is not None
         self.assertFalse(result.shadow_banned)
 
         channel = self.make_request("POST", self.url, access_token=self.admin_user_tok)
@@ -3665,6 +3685,7 @@ class ShadowBanRestTestCase(unittest.HomeserverTestCase):
 
         # Ensure the user is shadow-banned (and the cache was cleared).
         result = self.get_success(self.store.get_user_by_access_token(other_user_token))
+        assert result is not None
         self.assertTrue(result.shadow_banned)
 
         # Un-shadow-ban the user.
@@ -3676,6 +3697,7 @@ class ShadowBanRestTestCase(unittest.HomeserverTestCase):
 
         # Ensure the user is no longer shadow-banned (and the cache was cleared).
         result = self.get_success(self.store.get_user_by_access_token(other_user_token))
+        assert result is not None
         self.assertFalse(result.shadow_banned)
 
 

@@ -225,6 +225,8 @@ oidc_providers:
 3. Create an application for synapse in Authentik and link it to the provider.
 4. Note the slug of your application, Client ID and Client Secret.
 
+Note: RSA keys must be used for signing for Authentik, ECC keys do not work.
+
 Synapse config:
 ```yaml
 oidc_providers:
@@ -240,7 +242,7 @@ oidc_providers:
       - "email"
     user_mapping_provider:
       config:
-        localpart_template: "{{ user.preferred_username }}}"
+        localpart_template: "{{ user.preferred_username }}"
         display_name_template: "{{ user.preferred_username|capitalize }}" # TO BE FILLED: If your users have names in Authentik and you want those in Synapse, this should be replaced with user.name|capitalize.
 ```
 

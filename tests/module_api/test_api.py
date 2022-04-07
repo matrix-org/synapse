@@ -86,6 +86,28 @@ class ModuleApiTestCase(HomeserverTestCase):
         displayname = self.get_success(self.store.get_profile_displayname("bob"))
         self.assertEqual(displayname, "Bobberino")
 
+    def test_can_register_admin_user(self):
+        user_id = self.register_user(
+            "bob_module_admin", "1234", displayname="Bobberino Admin", admin=True
+        )
+
+        found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
+        self.assertEqual(found_user.user_id.to_string(), user_id)
+        self.assertIdentical(found_user.is_admin, True)
+
+    def test_can_set_admin(self):
+        user_id = self.register_user(
+            "alice_wants_admin",
+            "1234",
+            displayname="Alice Powerhungry",
+            admin=False,
+        )
+
+        self.get_success(self.module_api.set_user_admin(user_id, True))
+        found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
+        self.assertEqual(found_user.user_id.to_string(), user_id)
+        self.assertIdentical(found_user.is_admin, True)
+
     def test_get_userinfo_by_id(self):
         user_id = self.register_user("alice", "1234")
         found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
@@ -268,7 +290,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         # Create a user and room to play with
         user_id = self.register_user("kermit", "monkey")
         tok = self.login("kermit", "monkey")
-        room_id = self.helper.create_room_as(user_id, tok=tok)
+        room_id = self.helper.create_room_as(user_id, tok=tok, is_public=False)
 
         # The room should not currently be in the public rooms directory
         is_in_public_rooms = self.get_success(
