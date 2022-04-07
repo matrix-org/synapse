@@ -1288,7 +1288,7 @@ class DatabasePool:
             self.engine.can_native_upsert and table not in self._unsafe_to_upsert_tables
         )
 
-        return await self.runInteraction(
+        await self.runInteraction(
             desc,
             self.simple_upsert_many_txn,
             table,
@@ -1820,7 +1820,7 @@ class DatabasePool:
             value_values: A list of each row's value column values.
         """
 
-        return await self.runInteraction(
+        await self.runInteraction(
             desc,
             self.simple_update_many_txn,
             table,
