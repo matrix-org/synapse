@@ -1857,7 +1857,7 @@ class DatabasePool:
             )
 
         # List of tuples of (value values, then key values)
-        # (This matches the order of `allnames` and the order of the query)
+        # (This matches the order needed for the query)
         args = [tuple(x) + tuple(y) for x, y in zip(value_values, key_values)]
 
         for ks, vs in zip(key_values, value_values):
