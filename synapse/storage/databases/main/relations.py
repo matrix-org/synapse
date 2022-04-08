@@ -51,7 +51,14 @@ logger = logging.getLogger(__name__)
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class _RelatedEvent:
+    """
+    Contains enough information about a related event in order to properly filter
+    events from ignored users.
+    """
+
+    # The event ID of the related event.
     event_id: str
+    # The sender of the related event.
     sender: str
 
 
