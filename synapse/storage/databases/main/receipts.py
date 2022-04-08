@@ -122,31 +122,53 @@ class ReceiptsWorkerStore(SQLBaseStore):
             desc="get_receipts_for_room",
         )
 
-    @cached(num_args=2)
     async def get_last_receipt_event_id_for_user(
-        self, user_id: str, room_id: str
+        self, user_id: str, room_id: str, receipt_types: List[str]
     ) -> Optional[str]:
-        return await self.db_pool.simple_select_one_onecol(
-            table="receipts_linearized",
-            keyvalues={
-                "room_id": room_id,
-                "user_id": user_id,
-            },
-            retcol="event_id",
-            desc="get_own_receipt_for_user",
-            allow_none=True,
-        )
+        def f(txn: LoggingTransaction) -> List[Tuple[str, str]]:
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "rl.receipt_type", receipt_types
+            )
+            sql = """
+                SELECT rl.event_id, MAX(e.stream_ordering)
+                FROM receipts_linearized AS rl
+                INNER JOIN events AS e USING (room_id, event_id)
+                WHERE rl.user_id = ?
+                AND rl.room_id = ?
+                AND %s
+            """ % (
+                clause,
+            )
 
-    @cached(num_args=1)
-    async def get_receipts_for_user(self, user_id: str) -> Dict[str, str]:
-        rows = await self.db_pool.simple_select_list(
-            table="receipts_linearized",
-            keyvalues={"user_id": user_id},
-            retcols=("room_id", "event_id"),
-            desc="get_receipts_for_user",
-        )
+            txn.execute(sql, [user_id, room_id] + list(args))
+            return cast(List[Tuple[str, str]], txn.fetchall())
 
-        return {row["room_id"]: row["event_id"] for row in rows}
+        rows = await self.db_pool.runInteraction("get_own_receipt_for_user", f)
+        return rows[0][0]
+
+    async def get_latest_receipts_for_user(
+        self, user_id: str, receipt_types: List[str]
+    ) -> Dict[str, str]:
+        def f(txn: LoggingTransaction) -> List[Tuple[str, str]]:
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "rl.receipt_type", receipt_types
+            )
+            sql = """
+                SELECT rl.room_id, rl.event_id, MAX(e.stream_ordering)
+                FROM receipts_linearized AS rl
+                INNER JOIN events AS e USING (room_id, event_id)
+                WHERE rl.user_id = ?
+                AND %s
+                GROUP BY rl.room_id
+            """ % (
+                clause,
+            )
+
+            txn.execute(sql, [user_id] + list(args))
+            return cast(List[Tuple[str, str]], txn.fetchall())
+
+        rows = await self.db_pool.runInteraction("get_latest_receipts_for_user", f)
+        return {row[0]: row[1] for row in rows}
 
     async def get_receipts_for_user_with_orderings(self, user_id: str) -> JsonDict:
         def f(txn: LoggingTransaction) -> List[Tuple[str, str, int, int]]:
@@ -490,9 +512,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     def invalidate_caches_for_receipt(
         self, room_id: str, receipt_type: str, user_id: str
     ) -> None:
-        self.get_receipts_for_user.invalidate((user_id, receipt_type))
         self._get_linearized_receipts_for_room.invalidate((room_id,))
-        self.get_last_receipt_event_id_for_user.invalidate((user_id, room_id))
         self._invalidate_get_users_with_receipts_in_room(room_id, receipt_type, user_id)
         self.get_receipts_for_room.invalidate((room_id, receipt_type))
 
@@ -556,13 +576,12 @@ class ReceiptsWorkerStore(SQLBaseStore):
             for so, eid, rt in txn:
                 if int(so) >= stream_ordering and (
                     receipt_type == rt
+                    # We don't allow private read receipts to override public
+                    # ones since that would look as if the read receipt is going
+                    # up in the timeline from the perspective of the other users
                     or (
                         rt == ReceiptTypes.READ
                         and receipt_type == ReceiptTypes.READ_PRIVATE
-                    )
-                    or (
-                        rt == ReceiptTypes.READ_PRIVATE
-                        and receipt_type == ReceiptTypes.READ
                     )
                 ):
                     logger.debug(
@@ -723,7 +742,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
             receipt_type,
             user_id,
         )
-        txn.call_after(self.get_receipts_for_user.invalidate, (user_id, receipt_type))
         # FIXME: This shouldn't invalidate the whole cache
         txn.call_after(self._get_linearized_receipts_for_room.invalidate, (room_id,))
 
