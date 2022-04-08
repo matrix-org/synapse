@@ -384,12 +384,15 @@ class RelationsHandler:
                         continue
 
                     # The *last* event returned is the one that is cared about.
-                    #
-                    # This event shuold exist.
                     event = await self._event_handler.get_event(
                         user, room_id, potential_events[-1].event_id
                     )
+                    # It is unexpected that the event will not exist.
                     if event is None:
+                        logger.warning(
+                            "Unable to fetch latest event in a thread with event ID: %s",
+                            potential_events[-1].event_id,
+                        )
                         continue
                     latest_thread_event = event
 
