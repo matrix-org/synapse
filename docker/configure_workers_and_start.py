@@ -409,7 +409,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
         )
 
         # Update the shared config with any worker-type specific options
-        shared_config.update(worker_config["shared_extra_config"])
+        shared_config.update(worker_config["shared_extra_conf"])
 
         # Check if more than one instance of this worker type has been specified
         worker_type_total_count = worker_types.count(worker_type)
