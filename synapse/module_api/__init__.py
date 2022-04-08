@@ -1452,14 +1452,10 @@ class AccountDataManager:
         self._validate_user_id(user_id)
 
         if not isinstance(data_type, str):
-            raise TypeError(
-                f"data_type must be a str; got {data_type.__class__.__name__}"
-            )
+            raise TypeError(f"data_type must be a str; got {type(data_type).__name__}")
 
         if not isinstance(new_data, dict):
-            raise TypeError(
-                f"new_data must be a dict; got {new_data.__class__.__name__}"
-            )
+            raise TypeError(f"new_data must be a dict; got {type(new_data).__name__}")
 
         # Ensure the user exists, so we don't just write to users that aren't there.
         if await self._store.get_userinfo_by_id(user_id) is None:
