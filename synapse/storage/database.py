@@ -1360,11 +1360,17 @@ class DatabasePool:
         if not value_names:
             value_values = [() for x in range(len(key_values))]
 
+        if lock:
+            # Lock the table just once, to prevent it being done once per row.
+            # Note that, according to Postgres' documentation, once obtained,
+            # the lock is held for the remainder of the current transaction.
+            self.engine.lock_table(txn, "user_ips")
+
         for keyv, valv in zip(key_values, value_values):
             _keys = {x: y for x, y in zip(key_names, keyv)}
             _vals = {x: y for x, y in zip(value_names, valv)}
 
-            self.simple_upsert_txn_emulated(txn, table, _keys, _vals, lock=lock)
+            self.simple_upsert_txn_emulated(txn, table, _keys, _vals, lock=False)
 
     def simple_upsert_many_txn_native_upsert(
         self,
