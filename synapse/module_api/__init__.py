@@ -1455,6 +1455,4 @@ class AccountDataManager:
         if await self._store.get_userinfo_by_id(user_id) is None:
             raise ValueError(f"User {user_id} does not exist on this server.")
 
-        # Use the account data handler to write the account data.
-        # Crucially, this makes a replication request if necessary.
         await self._handler.add_account_data_for_user(user_id, data_type, new_data)
