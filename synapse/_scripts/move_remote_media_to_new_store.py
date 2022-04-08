@@ -42,7 +42,7 @@ from synapse.rest.media.v1.filepath import MediaFilePaths
 logger = logging.getLogger()
 
 
-def main(src_repo, dest_repo):
+def main(src_repo: str, dest_repo: str) -> None:
     src_paths = MediaFilePaths(src_repo)
     dest_paths = MediaFilePaths(dest_repo)
     for line in sys.stdin:
@@ -55,14 +55,19 @@ def main(src_repo, dest_repo):
         move_media(parts[0], parts[1], src_paths, dest_paths)
 
 
-def move_media(origin_server, file_id, src_paths, dest_paths):
+def move_media(
+    origin_server: str,
+    file_id: str,
+    src_paths: MediaFilePaths,
+    dest_paths: MediaFilePaths,
+) -> None:
     """Move the given file, and any thumbnails, to the dest repo
 
     Args:
-        origin_server (str):
-        file_id (str):
-        src_paths (MediaFilePaths):
-        dest_paths (MediaFilePaths):
+        origin_server:
+        file_id:
+        src_paths:
+        dest_paths:
     """
     logger.info("%s/%s", origin_server, file_id)
 
@@ -91,7 +96,7 @@ def move_media(origin_server, file_id, src_paths, dest_paths):
     )
 
 
-def mkdir_and_move(original_file, dest_file):
+def mkdir_and_move(original_file: str, dest_file: str) -> None:
     dirname = os.path.dirname(dest_file)
     if not os.path.exists(dirname):
         logger.debug("mkdir %s", dirname)
