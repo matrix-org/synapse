@@ -147,6 +147,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 WHERE rl.user_id = ?
                 AND rl.room_id = ?
                 AND %s
+                GROUP BY rl.event_id
             """ % (
                 clause,
             )
@@ -155,6 +156,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
             return cast(List[Tuple[str, str]], txn.fetchall())
 
         rows = await self.db_pool.runInteraction("get_own_receipt_for_user", f)
+
+        if len(rows) == 0:
+            return None
         return rows[0][0]
 
     async def get_latest_receipts_for_user(
