@@ -102,6 +102,8 @@ class VersionsRestServlet(RestServlet):
                     # Adds support for thread relations, per MSC3440.
                     "org.matrix.msc3440": self.config.experimental.msc3440_enabled,
                     "org.matrix.msc3440.stable": True,  # TODO: remove when "v1.3" is added above
+                    # Allows moderators to fetch redacted event content as described in MSC2815
+                    "fi.mau.msc2815": self.config.experimental.msc2815_enabled,
                 },
             },
         )

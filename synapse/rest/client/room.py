@@ -651,13 +651,14 @@ class RoomEventServlet(RestServlet):
         self._relations_handler = hs.get_relations_handler()
         self.auth = hs.get_auth()
         self.content_keep_ms = hs.config.server.redaction_retention_period
+        self.msc2815_enabled = hs.config.experimental.msc2815_enabled
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str, event_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
-        include_unredacted_content = (
+        include_unredacted_content = self.msc2815_enabled and (
             parse_string(
                 request,
                 "fi.mau.msc2815.include_unredacted_content",

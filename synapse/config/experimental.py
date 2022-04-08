@@ -81,3 +81,6 @@ class ExperimentalConfig(Config):
 
         # MSC2654: Unread counts
         self.msc2654_enabled: bool = experimental.get("msc2654_enabled", False)
+
+        # MSC2815 (allow room moderators to view redacted event content)
+        self.msc2815_enabled: bool = experimental.get("msc2815_enabled", False)
