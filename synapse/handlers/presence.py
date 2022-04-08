@@ -1027,7 +1027,7 @@ class PresenceHandler(BasePresenceHandler):
                     ]
                 )
 
-            if prev_state != PresenceState.BUSY:
+            if prev_state.state != PresenceState.BUSY:
                 # XXX: We set_state separately here and just update the last_active_ts above
                 # This keeps the logic as similar as possible between the worker and single
                 # process modes. Using set_state will actually cause last_active_ts to be
