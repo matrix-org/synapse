@@ -160,7 +160,7 @@ please upgrade Mjolnir to version 1.3.2 or later before upgrading Synapse.
 This release removes support for the `structured: true` logging configuration
 which was deprecated in Synapse v1.23.0. If your logging configuration contains
 `structured: true` then it should be modified based on the
-[structured logging documentation](structured_logging.md).
+[structured logging documentation](https://matrix-org.github.io/synapse/v1.56/structured_logging.html#upgrading-from-legacy-structured-logging-configuration).
 
 # Upgrading to v1.53.0
 
@@ -777,7 +777,7 @@ lock down external access to the Admin API endpoints.
 This release deprecates use of the `structured: true` logging
 configuration for structured logging. If your logging configuration
 contains `structured: true` then it should be modified based on the
-[structured logging documentation](structured_logging.md).
+[structured logging documentation](https://matrix-org.github.io/synapse/v1.56/structured_logging.html#upgrading-from-legacy-structured-logging-configuration).
 
 The `structured` and `drains` logging options are now deprecated and
 should be replaced by standard logging configuration of `handlers` and
