@@ -618,6 +618,19 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
         self.assertEqual(len(channel.json_body["notifications"]), 1, channel.json_body)
 
+    def test_check_push_rules_actions(self) -> None:
+        """Test that modules can check whether a list of push rules actions are spec
+        compliant.
+        """
+        self.assertFalse(self.module_api.check_push_rule_actions(["foo"]))
+        self.assertFalse(self.module_api.check_push_rule_actions({"foo": "bar"}))
+        self.assertTrue(self.module_api.check_push_rule_actions(["notify"]))
+        self.assertTrue(
+            self.module_api.check_push_rule_actions(
+                [{"set_tweak": "sound", "value": "default"}]
+            )
+        )
+
 
 class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
     """For testing ModuleApi functionality in a multi-worker setup"""

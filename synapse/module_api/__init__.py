@@ -1342,7 +1342,7 @@ class ModuleApi:
         """
         await self._store.add_user_bound_threepid(user_id, medium, address, id_server)
 
-    async def check_push_rule_actions(
+    def check_push_rule_actions(
         self, actions: List[Union[str, Dict[str, str]]]
     ) -> bool:
         """Checks if the given push rule actions are valid according to the Matrix
