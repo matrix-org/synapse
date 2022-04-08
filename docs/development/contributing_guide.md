@@ -206,9 +206,10 @@ To do so, [configure Postgres](../postgres.md) and run `trial` with the
 following environment variables matching your configuration:
 
 - `SYNAPSE_POSTGRES` to anything nonempty
-- `SYNAPSE_POSTGRES_HOST`
-- `SYNAPSE_POSTGRES_USER`
-- `SYNAPSE_POSTGRES_PASSWORD`
+- `SYNAPSE_POSTGRES_HOST` (optional if it's the default: UNIX socket)
+- `SYNAPSE_POSTGRES_PORT` (optional if it's the default: 5432)
+- `SYNAPSE_POSTGRES_USER` (optional if using a UNIX socket)
+- `SYNAPSE_POSTGRES_PASSWORD` (optional if using a UNIX socket)
 
 For example:
 
@@ -219,6 +220,13 @@ export SYNAPSE_POSTGRES_USER=postgres
 export SYNAPSE_POSTGRES_PASSWORD=mydevenvpassword
 trial
 ```
+
+You don't need to specify the host, user, port or password if your Postgres
+server is set to authenticate you over the UNIX socket (i.e. if the `psql` command
+works without further arguments).
+
+Your Postgres account needs to be able to create databases.
+
 
 ## Run the integration tests ([Sytest](https://github.com/matrix-org/sytest)).
 

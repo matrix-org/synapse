@@ -125,7 +125,7 @@ class BaseRelationsTestCase(unittest.HomeserverTestCase):
         # Request the relations of the event.
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}",
+            f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}",
             access_token=self.user_token,
         )
         self.assertEquals(200, channel.code, channel.json_body)
@@ -138,7 +138,7 @@ class BaseRelationsTestCase(unittest.HomeserverTestCase):
         # Fetch the bundled aggregations of the event.
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/event/{self.parent_id}",
+            f"/_matrix/client/v3/rooms/{self.room}/event/{self.parent_id}",
             access_token=self.user_token,
         )
         self.assertEquals(200, channel.code, channel.json_body)
@@ -340,7 +340,7 @@ class RelationsTestCase(BaseRelationsTestCase):
         # They should be ignored when fetching relations.
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/rooms/{room2}/relations/{parent_id}",
+            f"/_matrix/client/v1/rooms/{room2}/relations/{parent_id}",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -633,7 +633,7 @@ class RelationsTestCase(BaseRelationsTestCase):
 
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1",
+            f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}?limit=1",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -685,7 +685,7 @@ class RelationsTestCase(BaseRelationsTestCase):
         # Only the "good" annotation should be found.
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=10",
+            f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}?limit=10",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -710,7 +710,7 @@ class RelationsTestCase(BaseRelationsTestCase):
         # annotation.
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=10",
+            f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}?limit=10",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -731,7 +731,7 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
 
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1",
+            f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}?limit=1",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
@@ -762,7 +762,7 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
         # Request the relations again, but with a different direction.
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/relations"
+            f"/_matrix/client/v1/rooms/{self.room}/relations"
             f"/{self.parent_id}?limit=1&org.matrix.msc3715.dir=f",
             access_token=self.user_token,
         )
@@ -801,7 +801,7 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
 
             channel = self.make_request(
                 "GET",
-                f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1{from_token}",
+                f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}?limit=1{from_token}",
                 access_token=self.user_token,
             )
             self.assertEqual(200, channel.code, channel.json_body)
@@ -865,7 +865,7 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
         for from_token in (sync_prev_batch, messages_end):
             channel = self.make_request(
                 "GET",
-                f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?from={from_token}",
+                f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}?from={from_token}",
                 access_token=self.user_token,
             )
             self.assertEqual(200, channel.code, channel.json_body)
@@ -1088,7 +1088,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         # It should also be included when the entire thread is requested.
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/unstable/rooms/{self.room}/relations/{self.parent_id}?limit=1",
+            f"/_matrix/client/v1/rooms/{self.room}/relations/{self.parent_id}?limit=1",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)

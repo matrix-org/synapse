@@ -98,8 +98,19 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         super().__init__(database, db_conn, hs)
 
+        max_receipts_stream_id = self.get_max_receipt_stream_id()
+        receipts_stream_prefill, min_receipts_stream_id = self.db_pool.get_cache_dict(
+            db_conn,
+            "receipts_linearized",
+            entity_column="room_id",
+            stream_column="stream_id",
+            max_value=max_receipts_stream_id,
+            limit=10000,
+        )
         self._receipts_stream_cache = StreamChangeCache(
-            "ReceiptsRoomChangeCache", self.get_max_receipt_stream_id()
+            "ReceiptsRoomChangeCache",
+            min_receipts_stream_id,
+            prefilled_cache=receipts_stream_prefill,
         )
 
     def get_max_receipt_stream_id(self) -> int:

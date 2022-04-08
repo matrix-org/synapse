@@ -109,10 +109,9 @@ if __name__ == "__main__":
     parser.add_argument("dest_repo", help="Path to source content repo")
     args = parser.parse_args()
 
-    logging_config = {
-        "level": logging.DEBUG if args.v else logging.INFO,
-        "format": "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s",
-    }
-    logging.basicConfig(**logging_config)
+    logging.basicConfig(
+        level=logging.DEBUG if args.v else logging.INFO,
+        format="%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s",
+    )
 
     main(args.src_repo, args.dest_repo)

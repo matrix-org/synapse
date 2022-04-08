@@ -20,7 +20,6 @@ from synapse.replication.tcp.streams._base import DeviceListsStream, UserSignatu
 from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.devices import DeviceWorkerStore
 from synapse.storage.databases.main.end_to_end_keys import EndToEndKeyWorkerStore
-from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -33,8 +32,6 @@ class SlavedDeviceStore(EndToEndKeyWorkerStore, DeviceWorkerStore, BaseSlavedSto
         db_conn: LoggingDatabaseConnection,
         hs: "HomeServer",
     ):
-        super().__init__(database, db_conn, hs)
-
         self.hs = hs
 
         self._device_list_id_gen = SlavedIdTracker(
@@ -47,26 +44,8 @@ class SlavedDeviceStore(EndToEndKeyWorkerStore, DeviceWorkerStore, BaseSlavedSto
                 ("device_lists_changes_in_room", "stream_id"),
             ],
         )
-        device_list_max = self._device_list_id_gen.get_current_token()
-        device_list_prefill, min_device_list_id = self.db_pool.get_cache_dict(
-            db_conn,
-            "device_lists_stream",
-            entity_column="user_id",
-            stream_column="stream_id",
-            max_value=device_list_max,
-            limit=1000,
-        )
-        self._device_list_stream_cache = StreamChangeCache(
-            "DeviceListStreamChangeCache",
-            min_device_list_id,
-            prefilled_cache=device_list_prefill,
-        )
-        self._user_signature_stream_cache = StreamChangeCache(
-            "UserSignatureStreamChangeCache", device_list_max
-        )
-        self._device_list_federation_stream_cache = StreamChangeCache(
-            "DeviceListFederationStreamChangeCache", device_list_max
-        )
+
+        super().__init__(database, db_conn, hs)
 
     def get_device_stream_token(self) -> int:
         return self._device_list_id_gen.get_current_token()

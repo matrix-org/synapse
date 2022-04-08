@@ -17,8 +17,8 @@ import sys
 import time
 from typing import Optional
 
-import nacl.signing
 from signedjson.key import encode_verify_key_base64, get_verify_key, read_signing_keys
+from signedjson.types import VerifyKey
 
 
 def exit(status: int = 0, message: Optional[str] = None):
@@ -27,7 +27,7 @@ def exit(status: int = 0, message: Optional[str] = None):
     sys.exit(status)
 
 
-def format_plain(public_key: nacl.signing.VerifyKey):
+def format_plain(public_key: VerifyKey):
     print(
         "%s:%s %s"
         % (
@@ -38,7 +38,7 @@ def format_plain(public_key: nacl.signing.VerifyKey):
     )
 
 
-def format_for_config(public_key: nacl.signing.VerifyKey, expiry_ts: int):
+def format_for_config(public_key: VerifyKey, expiry_ts: int):
     print(
         '  "%s:%s": { key: "%s", expired_ts: %i }'
         % (

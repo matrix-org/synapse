@@ -46,6 +46,7 @@ from synapse.types import JsonDict, get_verify_key_from_cross_signing_key
 from synapse.util import json_decoder, json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.lrucache import LruCache
+from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.iterutils import batch_iter
 from synapse.util.stringutils import shortstr
 
@@ -70,6 +71,55 @@ class DeviceWorkerStore(SQLBaseStore):
         hs: "HomeServer",
     ):
         super().__init__(database, db_conn, hs)
+
+        device_list_max = self._device_list_id_gen.get_current_token()
+        device_list_prefill, min_device_list_id = self.db_pool.get_cache_dict(
+            db_conn,
+            "device_lists_stream",
+            entity_column="user_id",
+            stream_column="stream_id",
+            max_value=device_list_max,
+            limit=10000,
+        )
+        self._device_list_stream_cache = StreamChangeCache(
+            "DeviceListStreamChangeCache",
+            min_device_list_id,
+            prefilled_cache=device_list_prefill,
+        )
+
+        (
+            user_signature_stream_prefill,
+            user_signature_stream_list_id,
+        ) = self.db_pool.get_cache_dict(
+            db_conn,
+            "user_signature_stream",
+            entity_column="from_user_id",
+            stream_column="stream_id",
+            max_value=device_list_max,
+            limit=1000,
+        )
+        self._user_signature_stream_cache = StreamChangeCache(
+            "UserSignatureStreamChangeCache",
+            user_signature_stream_list_id,
+            prefilled_cache=user_signature_stream_prefill,
+        )
+
+        (
+            device_list_federation_prefill,
+            device_list_federation_list_id,
+        ) = self.db_pool.get_cache_dict(
+            db_conn,
+            "device_lists_outbound_pokes",
+            entity_column="destination",
+            stream_column="stream_id",
+            max_value=device_list_max,
+            limit=10000,
+        )
+        self._device_list_federation_stream_cache = StreamChangeCache(
+            "DeviceListFederationStreamChangeCache",
+            device_list_federation_list_id,
+            prefilled_cache=device_list_federation_prefill,
+        )
 
         if hs.config.worker.run_background_tasks:
             self._clock.looping_call(
