@@ -1281,7 +1281,7 @@ class DatabasePool:
             value_values: A list of each row's value column values.
                 Ignored if value_names is empty.
             lock: True to lock the table when doing the upsert. Unused if the database engine
-            	supports native upserts.
+                supports native upserts.
         """
 
         # We can autocommit if we are going to use native upserts
@@ -1322,7 +1322,7 @@ class DatabasePool:
             value_values: A list of each row's value column values.
                 Ignored if value_names is empty.
             lock: True to lock the table when doing the upsert. Unused if the database engine
-            	supports native upserts.
+                supports native upserts.
         """
         if self.engine.can_native_upsert and table not in self._unsafe_to_upsert_tables:
             return self.simple_upsert_many_txn_native_upsert(
