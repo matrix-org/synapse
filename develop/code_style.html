@@ -163,7 +163,7 @@ as an opinionated code formatter, ensuring all comitted code is
 properly formatted.</p>
 <p>Have <code>black</code> auto-format your code (it shouldn't change any
 functionality) with:</p>
-<pre><code class="language-sh">black . --exclude=&quot;\.tox|build|env&quot;
+<pre><code class="language-sh">black .
 </code></pre>
 </li>
 <li>
@@ -171,7 +171,7 @@ functionality) with:</p>
 <p><code>flake8</code> is a code checking tool. We require code to pass <code>flake8</code>
 before being merged into the codebase.</p>
 <p>Check all application and test code with:</p>
-<pre><code class="language-sh">flake8 synapse tests
+<pre><code class="language-sh">flake8 .
 </code></pre>
 </li>
 <li>
@@ -179,9 +179,8 @@ before being merged into the codebase.</p>
 <p><code>isort</code> ensures imports are nicely formatted, and can suggest and
 auto-fix issues such as double-importing.</p>
 <p>Auto-fix imports with:</p>
-<pre><code class="language-sh">isort -rc synapse tests
+<pre><code class="language-sh">isort .
 </code></pre>
-<p><code>-rc</code> means to recursively search the given directories.</p>
 </li>
 </ul>
 <p>It's worth noting that modern IDEs and text editors can run these tools
