@@ -21,6 +21,7 @@ from urllib import parse as urlparse
 
 from twisted.web.server import Request
 
+from synapse import event_auth
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
@@ -29,6 +30,7 @@ from synapse.api.errors import (
     MissingClientTokenError,
     ShadowBanError,
     SynapseError,
+    UnredactedContentDeleted,
 )
 from synapse.api.filtering import Filter
 from synapse.events.utils import format_event_for_client_v2
@@ -643,18 +645,54 @@ class RoomEventServlet(RestServlet):
         super().__init__()
         self.clock = hs.get_clock()
         self._store = hs.get_datastores().main
+        self._state = hs.get_state_handler()
         self.event_handler = hs.get_event_handler()
         self._event_serializer = hs.get_event_client_serializer()
         self._relations_handler = hs.get_relations_handler()
         self.auth = hs.get_auth()
+        self.content_keep_ms = hs.config.server.redaction_retention_period
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str, event_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
+
+        include_unredacted_content = (
+            parse_string(
+                request,
+                "fi.mau.msc2815.include_unredacted_content",
+                allowed_values=("true", "false"),
+            )
+            == "true"
+        )
+        if include_unredacted_content and not await self.auth.is_server_admin(
+            requester.user
+        ):
+            power_level_event = await self._state.get_current_state(
+                room_id, EventTypes.PowerLevels, ""
+            )
+
+            auth_events = {}
+            if power_level_event:
+                auth_events[(EventTypes.PowerLevels, "")] = power_level_event
+
+            redact_level = event_auth.get_named_level(auth_events, "redact", 50)
+            user_level = event_auth.get_user_power_level(
+                requester.user.to_string(), auth_events
+            )
+            if user_level < redact_level:
+                raise SynapseError(
+                    403,
+                    "You don't have permission to view redacted events in this room.",
+                    errcode=Codes.FORBIDDEN,
+                )
+
         try:
             event = await self.event_handler.get_event(
-                requester.user, room_id, event_id
+                requester.user,
+                room_id,
+                event_id,
+                show_redacted=include_unredacted_content,
             )
         except AuthError:
             # This endpoint is supposed to return a 404 when the requester does
@@ -663,6 +701,11 @@ class RoomEventServlet(RestServlet):
             raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
         if event:
+            if include_unredacted_content and await self._store.have_censored_event(
+                event_id
+            ):
+                raise UnredactedContentDeleted(self.content_keep_ms)
+
             # Ensure there are bundled aggregations available.
             aggregations = await self._relations_handler.get_bundled_aggregations(
                 [event], requester.user.to_string()

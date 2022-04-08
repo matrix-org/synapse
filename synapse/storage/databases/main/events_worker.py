@@ -303,6 +303,15 @@ class EventsWorkerStore(SQLBaseStore):
             desc="get_received_ts",
         )
 
+    async def have_censored_event(self, event_id: str) -> Optional[bool]:
+        return await self.db_pool.simple_select_one_onecol(
+            table="redactions",
+            keyvalues={"redacts": event_id},
+            retcol="have_censored",
+            desc="get_have_censored",
+            allow_none=True,
+        )
+
     # Inform mypy that if allow_none is False (the default) then get_event
     # always returns an EventBase.
     @overload

@@ -21,6 +21,7 @@ from synapse.api.errors import AuthError, SynapseError
 from synapse.events import EventBase
 from synapse.events.utils import SerializeEventConfig
 from synapse.handlers.presence import format_user_presence_state
+from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, UserID
 from synapse.visibility import filter_events_for_client
@@ -139,7 +140,11 @@ class EventHandler:
         self.storage = hs.get_storage()
 
     async def get_event(
-        self, user: UserID, room_id: Optional[str], event_id: str
+        self,
+        user: UserID,
+        room_id: Optional[str],
+        event_id: str,
+        show_redacted: bool = False,
     ) -> Optional[EventBase]:
         """Retrieve a single specified event.
 
@@ -148,6 +153,7 @@ class EventHandler:
             room_id: The expected room id. We'll return None if the
                 event's room does not match.
             event_id: The event ID to obtain.
+            show_redacted: Should the full content of redacted events be returned?
         Returns:
             An event, or None if there is no event matching this ID.
         Raises:
@@ -155,7 +161,12 @@ class EventHandler:
             AuthError if the user does not have the rights to inspect this
             event.
         """
-        event = await self.store.get_event(event_id, check_room_id=room_id)
+        redact_behaviour = (
+            EventRedactBehaviour.AS_IS if show_redacted else EventRedactBehaviour.REDACT
+        )
+        event = await self.store.get_event(
+            event_id, check_room_id=room_id, redact_behaviour=redact_behaviour
+        )
 
         if not event:
             return None
