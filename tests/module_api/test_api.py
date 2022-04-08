@@ -554,8 +554,8 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertEqual(state[("org.matrix.test", "")].state_key, "")
         self.assertEqual(state[("org.matrix.test", "")].content, {})
 
-    def test_add_push_rule(self) -> None:
-        """Test that a module can set a custom push rule for a user."""
+    def test_set_push_rules_action(self) -> None:
+        """Test that a module can change the actions of an existing push rule for a user."""
 
         # Create a room with 2 users in it. Push rules must not match if the user is the
         # event's sender, so we need one user to send messages and one user to receive
@@ -569,43 +569,14 @@ class ModuleApiTestCase(HomeserverTestCase):
         tok2 = self.login("user2", "password")
         self.helper.join(room_id, user_id2, tok=tok2)
 
-        # Set a push rule that doesn't notify for events with the word "testword" in it.
-        # This makes sense because we notify for every message by default, so to test
-        # that our change had any impact the easiest way is to not notify on something.
-        self.get_success(
-            defer.ensureDeferred(
-                self.module_api.add_push_rule_for_user(
-                    user_id=user_id,
-                    scope="global",
-                    kind="content",
-                    rule_id="test",
-                    conditions=[
-                        {
-                            "kind": "event_match",
-                            "key": "content.body",
-                            "pattern": "testword",
-                        }
-                    ],
-                    actions=["dont_notify"],
-                )
-            )
-        )
+        # Register a 3rd user and join them to the room, so that we don't accidentally
+        # trigger 1:1 push rules.
+        user_id3 = self.register_user("user3", "password")
+        tok3 = self.login("user3", "password")
+        self.helper.join(room_id, user_id3, tok=tok3)
 
-        # Send a message as the second user containing this word, and check that it
-        # didn't notify.
-        self.helper.send(room_id=room_id, body="here's a testword", tok=tok2)
-
-        channel = self.make_request(
-            "GET",
-            "/notifications",
-            access_token=tok,
-        )
-        self.assertEqual(channel.code, 200, channel.result)
-        self.assertEqual(len(channel.json_body["notifications"]), 0)
-
-        # Send a message as the second user not containing "testword" and check that it
-        # still notifies.
-        res = self.helper.send(room_id=room_id, body="here's a word", tok=tok2)
+        # Send a message as the second user and check that it notifies.
+        res = self.helper.send(room_id=room_id, body="here's a message", tok=tok2)
         event_id = res["event_id"]
 
         channel = self.make_request(
@@ -621,6 +592,31 @@ class ModuleApiTestCase(HomeserverTestCase):
             event_id,
             channel.json_body,
         )
+
+        # Change the .m.rule.message actions to not notify on new messages.
+        self.get_success(
+            defer.ensureDeferred(
+                self.module_api.set_push_rule_action(
+                    user_id=user_id,
+                    scope="global",
+                    kind="underride",
+                    rule_id=".m.rule.message",
+                    actions=["dont_notify"],
+                )
+            )
+        )
+
+        # Send another message as the second user and check that the number of
+        # notifications didn't change.
+        self.helper.send(room_id=room_id, body="here's another message", tok=tok2)
+
+        channel = self.make_request(
+            "GET",
+            "/notifications?from=",
+            access_token=tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(len(channel.json_body["notifications"]), 1, channel.json_body)
 
 
 class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
