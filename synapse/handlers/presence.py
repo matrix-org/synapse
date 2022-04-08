@@ -481,6 +481,9 @@ class WorkerPresenceHandler(BasePresenceHandler):
         if prev_state != PresenceState.BUSY:
             # We set state here but pass ignore_status_msg = True as we don't want to
             # cause the status message to be cleared.
+            # Note that this causes last_active_ts to be incremented which is not
+            # what the spec wants: see comment in the BasePresenceHandler version
+            # of this function.
             await self.set_state(
                 UserID.from_string(user_id), {"presence": presence_state}, True
             )
@@ -1001,7 +1004,9 @@ class PresenceHandler(BasePresenceHandler):
                 await self._update_states(
                     [
                         prev_state.copy_and_replace(
-                            state=presence_state,
+                            # We do want to update state here but currently do so with separate
+                            # set_state below.
+                            # state=presence_state,
                             last_active_ts=self.clock.time_msec(),
                             last_user_sync_ts=self.clock.time_msec(),
                         )
@@ -1014,10 +1019,22 @@ class PresenceHandler(BasePresenceHandler):
                 await self._update_states(
                     [
                         prev_state.copy_and_replace(
-                            state=presence_state,
+                            # We do want to update state here but currently do so with separate
+                            # set_state below.
+                            # state=presence_state,
                             last_user_sync_ts=self.clock.time_msec(),
                         )
                     ]
+                )
+
+            if prev_state != PresenceState.BUSY:
+                # XXX: We set_state separately here and just update the last_active_ts above
+                # This keeps the logic as similar as possible between the worker and single
+                # process modes. Using set_state will actually cause last_active_ts to be
+                # updated always, which is not what the spec calls for, but synapse has done
+                # this for... forever, I think.
+                await self.set_state(
+                    UserID.from_string(user_id), {"presence": presence_state}, True
                 )
 
         async def _end() -> None:
