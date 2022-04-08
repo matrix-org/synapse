@@ -91,6 +91,7 @@ from synapse.handlers.presence import (
     WorkerPresenceHandler,
 )
 from synapse.handlers.profile import ProfileHandler
+from synapse.handlers.push_rules import PushRulesHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.register import RegistrationHandler
@@ -850,3 +851,7 @@ class HomeServer(metaclass=abc.ABCMeta):
             self.config.ratelimiting.rc_message,
             self.config.ratelimiting.rc_admin_redaction,
         )
+
+    @cache_in_self
+    def get_push_rules_handler(self) -> PushRulesHandler:
+        return PushRulesHandler(self)
