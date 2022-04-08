@@ -16,22 +16,27 @@
 import argparse
 import logging
 import sys
+from typing import cast
 
 import yaml
 from matrix_common.versionstring import get_distribution_version_string
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer, reactor as reactor_
 
 from synapse.config.homeserver import HomeServerConfig
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.server import HomeServer
 from synapse.storage import DataStore
+from synapse.types import ISynapseReactor
 
+# Cast safety: Twisted does some naughty magic which replaces the
+# twisted.internet.reactor module with a Reactor instance at runtime.
+reactor = cast(ISynapseReactor, reactor_)
 logger = logging.getLogger("update_database")
 
 
 class MockHomeserver(HomeServer):
-    DATASTORE_CLASS = DataStore
+    DATASTORE_CLASS = DataStore  # type: ignore [assignment]
 
     def __init__(self, config, **kwargs):
         super(MockHomeserver, self).__init__(
@@ -85,12 +90,10 @@ def main():
 
     args = parser.parse_args()
 
-    logging_config = {
-        "level": logging.DEBUG if args.v else logging.INFO,
-        "format": "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s",
-    }
-
-    logging.basicConfig(**logging_config)
+    logging.basicConfig(
+        level=logging.DEBUG if args.v else logging.INFO,
+        format="%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s",
+    )
 
     # Load, process and sanity-check the config.
     hs_config = yaml.safe_load(args.database_config)

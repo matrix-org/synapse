@@ -1155,8 +1155,9 @@ class SyncHandler:
                 await self.store.get_e2e_unused_fallback_key_types(user_id, device_id)
             )
 
-        logger.debug("Fetching group data")
-        await self._generate_sync_entry_for_groups(sync_result_builder)
+        if self.hs_config.experimental.groups_enabled:
+            logger.debug("Fetching group data")
+            await self._generate_sync_entry_for_groups(sync_result_builder)
 
         num_events = 0
 
@@ -1850,6 +1851,7 @@ class SyncHandler:
                         full_state=False,
                         since_token=since_token,
                         upto_token=leave_token,
+                        out_of_band=leave_event.internal_metadata.is_out_of_band_membership(),
                     )
                 )
 
@@ -2116,33 +2118,41 @@ class SyncHandler:
             ):
                 return
 
-            state = await self.compute_state_delta(
-                room_id,
-                batch,
-                sync_config,
-                since_token,
-                now_token,
-                full_state=full_state,
-            )
+            if not room_builder.out_of_band:
+                state = await self.compute_state_delta(
+                    room_id,
+                    batch,
+                    sync_config,
+                    since_token,
+                    now_token,
+                    full_state=full_state,
+                )
+            else:
+                # An out of band room won't have any state changes.
+                state = {}
 
             summary: Optional[JsonDict] = {}
 
             # we include a summary in room responses when we're lazy loading
             # members (as the client otherwise doesn't have enough info to form
             # the name itself).
-            if sync_config.filter_collection.lazy_load_members() and (
-                # we recalculate the summary:
-                #   if there are membership changes in the timeline, or
-                #   if membership has changed during a gappy sync, or
-                #   if this is an initial sync.
-                any(ev.type == EventTypes.Member for ev in batch.events)
-                or (
-                    # XXX: this may include false positives in the form of LL
-                    # members which have snuck into state
-                    batch.limited
-                    and any(t == EventTypes.Member for (t, k) in state)
+            if (
+                not room_builder.out_of_band
+                and sync_config.filter_collection.lazy_load_members()
+                and (
+                    # we recalculate the summary:
+                    #   if there are membership changes in the timeline, or
+                    #   if membership has changed during a gappy sync, or
+                    #   if this is an initial sync.
+                    any(ev.type == EventTypes.Member for ev in batch.events)
+                    or (
+                        # XXX: this may include false positives in the form of LL
+                        # members which have snuck into state
+                        batch.limited
+                        and any(t == EventTypes.Member for (t, k) in state)
+                    )
+                    or since_token is None
                 )
-                or since_token is None
             ):
                 summary = await self.compute_summary(
                     room_id, sync_config, batch, state, now_token
@@ -2386,6 +2396,8 @@ class RoomSyncResultBuilder:
         full_state: Whether the full state should be sent in result
         since_token: Earliest point to return events from, or None
         upto_token: Latest point to return events from.
+        out_of_band: whether the events in the room are "out of band" events
+            and the server isn't in the room.
     """
 
     room_id: str
@@ -2395,3 +2407,5 @@ class RoomSyncResultBuilder:
     full_state: bool
     since_token: Optional[StreamToken]
     upto_token: StreamToken
+
+    out_of_band: bool = False
