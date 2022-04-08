@@ -630,11 +630,6 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
             self._update_on_this_worker
         ), "This worker is not designated to update client IPs"
 
-        if "user_ips" in self.db_pool._unsafe_to_upsert_tables or (
-            not self.database_engine.can_native_upsert
-        ):
-            self.database_engine.lock_table(txn, "user_ips")
-
         # Keys and values for the `user_ips` upsert.
         user_ips_keys = []
         user_ips_values = []
@@ -661,7 +656,6 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorke
             key_values=user_ips_keys,
             value_names=("user_agent", "device_id", "last_seen"),
             value_values=user_ips_values,
-            lock=False,
         )
 
         if devices_values:
