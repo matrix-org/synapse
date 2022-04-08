@@ -85,31 +85,13 @@ class ModuleApiTestCase(HomeserverTestCase):
             )
         )
 
-        # Request that account data from the normal store; check it's as we expect.
-        self.assertEqual(
-            self.get_success(
-                self._store.get_global_account_data_by_type_for_user(
-                    self.user_id, "test.data"
-                )
-            ),
-            {"wombat": True},
-        )
-
-        # Now, as a module, request that data and then mutate it (out of negligence or otherwise).
+        # Now request that data and then mutate it (out of negligence or otherwise).
         the_data = self.get_success(
             self._account_data_mgr.get_global(self.user_id, "test.data")
         )
-        the_data["wombat"] = False
-
-        # As Synapse, request that account data once more from the normal store; check it's as we expect.
-        self.assertEqual(
-            self.get_success(
-                self._store.get_global_account_data_by_type_for_user(
-                    self.user_id, "test.data"
-                )
-            ),
-            {"wombat": True},
-        )
+        with self.assertRaises(TypeError):
+            # This throws an exception because it's a frozen dict.
+            the_data["wombat"] = False
 
     def test_put_global(self) -> None:
         """
