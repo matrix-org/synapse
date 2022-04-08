@@ -118,6 +118,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         """
         Tests that a module can't write account data to user IDs that don't have
         actual users registered to them.
+        Modules also must supply the correct types.
         """
 
         with self.assertRaises(SynapseError):
@@ -136,5 +137,21 @@ class ModuleApiTestCase(HomeserverTestCase):
             self.get_success_or_raise(
                 self._module_api.account_data_manager.put_global(
                     "@notregistered:test", "test.data", {}
+                )
+            )
+
+        with self.assertRaises(TypeError):
+            # The account data type must be a string.
+            self.get_success_or_raise(
+                self._module_api.account_data_manager.put_global(
+                    self.user_id, 42, {}  # type: ignore
+                )
+            )
+
+        with self.assertRaises(TypeError):
+            # The account data dict must be a dict.
+            self.get_success_or_raise(
+                self._module_api.account_data_manager.put_global(
+                    self.user_id, "test.data", 42  # type: ignore
                 )
             )
