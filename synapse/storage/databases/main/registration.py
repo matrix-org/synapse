@@ -121,7 +121,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         database: DatabasePool,
         db_conn: LoggingDatabaseConnection,
         hs: "HomeServer",
-    ) -> None:
+    ):
         super().__init__(database, db_conn, hs)
 
         self.config: HomeServerConfig = hs.config
