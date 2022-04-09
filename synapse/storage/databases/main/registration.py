@@ -385,7 +385,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="get_renewal_token_for_user",
         )
 
-    async def get_users_expiring_soon(self) -> Optional[List[Tuple[str, int]]]:
+    async def get_users_expiring_soon(self) -> List[Tuple[str, int]]:
         """Selects users whose account will expire in the [now, now + renew_at] time
         window (see configuration for account_validity for information on what renew_at
         refers to).
@@ -396,14 +396,14 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         def select_users_txn(
             txn: LoggingTransaction, now_ms: int, renew_at: int
-        ) -> Optional[List[Tuple[str, int]]]:
+        ) -> List[Tuple[str, int]]:
             sql = (
                 "SELECT user_id, expiration_ts_ms FROM account_validity"
                 " WHERE email_sent = ? AND (expiration_ts_ms - ?) <= ?"
             )
             values = [False, now_ms, renew_at]
             txn.execute(sql, values)
-            return cast(Optional[List[Tuple[str, int]]], txn.fetchall())
+            return cast(List[Tuple[str, int]], txn.fetchall())
 
         return await self.db_pool.runInteraction(
             "get_users_expiring_soon",
