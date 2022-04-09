@@ -170,12 +170,15 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 self.database_engine, "rl.receipt_type", receipt_types
             )
             sql = """
-                SELECT rl.room_id, rl.event_id, MAX(e.stream_ordering)
-                FROM receipts_linearized AS rl
-                INNER JOIN events AS e USING (room_id, event_id)
-                WHERE rl.user_id = ?
-                AND %s
-                GROUP BY rl.room_id
+                SELECT t.room_id, t.event_id FROM (
+                    SELECT rl.room_id, rl.event_id, row_number() over (partition by rl.room_id order by e.stream_ordering desc) rw
+                    FROM receipts_linearized AS rl
+                    INNER JOIN events AS e USING (room_id, event_id)
+                    WHERE rl.user_id = ?
+                    AND %s
+                ) t
+                WHERE t.rw = 1;
+
             """ % (
                 clause,
             )
