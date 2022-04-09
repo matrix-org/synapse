@@ -180,9 +180,9 @@ class AccountValidityHandler:
         expiring_users = await self.store.get_users_expiring_soon()
 
         if expiring_users:
-            for user in expiring_users:
+            for user_id, expiration_ts_ms in expiring_users:
                 await self._send_renewal_email(
-                    user_id=user["user_id"], expiration_ts=user["expiration_ts_ms"]
+                    user_id=user_id, expiration_ts=expiration_ts_ms
                 )
 
     async def send_renewal_email_to_user(self, user_id: str) -> None:
