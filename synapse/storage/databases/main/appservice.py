@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Collection, Dict, List, Optional, Pattern, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Pattern, Tuple
 
 from synapse.appservice import (
     ApplicationService,
@@ -386,7 +386,7 @@ class ApplicationServiceTransactionWorkerStore(
 
         def get_new_events_for_appservice_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[int, Collection[str]]:
+        ) -> Tuple[int, List[str]]:
             sql = (
                 "SELECT e.stream_ordering, e.event_id"
                 " FROM events AS e"
