@@ -42,7 +42,6 @@ from typing import (
     Collection,
     Dict,
     List,
-    Literal,
     Optional,
     Set,
     Tuple,
@@ -51,6 +50,7 @@ from typing import (
 
 import attr
 from frozendict import frozendict
+from typing_extensions import Literal
 
 from twisted.internet import defer
 
@@ -753,7 +753,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 " LIMIT 1"
             )
             txn.execute(sql, (room_id, stream_ordering))
-            return cast(Tuple[int, int, str], txn.fetchone())
+            return cast(Optional[Tuple[int, int, str]], txn.fetchone())
 
         return await self.db_pool.runInteraction(
             "get_room_event_before_stream_ordering", _f
