@@ -130,7 +130,7 @@ def start_reactor(
     appname: str,
     soft_file_limit: int,
     gc_thresholds: Optional[Tuple[int, int, int]],
-    pid_file: str,
+    pid_file: Optional[str],
     daemonize: bool,
     print_pidfile: bool,
     logger: logging.Logger,
@@ -171,6 +171,8 @@ def start_reactor(
     # appearing to go backwards.
     with PreserveLoggingContext():
         if daemonize:
+            assert pid_file is not None
+
             if print_pidfile:
                 print(pid_file)
 

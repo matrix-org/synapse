@@ -20,7 +20,7 @@ import sys
 from synapse.config.logger import DEFAULT_LOG_CONFIG
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
 
     parser.add_argument(

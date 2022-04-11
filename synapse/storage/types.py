@@ -45,6 +45,7 @@ class Cursor(Protocol):
         Sequence[
             # Note that this is an approximate typing based on sqlite3 and other
             # drivers, and may not be entirely accurate.
+            # FWIW, the DBAPI 2 spec is: https://peps.python.org/pep-0249/#description
             Tuple[
                 str,
                 Optional[Any],
