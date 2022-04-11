@@ -2,7 +2,8 @@
 
 # Test for the export-data admin command against sqlite and postgres
 
-# Expects Synapse to have been already installed with `poetry install -e .[postgres]
+# Expects Synapse to have been already installed with `poetry install --extras postgres`.
+# Expects `poetry` to be available on the `PATH`.
 
 set -xe
 cd "$(dirname "$0")/../.."
