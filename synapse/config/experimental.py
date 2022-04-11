@@ -28,8 +28,6 @@ class ExperimentalConfig(Config):
 
         # MSC3440 (thread relation)
         self.msc3440_enabled: bool = experimental.get("msc3440_enabled", False)
-        # MSC3666: including bundled relations in /search.
-        self.msc3666_enabled: bool = experimental.get("msc3666_enabled", False)
 
         # MSC3026 (busy presence state)
         self.msc3026_enabled: bool = experimental.get("msc3026_enabled", False)
