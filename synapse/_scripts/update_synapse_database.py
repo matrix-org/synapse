@@ -38,25 +38,25 @@ logger = logging.getLogger("update_database")
 class MockHomeserver(HomeServer):
     DATASTORE_CLASS = DataStore  # type: ignore [assignment]
 
-    def __init__(self, config, **kwargs):
+    def __init__(self, config: HomeServerConfig):
         super(MockHomeserver, self).__init__(
-            config.server.server_name, reactor=reactor, config=config, **kwargs
+            hostname=config.server.server_name,
+            config=config,
+            reactor=reactor,
+            version_string="Synapse/"
+            + get_distribution_version_string("matrix-synapse"),
         )
 
-        self.version_string = "Synapse/" + get_distribution_version_string(
-            "matrix-synapse"
-        )
 
-
-def run_background_updates(hs):
+def run_background_updates(hs: HomeServer) -> None:
     store = hs.get_datastores().main
 
-    async def run_background_updates():
+    async def run_background_updates() -> None:
         await store.db_pool.updates.run_background_updates(sleep=False)
         # Stop the reactor to exit the script once every background update is run.
         reactor.stop()
 
-    def run():
+    def run() -> None:
         # Apply all background updates on the database.
         defer.ensureDeferred(
             run_as_background_process("background_updates", run_background_updates)
@@ -67,7 +67,7 @@ def run_background_updates(hs):
     reactor.run()
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
             "Updates a synapse database to the latest schema and optionally runs background updates"
