@@ -1079,7 +1079,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
     async def clear_partial_state_room(self, room_id: str) -> bool:
         # this can race with incoming events, so we watch out for FK errors.
-        # todo: this still doesn't completely fix the race, since the persist process
+        # TODO(faster_joins): this still doesn't completely fix the race, since the persist process
         #   is not atomic. I fear we need an application-level lock.
         try:
             await self.db_pool.runInteraction(
@@ -1087,7 +1087,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             )
             return True
         except self.db_pool.engine.module.DatabaseError as e:
-            # todo: how do we distinguish between FK errors and other errors?
+            # TODO(faster_joins): how do we distinguish between FK errors and other errors?
             logger.warning(
                 "Exception while clearing lazy partial-state-room %s, retrying: %s",
                 room_id,

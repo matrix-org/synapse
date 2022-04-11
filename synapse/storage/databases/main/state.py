@@ -395,7 +395,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             keyvalues={"event_id": event.event_id},
         )
 
-        # TODO: need to do something about workers here
+        # TODO(faster_joins): need to do something about workers here
         txn.call_after(
             self._get_state_group_for_event.prefill,
             (event.event_id,),

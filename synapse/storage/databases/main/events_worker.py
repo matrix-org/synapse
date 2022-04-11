@@ -1993,7 +1993,7 @@ class EventsWorkerStore(SQLBaseStore):
         txn: LoggingTransaction, room_id: str
     ) -> List[str]:
         txn.execute(
-            """\
+            """
             SELECT event_id FROM partial_state_events AS pse
                 JOIN events USING (event_id)
             WHERE pse.room_id = ?

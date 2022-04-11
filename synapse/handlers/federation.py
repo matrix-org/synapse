@@ -481,8 +481,8 @@ class FederationHandler:
             )
 
             if ret.partial_state:
-                # kick off the process of asynchronously fixing up the state for this
-                # room
+                # Kick off the process of asynchronously fetching the state for this
+                # room.
                 #
                 # TODO(faster_joins): pick this up again on restart
                 run_as_background_process(
@@ -1431,6 +1431,9 @@ class FederationHandler:
 
                 # we raced against more events arriving with partial state. Go round
                 # the loop again. We've already logged a warning, so no need for more.
+                # TODO(faster_joins): there is still a race here, whereby incoming events which raced 
+                #   with us will fail to be persisted after the call to `clear_partial_state_room` due to
+                #   having partial state.
                 continue
 
             events = await self.store.get_events_as_list(
