@@ -1,0 +1,1 @@
+Workaround a `poetry export` bug when building docker containers, by explicitly depending on `Twisted[tls]`.
