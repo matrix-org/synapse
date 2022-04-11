@@ -248,7 +248,7 @@ class LimitRemoteRoomsConfig:
 class ServerConfig(Config):
     section = "server"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.server_name = config["server_name"]
         self.server_context = config.get("server_context", None)
 
@@ -259,8 +259,8 @@ class ServerConfig(Config):
 
         self.pid_file = self.abspath(config.get("pid_file"))
         self.soft_file_limit = config.get("soft_file_limit", 0)
-        self.daemonize = config.get("daemonize")
-        self.print_pidfile = config.get("print_pidfile")
+        self.daemonize = bool(config.get("daemonize"))
+        self.print_pidfile = bool(config.get("print_pidfile"))
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
         self.serve_server_wellknown = config.get("serve_server_wellknown", False)
@@ -680,6 +680,14 @@ class ServerConfig(Config):
             config.get("use_account_validity_in_account_status") or False
         )
 
+        # This is a temporary option that enables fully using the new
+        # `device_lists_changes_in_room` without the backwards compat code. This
+        # is primarily for testing. If enabled the server should *not* be
+        # downgraded, as it may lead to missing device list updates.
+        self.use_new_device_lists_changes_in_room = (
+            config.get("use_new_device_lists_changes_in_room") or False
+        )
+
         self.rooms_to_exclude_from_sync: List[str] = (
             config.get("exclude_rooms_from_sync") or []
         )
@@ -689,13 +697,13 @@ class ServerConfig(Config):
 
     def generate_config_section(
         self,
-        server_name,
-        data_dir_path,
-        open_private_ports,
-        listeners,
-        config_dir_path,
-        **kwargs,
-    ):
+        config_dir_path: str,
+        data_dir_path: str,
+        server_name: str,
+        open_private_ports: bool,
+        listeners: Optional[List[dict]],
+        **kwargs: Any,
+    ) -> str:
         ip_range_blacklist = "\n".join(
             "        #  - '%s'" % ip for ip in DEFAULT_IP_RANGE_BLACKLIST
         )

@@ -1,0 +1,1 @@
+Convert `Linearizer` tests from `inlineCallbacks` to async.
