@@ -63,6 +63,11 @@ COPY pyproject.toml poetry.lock README.rst /synapse/
 
 RUN /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt
 
+# Workaround https://github.com/pypa/pip/issues/9644. Without this, pip tries to install
+# Twisted[tls] using the latest twisted and fails; it doesn't realisie that there is
+# already a version of twisted given in the requirments.
+RUN sed -i /synapse/requirements.txt -e 's/^twisted==/twisted[tls]==/'
+
 ###
 ### Stage 1: builder
 ###
