@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any
+
 from synapse.config._base import Config
 from synapse.types import JsonDict
 
@@ -21,7 +23,7 @@ class ExperimentalConfig(Config):
 
     section = "experimental"
 
-    def read_config(self, config: JsonDict, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         experimental = config.get("experimental_features") or {}
 
         # MSC3440 (thread relation)

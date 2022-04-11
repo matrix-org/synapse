@@ -16,6 +16,8 @@ from typing import Any, Dict, Optional
 
 import attr
 
+from synapse.types import JsonDict
+
 from ._base import Config
 
 logger = logging.getLogger(__name__)
@@ -49,7 +51,7 @@ class SSOConfig(Config):
 
     section = "sso"
 
-    def read_config(self, config, **kwargs) -> None:
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         sso_config: Dict[str, Any] = config.get("sso") or {}
 
         # The sso-specific template_dir
@@ -106,7 +108,7 @@ class SSOConfig(Config):
         )
         self.sso_client_whitelist.append(login_fallback_url)
 
-    def generate_config_section(self, **kwargs) -> str:
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         # Additional settings to use with single-sign on systems such as OpenID Connect,
         # SAML2 and CAS.

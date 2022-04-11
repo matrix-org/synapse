@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import Iterable
+from typing import Any, Iterable
 
 from synapse.api.constants import EventTypes
 from synapse.config._base import Config, ConfigError
@@ -26,12 +26,12 @@ logger = logging.getLogger(__name__)
 class ApiConfig(Config):
     section = "api"
 
-    def read_config(self, config: JsonDict, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         validate_config(_MAIN_SCHEMA, config, ())
         self.room_prejoin_state = list(self._get_prejoin_state_types(config))
         self.track_puppeted_user_ips = config.get("track_puppeted_user_ips", False)
 
-    def generate_config_section(cls, **kwargs) -> str:
+    def generate_config_section(cls, **kwargs: Any) -> str:
         formatted_default_state_types = "\n".join(
             "           # - %s" % (t,) for t in _DEFAULT_PREJOIN_STATE_TYPES
         )
