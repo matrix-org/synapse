@@ -1285,7 +1285,7 @@ urllib3 = ">=1.26.0"
 
 [[package]]
 name = "twisted"
-version = "22.2.0"
+version = "22.4.0"
 description = "An asynchronous networking framework written in Python"
 category = "main"
 optional = false
