@@ -41,13 +41,6 @@ database:
 
 ## Federation ##
 
-
-# disable verification of federation certificates
-#
-# TODO: this is temporary; see
-# https://github.com/matrix-org/synapse/issues/11803
-federation_verify_certificates: false
-
 # trust certs signed by the complement CA
 federation_custom_ca_list:
 - /complement/ca/ca.crt
