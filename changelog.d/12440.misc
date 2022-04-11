@@ -1,1 +1,0 @@
-Bump twisted version in poetry.lock to work around pip bug #9644. 
