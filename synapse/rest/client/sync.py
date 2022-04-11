@@ -301,14 +301,13 @@ class SyncRestServlet(RestServlet):
         if archived:
             response["rooms"][Membership.LEAVE] = archived
 
-        # By the time we get here groups is no longer optional.
-        assert sync_result.groups is not None
-        if sync_result.groups.join:
-            response["groups"][Membership.JOIN] = sync_result.groups.join
-        if sync_result.groups.invite:
-            response["groups"][Membership.INVITE] = sync_result.groups.invite
-        if sync_result.groups.leave:
-            response["groups"][Membership.LEAVE] = sync_result.groups.leave
+        if sync_result.groups is not None:
+            if sync_result.groups.join:
+                response["groups"][Membership.JOIN] = sync_result.groups.join
+            if sync_result.groups.invite:
+                response["groups"][Membership.INVITE] = sync_result.groups.invite
+            if sync_result.groups.leave:
+                response["groups"][Membership.LEAVE] = sync_result.groups.leave
 
         return response
 
