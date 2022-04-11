@@ -38,7 +38,7 @@ export VIRTUALENV_NO_DOWNLOAD=1
 # `python = "^3.7"` to `python = "==3.7", which would mean we fail because olddeps
 # runs on 3.8 (#12343).
 
-sed -i-backup \
+sed -i \
    -e "s/[~>]=/==/g" \
    -e "/psycopg2/d" \
    -e 's/pyOpenSSL = "==16.0.0"/pyOpenSSL = "==17.0.0"/' \
