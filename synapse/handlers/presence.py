@@ -988,25 +988,25 @@ class PresenceHandler(BasePresenceHandler):
             self.user_to_num_current_syncs[user_id] = curr_sync + 1
 
             prev_state = await self.current_state_for_user(user_id)
+
             # If they're busy then they don't stop being busy just by syncing,
             # so just update the last sync time.
-            if prev_state.state == PresenceState.BUSY:
-                await self._update_states(
-                    [
-                        prev_state.copy_and_replace(
-                            last_user_sync_ts=self.clock.time_msec(),
-                        )
-                    ]
+            if prev_state.state != PresenceState.BUSY:
+                # XXX: We set_state separately here and just update the last_active_ts above
+                # This keeps the logic as similar as possible between the worker and single
+                # process modes. Using set_state will actually cause last_active_ts to be
+                # updated always, which is not what the spec calls for, but synapse has done
+                # this for... forever, I think.
+                await self.set_state(
+                    UserID.from_string(user_id), {"presence": presence_state}, True
                 )
-            # If they were offline, then bring them online (update the presence
-            # state to the new state and update the last_active_ts)
-            elif prev_state.state == PresenceState.OFFLINE:
+                prev_state = prev_state.copy_and_replace(state=presence_state)
+
+            if prev_state.state == PresenceState.OFFLINE:
                 await self._update_states(
                     [
                         prev_state.copy_and_replace(
-                            # We do want to update state here but currently do so with separate
-                            # set_state below.
-                            # state=presence_state,
+                            state=presence_state,
                             last_active_ts=self.clock.time_msec(),
                             last_user_sync_ts=self.clock.time_msec(),
                         )
@@ -1019,22 +1019,9 @@ class PresenceHandler(BasePresenceHandler):
                 await self._update_states(
                     [
                         prev_state.copy_and_replace(
-                            # We do want to update state here but currently do so with separate
-                            # set_state below.
-                            # state=presence_state,
                             last_user_sync_ts=self.clock.time_msec(),
                         )
                     ]
-                )
-
-            if prev_state.state != PresenceState.BUSY:
-                # XXX: We set_state separately here and just update the last_active_ts above
-                # This keeps the logic as similar as possible between the worker and single
-                # process modes. Using set_state will actually cause last_active_ts to be
-                # updated always, which is not what the spec calls for, but synapse has done
-                # this for... forever, I think.
-                await self.set_state(
-                    UserID.from_string(user_id), {"presence": presence_state}, True
                 )
 
         async def _end() -> None:
