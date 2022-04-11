@@ -36,24 +36,9 @@
 
 [tool.black]
 target-version = ['py37', 'py38', 'py39', 'py310']
-exclude = '''
-
-(
-  /(
-      \.eggs         # exclude a few common directories in the
-    | \.git          # root of the project
-    | \.tox
-    | \.venv
-    | \.env
-    | env
-    | _build
-    | _trial_temp.*
-    | build
-    | dist
-    | debian
-  )/
-)
-'''
+# black ignores everything in .gitignore by default, see
+# https://black.readthedocs.io/en/stable/usage_and_configuration/file_collection_and_discovery.html#gitignore
+# Use `extend-exclude` if you want to exclude something in addition to this.
 
 [tool.isort]
 line_length = 88
@@ -65,6 +50,7 @@ known_twisted = ["twisted", "OpenSSL"]
 multi_line_output = 3
 include_trailing_comma = true
 combine_as_imports = true
+skip_gitignore = true
 
 [tool.poetry]
 name = "matrix-synapse"
