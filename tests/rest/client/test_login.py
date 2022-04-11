@@ -385,7 +385,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(b"POST", "/logout/all", access_token=access_token)
         self.assertEqual(channel.result["code"], b"200", channel.result)
 
-    def test_login_with_large_device_id_fails(self) -> None:
+    def test_login_with_overly_large_device_id_fails(self) -> None:
         self.register_user("mickey", "cheese")
 
         # create a device_id larger than 8KB
@@ -406,12 +406,14 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             json.dumps(body).encode("utf8"),
             custom_headers=None,
         )
+
+        # test that the login fails with the correct error code/message
         self.assertEqual(channel.code, 400)
         self.assertEqual(
             channel.json_body,
             {
                 "errcode": "M_INVALID_PARAM",
-                "error": "Device id cannot be greater than 8KB.",
+                "error": "Device_id cannot be greater than 8KB.",
             },
         )
 

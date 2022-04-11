@@ -344,12 +344,12 @@ class LoginRestServlet(RestServlet):
 
         device_id = login_submission.get("device_id")
 
-        # Check that device_id is not greater than 8KB as this causes issues with Postgres indexing
+        # Check that device_id is not greater than 8KB as Postgres is unable to index values larger than this
         device_id_size = sys.getsizeof(device_id)
         if device_id_size > 8000:
             raise LoginError(
                 400,
-                "Device id cannot be greater than 8KB.",
+                "Device_id cannot be greater than 8KB.",
                 errcode=Codes.INVALID_PARAM,
             )
 
