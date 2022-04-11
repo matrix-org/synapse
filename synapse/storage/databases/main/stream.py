@@ -50,7 +50,6 @@ from typing import (
 
 import attr
 from frozendict import frozendict
-from typing_extensions import Literal
 
 from twisted.internet import defer
 
