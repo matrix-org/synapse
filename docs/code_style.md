@@ -6,60 +6,36 @@ The Synapse codebase uses a number of code formatting tools in order to
 quickly and automatically check for formatting (and sometimes logical)
 errors in code.
 
-The necessary tools are detailed below.
+The necessary tools are:
 
-First install them with:
+- [black](https://black.readthedocs.io/en/stable/), a source code formatter;
+- [isort](https://pycqa.github.io/isort/), which organises each file's imports;
+- [flake8](https://flake8.pycqa.org/en/latest/), which can spot common errors; and
+- [mypy](https://mypy.readthedocs.io/en/stable/), a type checker.
+
+Install them with:
 
 ```sh
 pip install -e ".[lint,mypy]"
 ```
 
--   **black**
+The easiest way to run the lints is to invoke the linter script as follows.
 
-    The Synapse codebase uses [black](https://pypi.org/project/black/)
-    as an opinionated code formatter, ensuring all comitted code is
-    properly formatted.
-
-    Have `black` auto-format your code (it shouldn't change any
-    functionality) with:
-
-    ```sh
-    black .
-    ```
-
--   **flake8**
-
-    `flake8` is a code checking tool. We require code to pass `flake8`
-    before being merged into the codebase.
-
-    Check all application and test code with:
-
-    ```sh
-    flake8 .
-    ```
-
--   **isort**
-
-    `isort` ensures imports are nicely formatted, and can suggest and
-    auto-fix issues such as double-importing.
-
-    Auto-fix imports with:
-
-    ```sh
-    isort .
-    ```
+```sh
+scripts-dev/lint.sh
+```
 
 It's worth noting that modern IDEs and text editors can run these tools
 automatically on save. It may be worth looking into whether this
 functionality is supported in your editor for a more convenient
-development workflow. It is not, however, recommended to run `flake8` on
-save as it takes a while and is very resource intensive.
+development workflow. It is not, however, recommended to run `flake8` or `mypy`
+on save as they take a while and can be very resource intensive.
 
 ## General rules
 
 -   **Naming**:
-    -   Use camel case for class and type names
-    -   Use underscores for functions and variables.
+    -   Use `CamelCase` for class and type names
+    -   Use underscores for `function_names` and `variable_names`.
 -   **Docstrings**: should follow the [google code
     style](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings).
     See the
