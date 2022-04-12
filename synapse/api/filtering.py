@@ -89,9 +89,7 @@ ROOM_EVENT_FILTER_SCHEMA = {
         "org.matrix.not_labels": {"type": "array", "items": {"type": "string"}},
         # MSC3440, filtering by event relations.
         "related_by_senders": {"type": "array", "items": {"type": "string"}},
-        "io.element.relation_senders": {"type": "array", "items": {"type": "string"}},
         "related_by_rel_types": {"type": "array", "items": {"type": "string"}},
-        "io.element.relation_types": {"type": "array", "items": {"type": "string"}},
     },
 }
 
@@ -322,16 +320,6 @@ class Filter:
 
         self.related_by_senders = self.filter_json.get("related_by_senders", None)
         self.related_by_rel_types = self.filter_json.get("related_by_rel_types", None)
-
-        # Fallback to the unstable prefix if the stable version is not given.
-        if hs.config.experimental.msc3440_enabled:
-            self.related_by_senders = self.related_by_senders or self.filter_json.get(
-                "io.element.relation_senders", None
-            )
-            self.related_by_rel_types = (
-                self.related_by_rel_types
-                or self.filter_json.get("io.element.relation_types", None)
-            )
 
     def filters_all_types(self) -> bool:
         return "*" in self.not_types
