@@ -43,7 +43,7 @@ python3 -m venv "$TEMP_VENV"
 source "$TEMP_VENV/bin/activate"
 pip install -U pip
 pip install poetry==1.2.0b1
-poetry export --extras "all test" -o requirements.txt
+poetry export --extras all --extras test -o requirements.txt
 deactivate
 rm -rf "$TEMP_VENV"
 
