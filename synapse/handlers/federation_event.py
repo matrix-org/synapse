@@ -477,6 +477,45 @@ class FederationEventHandler:
 
             return await self.persist_events_and_notify(room_id, [(event, context)])
 
+    async def update_state_for_partial_state_event(
+        self, destination: str, event: EventBase
+    ) -> None:
+        """Recalculate the state at an event as part of a de-partial-stating process
+
+        Args:
+            destination: server to request full state from
+            event: partial-state event to be de-partial-stated
+        """
+        logger.info("Updating state for %s", event.event_id)
+        with nested_logging_context(suffix=event.event_id):
+            # if we have all the event's prev_events, then we can work out the
+            # state based on their states. Otherwise, we request it from the destination
+            # server.
+            #
+            # This is the same operation as we do when we receive a regular event
+            # over federation.
+            state = await self._resolve_state_at_missing_prevs(destination, event)
+
+            # build a new state group for it if need be
+            context = await self._state_handler.compute_event_context(
+                event,
+                old_state=state,
+            )
+            if context.partial_state:
+                # this can happen if some or all of the event's prev_events still have
+                # partial state - ie, an event has an earlier stream_ordering than one
+                # or more of its prev_events, so we de-partial-state it before its
+                # prev_events.
+                #
+                # TODO(faster_joins): we probably need to be more intelligent, and
+                #    exclude partial-state prev_events from consideration
+                logger.warning(
+                    "%s still has partial state: can't de-partial-state it yet",
+                    event.event_id,
+                )
+                return
+            await self._store.update_state_for_partial_state_event(event, context)
+
     async def backfill(
         self, dest: str, room_id: str, limit: int, extremities: Collection[str]
     ) -> None:

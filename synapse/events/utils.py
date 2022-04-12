@@ -39,7 +39,6 @@ from . import EventBase
 
 if TYPE_CHECKING:
     from synapse.handlers.relations import BundledAggregations
-    from synapse.server import HomeServer
 
 
 # Split strings on "." but not "\." This uses a negative lookbehind assertion for '\'
@@ -396,9 +395,6 @@ class EventClientSerializer:
     clients.
     """
 
-    def __init__(self, hs: "HomeServer"):
-        self._msc3440_enabled = hs.config.experimental.msc3440_enabled
-
     def serialize_event(
         self,
         event: Union[JsonDict, EventBase],
@@ -532,8 +528,6 @@ class EventClientSerializer:
                 "current_user_participated": thread.current_user_participated,
             }
             serialized_aggregations[RelationTypes.THREAD] = thread_summary
-            if self._msc3440_enabled:
-                serialized_aggregations[RelationTypes.UNSTABLE_THREAD] = thread_summary
 
         # Include the bundled aggregations in the event.
         if serialized_aggregations:

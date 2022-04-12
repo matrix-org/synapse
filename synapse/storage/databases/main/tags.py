@@ -97,7 +97,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
         )
 
         def get_tag_content(
-            txn: LoggingTransaction, tag_ids
+            txn: LoggingTransaction, tag_ids: List[Tuple[int, str, str]]
         ) -> List[Tuple[int, Tuple[str, str, str]]]:
             sql = "SELECT tag, content FROM room_tags WHERE user_id=? AND room_id=?"
             results = []
@@ -251,7 +251,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
         return self._account_data_id_gen.get_current_token()
 
     def _update_revision_txn(
-        self, txn, user_id: str, room_id: str, next_id: int
+        self, txn: LoggingTransaction, user_id: str, room_id: str, next_id: int
     ) -> None:
         """Update the latest revision of the tags for the given user and room.
 
