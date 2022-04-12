@@ -1,0 +1,1 @@
+Default to `private` room visibility rather than `public` when a client does not specify one, according to spec.

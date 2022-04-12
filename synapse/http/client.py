@@ -22,7 +22,6 @@ from typing import (
     BinaryIO,
     Callable,
     Dict,
-    Iterable,
     List,
     Mapping,
     Optional,
@@ -72,6 +71,7 @@ from twisted.web.iweb import (
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.http import QuieterFileBodyProducer, RequestTimedOutError, redact_uri
 from synapse.http.proxyagent import ProxyAgent
+from synapse.http.types import QueryParams
 from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.types import ISynapseReactor
@@ -96,10 +96,6 @@ RawHeaders = Union[Mapping[str, "RawHeaderValue"], Mapping[bytes, "RawHeaderValu
 # the value actually has to be a List, but List is invariant so we can't specify that
 # the entries can either be Lists or bytes.
 RawHeaderValue = Sequence[Union[str, bytes]]
-
-# the type of the query params, to be passed into `urlencode`
-QueryParamValue = Union[str, bytes, Iterable[Union[str, bytes]]]
-QueryParams = Union[Mapping[str, QueryParamValue], Mapping[bytes, QueryParamValue]]
 
 
 def check_against_blacklist(
@@ -911,7 +907,7 @@ def read_body_with_max_size(
     return d
 
 
-def encode_query_args(args: Optional[Mapping[str, Union[str, List[str]]]]) -> bytes:
+def encode_query_args(args: Optional[QueryParams]) -> bytes:
     """
     Encodes a map of query arguments to bytes which can be appended to a URL.
 
@@ -924,13 +920,7 @@ def encode_query_args(args: Optional[Mapping[str, Union[str, List[str]]]]) -> by
     if args is None:
         return b""
 
-    encoded_args = {}
-    for k, vs in args.items():
-        if isinstance(vs, str):
-            vs = [vs]
-        encoded_args[k] = [v.encode("utf8") for v in vs]
-
-    query_str = urllib.parse.urlencode(encoded_args, True)
+    query_str = urllib.parse.urlencode(args, True)
 
     return query_str.encode("utf8")
 

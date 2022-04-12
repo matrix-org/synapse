@@ -27,7 +27,6 @@ jobs:
           - "check_codestyle"
           - "check_isort"
           - "mypy"
-          - "packaging"
 
     steps:
       - uses: actions/checkout@v2
@@ -271,9 +270,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: sudo apt-get -qq install xmlsec1
-      - uses: actions/setup-python@v2
+      - uses: matrix-org/setup-python-poetry@v1
         with:
-          python-version: "3.9"
+          python-version: ${{ matrix.python-version }}
+          extras: "postgres"
       - run: .ci/scripts/test_export_data_command.sh
 
   portdb:
@@ -308,9 +308,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: sudo apt-get -qq install xmlsec1
-      - uses: actions/setup-python@v2
+      - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: ${{ matrix.python-version }}
+          extras: "postgres"
       - run: .ci/scripts/test_synapse_port_db.sh
 
   complement:
@@ -362,27 +363,11 @@ jobs:
             (wget -O - "https://github.com/matrix-org/complement/archive/$BRANCH_NAME.tar.gz" | tar -xz --strip-components=1 -C complement) && break
           done
 
-      # Build initial Synapse image
-      - run: docker build -t matrixdotorg/synapse:latest -f docker/Dockerfile .
-        working-directory: synapse
-        env:
-          DOCKER_BUILDKIT: 1
-
-      # Build a ready-to-run Synapse image based on the initial image above.
-      # This new image includes a config file, keys for signing and TLS, and
-      # other settings to make it suitable for testing under Complement.
-      - run: docker build -t complement-synapse -f Synapse.Dockerfile .
-        working-directory: complement/dockerfiles
-
-      # Run Complement
       - run: |
           set -o pipefail
-          go test -v -json -tags synapse_blacklist,msc2403,msc2716,msc3030 ./tests/... 2>&1 | gotestfmt
+          COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | gotestfmt
         shell: bash
         name: Run Complement Tests
-        env:
-          COMPLEMENT_BASE_IMAGE: complement-synapse:latest
-        working-directory: complement
 
   # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
   tests-done:

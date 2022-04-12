@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any
+
 from synapse.config._base import Config
 from synapse.types import JsonDict
 
@@ -21,13 +23,11 @@ class ExperimentalConfig(Config):
 
     section = "experimental"
 
-    def read_config(self, config: JsonDict, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         experimental = config.get("experimental_features") or {}
 
         # MSC3440 (thread relation)
         self.msc3440_enabled: bool = experimental.get("msc3440_enabled", False)
-        # MSC3666: including bundled relations in /search.
-        self.msc3666_enabled: bool = experimental.get("msc3666_enabled", False)
 
         # MSC3026 (busy presence state)
         self.msc3026_enabled: bool = experimental.get("msc3026_enabled", False)
@@ -59,8 +59,9 @@ class ExperimentalConfig(Config):
             "msc3202_device_masquerading", False
         )
 
-        # Portion of MSC3202 related to transaction extensions:
-        # sending one-time key counts and fallback key usage to application services.
+        # The portion of MSC3202 related to transaction extensions:
+        # sending device list changes, one-time key counts and fallback key
+        # usage to application services.
         self.msc3202_transaction_extensions: bool = experimental.get(
             "msc3202_transaction_extensions", False
         )
@@ -77,3 +78,6 @@ class ExperimentalConfig(Config):
 
         # The deprecated groups feature.
         self.groups_enabled: bool = experimental.get("groups_enabled", True)
+
+        # MSC2654: Unread counts
+        self.msc2654_enabled: bool = experimental.get("msc2654_enabled", False)

@@ -1,0 +1,1 @@
+Document the behaviour of `LoggingTransaction.call_after` and `LoggingTransaction.call_on_exception` methods when transactions are retried.
