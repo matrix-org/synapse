@@ -1,1 +1,0 @@
-Refactor `Linearizer`, convert methods to async and use an async context manager.

@@ -1,1 +1,0 @@
-Fix a long-standing bug where `Linearizer`s could get stuck if a cancellation were to happen at the wrong time.
