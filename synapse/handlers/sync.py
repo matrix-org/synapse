@@ -661,6 +661,9 @@ class SyncHandler:
             stream_position: point at which to get state
             state_filter: The state filter used to fetch state from the database.
         """
+        # FIXME: This gets the state at the latest event before the stream ordering,
+        # which might not be the same as the "current state" of the room at the time
+        # of the stream token if there were multiple forward extremities at the time.
         last_event = await self.store.get_last_event_in_room_before_stream_ordering(
             room_id,
             end_token=stream_position.room_key,
