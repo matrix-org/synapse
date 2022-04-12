@@ -14,7 +14,6 @@
 
 import logging
 import re
-import sys
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -344,8 +343,8 @@ class LoginRestServlet(RestServlet):
 
         device_id = login_submission.get("device_id")
 
-        # Check that device_id is not longer than a reasonable 512 characters
-        if len(device_id) > 512:
+        # If device_id is present, check that device_id is not longer than a reasonable 512 characters
+        if device_id and len(device_id) > 512:
             raise LoginError(
                 400,
                 "Device_id cannot be longer than 512 characters.",

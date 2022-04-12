@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
-import sys
 import time
 import urllib.parse
 from typing import Any, Dict, List, Optional, Union
@@ -389,7 +388,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         self.register_user("mickey", "cheese")
 
         # create a device_id longer than 512 characters
-        device_id = "yolo"*512
+        device_id = "yolo" * 512
 
         body = {
             "type": "m.login.password",
