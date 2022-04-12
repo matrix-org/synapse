@@ -388,7 +388,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
     def test_login_with_overly_large_device_id_fails(self) -> None:
         self.register_user("mickey", "cheese")
 
-        # create a device_id larger than 8KB
+        # create a device_id larger than 512B
         device_id = 1000**1000
         self.assertGreater(sys.getsizeof(device_id), 512)
 
