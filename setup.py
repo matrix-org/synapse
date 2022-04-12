@@ -120,7 +120,7 @@ CONDITIONAL_REQUIREMENTS["mypy"] = [
 # Tests assume that all optional dependencies are installed.
 #
 # parameterized_class decorator was introduced in parameterized 0.7.0
-CONDITIONAL_REQUIREMENTS["test"] = ["parameterized>=0.7.0"]
+CONDITIONAL_REQUIREMENTS["test"] = ["parameterized>=0.7.0", "idna>=2.5"]
 
 CONDITIONAL_REQUIREMENTS["dev"] = (
     CONDITIONAL_REQUIREMENTS["lint"]
