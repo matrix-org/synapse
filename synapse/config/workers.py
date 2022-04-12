@@ -14,7 +14,8 @@
 # limitations under the License.
 
 import argparse
-from typing import Any, List, Union
+import logging
+from typing import Any, Dict, List, Union
 
 import attr
 
@@ -41,6 +42,13 @@ synapse process before they can be run in a separate worker.
 
 Please add ``start_pushers: false`` to the main config
 """
+
+_DEPRECATED_WORKER_DUTY_OPTION_USED = """
+The '%s' configuration option is deprecated and will be removed in a future
+Synapse version. Please use ``%s: name_of_worker`` instead.
+"""
+
+logger = logging.getLogger(__name__)
 
 
 def _instance_to_list_converter(obj: Union[str, List[str]]) -> List[str]:
@@ -295,6 +303,94 @@ class WorkerConfig(Config):
         self.run_background_tasks = (
             self.worker_name is None and background_tasks_instance == "master"
         ) or self.worker_name == background_tasks_instance
+
+    def _should_this_worker_perform_duty(
+        self,
+        config: Dict[str, Any],
+        legacy_master_option_name: str,
+        legacy_worker_app_name: str,
+        new_option_name: str,
+    ) -> bool:
+        """
+        Figures out whether this worker should perform a certain duty.
+
+        This function is temporary and is only to deal with the complexity
+        of allowing old, transitional and new configurations all at once.
+
+        Contradictions between the legacy and new part of a transitional configuration
+        will lead to a ConfigError.
+
+        Parameters:
+            config: The config dictionary
+            legacy_master_option_name: The name of a legacy option, whose value is boolean,
+                specifying whether it's the master that should handle a certain duty.
+            legacy_worker_app_name: The name of a legacy Synapse worker application name
+                that would traditionally perform this duty.
+            new_option_name: The name of the new option, whose value is the name of a
+                designated worker to perform the duty.
+        """
+
+        # None means 'unspecified'; True means 'run here' and False means
+        # 'don't run here'.
+        new_option_should_run_here = None
+        if new_option_name in config:
+            designated_worker = config[new_option_name] or "master"
+            new_option_should_run_here = (
+                designated_worker == "master" and self.worker_name is None
+            ) or designated_worker == self.worker_name
+
+        legacy_option_should_run_here = None
+        if legacy_master_option_name in config:
+            run_on_master = bool(config[legacy_master_option_name])
+
+            legacy_option_should_run_here = (
+                self.worker_name is None and run_on_master
+            ) or (self.worker_app == legacy_worker_app_name and not run_on_master)
+
+            # Suggest using the new option instead.
+            logger.warning(
+                _DEPRECATED_WORKER_DUTY_OPTION_USED,
+                legacy_master_option_name,
+                new_option_name,
+            )
+
+        if self.worker_app == legacy_worker_app_name and config.get(
+            legacy_master_option_name, True
+        ):
+            # As an extra bit of complication, we need to check that the
+            # specialised worker is only used if the legacy config says the
+            # master isn't performing the duties.
+            raise ConfigError(
+                f"Cannot use deprecated worker app type '{legacy_worker_app_name}' whilst deprecated option '{legacy_master_option_name}' is not set to false.\n"
+                f"Consider setting `worker_app: synapse.app.generic_worker` and using the '{new_option_name}' option instead.\n"
+                f"The '{new_option_name}' option replaces '{legacy_master_option_name}'."
+            )
+
+        if new_option_should_run_here is None and legacy_option_should_run_here is None:
+            # Neither option specified; the fallback behaviour is to run on the main process
+            return self.worker_name is None
+
+        if (
+            new_option_should_run_here is not None
+            and legacy_option_should_run_here is not None
+        ):
+            # Both options specified; ensure they match!
+            if new_option_should_run_here != legacy_option_should_run_here:
+                update_worker_type = (
+                    " and set worker_app: synapse.app.generic_worker"
+                    if self.worker_app == legacy_worker_app_name
+                    else ""
+                )
+                # If the values conflict, we suggest the admin removes the legacy option
+                # for simplicity.
+                raise ConfigError(
+                    f"Conflicting configuration options: {legacy_master_option_name} (legacy), {new_option_name} (new).\n"
+                    f"Suggestion: remove {legacy_master_option_name}{update_worker_type}.\n"
+                )
+
+        # We've already validated that these aren't conflicting; now just see if
+        # either is True.
+        return bool(new_option_should_run_here or legacy_option_should_run_here)
 
     def generate_config_section(self, **kwargs: Any) -> str:
         return """\
