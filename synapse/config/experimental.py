@@ -26,9 +26,6 @@ class ExperimentalConfig(Config):
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         experimental = config.get("experimental_features") or {}
 
-        # MSC3666: including bundled relations in /search.
-        self.msc3666_enabled: bool = experimental.get("msc3666_enabled", False)
-
         # MSC3026 (busy presence state)
         self.msc3026_enabled: bool = experimental.get("msc3026_enabled", False)
 
