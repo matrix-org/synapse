@@ -237,6 +237,39 @@ worker for application service traffic, <strong>it must be stopped</strong> when
 without any risk of reusing transaction IDs.</p>
 <p>Deployments which do not use separate worker processes can be upgraded as normal. Similarly,
 deployments where no applciation services are in use can be upgraded as normal.</p>
+<details>
+<summary><b>Recovering from an incorrect upgrade</b></summary>
+<p>If the database schema is upgraded <em>without</em> stopping the worker responsible
+for AS traffic, then the following error may be given when attempting to start
+a Synapse worker or master process:</p>
+<pre><code>**********************************************************************************
+ Error during initialisation:
+
+ Postgres sequence 'application_services_txn_id_seq' is inconsistent with associated
+ table 'application_services_txns'. This can happen if Synapse has been downgraded and
+ then upgraded again, or due to a bad migration.
+
+ To fix this error, shut down Synapse (including any and all workers)
+ and run the following SQL:
+
+     SELECT setval('application_services_txn_id_seq', (
+         SELECT GREATEST(MAX(txn_id), 0) FROM application_services_txns
+     ));
+
+ See docs/postgres.md for more information.
+
+ There may be more information in the logs.
+**********************************************************************************
+</code></pre>
+<p>This error may also be seen if Synapse is <em>downgraded</em> to an earlier version,
+and then upgraded again to v1.57.0 or later.</p>
+<p>In either case:</p>
+<ol>
+<li>Ensure that the worker responsible for AS traffic is stopped.</li>
+<li>Run the SQL command given in the error message via <code>psql</code>.</li>
+</ol>
+<p>Synapse should then start correctly.</p>
+</details>
 <h1 id="upgrading-to-v1560"><a class="header" href="#upgrading-to-v1560">Upgrading to v1.56.0</a></h1>
 <h2 id="open-registration-without-verification-is-now-disabled-by-default"><a class="header" href="#open-registration-without-verification-is-now-disabled-by-default">Open registration without verification is now disabled by default</a></h2>
 <p>Synapse will refuse to start if registration is enabled without email, captcha, or token-based verification unless the new config
@@ -259,15 +292,15 @@ for more information and instructions on how to fix a database with incorrect va
 <a href="https://github.com/matrix-org/synapse/pull/12140">has been made</a> an
 <a href="https://packaging.python.org/en/latest/specifications/entry-points/">entry point</a>
 and no longer exists at the root of Synapse's source tree. If you wish to use
-<code>synctl</code> to manage your homeserver, you should invoke <code>synctl</code> directly, e.g. 
-<code>synctl start</code> instead of <code>./synctl start</code> or <code>/path/to/synctl start</code>. </p>
+<code>synctl</code> to manage your homeserver, you should invoke <code>synctl</code> directly, e.g.
+<code>synctl start</code> instead of <code>./synctl start</code> or <code>/path/to/synctl start</code>.</p>
 <p>You will need to ensure <code>synctl</code> is on your <code>PATH</code>.</p>
 <ul>
 <li>This is automatically the case when using
 <a href="https://packages.matrix.org/debian/">Debian packages</a> or
 <a href="https://hub.docker.com/r/matrixdotorg/synapse">docker images</a>
 provided by Matrix.org.</li>
-<li>When installing from a wheel, sdist, or PyPI, a <code>synctl</code> executable is added 
+<li>When installing from a wheel, sdist, or PyPI, a <code>synctl</code> executable is added
 to your Python installation's <code>bin</code>. This should be on your <code>PATH</code>
 automatically, though you might need to activate a virtual environment
 depending on how you installed Synapse.</li>
@@ -291,8 +324,8 @@ configuration error. Since the <code>webclient</code> listener is no longer supp
 setting only applies to the root path <code>/</code> of Synapse's web server and no longer
 the <code>/_matrix/client/</code> path.</p>
 <h2 id="stablisation-of-msc3231"><a class="header" href="#stablisation-of-msc3231">Stablisation of MSC3231</a></h2>
-<p>The unstable validity-check endpoint for the 
-<a href="https://spec.matrix.org/v1.2/client-server-api/#get_matrixclientv1registermloginregistration_tokenvalidity">Registration Tokens</a> 
+<p>The unstable validity-check endpoint for the
+<a href="https://spec.matrix.org/v1.2/client-server-api/#get_matrixclientv1registermloginregistration_tokenvalidity">Registration Tokens</a>
 feature has been stabilised and moved from:</p>
 <p><code>/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity</code></p>
 <p>to:</p>
@@ -300,9 +333,9 @@ feature has been stabilised and moved from:</p>
 <p>Please update any relevant reverse proxy or firewall configurations appropriately.</p>
 <h2 id="time-based-cache-expiry-is-now-enabled-by-default"><a class="header" href="#time-based-cache-expiry-is-now-enabled-by-default">Time-based cache expiry is now enabled by default</a></h2>
 <p>Formerly, entries in the cache were not evicted regardless of whether they were accessed after storing.
-This behavior has now changed. By default entries in the cache are now evicted after 30m of not being accessed. 
-To change the default behavior, go to the <code>caches</code> section of the config and change the <code>expire_caches</code> and 
-<code>cache_entry_ttl</code> flags as necessary. Please note that these flags replace the <code>expiry_time</code> flag in the config.<br />
+This behavior has now changed. By default entries in the cache are now evicted after 30m of not being accessed.
+To change the default behavior, go to the <code>caches</code> section of the config and change the <code>expire_caches</code> and
+<code>cache_entry_ttl</code> flags as necessary. Please note that these flags replace the <code>expiry_time</code> flag in the config.
 The <code>expiry_time</code> flag will still continue to work, but it has been deprecated and will be removed in the future.</p>
 <h2 id="deprecation-of-capability-orgmatrixmsc3283"><a class="header" href="#deprecation-of-capability-orgmatrixmsc3283">Deprecation of <code>capability</code> <code>org.matrix.msc3283.*</code></a></h2>
 <p>The <code>capabilities</code> of MSC3283 from the REST API <code>/_matrix/client/r0/capabilities</code>
