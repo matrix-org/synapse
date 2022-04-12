@@ -50,7 +50,6 @@ REQUIREMENTS = [
     # we use the type definitions added in signedjson 1.1.
     "signedjson>=1.1.0",
     "pynacl>=1.2.1",
-    "idna>=2.5",
     # validating SSL certs for IP addresses requires service_identity 18.1.
     "service_identity>=18.1.0",
     # Twisted 18.9 introduces some logger improvements that the structured
