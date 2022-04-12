@@ -389,8 +389,8 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         self.register_user("mickey", "cheese")
 
         # create a device_id larger than 8KB
-        device_id = 1000**100000
-        self.assertGreater(sys.getsizeof(device_id), 8000)
+        device_id = 1000**1000
+        self.assertGreater(sys.getsizeof(device_id), 512)
 
         body = {
             "type": "m.login.password",
@@ -413,7 +413,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             channel.json_body,
             {
                 "errcode": "M_INVALID_PARAM",
-                "error": "Device_id cannot be greater than 8KB.",
+                "error": "Device_id cannot be greater than 512B.",
             },
         )
 
