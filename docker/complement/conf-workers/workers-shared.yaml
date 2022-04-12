@@ -7,11 +7,6 @@ bcrypt_rounds: 4
 
 ## Federation ##
 
-# disable verification of federation certificates
-#
-# TODO: Figure out why this is still needed even though we are making use of the custom CA
-federation_verify_certificates: false
-
 # trust certs signed by Complement's CA
 federation_custom_ca_list:
 - /complement/ca/ca.crt

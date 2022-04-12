@@ -20,10 +20,12 @@ jobs:
       - run: scripts-dev/config-lint.sh
 
   lint:
-    # Note: This action does a vanilla `poetry install`, without extras.
-    # We may skip some typechecks which would otherwise be available, but this
-    # is likely best addressed by increasing mypy's strictness. For example,
-    # forbidding unknown imports and restricting uses of the Any type.
+    # This does a vanilla `poetry install` - no extras. I'm slightly anxious
+    # that we might skip some typechecks on code that uses extras. However,
+    # I think the right way to fix this is to mark any extras needed for
+    # typechecking as development dependencies. To detect this, we ought to
+    # turn up mypy's strictness: disallow unknown imports and be accept fewer
+    # uses of `Any`.
     uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v1"
 
   lint-crlf:
@@ -128,6 +130,7 @@ jobs:
       - name: Test with old deps
         uses: docker://ubuntu:focal # For old python and sqlite
         # Note: focal seems to be using 3.8, but the oldest is 3.7?
+        # See https://github.com/matrix-org/synapse/issues/12343
         with:
           workdir: /github/workspace
           entrypoint: .ci/scripts/test_old_deps.sh

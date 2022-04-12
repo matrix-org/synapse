@@ -88,6 +88,13 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.58.0
+
+## Groups/communities feature has been disabled by default
+
+The non-standard groups/communities feature in Synapse has been disabled by default
+and will be removed in Synapse v1.61.0.
+
 # Upgrading to v1.57.0
 
 ## Changes to database schema for application services
@@ -100,6 +107,45 @@ without any risk of reusing transaction IDs.
 
 Deployments which do not use separate worker processes can be upgraded as normal. Similarly,
 deployments where no applciation services are in use can be upgraded as normal.
+
+<details>
+<summary><b>Recovering from an incorrect upgrade</b></summary>
+
+If the database schema is upgraded *without* stopping the worker responsible
+for AS traffic, then the following error may be given when attempting to start
+a Synapse worker or master process:
+
+```
+**********************************************************************************
+ Error during initialisation:
+
+ Postgres sequence 'application_services_txn_id_seq' is inconsistent with associated
+ table 'application_services_txns'. This can happen if Synapse has been downgraded and
+ then upgraded again, or due to a bad migration.
+
+ To fix this error, shut down Synapse (including any and all workers)
+ and run the following SQL:
+
+     SELECT setval('application_services_txn_id_seq', (
+         SELECT GREATEST(MAX(txn_id), 0) FROM application_services_txns
+     ));
+
+ See docs/postgres.md for more information.
+
+ There may be more information in the logs.
+**********************************************************************************
+```
+
+This error may also be seen if Synapse is *downgraded* to an earlier version,
+and then upgraded again to v1.57.0 or later.
+
+In either case:
+
+ 1. Ensure that the worker responsible for AS traffic is stopped.
+ 2. Run the SQL command given in the error message via `psql`.
+
+Synapse should then start correctly.
+</details>
 
 # Upgrading to v1.56.0
 
@@ -135,15 +181,15 @@ The `synctl` script
 [has been made](https://github.com/matrix-org/synapse/pull/12140) an
 [entry point](https://packaging.python.org/en/latest/specifications/entry-points/)
 and no longer exists at the root of Synapse's source tree. If you wish to use
-`synctl` to manage your homeserver, you should invoke `synctl` directly, e.g. 
-`synctl start` instead of `./synctl start` or `/path/to/synctl start`. 
+`synctl` to manage your homeserver, you should invoke `synctl` directly, e.g.
+`synctl start` instead of `./synctl start` or `/path/to/synctl start`.
 
 You will need to ensure `synctl` is on your `PATH`.
   - This is automatically the case when using
     [Debian packages](https://packages.matrix.org/debian/) or
     [docker images](https://hub.docker.com/r/matrixdotorg/synapse)
     provided by Matrix.org.
-  - When installing from a wheel, sdist, or PyPI, a `synctl` executable is added 
+  - When installing from a wheel, sdist, or PyPI, a `synctl` executable is added
     to your Python installation's `bin`. This should be on your `PATH`
     automatically, though you might need to activate a virtual environment
     depending on how you installed Synapse.
@@ -179,8 +225,8 @@ the `/_matrix/client/` path.
 
 ## Stablisation of MSC3231
 
-The unstable validity-check endpoint for the 
-[Registration Tokens](https://spec.matrix.org/v1.2/client-server-api/#get_matrixclientv1registermloginregistration_tokenvalidity) 
+The unstable validity-check endpoint for the
+[Registration Tokens](https://spec.matrix.org/v1.2/client-server-api/#get_matrixclientv1registermloginregistration_tokenvalidity)
 feature has been stabilised and moved from:
 
 `/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity`
@@ -194,9 +240,9 @@ Please update any relevant reverse proxy or firewall configurations appropriatel
 ## Time-based cache expiry is now enabled by default
 
 Formerly, entries in the cache were not evicted regardless of whether they were accessed after storing.
-This behavior has now changed. By default entries in the cache are now evicted after 30m of not being accessed. 
-To change the default behavior, go to the `caches` section of the config and change the `expire_caches` and 
-`cache_entry_ttl` flags as necessary. Please note that these flags replace the `expiry_time` flag in the config.  
+This behavior has now changed. By default entries in the cache are now evicted after 30m of not being accessed.
+To change the default behavior, go to the `caches` section of the config and change the `expire_caches` and
+`cache_entry_ttl` flags as necessary. Please note that these flags replace the `expiry_time` flag in the config.
 The `expiry_time` flag will still continue to work, but it has been deprecated and will be removed in the future.
 
 ## Deprecation of `capability` `org.matrix.msc3283.*`

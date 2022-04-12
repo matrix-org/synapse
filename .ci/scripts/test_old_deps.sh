@@ -27,8 +27,8 @@ export VIRTUALENV_NO_DOWNLOAD=1
 
 # Patch the project definitions in-place:
 # - Replace all lower and tilde bounds with exact bounds
-# - Make the pyopenssl 17.0, which can work against an
-#   OpenSSL 1.1 compiled cryptography (as older ones don't compile on Travis).
+# - Make the pyopenssl 17.0, which is the oldest version that works with
+#   a `cryptography` compiled against OpenSSL 1.1.
 # - Delete all lines referring to psycopg2 --- so no testing of postgres support.
 # - Omit systemd: we're not logging to journal here.
 
@@ -38,7 +38,7 @@ export VIRTUALENV_NO_DOWNLOAD=1
 # `python = "^3.7"` to `python = "==3.7", which would mean we fail because olddeps
 # runs on 3.8 (#12343).
 
-sed -i-backup \
+sed -i \
    -e "s/[~>]=/==/g" \
    -e "/psycopg2/d" \
    -e 's/pyOpenSSL = "==16.0.0"/pyOpenSSL = "==17.0.0"/' \
@@ -67,11 +67,15 @@ with open('pyproject.toml', 'w') as f:
 "
 python3 -c "$REMOVE_DEV_DEPENDENCIES"
 
+pipx install poetry==1.1.12
+~/.local/bin/poetry lock
+
 echo "::group::Patched pyproject.toml"
 cat pyproject.toml
 echo "::endgroup::"
+echo "::group::Lockfile after patch"
+cat poetry.lock
+echo "::endgroup::"
 
-pipx install poetry==1.1.12
-~/.local/bin/poetry lock
 ~/.local/bin/poetry install -E "all test"
-~/.local/bin/poetry run trial -j2 tests
+~/.local/bin/poetry run trial --jobs=2 tests
