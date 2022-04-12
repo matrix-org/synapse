@@ -13,18 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
-from typing import Optional
+from typing import Any, Optional
 
 from synapse.api.constants import RoomCreationPreset
 from synapse.config._base import Config, ConfigError
-from synapse.types import RoomAlias, UserID
+from synapse.types import JsonDict, RoomAlias, UserID
 from synapse.util.stringutils import random_string_with_symbols, strtobool
 
 
 class RegistrationConfig(Config):
     section = "registration"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.enable_registration = strtobool(
             str(config.get("enable_registration", False))
         )
@@ -196,7 +196,9 @@ class RegistrationConfig(Config):
 
         self.inhibit_user_in_use_error = config.get("inhibit_user_in_use_error", False)
 
-    def generate_config_section(self, generate_secrets=False, **kwargs):
+    def generate_config_section(
+        self, generate_secrets: bool = False, **kwargs: Any
+    ) -> str:
         if generate_secrets:
             registration_shared_secret = 'registration_shared_secret: "%s"' % (
                 random_string_with_symbols(50),
