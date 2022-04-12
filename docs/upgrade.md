@@ -99,7 +99,7 @@ Deployments which do not use separate worker processes can be upgraded as normal
 deployments where no applciation services are in use can be upgraded as normal.
 
 <details>
-<summary>Recovering from an incorrect upgrade</summary>
+<summary><b>Recovering from an incorrect upgrade</b></summary>
 
 If the database schema is upgraded *without* stopping the worker responsible
 for AS traffic, then the following error may be given when attempting to start
