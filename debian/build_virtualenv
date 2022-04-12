@@ -41,6 +41,8 @@ poetry export --extras all --extras test -o exported_requirements.txt
 deactivate
 rm -rf "$TEMP_VENV"
 
+# Use --no-deps to only install pinned versions in exported_requirements.txt,
+# and to avoid https://github.com/pypa/pip/issues/9644
 dh_virtualenv \
     --install-suffix "matrix-synapse" \
     --builtin-venv \
@@ -49,9 +51,7 @@ dh_virtualenv \
     --preinstall="lxml" \
     --preinstall="mock" \
     --preinstall="wheel" \
-    # Use --no-deps to only install pinned versions in exported_requirements.txt,
-    # and to avoid https://github.com/pypa/pip/issues/9644
-    --extra-pip-arg "--no-deps" \
+    --extra-pip-arg="--no-deps" \
     --extra-pip-arg="--no-cache-dir" \
     --extra-pip-arg="--compile" \
     --extras="all,systemd,test" \
