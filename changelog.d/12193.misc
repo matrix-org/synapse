@@ -1,1 +1,0 @@
-Omit sending "offline" presence updates to application services after they are initially configured.
