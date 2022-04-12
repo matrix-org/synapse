@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple, Ty
 
 from typing_extensions import Literal
 
-from synapse.api.constants import EventTypes, Membership, OpenIdUserInfoField
+from synapse.api.constants import EventTypes, Membership, OpenIdUserInfoFields
 from synapse.api.errors import FederationDeniedError, SynapseError
 from synapse.federation.transport.server._base import (
     Authenticator,
@@ -292,23 +292,23 @@ class OpenIdUserInfo(BaseFederationServlet):
         userinfo: JsonDict = {"sub": user_id}
 
         if userinfo_fields:
-            if OpenIdUserInfoField.DISPLAY_NAME in userinfo_fields:
+            if OpenIdUserInfoFields.DISPLAY_NAME in userinfo_fields:
                 localpart = UserID.from_string(user_id).localpart
                 userinfo[
-                    OpenIdUserInfoField.DISPLAY_NAME
+                    OpenIdUserInfoFields.DISPLAY_NAME
                 ] = await self.hs.get_datastores().main.get_profile_displayname(
                     localpart
                 )
-            if OpenIdUserInfoField.AVATAR_URL in userinfo_fields:
+            if OpenIdUserInfoFields.AVATAR_URL in userinfo_fields:
                 localpart = UserID.from_string(user_id).localpart
                 userinfo[
-                    OpenIdUserInfoField.AVATAR_URL
+                    OpenIdUserInfoFields.AVATAR_URL
                 ] = await self.hs.get_datastores().main.get_profile_avatar_url(
                     localpart
                 )
-            if OpenIdUserInfoField.ROOM_POWERLEVELS in userinfo_fields:
+            if OpenIdUserInfoFields.ROOM_POWERLEVELS in userinfo_fields:
                 userinfo[
-                    OpenIdUserInfoField.ROOM_POWERLEVELS
+                    OpenIdUserInfoFields.ROOM_POWERLEVELS
                 ] = await self._get_powerlevels(user_id)
 
         return 200, userinfo

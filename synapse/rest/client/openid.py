@@ -15,7 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.constants import OpenIdUserInfoField
+from synapse.api.constants import OpenIdUserInfoFields
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -65,12 +65,6 @@ class IdTokenServlet(RestServlet):
 
     EXPIRES_MS = 3600 * 1000
 
-    USERINFO_FIELDS = [
-        item[1]
-        for item in OpenIdUserInfoField.__dict__.items()
-        if not item[0].startswith("_")
-    ]
-
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
@@ -91,7 +85,7 @@ class IdTokenServlet(RestServlet):
         if "org.matrix.msc3356.userinfo_fields" in json:
             userinfo_fields = json["org.matrix.msc3356.userinfo_fields"]
             for field in userinfo_fields:
-                if field not in self.USERINFO_FIELDS:
+                if field not in OpenIdUserInfoFields.ALL_OPEN_ID_USER_INFO_FIELDS:
                     raise SynapseError(
                         400,
                         "Unknown userinfo field '" + field + "'",

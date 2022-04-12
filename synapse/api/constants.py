@@ -263,7 +263,9 @@ class ReadReceiptEventFields:
     MSC2285_HIDDEN: Final = "org.matrix.msc2285.hidden"
 
 
-class OpenIdUserInfoField:
-    DISPLAY_NAME = "org.matrix.msc3356.display_name"
-    AVATAR_URL = "org.matrix.msc3356.avatar_url"
-    ROOM_POWERLEVELS = "org.matrix.msc3356.room_powerlevels"
+class OpenIdUserInfoFields:
+    DISPLAY_NAME: Final = "org.matrix.msc3356.display_name"
+    AVATAR_URL: Final = "org.matrix.msc3356.avatar_url"
+    ROOM_POWERLEVELS: Final = "org.matrix.msc3356.room_powerlevels"
+
+    ALL_OPEN_ID_USER_INFO_FIELDS: Final = (DISPLAY_NAME, AVATAR_URL, ROOM_POWERLEVELS)
