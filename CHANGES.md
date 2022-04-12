@@ -27,7 +27,7 @@ Features
 Bugfixes
 --------
 
-- Fix a long-standing bug that updating the server notices user profile (display name/avatar URL) in the configuration would not be applied to pre-existing rooms. Contributed by Jorge Florian. ([\#12115](https://github.com/matrix-org/synapse/issues/12115))
+- Fix a long-standing bug where updates to the server notices user profile (display name/avatar URL) in the configuration would not be applied to pre-existing rooms. Contributed by Jorge Florian. ([\#12115](https://github.com/matrix-org/synapse/issues/12115))
 - Fix a long-standing bug where events from ignored users were still considered for bundled aggregations. ([\#12235](https://github.com/matrix-org/synapse/issues/12235), [\#12338](https://github.com/matrix-org/synapse/issues/12338))
 - Fix non-member state events not resolving for historical events when used in [MSC2716](https://github.com/matrix-org/matrix-spec-proposals/pull/2716) `/batch_send` `state_events_at_start`. ([\#12329](https://github.com/matrix-org/synapse/issues/12329))
 - Fix a long-standing bug affecting URL previews that would generate a 500 response instead of a 403 if the previewed URL includes a port that isn't allowed by the relevant blacklist. ([\#12333](https://github.com/matrix-org/synapse/issues/12333))
@@ -39,7 +39,8 @@ Bugfixes
 Updates to the Docker image
 ---------------------------
 
-- Bundle locked versions of dependencies into the Docker image. ([\#12385](https://github.com/matrix-org/synapse/issues/12385))
+- Bundle locked versions of dependencies into the Docker image. ([\#12385](https://github.com/matrix-org/synapse/issues/12385), [\#12439](https://github.com/matrix-org/synapse/issues/12439))
+- Fix up healthcheck generation for workers docker image. ([\#12405](https://github.com/matrix-org/synapse/issues/12405))
 
 
 Improved Documentation
@@ -50,7 +51,7 @@ Improved Documentation
 - Update dead links in `check-newsfragment.sh` to point to the correct documentation URL. ([\#12331](https://github.com/matrix-org/synapse/issues/12331))
 - Upgrade the version of `mdbook` in CI to 0.4.17. ([\#12339](https://github.com/matrix-org/synapse/issues/12339))
 - Updates to the Room DAG concepts development document to clarify that we mark events as outliers because we don't have any state for them. ([\#12345](https://github.com/matrix-org/synapse/issues/12345))
-- Update the link to Redis pub/sub documentation in the workers documentation.. ([\#12369](https://github.com/matrix-org/synapse/issues/12369))
+- Update the link to Redis pub/sub documentation in the workers documentation. ([\#12369](https://github.com/matrix-org/synapse/issues/12369))
 - Remove documentation for converting a legacy structured logging configuration to the new format. ([\#12392](https://github.com/matrix-org/synapse/issues/12392))
 
 
@@ -66,7 +67,7 @@ Internal Changes
 - Remove lingering unstable references to MSC2403 (knocking). ([\#12165](https://github.com/matrix-org/synapse/issues/12165))
 - Avoid trying to calculate the state at outlier events. ([\#12191](https://github.com/matrix-org/synapse/issues/12191), [\#12316](https://github.com/matrix-org/synapse/issues/12316), [\#12330](https://github.com/matrix-org/synapse/issues/12330), [\#12332](https://github.com/matrix-org/synapse/issues/12332), [\#12409](https://github.com/matrix-org/synapse/issues/12409))
 - Omit sending "offline" presence updates to application services after they are initially configured. ([\#12193](https://github.com/matrix-org/synapse/issues/12193))
-- Switch to using a sequence to generate AS transaction IDs. Contributed by Nick Beeper. If running synapse with a dedicated appservice worker, this MUST be stopped before upgrading the main process and database. ([\#12209](https://github.com/matrix-org/synapse/issues/12209))
+- Switch to using a sequence to generate AS transaction IDs. Contributed by Nick @ Beeper. If running synapse with a dedicated appservice worker, this MUST be stopped before upgrading the main process and database. ([\#12209](https://github.com/matrix-org/synapse/issues/12209))
 - Add missing type hints for storage. ([\#12267](https://github.com/matrix-org/synapse/issues/12267))
 - Add missing type definitions for scripts in docker folder. Contributed by Jorge Florian. ([\#12280](https://github.com/matrix-org/synapse/issues/12280))
 - Move [MSC2654](https://github.com/matrix-org/matrix-doc/pull/2654) support behind an experimental configuration flag. ([\#12295](https://github.com/matrix-org/synapse/issues/12295))
@@ -89,23 +90,18 @@ Internal Changes
 - Allow specifying the Postgres database's port when running unit tests with Postgres. ([\#12376](https://github.com/matrix-org/synapse/issues/12376))
 - Remove temporary pin of signedjson<=1.1.1 that was added in Synapse 1.56.0. ([\#12379](https://github.com/matrix-org/synapse/issues/12379))
 - Add opentracing spans to calls to external cache. ([\#12380](https://github.com/matrix-org/synapse/issues/12380))
-- Lay groundwork for using `poetry` to manage Synapse's dependencies. ([\#12381](https://github.com/matrix-org/synapse/issues/12381))
+- Lay groundwork for using `poetry` to manage Synapse's dependencies. ([\#12381](https://github.com/matrix-org/synapse/issues/12381), [\#12407](https://github.com/matrix-org/synapse/issues/12407), [\#12412](https://github.com/matrix-org/synapse/issues/12412), [\#12418](https://github.com/matrix-org/synapse/issues/12418))
 - Make missing `importlib_metadata` dependency explicit. ([\#12384](https://github.com/matrix-org/synapse/issues/12384), [\#12400](https://github.com/matrix-org/synapse/issues/12400))
 - Update type annotations for compatiblity with prometheus_client 0.14. ([\#12389](https://github.com/matrix-org/synapse/issues/12389))
 - Remove support for the unstable identifiers specified in [MSC3288](https://github.com/matrix-org/matrix-doc/pull/3288). ([\#12398](https://github.com/matrix-org/synapse/issues/12398))
 - Add missing type hints to configuration classes. ([\#12402](https://github.com/matrix-org/synapse/issues/12402))
 - Add files used to build the Docker image used for complement testing into the Synapse repository. ([\#12404](https://github.com/matrix-org/synapse/issues/12404))
-- Fix up healthcheck generation for workers docker image. ([\#12405](https://github.com/matrix-org/synapse/issues/12405))
-- Run the olddeps CI job using Poetry. ([\#12407](https://github.com/matrix-org/synapse/issues/12407))
 - Do not include groups in the sync response when disabled. ([\#12408](https://github.com/matrix-org/synapse/issues/12408))
-- Run the CI portdb script in the locked poetry environment. ([\#12412](https://github.com/matrix-org/synapse/issues/12412))
 - Improve type hints related to HTTP query parameters. ([\#12415](https://github.com/matrix-org/synapse/issues/12415))
-- Run the CI export-data script in the locked poetry environment. ([\#12418](https://github.com/matrix-org/synapse/issues/12418))
 - Stop maintaining a list of lint targets. ([\#12420](https://github.com/matrix-org/synapse/issues/12420))
 - Make `synapse._scripts` pass type checks. ([\#12421](https://github.com/matrix-org/synapse/issues/12421), [\#12422](https://github.com/matrix-org/synapse/issues/12422))
 - Add some type hints to datastore. ([\#12423](https://github.com/matrix-org/synapse/issues/12423))
 - Enable certificate checking during complement tests. ([\#12435](https://github.com/matrix-org/synapse/issues/12435))
-- Bundle locked versions of dependencies into the Docker image. ([\#12439](https://github.com/matrix-org/synapse/issues/12439))
 - Explicitly specify the `tls` extra for Twisted dependency. ([\#12444](https://github.com/matrix-org/synapse/issues/12444))
 
 
