@@ -385,12 +385,11 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(b"POST", "/logout/all", access_token=access_token)
         self.assertEqual(channel.result["code"], b"200", channel.result)
 
-    def test_login_with_overly_large_device_id_fails(self) -> None:
+    def test_login_with_overly_long_device_id_fails(self) -> None:
         self.register_user("mickey", "cheese")
 
-        # create a device_id larger than 512B
-        device_id = 1000**1000
-        self.assertGreater(sys.getsizeof(device_id), 512)
+        # create a device_id longer than 512 characters
+        device_id = "yolo"*512
 
         body = {
             "type": "m.login.password",
@@ -413,7 +412,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             channel.json_body,
             {
                 "errcode": "M_INVALID_PARAM",
-                "error": "Device_id cannot be greater than 512B.",
+                "error": "Device_id cannot be longer than 512 characters.",
             },
         )
 

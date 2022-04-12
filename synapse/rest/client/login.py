@@ -344,12 +344,11 @@ class LoginRestServlet(RestServlet):
 
         device_id = login_submission.get("device_id")
 
-        # Check that device_id is not greater than a reasonable 512B
-        device_id_size = sys.getsizeof(device_id)
-        if device_id_size > 512:
+        # Check that device_id is not longer than a reasonable 512 characters
+        if len(device_id) > 512:
             raise LoginError(
                 400,
-                "Device_id cannot be greater than 512B.",
+                "Device_id cannot be longer than 512 characters.",
                 errcode=Codes.INVALID_PARAM,
             )
 

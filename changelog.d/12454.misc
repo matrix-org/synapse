@@ -1,1 +1,1 @@
-Limit max size of device_id to less than 8KB.
+Limit length of device_id to less than 512 characters.
