@@ -1,12 +1,7 @@
 Synapse 1.57.0rc1 (2022-04-12)
 ==============================
 
-This version includes a [change](https://github.com/matrix-org/synapse/pull/12209)
-to the way transaction IDs are managed for application services. If your
-deployment uses a dedicated worker for application service traffic, **it must
-be stopped** when the database is upgraded (which normally happens when the
-main process is upgraded), to ensure the change is made safely without any risk
-of reusing transaction IDs.
+This version includes a [change](https://github.com/matrix-org/synapse/pull/12209) to the way transaction IDs are managed for application services. If your deployment uses a dedicated worker for application service traffic, **it must be stopped** when the database is upgraded (which normally happens when the main process is upgraded), to ensure the change is made safely without any risk of reusing transaction IDs.
 
 See the [upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1570) for more details.
 
@@ -25,7 +20,7 @@ Features
 - Update `/messages` to use historic pagination tokens if no `from` query parameter is given. ([\#12370](https://github.com/matrix-org/synapse/issues/12370))
 - Add a module API for reading and writing global account data. ([\#12391](https://github.com/matrix-org/synapse/issues/12391))
 - Support the stable `v1` endpoint for `/relations`, per [MSC2675](https://github.com/matrix-org/matrix-doc/pull/2675). ([\#12403](https://github.com/matrix-org/synapse/issues/12403))
-- Include bundled aggregations in search results 
+- Include bundled aggregations in search results
   ([MSC3666](https://github.com/matrix-org/matrix-spec-proposals/pull/3666)). ([\#12436](https://github.com/matrix-org/synapse/issues/12436))
 
 
