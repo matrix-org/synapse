@@ -304,6 +304,13 @@ class WorkerConfig(Config):
             self.worker_name is None and background_tasks_instance == "master"
         ) or self.worker_name == background_tasks_instance
 
+        self.should_notify_appservices = self._should_this_worker_perform_duty(
+            config,
+            legacy_master_option_name="notify_appservices",
+            legacy_worker_app_name="synapse.app.appservice",
+            new_option_name="notify_appservices_from_worker",
+        )
+
     def _should_this_worker_perform_duty(
         self,
         config: Dict[str, Any],
