@@ -88,7 +88,7 @@ class IdTokenServlet(RestServlet):
                 if field not in OpenIdUserInfoFields.ALL_OPEN_ID_USER_INFO_FIELDS:
                     raise SynapseError(
                         400,
-                        "Unknown userinfo field '" + field + "'",
+                        f"Unknown userinfo field '{field}'",
                         Codes.INVALID_PARAM,
                     )
 
