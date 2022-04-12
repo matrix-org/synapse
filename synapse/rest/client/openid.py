@@ -16,7 +16,13 @@ import logging
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.constants import OpenIdUserInfoFields
-from synapse.api.errors import AuthError, Codes, InvalidAPICallError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    InvalidAPICallError,
+    SynapseError,
+    UnrecognizedRequestError,
+)
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -71,6 +77,7 @@ class IdTokenServlet(RestServlet):
         self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.server_name = hs.config.server.server_name
+        self.msc3356_enabled = hs.config.experimental.msc3356_enabled
 
     async def on_POST(
         self, request: SynapseRequest, user_id: str
@@ -83,6 +90,11 @@ class IdTokenServlet(RestServlet):
 
         userinfo_fields = None
         if "org.matrix.msc3356.userinfo_fields" in json:
+            if not self.msc3356_enabled:
+                raise UnrecognizedRequestError(
+                    "Experimental feature org.matrix.msc3356 is not enabled",
+                )
+
             userinfo_fields = json["org.matrix.msc3356.userinfo_fields"]
             if not (
                 isinstance(userinfo_fields, list)

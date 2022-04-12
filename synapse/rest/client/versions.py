@@ -102,6 +102,8 @@ class VersionsRestServlet(RestServlet):
                     # Adds support for thread relations, per MSC3440.
                     "org.matrix.msc3440": self.config.experimental.msc3440_enabled,
                     "org.matrix.msc3440.stable": True,  # TODO: remove when "v1.3" is added above
+                    # Adds support for extended openid user info fields, per MSC3356.
+                    "org.matrix.msc3356": self.config.experimental.msc3356_enabled,
                 },
             },
         )

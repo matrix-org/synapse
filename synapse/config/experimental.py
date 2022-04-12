@@ -81,3 +81,6 @@ class ExperimentalConfig(Config):
 
         # MSC2654: Unread counts
         self.msc2654_enabled: bool = experimental.get("msc2654_enabled", False)
+
+        # MSC3356: Support extended open id user info fields
+        self.msc3356_enabled: bool = experimental.get("msc3356_enabled", False)
