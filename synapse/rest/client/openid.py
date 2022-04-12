@@ -16,7 +16,7 @@ import logging
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.constants import OpenIdUserInfoFields
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, InvalidAPICallError, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -84,6 +84,14 @@ class IdTokenServlet(RestServlet):
         userinfo_fields = None
         if "org.matrix.msc3356.userinfo_fields" in json:
             userinfo_fields = json["org.matrix.msc3356.userinfo_fields"]
+            if not (
+                isinstance(userinfo_fields, list)
+                and all(isinstance(v, str) for v in userinfo_fields)
+            ):
+                raise InvalidAPICallError(
+                    "'org.matrix.msc3356.userinfo_fields' values must be a list of strings",
+                )
+
             for field in userinfo_fields:
                 if field not in OpenIdUserInfoFields.ALL_OPEN_ID_USER_INFO_FIELDS:
                     raise SynapseError(
