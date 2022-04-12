@@ -89,12 +89,40 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.59.0
+
+## Deprecation of the `synapse.app.appservice` worker application type
+
+The `synapse.app.appservice` worker application type allowed you to configure a
+single worker to use to notify application services of new events, as long
+as this functionality was disabled on the main process with `notify_appservices: False`.
+
+To unify Synapse's worker types, the `synapse.app.appservice` worker application
+type and the `notify_appservices` configuration option have been deprecated.
+
+To get the same functionality, it's now recommended that the `synapse.app.generic_worker`
+worker application type is used and that the `notify_appservices_from_worker` option
+is set to the name of a worker.
+
+For the time being, `notify_appservices_from_worker` can be used alongside
+`synapse.app.appservice` and `notify_appservices` to make it easier to transition
+between the two configurations, however please note that:
+
+- the options must not contradict each other (otherwise Synapse won't start); and
+- the `notify_appservices` option will be removed in a future release of Synapse.
+
+Please see [the relevant section of the worker documentation][v1_59_notify_ases_from] for more information.
+
+[v1_59_notify_ases_from]: workers.md#notifying-application-services
+
+
 # Upgrading to v1.58.0
 
 ## Groups/communities feature has been disabled by default
 
 The non-standard groups/communities feature in Synapse has been disabled by default
 and will be removed in Synapse v1.61.0.
+
 
 # Upgrading to v1.57.0
 
