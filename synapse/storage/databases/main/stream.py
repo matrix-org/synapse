@@ -1171,14 +1171,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         else:
             order = "ASC"
 
-        # If we have only a stream token, order by stream_ordering, otherwise
-        # order by topologicial_ordering.
-        order_clause = """ORDER BY event.topological_ordering %(order)s, event.stream_ordering %(order)s"""
-        if from_token.topological is None:
-            order_clause = """ORDER BY event.stream_ordering %(order)s, event.topological_ordering %(order)s"""
-
-        order_clause = order_clause % {"order": order}
-
         # The bounds for the stream tokens are complicated by the fact
         # that we need to handle the instance_map part of the tokens. We do this
         # by fetching all events between the min stream token and the maximum
@@ -1274,13 +1266,13 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             FROM events AS event
             %(join_clause)s
             WHERE event.outlier = ? AND event.room_id = ? AND %(bounds)s
-            %(order_clause)s
-            LIMIT ?
+            ORDER BY event.topological_ordering %(order)s,
+            event.stream_ordering %(order)s LIMIT ?
         """ % {
             "select_keywords": select_keywords,
             "join_clause": join_clause,
             "bounds": bounds,
-            "order_clause": order_clause,
+            "order": order,
         }
 
         txn.execute(sql, args)
