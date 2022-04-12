@@ -14,8 +14,19 @@
 # limitations under the License.
 import collections.abc
 import re
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Union,
+)
 
+import attr
 from frozendict import frozendict
 
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
@@ -26,6 +37,11 @@ from synapse.util.frozenutils import unfreeze
 
 from . import EventBase
 
+if TYPE_CHECKING:
+    from synapse.handlers.relations import BundledAggregations
+    from synapse.server import HomeServer
+
+
 # Split strings on "." but not "\." This uses a negative lookbehind assertion for '\'
 # (?<!stuff) matches if the current position in the string is not preceded
 # by a match for 'stuff'.
@@ -33,7 +49,7 @@ from . import EventBase
 #       the literal fields "foo\" and "bar" but will instead be treated as "foo\\.bar"
 SPLIT_FIELD_REGEX = re.compile(r"(?<!\\)\.")
 
-CANONICALJSON_MAX_INT = (2 ** 53) - 1
+CANONICALJSON_MAX_INT = (2**53) - 1
 CANONICALJSON_MIN_INT = -CANONICALJSON_MAX_INT
 
 
@@ -289,29 +305,37 @@ def format_event_for_client_v2_without_room_id(d: JsonDict) -> JsonDict:
     return d
 
 
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class SerializeEventConfig:
+    as_client_event: bool = True
+    # Function to convert from federation format to client format
+    event_format: Callable[[JsonDict], JsonDict] = format_event_for_client_v1
+    # ID of the user's auth token - used for namespacing of transaction IDs
+    token_id: Optional[int] = None
+    # List of event fields to include. If empty, all fields will be returned.
+    only_event_fields: Optional[List[str]] = None
+    # Some events can have stripped room state stored in the `unsigned` field.
+    # This is required for invite and knock functionality. If this option is
+    # False, that state will be removed from the event before it is returned.
+    # Otherwise, it will be kept.
+    include_stripped_room_state: bool = False
+
+
+_DEFAULT_SERIALIZE_EVENT_CONFIG = SerializeEventConfig()
+
+
 def serialize_event(
     e: Union[JsonDict, EventBase],
     time_now_ms: int,
     *,
-    as_client_event: bool = True,
-    event_format: Callable[[JsonDict], JsonDict] = format_event_for_client_v1,
-    token_id: Optional[str] = None,
-    only_event_fields: Optional[List[str]] = None,
-    include_stripped_room_state: bool = False,
+    config: SerializeEventConfig = _DEFAULT_SERIALIZE_EVENT_CONFIG,
 ) -> JsonDict:
     """Serialize event for clients
 
     Args:
         e
         time_now_ms
-        as_client_event
-        event_format
-        token_id
-        only_event_fields
-        include_stripped_room_state: Some events can have stripped room state
-            stored in the `unsigned` field. This is required for invite and knock
-            functionality. If this option is False, that state will be removed from the
-            event before it is returned. Otherwise, it will be kept.
+        config: Event serialization config
 
     Returns:
         The serialized event dictionary.
@@ -334,11 +358,11 @@ def serialize_event(
 
     if "redacted_because" in e.unsigned:
         d["unsigned"]["redacted_because"] = serialize_event(
-            e.unsigned["redacted_because"], time_now_ms, event_format=event_format
+            e.unsigned["redacted_because"], time_now_ms, config=config
         )
 
-    if token_id is not None:
-        if token_id == getattr(e.internal_metadata, "token_id", None):
+    if config.token_id is not None:
+        if config.token_id == getattr(e.internal_metadata, "token_id", None):
             txn_id = getattr(e.internal_metadata, "txn_id", None)
             if txn_id is not None:
                 d["unsigned"]["transaction_id"] = txn_id
@@ -347,13 +371,14 @@ def serialize_event(
     # that are meant to provide metadata about a room to an invitee/knocker. They are
     # intended to only be included in specific circumstances, such as down sync, and
     # should not be included in any other case.
-    if not include_stripped_room_state:
+    if not config.include_stripped_room_state:
         d["unsigned"].pop("invite_room_state", None)
         d["unsigned"].pop("knock_room_state", None)
 
-    if as_client_event:
-        d = event_format(d)
+    if config.as_client_event:
+        d = config.event_format(d)
 
+    only_event_fields = config.only_event_fields
     if only_event_fields:
         if not isinstance(only_event_fields, list) or not all(
             isinstance(f, str) for f in only_event_fields
@@ -371,23 +396,26 @@ class EventClientSerializer:
     clients.
     """
 
+    def __init__(self, hs: "HomeServer"):
+        self._msc3440_enabled = hs.config.experimental.msc3440_enabled
+
     def serialize_event(
         self,
         event: Union[JsonDict, EventBase],
         time_now: int,
         *,
-        bundle_aggregations: Optional[Dict[str, JsonDict]] = None,
-        **kwargs: Any,
+        config: SerializeEventConfig = _DEFAULT_SERIALIZE_EVENT_CONFIG,
+        bundle_aggregations: Optional[Dict[str, "BundledAggregations"]] = None,
     ) -> JsonDict:
         """Serializes a single event.
 
         Args:
             event: The event being serialized.
             time_now: The current time in milliseconds
+            config: Event serialization config
             bundle_aggregations: Whether to include the bundled aggregations for this
                 event. Only applies to non-state events. (State events never include
                 bundled aggregations.)
-            **kwargs: Arguments to pass to `serialize_event`
 
         Returns:
             The serialized event
@@ -396,26 +424,55 @@ class EventClientSerializer:
         if not isinstance(event, EventBase):
             return event
 
-        serialized_event = serialize_event(event, time_now, **kwargs)
+        serialized_event = serialize_event(event, time_now, config=config)
 
         # Check if there are any bundled aggregations to include with the event.
         if bundle_aggregations:
             event_aggregations = bundle_aggregations.get(event.event_id)
             if event_aggregations:
-                self._injected_bundled_aggregations(
+                self._inject_bundled_aggregations(
                     event,
                     time_now,
+                    config,
                     bundle_aggregations[event.event_id],
                     serialized_event,
                 )
 
         return serialized_event
 
-    def _injected_bundled_aggregations(
+    def _apply_edit(
+        self, orig_event: EventBase, serialized_event: JsonDict, edit: EventBase
+    ) -> None:
+        """Replace the content, preserving existing relations of the serialized event.
+
+        Args:
+            orig_event: The original event.
+            serialized_event: The original event, serialized. This is modified.
+            edit: The event which edits the above.
+        """
+
+        # Ensure we take copies of the edit content, otherwise we risk modifying
+        # the original event.
+        edit_content = edit.content.copy()
+
+        # Unfreeze the event content if necessary, so that we may modify it below
+        edit_content = unfreeze(edit_content)
+        serialized_event["content"] = edit_content.get("m.new_content", {})
+
+        # Check for existing relations
+        relates_to = orig_event.content.get("m.relates_to")
+        if relates_to:
+            # Keep the relations, ensuring we use a dict copy of the original
+            serialized_event["content"]["m.relates_to"] = relates_to.copy()
+        else:
+            serialized_event["content"].pop("m.relates_to", None)
+
+    def _inject_bundled_aggregations(
         self,
         event: EventBase,
         time_now: int,
-        aggregations: JsonDict,
+        config: SerializeEventConfig,
+        aggregations: "BundledAggregations",
         serialized_event: JsonDict,
     ) -> None:
         """Potentially injects bundled aggregations into the unsigned portion of the serialized event.
@@ -425,66 +482,90 @@ class EventClientSerializer:
             time_now: The current time in milliseconds
             aggregations: The bundled aggregation to serialize.
             serialized_event: The serialized event which may be modified.
+            config: Event serialization config
 
         """
-        # Make a copy in-case the object is cached.
-        aggregations = aggregations.copy()
+        serialized_aggregations = {}
 
-        if RelationTypes.REPLACE in aggregations:
-            # If there is an edit replace the content, preserving existing
-            # relations.
-            edit = aggregations[RelationTypes.REPLACE]
+        if aggregations.annotations:
+            serialized_aggregations[RelationTypes.ANNOTATION] = aggregations.annotations
 
-            # Ensure we take copies of the edit content, otherwise we risk modifying
-            # the original event.
-            edit_content = edit.content.copy()
+        if aggregations.references:
+            serialized_aggregations[RelationTypes.REFERENCE] = aggregations.references
 
-            # Unfreeze the event content if necessary, so that we may modify it below
-            edit_content = unfreeze(edit_content)
-            serialized_event["content"] = edit_content.get("m.new_content", {})
+        if aggregations.replace:
+            # If there is an edit, apply it to the event.
+            edit = aggregations.replace
+            self._apply_edit(event, serialized_event, edit)
 
-            # Check for existing relations
-            relates_to = event.content.get("m.relates_to")
-            if relates_to:
-                # Keep the relations, ensuring we use a dict copy of the original
-                serialized_event["content"]["m.relates_to"] = relates_to.copy()
-            else:
-                serialized_event["content"].pop("m.relates_to", None)
-
-            aggregations[RelationTypes.REPLACE] = {
+            # Include information about it in the relations dict.
+            serialized_aggregations[RelationTypes.REPLACE] = {
                 "event_id": edit.event_id,
                 "origin_server_ts": edit.origin_server_ts,
                 "sender": edit.sender,
             }
 
         # If this event is the start of a thread, include a summary of the replies.
-        if RelationTypes.THREAD in aggregations:
-            # Serialize the latest thread event.
-            latest_thread_event = aggregations[RelationTypes.THREAD]["latest_event"]
+        if aggregations.thread:
+            thread = aggregations.thread
 
             # Don't bundle aggregations as this could recurse forever.
-            aggregations[RelationTypes.THREAD]["latest_event"] = self.serialize_event(
-                latest_thread_event, time_now, bundle_aggregations=None
+            serialized_latest_event = serialize_event(
+                thread.latest_event, time_now, config=config
             )
+            # Manually apply an edit, if one exists.
+            if thread.latest_edit:
+                self._apply_edit(
+                    thread.latest_event, serialized_latest_event, thread.latest_edit
+                )
+
+            thread_summary = {
+                "latest_event": serialized_latest_event,
+                "count": thread.count,
+                "current_user_participated": thread.current_user_participated,
+            }
+            serialized_aggregations[RelationTypes.THREAD] = thread_summary
+            if self._msc3440_enabled:
+                serialized_aggregations[RelationTypes.UNSTABLE_THREAD] = thread_summary
 
         # Include the bundled aggregations in the event.
-        serialized_event["unsigned"].setdefault("m.relations", {}).update(aggregations)
+        if serialized_aggregations:
+            # There is likely already an "unsigned" field, but a filter might
+            # have stripped it off (via the event_fields option). The server is
+            # allowed to return additional fields, so add it back.
+            serialized_event.setdefault("unsigned", {}).setdefault(
+                "m.relations", {}
+            ).update(serialized_aggregations)
 
     def serialize_events(
-        self, events: Iterable[Union[JsonDict, EventBase]], time_now: int, **kwargs: Any
+        self,
+        events: Iterable[Union[JsonDict, EventBase]],
+        time_now: int,
+        *,
+        config: SerializeEventConfig = _DEFAULT_SERIALIZE_EVENT_CONFIG,
+        bundle_aggregations: Optional[Dict[str, "BundledAggregations"]] = None,
     ) -> List[JsonDict]:
         """Serializes multiple events.
 
         Args:
             event
             time_now: The current time in milliseconds
-            **kwargs: Arguments to pass to `serialize_event`
+            config: Event serialization config
+            bundle_aggregations: Whether to include the bundled aggregations for this
+                event. Only applies to non-state events. (State events never include
+                bundled aggregations.)
 
         Returns:
             The list of serialized events
         """
         return [
-            self.serialize_event(event, time_now=time_now, **kwargs) for event in events
+            self.serialize_event(
+                event,
+                time_now,
+                config=config,
+                bundle_aggregations=bundle_aggregations,
+            )
+            for event in events
         ]
 
 

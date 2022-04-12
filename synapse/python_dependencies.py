@@ -17,14 +17,7 @@
 
 import itertools
 import logging
-from typing import List, Set
-
-from pkg_resources import (
-    DistributionNotFound,
-    Requirement,
-    VersionConflict,
-    get_provider,
-)
+from typing import Set
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +44,11 @@ REQUIREMENTS = [
     # we use the TYPE_CHECKER.redefine method added in jsonschema 3.0.0
     "jsonschema>=3.0.0",
     # frozendict 2.1.2 is broken on Debian 10: https://github.com/Marco-Sulla/python-frozendict/issues/41
-    "frozendict>=1,<2.1.2",
+    "frozendict>=1,!=2.1.2",
     "unpaddedbase64>=1.1.0",
     "canonicaljson>=1.4.0",
     # we use the type definitions added in signedjson 1.1.
-    "signedjson>=1.1.0",
+    "signedjson>=1.1.0,<=1.1.1",
     "pynacl>=1.2.1",
     "idna>=2.5",
     # validating SSL certs for IP addresses requires service_identity 18.1.
@@ -70,7 +63,7 @@ REQUIREMENTS = [
     "pyasn1>=0.1.9",
     "pyasn1-modules>=0.0.7",
     "bcrypt>=3.1.0",
-    "pillow>=4.3.0",
+    "pillow>=5.4.0",
     "sortedcontainers>=1.4.4",
     "pymacaroons>=0.13.0",
     "msgpack>=0.5.2",
@@ -81,14 +74,21 @@ REQUIREMENTS = [
     # Note: 21.1.0 broke `/sync`, see #9936
     "attrs>=19.2.0,!=21.1.0",
     "netaddr>=0.7.18",
-    "Jinja2>=2.9",
+    # Jinja 2.x is incompatible with MarkupSafe>=2.1. To ensure that admins do not
+    # end up with a broken installation, with recent MarkupSafe but old Jinja, we
+    # add a lower bound to the Jinja2 dependency.
+    "Jinja2>=3.0",
     "bleach>=1.4.3",
-    "typing-extensions>=3.7.4",
+    # We use `ParamSpec`, which was added in `typing-extensions` 3.10.0.0.
+    "typing-extensions>=3.10.0",
     # We enforce that we have a `cryptography` version that bundles an `openssl`
     # with the latest security patches.
     "cryptography>=3.4.7",
-    "ijson>=3.1",
-    "matrix-common==1.0.0",
+    # ijson 3.1.4 fixes a bug with "." in property names
+    "ijson>=3.1.4",
+    "matrix-common~=1.1.0",
+    # We need packaging.requirements.Requirement, added in 16.1.
+    "packaging>=16.1",
 ]
 
 CONDITIONAL_REQUIREMENTS = {
@@ -107,7 +107,7 @@ CONDITIONAL_REQUIREMENTS = {
     # `systemd.journal.JournalHandler`, as is documented in
     # `contrib/systemd/log_config.yaml`.
     "systemd": ["systemd-python>=231"],
-    "url_preview": ["lxml>=3.5.0"],
+    "url_preview": ["lxml>=4.2.0"],
     "sentry": ["sentry-sdk>=0.7.2"],
     "opentracing": ["jaeger-client>=4.0.0", "opentracing>=2.2.0"],
     "jwt": ["pyjwt>=1.6.4"],
@@ -141,102 +141,6 @@ for dep in itertools.chain(
 
 def list_requirements():
     return list(set(REQUIREMENTS) | ALL_OPTIONAL_REQUIREMENTS)
-
-
-class DependencyException(Exception):
-    @property
-    def message(self):
-        return "\n".join(
-            [
-                "Missing Requirements: %s" % (", ".join(self.dependencies),),
-                "To install run:",
-                "    pip install --upgrade --force %s" % (" ".join(self.dependencies),),
-                "",
-            ]
-        )
-
-    @property
-    def dependencies(self):
-        for i in self.args[0]:
-            yield '"' + i + '"'
-
-
-def check_requirements(for_feature=None):
-    deps_needed = []
-    errors = []
-
-    if for_feature:
-        reqs = CONDITIONAL_REQUIREMENTS[for_feature]
-    else:
-        reqs = REQUIREMENTS
-
-    for dependency in reqs:
-        try:
-            _check_requirement(dependency)
-        except VersionConflict as e:
-            deps_needed.append(dependency)
-            errors.append(
-                "Needed %s, got %s==%s"
-                % (
-                    dependency,
-                    e.dist.project_name,  # type: ignore[attr-defined] # noqa
-                    e.dist.version,  # type: ignore[attr-defined] # noqa
-                )
-            )
-        except DistributionNotFound:
-            deps_needed.append(dependency)
-            if for_feature:
-                errors.append(
-                    "Needed %s for the '%s' feature but it was not installed"
-                    % (dependency, for_feature)
-                )
-            else:
-                errors.append("Needed %s but it was not installed" % (dependency,))
-
-    if not for_feature:
-        # Check the optional dependencies are up to date. We allow them to not be
-        # installed.
-        OPTS: List[str] = sum(CONDITIONAL_REQUIREMENTS.values(), [])
-
-        for dependency in OPTS:
-            try:
-                _check_requirement(dependency)
-            except VersionConflict as e:
-                deps_needed.append(dependency)
-                errors.append(
-                    "Needed optional %s, got %s==%s"
-                    % (
-                        dependency,
-                        e.dist.project_name,  # type: ignore[attr-defined] # noqa
-                        e.dist.version,  # type: ignore[attr-defined] # noqa
-                    )
-                )
-            except DistributionNotFound:
-                # If it's not found, we don't care
-                pass
-
-    if deps_needed:
-        for err in errors:
-            logging.error(err)
-
-        raise DependencyException(deps_needed)
-
-
-def _check_requirement(dependency_string):
-    """Parses a dependency string, and checks if the specified requirement is installed
-
-    Raises:
-        VersionConflict if the requirement is installed, but with the the wrong version
-        DistributionNotFound if nothing is found to provide the requirement
-    """
-    req = Requirement.parse(dependency_string)
-
-    # first check if the markers specify that this requirement needs installing
-    if req.marker is not None and not req.marker.evaluate():
-        # not required for this environment
-        return
-
-    get_provider(req)
 
 
 if __name__ == "__main__":

@@ -15,8 +15,12 @@ from unittest.mock import Mock
 
 import pymacaroons
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.api.errors import AuthError, ResourceLimitError
 from synapse.rest import admin
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 from tests.test_utils import make_awaitable
@@ -27,7 +31,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         admin.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.auth_handler = hs.get_auth_handler()
         self.macaroon_generator = hs.get_macaroon_generator()
 
@@ -42,23 +46,23 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         self.user1 = self.register_user("a_user", "pass")
 
-    def test_macaroon_caveats(self):
+    def test_macaroon_caveats(self) -> None:
         token = self.macaroon_generator.generate_guest_access_token("a_user")
         macaroon = pymacaroons.Macaroon.deserialize(token)
 
-        def verify_gen(caveat):
+        def verify_gen(caveat: str) -> bool:
             return caveat == "gen = 1"
 
-        def verify_user(caveat):
+        def verify_user(caveat: str) -> bool:
             return caveat == "user_id = a_user"
 
-        def verify_type(caveat):
+        def verify_type(caveat: str) -> bool:
             return caveat == "type = access"
 
-        def verify_nonce(caveat):
+        def verify_nonce(caveat: str) -> bool:
             return caveat.startswith("nonce =")
 
-        def verify_guest(caveat):
+        def verify_guest(caveat: str) -> bool:
             return caveat == "guest = true"
 
         v = pymacaroons.Verifier()
@@ -69,7 +73,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         v.satisfy_general(verify_guest)
         v.verify(macaroon, self.hs.config.key.macaroon_secret_key)
 
-    def test_short_term_login_token_gives_user_id(self):
+    def test_short_term_login_token_gives_user_id(self) -> None:
         token = self.macaroon_generator.generate_short_term_login_token(
             self.user1, "", duration_in_ms=5000
         )
@@ -84,7 +88,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             AuthError,
         )
 
-    def test_short_term_login_token_gives_auth_provider(self):
+    def test_short_term_login_token_gives_auth_provider(self) -> None:
         token = self.macaroon_generator.generate_short_term_login_token(
             self.user1, auth_provider_id="my_idp"
         )
@@ -92,7 +96,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertEqual(self.user1, res.user_id)
         self.assertEqual("my_idp", res.auth_provider_id)
 
-    def test_short_term_login_token_cannot_replace_user_id(self):
+    def test_short_term_login_token_cannot_replace_user_id(self) -> None:
         token = self.macaroon_generator.generate_short_term_login_token(
             self.user1, "", duration_in_ms=5000
         )
@@ -112,7 +116,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             AuthError,
         )
 
-    def test_mau_limits_disabled(self):
+    def test_mau_limits_disabled(self) -> None:
         self.auth_blocking._limit_usage_by_mau = False
         # Ensure does not throw exception
         self.get_success(
@@ -127,9 +131,9 @@ class AuthTestCase(unittest.HomeserverTestCase):
             )
         )
 
-    def test_mau_limits_exceeded_large(self):
+    def test_mau_limits_exceeded_large(self) -> None:
         self.auth_blocking._limit_usage_by_mau = True
-        self.hs.get_datastore().get_monthly_active_count = Mock(
+        self.hs.get_datastores().main.get_monthly_active_count = Mock(
             return_value=make_awaitable(self.large_number_of_users)
         )
 
@@ -140,7 +144,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             ResourceLimitError,
         )
 
-        self.hs.get_datastore().get_monthly_active_count = Mock(
+        self.hs.get_datastores().main.get_monthly_active_count = Mock(
             return_value=make_awaitable(self.large_number_of_users)
         )
         self.get_failure(
@@ -150,13 +154,13 @@ class AuthTestCase(unittest.HomeserverTestCase):
             ResourceLimitError,
         )
 
-    def test_mau_limits_parity(self):
+    def test_mau_limits_parity(self) -> None:
         # Ensure we're not at the unix epoch.
         self.reactor.advance(1)
         self.auth_blocking._limit_usage_by_mau = True
 
         # Set the server to be at the edge of too many users.
-        self.hs.get_datastore().get_monthly_active_count = Mock(
+        self.hs.get_datastores().main.get_monthly_active_count = Mock(
             return_value=make_awaitable(self.auth_blocking._max_mau_value)
         )
 
@@ -175,7 +179,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
 
         # If in monthly active cohort
-        self.hs.get_datastore().user_last_seen_monthly_active = Mock(
+        self.hs.get_datastores().main.user_last_seen_monthly_active = Mock(
             return_value=make_awaitable(self.clock.time_msec())
         )
         self.get_success(
@@ -189,10 +193,10 @@ class AuthTestCase(unittest.HomeserverTestCase):
             )
         )
 
-    def test_mau_limits_not_exceeded(self):
+    def test_mau_limits_not_exceeded(self) -> None:
         self.auth_blocking._limit_usage_by_mau = True
 
-        self.hs.get_datastore().get_monthly_active_count = Mock(
+        self.hs.get_datastores().main.get_monthly_active_count = Mock(
             return_value=make_awaitable(self.small_number_of_users)
         )
         # Ensure does not raise exception
@@ -202,7 +206,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.hs.get_datastore().get_monthly_active_count = Mock(
+        self.hs.get_datastores().main.get_monthly_active_count = Mock(
             return_value=make_awaitable(self.small_number_of_users)
         )
         self.get_success(
@@ -211,7 +215,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             )
         )
 
-    def _get_macaroon(self):
+    def _get_macaroon(self) -> pymacaroons.Macaroon:
         token = self.macaroon_generator.generate_short_term_login_token(
             self.user1, "", duration_in_ms=5000
         )

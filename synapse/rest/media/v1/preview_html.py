@@ -16,7 +16,6 @@ import itertools
 import logging
 import re
 from typing import TYPE_CHECKING, Dict, Generator, Iterable, Optional, Set, Union
-from urllib import parse as urlparse
 
 if TYPE_CHECKING:
     from lxml import etree
@@ -24,10 +23,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _charset_match = re.compile(
-    br'<\s*meta[^>]*charset\s*=\s*"?([a-z0-9_-]+)"?', flags=re.I
+    rb'<\s*meta[^>]*charset\s*=\s*"?([a-z0-9_-]+)"?', flags=re.I
 )
 _xml_encoding_match = re.compile(
-    br'\s*<\s*\?\s*xml[^>]*encoding="([a-z0-9_-]+)"', flags=re.I
+    rb'\s*<\s*\?\s*xml[^>]*encoding="([a-z0-9_-]+)"', flags=re.I
 )
 _content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
 
@@ -144,9 +143,7 @@ def decode_body(
     return etree.fromstring(body, parser)
 
 
-def parse_html_to_open_graph(
-    tree: "etree.Element", media_uri: str
-) -> Dict[str, Optional[str]]:
+def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
     """
     Parse the HTML document into an Open Graph response.
 
@@ -155,7 +152,6 @@ def parse_html_to_open_graph(
 
     Args:
         tree: The parsed HTML document.
-        media_url: The URI used to download the body.
 
     Returns:
         The Open Graph response as a dictionary.
@@ -209,7 +205,7 @@ def parse_html_to_open_graph(
             "//*/meta[translate(@itemprop, 'IMAGE', 'image')='image']/@content"
         )
         if meta_image:
-            og["og:image"] = rebase_url(meta_image[0], media_uri)
+            og["og:image"] = meta_image[0]
         else:
             # TODO: consider inlined CSS styles as well as width & height attribs
             images = tree.xpath("//img[@src][number(@width)>10][number(@height)>10]")
@@ -318,18 +314,6 @@ def _iterate_over_text(
                 ),
                 elements,
             )
-
-
-def rebase_url(url: str, base: str) -> str:
-    base_parts = list(urlparse.urlparse(base))
-    url_parts = list(urlparse.urlparse(url))
-    if not url_parts[0]:  # fix up schema
-        url_parts[0] = base_parts[0] or "http"
-    if not url_parts[1]:  # fix up hostname
-        url_parts[1] = base_parts[1]
-        if not url_parts[2].startswith("/"):
-            url_parts[2] = re.sub(r"/[^/]+$", "/", base_parts[2]) + url_parts[2]
-    return urlparse.urlunparse(url_parts)
 
 
 def summarize_paragraphs(

@@ -16,6 +16,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import Codes, NotFoundError, SynapseError
+from synapse.federation.transport.server import Authenticator
 from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
@@ -47,7 +48,7 @@ class ListDestinationsRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self._auth = hs.get_auth()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self._auth, request)
@@ -90,7 +91,7 @@ class ListDestinationsRestServlet(RestServlet):
         return HTTPStatus.OK, response
 
 
-class DestinationsRestServlet(RestServlet):
+class DestinationRestServlet(RestServlet):
     """Get details of a destination.
     This needs user to have administrator access in Synapse.
 
@@ -104,7 +105,7 @@ class DestinationsRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self._auth = hs.get_auth()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
 
     async def on_GET(
         self, request: SynapseRequest, destination: str
@@ -145,3 +146,100 @@ class DestinationsRestServlet(RestServlet):
             }
 
         return HTTPStatus.OK, response
+
+
+class DestinationMembershipRestServlet(RestServlet):
+    """Get list of rooms of a destination.
+    This needs user to have administrator access in Synapse.
+
+    GET /_synapse/admin/v1/federation/destinations/<destination>/rooms?from=0&limit=10
+
+    returns:
+        200 OK with a list of rooms if success otherwise an error.
+
+    The parameters `from` and `limit` are required only for pagination.
+    By default, a `limit` of 100 is used.
+    """
+
+    PATTERNS = admin_patterns("/federation/destinations/(?P<destination>[^/]*)/rooms$")
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastores().main
+
+    async def on_GET(
+        self, request: SynapseRequest, destination: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self._auth, request)
+
+        if not await self._store.is_destination_known(destination):
+            raise NotFoundError("Unknown destination")
+
+        start = parse_integer(request, "from", default=0)
+        limit = parse_integer(request, "limit", default=100)
+
+        if start < 0:
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Query parameter from must be a string representing a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        if limit < 0:
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Query parameter limit must be a string representing a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        direction = parse_string(request, "dir", default="f", allowed_values=("f", "b"))
+
+        rooms, total = await self._store.get_destination_rooms_paginate(
+            destination, start, limit, direction
+        )
+        response = {"rooms": rooms, "total": total}
+        if (start + limit) < total:
+            response["next_token"] = str(start + len(rooms))
+
+        return HTTPStatus.OK, response
+
+
+class DestinationResetConnectionRestServlet(RestServlet):
+    """Reset destinations' connection timeouts and wake it up.
+    This needs user to have administrator access in Synapse.
+
+    POST /_synapse/admin/v1/federation/destinations/<destination>/reset_connection
+    {}
+
+    returns:
+        200 OK otherwise an error.
+    """
+
+    PATTERNS = admin_patterns(
+        "/federation/destinations/(?P<destination>[^/]+)/reset_connection$"
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastores().main
+        self._authenticator = Authenticator(hs)
+
+    async def on_POST(
+        self, request: SynapseRequest, destination: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self._auth, request)
+
+        if not await self._store.is_destination_known(destination):
+            raise NotFoundError("Unknown destination")
+
+        retry_timings = await self._store.get_destination_retry_timings(destination)
+        if not (retry_timings and retry_timings.retry_last_ts):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "The retry timing does not need to be reset for this destination.",
+            )
+
+        # reset timings and wake up
+        await self._authenticator.reset_retry_timings(destination)
+
+        return HTTPStatus.OK, {}

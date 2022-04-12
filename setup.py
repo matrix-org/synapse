@@ -15,7 +15,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import glob
 import os
 from typing import Any, Dict
 
@@ -96,19 +95,20 @@ CONDITIONAL_REQUIREMENTS["all"] = list(ALL_OPTIONAL_REQUIREMENTS)
 # We pin black so that our tests don't start failing on new releases.
 CONDITIONAL_REQUIREMENTS["lint"] = [
     "isort==5.7.0",
-    "black==21.12b0",
+    "black==22.3.0",
     "flake8-comprehensions",
     "flake8-bugbear==21.3.2",
     "flake8",
 ]
 
 CONDITIONAL_REQUIREMENTS["mypy"] = [
-    "mypy==0.910",
-    "mypy-zope==0.3.2",
+    "mypy==0.931",
+    "mypy-zope==0.3.5",
     "types-bleach>=4.1.0",
     "types-jsonschema>=3.2.0",
     "types-opentracing>=2.4.2",
     "types-Pillow>=8.3.4",
+    "types-psycopg2>=2.9.9",
     "types-pyOpenSSL>=20.0.7",
     "types-PyYAML>=5.4.10",
     "types-requests>=2.26.0",
@@ -128,7 +128,7 @@ CONDITIONAL_REQUIREMENTS["dev"] = (
     + CONDITIONAL_REQUIREMENTS["test"]
     + [
         # The following are used by the release script
-        "click==7.1.2",
+        "click==8.1.0",
         "redbaron==0.9.2",
         "GitPython==3.1.14",
         "commonmark==0.9.1",
@@ -150,11 +150,23 @@ setup(
     zip_safe=False,
     long_description=long_description,
     long_description_content_type="text/x-rst",
-    python_requires="~=3.6",
+    python_requires="~=3.7",
     entry_points={
         "console_scripts": [
+            # Application
             "synapse_homeserver = synapse.app.homeserver:main",
             "synapse_worker = synapse.app.generic_worker:main",
+            "synctl = synapse._scripts.synctl:main",
+            # Scripts
+            "export_signing_key = synapse._scripts.export_signing_key:main",
+            "generate_config = synapse._scripts.generate_config:main",
+            "generate_log_config = synapse._scripts.generate_log_config:main",
+            "generate_signing_key = synapse._scripts.generate_signing_key:main",
+            "hash_password = synapse._scripts.hash_password:main",
+            "register_new_matrix_user = synapse._scripts.register_new_matrix_user:main",
+            "synapse_port_db = synapse._scripts.synapse_port_db:main",
+            "synapse_review_recent_signups = synapse._scripts.review_recent_signups:main",
+            "update_synapse_database = synapse._scripts.update_synapse_database:main",
         ]
     },
     classifiers=[
@@ -165,7 +177,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
     ],
-    scripts=["synctl"] + glob.glob("scripts/*"),
     cmdclass={"test": TestCommand},
 )

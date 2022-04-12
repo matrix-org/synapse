@@ -60,7 +60,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
-        self.datastore = hs.get_datastore()
+        self.datastore = hs.get_datastores().main
         self.config = hs.config
         self.identity_handler = hs.get_identity_handler()
 
@@ -114,7 +114,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         # This avoids a potential account hijack by requesting a password reset to
         # an email address which is controlled by the attacker but which, after
         # canonicalisation, matches the one in our database.
-        existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
+        existing_user_id = await self.hs.get_datastores().main.get_user_id_by_threepid(
             "email", email
         )
 
@@ -168,7 +168,7 @@ class PasswordRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
-        self.datastore = self.hs.get_datastore()
+        self.datastore = self.hs.get_datastores().main
         self.password_policy_handler = hs.get_password_policy_handler()
         self._set_password_handler = hs.get_set_password_handler()
 
@@ -347,7 +347,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         self.hs = hs
         self.config = hs.config
         self.identity_handler = hs.get_identity_handler()
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
 
         if self.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self.mailer = Mailer(
@@ -385,7 +385,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
-        if not check_3pid_allowed(self.hs, "email", email):
+        if not await check_3pid_allowed(self.hs, "email", email):
             raise SynapseError(
                 403,
                 "Your email domain is not authorized on this server",
@@ -450,7 +450,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         super().__init__()
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.identity_handler = hs.get_identity_handler()
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
@@ -468,7 +468,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
 
         msisdn = phone_number_to_msisdn(country, phone_number)
 
-        if not check_3pid_allowed(self.hs, "msisdn", msisdn):
+        if not await check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
                 403,
                 "Account phone numbers are not authorized on this server",
@@ -533,7 +533,7 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
         super().__init__()
         self.config = hs.config
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         if self.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self._failure_email_template = (
                 self.config.email.email_add_threepid_template_failure_html
@@ -600,7 +600,7 @@ class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
         super().__init__()
         self.config = hs.config
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.identity_handler = hs.get_identity_handler()
 
     async def on_POST(self, request: Request) -> Tuple[int, JsonDict]:
@@ -634,7 +634,7 @@ class ThreepidRestServlet(RestServlet):
         self.identity_handler = hs.get_identity_handler()
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
-        self.datastore = self.hs.get_datastore()
+        self.datastore = self.hs.get_datastores().main
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
@@ -768,7 +768,7 @@ class ThreepidUnbindRestServlet(RestServlet):
         self.hs = hs
         self.identity_handler = hs.get_identity_handler()
         self.auth = hs.get_auth()
-        self.datastore = self.hs.get_datastore()
+        self.datastore = self.hs.get_datastores().main
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         """Unbind the given 3pid from a specific identity server, or identity servers that are
@@ -883,7 +883,9 @@ class WhoamiRestServlet(RestServlet):
         response = {
             "user_id": requester.user.to_string(),
             # MSC: https://github.com/matrix-org/matrix-doc/pull/3069
+            # Entered spec in Matrix 1.2
             "org.matrix.msc3069.is_guest": bool(requester.is_guest),
+            "is_guest": bool(requester.is_guest),
         }
 
         # Appservices and similar accounts do not have device IDs
@@ -892,6 +894,33 @@ class WhoamiRestServlet(RestServlet):
             response["device_id"] = requester.device_id
 
         return 200, response
+
+
+class AccountStatusRestServlet(RestServlet):
+    PATTERNS = client_patterns(
+        "/org.matrix.msc3720/account_status$", unstable=True, releases=()
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self._auth = hs.get_auth()
+        self._account_handler = hs.get_account_handler()
+
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        await self._auth.get_user_by_req(request)
+
+        body = parse_json_object_from_request(request)
+        if "user_ids" not in body:
+            raise SynapseError(
+                400, "Required parameter 'user_ids' is missing", Codes.MISSING_PARAM
+            )
+
+        statuses, failures = await self._account_handler.get_account_statuses(
+            body["user_ids"],
+            allow_remote=True,
+        )
+
+        return 200, {"account_statuses": statuses, "failures": failures}
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
@@ -908,3 +937,6 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ThreepidUnbindRestServlet(hs).register(http_server)
     ThreepidDeleteRestServlet(hs).register(http_server)
     WhoamiRestServlet(hs).register(http_server)
+
+    if hs.config.experimental.msc3720_enabled:
+        AccountStatusRestServlet(hs).register(http_server)

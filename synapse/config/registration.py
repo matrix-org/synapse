@@ -33,6 +33,10 @@ class RegistrationConfig(Config):
                 str(config["disable_registration"])
             )
 
+        self.enable_registration_without_verification = strtobool(
+            str(config.get("enable_registration_without_verification", False))
+        )
+
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
         self.enable_3pid_lookup = config.get("enable_3pid_lookup", True)
@@ -190,6 +194,8 @@ class RegistrationConfig(Config):
         # The success template used during fallback auth.
         self.fallback_success_template = self.read_template("auth_success.html")
 
+        self.inhibit_user_in_use_error = config.get("inhibit_user_in_use_error", False)
+
     def generate_config_section(self, generate_secrets=False, **kwargs):
         if generate_secrets:
             registration_shared_secret = 'registration_shared_secret: "%s"' % (
@@ -205,9 +211,17 @@ class RegistrationConfig(Config):
         # Registration can be rate-limited using the parameters in the "Ratelimiting"
         # section of this file.
 
-        # Enable registration for new users.
+        # Enable registration for new users. Defaults to 'false'. It is highly recommended that if you enable registration,
+        # you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration
+        # without any verification, you must also set `enable_registration_without_verification`, found below.
         #
         #enable_registration: false
+
+        # Enable registration without email or captcha verification. Note: this option is *not* recommended,
+        # as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
+        # unless `enable_registration` is also enabled.
+        #
+        #enable_registration_without_verification: true
 
         # Time that a user's session remains valid for, after they log in.
         #
@@ -446,6 +460,16 @@ class RegistrationConfig(Config):
         # Defaults to true.
         #
         #auto_join_rooms_for_guests: false
+
+        # Whether to inhibit errors raised when registering a new account if the user ID
+        # already exists. If turned on, that requests to /register/available will always
+        # show a user ID as available, and Synapse won't raise an error when starting
+        # a registration with a user ID that already exists. However, Synapse will still
+        # raise an error if the registration completes and the username conflicts.
+        #
+        # Defaults to false.
+        #
+        #inhibit_user_in_use_error: true
         """
             % locals()
         )

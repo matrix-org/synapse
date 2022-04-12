@@ -13,14 +13,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def generate_fake_event_id() -> str:
-    return "$fake_" + random_string(43)
-
-
 class RoomBatchHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state_store = hs.get_storage().state
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
@@ -125,12 +121,11 @@ class RoomBatchHandler:
 
         return create_requester(user_id, app_service=app_service)
 
-    async def get_most_recent_auth_event_ids_from_event_id_list(
+    async def get_most_recent_full_state_ids_from_event_id_list(
         self, event_ids: List[str]
     ) -> List[str]:
-        """Find the most recent auth event ids (derived from state events) that
-        allowed that message to be sent. We will use this as a base
-        to auth our historical messages against.
+        """Find the most recent event_id and grab the full state at that event.
+        We will use this as a base to auth our historical messages against.
 
         Args:
             event_ids: List of event ID's to look at
@@ -140,38 +135,37 @@ class RoomBatchHandler:
         """
 
         (
-            most_recent_prev_event_id,
+            most_recent_event_id,
             _,
         ) = await self.store.get_max_depth_of(event_ids)
         # mapping from (type, state_key) -> state_event_id
         prev_state_map = await self.state_store.get_state_ids_for_event(
-            most_recent_prev_event_id
+            most_recent_event_id
         )
         # List of state event ID's
-        prev_state_ids = list(prev_state_map.values())
-        auth_event_ids = prev_state_ids
+        full_state_ids = list(prev_state_map.values())
 
-        return auth_event_ids
+        return full_state_ids
 
     async def persist_state_events_at_start(
         self,
         state_events_at_start: List[JsonDict],
         room_id: str,
-        initial_auth_event_ids: List[str],
+        initial_state_event_ids: List[str],
         app_service_requester: Requester,
     ) -> List[str]:
         """Takes all `state_events_at_start` event dictionaries and creates/persists
-        them as floating state events which don't resolve into the current room state.
-        They are floating because they reference a fake prev_event which doesn't connect
-        to the normal DAG at all.
+        them in a floating state event chain which don't resolve into the current room
+        state. They are floating because they reference no prev_events and are marked
+        as outliers which disconnects them from the normal DAG.
 
         Args:
             state_events_at_start:
             room_id: Room where you want the events persisted in.
-            initial_auth_event_ids: These will be the auth_events for the first
-                state event created. Each event created afterwards will be
-                added to the list of auth events for the next state event
-                created.
+            initial_state_event_ids:
+                The base set of state for the historical batch which the floating
+                state chain will derive from. This should probably be the state
+                from the `prev_event` defined by `/batch_send?prev_event_id=$abc`.
             app_service_requester: The requester of an application service.
 
         Returns:
@@ -180,21 +174,20 @@ class RoomBatchHandler:
         assert app_service_requester.app_service
 
         state_event_ids_at_start = []
-        auth_event_ids = initial_auth_event_ids.copy()
+        state_event_ids = initial_state_event_ids.copy()
 
-        # Make the state events float off on their own so we don't have a
-        # bunch of `@mxid joined the room` noise between each batch
-        prev_event_id_for_state_chain = generate_fake_event_id()
+        # Make the state events float off on their own by specifying no
+        # prev_events for the first one in the chain so we don't have a bunch of
+        # `@mxid joined the room` noise between each batch.
+        prev_event_ids_for_state_chain: List[str] = []
 
-        for state_event in state_events_at_start:
+        for index, state_event in enumerate(state_events_at_start):
             assert_params_in_dict(
                 state_event, ["type", "origin_server_ts", "content", "sender"]
             )
 
             logger.debug(
-                "RoomBatchSendEventRestServlet inserting state_event=%s, auth_event_ids=%s",
-                state_event,
-                auth_event_ids,
+                "RoomBatchSendEventRestServlet inserting state_event=%s", state_event
             )
 
             event_dict = {
@@ -220,13 +213,26 @@ class RoomBatchHandler:
                     room_id=room_id,
                     action=membership,
                     content=event_dict["content"],
+                    # Mark as an outlier to disconnect it from the normal DAG
+                    # and not show up between batches of history.
                     outlier=True,
                     historical=True,
-                    prev_event_ids=[prev_event_id_for_state_chain],
+                    # Only the first event in the state chain should be floating.
+                    # The rest should hang off each other in a chain.
+                    allow_no_prev_events=index == 0,
+                    prev_event_ids=prev_event_ids_for_state_chain,
+                    # Since each state event is marked as an outlier, the
+                    # `EventContext.for_outlier()` won't have any `state_ids`
+                    # set and therefore can't derive any state even though the
+                    # prev_events are set. Also since the first event in the
+                    # state chain is floating with no `prev_events`, it can't
+                    # derive state from anywhere automatically. So we need to
+                    # set some state explicitly.
+                    #
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same
                     # reference and also update in the event when we append later.
-                    auth_event_ids=auth_event_ids.copy(),
+                    state_event_ids=state_event_ids.copy(),
                 )
             else:
                 # TODO: Add some complement tests that adds state that is not member joins
@@ -240,20 +246,33 @@ class RoomBatchHandler:
                         state_event["sender"], app_service_requester.app_service
                     ),
                     event_dict,
+                    # Mark as an outlier to disconnect it from the normal DAG
+                    # and not show up between batches of history.
                     outlier=True,
                     historical=True,
-                    prev_event_ids=[prev_event_id_for_state_chain],
+                    # Only the first event in the state chain should be floating.
+                    # The rest should hang off each other in a chain.
+                    allow_no_prev_events=index == 0,
+                    prev_event_ids=prev_event_ids_for_state_chain,
+                    # Since each state event is marked as an outlier, the
+                    # `EventContext.for_outlier()` won't have any `state_ids`
+                    # set and therefore can't derive any state even though the
+                    # prev_events are set. Also since the first event in the
+                    # state chain is floating with no `prev_events`, it can't
+                    # derive state from anywhere automatically. So we need to
+                    # set some state explicitly.
+                    #
                     # Make sure to use a copy of this list because we modify it
                     # later in the loop here. Otherwise it will be the same
                     # reference and also update in the event when we append later.
-                    auth_event_ids=auth_event_ids.copy(),
+                    state_event_ids=state_event_ids.copy(),
                 )
                 event_id = event.event_id
 
             state_event_ids_at_start.append(event_id)
-            auth_event_ids.append(event_id)
+            state_event_ids.append(event_id)
             # Connect all the state in a floating chain
-            prev_event_id_for_state_chain = event_id
+            prev_event_ids_for_state_chain = [event_id]
 
         return state_event_ids_at_start
 
@@ -261,9 +280,8 @@ class RoomBatchHandler:
         self,
         events_to_create: List[JsonDict],
         room_id: str,
-        initial_prev_event_ids: List[str],
         inherited_depth: int,
-        auth_event_ids: List[str],
+        initial_state_event_ids: List[str],
         app_service_requester: Requester,
     ) -> List[str]:
         """Create and persists all events provided sequentially. Handles the
@@ -277,13 +295,12 @@ class RoomBatchHandler:
             events_to_create: List of historical events to create in JSON
                 dictionary format.
             room_id: Room where you want the events persisted in.
-            initial_prev_event_ids: These will be the prev_events for the first
-                event created. Each event created afterwards will point to the
-                previous event created.
             inherited_depth: The depth to create the events at (you will
                 probably by calling inherit_depth_from_prev_ids(...)).
-            auth_event_ids: Define which events allow you to create the given
-                event in the room.
+            initial_state_event_ids:
+                This is used to set explicit state for the insertion event at
+                the start of the historical batch since it's floating with no
+                prev_events to derive state from automatically.
             app_service_requester: The requester of an application service.
 
         Returns:
@@ -291,11 +308,19 @@ class RoomBatchHandler:
         """
         assert app_service_requester.app_service
 
-        prev_event_ids = initial_prev_event_ids.copy()
+        # We expect the first event in a historical batch to be an insertion event
+        assert events_to_create[0]["type"] == EventTypes.MSC2716_INSERTION
+        # We expect the last event in a historical batch to be an batch event
+        assert events_to_create[-1]["type"] == EventTypes.MSC2716_BATCH
+
+        # Make the historical event chain float off on its own by specifying no
+        # prev_events for the first event in the chain which causes the HS to
+        # ask for the state at the start of the batch later.
+        prev_event_ids: List[str] = []
 
         event_ids = []
         events_to_persist = []
-        for ev in events_to_create:
+        for index, ev in enumerate(events_to_create):
             assert_params_in_dict(ev, ["type", "origin_server_ts", "content", "sender"])
 
             assert self.hs.is_mine_id(ev["sender"]), "User must be our own: %s" % (
@@ -319,8 +344,16 @@ class RoomBatchHandler:
                     ev["sender"], app_service_requester.app_service
                 ),
                 event_dict,
+                # Only the first event (which is the insertion event) in the
+                # chain should be floating. The rest should hang off each other
+                # in a chain.
+                allow_no_prev_events=index == 0,
                 prev_event_ids=event_dict.get("prev_events"),
-                auth_event_ids=auth_event_ids,
+                # Since the first event (which is the insertion event) in the
+                # chain is floating with no `prev_events`, it can't derive state
+                # from anywhere automatically. So we need to set some state
+                # explicitly.
+                state_event_ids=initial_state_event_ids if index == 0 else None,
                 historical=True,
                 depth=inherited_depth,
             )
@@ -338,10 +371,9 @@ class RoomBatchHandler:
             )
 
             logger.debug(
-                "RoomBatchSendEventRestServlet inserting event=%s, prev_event_ids=%s, auth_event_ids=%s",
+                "RoomBatchSendEventRestServlet inserting event=%s, prev_event_ids=%s",
                 event,
                 prev_event_ids,
-                auth_event_ids,
             )
 
             events_to_persist.append((event, context))
@@ -370,14 +402,13 @@ class RoomBatchHandler:
         events_to_create: List[JsonDict],
         room_id: str,
         batch_id_to_connect_to: str,
-        initial_prev_event_ids: List[str],
         inherited_depth: int,
-        auth_event_ids: List[str],
+        initial_state_event_ids: List[str],
         app_service_requester: Requester,
     ) -> Tuple[List[str], str]:
         """
-        Handles creating and persisting all of the historical events as well
-        as insertion and batch meta events to make the batch navigable in the DAG.
+        Handles creating and persisting all of the historical events as well as
+        insertion and batch meta events to make the batch navigable in the DAG.
 
         Args:
             events_to_create: List of historical events to create in JSON
@@ -385,13 +416,15 @@ class RoomBatchHandler:
             room_id: Room where you want the events created in.
             batch_id_to_connect_to: The batch_id from the insertion event you
                 want this batch to connect to.
-            initial_prev_event_ids: These will be the prev_events for the first
-                event created. Each event created afterwards will point to the
-                previous event created.
             inherited_depth: The depth to create the events at (you will
                 probably by calling inherit_depth_from_prev_ids(...)).
-            auth_event_ids: Define which events allow you to create the given
-                event in the room.
+            initial_state_event_ids:
+                This is used to set explicit state for the insertion event at
+                the start of the historical batch since it's floating with no
+                prev_events to derive state from automatically. This should
+                probably be the state from the `prev_event` defined by
+                `/batch_send?prev_event_id=$abc` plus the outcome of
+                `persist_state_events_at_start`
             app_service_requester: The requester of an application service.
 
         Returns:
@@ -436,9 +469,8 @@ class RoomBatchHandler:
         event_ids = await self.persist_historical_events(
             events_to_create=events_to_create,
             room_id=room_id,
-            initial_prev_event_ids=initial_prev_event_ids,
             inherited_depth=inherited_depth,
-            auth_event_ids=auth_event_ids,
+            initial_state_event_ids=initial_state_event_ids,
             app_service_requester=app_service_requester,
         )
 

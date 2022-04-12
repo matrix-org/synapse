@@ -55,6 +55,7 @@ setup a *virtualenv*, as follows:
 cd path/where/you/have/cloned/the/repository
 python3 -m venv ./env
 source ./env/bin/activate
+pip install wheel
 pip install -e ".[all,dev]"
 pip install tox
 ```
@@ -116,7 +117,7 @@ The linters look at your code and do two things:
 - ensure that your code follows the coding style adopted by the project;
 - catch a number of errors in your code.
 
-They're pretty fast, don't hesitate!
+The linter takes no time at all to run as soon as you've [downloaded the dependencies into your python virtual environment](#4-install-the-dependencies).
 
 ```sh
 source ./env/bin/activate
@@ -457,6 +458,17 @@ Git allows you to add this signoff automatically when using the `-s`
 flag to `git commit`, which uses the name and email set in your
 `user.name` and `user.email` git configs.
 
+### Private Sign off
+
+If you would like to provide your legal name privately to the Matrix.org
+Foundation (instead of in a public commit or comment), you can do so
+by emailing your legal name and a link to the pull request to
+[dco@matrix.org](mailto:dco@matrix.org?subject=Private%20sign%20off).
+It helps to include "sign off" or similar in the subject line. You will then
+be instructed further.
+
+Once private sign off is complete, doing so for future contributions will not
+be required.
 
 # 10. Turn feedback into better code.
 

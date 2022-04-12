@@ -48,18 +48,21 @@ from synapse.events.spamcheck import (
     CHECK_USERNAME_FOR_SPAM_CALLBACK,
     USER_MAY_CREATE_ROOM_ALIAS_CALLBACK,
     USER_MAY_CREATE_ROOM_CALLBACK,
-    USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK,
     USER_MAY_INVITE_CALLBACK,
     USER_MAY_JOIN_ROOM_CALLBACK,
     USER_MAY_PUBLISH_ROOM_CALLBACK,
     USER_MAY_SEND_3PID_INVITE_CALLBACK,
 )
 from synapse.events.third_party_rules import (
+    CHECK_CAN_DEACTIVATE_USER_CALLBACK,
+    CHECK_CAN_SHUTDOWN_ROOM_CALLBACK,
     CHECK_EVENT_ALLOWED_CALLBACK,
     CHECK_THREEPID_CAN_BE_INVITED_CALLBACK,
     CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK,
     ON_CREATE_ROOM_CALLBACK,
     ON_NEW_EVENT_CALLBACK,
+    ON_PROFILE_UPDATE_CALLBACK,
+    ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK,
 )
 from synapse.handlers.account_validity import (
     IS_USER_EXPIRED_CALLBACK,
@@ -71,6 +74,9 @@ from synapse.handlers.account_validity import (
 from synapse.handlers.auth import (
     CHECK_3PID_AUTH_CALLBACK,
     CHECK_AUTH_CALLBACK,
+    GET_DISPLAYNAME_FOR_REGISTRATION_CALLBACK,
+    GET_USERNAME_FOR_REGISTRATION_CALLBACK,
+    IS_3PID_ALLOWED_CALLBACK,
     ON_LOGGED_OUT_CALLBACK,
     AuthHandler,
 )
@@ -105,6 +111,7 @@ from synapse.types import (
     StateMap,
     UserID,
     UserInfo,
+    UserProfile,
     create_requester,
 )
 from synapse.util import Clock
@@ -143,6 +150,8 @@ __all__ = [
     "JsonDict",
     "EventBase",
     "StateMap",
+    "ProfileInfo",
+    "UserProfile",
 ]
 
 logger = logging.getLogger(__name__)
@@ -170,13 +179,16 @@ class ModuleApi:
 
         # TODO: Fix this type hint once the types for the data stores have been ironed
         #       out.
-        self._store: Union[DataStore, "GenericWorkerSlavedStore"] = hs.get_datastore()
+        self._store: Union[
+            DataStore, "GenericWorkerSlavedStore"
+        ] = hs.get_datastores().main
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
         self._server_name = hs.hostname
         self._presence_stream = hs.get_event_sources().sources.presence
         self._state = hs.get_state_handler()
         self._clock: Clock = hs.get_clock()
+        self._registration_handler = hs.get_registration_handler()
         self._send_email_handler = hs.get_send_email_handler()
         self.custom_template_dir = hs.config.server.custom_template_directory
 
@@ -209,14 +221,12 @@ class ModuleApi:
 
     def register_spam_checker_callbacks(
         self,
+        *,
         check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
         user_may_join_room: Optional[USER_MAY_JOIN_ROOM_CALLBACK] = None,
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
         user_may_send_3pid_invite: Optional[USER_MAY_SEND_3PID_INVITE_CALLBACK] = None,
         user_may_create_room: Optional[USER_MAY_CREATE_ROOM_CALLBACK] = None,
-        user_may_create_room_with_invites: Optional[
-            USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK
-        ] = None,
         user_may_create_room_alias: Optional[
             USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
         ] = None,
@@ -237,7 +247,6 @@ class ModuleApi:
             user_may_invite=user_may_invite,
             user_may_send_3pid_invite=user_may_send_3pid_invite,
             user_may_create_room=user_may_create_room,
-            user_may_create_room_with_invites=user_may_create_room_with_invites,
             user_may_create_room_alias=user_may_create_room_alias,
             user_may_publish_room=user_may_publish_room,
             check_username_for_spam=check_username_for_spam,
@@ -247,6 +256,7 @@ class ModuleApi:
 
     def register_account_validity_callbacks(
         self,
+        *,
         is_user_expired: Optional[IS_USER_EXPIRED_CALLBACK] = None,
         on_user_registration: Optional[ON_USER_REGISTRATION_CALLBACK] = None,
         on_legacy_send_mail: Optional[ON_LEGACY_SEND_MAIL_CALLBACK] = None,
@@ -267,6 +277,7 @@ class ModuleApi:
 
     def register_third_party_rules_callbacks(
         self,
+        *,
         check_event_allowed: Optional[CHECK_EVENT_ALLOWED_CALLBACK] = None,
         on_create_room: Optional[ON_CREATE_ROOM_CALLBACK] = None,
         check_threepid_can_be_invited: Optional[
@@ -276,6 +287,12 @@ class ModuleApi:
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = None,
         on_new_event: Optional[ON_NEW_EVENT_CALLBACK] = None,
+        check_can_shutdown_room: Optional[CHECK_CAN_SHUTDOWN_ROOM_CALLBACK] = None,
+        check_can_deactivate_user: Optional[CHECK_CAN_DEACTIVATE_USER_CALLBACK] = None,
+        on_profile_update: Optional[ON_PROFILE_UPDATE_CALLBACK] = None,
+        on_user_deactivation_status_changed: Optional[
+            ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
+        ] = None,
     ) -> None:
         """Registers callbacks for third party event rules capabilities.
 
@@ -287,10 +304,15 @@ class ModuleApi:
             check_threepid_can_be_invited=check_threepid_can_be_invited,
             check_visibility_can_be_modified=check_visibility_can_be_modified,
             on_new_event=on_new_event,
+            check_can_shutdown_room=check_can_shutdown_room,
+            check_can_deactivate_user=check_can_deactivate_user,
+            on_profile_update=on_profile_update,
+            on_user_deactivation_status_changed=on_user_deactivation_status_changed,
         )
 
     def register_presence_router_callbacks(
         self,
+        *,
         get_users_for_states: Optional[GET_USERS_FOR_STATES_CALLBACK] = None,
         get_interested_users: Optional[GET_INTERESTED_USERS_CALLBACK] = None,
     ) -> None:
@@ -305,10 +327,18 @@ class ModuleApi:
 
     def register_password_auth_provider_callbacks(
         self,
+        *,
         check_3pid_auth: Optional[CHECK_3PID_AUTH_CALLBACK] = None,
         on_logged_out: Optional[ON_LOGGED_OUT_CALLBACK] = None,
         auth_checkers: Optional[
             Dict[Tuple[str, Tuple[str, ...]], CHECK_AUTH_CALLBACK]
+        ] = None,
+        is_3pid_allowed: Optional[IS_3PID_ALLOWED_CALLBACK] = None,
+        get_username_for_registration: Optional[
+            GET_USERNAME_FOR_REGISTRATION_CALLBACK
+        ] = None,
+        get_displayname_for_registration: Optional[
+            GET_DISPLAYNAME_FOR_REGISTRATION_CALLBACK
         ] = None,
     ) -> None:
         """Registers callbacks for password auth provider capabilities.
@@ -318,11 +348,15 @@ class ModuleApi:
         return self._password_auth_provider.register_password_auth_provider_callbacks(
             check_3pid_auth=check_3pid_auth,
             on_logged_out=on_logged_out,
+            is_3pid_allowed=is_3pid_allowed,
             auth_checkers=auth_checkers,
+            get_username_for_registration=get_username_for_registration,
+            get_displayname_for_registration=get_displayname_for_registration,
         )
 
     def register_background_update_controller_callbacks(
         self,
+        *,
         on_update: ON_UPDATE_CALLBACK,
         default_batch_size: Optional[DEFAULT_BATCH_SIZE_CALLBACK] = None,
         min_batch_size: Optional[MIN_BATCH_SIZE_CALLBACK] = None,
@@ -394,6 +428,32 @@ class ModuleApi:
         Added in Synapse v1.39.0.
         """
         return self._hs.config.email.email_app_name
+
+    @property
+    def server_name(self) -> str:
+        """The server name for the local homeserver.
+
+        Added in Synapse v1.53.0.
+        """
+        return self._server_name
+
+    @property
+    def worker_name(self) -> Optional[str]:
+        """The name of the worker this specific instance is running as per the
+        "worker_name" configuration setting, or None if it's the main process.
+
+        Added in Synapse v1.53.0.
+        """
+        return self._hs.config.worker.worker_name
+
+    @property
+    def worker_app(self) -> Optional[str]:
+        """The name of the worker app this specific instance is running as per the
+        "worker_app" configuration setting, or None if it's the main process.
+
+        Added in Synapse v1.53.0.
+        """
+        return self._hs.config.worker.worker_app
 
     async def get_userinfo_by_id(self, user_id: str) -> Optional[UserInfo]:
         """Get user info by user_id
@@ -551,15 +611,18 @@ class ModuleApi:
         localpart: str,
         displayname: Optional[str] = None,
         emails: Optional[List[str]] = None,
+        admin: bool = False,
     ) -> "defer.Deferred[str]":
         """Registers a new user with given localpart and optional displayname, emails.
 
         Added in Synapse v1.2.0.
+        Changed in Synapse v1.56.0: add 'admin' argument to register the user as admin.
 
         Args:
             localpart: The localpart of the new user.
             displayname: The displayname of the new user.
             emails: Emails to bind to the new user.
+            admin: True if the user should be registered as a server admin.
 
         Raises:
             SynapseError if there is an error performing the registration. Check the
@@ -573,6 +636,7 @@ class ModuleApi:
                 localpart=localpart,
                 default_display_name=displayname,
                 bind_emails=emails or [],
+                admin=admin,
             )
         )
 
@@ -607,12 +671,17 @@ class ModuleApi:
     def record_user_external_id(
         self, auth_provider_id: str, remote_user_id: str, registered_user_id: str
     ) -> defer.Deferred:
-        """Record a mapping from an external user id to a mxid
+        """Record a mapping between an external user id from a single sign-on provider
+        and a mxid.
 
         Added in Synapse v1.9.0.
 
         Args:
-            auth_provider: identifier for the remote auth provider
+            auth_provider: identifier for the remote auth provider, see `sso` and
+                `oidc_providers` in the homeserver configuration.
+
+                Note that no error is raised if the provided value is not in the
+                homeserver configuration.
             external_id: id on that system
             user_id: complete mxid that it is mapped to
         """
@@ -881,7 +950,7 @@ class ModuleApi:
         )
 
         # Try to retrieve the resulting event.
-        event = await self._hs.get_datastore().get_event(event_id)
+        event = await self._hs.get_datastores().main.get_event(event_id)
 
         # update_membership is supposed to always return after the event has been
         # successfully persisted.
@@ -1202,6 +1271,46 @@ class ModuleApi:
         """
         return await defer_to_thread(self._hs.get_reactor(), f, *args, **kwargs)
 
+    async def check_username(self, username: str) -> None:
+        """Checks if the provided username uses the grammar defined in the Matrix
+        specification, and is already being used by an existing user.
+
+        Added in Synapse v1.52.0.
+
+        Args:
+            username: The username to check. This is the local part of the user's full
+                Matrix user ID, i.e. it's "alice" if the full user ID is "@alice:foo.com".
+
+        Raises:
+            SynapseError with the errcode "M_USER_IN_USE" if the username is already in
+            use.
+        """
+        await self._registration_handler.check_username(username)
+
+    async def store_remote_3pid_association(
+        self, user_id: str, medium: str, address: str, id_server: str
+    ) -> None:
+        """Stores an existing association between a user ID and a third-party identifier.
+
+        The association must already exist on the remote identity server.
+
+        Added in Synapse v1.56.0.
+
+        Args:
+            user_id: The user ID that's been associated with the 3PID.
+            medium: The medium of the 3PID (current supported values are "msisdn" and
+                "email").
+            address: The address of the 3PID.
+            id_server: The identity server the 3PID association has been registered on.
+                This should only be the domain (or IP address, optionally with the port
+                number) for the identity server. This will be used to reach out to the
+                identity server using HTTPS (unless specified otherwise by Synapse's
+                configuration) when attempting to unbind the third-party identifier.
+
+
+        """
+        await self._store.add_user_bound_threepid(user_id, medium, address, id_server)
+
 
 class PublicRoomListManager:
     """Contains methods for adding to, removing from and querying whether a room
@@ -1209,7 +1318,7 @@ class PublicRoomListManager:
     """
 
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
 
     async def room_is_in_public_room_list(self, room_id: str) -> bool:
         """Checks whether a room is in the public room list.

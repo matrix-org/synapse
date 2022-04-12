@@ -670,6 +670,16 @@ class DeviceWorkerStore(SQLBaseStore):
             device["device_id"]: db_to_json(device["content"]) for device in devices
         }
 
+    def get_cached_device_list_changes(
+        self,
+        from_key: int,
+    ) -> Optional[Set[str]]:
+        """Get set of users whose devices have changed since `from_key`, or None
+        if that information is not in our cache.
+        """
+
+        return self._device_list_stream_cache.get_all_entities_changed(from_key)
+
     async def get_users_whose_devices_changed(
         self, from_key: int, user_ids: Iterable[str]
     ) -> Set[str]:
@@ -1496,13 +1506,23 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         )
 
     async def add_device_change_to_streams(
-        self, user_id: str, device_ids: Collection[str], hosts: List[str]
-    ) -> int:
+        self, user_id: str, device_ids: Collection[str], hosts: Collection[str]
+    ) -> Optional[int]:
         """Persist that a user's devices have been updated, and which hosts
         (if any) should be poked.
+
+        Args:
+            user_id: The ID of the user whose device changed.
+            device_ids: The IDs of any changed devices. If empty, this function will
+                return None.
+            hosts: The remote destinations that should be notified of the change.
+
+        Returns:
+            The maximum stream ID of device list updates that were added to the database, or
+            None if no updates were added.
         """
         if not device_ids:
-            return
+            return None
 
         async with self._device_list_id_gen.get_next_mult(
             len(device_ids)
@@ -1573,11 +1593,11 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         self,
         txn: LoggingTransaction,
         user_id: str,
-        device_ids: Collection[str],
-        hosts: List[str],
+        device_ids: Iterable[str],
+        hosts: Collection[str],
         stream_ids: List[str],
         context: Dict[str, str],
-    ):
+    ) -> None:
         for host in hosts:
             txn.call_after(
                 self._device_list_federation_stream_cache.entity_has_changed,

@@ -71,7 +71,7 @@ class ListRegistrationTokensRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
@@ -109,7 +109,7 @@ class NewRegistrationTokenRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         # A string of all the characters allowed to be in a registration_token
         self.allowed_chars = string.ascii_letters + string.digits + "._~-"
@@ -260,7 +260,7 @@ class RegistrationTokenRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_GET(self, request: SynapseRequest, token: str) -> Tuple[int, JsonDict]:
         """Retrieve a registration token."""

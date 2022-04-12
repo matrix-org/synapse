@@ -23,8 +23,6 @@ from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
 from unpaddedbase64 import decode_base64
 
-from twisted.internet import defer
-
 from synapse import event_auth
 from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
@@ -45,12 +43,8 @@ from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.http.servlet import assert_params_in_dict
-from synapse.logging.context import (
-    make_deferred_yieldable,
-    nested_logging_context,
-    preserve_fn,
-    run_in_background,
-)
+from synapse.logging.context import nested_logging_context
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationStoreRoomOnOutlierMembershipRestServlet,
@@ -107,7 +101,7 @@ class FederationHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
         self.federation_client = hs.get_federation_client()
@@ -166,9 +160,14 @@ class FederationHandler:
         oldest_events_with_depth = (
             await self.store.get_oldest_event_ids_with_depth_in_room(room_id)
         )
-        insertion_events_to_be_backfilled = (
-            await self.store.get_insertion_event_backwards_extremities_in_room(room_id)
-        )
+
+        insertion_events_to_be_backfilled: Dict[str, int] = {}
+        if self.hs.config.experimental.msc2716_enabled:
+            insertion_events_to_be_backfilled = (
+                await self.store.get_insertion_event_backward_extremities_in_room(
+                    room_id
+                )
+            )
         logger.debug(
             "_maybe_backfill_inner: extremities oldest_events_with_depth=%s insertion_events_to_be_backfilled=%s",
             oldest_events_with_depth,
@@ -271,11 +270,12 @@ class FederationHandler:
         ]
 
         logger.debug(
-            "room_id: %s, backfill: current_depth: %s, limit: %s, max_depth: %s, extrems: %s filtered_sorted_extremeties_tuple: %s",
+            "room_id: %s, backfill: current_depth: %s, limit: %s, max_depth: %s, extrems (%d): %s filtered_sorted_extremeties_tuple: %s",
             room_id,
             current_depth,
             limit,
             max_depth,
+            len(sorted_extremeties_tuple),
             sorted_extremeties_tuple,
             filtered_sorted_extremeties_tuple,
         )
@@ -349,56 +349,8 @@ class FederationHandler:
         if success:
             return True
 
-        # Huh, well *those* domains didn't work out. Lets try some domains
-        # from the time.
-
-        tried_domains = set(likely_domains)
-        tried_domains.add(self.server_name)
-
-        event_ids = list(extremities.keys())
-
-        logger.debug("calling resolve_state_groups in _maybe_backfill")
-        resolve = preserve_fn(self.state_handler.resolve_state_groups_for_events)
-        states_list = await make_deferred_yieldable(
-            defer.gatherResults(
-                [resolve(room_id, [e]) for e in event_ids], consumeErrors=True
-            )
-        )
-
-        # A map from event_id to state map of event_ids.
-        state_ids: Dict[str, StateMap[str]] = dict(
-            zip(event_ids, [s.state for s in states_list])
-        )
-
-        state_map = await self.store.get_events(
-            [e_id for ids in state_ids.values() for e_id in ids.values()],
-            get_prev_content=False,
-        )
-
-        # A map from event_id to state map of events.
-        state_events: Dict[str, StateMap[EventBase]] = {
-            key: {
-                k: state_map[e_id]
-                for k, e_id in state_dict.items()
-                if e_id in state_map
-            }
-            for key, state_dict in state_ids.items()
-        }
-
-        for e_id in event_ids:
-            likely_extremeties_domains = get_domains_from_state(state_events[e_id])
-
-            success = await try_backfill(
-                [
-                    dom
-                    for dom, _ in likely_extremeties_domains
-                    if dom not in tried_domains
-                ]
-            )
-            if success:
-                return True
-
-            tried_domains.update(dom for dom, _ in likely_extremeties_domains)
+        # TODO: we could also try servers which were previously in the room, but
+        #   are no longer.
 
         return False
 
@@ -510,11 +462,20 @@ class FederationHandler:
             await self.store.upsert_room_on_join(
                 room_id=room_id,
                 room_version=room_version_obj,
-                auth_events=auth_chain,
+                state_events=state,
             )
 
+            if ret.partial_state:
+                await self.store.store_partial_state_room(room_id, ret.servers_in_room)
+
             max_stream_id = await self._federation_event_handler.process_remote_join(
-                origin, room_id, auth_chain, state, event, room_version_obj
+                origin,
+                room_id,
+                auth_chain,
+                state,
+                event,
+                room_version_obj,
+                partial_state=ret.partial_state,
             )
 
             # We wait here until this instance has seen the events come down
@@ -553,7 +514,9 @@ class FederationHandler:
             # lots of requests for missing prev_events which we do actually
             # have. Hence we fire off the background task, but don't wait for it.
 
-            run_in_background(self._handle_queued_pdus, room_queue)
+            run_as_background_process(
+                "handle_queued_pdus", self._handle_queued_pdus, room_queue
+            )
 
     async def do_knock(
         self,
@@ -987,54 +950,35 @@ class FederationHandler:
 
         return event
 
-    async def get_state_for_pdu(self, room_id: str, event_id: str) -> List[EventBase]:
-        """Returns the state at the event. i.e. not including said event."""
-
-        event = await self.store.get_event(event_id, check_room_id=room_id)
-
-        state_groups = await self.state_store.get_state_groups(room_id, [event_id])
-
-        if state_groups:
-            _, state = list(state_groups.items()).pop()
-            results = {(e.type, e.state_key): e for e in state}
-
-            if event.is_state():
-                # Get previous state
-                if "replaces_state" in event.unsigned:
-                    prev_id = event.unsigned["replaces_state"]
-                    if prev_id != event.event_id:
-                        prev_event = await self.store.get_event(prev_id)
-                        results[(event.type, event.state_key)] = prev_event
-                else:
-                    del results[(event.type, event.state_key)]
-
-            res = list(results.values())
-            return res
-        else:
-            return []
-
     async def get_state_ids_for_pdu(self, room_id: str, event_id: str) -> List[str]:
         """Returns the state at the event. i.e. not including said event."""
         event = await self.store.get_event(event_id, check_room_id=room_id)
+        if event.internal_metadata.outlier:
+            raise NotFoundError("State not known at event %s" % (event_id,))
 
         state_groups = await self.state_store.get_state_groups_ids(room_id, [event_id])
 
-        if state_groups:
-            _, state = list(state_groups.items()).pop()
-            results = state
+        # get_state_groups_ids should return exactly one result
+        assert len(state_groups) == 1
 
-            if event.is_state():
-                # Get previous state
-                if "replaces_state" in event.unsigned:
-                    prev_id = event.unsigned["replaces_state"]
-                    if prev_id != event.event_id:
-                        results[(event.type, event.state_key)] = prev_id
-                else:
-                    results.pop((event.type, event.state_key), None)
+        state_map = next(iter(state_groups.values()))
 
-            return list(results.values())
-        else:
-            return []
+        state_key = event.get_state_key()
+        if state_key is not None:
+            # the event was not rejected (get_event raises a NotFoundError for rejected
+            # events) so the state at the event should include the event itself.
+            assert (
+                state_map.get((event.type, state_key)) == event.event_id
+            ), "State at event did not include event itself"
+
+            # ... but we need the state *before* that event
+            if "replaces_state" in event.unsigned:
+                prev_id = event.unsigned["replaces_state"]
+                state_map[(event.type, state_key)] = prev_id
+            else:
+                del state_map[(event.type, state_key)]
+
+        return list(state_map.values())
 
     async def on_backfill_request(
         self, origin: str, room_id: str, pdu_list: List[str], limit: int
@@ -1047,6 +991,19 @@ class FederationHandler:
         limit = min(limit, 100)
 
         events = await self.store.get_backfill_events(room_id, pdu_list, limit)
+        logger.debug(
+            "on_backfill_request: backfill events=%s",
+            [
+                "event_id=%s,depth=%d,body=%s,prevs=%s\n"
+                % (
+                    event.event_id,
+                    event.depth,
+                    event.content.get("body", event.type),
+                    event.prev_event_ids(),
+                )
+                for event in events
+            ],
+        )
 
         events = await filter_events_for_server(self.storage, origin, events)
 

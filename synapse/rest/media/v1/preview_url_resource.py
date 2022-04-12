@@ -21,8 +21,9 @@ import re
 import shutil
 import sys
 import traceback
-from typing import TYPE_CHECKING, Iterable, Optional, Tuple
-from urllib import parse as urlparse
+from typing import TYPE_CHECKING, BinaryIO, Iterable, Optional, Tuple
+from urllib.parse import urljoin, urlparse, urlsplit
+from urllib.request import urlopen
 
 import attr
 
@@ -43,11 +44,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
 from synapse.rest.media.v1.media_storage import MediaStorage
 from synapse.rest.media.v1.oembed import OEmbedProvider
-from synapse.rest.media.v1.preview_html import (
-    decode_body,
-    parse_html_to_open_graph,
-    rebase_url,
-)
+from synapse.rest.media.v1.preview_html import decode_body, parse_html_to_open_graph
 from synapse.types import JsonDict, UserID
 from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
@@ -68,6 +65,17 @@ OG_TAG_VALUE_MAXLEN = 1000
 ONE_HOUR = 60 * 60 * 1000
 ONE_DAY = 24 * ONE_HOUR
 IMAGE_CACHE_EXPIRY_MS = 2 * ONE_DAY
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class DownloadResult:
+    length: int
+    uri: str
+    response_code: int
+    media_type: str
+    download_name: Optional[str]
+    expires: int
+    etag: Optional[str]
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -122,7 +130,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         self.filepaths = media_repo.filepaths
         self.max_spider_size = hs.config.media.max_spider_size
         self.server_name = hs.hostname
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.client = SimpleHttpClient(
             hs,
             treq_args={"browser_like_redirects": True},
@@ -175,7 +183,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             ts = self.clock.time_msec()
 
         # XXX: we could move this into _do_preview if we wanted.
-        url_tuple = urlparse.urlsplit(url)
+        url_tuple = urlsplit(url)
         for entry in self.url_preview_url_blacklist:
             match = True
             for attrib in entry:
@@ -256,7 +264,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         if oembed_url:
             url_to_download = oembed_url
 
-        media_info = await self._download_url(url_to_download, user)
+        media_info = await self._handle_url(url_to_download, user)
 
         logger.debug("got media_info of '%s'", media_info)
 
@@ -297,7 +305,9 @@ class PreviewUrlResource(DirectServeJsonResource):
                 oembed_url = self._oembed.autodiscover_from_html(tree)
                 og_from_oembed: JsonDict = {}
                 if oembed_url:
-                    oembed_info = await self._download_url(oembed_url, user)
+                    oembed_info = await self._handle_url(
+                        oembed_url, user, allow_data_urls=True
+                    )
                     (
                         og_from_oembed,
                         author_name,
@@ -308,7 +318,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
                 # Parse Open Graph information from the HTML in case the oEmbed
                 # response failed or is incomplete.
-                og_from_html = parse_html_to_open_graph(tree, media_info.uri)
+                og_from_html = parse_html_to_open_graph(tree)
 
                 # Compile the Open Graph response by using the scraped
                 # information from the HTML and overlaying any information
@@ -367,7 +377,144 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         return jsonog.encode("utf8")
 
-    async def _download_url(self, url: str, user: UserID) -> MediaInfo:
+    async def _download_url(self, url: str, output_stream: BinaryIO) -> DownloadResult:
+        """
+        Fetches a remote URL and parses the headers.
+
+        Args:
+             url: The URL to fetch.
+             output_stream: The stream to write the content to.
+
+        Returns:
+            A tuple of:
+                Media length, URL downloaded, the HTTP response code,
+                the media type, the downloaded file name, the number of
+                milliseconds the result is valid for, the etag header.
+        """
+
+        try:
+            logger.debug("Trying to get preview for url '%s'", url)
+            length, headers, uri, code = await self.client.get_file(
+                url,
+                output_stream=output_stream,
+                max_size=self.max_spider_size,
+                headers={
+                    b"Accept-Language": self.url_preview_accept_language,
+                    # Use a custom user agent for the preview because some sites will only return
+                    # Open Graph metadata to crawler user agents. Omit the Synapse version
+                    # string to avoid leaking information.
+                    b"User-Agent": [
+                        "Synapse (bot; +https://github.com/matrix-org/synapse)"
+                    ],
+                },
+                is_allowed_content_type=_is_previewable,
+            )
+        except SynapseError:
+            # Pass SynapseErrors through directly, so that the servlet
+            # handler will return a SynapseError to the client instead of
+            # blank data or a 500.
+            raise
+        except DNSLookupError:
+            # DNS lookup returned no results
+            # Note: This will also be the case if one of the resolved IP
+            # addresses is blacklisted
+            raise SynapseError(
+                502,
+                "DNS resolution failure during URL preview generation",
+                Codes.UNKNOWN,
+            )
+        except Exception as e:
+            # FIXME: pass through 404s and other error messages nicely
+            logger.warning("Error downloading %s: %r", url, e)
+
+            raise SynapseError(
+                500,
+                "Failed to download content: %s"
+                % (traceback.format_exception_only(sys.exc_info()[0], e),),
+                Codes.UNKNOWN,
+            )
+
+        if b"Content-Type" in headers:
+            media_type = headers[b"Content-Type"][0].decode("ascii")
+        else:
+            media_type = "application/octet-stream"
+
+        download_name = get_filename_from_headers(headers)
+
+        # FIXME: we should calculate a proper expiration based on the
+        # Cache-Control and Expire headers.  But for now, assume 1 hour.
+        expires = ONE_HOUR
+        etag = headers[b"ETag"][0].decode("ascii") if b"ETag" in headers else None
+
+        return DownloadResult(
+            length, uri, code, media_type, download_name, expires, etag
+        )
+
+    async def _parse_data_url(
+        self, url: str, output_stream: BinaryIO
+    ) -> DownloadResult:
+        """
+        Parses a data: URL.
+
+        Args:
+             url: The URL to parse.
+             output_stream: The stream to write the content to.
+
+        Returns:
+            A tuple of:
+                Media length, URL downloaded, the HTTP response code,
+                the media type, the downloaded file name, the number of
+                milliseconds the result is valid for, the etag header.
+        """
+
+        try:
+            logger.debug("Trying to parse data url '%s'", url)
+            with urlopen(url) as url_info:
+                # TODO Can this be more efficient.
+                output_stream.write(url_info.read())
+        except Exception as e:
+            logger.warning("Error parsing data: URL %s: %r", url, e)
+
+            raise SynapseError(
+                500,
+                "Failed to parse data URL: %s"
+                % (traceback.format_exception_only(sys.exc_info()[0], e),),
+                Codes.UNKNOWN,
+            )
+
+        return DownloadResult(
+            # Read back the length that has been written.
+            length=output_stream.tell(),
+            uri=url,
+            # If it was parsed, consider this a 200 OK.
+            response_code=200,
+            # urlopen shoves the media-type from the data URL into the content type
+            # header object.
+            media_type=url_info.headers.get_content_type(),
+            # Some features are not supported by data: URLs.
+            download_name=None,
+            expires=ONE_HOUR,
+            etag=None,
+        )
+
+    async def _handle_url(
+        self, url: str, user: UserID, allow_data_urls: bool = False
+    ) -> MediaInfo:
+        """
+        Fetches content from a URL and parses the result to generate a MediaInfo.
+
+        It uses the media storage provider to persist the fetched content and
+        stores the mapping into the database.
+
+        Args:
+             url: The URL to fetch.
+             user: The user who ahs requested this URL.
+             allow_data_urls: True if data URLs should be allowed.
+
+        Returns:
+            A MediaInfo object describing the fetched content.
+        """
+
         # TODO: we should probably honour robots.txt... except in practice
         # we're most likely being explicitly triggered by a human rather than a
         # bot, so are we really a robot?
@@ -377,61 +524,27 @@ class PreviewUrlResource(DirectServeJsonResource):
         file_info = FileInfo(server_name=None, file_id=file_id, url_cache=True)
 
         with self.media_storage.store_into_file(file_info) as (f, fname, finish):
-            try:
-                logger.debug("Trying to get preview for url '%s'", url)
-                length, headers, uri, code = await self.client.get_file(
-                    url,
-                    output_stream=f,
-                    max_size=self.max_spider_size,
-                    headers={"Accept-Language": self.url_preview_accept_language},
-                )
-            except SynapseError:
-                # Pass SynapseErrors through directly, so that the servlet
-                # handler will return a SynapseError to the client instead of
-                # blank data or a 500.
-                raise
-            except DNSLookupError:
-                # DNS lookup returned no results
-                # Note: This will also be the case if one of the resolved IP
-                # addresses is blacklisted
-                raise SynapseError(
-                    502,
-                    "DNS resolution failure during URL preview generation",
-                    Codes.UNKNOWN,
-                )
-            except Exception as e:
-                # FIXME: pass through 404s and other error messages nicely
-                logger.warning("Error downloading %s: %r", url, e)
+            if url.startswith("data:"):
+                if not allow_data_urls:
+                    raise SynapseError(
+                        500, "Previewing of data: URLs is forbidden", Codes.UNKNOWN
+                    )
 
-                raise SynapseError(
-                    500,
-                    "Failed to download content: %s"
-                    % (traceback.format_exception_only(sys.exc_info()[0], e),),
-                    Codes.UNKNOWN,
-                )
-            await finish()
-
-            if b"Content-Type" in headers:
-                media_type = headers[b"Content-Type"][0].decode("ascii")
+                download_result = await self._parse_data_url(url, f)
             else:
-                media_type = "application/octet-stream"
+                download_result = await self._download_url(url, f)
 
-            download_name = get_filename_from_headers(headers)
-
-            # FIXME: we should calculate a proper expiration based on the
-            # Cache-Control and Expire headers.  But for now, assume 1 hour.
-            expires = ONE_HOUR
-            etag = headers[b"ETag"][0].decode("ascii") if b"ETag" in headers else None
+            await finish()
 
         try:
             time_now_ms = self.clock.time_msec()
 
             await self.store.store_local_media(
                 media_id=file_id,
-                media_type=media_type,
+                media_type=download_result.media_type,
                 time_now_ms=time_now_ms,
-                upload_name=download_name,
-                media_length=length,
+                upload_name=download_result.download_name,
+                media_length=download_result.length,
                 user_id=user,
                 url_cache=url,
             )
@@ -444,16 +557,16 @@ class PreviewUrlResource(DirectServeJsonResource):
             raise
 
         return MediaInfo(
-            media_type=media_type,
-            media_length=length,
-            download_name=download_name,
+            media_type=download_result.media_type,
+            media_length=download_result.length,
+            download_name=download_result.download_name,
             created_ts_ms=time_now_ms,
             filesystem_id=file_id,
             filename=fname,
-            uri=uri,
-            response_code=code,
-            expires=expires,
-            etag=etag,
+            uri=download_result.uri,
+            response_code=download_result.response_code,
+            expires=download_result.expires,
+            etag=download_result.etag,
         )
 
     async def _precache_image_url(
@@ -471,12 +584,17 @@ class PreviewUrlResource(DirectServeJsonResource):
         if "og:image" not in og or not og["og:image"]:
             return
 
+        # The image URL from the HTML might be relative to the previewed page,
+        # convert it to an URL which can be requested directly.
+        image_url = og["og:image"]
+        url_parts = urlparse(image_url)
+        if url_parts.scheme != "data":
+            image_url = urljoin(media_info.uri, image_url)
+
         # FIXME: it might be cleaner to use the same flow as the main /preview_url
         # request itself and benefit from the same caching etc.  But for now we
         # just rely on the caching on the master request to speed things up.
-        image_info = await self._download_url(
-            rebase_url(og["og:image"], media_info.uri), user
-        )
+        image_info = await self._handle_url(image_url, user, allow_data_urls=True)
 
         if _is_media(image_info.media_type):
             # TODO: make sure we don't choke on white-on-transparent images
@@ -653,3 +771,10 @@ def _is_html(content_type: str) -> bool:
 
 def _is_json(content_type: str) -> bool:
     return content_type.lower().startswith("application/json")
+
+
+def _is_previewable(content_type: str) -> bool:
+    """Returns True for content types for which we will perform URL preview and False
+    otherwise."""
+
+    return _is_html(content_type) or _is_media(content_type) or _is_json(content_type)

@@ -35,7 +35,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
 
         # We can't test the RoomMemberStore on its own without the other event
         # storage logic
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.u_alice = self.register_user("alice", "pass")
         self.t_alice = self.login("alice", "pass")
@@ -55,7 +55,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.assertEquals([self.room], [m.room_id for m in rooms_for_user])
+        self.assertEqual([self.room], [m.room_id for m in rooms_for_user])
 
     def test_count_known_servers(self):
         """
@@ -212,7 +212,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
 
 class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastore()
+        self.store = homeserver.get_datastores().main
         self.room_creator = homeserver.get_room_creation_handler()
 
     def test_can_rerun_update(self):

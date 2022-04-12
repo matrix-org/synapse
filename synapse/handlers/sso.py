@@ -132,6 +132,7 @@ class UserAttributes:
     # if `None`, the mapper has not picked a userid, and the user should be prompted to
     # enter one.
     localpart: Optional[str]
+    confirm_localpart: bool = False
     display_name: Optional[str] = None
     emails: Collection[str] = attr.Factory(list)
 
@@ -180,7 +181,7 @@ class SsoHandler:
 
     def __init__(self, hs: "HomeServer"):
         self._clock = hs.get_clock()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._server_name = hs.hostname
         self._registration_handler = hs.get_registration_handler()
         self._auth_handler = hs.get_auth_handler()
@@ -561,9 +562,10 @@ class SsoHandler:
         # Must provide either attributes or session, not both
         assert (attributes is not None) != (session is not None)
 
-        if (attributes and attributes.localpart is None) or (
-            session and session.chosen_localpart is None
-        ):
+        if (
+            attributes
+            and (attributes.localpart is None or attributes.confirm_localpart is True)
+        ) or (session and session.chosen_localpart is None):
             return b"/_synapse/client/pick_username/account_details"
         elif self._consent_at_registration and not (
             session and session.terms_accepted_version

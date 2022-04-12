@@ -29,7 +29,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.http.site import SynapseRequest
-from synapse.push.baserules import BASE_RULE_IDS, NEW_RULE_IDS
+from synapse.push.baserules import BASE_RULE_IDS
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 from synapse.rest.client._base import client_patterns
@@ -57,13 +57,9 @@ class PushRuleRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.notifier = hs.get_notifier()
         self._is_worker = hs.config.worker.worker_app is not None
-
-        self._users_new_default_push_rules = (
-            hs.config.server.users_new_default_push_rules
-        )
 
     async def on_PUT(self, request: SynapseRequest, path: str) -> Tuple[int, JsonDict]:
         if self._is_worker:
@@ -217,12 +213,7 @@ class PushRuleRestServlet(RestServlet):
             rule_id = spec.rule_id
             is_default_rule = rule_id.startswith(".")
             if is_default_rule:
-                if user_id in self._users_new_default_push_rules:
-                    rule_ids = NEW_RULE_IDS
-                else:
-                    rule_ids = BASE_RULE_IDS
-
-                if namespaced_rule_id not in rule_ids:
+                if namespaced_rule_id not in BASE_RULE_IDS:
                     raise SynapseError(404, "Unknown rule %r" % (namespaced_rule_id,))
             await self.store.set_push_rule_actions(
                 user_id, namespaced_rule_id, actions, is_default_rule

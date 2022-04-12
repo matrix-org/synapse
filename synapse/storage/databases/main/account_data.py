@@ -14,7 +14,17 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    FrozenSet,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    cast,
+)
 
 from synapse.api.constants import AccountDataTypes
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
@@ -26,6 +36,7 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
+from synapse.storage.databases.main.push_rule import PushRulesWorkerStore
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import (
     AbstractStreamIdGenerator,
@@ -44,7 +55,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class AccountDataWorkerStore(CacheInvalidationWorkerStore):
+class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore):
     def __init__(
         self,
         database: DatabasePool,
@@ -105,6 +116,11 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
             "AccountDataAndTagsChangeCache", account_max
         )
 
+        self.db_pool.updates.register_background_update_handler(
+            "delete_account_data_for_deactivated_users",
+            self._delete_account_data_for_deactivated_users,
+        )
+
     def get_max_account_data_stream_id(self) -> int:
         """Get the current max stream ID for account data stream
 
@@ -158,9 +174,9 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
             "get_account_data_for_user", get_account_data_for_user_txn
         )
 
-    @cached(num_args=2, max_entries=5000)
+    @cached(num_args=2, max_entries=5000, tree=True)
     async def get_global_account_data_by_type_for_user(
-        self, data_type: str, user_id: str
+        self, user_id: str, data_type: str
     ) -> Optional[JsonDict]:
         """
         Returns:
@@ -179,7 +195,7 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
         else:
             return None
 
-    @cached(num_args=2)
+    @cached(num_args=2, tree=True)
     async def get_account_data_for_room(
         self, user_id: str, room_id: str
     ) -> Dict[str, JsonDict]:
@@ -210,7 +226,7 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
             "get_account_data_for_room", get_account_data_for_room_txn
         )
 
-    @cached(num_args=3, max_entries=5000)
+    @cached(num_args=3, max_entries=5000, tree=True)
     async def get_account_data_for_room_and_type(
         self, user_id: str, room_id: str, account_data_type: str
     ) -> Optional[JsonDict]:
@@ -359,7 +375,7 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
         )
 
     @cached(max_entries=5000, iterable=True)
-    async def ignored_by(self, user_id: str) -> Set[str]:
+    async def ignored_by(self, user_id: str) -> FrozenSet[str]:
         """
         Get users which ignore the given user.
 
@@ -369,12 +385,32 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
         Return:
             The user IDs which ignore the given user.
         """
-        return set(
+        return frozenset(
             await self.db_pool.simple_select_onecol(
                 table="ignored_users",
                 keyvalues={"ignored_user_id": user_id},
                 retcol="ignorer_user_id",
                 desc="ignored_by",
+            )
+        )
+
+    @cached(max_entries=5000, iterable=True)
+    async def ignored_users(self, user_id: str) -> FrozenSet[str]:
+        """
+        Get users which the given user ignores.
+
+        Params:
+            user_id: The user ID which is making the request.
+
+        Return:
+            The user IDs which are ignored by the given user.
+        """
+        return frozenset(
+            await self.db_pool.simple_select_onecol(
+                table="ignored_users",
+                keyvalues={"ignorer_user_id": user_id},
+                retcol="ignored_user_id",
+                desc="ignored_users",
             )
         )
 
@@ -392,7 +428,7 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
             for row in rows:
                 if not row.room_id:
                     self.get_global_account_data_by_type_for_user.invalidate(
-                        (row.data_type, row.user_id)
+                        (row.user_id, row.data_type)
                     )
                 self.get_account_data_for_user.invalidate((row.user_id,))
                 self.get_account_data_for_room.invalidate((row.user_id, row.room_id))
@@ -476,7 +512,7 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
             self._account_data_stream_cache.entity_has_changed(user_id, next_id)
             self.get_account_data_for_user.invalidate((user_id,))
             self.get_global_account_data_by_type_for_user.invalidate(
-                (account_data_type, user_id)
+                (user_id, account_data_type)
             )
 
         return self._account_data_id_gen.get_current_token()
@@ -523,6 +559,10 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
         else:
             currently_ignored_users = set()
 
+        # If the data has not changed, nothing to do.
+        if previously_ignored_users == currently_ignored_users:
+            return
+
         # Delete entries which are no longer ignored.
         self.db_pool.simple_delete_many_txn(
             txn,
@@ -545,6 +585,124 @@ class AccountDataWorkerStore(CacheInvalidationWorkerStore):
         # Invalidate the cache for any ignored users which were added or removed.
         for ignored_user_id in previously_ignored_users ^ currently_ignored_users:
             self._invalidate_cache_and_stream(txn, self.ignored_by, (ignored_user_id,))
+        self._invalidate_cache_and_stream(txn, self.ignored_users, (user_id,))
+
+    async def purge_account_data_for_user(self, user_id: str) -> None:
+        """
+        Removes ALL the account data for a user.
+        Intended to be used upon user deactivation.
+
+        Also purges the user from the ignored_users cache table
+        and the push_rules cache tables.
+        """
+
+        await self.db_pool.runInteraction(
+            "purge_account_data_for_user_txn",
+            self._purge_account_data_for_user_txn,
+            user_id,
+        )
+
+    def _purge_account_data_for_user_txn(
+        self, txn: LoggingTransaction, user_id: str
+    ) -> None:
+        """
+        See `purge_account_data_for_user`.
+        """
+        # Purge from the primary account_data tables.
+        self.db_pool.simple_delete_txn(
+            txn, table="account_data", keyvalues={"user_id": user_id}
+        )
+
+        self.db_pool.simple_delete_txn(
+            txn, table="room_account_data", keyvalues={"user_id": user_id}
+        )
+
+        # Purge from ignored_users where this user is the ignorer.
+        # N.B. We don't purge where this user is the ignoree, because that
+        #      interferes with other users' account data.
+        #      It's also not this user's data to delete!
+        self.db_pool.simple_delete_txn(
+            txn, table="ignored_users", keyvalues={"ignorer_user_id": user_id}
+        )
+
+        # Remove the push rules
+        self.db_pool.simple_delete_txn(
+            txn, table="push_rules", keyvalues={"user_name": user_id}
+        )
+        self.db_pool.simple_delete_txn(
+            txn, table="push_rules_enable", keyvalues={"user_name": user_id}
+        )
+        self.db_pool.simple_delete_txn(
+            txn, table="push_rules_stream", keyvalues={"user_id": user_id}
+        )
+
+        # Invalidate caches as appropriate
+        self._invalidate_cache_and_stream(
+            txn, self.get_account_data_for_room_and_type, (user_id,)
+        )
+        self._invalidate_cache_and_stream(
+            txn, self.get_account_data_for_user, (user_id,)
+        )
+        self._invalidate_cache_and_stream(
+            txn, self.get_global_account_data_by_type_for_user, (user_id,)
+        )
+        self._invalidate_cache_and_stream(
+            txn, self.get_account_data_for_room, (user_id,)
+        )
+        self._invalidate_cache_and_stream(txn, self.get_push_rules_for_user, (user_id,))
+        self._invalidate_cache_and_stream(
+            txn, self.get_push_rules_enabled_for_user, (user_id,)
+        )
+        # This user might be contained in the ignored_by cache for other users,
+        # so we have to invalidate it all.
+        self._invalidate_all_cache_and_stream(txn, self.ignored_by)
+
+    async def _delete_account_data_for_deactivated_users(
+        self, progress: dict, batch_size: int
+    ) -> int:
+        """
+        Retroactively purges account data for users that have already been deactivated.
+        Gets run as a background update caused by a schema delta.
+        """
+
+        last_user: str = progress.get("last_user", "")
+
+        def _delete_account_data_for_deactivated_users_txn(
+            txn: LoggingTransaction,
+        ) -> int:
+            sql = """
+                SELECT name FROM users
+                WHERE deactivated = ? and name > ?
+                ORDER BY name ASC
+                LIMIT ?
+            """
+
+            txn.execute(sql, (1, last_user, batch_size))
+            users = [row[0] for row in txn]
+
+            for user in users:
+                self._purge_account_data_for_user_txn(txn, user_id=user)
+
+            if users:
+                self.db_pool.updates._background_update_progress_txn(
+                    txn,
+                    "delete_account_data_for_deactivated_users",
+                    {"last_user": users[-1]},
+                )
+
+            return len(users)
+
+        number_deleted = await self.db_pool.runInteraction(
+            "_delete_account_data_for_deactivated_users",
+            _delete_account_data_for_deactivated_users_txn,
+        )
+
+        if number_deleted < batch_size:
+            await self.db_pool.updates._end_background_update(
+                "delete_account_data_for_deactivated_users"
+            )
+
+        return number_deleted
 
 
 class AccountDataStore(AccountDataWorkerStore):
