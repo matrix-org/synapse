@@ -215,9 +215,18 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
         # Join the room as the normal user
         self.helper.join(room_id, user_id, tok=user_tok)
 
-        # Create event to hang backfill batch from, and send batch - historical batches
-        # must be hung from the lmost recent event after the member join event to see
-        # this failure case.
+        # Create an event to hang the historical batch from - In order to see
+        # the failure case originally reported in #12281, the historical batch
+        # must be hung from the most recent event in the room so the base
+        # insertion event ends up with the highest `topogological_ordering`
+        # (`depth`) in the room but will have a negative `stream_ordering`
+        # because it's a `historical` event. Previously, when assembling the
+        # `state` for the `/sync` response, the bugged logic would sort by
+        # `topological_ordering` descending and pick up the base insertion
+        # event because it has a negative `stream_ordering` below the given
+        # pagination token. Now we properly sort by `stream_ordering`
+        # descending which puts `historical` events with a negative
+        # `stream_ordering` way at the bottom and aren't selected as expected.
         response = self.helper.send_event(
             room_id=room_id,
             type=EventTypes.Message,
