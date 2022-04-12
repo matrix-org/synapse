@@ -14,9 +14,11 @@
 # limitations under the License.
 
 import argparse
-from typing import List, Union
+from typing import Any, List, Union
 
 import attr
+
+from synapse.types import JsonDict
 
 from ._base import (
     Config,
@@ -110,7 +112,7 @@ class WorkerConfig(Config):
 
     section = "worker"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.worker_app = config.get("worker_app")
 
         # Canonicalise worker_app so that master always has None
@@ -120,9 +122,13 @@ class WorkerConfig(Config):
         self.worker_listeners = [
             parse_listener_def(x) for x in config.get("worker_listeners", [])
         ]
-        self.worker_daemonize = config.get("worker_daemonize")
+        self.worker_daemonize = bool(config.get("worker_daemonize"))
         self.worker_pid_file = config.get("worker_pid_file")
-        self.worker_log_config = config.get("worker_log_config")
+
+        worker_log_config = config.get("worker_log_config")
+        if worker_log_config is not None and not isinstance(worker_log_config, str):
+            raise ConfigError("worker_log_config must be a string")
+        self.worker_log_config = worker_log_config
 
         # The host used to connect to the main synapse
         self.worker_replication_host = config.get("worker_replication_host", None)
@@ -290,7 +296,7 @@ class WorkerConfig(Config):
             self.worker_name is None and background_tasks_instance == "master"
         ) or self.worker_name == background_tasks_instance
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         ## Workers ##
 

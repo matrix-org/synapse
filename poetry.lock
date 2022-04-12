@@ -1587,13 +1587,13 @@ redis = ["txredisapi", "hiredis"]
 saml2 = ["pysaml2"]
 sentry = ["sentry-sdk"]
 systemd = ["systemd-python"]
-test = ["parameterized"]
+test = ["parameterized", "idna"]
 url_preview = ["lxml"]
 
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7"
-content-hash = "7ff6d982a9d6675cb595b216b23549ef1942d0e39cb91c97494ff6ed95a9e8d2"
+content-hash = "964ad29eaf7fd02749a4e735818f3bc0ba729c2f4b9e3213f0daa02643508b16"
 
 [metadata.files]
 appdirs = [
