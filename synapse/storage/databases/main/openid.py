@@ -24,7 +24,7 @@ class OpenIdStore(SQLBaseStore):
         token: str,
         ts_valid_until_ms: int,
         user_id: str,
-        userinfo_fields: Optional[list],
+        userinfo_fields: Optional[List[str]],
     ) -> None:
         await self.db_pool.simple_insert(
             table="open_id_tokens",
