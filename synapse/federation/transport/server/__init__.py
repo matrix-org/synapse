@@ -296,12 +296,16 @@ class OpenIdUserInfo(BaseFederationServlet):
                 localpart = UserID.from_string(user_id).localpart
                 userinfo[
                     OpenIdUserInfoField.DISPLAY_NAME
-                ] = await self.hs.get_datastore().get_profile_displayname(localpart)
+                ] = await self.hs.get_datastores().main.get_profile_displayname(
+                    localpart
+                )
             if OpenIdUserInfoField.AVATAR_URL in userinfo_fields:
                 localpart = UserID.from_string(user_id).localpart
                 userinfo[
                     OpenIdUserInfoField.AVATAR_URL
-                ] = await self.hs.get_datastore().get_profile_avatar_url(localpart)
+                ] = await self.hs.get_datastores().main.get_profile_avatar_url(
+                    localpart
+                )
             if OpenIdUserInfoField.ROOM_POWERLEVELS in userinfo_fields:
                 userinfo[
                     OpenIdUserInfoField.ROOM_POWERLEVELS
