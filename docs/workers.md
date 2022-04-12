@@ -422,7 +422,7 @@ the stream writer for the `presence` stream:
 
 #### Background tasks
 
-There is also *experimental* support for moving background tasks to a separate
+There is also support for moving background tasks to a separate
 worker. Background tasks are run periodically or started via replication. Exactly
 which tasks are configured to run depends on your Synapse configuration (e.g. if
 stats is enabled).
