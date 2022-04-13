@@ -341,7 +341,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     # base shared worker jinja2 template.
     #
     # This config file will be passed to all workers, included Synapse's main process.
-    shared_config = {"listeners": listeners}
+    shared_config: Dict[str, Any] = {"listeners": listeners}
 
     # The supervisord config. The contents of which will be inserted into the
     # base supervisord jinja2 template.
