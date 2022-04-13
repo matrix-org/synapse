@@ -68,7 +68,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.roommember import ProfileInfo
 from synapse.types import JsonDict, Requester, UserID
 from synapse.util import stringutils as stringutils
-from synapse.util.async_helpers import maybe_awaitable
+from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import base62_encode
@@ -2203,7 +2203,9 @@ class PasswordAuthProvider:
         # other than None (i.e. until a callback returns a success)
         for callback in self.auth_checker_callbacks[login_type]:
             try:
-                result = await callback(username, login_type, login_dict)
+                result = await delay_cancellation(
+                    callback(username, login_type, login_dict)
+                )
             except CancelledError:
                 raise
             except Exception as e:
@@ -2266,7 +2268,7 @@ class PasswordAuthProvider:
 
         for callback in self.check_3pid_auth_callbacks:
             try:
-                result = await callback(medium, address, password)
+                result = await delay_cancellation(callback(medium, address, password))
             except CancelledError:
                 raise
             except Exception as e:
@@ -2350,7 +2352,7 @@ class PasswordAuthProvider:
         """
         for callback in self.get_username_for_registration_callbacks:
             try:
-                res = await callback(uia_results, params)
+                res = await delay_cancellation(callback(uia_results, params))
 
                 if isinstance(res, str):
                     return res
@@ -2395,7 +2397,7 @@ class PasswordAuthProvider:
         """
         for callback in self.get_displayname_for_registration_callbacks:
             try:
-                res = await callback(uia_results, params)
+                res = await delay_cancellation(callback(uia_results, params))
 
                 if isinstance(res, str):
                     return res
@@ -2438,7 +2440,7 @@ class PasswordAuthProvider:
         """
         for callback in self.is_3pid_allowed_callbacks:
             try:
-                res = await callback(medium, address, registration)
+                res = await delay_cancellation(callback(medium, address, registration))
 
                 if res is False:
                     return res
