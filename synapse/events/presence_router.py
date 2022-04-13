@@ -25,6 +25,8 @@ from typing import (
     Union,
 )
 
+from twisted.internet.defer import CancelledError
+
 from synapse.api.presence import UserPresenceState
 from synapse.util.async_helpers import maybe_awaitable
 
@@ -148,6 +150,8 @@ class PresenceRouter:
         for callback in self._get_users_for_states_callbacks:
             try:
                 result = await callback(state_updates)
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue
@@ -200,6 +204,8 @@ class PresenceRouter:
         for callback in self._get_interested_users_callbacks:
             try:
                 result = await callback(user_id)
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue

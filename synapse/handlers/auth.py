@@ -41,6 +41,7 @@ import pymacaroons
 import unpaddedbase64
 from pymacaroons.exceptions import MacaroonVerificationFailedException
 
+from twisted.internet.defer import CancelledError
 from twisted.web.server import Request
 
 from synapse.api.constants import LoginType
@@ -2203,6 +2204,8 @@ class PasswordAuthProvider:
         for callback in self.auth_checker_callbacks[login_type]:
             try:
                 result = await callback(username, login_type, login_dict)
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue
@@ -2264,6 +2267,8 @@ class PasswordAuthProvider:
         for callback in self.check_3pid_auth_callbacks:
             try:
                 result = await callback(medium, address, password)
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue
@@ -2359,6 +2364,8 @@ class PasswordAuthProvider:
                         callback,
                         res,
                     )
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.error(
                     "Module raised an exception in get_username_for_registration: %s",
@@ -2402,6 +2409,8 @@ class PasswordAuthProvider:
                         callback,
                         res,
                     )
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.error(
                     "Module raised an exception in get_displayname_for_registration: %s",
@@ -2443,6 +2452,8 @@ class PasswordAuthProvider:
                         callback,
                         res,
                     )
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.error("Module raised an exception in is_3pid_allowed: %s", e)
                 raise SynapseError(code=500, msg="Internal Server Error")
