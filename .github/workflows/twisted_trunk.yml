@@ -21,7 +21,6 @@ jobs:
           python-version: "3.x"
           extras: "all"
       - run: |
-          poetry remove twisted
           poetry add --extras tls git+https://github.com/twisted/twisted.git#trunk
           poetry install --no-interaction --extras "all test"
       - run: poetry run mypy
@@ -37,7 +36,6 @@ jobs:
           python-version: "3.x"
           extras: "all test"
       - run: |
-          poetry remove twisted
           poetry add --extras tls git+https://github.com/twisted/twisted.git#trunk
           poetry install --no-interaction --extras "all test"
       - run: poetry run trial --jobs 2 tests
@@ -65,16 +63,14 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Patch dependencies
-        # Note: The script below runs poetry against a virtualenv in /src/.venv/
-        #       ...but the sytest-synapse container expects it to be in /venv/
-        #       So we temporarily symlink it, run poetry, then remove the link.
-        #       Tidying up is important because `/src` is a mounted volume.
+        # Note: The poetry commands want to create a virtualenv in /src/.venv/,
+        #       but the sytest-synapse container expects it to be in /venv/.
+        #       We symlink it before running poetry so that poetry actually
+        #       ends up installing to `/venv`.
         run: |
           ln -s -T /venv /src/.venv
-          poetry remove twisted
           poetry add --extras tls git+https://github.com/twisted/twisted.git#trunk
           poetry install --no-interaction --extras "all test"
-          rm /src/.venv
         working-directory: /src
       - name: Run SyTest
         run: /bootstrap.sh synapse
