@@ -1017,7 +1017,8 @@ class PresenceHandler(BasePresenceHandler):
                 )
             # otherwise, set the new presence state & update the last sync time,
             # but don't update last_active_ts as this isn't an indication that
-            # they've been active.
+            # they've been active (even though it's probably been updated by
+            # set_state above)
             else:
                 await self._update_states(
                     [
