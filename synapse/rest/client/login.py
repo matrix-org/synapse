@@ -347,7 +347,7 @@ class LoginRestServlet(RestServlet):
         if device_id and len(device_id) > 512:
             raise LoginError(
                 400,
-                "Device_id cannot be longer than 512 characters.",
+                "device_id cannot be longer than 512 characters.",
                 errcode=Codes.INVALID_PARAM,
             )
 

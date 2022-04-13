@@ -400,20 +400,14 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         # make a login request with the bad device_id
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/login",
+            "/_matrix/client/v3/login",
             json.dumps(body).encode("utf8"),
             custom_headers=None,
         )
 
-        # test that the login fails with the correct error code/message
+        # test that the login fails with the correct error code
         self.assertEqual(channel.code, 400)
-        self.assertEqual(
-            channel.json_body,
-            {
-                "errcode": "M_INVALID_PARAM",
-                "error": "Device_id cannot be longer than 512 characters.",
-            },
-        )
+        self.assertEqual(channel.json_body["errcode"], "M_INVALID_PARAM")
 
 
 @skip_unless(has_saml2 and HAS_OIDC, "Requires SAML2 and OIDC")
