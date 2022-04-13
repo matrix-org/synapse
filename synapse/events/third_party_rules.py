@@ -14,6 +14,8 @@
 import logging
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, List, Optional, Tuple
 
+from twisted.internet.defer import CancelledError
+
 from synapse.api.errors import ModuleFailedException, SynapseError
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
@@ -264,6 +266,8 @@ class ThirdPartyEventRules:
         for callback in self._check_event_allowed_callbacks:
             try:
                 res, replacement_data = await callback(event, state_events)
+            except CancelledError:
+                raise
             except SynapseError as e:
                 # FIXME: Being able to throw SynapseErrors is relied upon by
                 # some modules. PR #10386 accidentally broke this ability.
@@ -335,6 +339,8 @@ class ThirdPartyEventRules:
             try:
                 if await callback(medium, address, state_events) is False:
                     return False
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
 
@@ -363,6 +369,8 @@ class ThirdPartyEventRules:
             try:
                 if await callback(room_id, state_events, new_visibility) is False:
                     return False
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
 
@@ -402,6 +410,8 @@ class ThirdPartyEventRules:
             try:
                 if await callback(user_id, room_id) is False:
                     return False
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.exception(
                     "Failed to run module API callback %s: %s", callback, e
@@ -424,6 +434,8 @@ class ThirdPartyEventRules:
             try:
                 if await callback(user_id, by_admin) is False:
                     return False
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.exception(
                     "Failed to run module API callback %s: %s", callback, e
