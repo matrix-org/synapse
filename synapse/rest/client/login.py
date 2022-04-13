@@ -342,6 +342,15 @@ class LoginRestServlet(RestServlet):
             user_id = canonical_uid
 
         device_id = login_submission.get("device_id")
+
+        # If device_id is present, check that device_id is not longer than a reasonable 512 characters
+        if device_id and len(device_id) > 512:
+            raise LoginError(
+                400,
+                "device_id cannot be longer than 512 characters.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
         initial_display_name = login_submission.get("initial_device_display_name")
         (
             device_id,
