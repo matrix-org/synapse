@@ -584,7 +584,7 @@ class StateGroupStorage:
         if not event_ids:
             return {}
 
-        event_to_groups = await self.stores.main._get_state_group_for_events(event_ids)
+        event_to_groups = await self._get_state_group_for_events(event_ids)
 
         groups = set(event_to_groups.values())
         group_to_state = await self.stores.state._get_state_for_groups(groups)
@@ -673,7 +673,7 @@ class StateGroupStorage:
             RuntimeError if we don't have a state group for one or more of the events
                (ie they are outliers or unknown)
         """
-        event_to_groups = await self.stores.main._get_state_group_for_events(event_ids)
+        event_to_groups = await self._get_state_group_for_events(event_ids)
 
         groups = set(event_to_groups.values())
         group_to_state = await self.stores.state._get_state_for_groups(
@@ -714,7 +714,7 @@ class StateGroupStorage:
             RuntimeError if we don't have a state group for one or more of the events
                 (ie they are outliers or unknown)
         """
-        event_to_groups = await self.stores.main._get_state_group_for_events(event_ids)
+        event_to_groups = await self._get_state_group_for_events(event_ids)
 
         groups = set(event_to_groups.values())
         group_to_state = await self.stores.state._get_state_for_groups(
@@ -789,6 +789,23 @@ class StateGroupStorage:
         return self.stores.state._get_state_for_groups(
             groups, state_filter or StateFilter.all()
         )
+
+    async def _get_state_group_for_events(
+        self,
+        event_ids: Collection[str],
+        await_full_state: bool = True,
+    ) -> Mapping[str, int]:
+        """Returns mapping event_id -> state_group
+
+        Args:
+            event_ids: events to get state groups for
+            await_full_state: if true, will block if we do not yet have complete
+               state at this event.
+        """
+        if await_full_state:
+            await self._partial_state_events_tracker.await_full_state(event_ids)
+
+        return await self.stores.main._get_state_group_for_events(event_ids)
 
     async def store_state_group(
         self,
