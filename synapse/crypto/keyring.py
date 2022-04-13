@@ -182,7 +182,7 @@ class Keyring:
         vk = get_verify_key(hs.signing_key)
         self._local_verify_keys[f"{vk.alg}:{vk.version}"] = FetchKeyResult(
             verify_key=vk,
-            valid_until_ts=2 ** 63,  # fake future timestamp
+            valid_until_ts=2**63,  # fake future timestamp
         )
 
     async def verify_json_for_server(

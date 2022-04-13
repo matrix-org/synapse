@@ -331,11 +331,11 @@ class PresenceUpdateTestCase(unittest.HomeserverTestCase):
 
         # Extract presence update user ID and state information into lists of tuples
         db_presence_states = [(ps[0], ps[1]) for _, ps in db_presence_states[0]]
-        presence_states = [(ps.user_id, ps.state) for ps in presence_states]
+        presence_states_compare = [(ps.user_id, ps.state) for ps in presence_states]
 
         # Compare what we put into the storage with what we got out.
         # They should be identical.
-        self.assertEqual(presence_states, db_presence_states)
+        self.assertEqual(presence_states_compare, db_presence_states)
 
 
 class PresenceTimeoutTestCase(unittest.TestCase):
@@ -357,6 +357,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
 
         self.assertIsNotNone(new_state)
+        assert new_state is not None
         self.assertEqual(new_state.state, PresenceState.UNAVAILABLE)
         self.assertEqual(new_state.status_msg, status_msg)
 
@@ -380,6 +381,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
 
         self.assertIsNotNone(new_state)
+        assert new_state is not None
         self.assertEqual(new_state.state, PresenceState.BUSY)
         self.assertEqual(new_state.status_msg, status_msg)
 
@@ -399,6 +401,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         new_state = handle_timeout(state, is_mine=True, syncing_user_ids=set(), now=now)
 
         self.assertIsNotNone(new_state)
+        assert new_state is not None
         self.assertEqual(new_state.state, PresenceState.OFFLINE)
         self.assertEqual(new_state.status_msg, status_msg)
 
@@ -420,6 +423,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         )
 
         self.assertIsNotNone(new_state)
+        assert new_state is not None
         self.assertEqual(new_state.state, PresenceState.ONLINE)
         self.assertEqual(new_state.status_msg, status_msg)
 
@@ -477,6 +481,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         )
 
         self.assertIsNotNone(new_state)
+        assert new_state is not None
         self.assertEqual(new_state.state, PresenceState.OFFLINE)
         self.assertEqual(new_state.status_msg, status_msg)
 
@@ -653,13 +658,13 @@ class PresenceHandlerTestCase(unittest.HomeserverTestCase):
         self._set_presencestate_with_status_msg(user_id, PresenceState.ONLINE, None)
 
     def _set_presencestate_with_status_msg(
-        self, user_id: str, state: PresenceState, status_msg: Optional[str]
+        self, user_id: str, state: str, status_msg: Optional[str]
     ):
         """Set a PresenceState and status_msg and check the result.
 
         Args:
             user_id: User for that the status is to be set.
-            PresenceState: The new PresenceState.
+            state: The new PresenceState.
             status_msg: Status message that is to be set.
         """
         self.get_success(

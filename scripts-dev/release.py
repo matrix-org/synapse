@@ -66,9 +66,13 @@ def cli():
 
         ./scripts-dev/release.py tag
 
-        # ... wait for asssets to build ...
+        # ... wait for assets to build ...
 
         ./scripts-dev/release.py publish
+        ./scripts-dev/release.py upload
+
+        # Optional: generate some nice links for the announcement
+
         ./scripts-dev/release.py upload
 
     If the env var GH_TOKEN (or GITHUB_TOKEN) is set, or passed into the
@@ -413,6 +417,41 @@ def upload():
     click.echo(
         f"Done! Remember to merge the tag {tag_name} into the appropriate branches"
     )
+
+
+@cli.command()
+def announce():
+    """Generate markdown to announce the release."""
+
+    current_version, _, _ = parse_version_from_module()
+    tag_name = f"v{current_version}"
+
+    click.echo(
+        f"""
+Hi everyone. Synapse {current_version} has just been released.
+
+[notes](https://github.com/matrix-org/synapse/releases/tag/{tag_name}) |\
+[docker](https://hub.docker.com/r/matrixdotorg/synapse/tags?name={tag_name}) | \
+[debs](https://packages.matrix.org/debian/) | \
+[pypi](https://pypi.org/project/matrix-synapse/{current_version}/)"""
+    )
+
+    if "rc" in tag_name:
+        click.echo(
+            """
+Announce the RC in
+- #homeowners:matrix.org (Synapse Announcements)
+- #synapse-dev:matrix.org"""
+        )
+    else:
+        click.echo(
+            """
+Announce the release in
+- #homeowners:matrix.org (Synapse Announcements), bumping the version in the topic
+- #synapse:matrix.org (Synapse Admins), bumping the version in the topic
+- #synapse-dev:matrix.org
+- #synapse-package-maintainers:matrix.org"""
+        )
 
 
 def parse_version_from_module() -> Tuple[
