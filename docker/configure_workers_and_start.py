@@ -483,7 +483,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     # Finally, we'll write out the config files.
 
     # log config for the master process
-    master_log_config = generate_worker_log_config(environ, "master")
+    master_log_config = generate_worker_log_config(environ, "master", data_dir)
     shared_config["log_config"] = master_log_config
 
     # Shared homeserver config
