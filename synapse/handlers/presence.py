@@ -1022,7 +1022,7 @@ class PresenceHandler(BasePresenceHandler):
                 await self._update_states(
                     [
                         prev_state.copy_and_replace(
-                            last_user_sync_ts=self.clock.time_msec(),
+                            last_user_sync_ts=self.clock.time_msec()
                         )
                     ]
                 )
