@@ -649,9 +649,13 @@ class DeviceHandler(DeviceWorkerHandler):
                         return
 
                 for user_id, device_id, room_id, stream_id, opentracing_context in rows:
-                    joined_user_ids = await self.store.get_users_in_room(room_id)
-                    hosts = {get_domain_from_id(u) for u in joined_user_ids}
-                    hosts.discard(self.server_name)
+                    hosts = set()
+
+                    # Ignore any users that aren't ours
+                    if self.hs.is_mine_id(user_id):
+                        joined_user_ids = await self.store.get_users_in_room(room_id)
+                        hosts = {get_domain_from_id(u) for u in joined_user_ids}
+                        hosts.discard(self.server_name)
 
                     # Check if we've already sent this update to some hosts
                     if current_stream_id == stream_id:
