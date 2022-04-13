@@ -806,8 +806,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         self,
         txn: LoggingTransaction,
         event_id: str,
-        allow_none=False,
-    ) -> int:
+        allow_none: bool = False,
+    ) -> Optional[int]:
         return self.db_pool.simple_select_one_onecol_txn(
             txn=txn,
             table="events",
