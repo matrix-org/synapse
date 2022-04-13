@@ -49,13 +49,8 @@ class GroupServerWorkerStore(SQLBaseStore):
         db_conn: LoggingDatabaseConnection,
         hs: "HomeServer",
     ):
-        database.updates.register_background_index_update(
-            update_name="local_group_updates_index",
-            index_name="local_group_updates_stream_id_index",
-            table="local_group_updates",
-            columns=("stream_id",),
-            unique=True,
-        )
+        # Register a legacy groups background update as a no-op.
+        database.updates.register_noop_background_update("local_group_updates_index")
         super().__init__(database, db_conn, hs)
 
     async def get_group(self, group_id: str) -> Optional[Dict[str, Any]]:
