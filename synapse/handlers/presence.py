@@ -1000,6 +1000,9 @@ class PresenceHandler(BasePresenceHandler):
                 await self.set_state(
                     UserID.from_string(user_id), {"presence": presence_state}, True
                 )
+                # To keep the single process behaviour consistent with worker mode, run the
+                # same logic as `update_external_syncs_row`, even though it looks weird
+                # (this should come from the in-memory cache)
                 prev_state = await self.current_state_for_user(user_id)
 
             if prev_state.state == PresenceState.OFFLINE:
