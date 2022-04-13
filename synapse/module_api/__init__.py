@@ -119,6 +119,7 @@ from synapse.types import (
 from synapse.util import Clock
 from synapse.util.async_helpers import maybe_awaitable
 from synapse.util.caches.descriptors import cached
+from synapse.util.frozenutils import freeze
 
 if TYPE_CHECKING:
     from synapse.app.generic_worker import GenericWorkerSlavedStore
@@ -211,6 +212,7 @@ class ModuleApi:
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client: SimpleHttpClient = hs.get_simple_http_client()
         self._public_room_list_manager = PublicRoomListManager(hs)
+        self._account_data_manager = AccountDataManager(hs)
 
         self._spam_checker = hs.get_spam_checker()
         self._account_validity_handler = hs.get_account_validity_handler()
@@ -430,6 +432,14 @@ class ModuleApi:
         Added in Synapse v1.22.0.
         """
         return self._public_room_list_manager
+
+    @property
+    def account_data_manager(self) -> "AccountDataManager":
+        """Allows reading and modifying users' account data.
+
+        Added in Synapse v1.57.0.
+        """
+        return self._account_data_manager
 
     @property
     def public_baseurl(self) -> str:
@@ -1386,3 +1396,69 @@ class PublicRoomListManager:
             room_id: The ID of the room.
         """
         await self._store.set_room_is_public(room_id, False)
+
+
+class AccountDataManager:
+    """
+    Allows modules to manage account data.
+    """
+
+    def __init__(self, hs: "HomeServer") -> None:
+        self._hs = hs
+        self._store = hs.get_datastores().main
+        self._handler = hs.get_account_data_handler()
+
+    def _validate_user_id(self, user_id: str) -> None:
+        """
+        Validates a user ID is valid and local.
+        Private method to be used in other account data methods.
+        """
+        user = UserID.from_string(user_id)
+        if not self._hs.is_mine(user):
+            raise ValueError(
+                f"{user_id} is not local to this homeserver; can't access account data for remote users."
+            )
+
+    async def get_global(self, user_id: str, data_type: str) -> Optional[JsonDict]:
+        """
+        Gets some global account data, of a specified type, for the specified user.
+
+        The provided user ID must be a valid user ID of a local user.
+
+        Added in Synapse v1.57.0.
+        """
+        self._validate_user_id(user_id)
+
+        data = await self._store.get_global_account_data_by_type_for_user(
+            user_id, data_type
+        )
+        # We clone and freeze to prevent the module accidentally mutating the
+        # dict that lives in the cache, as that could introduce nasty bugs.
+        return freeze(data)
+
+    async def put_global(
+        self, user_id: str, data_type: str, new_data: JsonDict
+    ) -> None:
+        """
+        Puts some global account data, of a specified type, for the specified user.
+
+        The provided user ID must be a valid user ID of a local user.
+
+        Please note that this will overwrite existing the account data of that type
+        for that user!
+
+        Added in Synapse v1.57.0.
+        """
+        self._validate_user_id(user_id)
+
+        if not isinstance(data_type, str):
+            raise TypeError(f"data_type must be a str; got {type(data_type).__name__}")
+
+        if not isinstance(new_data, dict):
+            raise TypeError(f"new_data must be a dict; got {type(new_data).__name__}")
+
+        # Ensure the user exists, so we don't just write to users that aren't there.
+        if await self._store.get_userinfo_by_id(user_id) is None:
+            raise ValueError(f"User {user_id} does not exist on this server.")
+
+        await self._handler.add_account_data_for_user(user_id, data_type, new_data)

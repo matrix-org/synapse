@@ -10,10 +10,10 @@ Note that running Synapse's unit tests from within the docker image is not suppo
 
 ## Testing with SQLite and single-process Synapse
 
-> Note that `scripts-dev/complement.sh` is a script that will automatically build 
+> Note that `scripts-dev/complement.sh` is a script that will automatically build
 > and run an SQLite-based, single-process of Synapse against Complement.
 
-The instructions below will set up Complement testing for a single-process, 
+The instructions below will set up Complement testing for a single-process,
 SQLite-based Synapse deployment.
 
 Start by building the base Synapse docker image. If you wish to run tests with the latest
@@ -26,23 +26,22 @@ docker build -t matrixdotorg/synapse -f docker/Dockerfile .
 
 This will build an image with the tag `matrixdotorg/synapse`.
 
-Next, build the Synapse image for Complement. You will need a local checkout 
-of Complement. Change to the root of your Complement checkout and run:
+Next, build the Synapse image for Complement.
 
 ```sh
-docker build -t complement-synapse -f "dockerfiles/Synapse.Dockerfile" dockerfiles
+docker build -t complement-synapse -f "docker/complement/Dockerfile" docker/complement
 ```
 
-This will build an image with the tag `complement-synapse`, which can be handed to 
-Complement for testing via the `COMPLEMENT_BASE_IMAGE` environment variable. Refer to 
-[Complement's documentation](https://github.com/matrix-org/complement/#running) for 
+This will build an image with the tag `complement-synapse`, which can be handed to
+Complement for testing via the `COMPLEMENT_BASE_IMAGE` environment variable. Refer to
+[Complement's documentation](https://github.com/matrix-org/complement/#running) for
 how to run the tests, as well as the various available command line flags.
 
 ## Testing with PostgreSQL and single or multi-process Synapse
 
-The above docker image only supports running Synapse with SQLite and in a 
-single-process topology. The following instructions are used to build a Synapse image for 
-Complement that supports either single or multi-process topology with a PostgreSQL 
+The above docker image only supports running Synapse with SQLite and in a
+single-process topology. The following instructions are used to build a Synapse image for
+Complement that supports either single or multi-process topology with a PostgreSQL
 database backend.
 
 As with the single-process image, build the base Synapse docker image. If you wish to run
@@ -55,7 +54,7 @@ docker build -t matrixdotorg/synapse -f docker/Dockerfile .
 
 This will build an image with the tag `matrixdotorg/synapse`.
 
-Next, we build a new image with worker support based on `matrixdotorg/synapse:latest`. 
+Next, we build a new image with worker support based on `matrixdotorg/synapse:latest`.
 Again, from the root of the repository:
 
 ```sh
@@ -64,18 +63,17 @@ docker build -t matrixdotorg/synapse-workers -f docker/Dockerfile-workers .
 
 This will build an image with the tag` matrixdotorg/synapse-workers`.
 
-It's worth noting at this point that this image is fully functional, and 
-can be used for testing against locally. See instructions for using the container 
+It's worth noting at this point that this image is fully functional, and
+can be used for testing against locally. See instructions for using the container
 under
 [Running the Dockerfile-worker image standalone](#running-the-dockerfile-worker-image-standalone)
 below.
 
 Finally, build the Synapse image for Complement, which is based on
-`matrixdotorg/synapse-workers`. You will need a local checkout of Complement. Change to
-the root of your Complement checkout and run:
+`matrixdotorg/synapse-workers`.
 
 ```sh
-docker build -t matrixdotorg/complement-synapse-workers -f dockerfiles/SynapseWorkers.Dockerfile dockerfiles
+docker build -t matrixdotorg/complement-synapse-workers -f docker/complement/SynapseWorkers.Dockerfile docker/complement
 ```
 
 This will build an image with the tag `complement-synapse-workers`, which can be handed to
@@ -91,10 +89,10 @@ bundling all necessary components together for a workerised homeserver instance.
 
 This includes any desired Synapse worker processes, a nginx to route traffic accordingly,
 a redis for worker communication and a supervisord instance to start up and monitor all
-processes. You will need to provide your own postgres container to connect to, and TLS 
+processes. You will need to provide your own postgres container to connect to, and TLS
 is not handled by the container.
 
-Once you've built the image using the above instructions, you can run it. Be sure 
+Once you've built the image using the above instructions, you can run it. Be sure
 you've set up a volume according to the [usual Synapse docker instructions](README.md).
 Then run something along the lines of:
 
@@ -112,7 +110,7 @@ docker run -d --name synapse \
     matrixdotorg/synapse-workers
 ```
 
-...substituting `POSTGRES*` variables for those that match a postgres host you have 
+...substituting `POSTGRES*` variables for those that match a postgres host you have
 available (usually a running postgres docker container).
 
 The `SYNAPSE_WORKER_TYPES` environment variable is a comma-separated list of workers to
@@ -130,11 +128,11 @@ Otherwise, `SYNAPSE_WORKER_TYPES` can either be left empty or unset to spawn no 
 (leaving only the main process). The container is configured to use redis-based worker
 mode.
 
-Logs for workers and the main process are logged to stdout and can be viewed with 
-standard `docker logs` tooling. Worker logs contain their worker name 
+Logs for workers and the main process are logged to stdout and can be viewed with
+standard `docker logs` tooling. Worker logs contain their worker name
 after the timestamp.
 
 Setting `SYNAPSE_WORKERS_WRITE_LOGS_TO_DISK=1` will cause worker logs to be written to
 `<data_dir>/logs/<worker_name>.log`. Logs are kept for 1 week and rotate every day at 00:
-00, according to the container's clock. Logging for the main process must still be 
+00, according to the container's clock. Logging for the main process must still be
 configured by modifying the homeserver's log config in your Synapse data volume.

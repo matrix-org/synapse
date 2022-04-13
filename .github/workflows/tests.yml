@@ -20,19 +20,13 @@ jobs:
       - run: scripts-dev/config-lint.sh
 
   lint:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        toxenv:
-          - "check_codestyle"
-          - "check_isort"
-          - "mypy"
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-      - run: pip install tox
-      - run: tox -e ${{ matrix.toxenv }}
+    # This does a vanilla `poetry install` - no extras. I'm slightly anxious
+    # that we might skip some typechecks on code that uses extras. However,
+    # I think the right way to fix this is to mark any extras needed for
+    # typechecking as development dependencies. To detect this, we ought to
+    # turn up mypy's strictness: disallow unknown imports and be accept fewer
+    # uses of `Any`.
+    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v1"
 
   lint-crlf:
     runs-on: ubuntu-latest
@@ -71,23 +65,23 @@ jobs:
       matrix:
         python-version: ["3.7", "3.8", "3.9", "3.10"]
         database: ["sqlite"]
-        toxenv: ["py"]
+        extras: ["all"]
         include:
           # Newest Python without optional deps
           - python-version: "3.10"
-            toxenv: "py-noextras"
+            extras: ""
 
           # Oldest Python with PostgreSQL
           - python-version: "3.7"
             database: "postgres"
             postgres-version: "10"
-            toxenv: "py"
+            extras: "all"
 
           # Newest Python with newest PostgreSQL
           - python-version: "3.10"
             database: "postgres"
             postgres-version: "14"
-            toxenv: "py"
+            extras: "all"
 
     steps:
       - uses: actions/checkout@v2
@@ -99,17 +93,16 @@ jobs:
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_INITDB_ARGS="--lc-collate C --lc-ctype C --encoding UTF8" \
             postgres:${{ matrix.postgres-version }}
-      - uses: actions/setup-python@v2
+      - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install tox
+          extras: ${{ matrix.extras }}
       - name: Await PostgreSQL
         if: ${{ matrix.postgres-version }}
         timeout-minutes: 2
         run: until pg_isready -h localhost; do sleep 1; done
-      - run: tox -e ${{ matrix.toxenv }}
+      - run: poetry run trial --jobs=2 tests
         env:
-          TRIAL_FLAGS: "--jobs=2"
           SYNAPSE_POSTGRES: ${{ matrix.database == 'postgres' || '' }}
           SYNAPSE_POSTGRES_HOST: localhost
           SYNAPSE_POSTGRES_USER: postgres
@@ -128,6 +121,7 @@ jobs:
           || true
 
   trial-olddeps:
+    # Note: sqlite only; no postgres
     if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
     needs: linting-done
     runs-on: ubuntu-latest
@@ -135,11 +129,11 @@ jobs:
       - uses: actions/checkout@v2
       - name: Test with old deps
         uses: docker://ubuntu:focal # For old python and sqlite
+        # Note: focal seems to be using 3.8, but the oldest is 3.7?
+        # See https://github.com/matrix-org/synapse/issues/12343
         with:
           workdir: /github/workspace
           entrypoint: .ci/scripts/test_old_deps.sh
-        env:
-          TRIAL_FLAGS: "--jobs=2"
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
@@ -155,23 +149,24 @@ jobs:
 
   trial-pypy:
     # Very slow; only run if the branch name includes 'pypy'
+    # Note: sqlite only; no postgres. Completely untested since poetry move.
     if: ${{ contains(github.ref, 'pypy') && !failure() && !cancelled() }}
     needs: linting-done
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["pypy-3.7"]
+        extras: ["all"]
 
     steps:
       - uses: actions/checkout@v2
+      # Install libs necessary for PyPy to build binary wheels for dependencies
       - run: sudo apt-get -qq install xmlsec1 libxml2-dev libxslt-dev
-      - uses: actions/setup-python@v2
+      - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install tox
-      - run: tox -e py
-        env:
-          TRIAL_FLAGS: "--jobs=2"
+          extras: ${{ matrix.extras }}
+      - run: poetry run trial --jobs=2 tests
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
@@ -363,27 +358,11 @@ jobs:
             (wget -O - "https://github.com/matrix-org/complement/archive/$BRANCH_NAME.tar.gz" | tar -xz --strip-components=1 -C complement) && break
           done
 
-      # Build initial Synapse image
-      - run: docker build -t matrixdotorg/synapse:latest -f docker/Dockerfile .
-        working-directory: synapse
-        env:
-          DOCKER_BUILDKIT: 1
-
-      # Build a ready-to-run Synapse image based on the initial image above.
-      # This new image includes a config file, keys for signing and TLS, and
-      # other settings to make it suitable for testing under Complement.
-      - run: docker build -t complement-synapse -f Synapse.Dockerfile .
-        working-directory: complement/dockerfiles
-
-      # Run Complement
       - run: |
           set -o pipefail
-          go test -v -json -tags synapse_blacklist,msc2716,msc3030 ./tests/... 2>&1 | gotestfmt
+          COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | gotestfmt
         shell: bash
         name: Run Complement Tests
-        env:
-          COMPLEMENT_BASE_IMAGE: complement-synapse:latest
-        working-directory: complement
 
   # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
   tests-done:

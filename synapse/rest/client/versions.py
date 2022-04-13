@@ -86,7 +86,7 @@ class VersionsRestServlet(RestServlet):
                     # Implements additional endpoints as described in MSC2432
                     "org.matrix.msc2432": True,
                     # Implements additional endpoints as described in MSC2666
-                    "uk.half-shot.msc2666": True,
+                    "uk.half-shot.msc2666.mutual_rooms": True,
                     # Whether new rooms will be set to encrypted or not (based on presets).
                     "io.element.e2ee_forced.public": self.e2ee_forced_public,
                     "io.element.e2ee_forced.private": self.e2ee_forced_private,
@@ -100,7 +100,6 @@ class VersionsRestServlet(RestServlet):
                     # Adds support for jump to date endpoints (/timestamp_to_event) as per MSC3030
                     "org.matrix.msc3030": self.config.experimental.msc3030_enabled,
                     # Adds support for thread relations, per MSC3440.
-                    "org.matrix.msc3440": self.config.experimental.msc3440_enabled,
                     "org.matrix.msc3440.stable": True,  # TODO: remove when "v1.3" is added above
                 },
             },

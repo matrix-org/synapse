@@ -11,7 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.types import UserID
+
+from typing import Any, Optional
+
+from synapse.types import JsonDict, UserID
 
 from ._base import Config
 
@@ -60,14 +63,14 @@ class ServerNoticesConfig(Config):
 
     section = "servernotices"
 
-    def __init__(self, *args):
+    def __init__(self, *args: Any):
         super().__init__(*args)
-        self.server_notices_mxid = None
-        self.server_notices_mxid_display_name = None
-        self.server_notices_mxid_avatar_url = None
-        self.server_notices_room_name = None
+        self.server_notices_mxid: Optional[str] = None
+        self.server_notices_mxid_display_name: Optional[str] = None
+        self.server_notices_mxid_avatar_url: Optional[str] = None
+        self.server_notices_room_name: Optional[str] = None
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         c = config.get("server_notices")
         if c is None:
             return
@@ -81,5 +84,5 @@ class ServerNoticesConfig(Config):
         # todo: i18n
         self.server_notices_room_name = c.get("room_name", "Server Notices")
 
-    def generate_config_section(self, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return DEFAULT_CONFIG

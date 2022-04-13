@@ -9,7 +9,7 @@ import bcrypt
 import yaml
 
 
-def prompt_for_pass():
+def prompt_for_pass() -> str:
     password = getpass.getpass("Password: ")
 
     if not password:
@@ -23,7 +23,7 @@ def prompt_for_pass():
     return password
 
 
-def main():
+def main() -> None:
     bcrypt_rounds = 12
     password_pepper = ""
 
