@@ -988,8 +988,6 @@ class PresenceHandler(BasePresenceHandler):
             self.user_to_num_current_syncs[user_id] = curr_sync + 1
 
             prev_state = await self.current_state_for_user(user_id)
-            # take a copy so we can start modifying it
-            new_state = prev_state.copy_and_replace()
 
             # If they're busy then they don't stop being busy just by syncing,
             # so just update the last sync time.
@@ -1002,12 +1000,12 @@ class PresenceHandler(BasePresenceHandler):
                 await self.set_state(
                     UserID.from_string(user_id), {"presence": presence_state}, True
                 )
-                new_state = new_state.copy_and_replace(state=presence_state)
+                prev_state = await self.current_state_for_user(user_id)
 
             if prev_state.state == PresenceState.OFFLINE:
                 await self._update_states(
                     [
-                        new_state.copy_and_replace(
+                        prev_state.copy_and_replace(
                             state=presence_state,
                             last_active_ts=self.clock.time_msec(),
                             last_user_sync_ts=self.clock.time_msec(),
@@ -1020,7 +1018,7 @@ class PresenceHandler(BasePresenceHandler):
             else:
                 await self._update_states(
                     [
-                        new_state.copy_and_replace(
+                        prev_state.copy_and_replace(
                             last_user_sync_ts=self.clock.time_msec(),
                         )
                     ]
