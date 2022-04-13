@@ -1,0 +1,1 @@
+Changed type annotation of `StreamWorkerStore.get_stream_id_for_event_txn` from `int` to `Optional[int]` to be consistent with the parameter `allow_none`
