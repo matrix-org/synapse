@@ -512,9 +512,10 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     )
 
     # Supervisord config
+    os.makedirs("/etc/supervisor", exist_ok=True)
     convert(
         "/conf/supervisord.conf.j2",
-        "/etc/supervisor/conf.d/supervisord.conf",
+        "/etc/supervisor/supervisord.conf",
         main_config_path=config_path,
         worker_config=supervisord_config,
     )
@@ -530,14 +531,6 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     log_dir = data_dir + "/logs"
     if not os.path.exists(log_dir):
         os.mkdir(log_dir)
-
-
-def start_supervisord():
-    """Starts up supervisord which then starts and monitors all other necessary processes
-
-    Raises: CalledProcessError if calling start.py return a non-zero exit code.
-    """
-    subprocess.run(["/usr/bin/supervisord"], stdin=subprocess.PIPE)
 
 
 def main(args, environ):
@@ -567,7 +560,13 @@ def main(args, environ):
 
     # Start supervisord, which will start Synapse, all of the configured worker
     # processes, redis, nginx etc. according to the config we created above.
-    start_supervisord()
+    log("Starting supervisord")
+    os.execl(
+        "/usr/local/bin/supervisord",
+        "supervisord",
+        "-c",
+        "/etc/supervisor/supervisord.conf",
+    )
 
 
 if __name__ == "__main__":
