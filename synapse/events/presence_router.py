@@ -28,7 +28,7 @@ from typing import (
 from twisted.internet.defer import CancelledError
 
 from synapse.api.presence import UserPresenceState
-from synapse.util.async_helpers import maybe_awaitable
+from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -149,7 +149,7 @@ class PresenceRouter:
         # run all the callbacks for get_users_for_states and combine the results
         for callback in self._get_users_for_states_callbacks:
             try:
-                result = await callback(state_updates)
+                result = await delay_cancellation(callback(state_updates))
             except CancelledError:
                 raise
             except Exception as e:
@@ -203,7 +203,7 @@ class PresenceRouter:
         # run all the callbacks for get_interested_users and combine the results
         for callback in self._get_interested_users_callbacks:
             try:
-                result = await callback(user_id)
+                result = await delay_cancellation(callback(user_id))
             except CancelledError:
                 raise
             except Exception as e:
