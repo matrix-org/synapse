@@ -1,0 +1,113 @@
+# People who are freshly `pip install`ing from the wheels we publish to PyPI will pull
+# in the latest versions of all dependencies. We used to do this in our CI runs, which
+# would detect any incompatibilities due to new package releases. Now that we use the
+# locked poetry environment, we don't have advance notice of these breakages.defaults:
+#
+# To plug that hole, this job is a canary which periodically
+# - checks out develop,
+# - pip installs from source (building a wheel locally using `poetry-core`,
+#   and `pip install`ing from that), and
+# - runs test suites against that checkout.
+#
+# Based on the twisted trunk CI job.
+
+name: Latest dependencies
+
+on:
+  schedule:
+    - cron: 0 7 * * *
+  pull_request:
+    branches:
+      - dmr/poetry-wheel-ci
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+# TODO: do we want a mypy job? The mypy-only dependencies aren't exposed as extras, so
+# we would need to do some poetry shenanigans here.
+#  mypy:
+
+  trial:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - run: sudo apt-get -qq install xmlsec1
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "3.x"
+      - run: trial --jobs 2 tests
+
+      - name: Dump logs
+        # Logs are most useful when the command fails, always include them.
+        if: ${{ always() }}
+        # Note: Dumps to workflow logs instead of using actions/upload-artifact
+        #       This keeps logs colocated with failing jobs
+        #       It also ignores find's exit code; this is a best effort affair
+        run: >-
+          find _trial_temp -name '*.log'
+          -exec echo "::group::{}" \;
+          -exec cat {} \;
+          -exec echo "::endgroup::" \;
+          || true
+
+#  sytest:
+#    runs-on: ubuntu-latest
+#    container:
+#      image: matrixdotorg/sytest-synapse:testing
+#      volumes:
+#        - ${{ github.workspace }}:/src
+#
+#    steps:
+#      - uses: actions/checkout@v2
+#      - name: Patch dependencies
+#        # Note: The poetry commands want to create a virtualenv in /src/.venv/,
+#        #       but the sytest-synapse container expects it to be in /venv/.
+#        #       We symlink it before running poetry so that poetry actually
+#        #       ends up installing to `/venv`.
+#        run: |
+#          ln -s -T /venv /src/.venv
+#          poetry remove twisted
+#          poetry add --extras tls git+https://github.com/twisted/twisted.git#trunk
+#          poetry install --no-interaction --extras "all test"
+#        working-directory: /src
+#      - name: Run SyTest
+#        run: /bootstrap.sh synapse
+#        working-directory: /src
+#        env:
+#          # Use offline mode to avoid reinstalling the pinned version of
+#          # twisted.
+#          OFFLINE: 1
+#      - name: Summarise results.tap
+#        if: ${{ always() }}
+#        run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
+#      - name: Upload SyTest logs
+#        uses: actions/upload-artifact@v2
+#        if: ${{ always() }}
+#        with:
+#          name: Sytest Logs - ${{ job.status }} - (${{ join(matrix.*, ', ') }})
+#          path: |
+#            /logs/results.tap
+#            /logs/**/*.log*
+
+  # open an issue if the build fails, so we know about it.
+#  open-issue:
+#    if: failure()
+#    needs:
+#      - mypy
+#      - trial
+#      - sytest
+#
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#      - uses: actions/checkout@v2
+#      - uses: JasonEtco/create-an-issue@5d9504915f79f9cc6d791934b8ef34f2353dd74d # v2.5.0, 2020-12-06
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#        with:
+#          update_existing: true
+#          filename: .ci/twisted_trunk_build_failed_issue_template.md
