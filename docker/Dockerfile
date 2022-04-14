@@ -59,7 +59,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 WORKDIR /synapse
 
 # Copy just what we need to run `poetry export`...
-COPY pyproject.toml poetry.lock README.rst /synapse/
+COPY pyproject.toml poetry.lock /synapse/
 
 RUN /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt
 
