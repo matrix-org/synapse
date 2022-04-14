@@ -33,15 +33,36 @@ jobs:
 
   trial:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - database: "sqlite"
+          - database: "postgres"
+            postgres-version: "14"
 
     steps:
       - uses: actions/checkout@v2
       - run: sudo apt-get -qq install xmlsec1
+      - name: Set up PostgreSQL ${{ matrix.postgres-version }}
+        if: ${{ matrix.postgres-version }}
+        run: |
+          docker run -d -p 5432:5432 \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_INITDB_ARGS="--lc-collate C --lc-ctype C --encoding UTF8" \
+            postgres:${{ matrix.postgres-version }}
       - uses: actions/setup-python@v2
         with:
           python-version: "3.x"
-      - run: trial --jobs 2 tests
-
+      - name: Await PostgreSQL
+        if: ${{ matrix.postgres-version }}
+        timeout-minutes: 2
+        run: until pg_isready -h localhost; do sleep 1; done
+      - run: trial --jobs=2 tests
+        env:
+          SYNAPSE_POSTGRES: ${{ matrix.database == 'postgres' || '' }}
+          SYNAPSE_POSTGRES_HOST: localhost
+          SYNAPSE_POSTGRES_USER: postgres
+          SYNAPSE_POSTGRES_PASSWORD: postgres
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
@@ -54,6 +75,7 @@ jobs:
           -exec cat {} \;
           -exec echo "::endgroup::" \;
           || true
+
 
 #  sytest:
 #    runs-on: ubuntu-latest
