@@ -189,18 +189,28 @@ class ReceiptsWorkerStore(SQLBaseStore):
         rows = await self.db_pool.runInteraction("get_latest_receipts_for_user", f)
         return {row[0]: row[1] for row in rows}
 
-    async def get_receipts_for_user_with_orderings(self, user_id: str) -> JsonDict:
+    async def get_receipts_for_user_with_orderings(
+        self, user_id: str, receipt_types: List[str]
+    ) -> JsonDict:
         def f(txn: LoggingTransaction) -> List[Tuple[str, str, int, int]]:
-            sql = (
-                "SELECT rl.room_id, rl.event_id,"
-                " e.topological_ordering, e.stream_ordering"
-                " FROM receipts_linearized AS rl"
-                " INNER JOIN events AS e USING (room_id, event_id)"
-                " WHERE rl.room_id = e.room_id"
-                " AND rl.event_id = e.event_id"
-                " AND user_id = ?"
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "rl.receipt_type", receipt_types
             )
-            txn.execute(sql, (user_id,))
+
+            sql = """
+                SELECT rl.room_id, rl.event_id, rl.receipt_type,
+                e.topological_ordering, e.stream_ordering
+                FROM receipts_linearized AS rl
+                INNER JOIN events AS e USING (room_id, event_id)
+                WHERE rl.room_id = e.room_id
+                AND rl.event_id = e.event_id
+                AND user_id = ?
+                AND %s
+            """ % (
+                clause,
+            )
+
+            txn.execute(sql, [user_id] + list(args))
             return cast(List[Tuple[str, str, int, int]], txn.fetchall())
 
         rows = await self.db_pool.runInteraction(
@@ -209,8 +219,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
         return {
             row[0]: {
                 "event_id": row[1],
-                "topological_ordering": row[2],
-                "stream_ordering": row[3],
+                "receipt_type": row[2],
+                "topological_ordering": row[3],
+                "stream_ordering": row[4],
             }
             for row in rows
         }

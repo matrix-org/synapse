@@ -88,6 +88,14 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
         self.assertEqual(res, {})
 
         res = self.get_success(
+            self.master_store.get_receipts_for_user_with_orderings(
+                OUR_USER_ID,
+                [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE],
+            )
+        )
+        self.assertEqual(res, {})
+
+        res = self.get_success(
             self.master_store.get_last_receipt_event_id_for_user(
                 OUR_USER_ID,
                 self.room_id1,
