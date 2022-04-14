@@ -134,10 +134,14 @@ jobs:
             /logs/results.tap
             /logs/**/*.log*
 
+
+  # TODO: run complement (as with twisted trunk, see #12473).
+
   # open an issue if the build fails, so we know about it.
 #  open-issue:
 #    if: failure()
 #    needs:
+#      # TODO: should mypy be included here? It feels more brittle than the other two.
 #      - mypy
 #      - trial
 #      - sytest
@@ -151,4 +155,4 @@ jobs:
 #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 #        with:
 #          update_existing: true
-#          filename: .ci/twisted_trunk_build_failed_issue_template.md
+#          filename: .ci/latest_deps_build_failed_issue_template.md
