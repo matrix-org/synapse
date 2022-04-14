@@ -32,21 +32,16 @@ esac
 
 # Manually install Poetry and export a pip-compatible `requirements.txt`
 # We need a Poetry pre-release as the export command is buggy in < 1.2
-if [ -e requirements.txt ]; then
-    # Guard against a possible future where requirements.txt lives in the repo.
-    # Otherwise, calling `poetry export` below would silently clobber it.
-    echo "requirements.txt already exists; aborting" 1>&2
-    exit 1
-fi
 TEMP_VENV="$(mktemp -d)"
 python3 -m venv "$TEMP_VENV"
 source "$TEMP_VENV/bin/activate"
 pip install -U pip
 pip install poetry==1.2.0b1
-poetry export --extras "all test" -o requirements.txt
 deactivate
 rm -rf "$TEMP_VENV"
 
+# Use --no-deps to only install pinned versions in exported_requirements.txt,
+# and to avoid https://github.com/pypa/pip/issues/9644
 dh_virtualenv \
     --install-suffix "matrix-synapse" \
     --builtin-venv \
@@ -55,10 +50,11 @@ dh_virtualenv \
     --preinstall="lxml" \
     --preinstall="mock" \
     --preinstall="wheel" \
+    --extra-pip-arg="--no-deps" \
     --extra-pip-arg="--no-cache-dir" \
     --extra-pip-arg="--compile" \
     --extras="all,systemd,test" \
-    --requirements="requirements.txt"
+    --requirements="exported_requirements.txt"
 
 PACKAGE_BUILD_DIR="debian/matrix-synapse-py3"
 VIRTUALENV_DIR="${PACKAGE_BUILD_DIR}${DH_VIRTUALENV_INSTALL_ROOT}/matrix-synapse"
