@@ -9048,12 +9048,10 @@ worker_replication_host: 127.0.0.1
 worker_replication_http_port: 9093
 
 worker_listeners:
- - type: http
-   port: 8083
-   resources:
-     - names:
-       - client
-       - federation
+  - type: http
+    port: 8083
+    resources:
+      - names: [client, federation]
 
 worker_log_config: /home/matrix/synapse/config/worker1_log_config.yaml
 </code></pre>
@@ -9463,24 +9461,24 @@ require. Additionally, to group the required services, it sets up a
 <p>See the folder <a href="https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/system/">system</a>
 for the systemd unit files.</p>
 <p>The folder <a href="https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/workers/">workers</a>
-contains an example configuration for the <code>federation_reader</code> worker.</p>
+contains an example configuration for the <code>generic_worker</code> worker.</p>
 <h2 id="synapse-configuration-files"><a class="header" href="#synapse-configuration-files">Synapse configuration files</a></h2>
 <p>See <a href="systemd-with-workers/../workers.html">the worker documentation</a> for information on how to set up the
 configuration files and reverse-proxy correctly.
-Below is a sample <code>federation_reader</code> worker configuration file.</p>
-<pre><code class="language-yaml">worker_app: synapse.app.federation_reader
-worker_name: federation_reader1
+Below is a sample <code>generic_worker</code> worker configuration file.</p>
+<pre><code class="language-yaml">worker_app: synapse.app.generic_worker
+worker_name: generic_worker1
 
 worker_replication_host: 127.0.0.1
 worker_replication_http_port: 9093
 
 worker_listeners:
-    - type: http
-      port: 8011
-      resources:
-          - names: [federation]
+  - type: http
+    port: 8011
+    resources:
+      - names: [client, federation]
 
-worker_log_config: /etc/matrix-synapse/federation-reader-log.yaml
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
 </code></pre>
 <p>Systemd manages daemonization itself, so ensure that none of the configuration
 files set either <code>daemonize</code> or <code>worker_daemonize</code>.</p>
@@ -9515,9 +9513,9 @@ systemctl stop matrix-synapse.target
 # Restart the master alone
 systemctl start matrix-synapse.service
 
-# Restart a specific worker (eg. federation_reader); the master is
+# Restart a specific worker (eg. generic_worker); the master is
 # unaffected by this.
-systemctl restart matrix-synapse-worker@federation_reader.service
+systemctl restart matrix-synapse-worker@generic_worker.service
 
 # Add a new worker (assuming all configs are set up already)
 systemctl enable matrix-synapse-worker@federation_writer.service

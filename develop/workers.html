@@ -257,12 +257,10 @@ worker_replication_host: 127.0.0.1
 worker_replication_http_port: 9093
 
 worker_listeners:
- - type: http
-   port: 8083
-   resources:
-     - names:
-       - client
-       - federation
+  - type: http
+    port: 8083
+    resources:
+      - names: [client, federation]
 
 worker_log_config: /home/matrix/synapse/config/worker1_log_config.yaml
 </code></pre>
