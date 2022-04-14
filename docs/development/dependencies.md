@@ -1,0 +1,138 @@
+# Managing dependencies with Poetry
+
+This is a quick cheat sheet for developers on how to use [`poetry`](https://python-poetry.org/).
+
+# Recommendation: direnv
+
+[`direnv`](https://direnv.net/) is a tool for activating environments in your
+shell inside a given directory. Its support for poetry is unofficial (a 
+community wiki recipe only), but works solidly in our experience. We thoroughly
+recommend it for daily use. To use it:
+
+1. [Install `direnv`](https://direnv.net/docs/installation.html) - it's likely
+   packaged for your system already.
+2. Teach direnv about poetry. The [shell config here](https://github.com/direnv/direnv/wiki/Python#poetry)
+   needs to be added to `~/.config/direnv/direnvrc` (or more generally `$XDG_CONFIG_HOME/direnv/direnvrc`).
+3. Mark the synapse checkout as a poetry project: `echo layout poetry > .envrc`.
+4. Convince yourself that you trust this `.envrc` configuration and project.
+   Then formally confirm this to `direnv` by running `direnv allow`.
+
+Then whenever you navigate to the synapse checkout, you should be able to run
+e.g. `mypy` instead of `poetry run mypy`; `python` instead of 
+`poetry run python`; and your shell commands will automatically be ran in the
+context of poetry's venv, without having to run `poetry shell` beforehand.
+
+# Rules of thumb:
+
+- `poetry install --extras all` gets you into a good state.
+- `poetry install --extras all --remove-untracked` gets you into the precise 
+  locked state with no undeclared dependencies floating around.
+- Whenever you edit `pyproject.toml`, run `poetry lock --no-update` to keep them
+  in sync.
+- `poetry run cmd args` when you need the python virtualenv context.
+  `poetry shell` is roughly the same as activating the virtualenv, execpt it
+  starts a new shell. (Though see the direnv recommendation above, which makes
+  both commands unnecessary.)
+
+# How do I...
+
+## ...reset my venv to the locked environment?
+
+```shell
+poetry install --extras all --remove-untracked
+```
+
+## ... inspect the `poetry` virtualenv?
+
+Some suggestions:
+
+```shell
+# Current env only
+poetry env info
+# All envs: this allows you to have e.g. a poetry managed venv for Python 3.7,
+# and another for Python 3.10.
+poetry env list --full-path
+poetry run pip list
+```
+
+Note that `poetry show` describes the abstract *lock file* rather than your
+on-disk environment. With that said, `poetry show --tree` can sometimes be 
+useful.
+
+
+## ...add a new dependency?
+
+Either:
+- manually update `pyproject.toml`; then `poetry lock --no-update`; or else
+- `poetry add packagename`. See `poetry add --help`; note the `--dev`,
+  `--extras` and `--optional` flags in particular.
+
+Include the updated `pyproject.toml` and `poetry.lock` files in your commit.
+
+## ...remove a dependency?
+
+I don't think we do this often, and I've not tried it myself, but
+
+```shell
+poetry remove packagename
+```
+
+ought to do the trick. Alternatively, manually update `pyproject.toml` and 
+`poetry lock --no-update`. Include the updated `pyproject.toml` and poetry.lock`
+files in your commit.
+
+## ...update the version range for an existing dependency?
+
+Best done by manually editing `pyproject.toml`, then `poetry lock --no-update`.
+Include the updated `pyproject.toml` and `poetry.lock` in your commit.
+
+## ...update a dependency in the locked environment?
+
+Use 
+
+```shell
+poetry update packagename
+```
+
+to use the latest version of `packagename` in the locked environment, without
+affecting the broad dependencies listed in the wheel. 
+
+There doesn't seem to be away to do this whilst locking a _specific_ version of 
+`packagename`. We can workaround this (crudely) as follows:
+
+```shell
+poetry add packagename==1.2.3
+# This should update pyproject.lock.
+
+# Now undo the changes to pyproject.toml. For example
+# git restore pyproject.toml
+
+# Get poetry to recompute the content-hash of pyproject.toml without changing
+# the locked package versions.
+poetry lock --no-update
+```
+
+Either way, include the updated `poetry.lock` file in your commit.
+
+## ...export a `requirements.txt` file?
+
+```shell
+poetry export --extras all
+```
+
+Be wary of bugs in `poetry export` and `pip install -r requirements.txt`.
+
+Note: `poetry export` will be made a plugin in Poetry 1.2. Additional config may
+be required.
+
+## ...build a test wheel?
+
+I usually use
+
+```shell
+`poetry run pip install build && poetry run python -m build
+```
+
+because [`build`](https://github.com/pypa/build) is a standardish tool which 
+doesn't require poetry. (It's what we use in CI too). However, you could try
+`poetry build` too.

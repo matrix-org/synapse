@@ -19,32 +19,36 @@ this document.
     packages](setup/installation.md#prebuilt-packages), you will need to follow the
     normal process for upgrading those packages.
 
+-   If Synapse was installed using pip then upgrade to the latest
+    version by running:
+
+    ```bash
+    pip install --upgrade matrix-synapse
+    ```
+
 -   If Synapse was installed from source, then:
 
-    1.  Activate the virtualenv before upgrading. For example, if
-        Synapse is installed in a virtualenv in `~/synapse/env` then
+    1.  Obtain the latest version of the source code. Git users can run
+        `git pull` to do this.
+
+    2.  If you're running Synapse in a virtualenv, make sure to activate it before
+        upgrading. For example, if Synapse is installed in a virtualenv in `~/synapse/env` then
         run:
 
         ```bash
         source ~/synapse/env/bin/activate
-        ```
-
-    2.  If Synapse was installed using pip then upgrade to the latest
-        version by running:
-
-        ```bash
-        pip install --upgrade matrix-synapse
-        ```
-
-        If Synapse was installed using git then upgrade to the latest
-        version by running:
-
-        ```bash
-        git pull
         pip install --upgrade .
         ```
+        Include any relevant extras between square brackets, e.g. `pip install --upgrade .[postgres,oidc]`.
 
-    3.  Restart Synapse:
+    3.  If you're using `poetry` to manage a Synapse installation, run:
+        ```bash
+        poetry install
+        ```
+        Include any relevant extras with `--extras`, e.g. `poetry install --extras postgres --extras oidc`.
+        It's probably easiest to run `poetry install --extras all`.
+
+    4.  Restart Synapse:
 
         ```bash
         synctl restart
