@@ -9219,9 +9219,9 @@ the full URI, or even just round robin), the room ID is the path component after
 of events, then a dedicated set of workers can be provisioned to limit the
 effects of bursts of events from that bridge on events sent by normal users.</p>
 <h4 id="stream-writers"><a class="header" href="#stream-writers">Stream writers</a></h4>
-<p>Additionally, there is <em>experimental</em> support for moving writing of specific
-streams (such as events) off of the main process to a particular worker. (This
-is only supported with Redis-based replication.)</p>
+<p>Additionally, the writing of specific streams (such as events) can be moved off
+of the main process to a particular worker.
+(This is only supported with Redis-based replication.)</p>
 <p>To enable this, the worker must have a HTTP replication listener configured,
 have a <code>worker_name</code> and be listed in the <code>instance_map</code> config. The same worker
 can handle multiple streams, but unless otherwise documented, each stream can only
@@ -9277,7 +9277,7 @@ the stream writer for the <code>presence</code> stream:</p>
 <pre><code>^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
 </code></pre>
 <h4 id="background-tasks"><a class="header" href="#background-tasks">Background tasks</a></h4>
-<p>There is also <em>experimental</em> support for moving background tasks to a separate
+<p>There is also support for moving background tasks to a separate
 worker. Background tasks are run periodically or started via replication. Exactly
 which tasks are configured to run depends on your Synapse configuration (e.g. if
 stats is enabled).</p>
