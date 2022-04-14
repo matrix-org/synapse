@@ -192,7 +192,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     async def get_receipts_for_user_with_orderings(
         self, user_id: str, receipt_types: List[str]
     ) -> JsonDict:
-        def f(txn: LoggingTransaction) -> List[Tuple[str, str, int, int]]:
+        def f(txn: LoggingTransaction) -> List[Tuple[str, str, str, int, int]]:
             clause, args = make_in_list_sql_clause(
                 self.database_engine, "rl.receipt_type", receipt_types
             )
