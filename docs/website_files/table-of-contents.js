@@ -75,6 +75,20 @@ function setTocEntry() {
  * Populate sidebar on load
  */
 window.addEventListener('load', () => {
+    // Prevent rendering the table of contents of the "print book" page, as it
+    // will end up being rendered into the output (in a broken-looking way)
+
+    // Get the name of the current page (i.e. 'print.html')
+    const pageNameExtension = window.location.pathname.split('/').pop();
+
+    // Split off the extension (as '.../print' is also a valid page name), which
+    // should result in 'print'
+    const pageName = pageNameExtension.split('.')[0];
+    if (pageName === "print") {
+        // Don't render the table of contents on this page
+        return;
+    }
+
     // Only create table of contents if there is more than one header on the page
     if (headers.length <= 1) {
         return;

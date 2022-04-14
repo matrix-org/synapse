@@ -86,7 +86,7 @@ class VersionsRestServlet(RestServlet):
                     # Implements additional endpoints as described in MSC2432
                     "org.matrix.msc2432": True,
                     # Implements additional endpoints as described in MSC2666
-                    "uk.half-shot.msc2666": True,
+                    "uk.half-shot.msc2666.mutual_rooms": True,
                     # Whether new rooms will be set to encrypted or not (based on presets).
                     "io.element.e2ee_forced.public": self.e2ee_forced_public,
                     "io.element.e2ee_forced.private": self.e2ee_forced_private,
