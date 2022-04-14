@@ -34,6 +34,9 @@ WORKDIR /data
 # Copy the caddy config
 COPY conf-workers/caddy.complement.json /root/caddy.json
 
+COPY conf-workers/postgres.supervisord.conf /etc/supervisor/conf.d/postgres.conf
+COPY conf-workers/caddy.supervisord.conf /etc/supervisor/conf.d/caddy.conf
+
 # Copy the entrypoint
 COPY conf-workers/start-complement-synapse-workers.sh /
 
