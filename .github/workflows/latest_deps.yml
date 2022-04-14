@@ -27,10 +27,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-# TODO: do we want a mypy job? The mypy-only dependencies aren't exposed as extras, so
-# we would need to do some poetry shenanigans here.
-#  mypy:
-
+  # TODO(dmr): I'm not sure if we want to run mypy here, nor if mypy failures should
+  # merit an issue.
+  mypy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      # The dev dependencies aren't exposed in the wheel metadata (at least with current
+      # poetry-core versions). So we'll have to be dirty: `poetry install` to get the
+      # dev deps, then upgrade them in situ with pip.
+      - uses: matrix-org/setup-python-poetry@v1
+        with:
+          python-version: "3.x"
+      # Lacking a `pip install --upgrade-literally-everything` option, concoct our own.
+      - run: "poetry run pip freeze | cut -d' ' -f 1 | xargs echo pip install --upgrade --upgrade-strategy eager"
+      - run: poetry run mypy
   trial:
     runs-on: ubuntu-latest
     strategy:
