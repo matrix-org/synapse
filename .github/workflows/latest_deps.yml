@@ -78,44 +78,34 @@ jobs:
           || true
 
 
-#  sytest:
-#    runs-on: ubuntu-latest
-#    container:
-#      image: matrixdotorg/sytest-synapse:testing
-#      volumes:
-#        - ${{ github.workspace }}:/src
-#
-#    steps:
-#      - uses: actions/checkout@v2
-#      - name: Patch dependencies
-#        # Note: The poetry commands want to create a virtualenv in /src/.venv/,
-#        #       but the sytest-synapse container expects it to be in /venv/.
-#        #       We symlink it before running poetry so that poetry actually
-#        #       ends up installing to `/venv`.
-#        run: |
-#          ln -s -T /venv /src/.venv
-#          poetry remove twisted
-#          poetry add --extras tls git+https://github.com/twisted/twisted.git#trunk
-#          poetry install --no-interaction --extras "all test"
-#        working-directory: /src
-#      - name: Run SyTest
-#        run: /bootstrap.sh synapse
-#        working-directory: /src
-#        env:
-#          # Use offline mode to avoid reinstalling the pinned version of
-#          # twisted.
-#          OFFLINE: 1
-#      - name: Summarise results.tap
-#        if: ${{ always() }}
-#        run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
-#      - name: Upload SyTest logs
-#        uses: actions/upload-artifact@v2
-#        if: ${{ always() }}
-#        with:
-#          name: Sytest Logs - ${{ job.status }} - (${{ join(matrix.*, ', ') }})
-#          path: |
-#            /logs/results.tap
-#            /logs/**/*.log*
+  sytest:
+    runs-on: ubuntu-latest
+    container:
+      image: matrixdotorg/sytest-synapse:testing
+      volumes:
+        - ${{ github.workspace }}:/src
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Ensure systest runs `pip install`
+        run: |
+          # Delete the lockfile so sytest will `pip install` rather than `poetry install`
+          rm /src/poetry.lock
+        working-directory: /src
+      - name: Run SyTest
+        run: /bootstrap.sh synapse
+        working-directory: /src
+      - name: Summarise results.tap
+        if: ${{ always() }}
+        run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
+      - name: Upload SyTest logs
+        uses: actions/upload-artifact@v2
+        if: ${{ always() }}
+        with:
+          name: Sytest Logs - ${{ job.status }} - (${{ join(matrix.*, ', ') }})
+          path: |
+            /logs/results.tap
+            /logs/**/*.log*
 
   # open an issue if the build fails, so we know about it.
 #  open-issue:
