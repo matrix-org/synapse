@@ -53,6 +53,7 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           python-version: "3.x"
+      - run: pip install -e .[all,test]
       - name: Await PostgreSQL
         if: ${{ matrix.postgres-version }}
         timeout-minutes: 2
