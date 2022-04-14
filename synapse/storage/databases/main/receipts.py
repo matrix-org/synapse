@@ -211,7 +211,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             )
 
             txn.execute(sql, [user_id] + list(args))
-            return cast(List[Tuple[str, str, int, int]], txn.fetchall())
+            return cast(List[Tuple[str, str, str, int, int]], txn.fetchall())
 
         rows = await self.db_pool.runInteraction(
             "get_receipts_for_user_with_orderings", f
