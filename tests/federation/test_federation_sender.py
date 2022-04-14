@@ -162,7 +162,9 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         return self.setup_test_homeserver(
-            federation_transport_client=Mock(spec=["send_transaction"]),
+            federation_transport_client=Mock(
+                spec=["send_transaction", "query_user_devices"]
+            ),
         )
 
     def default_config(self):
@@ -217,6 +219,45 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
         self.assertEqual(len(self.edus), 1)
         self.check_device_update_edu(self.edus.pop(0), u1, "D2", stream_id)
+
+    def test_dont_send_device_updates_for_remote_users(self):
+        """Check that we don't send device updates for remote users"""
+
+        # Send the server a device list EDU for the other user, this will cause
+        # it to try and resync the device lists.
+        self.hs.get_federation_transport_client().query_user_devices.return_value = (
+            defer.succeed(
+                {
+                    "stream_id": "1",
+                    "user_id": "@user2:host2",
+                    "devices": [{"device_id": "D1"}],
+                }
+            )
+        )
+
+        self.get_success(
+            self.hs.get_device_handler().device_list_updater.incoming_device_list_update(
+                "host2",
+                {
+                    "user_id": "@user2:host2",
+                    "device_id": "D1",
+                    "stream_id": "1",
+                    "prev_ids": [],
+                },
+            )
+        )
+
+        self.reactor.advance(1)
+
+        # We shouldn't see an EDU for that update
+        self.assertEqual(self.edus, [])
+
+        # Check that we did successfully process the inbound EDU (otherwise this
+        # test would pass if we failed to process the EDU)
+        devices = self.get_success(
+            self.hs.get_datastores().main.get_cached_devices_for_user("@user2:host2")
+        )
+        self.assertIn("D1", devices)
 
     def test_upload_signatures(self):
         """Uploading signatures on some devices should produce updates for that user"""
