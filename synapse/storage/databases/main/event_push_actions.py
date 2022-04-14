@@ -191,7 +191,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         stream_ordering = None
 
         if last_read_event_id is not None:
-            stream_ordering = self.get_stream_id_for_event_txn(  # type: ignore[attr-defined]
+            stream_ordering = self.get_stream_id_for_event_txn(
                 txn,
                 last_read_event_id,
                 allow_none=True,
@@ -209,7 +209,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 retcol="event_id",
             )
 
-            stream_ordering = self.get_stream_id_for_event_txn(txn, event_id)  # type: ignore[attr-defined]
+            stream_ordering = self.get_stream_id_for_event_txn(txn, event_id)
 
         return self._get_unread_counts_by_pos_txn(
             txn, room_id, user_id, stream_ordering

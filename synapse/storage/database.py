@@ -1560,6 +1560,21 @@ class DatabasePool:
     ) -> Optional[Any]:
         ...
 
+    @overload
+    @classmethod
+    def simple_select_one_onecol_txn(
+        cls,
+        txn: LoggingTransaction,
+        table: str,
+        keyvalues: Dict[str, Any],
+        retcol: str,
+        allow_none: bool = False,
+    ) -> Optional[int]:
+        ret = cls.simple_select_one_onecol_txn(cls, txn, table=table, keyvalues=keyvalues, retcol=retcol, allow_none=allow_none)
+        if ret:
+            return int(ret)
+        return ret
+
     @classmethod
     def simple_select_one_onecol_txn(
         cls,
