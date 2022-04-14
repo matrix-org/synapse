@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import abc
+import asyncio
 import collections
 import inspect
 import itertools
@@ -743,11 +744,14 @@ def delay_cancellation(awaitable: Awaitable[T]) -> Awaitable[T]:
     # First, convert the awaitable into a `Deferred`.
     if isinstance(awaitable, defer.Deferred):
         deferred = awaitable
-    elif isinstance(awaitable, Coroutine):
+    elif asyncio.iscoroutine(awaitable):
+        # Ideally we'd use `Deferred.fromCoroutine()` here, to save on redundant
+        # type-checking, but we'd need Twisted >= 21.2.
         deferred = defer.ensureDeferred(awaitable)
     else:
         # We have no idea what to do with this awaitable.
-        # Let the caller `await` it normally.
+        # We assume it's already resolved, such as `DoneAwaitable`s or `Future`s from
+        # `make_awaitable`, and let the caller `await` it normally.
         return awaitable
 
     def handle_cancel(new_deferred: "defer.Deferred[T]") -> None:
