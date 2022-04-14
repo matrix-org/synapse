@@ -13490,49 +13490,30 @@ do!</p>
 <p>The Synapse codebase uses a number of code formatting tools in order to
 quickly and automatically check for formatting (and sometimes logical)
 errors in code.</p>
-<p>The necessary tools are detailed below.</p>
-<p>First install them with:</p>
+<p>The necessary tools are:</p>
+<ul>
+<li><a href="https://black.readthedocs.io/en/stable/">black</a>, a source code formatter;</li>
+<li><a href="https://pycqa.github.io/isort/">isort</a>, which organises each file's imports;</li>
+<li><a href="https://flake8.pycqa.org/en/latest/">flake8</a>, which can spot common errors; and</li>
+<li><a href="https://mypy.readthedocs.io/en/stable/">mypy</a>, a type checker.</li>
+</ul>
+<p>Install them with:</p>
 <pre><code class="language-sh">pip install -e &quot;.[lint,mypy]&quot;
 </code></pre>
-<ul>
-<li>
-<p><strong>black</strong></p>
-<p>The Synapse codebase uses <a href="https://pypi.org/project/black/">black</a>
-as an opinionated code formatter, ensuring all comitted code is
-properly formatted.</p>
-<p>Have <code>black</code> auto-format your code (it shouldn't change any
-functionality) with:</p>
-<pre><code class="language-sh">black .
+<p>The easiest way to run the lints is to invoke the linter script as follows.</p>
+<pre><code class="language-sh">scripts-dev/lint.sh
 </code></pre>
-</li>
-<li>
-<p><strong>flake8</strong></p>
-<p><code>flake8</code> is a code checking tool. We require code to pass <code>flake8</code>
-before being merged into the codebase.</p>
-<p>Check all application and test code with:</p>
-<pre><code class="language-sh">flake8 .
-</code></pre>
-</li>
-<li>
-<p><strong>isort</strong></p>
-<p><code>isort</code> ensures imports are nicely formatted, and can suggest and
-auto-fix issues such as double-importing.</p>
-<p>Auto-fix imports with:</p>
-<pre><code class="language-sh">isort .
-</code></pre>
-</li>
-</ul>
 <p>It's worth noting that modern IDEs and text editors can run these tools
 automatically on save. It may be worth looking into whether this
 functionality is supported in your editor for a more convenient
-development workflow. It is not, however, recommended to run <code>flake8</code> on
-save as it takes a while and is very resource intensive.</p>
+development workflow. It is not, however, recommended to run <code>flake8</code> or <code>mypy</code>
+on save as they take a while and can be very resource intensive.</p>
 <h2 id="general-rules"><a class="header" href="#general-rules">General rules</a></h2>
 <ul>
 <li><strong>Naming</strong>:
 <ul>
-<li>Use camel case for class and type names</li>
-<li>Use underscores for functions and variables.</li>
+<li>Use <code>CamelCase</code> for class and type names</li>
+<li>Use underscores for <code>function_names</code> and <code>variable_names</code>.</li>
 </ul>
 </li>
 <li><strong>Docstrings</strong>: should follow the <a href="https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings">google code
