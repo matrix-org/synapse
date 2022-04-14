@@ -84,14 +84,30 @@ jobs:
       image: matrixdotorg/sytest-synapse:testing
       volumes:
         - ${{ github.workspace }}:/src
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sytest-tag: focal
+
+          - sytest-tag: focal
+            postgres: postgres
+            workers: workers
+            redis: redis
+    env:
+      POSTGRES: ${{ matrix.postgres && 1}}
+      WORKERS: ${{ matrix.workers && 1 }}
+      REDIS: ${{ matrix.redis && 1 }}
+      BLACKLIST: ${{ matrix.workers && 'synapse-blacklist-with-workers' }}
 
     steps:
       - uses: actions/checkout@v2
       - name: Ensure systest runs `pip install`
-        run: |
-          # Delete the lockfile so sytest will `pip install` rather than `poetry install`
-          rm /src/poetry.lock
+        # Delete the lockfile so sytest will `pip install` rather than `poetry install`
+        run: rm /src/poetry.lock
         working-directory: /src
+      - name: Prepare test blacklist
+        run: cat sytest-blacklist .ci/worker-blacklist > synapse-blacklist-with-workers
       - name: Run SyTest
         run: /bootstrap.sh synapse
         working-directory: /src
