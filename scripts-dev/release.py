@@ -69,11 +69,12 @@ def cli():
         # ... wait for assets to build ...
 
         ./scripts-dev/release.py publish
+
         ./scripts-dev/release.py upload
 
         # Optional: generate some nice links for the announcement
 
-        ./scripts-dev/release.py upload
+        ./scripts-dev/release.py announce
 
     If the env var GH_TOKEN (or GITHUB_TOKEN) is set, or passed into the
     `tag`/`publish` command, then a new draft release will be created/published.

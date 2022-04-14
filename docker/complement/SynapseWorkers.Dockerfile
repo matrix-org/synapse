@@ -13,8 +13,8 @@ RUN curl -OL "https://github.com/caddyserver/caddy/releases/download/v2.3.0/cadd
   tar xzf caddy_2.3.0_linux_amd64.tar.gz && rm caddy_2.3.0_linux_amd64.tar.gz && mv caddy /root
 
 # Install postgresql
-RUN apt-get update
-RUN apt-get install -y postgresql
+RUN apt-get update && \
+  DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y postgresql-13
 
 # Configure a user and create a database for Synapse
 RUN pg_ctlcluster 13 main start &&  su postgres -c "echo \
@@ -34,40 +34,14 @@ WORKDIR /data
 # Copy the caddy config
 COPY conf-workers/caddy.complement.json /root/caddy.json
 
+# Copy the entrypoint
+COPY conf-workers/start-complement-synapse-workers.sh /
+
 # Expose caddy's listener ports
 EXPOSE 8008 8448
 
-ENTRYPOINT \
-  # Replace the server name in the caddy config
-  sed -i "s/{{ server_name }}/${SERVER_NAME}/g" /root/caddy.json && \
-  # Start postgres
-  pg_ctlcluster 13 main start 2>&1 && \
-  # Start caddy
-  /root/caddy start --config /root/caddy.json 2>&1 && \
-  # Set the server name of the homeserver
-  SYNAPSE_SERVER_NAME=${SERVER_NAME} \
-  # No need to report stats here
-  SYNAPSE_REPORT_STATS=no \
-  # Set postgres authentication details which will be placed in the homeserver config file
-  POSTGRES_PASSWORD=somesecret POSTGRES_USER=postgres POSTGRES_HOST=localhost \
-  # Specify the workers to test with
-  SYNAPSE_WORKER_TYPES="\
-    event_persister, \
-    event_persister, \
-    background_worker, \
-    frontend_proxy, \
-    event_creator, \
-    user_dir, \
-    media_repository, \
-    federation_inbound, \
-    federation_reader, \
-    federation_sender, \
-    synchrotron, \
-    appservice, \
-    pusher" \
-  # Run the script that writes the necessary config files and starts supervisord, which in turn
-  # starts everything else
-  /configure_workers_and_start.py
+ENTRYPOINT /start-complement-synapse-workers.sh
 
+# Update the healthcheck to have a shorter check interval
 HEALTHCHECK --start-period=5s --interval=1s --timeout=1s \
     CMD /bin/sh /healthcheck.sh
