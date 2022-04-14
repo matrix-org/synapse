@@ -50,6 +50,18 @@ class ReadMarkerRestServlet(RestServlet):
 
         body = parse_json_object_from_request(request)
 
+        valid_receipt_types = {ReceiptTypes.READ, ReceiptTypes.FULLY_READ}
+        if self.config.experimental.msc2285_enabled:
+            valid_receipt_types.add(ReceiptTypes.READ_PRIVATE)
+
+        if set(body.keys()) > (valid_receipt_types):
+            raise SynapseError(
+                400,
+                "Receipt type must be 'm.read', 'org.matrix.msc2285.read.private' or 'm.fully_read'"
+                if self.config.experimental.msc2285_enabled
+                else "Receipt type must be 'm.read' or 'm.fully_read'",
+            )
+
         read_event_id = body.get(ReceiptTypes.READ, None)
         if read_event_id:
             await self.receipts_handler.received_client_receipt(
@@ -75,24 +87,6 @@ class ReadMarkerRestServlet(RestServlet):
                 user_id=requester.user.to_string(),
                 event_id=read_marker_event_id,
             )
-
-        for key in body.keys():
-            if self.config.experimental.msc2285_enabled and key not in [
-                ReceiptTypes.READ,
-                ReceiptTypes.READ_PRIVATE,
-                ReceiptTypes.FULLY_READ,
-            ]:
-                raise SynapseError(
-                    400,
-                    "Receipt type must be 'm.read', 'org.matrix.msc2285.read.private' or 'm.fully_read'",
-                )
-            elif not self.config.experimental.msc2285_enabled and key not in [
-                ReceiptTypes.READ,
-                ReceiptTypes.FULLY_READ,
-            ]:
-                raise SynapseError(
-                    400, "Receipt type must be 'm.read' or 'm.fully_read'"
-                )
 
         return 200, {}
 
