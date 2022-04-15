@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import IO, TYPE_CHECKING, Dict, List, Optional
+from typing import IO, TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import DirectServeJsonResource, respond_with_json
@@ -22,32 +22,40 @@ from synapse.http.servlet import parse_bytes_from_args
 from synapse.http.site import SynapseRequest
 from synapse.rest.media.v1.media_storage import SpamMediaException
 
+from ._base import parse_media_id
+
 if TYPE_CHECKING:
     from synapse.rest.media.v1.media_repository import MediaRepository
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
+# The name of the lock to use when uploading media.
+_UPLOAD_MEDIA_LOCK_NAME = "upload_media"
+
 
 class UploadResource(DirectServeJsonResource):
     isLeaf = True
 
-    def __init__(self, hs: "HomeServer", media_repo: "MediaRepository"):
+    def __init__(
+        self,
+        hs: "HomeServer",
+        media_repo: "MediaRepository",
+        enable_async_uploads: bool,
+    ):
         super().__init__()
 
+        self.enable_async_uploads = enable_async_uploads
         self.media_repo = media_repo
         self.filepaths = media_repo.filepaths
         self.store = hs.get_datastores().main
-        self.clock = hs.get_clock()
         self.server_name = hs.hostname
         self.auth = hs.get_auth()
         self.max_upload_size = hs.config.media.max_upload_size
 
-    async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
-        respond_with_json(request, 200, {}, send_cors=True)
-
-    async def _async_render_POST(self, request: SynapseRequest) -> None:
-        requester = await self.auth.get_user_by_req(request)
+    def _get_file_metadata(
+        self, request: SynapseRequest
+    ) -> Tuple[int, Optional[str], str]:
         raw_content_length = request.getHeader("Content-Length")
         if raw_content_length is None:
             raise SynapseError(msg="Request must specify a Content-Length", code=400)
@@ -90,6 +98,15 @@ class UploadResource(DirectServeJsonResource):
         #     disposition = headers.getRawHeaders(b"Content-Disposition")[0]
         # TODO(markjh): parse content-dispostion
 
+        return content_length, upload_name, media_type
+
+    async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
+        respond_with_json(request, 200, {}, send_cors=True)
+
+    async def _async_render_POST(self, request: SynapseRequest) -> None:
+        requester = await self.auth.get_user_by_req(request)
+        content_length, upload_name, media_type = self._get_file_metadata(request)
+
         try:
             content: IO = request.content  # type: ignore
             content_uri = await self.media_repo.create_content(
@@ -103,3 +120,51 @@ class UploadResource(DirectServeJsonResource):
         logger.info("Uploaded content with URI %r", content_uri)
 
         respond_with_json(request, 200, {"content_uri": content_uri}, send_cors=True)
+
+    async def _async_render_PUT(self, request: SynapseRequest) -> None:
+        if not self.enable_async_uploads:
+            raise SynapseError(
+                405,
+                "Asynchronous uploads are not enabled on this homeserver",
+                errcode=Codes.UNRECOGNIZED,
+            )
+
+        requester = await self.auth.get_user_by_req(request)
+        server_name, media_id, _ = parse_media_id(request)
+
+        if server_name != self.server_name:
+            raise SynapseError(
+                404,
+                "Non-local server name specified",
+                errcode=Codes.NOT_FOUND,
+            )
+
+        lock = await self.store.try_acquire_lock(_UPLOAD_MEDIA_LOCK_NAME, media_id)
+        if not lock:
+            raise SynapseError(
+                409,
+                "Media ID is is locked and cannot be uploaded to",
+                errcode="FI.MAU.MSC2246_CANNOT_OVERWRITE_MEDIA",
+            )
+
+        async with lock:
+            await self.media_repo.verify_can_upload(media_id, requester.user)
+            content_length, upload_name, media_type = self._get_file_metadata(request)
+
+            try:
+                content: IO = request.content  # type: ignore
+                await self.media_repo.update_content(
+                    media_id,
+                    media_type,
+                    upload_name,
+                    content,
+                    content_length,
+                    requester.user,
+                )
+            except SpamMediaException:
+                # For uploading of media we want to respond with a 400, instead of
+                # the default 404, as that would just be confusing.
+                raise SynapseError(400, "Bad content")
+
+            logger.info("Uploaded content to URI %r", media_id)
+            respond_with_json(request, 200, {}, send_cors=True)

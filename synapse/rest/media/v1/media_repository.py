@@ -26,6 +26,7 @@ from twisted.internet.defer import Deferred
 from twisted.web.resource import Resource
 
 from synapse.api.errors import (
+    Codes,
     FederationDeniedError,
     HttpResponseException,
     NotFoundError,
@@ -203,6 +204,77 @@ class MediaRepository:
             unused_expires_at=unused_expires_at,
         )
         return f"mxc://{self.server_name}/{media_id}", unused_expires_at
+
+    async def verify_can_upload(self, media_id: str, auth_user: UserID) -> None:
+        """Verify that the media ID can be uploaded to by the given user. This
+        function checks that:
+
+        * the media ID exists
+        * the media ID does not already have content
+        * the user uploading is the same as the one who created the media ID
+        * the media ID has not expired
+
+        Args:
+            media_id: The media ID to verify
+            auth_user: The user_id of the uploader
+        """
+        media = await self.store.get_local_media(media_id)
+        if media is None:
+            raise SynapseError(404, "Unknow media ID", errcode=Codes.NOT_FOUND)
+
+        if media["user_id"] != str(auth_user):
+            raise SynapseError(
+                403,
+                "Only the creator of the media ID can upload to it",
+                errcode=Codes.FORBIDDEN,
+            )
+
+        if media.get("media_length") is not None:
+            raise SynapseError(
+                409,
+                "Media ID already has content",
+                errcode="FI.MAU.MSC2246_CANNOT_OVERWRITE_MEDIA",
+            )
+
+        if media.get("unused_expires_at", 0) < self.clock.time_msec():
+            raise SynapseError(
+                409,
+                "Media ID has expired",
+                errcode="FI.MAU.MSC2246_CANNOT_OVERWRITE_MEDIA",
+            )
+
+    async def update_content(
+        self,
+        media_id: str,
+        media_type: str,
+        upload_name: Optional[str],
+        content: IO,
+        content_length: int,
+        auth_user: UserID,
+    ) -> None:
+        """Update the content of the given media ID.
+
+        Args:
+            media_id: The media ID to replace.
+            media_type: The content type of the file.
+            upload_name: The name of the file, if provided.
+            content: A file like object that is the content to store
+            content_length: The length of the content
+            auth_user: The user_id of the uploader
+        """
+        file_info = FileInfo(server_name=None, file_id=media_id)
+        fname = await self.media_storage.store_file(content, file_info)
+        logger.info("Stored local media in file %r", fname)
+
+        await self.store.update_local_media(
+            media_id=media_id,
+            media_type=media_type,
+            upload_name=upload_name,
+            media_length=content_length,
+            user_id=auth_user,
+        )
+
+        await self._generate_thumbnails(None, media_id, media_id, media_type)
 
     async def create_content(
         self,
@@ -1078,6 +1150,7 @@ class MSC2246MediaRepositoryResource(Resource):
         media_repo = hs.get_media_repository()
 
         self.putChild(b"create", CreateResource(hs, media_repo))
+        self.putChild(b"upload", UploadResource(hs, media_repo, True))
 
 
 class VersionedMediaRepositoryResource(Resource):
@@ -1133,7 +1206,7 @@ class VersionedMediaRepositoryResource(Resource):
         super().__init__()
         media_repo = hs.get_media_repository()
 
-        self.putChild(b"upload", UploadResource(hs, media_repo))
+        self.putChild(b"upload", UploadResource(hs, media_repo, False))
         self.putChild(b"download", DownloadResource(hs, media_repo))
         self.putChild(
             b"thumbnail", ThumbnailResource(hs, media_repo, media_repo.media_storage)

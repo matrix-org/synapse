@@ -175,6 +175,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 "quarantined_by",
                 "url_cache",
                 "safe_from_quarantine",
+                "user_id",
             ),
             allow_none=True,
             desc="get_local_media",
@@ -342,6 +343,30 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 "url_cache": url_cache,
             },
             desc="store_local_media",
+        )
+
+    async def update_local_media(
+        self,
+        media_id: str,
+        media_type: str,
+        upload_name: Optional[str],
+        media_length: int,
+        user_id: UserID,
+        url_cache: Optional[str] = None,
+    ) -> None:
+        await self.db_pool.simple_update_one(
+            "local_media_repository",
+            keyvalues={
+                "user_id": user_id.to_string(),
+                "media_id": media_id,
+            },
+            updatevalues={
+                "media_type": media_type,
+                "upload_name": upload_name,
+                "media_length": media_length,
+                "url_cache": url_cache,
+            },
+            desc="update_local_media",
         )
 
     async def mark_local_media_as_safe(self, media_id: str, safe: bool = True) -> None:
