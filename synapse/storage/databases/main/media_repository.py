@@ -302,6 +302,24 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             "get_local_media_before", _get_local_media_before_txn
         )
 
+    async def store_local_media_id(
+        self,
+        media_id: str,
+        time_now_ms: int,
+        user_id: UserID,
+        unused_expires_at: int,
+    ) -> None:
+        await self.db_pool.simple_insert(
+            "local_media_repository",
+            {
+                "media_id": media_id,
+                "created_ts": time_now_ms,
+                "user_id": user_id.to_string(),
+                "unused_expires_at": unused_expires_at,
+            },
+            desc="store_local_media_id",
+        )
+
     async def store_local_media(
         self,
         media_id: str,
