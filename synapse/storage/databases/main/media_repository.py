@@ -161,6 +161,9 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
     async def get_local_media(self, media_id: str) -> Optional[Dict[str, Any]]:
         """Get the metadata for a local piece of media
 
+        Args:
+            media_id: the media ID to retrieve information for
+
         Returns:
             None if the media_id doesn't exist.
         """
@@ -176,6 +179,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 "url_cache",
                 "safe_from_quarantine",
                 "user_id",
+                "unused_expires_at",
             ),
             allow_none=True,
             desc="get_local_media",

@@ -49,6 +49,8 @@ TEXT_CONTENT_TYPES = [
     "text/xml",
 ]
 
+DEFAULT_MSC2246_DELAY = 20_000
+
 
 def parse_media_id(request: Request) -> Tuple[str, str, Optional[str]]:
     """Parses the server name, media ID and optional file name from the request URI

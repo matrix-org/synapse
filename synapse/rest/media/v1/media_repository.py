@@ -18,7 +18,7 @@ import os
 import shutil
 from enum import Enum
 from io import BytesIO
-from typing import IO, TYPE_CHECKING, Dict, List, Optional, Set, Tuple
+from typing import IO, TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 import twisted.internet.error
 import twisted.web.http
@@ -32,13 +32,14 @@ from synapse.api.errors import (
     NotFoundError,
     RequestSendFailed,
     SynapseError,
+    cs_error,
 )
 from synapse.config._base import ConfigError
 from synapse.config.repository import ThumbnailRequirement
+from synapse.http.server import respond_with_json
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.rest.media.v1.create_resource import CreateResource
 from synapse.types import UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.retryutils import NotRetryingDestination
@@ -53,6 +54,7 @@ from ._base import (
     respond_with_responder,
 )
 from .config_resource import MediaConfigResource
+from .create_resource import CreateResource
 from .download_resource import DownloadResource
 from .filepath import MediaFilePaths
 from .media_storage import MediaStorage
@@ -318,8 +320,64 @@ class MediaRepository:
 
         return "mxc://%s/%s" % (self.server_name, media_id)
 
+    def respond_not_yet_uploaded(self, request: SynapseRequest) -> None:
+        not_uploaded_error = cs_error(
+            "Media has not been uploaded yet",
+            code="FI.MAU.MSC2246_NOT_YET_UPLOADED",
+            retry_after_ms=5_000,
+        )
+        respond_with_json(request, 404, not_uploaded_error, send_cors=True)
+
+    async def get_local_media_info(
+        self, request: SynapseRequest, media_id: str, max_stall_ms: int
+    ) -> Optional[Dict[str, Any]]:
+        """Gets the info dictionary for given local media ID. If the media has
+        not been uploaded yet, this function will wait up to ``max_stall_ms``
+        milliseconds for the media to be uploaded.
+
+        Args:
+            request: The incoming request.
+            media_id: The media ID of the content. (This is the same as
+                the file_id for local content.)
+            max_stall_ms: the maximum number of milliseconds to wait for the
+                media to be uploaded.
+
+        Returns:
+            Either the info dictionary for the given local media ID or
+            ``None``. If ``None``, then no further processing is necessary as
+            this function will send the necessary JSON response.
+        """
+        wait_until = self.clock.time_msec() + max_stall_ms
+        while True:
+            # Get the info for the media
+            media_info = await self.store.get_local_media(media_id)
+            if not media_info:
+                respond_404(request)
+                return None
+
+            if media_info["quarantined_by"]:
+                logger.info("Media is quarantined")
+                respond_404(request)
+                return None
+
+            # The file has been uploaded, so stop looping
+            if media_info.get("media_length") is not None:
+                return media_info
+
+            if self.clock.time_msec() >= wait_until:
+                break
+
+            await self.clock.sleep(0.5)
+
+        self.respond_not_yet_uploaded(request)
+        return None
+
     async def get_local_media(
-        self, request: SynapseRequest, media_id: str, name: Optional[str]
+        self,
+        request: SynapseRequest,
+        media_id: str,
+        name: Optional[str],
+        max_stall_ms: int,
     ) -> None:
         """Responds to requests for local media, if exists, or returns 404.
 
@@ -329,13 +387,14 @@ class MediaRepository:
                 the file_id for local content.)
             name: Optional name that, if specified, will be used as
                 the filename in the Content-Disposition header of the response.
+            max_stall_ms: the maximum number of milliseconds to wait for the
+                media to be uploaded.
 
         Returns:
             Resolves once a response has successfully been written to request
         """
-        media_info = await self.store.get_local_media(media_id)
-        if not media_info or media_info["quarantined_by"]:
-            respond_404(request)
+        media_info = await self.get_local_media_info(request, media_id, max_stall_ms)
+        if not media_info:
             return
 
         self.mark_recently_accessed(None, media_id)
@@ -360,6 +419,7 @@ class MediaRepository:
         server_name: str,
         media_id: str,
         name: Optional[str],
+        max_stall_ms: int,
     ) -> None:
         """Respond to requests for remote media.
 
@@ -369,6 +429,8 @@ class MediaRepository:
             media_id: The media ID of the content (as defined by the remote server).
             name: Optional name that, if specified, will be used as
                 the filename in the Content-Disposition header of the response.
+            max_stall_ms: the maximum number of milliseconds to wait for the
+                media to be uploaded.
 
         Returns:
             Resolves once a response has successfully been written to request
@@ -383,14 +445,12 @@ class MediaRepository:
 
         # We linearize here to ensure that we don't try and download remote
         # media multiple times concurrently
-        key = (server_name, media_id)
-        async with self.remote_media_linearizer.queue(key):
+        async with self.remote_media_linearizer.queue((server_name, media_id)):
             responder, media_info = await self._get_remote_media_impl(
-                server_name, media_id
+                server_name, media_id, max_stall_ms
             )
 
-        # We deliberately stream the file outside the lock
-        if responder:
+        if responder and media_info:
             media_type = media_info["media_type"]
             media_length = media_info["media_length"]
             upload_name = name if name else media_info["upload_name"]
@@ -398,18 +458,24 @@ class MediaRepository:
                 request, responder, media_type, media_length, upload_name
             )
         else:
-            respond_404(request)
+            self.respond_not_yet_uploaded(request)
+            return
 
-    async def get_remote_media_info(self, server_name: str, media_id: str) -> dict:
+    async def get_remote_media_info(
+        self, server_name: str, media_id: str, max_stall_ms: int
+    ) -> Optional[dict]:
         """Gets the media info associated with the remote file, downloading
         if necessary.
 
         Args:
             server_name: Remote server_name where the media originated.
             media_id: The media ID of the content (as defined by the remote server).
+            max_stall_ms: the maximum number of milliseconds to wait for the
+                media to be uploaded.
 
         Returns:
-            The media info of the file
+            The media info of the file or ``None`` if the media wasn't uploaded
+            in time.
         """
         if (
             self.federation_domain_whitelist is not None
@@ -419,10 +485,9 @@ class MediaRepository:
 
         # We linearize here to ensure that we don't try and download remote
         # media multiple times concurrently
-        key = (server_name, media_id)
-        async with self.remote_media_linearizer.queue(key):
+        async with self.remote_media_linearizer.queue((server_name, media_id)):
             responder, media_info = await self._get_remote_media_impl(
-                server_name, media_id
+                server_name, media_id, max_stall_ms
             )
 
         # Ensure we actually use the responder so that it releases resources
@@ -433,7 +498,7 @@ class MediaRepository:
         return media_info
 
     async def _get_remote_media_impl(
-        self, server_name: str, media_id: str
+        self, server_name: str, media_id: str, max_stall_ms: int
     ) -> Tuple[Optional[Responder], dict]:
         """Looks for media in local cache, if not there then attempt to
         download from remote server.
@@ -442,6 +507,8 @@ class MediaRepository:
             server_name (str): Remote server_name where the media originated.
             media_id (str): The media ID of the content (as defined by the
                 remote server).
+            max_stall_ms: the maximum number of milliseconds to wait for the
+                media to be uploaded.
 
         Returns:
             A tuple of responder and the media info of the file.
@@ -472,8 +539,7 @@ class MediaRepository:
 
         try:
             media_info = await self._download_remote_file(
-                server_name,
-                media_id,
+                server_name, media_id, max_stall_ms
             )
         except SynapseError:
             raise
@@ -506,6 +572,7 @@ class MediaRepository:
         self,
         server_name: str,
         media_id: str,
+        max_stall_ms: int,
     ) -> dict:
         """Attempt to download the remote file from the given server name,
         using the given file_id as the local id.
@@ -515,7 +582,8 @@ class MediaRepository:
             media_id: The media ID of the content (as defined by the
                 remote server). This is different than the file_id, which is
                 locally generated.
-            file_id: Local file ID
+            max_stall_ms: the maximum number of milliseconds to wait for the
+                media to be uploaded.
 
         Returns:
             The media info of the file.
@@ -539,7 +607,8 @@ class MediaRepository:
                         # tell the remote server to 404 if it doesn't
                         # recognise the server_name, to make sure we don't
                         # end up with a routing loop.
-                        "allow_remote": "false"
+                        "allow_remote": "false",
+                        "fi.mau.msc2246.max_stall_ms": str(max_stall_ms),
                     },
                 )
             except RequestSendFailed as e:

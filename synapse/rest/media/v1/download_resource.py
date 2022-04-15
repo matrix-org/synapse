@@ -16,10 +16,10 @@ import logging
 from typing import TYPE_CHECKING
 
 from synapse.http.server import DirectServeJsonResource, set_cors_headers
-from synapse.http.servlet import parse_boolean
+from synapse.http.servlet import parse_boolean, parse_integer
 from synapse.http.site import SynapseRequest
 
-from ._base import parse_media_id, respond_404
+from ._base import DEFAULT_MSC2246_DELAY, parse_media_id, respond_404
 
 if TYPE_CHECKING:
     from synapse.rest.media.v1.media_repository import MediaRepository
@@ -35,6 +35,7 @@ class DownloadResource(DirectServeJsonResource):
         super().__init__()
         self.media_repo = media_repo
         self.server_name = hs.hostname
+        self.enable_msc2246 = hs.config.experimental.msc2246_enabled
 
     async def _async_render_GET(self, request: SynapseRequest) -> None:
         set_cors_headers(request)
@@ -50,13 +51,14 @@ class DownloadResource(DirectServeJsonResource):
         )
         # Limited non-standard form of CSP for IE11
         request.setHeader(b"X-Content-Security-Policy", b"sandbox;")
-        request.setHeader(
-            b"Referrer-Policy",
-            b"no-referrer",
-        )
+        request.setHeader(b"Referrer-Policy", b"no-referrer")
         server_name, media_id, name = parse_media_id(request)
+        max_stall_ms = parse_integer(
+            request, "fi.mau.msc2246.max_stall_ms", default=DEFAULT_MSC2246_DELAY
+        )
+
         if server_name == self.server_name:
-            await self.media_repo.get_local_media(request, media_id, name)
+            await self.media_repo.get_local_media(request, media_id, name, max_stall_ms)
         else:
             allow_remote = parse_boolean(request, "allow_remote", default=True)
             if not allow_remote:
@@ -68,4 +70,6 @@ class DownloadResource(DirectServeJsonResource):
                 respond_404(request)
                 return
 
-            await self.media_repo.get_remote_media(request, server_name, media_id, name)
+            await self.media_repo.get_remote_media(
+                request, server_name, media_id, name, max_stall_ms
+            )
