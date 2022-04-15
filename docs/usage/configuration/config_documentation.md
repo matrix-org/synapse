@@ -1664,6 +1664,19 @@ rc_third_party_invite:
   burst_count: 10
 ```
 ---
+### `rc_media_create`
+
+This option ratelimits creation of MXC URIs via the MSC2246 asynchronous upload
+`/_matrix/media/v1/create` endpoint based on the account that's creating the
+media. Defaults to `per_second: 10`, `burst_count: 50`.
+
+Example configuration:
+```yaml
+rc_media_create:
+  per_second: 10
+  burst_count: 50
+```
+---
 ### `rc_federation`
 
 Defines limits on federation requests.
