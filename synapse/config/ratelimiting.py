@@ -144,6 +144,12 @@ class RatelimitConfig(Config):
             },
         )
 
+        # Ratelimit create media requests:
+        self.rc_media_create = RateLimitConfig(
+            config.get("rc_media_create", {}),
+            defaults={"per_second": 10, "burst_count": 50},
+        )
+
     def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         ## Ratelimiting ##
@@ -234,6 +240,10 @@ class RatelimitConfig(Config):
         #rc_third_party_invite:
         #  per_second: 0.2
         #  burst_count: 10
+        #
+        #rc_media_create:
+        #  per_second: 10
+        #  burst_count: 50
 
         # Ratelimiting settings for incoming federation
         #

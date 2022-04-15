@@ -964,6 +964,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #rc_third_party_invite:
 #  per_second: 0.2
 #  burst_count: 10
+#
+#rc_media_create:
+#  per_second: 10
+#  burst_count: 50
 
 # Ratelimiting settings for incoming federation
 #
