@@ -16,6 +16,7 @@ import errno
 import logging
 import os
 import shutil
+from enum import Enum
 from io import BytesIO
 from typing import IO, TYPE_CHECKING, Dict, List, Optional, Set, Tuple
 
@@ -1035,7 +1036,14 @@ class MediaRepository:
         return removed_media, len(removed_media)
 
 
-class MediaRepositoryResource(Resource):
+class MediaVersion(Enum):
+    R0 = b"r0"
+    V3 = b"v3"
+    LEGACY = b"v1"
+    UNSTABLE = b"unstable"
+
+
+class VersionedMediaRepositoryResource(Resource):
     """File uploading and downloading.
 
     Uploads are POSTed to a resource which returns a token which is used to GET
@@ -1080,7 +1088,7 @@ class MediaRepositoryResource(Resource):
     within a given rectangle.
     """
 
-    def __init__(self, hs: "HomeServer"):
+    def __init__(self, hs: "HomeServer", version: MediaVersion):
         # If we're not configured to use it, raise if we somehow got here.
         if not hs.config.media.can_load_media_repo:
             raise ConfigError("Synapse is not configured to use a media repo.")
@@ -1099,3 +1107,20 @@ class MediaRepositoryResource(Resource):
                 PreviewUrlResource(hs, media_repo, media_repo.media_storage),
             )
         self.putChild(b"config", MediaConfigResource(hs))
+
+
+class MediaRepositoryResource(Resource):
+    """
+    Base media repository resource. This handles all /_matrix/media requests
+    and muxes them between the versioned media repository endpoints.
+    """
+
+    def __init__(self, hs: "HomeServer"):
+        # If we're not configured to use it, raise if we somehow got here.
+        if not hs.config.media.can_load_media_repo:
+            raise ConfigError("Synapse is not configured to use a media repo.")
+
+        super().__init__()
+
+        for version in MediaVersion:
+            self.putChild(version.value, VersionedMediaRepositoryResource(hs, version))

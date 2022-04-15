@@ -27,9 +27,7 @@ from synapse.api.errors import HttpResponseException, RequestSendFailed, Synapse
 from synapse.api.urls import (
     CLIENT_API_PREFIX,
     FEDERATION_PREFIX,
-    LEGACY_MEDIA_PREFIX,
-    MEDIA_R0_PREFIX,
-    MEDIA_V3_PREFIX,
+    MEDIA_PREFIX,
     SERVER_KEY_V2_PREFIX,
 )
 from synapse.app import _base
@@ -338,9 +336,7 @@ class GenericWorkerServer(HomeServer):
 
                         resources.update(
                             {
-                                MEDIA_R0_PREFIX: media_repo,
-                                MEDIA_V3_PREFIX: media_repo,
-                                LEGACY_MEDIA_PREFIX: media_repo,
+                                MEDIA_PREFIX: media_repo,
                                 "/_synapse/admin": admin_resource,
                             }
                         )

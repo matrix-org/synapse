@@ -30,9 +30,7 @@ from synapse import events
 from synapse.api.urls import (
     CLIENT_API_PREFIX,
     FEDERATION_PREFIX,
-    LEGACY_MEDIA_PREFIX,
-    MEDIA_R0_PREFIX,
-    MEDIA_V3_PREFIX,
+    MEDIA_PREFIX,
     SERVER_KEY_V2_PREFIX,
     STATIC_PREFIX,
 )
@@ -245,13 +243,7 @@ class SynapseHomeServer(HomeServer):
         if name in ["media", "federation", "client"]:
             if self.config.server.enable_media_repo:
                 media_repo = self.get_media_repository_resource()
-                resources.update(
-                    {
-                        MEDIA_R0_PREFIX: media_repo,
-                        MEDIA_V3_PREFIX: media_repo,
-                        LEGACY_MEDIA_PREFIX: media_repo,
-                    }
-                )
+                resources[MEDIA_PREFIX] = media_repo
             elif name == "media":
                 raise ConfigError(
                     "'media' resource conflicts with enable_media_repo=False"
