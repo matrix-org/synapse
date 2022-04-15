@@ -84,3 +84,6 @@ class ExperimentalConfig(Config):
 
         # MSC3772: A push rule for mutual relations.
         self.msc3772_enabled: bool = experimental.get("msc3772_enabled", False)
+
+        # MSC2246 (async media uploads)
+        self.msc2246_enabled: bool = experimental.get("msc2246_enabled", False)
