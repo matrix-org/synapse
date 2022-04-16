@@ -120,7 +120,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
 
         self.media_repo = hs.get_media_repository_resource()
-        self.preview_url = self.media_repo.children[b"preview_url"]
+        self.preview_url = self.media_repo.children[b"v3"].children[b"preview_url"]
 
         self.lookups: Dict[str, Any] = {}
 
@@ -162,7 +162,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://matrix.org",
+            "v3/preview_url?url=http://matrix.org",
             shorthand=False,
             await_result=False,
         )
@@ -186,7 +186,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # Check the cache returns the correct response
         channel = self.make_request(
-            "GET", "preview_url?url=http://matrix.org", shorthand=False
+            "GET", "v3/preview_url?url=http://matrix.org", shorthand=False
         )
 
         # Check the cache response has the same content
@@ -202,7 +202,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         # Check the database cache returns the correct response
         channel = self.make_request(
-            "GET", "preview_url?url=http://matrix.org", shorthand=False
+            "GET", "v3/preview_url?url=http://matrix.org", shorthand=False
         )
 
         # Check the cache response has the same content
@@ -224,7 +224,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://matrix.org",
+            "v3/preview_url?url=http://matrix.org",
             shorthand=False,
             await_result=False,
         )
@@ -254,7 +254,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://matrix.org",
+            "v3/preview_url?url=http://matrix.org",
             shorthand=False,
             await_result=False,
         )
@@ -290,7 +290,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://matrix.org",
+            "v3/preview_url?url=http://matrix.org",
             shorthand=False,
             await_result=False,
         )
@@ -331,7 +331,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://matrix.org",
+            "v3/preview_url?url=http://matrix.org",
             shorthand=False,
             await_result=False,
         )
@@ -366,7 +366,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://matrix.org",
+            "v3/preview_url?url=http://matrix.org",
             shorthand=False,
             await_result=False,
         )
@@ -399,7 +399,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://example.com",
+            "v3/preview_url?url=http://example.com",
             shorthand=False,
             await_result=False,
         )
@@ -428,7 +428,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.lookups["example.com"] = [(IPv4Address, "192.168.1.1")]
 
         channel = self.make_request(
-            "GET", "preview_url?url=http://example.com", shorthand=False
+            "GET", "v3/preview_url?url=http://example.com", shorthand=False
         )
 
         # No requests made.
@@ -449,7 +449,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.lookups["example.com"] = [(IPv4Address, "1.1.1.2")]
 
         channel = self.make_request(
-            "GET", "preview_url?url=http://example.com", shorthand=False
+            "GET", "v3/preview_url?url=http://example.com", shorthand=False
         )
 
         self.assertEqual(channel.code, 502)
@@ -466,7 +466,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         Blacklisted IP addresses, accessed directly, are not spidered.
         """
         channel = self.make_request(
-            "GET", "preview_url?url=http://192.168.1.1", shorthand=False
+            "GET", "v3/preview_url?url=http://192.168.1.1", shorthand=False
         )
 
         # No requests made.
@@ -485,7 +485,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         Blacklisted IP ranges, accessed directly, are not spidered.
         """
         channel = self.make_request(
-            "GET", "preview_url?url=http://1.1.1.2", shorthand=False
+            "GET", "v3/preview_url?url=http://1.1.1.2", shorthand=False
         )
 
         self.assertEqual(channel.code, 403)
@@ -506,7 +506,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://example.com",
+            "v3/preview_url?url=http://example.com",
             shorthand=False,
             await_result=False,
         )
@@ -542,7 +542,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         ]
 
         channel = self.make_request(
-            "GET", "preview_url?url=http://example.com", shorthand=False
+            "GET", "v3/preview_url?url=http://example.com", shorthand=False
         )
         self.assertEqual(channel.code, 502)
         self.assertEqual(
@@ -562,7 +562,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         ]
 
         channel = self.make_request(
-            "GET", "preview_url?url=http://example.com", shorthand=False
+            "GET", "v3/preview_url?url=http://example.com", shorthand=False
         )
 
         # No requests made.
@@ -583,7 +583,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.lookups["example.com"] = [(IPv6Address, "2001:800::1")]
 
         channel = self.make_request(
-            "GET", "preview_url?url=http://example.com", shorthand=False
+            "GET", "v3/preview_url?url=http://example.com", shorthand=False
         )
 
         self.assertEqual(channel.code, 502)
@@ -600,7 +600,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         OPTIONS returns the OPTIONS.
         """
         channel = self.make_request(
-            "OPTIONS", "preview_url?url=http://example.com", shorthand=False
+            "OPTIONS", "v3/preview_url?url=http://example.com", shorthand=False
         )
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body, {})
@@ -614,7 +614,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         # Build and make a request to the server
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://example.com",
+            "v3/preview_url?url=http://example.com",
             shorthand=False,
             await_result=False,
         )
@@ -672,7 +672,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            f"preview_url?{query_params}",
+            f"v3/preview_url?{query_params}",
             shorthand=False,
         )
         self.pump()
@@ -693,7 +693,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://matrix.org",
+            "v3/preview_url?url=http://matrix.org",
             shorthand=False,
             await_result=False,
         )
@@ -730,7 +730,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
+            "v3/preview_url?url=http://twitter.com/matrixdotorg/status/12345",
             shorthand=False,
             await_result=False,
         )
@@ -790,7 +790,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
+            "v3/preview_url?url=http://twitter.com/matrixdotorg/status/12345",
             shorthand=False,
             await_result=False,
         )
@@ -834,7 +834,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://www.hulu.com/watch/12345",
+            "v3/preview_url?url=http://www.hulu.com/watch/12345",
             shorthand=False,
             await_result=False,
         )
@@ -892,7 +892,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://www.twitter.com/matrixdotorg/status/12345",
+            "v3/preview_url?url=http://www.twitter.com/matrixdotorg/status/12345",
             shorthand=False,
             await_result=False,
         )
@@ -975,7 +975,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://cdn.twitter.com/matrixdotorg",
+            "v3/preview_url?url=http://cdn.twitter.com/matrixdotorg",
             shorthand=False,
             await_result=False,
         )
@@ -1017,7 +1017,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         # Check fetching
         channel = self.make_request(
             "GET",
-            f"download/{host}/{media_id}",
+            f"v3/download/{host}/{media_id}",
             shorthand=False,
             await_result=False,
         )
@@ -1030,7 +1030,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            f"download/{host}/{media_id}",
+            f"v3/download/{host}/{media_id}",
             shorthand=False,
             await_result=False,
         )
@@ -1065,7 +1065,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         # Check fetching
         channel = self.make_request(
             "GET",
-            f"thumbnail/{host}/{media_id}?width=32&height=32&method=scale",
+            f"v3/thumbnail/{host}/{media_id}?width=32&height=32&method=scale",
             shorthand=False,
             await_result=False,
         )
@@ -1083,7 +1083,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            f"thumbnail/{host}/{media_id}?width=32&height=32&method=scale",
+            f"v3/thumbnail/{host}/{media_id}?width=32&height=32&method=scale",
             shorthand=False,
             await_result=False,
         )
@@ -1135,7 +1135,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=" + bad_url,
+            "v3/preview_url?url=" + bad_url,
             shorthand=False,
             await_result=False,
         )
@@ -1144,7 +1144,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=" + good_url,
+            "v3/preview_url?url=" + good_url,
             shorthand=False,
             await_result=False,
         )

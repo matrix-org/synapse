@@ -61,8 +61,8 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         # Allow for uploading and downloading to/from the media repo
         self.media_repo = hs.get_media_repository_resource()
-        self.download_resource = self.media_repo.children[b"download"]
-        self.upload_resource = self.media_repo.children[b"upload"]
+        self.download_resource = self.media_repo.children[b"v3"].children[b"download"]
+        self.upload_resource = self.media_repo.children[b"v3"].children[b"upload"]
 
     def _ensure_quarantined(
         self, admin_user_tok: str, server_and_media_id: str

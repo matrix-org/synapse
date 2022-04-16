@@ -123,8 +123,8 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         Tests that delete a media is successfully
         """
 
-        download_resource = self.media_repo.children[b"download"]
-        upload_resource = self.media_repo.children[b"upload"]
+        download_resource = self.media_repo.children[b"v3"].children[b"download"]
+        upload_resource = self.media_repo.children[b"v3"].children[b"upload"]
 
         # Upload some media into the room
         response = self.helper.upload_media(
@@ -562,7 +562,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         """
         Create a media and return media_id and server_and_media_id
         """
-        upload_resource = self.media_repo.children[b"upload"]
+        upload_resource = self.media_repo.children[b"v3"].children[b"upload"]
 
         # Upload some media into the room
         response = self.helper.upload_media(
@@ -586,7 +586,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         """
         Try to access a media and check the result
         """
-        download_resource = self.media_repo.children[b"download"]
+        download_resource = self.media_repo.children[b"v3"].children[b"download"]
 
         media_id = server_and_media_id.split("/")[1]
         local_path = self.filepaths.local_media_filepath(media_id)
@@ -641,7 +641,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
         self.admin_user_tok = self.login("admin", "pass")
 
         # Create media
-        upload_resource = media_repo.children[b"upload"]
+        upload_resource = media_repo.children[b"v3"].children[b"upload"]
 
         # Upload some media into the room
         response = self.helper.upload_media(
@@ -778,7 +778,7 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
         self.admin_user_tok = self.login("admin", "pass")
 
         # Create media
-        upload_resource = media_repo.children[b"upload"]
+        upload_resource = media_repo.children[b"v3"].children[b"upload"]
 
         # Upload some media into the room
         response = self.helper.upload_media(

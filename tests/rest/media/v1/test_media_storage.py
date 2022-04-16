@@ -253,8 +253,8 @@ class MediaRepoTests(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
 
         media_resource = hs.get_media_repository_resource()
-        self.download_resource = media_resource.children[b"download"]
-        self.thumbnail_resource = media_resource.children[b"thumbnail"]
+        self.download_resource = media_resource.children[b"v3"].children[b"download"]
+        self.thumbnail_resource = media_resource.children[b"v3"].children[b"thumbnail"]
         self.store = hs.get_datastores().main
         self.media_repo = hs.get_media_repository()
 
@@ -605,8 +605,8 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
 
         # Allow for uploading and downloading to/from the media repo
         self.media_repo = hs.get_media_repository_resource()
-        self.download_resource = self.media_repo.children[b"download"]
-        self.upload_resource = self.media_repo.children[b"upload"]
+        self.download_resource = self.media_repo.children[b"v3"].children[b"download"]
+        self.upload_resource = self.media_repo.children[b"v3"].children[b"upload"]
 
         load_legacy_spam_checkers(hs)
 

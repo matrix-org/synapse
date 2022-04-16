@@ -65,7 +65,9 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
             The channel for the *client* request and the *outbound* request for
             the media which the caller should respond to.
         """
-        resource = hs.get_media_repository_resource().children[b"download"]
+        resource = (
+            hs.get_media_repository_resource().children[b"r0"].children[b"download"]
+        )
         channel = make_request(
             self.reactor,
             FakeSite(resource, self.reactor),

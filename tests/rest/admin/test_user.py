@@ -3243,8 +3243,8 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         Returns:
             The ID of the newly created media.
         """
-        upload_resource = self.media_repo.children[b"upload"]
-        download_resource = self.media_repo.children[b"download"]
+        upload_resource = self.media_repo.children[b"v3"].children[b"upload"]
+        download_resource = self.media_repo.children[b"v3"].children[b"download"]
 
         # Upload some media into the room
         response = self.helper.upload_media(

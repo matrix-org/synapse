@@ -511,7 +511,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             user_token: Access token of the user
             number_media: Number of media to be created for the user
         """
-        upload_resource = self.media_repo.children[b"upload"]
+        upload_resource = self.media_repo.children[b"v3"].children[b"upload"]
         for _ in range(number_media):
             # Upload some media into the room
             self.helper.upload_media(
