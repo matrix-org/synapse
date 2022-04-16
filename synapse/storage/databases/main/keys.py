@@ -20,6 +20,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 from signedjson.key import decode_verify_key_bytes
 
 from synapse.storage._base import SQLBaseStore
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.keys import FetchKeyResult
 from synapse.storage.types import Cursor
 from synapse.util.caches.descriptors import cached, cachedList
@@ -35,7 +36,9 @@ class KeyStore(SQLBaseStore):
     """Persistence for signature verification keys"""
 
     @cached()
-    def _get_server_verify_key(self, server_name_and_key_id):
+    def _get_server_verify_key(
+        self, server_name_and_key_id: Iterable[Tuple[str, str]]
+    ) -> Dict[Tuple[str, str], FetchKeyResult]:
         raise NotImplementedError()
 
     @cachedList(
@@ -191,7 +194,9 @@ class KeyStore(SQLBaseStore):
             A mapping from (server_name, key_id, source) triplets to a list of dicts
         """
 
-        def _get_server_keys_json_txn(txn):
+        def _get_server_keys_json_txn(
+            txn: LoggingTransaction,
+        ) -> Dict[Tuple[str, Optional[str], Optional[str]], List[dict]]:
             results = {}
             for server_name, key_id, from_server in server_keys:
                 keyvalues = {"server_name": server_name}
