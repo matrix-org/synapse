@@ -485,7 +485,7 @@ class RequestSendFailed(RuntimeError):
         self.can_retry = can_retry
 
 
-class UnredactedContentDeleted(SynapseError):
+class UnredactedContentDeletedError(SynapseError):
     def __init__(self, content_keep_ms: Optional[int] = None):
         super().__init__(
             404,

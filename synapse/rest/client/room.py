@@ -30,7 +30,7 @@ from synapse.api.errors import (
     MissingClientTokenError,
     ShadowBanError,
     SynapseError,
-    UnredactedContentDeleted,
+    UnredactedContentDeletedError,
 )
 from synapse.api.filtering import Filter
 from synapse.events.utils import format_event_for_client_v2
@@ -705,7 +705,7 @@ class RoomEventServlet(RestServlet):
             if include_unredacted_content and await self._store.have_censored_event(
                 event_id
             ):
-                raise UnredactedContentDeleted(self.content_keep_ms)
+                raise UnredactedContentDeletedError(self.content_keep_ms)
 
             # Ensure there are bundled aggregations available.
             aggregations = await self._relations_handler.get_bundled_aggregations(
