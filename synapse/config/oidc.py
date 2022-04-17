@@ -213,6 +213,9 @@ class OIDCConfig(Config):
         #   Additional attributes can be added to userinfo by expanding the `scopes` section 
         #   of the OIDC config to retrieve additional information from the OIDC provider.
         #
+        #   If you specify both `value` and `values` entries, then only `value` entry will be checked
+        #   and `values` will be ignored.
+        #
         #   If the OIDC claim is a list, then the attribute must match any value in the list.
         #   Otherwise, it must exactly match the value of the claim. Using the example
         #   below, the `given_name` claim MUST be either "Andries" or "Michael", the `family_name` 
