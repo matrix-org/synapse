@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import attr
 
@@ -36,13 +36,27 @@ class SsoAttributeRequirement:
     """Object describing a single requirement for SSO attributes."""
 
     attribute: str
-    # If a value is not given, than the attribute must simply exist.
-    value: Optional[str]
+    # If a value or values are not given, than the attribute must simply exist.
+    value: Optional[str] = None
+    values: Optional[List[str]] = []
 
     JSON_SCHEMA = {
         "type": "object",
-        "properties": {"attribute": {"type": "string"}, "value": {"type": "string"}},
-        "required": ["attribute", "value"],
+        "properties": {
+            "attribute": {"type": "string"},
+            "value": {"type": "string"},
+            "values": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                },
+            },
+        },
+        "required": ["attribute"],
+        "oneOf": [
+            {"required": ["value"]},
+            {"required": ["values"]},
+        ],
     }
 
 

@@ -1042,12 +1042,17 @@ def _check_attribute_requirement(
         logger.info("SSO attribute missing: %s", req.attribute)
         return False
 
-    # If the requirement is None, the attribute existing is enough.
-    if req.value is None:
+    req_values = []
+    if req.value is not None:
+        req_values.append(req.value)
+    elif req.values:
+        req_values.extend(req.values)
+    else:
+        # If the requirement is None or empty, the attribute existing is enough.
         return True
 
     values = attributes[req.attribute]
-    if req.value in values:
+    if any(req_value in values for req_value in req_values):
         return True
 
     logger.info(
