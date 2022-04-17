@@ -1,0 +1,1 @@
+Add the ability of filtering multiple SSO attribute values.
