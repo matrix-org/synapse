@@ -130,7 +130,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         if room_version is None:
-            raise NotFoundError("Could not room_version for %s" % (room_id,))
+            raise NotFoundError("Could not find room_version for %s" % (room_id,))
 
         return room_version
 
