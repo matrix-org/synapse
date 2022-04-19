@@ -5,6 +5,9 @@
 nodaemon=true
 user=root
 
+[include]
+files = /etc/supervisor/conf.d/*.conf
+
 [program:nginx]
 command=/usr/sbin/nginx -g "daemon off;"
 priority=500
