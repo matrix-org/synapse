@@ -92,7 +92,6 @@ incoming_responses_counter = Counter(
 # need a generous limit here.
 MAX_RESPONSE_SIZE = 100 * 1024 * 1024
 
-MAX_SHORT_RETRIES = 3
 MAXINT = sys.maxsize
 
 
@@ -346,9 +345,11 @@ class MatrixFederationHttpClient:
         self._store = hs.get_datastores().main
         self.version_string_bytes = hs.version_string.encode("ascii")
         self.default_timeout = 60
+
         self.max_long_retry_delay = hs.config.experimental.max_long_retry_delay
-        self.min_retry_delay = hs.config.experimental.min_retry_delay
+        self.max_short_retry_delay = hs.config.experimental.max_short_retry_delay
         self.max_long_retries = hs.config.experimental.max_long_retries
+        self.max_short_retries = hs.config.experimental.max_short_retries
 
         def schedule(x):
             self.reactor.callLater(_EPSILON, x)
@@ -506,7 +507,7 @@ class MatrixFederationHttpClient:
             if long_retries:
                 retries_left = self.max_long_retries
             else:
-                retries_left = MAX_SHORT_RETRIES
+                retries_left = self.max_short_retries
 
             url_bytes = request.uri
             url_str = url_bytes.decode("ascii")
@@ -655,8 +656,8 @@ class MatrixFederationHttpClient:
                             delay = min(delay, self.max_long_retry_delay)
                             delay *= random.uniform(0.8, 1.4)
                         else:
-                            delay = 0.5 * 2 ** (MAX_SHORT_RETRIES - retries_left)
-                            delay = min(delay, self.min_retry_delay)
+                            delay = 0.5 * 2 ** (self.max_short_retries - retries_left)
+                            delay = min(delay, self.max_short_retry_delay)
                             delay *= random.uniform(0.8, 1.4)
 
                         logger.debug(
