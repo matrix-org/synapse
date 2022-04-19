@@ -193,7 +193,7 @@ poetry update packagename
 to use the latest version of `packagename` in the locked environment, without
 affecting the broad dependencies listed in the wheel.
 
-There doesn't seem to be away to do this whilst locking a _specific_ version of
+There doesn't seem to be a way to do this whilst locking a _specific_ version of
 `packagename`. We can workaround this (crudely) as follows:
 
 ```shell
