@@ -299,9 +299,10 @@ environment using [poetry](https://python-poetry.org/). First, install poetry. W
     pip install --user pipx
     pipx install poetry
 
-but see the `poetry installation docs <https://python-poetry.org/docs/#installation>`_
-for more details. Then ask poetry to create a virtual environment from the project
-and install Synapse's dependencies::
+as described `here <https://python-poetry.org/docs/#installing-with-pipx>`_.
+(See `poetry's installation docs <https://python-poetry.org/docs/#installation>`
+for other installation methods.) Then ask poetry to create a virtual environment
+from the project and install Synapse's dependencies::
 
     poetry install --extras "all test"
 

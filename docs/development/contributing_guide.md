@@ -51,7 +51,8 @@ can find many good git tutorials on the web.
 Synapse uses the [poetry](https://python-poetry.org/) project to manage its dependencies
 and development environment. Once you have installed Python 3 and added the
 source, you should install `poetry`.
-Of their installation methods, we recommend installing `poetry` using `pipx`,
+Of their installation methods, we recommend
+[installing `poetry` using `pipx`](https://python-poetry.org/docs/#installing-with-pipx),
 
 ```shell
 pip install --user pipx
@@ -59,7 +60,7 @@ pipx install poetry
 ```
 
 but see poetry's [installation instructions](https://python-poetry.org/docs/#installation)
-for more details.
+for more other installation methods.
 
 Next, open a terminal and install dependencies as follows:
 
