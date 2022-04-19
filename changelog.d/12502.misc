@@ -1,0 +1,1 @@
+Allow for the configuration of max request retries and min/max retry delays in the matrix federation client.
