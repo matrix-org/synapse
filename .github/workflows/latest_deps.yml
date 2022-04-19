@@ -49,7 +49,7 @@ jobs:
       # Doing the above makes mypy not process its list of ignores for some reason.
       # I think this is because the above does a normal install of matrix-synapse rather
       # than an editable install. We workaround this by uninstalling matrix-synapse.
-      - run: poetry run pip uninstall matrix-synapse
+      - run: poetry run pip uninstall -y matrix-synapse
       - run: poetry run pip list > after.txt && (diff -u before.txt after.txt || true)
       - run: poetry run mypy
   trial:
