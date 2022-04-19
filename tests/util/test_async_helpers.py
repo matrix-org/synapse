@@ -28,6 +28,7 @@ from synapse.logging.context import (
     make_deferred_yieldable,
 )
 from synapse.util.async_helpers import (
+    AwakenableSleeper,
     ObservableDeferred,
     concurrently_execute,
     delay_cancellation,
@@ -35,6 +36,7 @@ from synapse.util.async_helpers import (
     timeout_deferred,
 )
 
+from tests.server import get_clock
 from tests.unittest import TestCase
 
 
@@ -467,3 +469,39 @@ class DelayCancellationTests(TestCase):
         # logging context.
         blocking_d.callback(None)
         self.successResultOf(d)
+
+
+class AwakenableSleeperTests(TestCase):
+    "Tests AwakenableSleeper"
+
+    def test_sleep(self):
+        reactor, _ = get_clock()
+        sleeper = AwakenableSleeper(reactor)
+
+        d = defer.ensureDeferred(sleeper.sleep("name", 1000))
+
+        reactor.pump([0.0])
+        self.assertFalse(d.called)
+
+        reactor.advance(0.5)
+        self.assertFalse(d.called)
+
+        reactor.advance(0.6)
+        self.assertTrue(d.called)
+
+    def test_explicit_wake(self):
+        reactor, _ = get_clock()
+        sleeper = AwakenableSleeper(reactor)
+
+        d = defer.ensureDeferred(sleeper.sleep("name", 1000))
+
+        reactor.pump([0.0])
+        self.assertFalse(d.called)
+
+        reactor.advance(0.5)
+        self.assertFalse(d.called)
+
+        sleeper.wake("name")
+        self.assertTrue(d.called)
+
+        reactor.advance(0.6)
