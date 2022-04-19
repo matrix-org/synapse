@@ -521,7 +521,7 @@ class EventClientSerializer:
         # has a relation. Doing so would cause an infinite loop.
         event_relation = event.content.get("m.relates_to")
         include_thread = (
-            not isinstance(event_relation, dict)
+            not isinstance(event_relation, (dict, frozendict))
             or event_relation.get("rel_type") is None
         )
         if include_thread and event_aggregations.thread:
