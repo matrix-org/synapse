@@ -820,10 +820,10 @@ def run_in_background(  # type: ignore[misc]
                 )
             except StopIteration as e:
                 # ...which raises a `StopIteration` once the awaitable is complete.
-                res = e.value
-
-        # res is now a plain value here.
-        return defer.succeed(res)
+                return defer.succeed(e.value)
+        else:
+            # `f` returned a plain value.
+            return defer.succeed(res)
 
     if res.called and not res.paused:
         # The function should have maintained the logcontext, so we can
