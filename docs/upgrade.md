@@ -103,7 +103,7 @@ worker for application service traffic, **it must be stopped** when the database
 without any risk of reusing transaction IDs.
 
 Deployments which do not use separate worker processes can be upgraded as normal. Similarly,
-deployments where no applciation services are in use can be upgraded as normal.
+deployments where no application services are in use can be upgraded as normal.
 
 <details>
 <summary><b>Recovering from an incorrect upgrade</b></summary>
