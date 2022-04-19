@@ -192,6 +192,11 @@ class DeactivateAccountHandler:
         """
         user = UserID.from_string(user_id)
         pending_invites = await self.store.get_invited_rooms_for_local_user(user_id)
+        extra_content = (
+            {"org.matrix.msc3759.deactivated": True}
+            if self.hs.config.experimental.msc3759_enabled
+            else None
+        )
 
         for room in pending_invites:
             try:
@@ -202,6 +207,7 @@ class DeactivateAccountHandler:
                     "leave",
                     ratelimit=False,
                     require_consent=False,
+                    content=extra_content,
                 )
                 logger.info(
                     "Rejected invite for deactivated user %r in room %r",
@@ -246,6 +252,11 @@ class DeactivateAccountHandler:
         user = UserID.from_string(user_id)
 
         rooms_for_user = await self.store.get_rooms_for_user(user_id)
+        extra_content = (
+            {"org.matrix.msc3759.deactivated": True}
+            if self.hs.config.experimental.msc3759_enabled
+            else None
+        )
         for room_id in rooms_for_user:
             logger.info("User parter parting %r from %r", user_id, room_id)
             try:
@@ -256,6 +267,7 @@ class DeactivateAccountHandler:
                     "leave",
                     ratelimit=False,
                     require_consent=False,
+                    content=extra_content,
                 )
             except Exception:
                 logger.exception(
