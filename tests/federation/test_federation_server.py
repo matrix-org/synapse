@@ -1,4 +1,5 @@
 # Copyright 2018 New Vector Ltd
+# Copyright 2019 Matrix.org Federation C.I.C
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -100,6 +101,27 @@ class ServerACLsTestCase(unittest.TestCase):
             server_matches_acl_event("ishgood.com", e),
             "pattern does not allow prefixes",
         )
+
+
+class StateQueryTests(unittest.FederatingHomeserverTestCase):
+    servlets = [
+        admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def test_needs_to_be_in_room(self):
+        """/v1/state/<room_id> requires the server to be in the room"""
+        u1 = self.register_user("u1", "pass")
+        u1_token = self.login("u1", "pass")
+
+        room_1 = self.helper.create_room_as(u1, tok=u1_token)
+
+        channel = self.make_signed_federation_request(
+            "GET", "/_matrix/federation/v1/state/%s?event_id=xyz" % (room_1,)
+        )
+        self.assertEqual(403, channel.code, channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
 
 
 class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
