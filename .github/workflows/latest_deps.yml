@@ -1,7 +1,7 @@
-# People who are freshly `pip install`ing from the wheels we publish to PyPI will pull
-# in the latest versions of all dependencies. We used to do this in our CI runs, which
-# would detect any incompatibilities due to new package releases. Now that we use the
-# locked poetry environment, we don't have advance notice of these breakages.defaults:
+# People who are freshly `pip install`ing from PyPI will pull in the latest versions of all
+# dependencies. Since most CI runs are against the locked poetry environment, run
+# specifically against the latest dependencies to know if there's an upcoming breaking
+# change.
 #
 # To plug that hole, this job is a canary which periodically
 # - checks out develop,
