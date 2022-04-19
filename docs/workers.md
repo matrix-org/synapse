@@ -138,20 +138,7 @@ as the `listeners` option in the shared config.
 For example:
 
 ```yaml
-worker_app: synapse.app.generic_worker
-worker_name: worker1
-
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
-
-worker_listeners:
-  - type: http
-    port: 8083
-    resources:
-      - names: [client, federation]
-
-worker_log_config: /home/matrix/synapse/config/worker1_log_config.yaml
+{{#include systemd-with-workers/workers/generic_worker.yaml}}
 ```
 
 ...is a full configuration for a generic worker instance, which will expose a
@@ -363,6 +350,12 @@ stream_writers:
     events: event_persister1
 ```
 
+An example for a stream writer instance:
+
+```yaml
+{{#include systemd-with-workers/workers/event_persister.yaml}}
+```
+
 Some of the streams have associated endpoints which, for maximum efficiency, should
 be routed to the workers handling that stream. See below for the currently supported
 streams and the endpoints associated with them:
@@ -435,6 +428,12 @@ run_background_tasks_on: background_worker
 
 You might also wish to investigate the `update_user_directory` and
 `media_instance_running_background_jobs` settings.
+
+An example for a dedicated background worker instance:
+
+```yaml
+{{#include systemd-with-workers/workers/background_worker.yaml}}
+```
 
 ### `synapse.app.pusher`
 
@@ -615,14 +614,14 @@ The following shows an example setup using Redis and a reverse proxy:
 |   Main       |  |   Generic    |  |   Generic    |  |  Event       |
 |   Process    |  |   Worker 1   |  |   Worker 2   |  |  Persister   |
 +--------------+  +--------------+  +--------------+  +--------------+
-      ^    ^          |   ^   |         |   ^   |          ^    ^
-      |    |          |   |   |         |   |   |          |    |
-      |    |          |   |   |  HTTP   |   |   |          |    |
-      |    +----------+<--|---|---------+   |   |          |    |
-      |                   |   +-------------|-->+----------+    |
-      |                   |                 |                   |
-      |                   |                 |                   |
-      v                   v                 v                   v
-====================================================================
+      ^    ^          |   ^   |         |   ^   |         |   ^   ^
+      |    |          |   |   |         |   |   |         |   |   |
+      |    |          |   |   |  HTTP   |   |   |         |   |   |
+      |    +----------+<--|---|---------+<--|---|---------+   |   |
+      |                   |   +-------------|-->+-------------+   |
+      |                   |                 |                     |
+      |                   |                 |                     |
+      v                   v                 v                     v
+======================================================================
                                                          Redis pub/sub channel
 ```
