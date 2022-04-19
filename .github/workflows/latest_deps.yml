@@ -27,8 +27,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # TODO(dmr): I'm not sure if we want to run mypy here, nor if mypy failures should
-  # merit an issue.
   mypy:
     runs-on: ubuntu-latest
     steps:
