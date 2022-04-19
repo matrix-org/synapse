@@ -71,7 +71,7 @@ jobs:
         if: ${{ matrix.postgres-version }}
         timeout-minutes: 2
         run: until pg_isready -h localhost; do sleep 1; done
-      - run: trial --jobs=2 tests
+      - run: python -m trial --jobs=2 tests
         env:
           SYNAPSE_POSTGRES: ${{ matrix.database == 'postgres' || '' }}
           SYNAPSE_POSTGRES_HOST: localhost
