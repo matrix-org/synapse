@@ -1,4 +1,5 @@
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +16,7 @@
 from typing import Any, List
 
 from synapse.config.sso import SsoAttributeRequirement
+from synapse.types import JsonDict
 
 from ._base import Config
 from ._util import validate_config
@@ -28,7 +30,7 @@ class CasConfig(Config):
 
     section = "cas"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         cas_config = config.get("cas_config", None)
         self.cas_enabled = cas_config and cas_config.get("enabled", True)
 
@@ -51,7 +53,7 @@ class CasConfig(Config):
             self.cas_displayname_attribute = None
             self.cas_required_attributes = []
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         # Enable Central Authentication Service (CAS) for registration and login.
         #

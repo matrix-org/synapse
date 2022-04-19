@@ -162,7 +162,9 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         return self.setup_test_homeserver(
-            federation_transport_client=Mock(spec=["send_transaction"]),
+            federation_transport_client=Mock(
+                spec=["send_transaction", "query_user_devices"]
+            ),
         )
 
     def default_config(self):
@@ -171,14 +173,17 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         return c
 
     def prepare(self, reactor, clock, hs):
-        # stub out get_users_who_share_room_with_user so that it claims that
-        # `@user2:host2` is in the room
-        def get_users_who_share_room_with_user(user_id):
+        # stub out `get_rooms_for_user` and `get_users_in_room` so that the
+        # server thinks the user shares a room with `@user2:host2`
+        def get_rooms_for_user(user_id):
+            return defer.succeed({"!room:host1"})
+
+        hs.get_datastores().main.get_rooms_for_user = get_rooms_for_user
+
+        def get_users_in_room(room_id):
             return defer.succeed({"@user2:host2"})
 
-        hs.get_datastore().get_users_who_share_room_with_user = (
-            get_users_who_share_room_with_user
-        )
+        hs.get_datastores().main.get_users_in_room = get_users_in_room
 
         # whenever send_transaction is called, record the edu data
         self.edus = []
@@ -201,9 +206,12 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         self.assertEqual(len(self.edus), 1)
         stream_id = self.check_device_update_edu(self.edus.pop(0), u1, "D1", None)
 
+        # We queue up device list updates to be sent over federation, so we
+        # advance to clear the queue.
+        self.reactor.advance(1)
+
         # a second call should produce no new device EDUs
         self.hs.get_federation_sender().send_device_messages("host2")
-        self.pump()
         self.assertEqual(self.edus, [])
 
         # a second device
@@ -211,6 +219,45 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
         self.assertEqual(len(self.edus), 1)
         self.check_device_update_edu(self.edus.pop(0), u1, "D2", stream_id)
+
+    def test_dont_send_device_updates_for_remote_users(self):
+        """Check that we don't send device updates for remote users"""
+
+        # Send the server a device list EDU for the other user, this will cause
+        # it to try and resync the device lists.
+        self.hs.get_federation_transport_client().query_user_devices.return_value = (
+            defer.succeed(
+                {
+                    "stream_id": "1",
+                    "user_id": "@user2:host2",
+                    "devices": [{"device_id": "D1"}],
+                }
+            )
+        )
+
+        self.get_success(
+            self.hs.get_device_handler().device_list_updater.incoming_device_list_update(
+                "host2",
+                {
+                    "user_id": "@user2:host2",
+                    "device_id": "D1",
+                    "stream_id": "1",
+                    "prev_ids": [],
+                },
+            )
+        )
+
+        self.reactor.advance(1)
+
+        # We shouldn't see an EDU for that update
+        self.assertEqual(self.edus, [])
+
+        # Check that we did successfully process the inbound EDU (otherwise this
+        # test would pass if we failed to process the EDU)
+        devices = self.get_success(
+            self.hs.get_datastores().main.get_cached_devices_for_user("@user2:host2")
+        )
+        self.assertIn("D1", devices)
 
     def test_upload_signatures(self):
         """Uploading signatures on some devices should produce updates for that user"""
@@ -231,6 +278,10 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         # upload signing keys for each device
         device1_signing_key = self.generate_and_upload_device_signing_key(u1, "D1")
         device2_signing_key = self.generate_and_upload_device_signing_key(u1, "D2")
+
+        # We queue up device list updates to be sent over federation, so we
+        # advance to clear the queue.
+        self.reactor.advance(1)
 
         # expect two more edus
         self.assertEqual(len(self.edus), 2)
@@ -265,8 +316,13 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
             e2e_handler.upload_signing_keys_for_user(u1, cross_signing_keys)
         )
 
+        # We queue up device list updates to be sent over federation, so we
+        # advance to clear the queue.
+        self.reactor.advance(1)
+
         # expect signing key update edu
-        self.assertEqual(len(self.edus), 1)
+        self.assertEqual(len(self.edus), 2)
+        self.assertEqual(self.edus.pop(0)["edu_type"], "m.signing_key_update")
         self.assertEqual(self.edus.pop(0)["edu_type"], "org.matrix.signing_key_update")
 
         # sign the devices
@@ -282,6 +338,10 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
             )
         )
         self.assertEqual(ret["failures"], {})
+
+        # We queue up device list updates to be sent over federation, so we
+        # advance to clear the queue.
+        self.reactor.advance(1)
 
         # expect two edus, in one or two transactions. We don't know what order the
         # devices will be updated.
@@ -306,6 +366,10 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         self.login("user", "pass", device_id="D2")
         self.login("user", "pass", device_id="D3")
 
+        # We queue up device list updates to be sent over federation, so we
+        # advance to clear the queue.
+        self.reactor.advance(1)
+
         # expect three edus
         self.assertEqual(len(self.edus), 3)
         stream_id = self.check_device_update_edu(self.edus.pop(0), u1, "D1", None)
@@ -316,6 +380,10 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         self.get_success(
             self.hs.get_device_handler().delete_devices(u1, ["D1", "D2", "D3"])
         )
+
+        # We queue up device list updates to be sent over federation, so we
+        # advance to clear the queue.
+        self.reactor.advance(1)
 
         # expect three edus, in an unknown order
         self.assertEqual(len(self.edus), 3)
@@ -349,12 +417,19 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
             self.hs.get_device_handler().delete_devices(u1, ["D1", "D2", "D3"])
         )
 
+        # We queue up device list updates to be sent over federation, so we
+        # advance to clear the queue.
+        self.reactor.advance(1)
+
         self.assertGreaterEqual(mock_send_txn.call_count, 4)
 
         # recover the server
         mock_send_txn.side_effect = self.record_transaction
         self.hs.get_federation_sender().send_device_messages("host2")
-        self.pump()
+
+        # We queue up device list updates to be sent over federation, so we
+        # advance to clear the queue.
+        self.reactor.advance(1)
 
         # for each device, there should be a single update
         self.assertEqual(len(self.edus), 3)
@@ -389,18 +464,25 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
             self.hs.get_device_handler().delete_devices(u1, ["D1", "D2", "D3"])
         )
 
+        # We queue up device list updates to be sent over federation, so we
+        # advance to clear the queue.
+        self.reactor.advance(1)
+
         self.assertGreaterEqual(mock_send_txn.call_count, 4)
 
         # run the prune job
         self.reactor.advance(10)
         self.get_success(
-            self.hs.get_datastore()._prune_old_outbound_device_pokes(prune_age=1)
+            self.hs.get_datastores().main._prune_old_outbound_device_pokes(prune_age=1)
         )
 
         # recover the server
         mock_send_txn.side_effect = self.record_transaction
         self.hs.get_federation_sender().send_device_messages("host2")
-        self.pump()
+
+        # We queue up device list updates to be sent over federation, so we
+        # advance to clear the queue.
+        self.reactor.advance(1)
 
         # there should be a single update for this user.
         self.assertEqual(len(self.edus), 1)
@@ -434,6 +516,10 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         self.login("user", "pass", device_id="D2")
         self.login("user", "pass", device_id="D3")
 
+        # We queue up device list updates to be sent over federation, so we
+        # advance to clear the queue.
+        self.reactor.advance(1)
+
         # delete them again
         self.get_success(
             self.hs.get_device_handler().delete_devices(u1, ["D1", "D2", "D3"])
@@ -444,13 +530,16 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         # run the prune job
         self.reactor.advance(10)
         self.get_success(
-            self.hs.get_datastore()._prune_old_outbound_device_pokes(prune_age=1)
+            self.hs.get_datastores().main._prune_old_outbound_device_pokes(prune_age=1)
         )
 
         # recover the server
         mock_send_txn.side_effect = self.record_transaction
         self.hs.get_federation_sender().send_device_messages("host2")
-        self.pump()
+
+        # We queue up device list updates to be sent over federation, so we
+        # advance to clear the queue.
+        self.reactor.advance(1)
 
         # ... and we should get a single update for this user.
         self.assertEqual(len(self.edus), 1)
@@ -491,7 +580,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
     ) -> None:
         """Check that the txn has an EDU with a signing key update."""
         edus = txn["edus"]
-        self.assertEqual(len(edus), 1)
+        self.assertEqual(len(edus), 2)
 
     def generate_and_upload_device_signing_key(
         self, user_id: str, device_id: str

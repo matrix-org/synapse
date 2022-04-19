@@ -187,7 +187,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         state_key: str,
         txn_id: Optional[str] = None,
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         if txn_id:
             set_tag("txn_id", txn_id)
@@ -477,7 +477,7 @@ class RoomMemberListRestServlet(RestServlet):
         super().__init__()
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
@@ -553,7 +553,7 @@ class RoomMessageListRestServlet(RestServlet):
         self._hs = hs
         self.pagination_handler = hs.get_pagination_handler()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
@@ -621,7 +621,7 @@ class RoomInitialSyncRestServlet(RestServlet):
         super().__init__()
         self.initial_sync_handler = hs.get_initial_sync_handler()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
@@ -642,8 +642,10 @@ class RoomEventServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.clock = hs.get_clock()
+        self._store = hs.get_datastores().main
         self.event_handler = hs.get_event_handler()
         self._event_serializer = hs.get_event_client_serializer()
+        self._relations_handler = hs.get_relations_handler()
         self.auth = hs.get_auth()
 
     async def on_GET(
@@ -660,9 +662,16 @@ class RoomEventServlet(RestServlet):
             # https://matrix.org/docs/spec/client_server/r0.5.0#get-matrix-client-r0-rooms-roomid-event-eventid
             raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
-        time_now = self.clock.time_msec()
         if event:
-            event_dict = await self._event_serializer.serialize_event(event, time_now)
+            # Ensure there are bundled aggregations available.
+            aggregations = await self._relations_handler.get_bundled_aggregations(
+                [event], requester.user.to_string()
+            )
+
+            time_now = self.clock.time_msec()
+            event_dict = self._event_serializer.serialize_event(
+                event, time_now, bundle_aggregations=aggregations
+            )
             return 200, event_dict
 
         raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
@@ -698,29 +707,36 @@ class RoomEventContextServlet(RestServlet):
         else:
             event_filter = None
 
-        results = await self.room_context_handler.get_event_context(
+        event_context = await self.room_context_handler.get_event_context(
             requester, room_id, event_id, limit, event_filter
         )
 
-        if not results:
+        if not event_context:
             raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
         time_now = self.clock.time_msec()
-        results["events_before"] = await self._event_serializer.serialize_events(
-            results["events_before"], time_now
-        )
-        results["event"] = await self._event_serializer.serialize_event(
-            results["event"], time_now
-        )
-        results["events_after"] = await self._event_serializer.serialize_events(
-            results["events_after"], time_now
-        )
-        results["state"] = await self._event_serializer.serialize_events(
-            results["state"],
-            time_now,
-            # No need to bundle aggregations for state events
-            bundle_relations=False,
-        )
+        results = {
+            "events_before": self._event_serializer.serialize_events(
+                event_context.events_before,
+                time_now,
+                bundle_aggregations=event_context.aggregations,
+            ),
+            "event": self._event_serializer.serialize_event(
+                event_context.event,
+                time_now,
+                bundle_aggregations=event_context.aggregations,
+            ),
+            "events_after": self._event_serializer.serialize_events(
+                event_context.events_after,
+                time_now,
+                bundle_aggregations=event_context.aggregations,
+            ),
+            "state": self._event_serializer.serialize_events(
+                event_context.state, time_now
+            ),
+            "start": event_context.start,
+            "end": event_context.end,
+        }
 
         return 200, results
 
@@ -1012,7 +1028,7 @@ class JoinedRoomsRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
@@ -1070,77 +1086,66 @@ def register_txn_path(
         )
 
 
-class RoomSpaceSummaryRestServlet(RestServlet):
+class TimestampLookupRestServlet(RestServlet):
+    """
+    API endpoint to fetch the `event_id` of the closest event to the given
+    timestamp (`ts` query parameter) in the given direction (`dir` query
+    parameter).
+
+    Useful for cases like jump to date so you can start paginating messages from
+    a given date in the archive.
+
+    `ts` is a timestamp in milliseconds where we will find the closest event in
+    the given direction.
+
+    `dir` can be `f` or `b` to indicate forwards and backwards in time from the
+    given timestamp.
+
+    GET /_matrix/client/unstable/org.matrix.msc3030/rooms/<roomID>/timestamp_to_event?ts=<timestamp>&dir=<direction>
+    {
+        "event_id": ...
+    }
+    """
+
     PATTERNS = (
         re.compile(
-            "^/_matrix/client/unstable/org.matrix.msc2946"
-            "/rooms/(?P<room_id>[^/]*)/spaces$"
+            "^/_matrix/client/unstable/org.matrix.msc3030"
+            "/rooms/(?P<room_id>[^/]*)/timestamp_to_event$"
         ),
     )
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self._auth = hs.get_auth()
-        self._room_summary_handler = hs.get_room_summary_handler()
+        self._store = hs.get_datastores().main
+        self.timestamp_lookup_handler = hs.get_timestamp_lookup_handler()
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self._auth.get_user_by_req(request, allow_guest=True)
+        requester = await self._auth.get_user_by_req(request)
+        await self._auth.check_user_in_room(room_id, requester.user.to_string())
 
-        max_rooms_per_space = parse_integer(request, "max_rooms_per_space")
-        if max_rooms_per_space is not None and max_rooms_per_space < 0:
-            raise SynapseError(
-                400,
-                "Value for 'max_rooms_per_space' must be a non-negative integer",
-                Codes.BAD_JSON,
-            )
+        timestamp = parse_integer(request, "ts", required=True)
+        direction = parse_string(request, "dir", default="f", allowed_values=["f", "b"])
 
-        return 200, await self._room_summary_handler.get_space_summary(
-            requester.user.to_string(),
-            room_id,
-            suggested_only=parse_boolean(request, "suggested_only", default=False),
-            max_rooms_per_space=max_rooms_per_space,
+        (
+            event_id,
+            origin_server_ts,
+        ) = await self.timestamp_lookup_handler.get_event_for_timestamp(
+            requester, room_id, timestamp, direction
         )
 
-    # TODO When switching to the stable endpoint, remove the POST handler.
-    async def on_POST(
-        self, request: SynapseRequest, room_id: str
-    ) -> Tuple[int, JsonDict]:
-        requester = await self._auth.get_user_by_req(request, allow_guest=True)
-        content = parse_json_object_from_request(request)
-
-        suggested_only = content.get("suggested_only", False)
-        if not isinstance(suggested_only, bool):
-            raise SynapseError(
-                400, "'suggested_only' must be a boolean", Codes.BAD_JSON
-            )
-
-        max_rooms_per_space = content.get("max_rooms_per_space")
-        if max_rooms_per_space is not None:
-            if not isinstance(max_rooms_per_space, int):
-                raise SynapseError(
-                    400, "'max_rooms_per_space' must be an integer", Codes.BAD_JSON
-                )
-            if max_rooms_per_space < 0:
-                raise SynapseError(
-                    400,
-                    "Value for 'max_rooms_per_space' must be a non-negative integer",
-                    Codes.BAD_JSON,
-                )
-
-        return 200, await self._room_summary_handler.get_space_summary(
-            requester.user.to_string(),
-            room_id,
-            suggested_only=suggested_only,
-            max_rooms_per_space=max_rooms_per_space,
-        )
+        return 200, {
+            "event_id": event_id,
+            "origin_server_ts": origin_server_ts,
+        }
 
 
 class RoomHierarchyRestServlet(RestServlet):
     PATTERNS = (
         re.compile(
-            "^/_matrix/client/unstable/org.matrix.msc2946"
+            "^/_matrix/client/(v1|unstable/org.matrix.msc2946)"
             "/rooms/(?P<room_id>[^/]*)/hierarchy$"
         ),
     )
@@ -1168,7 +1173,7 @@ class RoomHierarchyRestServlet(RestServlet):
             )
 
         return 200, await self._room_summary_handler.get_room_hierarchy(
-            requester.user.to_string(),
+            requester,
             room_id,
             suggested_only=parse_boolean(request, "suggested_only", default=False),
             max_depth=max_depth,
@@ -1230,7 +1235,6 @@ def register_servlets(
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
-    RoomSpaceSummaryRestServlet(hs).register(http_server)
     RoomHierarchyRestServlet(hs).register(http_server)
     if hs.config.experimental.msc3266_enabled:
         RoomSummaryRestServlet(hs).register(http_server)
@@ -1239,6 +1243,8 @@ def register_servlets(
     RoomAliasListServlet(hs).register(http_server)
     SearchRestServlet(hs).register(http_server)
     RoomCreateRestServlet(hs).register(http_server)
+    if hs.config.experimental.msc3030_enabled:
+        TimestampLookupRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.
     if not is_worker:

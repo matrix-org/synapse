@@ -27,6 +27,7 @@ from synapse.push.pusher import PusherFactory
 from synapse.replication.http.push import ReplicationRemovePusherRestServlet
 from synapse.types import JsonDict, RoomStreamToken
 from synapse.util.async_helpers import concurrently_execute
+from synapse.util.threepids import canonicalise_email
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -58,7 +59,7 @@ class PusherPool:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.pusher_factory = PusherFactory(hs)
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.clock = self.hs.get_clock()
 
         # We shard the handling of push notifications by user ID.
@@ -113,7 +114,9 @@ class PusherPool:
         """
 
         if kind == "email":
-            email_owner = await self.store.get_user_id_by_threepid("email", pushkey)
+            email_owner = await self.store.get_user_id_by_threepid(
+                "email", canonicalise_email(pushkey)
+            )
             if email_owner != user_id:
                 raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 

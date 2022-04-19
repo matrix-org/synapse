@@ -63,7 +63,7 @@ def _create_rerouter(func_name: str) -> Callable[..., Awaitable[JsonDict]]:
 class GroupsLocalWorkerHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.room_list_handler = hs.get_room_list_handler()
         self.groups_server_handler = hs.get_groups_server_handler()
         self.transport_client = hs.get_federation_transport_client()

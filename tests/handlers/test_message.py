@@ -23,6 +23,7 @@ from synapse.types import create_requester
 from synapse.util.stringutils import random_string
 
 from tests import unittest
+from tests.test_utils.event_injection import create_event
 
 logger = logging.getLogger(__name__)
 
@@ -43,13 +44,31 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.access_token)
 
         self.info = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(
+            self.hs.get_datastores().main.get_user_by_access_token(
                 self.access_token,
             )
         )
         self.token_id = self.info.token_id
 
         self.requester = create_requester(self.user_id, access_token_id=self.token_id)
+
+    def _create_and_persist_member_event(self) -> Tuple[EventBase, EventContext]:
+        # Create a member event we can use as an auth_event
+        memberEvent, memberEventContext = self.get_success(
+            create_event(
+                self.hs,
+                room_id=self.room_id,
+                type="m.room.member",
+                sender=self.requester.user.to_string(),
+                state_key=self.requester.user.to_string(),
+                content={"membership": "join"},
+            )
+        )
+        self.get_success(
+            self.persist_event_storage.persist_event(memberEvent, memberEventContext)
+        )
+
+        return memberEvent, memberEventContext
 
     def _create_duplicate_event(self, txn_id: str) -> Tuple[EventBase, EventContext]:
         """Create a new event with the given transaction ID. All events produced
@@ -155,6 +174,90 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         # Check that we've deduplicated the events.
         self.assertEqual(len(events), 2)
         self.assertEqual(events[0].event_id, events[1].event_id)
+
+    def test_when_empty_prev_events_allowed_create_event_with_empty_prev_events(self):
+        """When we set allow_no_prev_events=True, should be able to create a
+        event without any prev_events (only auth_events).
+        """
+        # Create a member event we can use as an auth_event
+        memberEvent, _ = self._create_and_persist_member_event()
+
+        # Try to create the event with empty prev_events bit with some auth_events
+        event, _ = self.get_success(
+            self.handler.create_event(
+                self.requester,
+                {
+                    "type": EventTypes.Message,
+                    "room_id": self.room_id,
+                    "sender": self.requester.user.to_string(),
+                    "content": {"msgtype": "m.text", "body": random_string(5)},
+                },
+                # Empty prev_events is the key thing we're testing here
+                prev_event_ids=[],
+                # But with some auth_events
+                auth_event_ids=[memberEvent.event_id],
+                # Allow no prev_events!
+                allow_no_prev_events=True,
+            )
+        )
+        self.assertIsNotNone(event)
+
+    def test_when_empty_prev_events_not_allowed_reject_event_with_empty_prev_events(
+        self,
+    ):
+        """When we set allow_no_prev_events=False, shouldn't be able to create a
+        event without any prev_events even if it has auth_events. Expect an
+        exception to be raised.
+        """
+        # Create a member event we can use as an auth_event
+        memberEvent, _ = self._create_and_persist_member_event()
+
+        # Try to create the event with empty prev_events but with some auth_events
+        self.get_failure(
+            self.handler.create_event(
+                self.requester,
+                {
+                    "type": EventTypes.Message,
+                    "room_id": self.room_id,
+                    "sender": self.requester.user.to_string(),
+                    "content": {"msgtype": "m.text", "body": random_string(5)},
+                },
+                # Empty prev_events is the key thing we're testing here
+                prev_event_ids=[],
+                # But with some auth_events
+                auth_event_ids=[memberEvent.event_id],
+                # We expect the test to fail because empty prev_events are not
+                # allowed here!
+                allow_no_prev_events=False,
+            ),
+            AssertionError,
+        )
+
+    def test_when_empty_prev_events_allowed_reject_event_with_empty_prev_events_and_auth_events(
+        self,
+    ):
+        """When we set allow_no_prev_events=True, should be able to create a
+        event without any prev_events or auth_events. Expect an exception to be
+        raised.
+        """
+        # Try to create the event with empty prev_events and empty auth_events
+        self.get_failure(
+            self.handler.create_event(
+                self.requester,
+                {
+                    "type": EventTypes.Message,
+                    "room_id": self.room_id,
+                    "sender": self.requester.user.to_string(),
+                    "content": {"msgtype": "m.text", "body": random_string(5)},
+                },
+                prev_event_ids=[],
+                # The event should be rejected when there are no auth_events
+                auth_event_ids=[],
+                # Allow no prev_events!
+                allow_no_prev_events=True,
+            ),
+            AssertionError,
+        )
 
 
 class ServerAclValidationTestCase(unittest.HomeserverTestCase):

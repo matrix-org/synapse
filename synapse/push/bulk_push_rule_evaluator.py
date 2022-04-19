@@ -24,6 +24,7 @@ from synapse.event_auth import get_user_power_level
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
+from synapse.storage.databases.main.roommember import EventIdMembership
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import CacheMetric, register_cache
 from synapse.util.caches.descriptors import lru_cache
@@ -103,7 +104,7 @@ class BulkPushRuleEvaluator:
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self._event_auth_handler = hs.get_event_auth_handler()
 
         # Used by `RulesForRoom` to ensure only one thing mutates the cache at a
@@ -213,7 +214,7 @@ class BulkPushRuleEvaluator:
         if not event.is_state():
             ignorers = await self.store.ignored_by(event.sender)
         else:
-            ignorers = set()
+            ignorers = frozenset()
 
         for uid, rules in rules_by_user.items():
             if event.sender == uid:
@@ -274,17 +275,17 @@ def _condition_checker(
     cache: Dict[str, bool],
 ) -> bool:
     for cond in conditions:
-        _id = cond.get("_id", None)
-        if _id:
-            res = cache.get(_id, None)
+        _cache_key = cond.get("_cache_key", None)
+        if _cache_key:
+            res = cache.get(_cache_key, None)
             if res is False:
                 return False
             elif res is True:
                 continue
 
         res = evaluator.matches(cond, uid, display_name)
-        if _id:
-            cache[_id] = bool(res)
+        if _cache_key:
+            cache[_cache_key] = bool(res)
 
         if not res:
             return False
@@ -292,13 +293,13 @@ def _condition_checker(
     return True
 
 
-MemberMap = Dict[str, Tuple[str, str]]
+MemberMap = Dict[str, Optional[EventIdMembership]]
 Rule = Dict[str, dict]
 RulesByUser = Dict[str, List[Rule]]
 StateGroup = Union[object, int]
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class RulesForRoomData:
     """The data stored in the cache by `RulesForRoom`.
 
@@ -306,30 +307,30 @@ class RulesForRoomData:
     *only* include data, and not references to e.g. the data stores.
     """
 
-    # event_id -> (user_id, state)
-    member_map = attr.ib(type=MemberMap, factory=dict)
+    # event_id -> EventIdMembership
+    member_map: MemberMap = attr.Factory(dict)
     # user_id -> rules
-    rules_by_user = attr.ib(type=RulesByUser, factory=dict)
+    rules_by_user: RulesByUser = attr.Factory(dict)
 
     # The last state group we updated the caches for. If the state_group of
     # a new event comes along, we know that we can just return the cached
     # result.
     # On invalidation of the rules themselves (if the user changes them),
     # we invalidate everything and set state_group to `object()`
-    state_group = attr.ib(type=StateGroup, factory=object)
+    state_group: StateGroup = attr.Factory(object)
 
     # A sequence number to keep track of when we're allowed to update the
     # cache. We bump the sequence number when we invalidate the cache. If
     # the sequence number changes while we're calculating stuff we should
     # not update the cache with it.
-    sequence = attr.ib(type=int, default=0)
+    sequence: int = 0
 
     # A cache of user_ids that we *know* aren't interesting, e.g. user_ids
     # owned by AS's, or remote users, etc. (I.e. users we will never need to
     # calculate push for)
     # These never need to be invalidated as we will never set up push for
     # them.
-    uninteresting_user_set = attr.ib(type=Set[str], factory=set)
+    uninteresting_user_set: Set[str] = attr.Factory(set)
 
 
 class RulesForRoom:
@@ -366,7 +367,7 @@ class RulesForRoom:
         """
         self.room_id = room_id
         self.is_mine_id = hs.is_mine_id
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.room_push_rule_cache_metrics = room_push_rule_cache_metrics
 
         # Used to ensure only one thing mutates the cache at a time. Keyed off
@@ -396,7 +397,7 @@ class RulesForRoom:
             self.room_push_rule_cache_metrics.inc_hits()
             return self.data.rules_by_user
 
-        with (await self.linearizer.queue(self.room_id)):
+        async with self.linearizer.queue(self.room_id):
             if state_group and self.data.state_group == state_group:
                 logger.debug("Using cached rules for %r", self.room_id)
                 self.room_push_rule_cache_metrics.inc_hits()
@@ -447,11 +448,10 @@ class RulesForRoom:
 
                 res = self.data.member_map.get(event_id, None)
                 if res:
-                    user_id, state = res
-                    if state == Membership.JOIN:
-                        rules = self.data.rules_by_user.get(user_id, None)
+                    if res.membership == Membership.JOIN:
+                        rules = self.data.rules_by_user.get(res.user_id, None)
                         if rules:
-                            ret_rules_by_user[user_id] = rules
+                            ret_rules_by_user[res.user_id] = rules
                     continue
 
                 # If a user has left a room we remove their push rule. If they
@@ -502,24 +502,26 @@ class RulesForRoom:
         """
         sequence = self.data.sequence
 
-        rows = await self.store.get_membership_from_event_ids(member_event_ids.values())
+        members = await self.store.get_membership_from_event_ids(
+            member_event_ids.values()
+        )
 
-        members = {row["event_id"]: (row["user_id"], row["membership"]) for row in rows}
-
-        # If the event is a join event then it will be in current state evnts
+        # If the event is a join event then it will be in current state events
         # map but not in the DB, so we have to explicitly insert it.
         if event.type == EventTypes.Member:
             for event_id in member_event_ids.values():
                 if event_id == event.event_id:
-                    members[event_id] = (event.state_key, event.membership)
+                    members[event_id] = EventIdMembership(
+                        user_id=event.state_key, membership=event.membership
+                    )
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug("Found members %r: %r", self.room_id, members.values())
 
         joined_user_ids = {
-            user_id
-            for user_id, membership in members.values()
-            if membership == Membership.JOIN
+            entry.user_id
+            for entry in members.values()
+            if entry and entry.membership == Membership.JOIN
         }
 
         logger.debug("Joined: %r", joined_user_ids)
@@ -553,7 +555,7 @@ class RulesForRoom:
             self.data.state_group = state_group
 
 
-@attr.attrs(slots=True, frozen=True)
+@attr.attrs(slots=True, frozen=True, auto_attribs=True)
 class _Invalidation:
     # _Invalidation is passed as an `on_invalidate` callback to bulk_get_push_rules,
     # which means that it it is stored on the bulk_get_push_rules cache entry. In order
@@ -564,8 +566,8 @@ class _Invalidation:
     # attrs provides suitable __hash__ and __eq__ methods, provided we remember to
     # set `frozen=True`.
 
-    cache = attr.ib(type=LruCache)
-    room_id = attr.ib(type=str)
+    cache: LruCache
+    room_id: str
 
     def __call__(self) -> None:
         rules_data = self.cache.get(self.room_id, None, update_metrics=False)

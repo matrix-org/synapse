@@ -1,4 +1,5 @@
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2022 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,21 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import urllib
-from typing import TYPE_CHECKING, List, Optional, Tuple
+import urllib.parse
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
 
 from prometheus_client import Counter
 
 from synapse.api.constants import EventTypes, Membership, ThirdPartyEntityKind
 from synapse.api.errors import CodeMessageException
+from synapse.appservice import (
+    ApplicationService,
+    TransactionOneTimeKeyCounts,
+    TransactionUnusedFallbackKeys,
+)
 from synapse.events import EventBase
-from synapse.events.utils import serialize_event
+from synapse.events.utils import SerializeEventConfig, serialize_event
 from synapse.http.client import SimpleHttpClient
-from synapse.types import JsonDict, ThirdPartyInstanceID
+from synapse.types import DeviceListUpdates, JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.response_cache import ResponseCache
 
 if TYPE_CHECKING:
-    from synapse.appservice import ApplicationService
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -53,7 +58,7 @@ HOUR_IN_MS = 60 * 60 * 1000
 APP_SERVICE_PREFIX = "/_matrix/app/unstable"
 
 
-def _is_valid_3pe_metadata(info):
+def _is_valid_3pe_metadata(info: JsonDict) -> bool:
     if "instances" not in info:
         return False
     if not isinstance(info["instances"], list):
@@ -61,7 +66,7 @@ def _is_valid_3pe_metadata(info):
     return True
 
 
-def _is_valid_3pe_result(r, field):
+def _is_valid_3pe_result(r: JsonDict, field: str) -> bool:
     if not isinstance(r, dict):
         return False
 
@@ -93,9 +98,13 @@ class ApplicationServiceApi(SimpleHttpClient):
             hs.get_clock(), "as_protocol_meta", timeout_ms=HOUR_IN_MS
         )
 
-    async def query_user(self, service, user_id):
+    async def query_user(self, service: "ApplicationService", user_id: str) -> bool:
         if service.url is None:
             return False
+
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
         uri = service.url + ("/users/%s" % urllib.parse.quote(user_id))
         try:
             response = await self.get_json(uri, {"access_token": service.hs_token})
@@ -109,9 +118,13 @@ class ApplicationServiceApi(SimpleHttpClient):
             logger.warning("query_user to %s threw exception %s", uri, ex)
         return False
 
-    async def query_alias(self, service, alias):
+    async def query_alias(self, service: "ApplicationService", alias: str) -> bool:
         if service.url is None:
             return False
+
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
         uri = service.url + ("/rooms/%s" % urllib.parse.quote(alias))
         try:
             response = await self.get_json(uri, {"access_token": service.hs_token})
@@ -125,7 +138,13 @@ class ApplicationServiceApi(SimpleHttpClient):
             logger.warning("query_alias to %s threw exception %s", uri, ex)
         return False
 
-    async def query_3pe(self, service, kind, protocol, fields):
+    async def query_3pe(
+        self,
+        service: "ApplicationService",
+        kind: str,
+        protocol: str,
+        fields: Dict[bytes, List[bytes]],
+    ) -> List[JsonDict]:
         if kind == ThirdPartyEntityKind.USER:
             required_field = "userid"
         elif kind == ThirdPartyEntityKind.LOCATION:
@@ -204,12 +223,33 @@ class ApplicationServiceApi(SimpleHttpClient):
         service: "ApplicationService",
         events: List[EventBase],
         ephemeral: List[JsonDict],
+        to_device_messages: List[JsonDict],
+        one_time_key_counts: TransactionOneTimeKeyCounts,
+        unused_fallback_keys: TransactionUnusedFallbackKeys,
+        device_list_summary: DeviceListUpdates,
         txn_id: Optional[int] = None,
-    ):
+    ) -> bool:
+        """
+        Push data to an application service.
+
+        Args:
+            service: The application service to send to.
+            events: The persistent events to send.
+            ephemeral: The ephemeral events to send.
+            to_device_messages: The to-device messages to send.
+            txn_id: An unique ID to assign to this transaction. Application services should
+                deduplicate transactions received with identitical IDs.
+
+        Returns:
+            True if the task succeeded, False if it failed.
+        """
         if service.url is None:
             return True
 
-        events = self._serialize(service, events)
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
+        serialized_events = self._serialize(service, events)
 
         if txn_id is None:
             logger.warning(
@@ -220,10 +260,31 @@ class ApplicationServiceApi(SimpleHttpClient):
         uri = service.url + ("/transactions/%s" % urllib.parse.quote(str(txn_id)))
 
         # Never send ephemeral events to appservices that do not support it
+        body: JsonDict = {"events": serialized_events}
         if service.supports_ephemeral:
-            body = {"events": events, "de.sorunome.msc2409.ephemeral": ephemeral}
-        else:
-            body = {"events": events}
+            body.update(
+                {
+                    # TODO: Update to stable prefixes once MSC2409 completes FCP merge.
+                    "de.sorunome.msc2409.ephemeral": ephemeral,
+                    "de.sorunome.msc2409.to_device": to_device_messages,
+                }
+            )
+
+        # TODO: Update to stable prefixes once MSC3202 completes FCP merge
+        if service.msc3202_transaction_extensions:
+            if one_time_key_counts:
+                body[
+                    "org.matrix.msc3202.device_one_time_key_counts"
+                ] = one_time_key_counts
+            if unused_fallback_keys:
+                body[
+                    "org.matrix.msc3202.device_unused_fallback_keys"
+                ] = unused_fallback_keys
+            if device_list_summary:
+                body["org.matrix.msc3202.device_lists"] = {
+                    "changed": list(device_list_summary.changed),
+                    "left": list(device_list_summary.left),
+                }
 
         try:
             await self.put_json(
@@ -238,7 +299,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                     [event.get("event_id") for event in events],
                 )
             sent_transactions_counter.labels(service.id).inc()
-            sent_events_counter.labels(service.id).inc(len(events))
+            sent_events_counter.labels(service.id).inc(len(serialized_events))
             return True
         except CodeMessageException as e:
             logger.warning(
@@ -260,22 +321,26 @@ class ApplicationServiceApi(SimpleHttpClient):
         failed_transactions_counter.labels(service.id).inc()
         return False
 
-    def _serialize(self, service, events):
+    def _serialize(
+        self, service: "ApplicationService", events: Iterable[EventBase]
+    ) -> List[JsonDict]:
         time_now = self.clock.time_msec()
         return [
             serialize_event(
                 e,
                 time_now,
-                as_client_event=True,
-                # If this is an invite or a knock membership event, and we're interested
-                # in this user, then include any stripped state alongside the event.
-                include_stripped_room_state=(
-                    e.type == EventTypes.Member
-                    and (
-                        e.membership == Membership.INVITE
-                        or e.membership == Membership.KNOCK
-                    )
-                    and service.is_interested_in_user(e.state_key)
+                config=SerializeEventConfig(
+                    as_client_event=True,
+                    # If this is an invite or a knock membership event, and we're interested
+                    # in this user, then include any stripped state alongside the event.
+                    include_stripped_room_state=(
+                        e.type == EventTypes.Member
+                        and (
+                            e.membership == Membership.INVITE
+                            or e.membership == Membership.KNOCK
+                        )
+                        and service.is_interested_in_user(e.state_key)
+                    ),
                 ),
             )
             for e in events

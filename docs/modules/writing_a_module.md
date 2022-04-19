@@ -33,7 +33,7 @@ A module can implement the following static method:
 
 ```python
 @staticmethod
-def parse_config(config: dict) -> dict
+def parse_config(config: dict) -> Any
 ```
 
 This method is given a dictionary resulting from parsing the YAML configuration for the
@@ -71,15 +71,15 @@ Modules **must** register their web resources in their `__init__` method.
 ## Registering a callback
 
 Modules can use Synapse's module API to register callbacks. Callbacks are functions that
-Synapse will call when performing specific actions. Callbacks must be asynchronous, and
-are split in categories. A single module may implement callbacks from multiple categories,
-and is under no obligation to implement all callbacks from the categories it registers
-callbacks for.
+Synapse will call when performing specific actions. Callbacks must be asynchronous (unless
+specified otherwise), and are split in categories. A single module may implement callbacks
+from multiple categories, and is under no obligation to implement all callbacks from the
+categories it registers callbacks for.
 
 Modules can register callbacks using one of the module API's `register_[...]_callbacks`
 methods. The callback functions are passed to these methods as keyword arguments, with
-the callback name as the argument name and the function as its value. This is demonstrated
-in the example below. A `register_[...]_callbacks` method exists for each category.
+the callback name as the argument name and the function as its value. A
+`register_[...]_callbacks` method exists for each category.
 
 Callbacks for each category can be found on their respective page of the
 [Synapse documentation website](https://matrix-org.github.io/synapse).

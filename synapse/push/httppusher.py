@@ -26,6 +26,7 @@ from synapse.events import EventBase
 from synapse.logging import opentracing
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import Pusher, PusherConfig, PusherConfigException
+from synapse.storage.databases.main.event_push_actions import HttpPushAction
 
 from . import push_rule_evaluator, push_tools
 
@@ -108,6 +109,7 @@ class HttpPusher(Pusher):
         self.data_minus_url = {}
         self.data_minus_url.update(self.data)
         del self.data_minus_url["url"]
+        self.badge_count_last_call: Optional[int] = None
 
     def on_started(self, should_check_for_notifs: bool) -> None:
         """Called when this pusher has been started.
@@ -131,11 +133,13 @@ class HttpPusher(Pusher):
         # XXX as per https://github.com/matrix-org/matrix-doc/issues/2627, this seems
         # to be largely redundant. perhaps we can remove it.
         badge = await push_tools.get_badge_count(
-            self.hs.get_datastore(),
+            self.hs.get_datastores().main,
             self.user_id,
             group_by_room=self._group_unread_count_by_room,
         )
-        await self._send_badge(badge)
+        if self.badge_count_last_call is None or self.badge_count_last_call != badge:
+            self.badge_count_last_call = badge
+            await self._send_badge(badge)
 
     def on_timer(self) -> None:
         self._start_processing()
@@ -198,7 +202,7 @@ class HttpPusher(Pusher):
                 "http-push",
                 tags={
                     "authenticated_entity": self.user_id,
-                    "event_id": push_action["event_id"],
+                    "event_id": push_action.event_id,
                     "app_id": self.app_id,
                     "app_display_name": self.app_display_name,
                 },
@@ -208,7 +212,7 @@ class HttpPusher(Pusher):
             if processed:
                 http_push_processed_counter.inc()
                 self.backoff_delay = HttpPusher.INITIAL_BACKOFF_SEC
-                self.last_stream_ordering = push_action["stream_ordering"]
+                self.last_stream_ordering = push_action.stream_ordering
                 pusher_still_exists = (
                     await self.store.update_pusher_last_stream_ordering_and_success(
                         self.app_id,
@@ -251,7 +255,7 @@ class HttpPusher(Pusher):
                         self.pushkey,
                     )
                     self.backoff_delay = HttpPusher.INITIAL_BACKOFF_SEC
-                    self.last_stream_ordering = push_action["stream_ordering"]
+                    self.last_stream_ordering = push_action.stream_ordering
                     await self.store.update_pusher_last_stream_ordering(
                         self.app_id,
                         self.pushkey,
@@ -273,18 +277,18 @@ class HttpPusher(Pusher):
                     )
                     break
 
-    async def _process_one(self, push_action: dict) -> bool:
-        if "notify" not in push_action["actions"]:
+    async def _process_one(self, push_action: HttpPushAction) -> bool:
+        if "notify" not in push_action.actions:
             return True
 
-        tweaks = push_rule_evaluator.tweaks_for_actions(push_action["actions"])
+        tweaks = push_rule_evaluator.tweaks_for_actions(push_action.actions)
         badge = await push_tools.get_badge_count(
-            self.hs.get_datastore(),
+            self.hs.get_datastores().main,
             self.user_id,
             group_by_room=self._group_unread_count_by_room,
         )
 
-        event = await self.store.get_event(push_action["event_id"], allow_none=True)
+        event = await self.store.get_event(push_action.event_id, allow_none=True)
         if event is None:
             return True  # It's been redacted
         rejected = await self.dispatch_push(event, tweaks, badge)
@@ -321,7 +325,7 @@ class HttpPusher(Pusher):
         # This was checked in the __init__, but mypy doesn't seem to know that.
         assert self.data is not None
         if self.data.get("format") == "event_id_only":
-            d = {
+            d: Dict[str, Any] = {
                 "notification": {
                     "event_id": event.event_id,
                     "room_id": event.room_id,
@@ -401,6 +405,8 @@ class HttpPusher(Pusher):
         rejected = []
         if "rejected" in resp:
             rejected = resp["rejected"]
+        else:
+            self.badge_count_last_call = badge
         return rejected
 
     async def _send_badge(self, badge: int) -> None:

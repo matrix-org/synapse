@@ -16,6 +16,8 @@ import logging
 import sys
 from typing import Dict, List, Optional, Tuple
 
+from matrix_common.versionstring import get_distribution_version_string
+
 from twisted.internet import address
 from twisted.web.resource import Resource
 
@@ -51,7 +53,6 @@ from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
-from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
 from synapse.replication.slave.storage.deviceinbox import SlavedDeviceInboxStore
 from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.directory import DirectoryStore
@@ -113,6 +114,7 @@ from synapse.storage.databases.main.monthly_active_users import (
 )
 from synapse.storage.databases.main.presence import PresenceStore
 from synapse.storage.databases.main.room import RoomWorkerStore
+from synapse.storage.databases.main.room_batch import RoomBatchStore
 from synapse.storage.databases.main.search import SearchStore
 from synapse.storage.databases.main.session import SessionStore
 from synapse.storage.databases.main.stats import StatsStore
@@ -121,7 +123,6 @@ from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.databases.main.user_directory import UserDirectoryStore
 from synapse.types import JsonDict
 from synapse.util.httpresourcetree import create_resource_tree
-from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("synapse.app.generic_worker")
 
@@ -140,7 +141,7 @@ class KeyUploadServlet(RestServlet):
         """
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.http_client = hs.get_simple_http_client()
         self.main_uri = hs.config.worker.worker_main_http_uri
 
@@ -240,11 +241,11 @@ class GenericWorkerSlavedStore(
     SlavedEventStore,
     SlavedKeyStore,
     RoomWorkerStore,
+    RoomBatchStore,
     DirectoryStore,
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
     SlavedProfileStore,
-    SlavedClientIpStore,
     SlavedFilteringStore,
     MonthlyActiveUsersWorkerStore,
     MediaRepositoryStore,
@@ -319,7 +320,8 @@ class GenericWorkerServer(HomeServer):
 
                     presence.register_servlets(self, resource)
 
-                    groups.register_servlets(self, resource)
+                    if self.config.experimental.groups_enabled:
+                        groups.register_servlets(self, resource)
 
                     resources.update({CLIENT_API_PREFIX: resource})
 
@@ -414,7 +416,7 @@ class GenericWorkerServer(HomeServer):
             else:
                 logger.warning("Unsupported listener type: %s", listener.type)
 
-        self.get_tcp_replication().start_replication(self)
+        self.get_replication_command_handler().start_replication(self)
 
 
 def start(config_options: List[str]) -> None:
@@ -480,7 +482,7 @@ def start(config_options: List[str]) -> None:
     hs = GenericWorkerServer(
         config.server.server_name,
         config=config,
-        version_string="Synapse/" + get_version_string(synapse),
+        version_string="Synapse/" + get_distribution_version_string("matrix-synapse"),
     )
 
     setup_logging(hs, config, use_worker_options=True)
@@ -503,6 +505,10 @@ def start(config_options: List[str]) -> None:
     _base.start_worker_reactor("synapse-generic-worker", config)
 
 
-if __name__ == "__main__":
+def main() -> None:
     with LoggingContext("main"):
         start(sys.argv[1:])
+
+
+if __name__ == "__main__":
+    main()

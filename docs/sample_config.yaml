@@ -37,15 +37,15 @@
 
 # Server admins can expand Synapse's functionality with external modules.
 #
-# See https://matrix-org.github.io/synapse/latest/modules.html for more
+# See https://matrix-org.github.io/synapse/latest/modules/index.html for more
 # documentation on how to configure or create custom modules for Synapse.
 #
 modules:
-    # - module: my_super_module.MySuperClass
-    #   config:
-    #       do_thing: true
-    # - module: my_other_super_module.SomeClass
-    #   config: {}
+  #- module: my_super_module.MySuperClass
+  #  config:
+  #    do_thing: true
+  #- module: my_other_super_module.SomeClass
+  #  config: {}
 
 
 ## Server ##
@@ -74,13 +74,7 @@ server_name: "SERVERNAME"
 #
 pid_file: DATADIR/homeserver.pid
 
-# The absolute URL to the web client which /_matrix/client will redirect
-# to if 'webclient' is configured under the 'listeners' configuration.
-#
-# This option can be also set to the filesystem path to the web client
-# which will be served at /_matrix/client/ if 'webclient' is configured
-# under the 'listeners' configuration, however this is a security risk:
-# https://github.com/matrix-org/synapse#security-note
+# The absolute URL to the web client which / will redirect to.
 #
 #web_client_location: https://riot.example.com/
 
@@ -164,12 +158,12 @@ presence:
 # The default room version for newly created rooms.
 #
 # Known room versions are listed here:
-# https://matrix.org/docs/spec/#complete-list-of-room-versions
+# https://spec.matrix.org/latest/rooms/#complete-list-of-room-versions
 #
 # For example, for room version 1, default_room_version should be set
 # to "1".
 #
-#default_room_version: "6"
+#default_room_version: "9"
 
 # The GC threshold parameters to pass to `gc.set_threshold`, if defined
 #
@@ -309,8 +303,6 @@ presence:
 #
 #   static: static resources under synapse/static (/_matrix/static). (Mostly
 #       useful for 'fallback authentication'.)
-#
-#   webclient: A web client. Requires web_client_location to be set.
 #
 listeners:
   # TLS-enabled listener: for when matrix traffic is sent directly to synapse.
@@ -479,6 +471,20 @@ limit_remote_rooms:
 #
 #allow_per_room_profiles: false
 
+# The largest allowed file size for a user avatar. Defaults to no restriction.
+#
+# Note that user avatar changes will not work if this is set without
+# using Synapse's media repository.
+#
+#max_avatar_size: 10M
+
+# The MIME types allowed for user avatars. Defaults to no restriction.
+#
+# Note that user avatar changes will not work if this is set without
+# using Synapse's media repository.
+#
+#allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
+
 # How long to keep redacted events in unredacted form in the database. After
 # this period redacted events get replaced with their redacted form in the DB.
 #
@@ -532,6 +538,15 @@ templates:
   # information about using custom templates.
   #
   #custom_template_directory: /path/to/custom/templates/
+
+# List of rooms to exclude from sync responses. This is useful for server
+# administrators wishing to group users into a room without these users being able
+# to see it from their client.
+#
+# By default, no room is excluded.
+#
+#exclude_rooms_from_sync:
+#    - !foo:example.com
 
 
 # Message retention policy at the server level.
@@ -745,11 +760,16 @@ caches:
   per_cache_factors:
     #get_users_who_share_room_with_user: 2.0
 
-  # Controls how long an entry can be in a cache without having been
-  # accessed before being evicted. Defaults to None, which means
-  # entries are never evicted based on time.
+  # Controls whether cache entries are evicted after a specified time
+  # period. Defaults to true. Uncomment to disable this feature.
   #
-  #expiry_time: 30m
+  #expire_caches: false
+
+  # If expire_caches is enabled, this flag controls how long an entry can
+  # be in a cache without having been accessed before being evicted.
+  # Defaults to 30m. Uncomment to set a different time to live for cache entries.
+  #
+  #cache_entry_ttl: 30m
 
   # Controls how long the results of a /sync request are cached for after
   # a successful response is returned. A higher duration can help clients with
@@ -771,6 +791,12 @@ caches:
 #
 # 'txn_limit' gives the maximum number of transactions to run per connection
 # before reconnecting. Defaults to 0, which means no limit.
+#
+# 'allow_unsafe_locale' is an option specific to Postgres. Under the default behavior, Synapse will refuse to
+# start if the postgres db is set to a non-C locale. You can override this behavior (which is *not* recommended)
+# by setting 'allow_unsafe_locale' to true. Note that doing so may corrupt your database. You can find more information
+# here: https://matrix-org.github.io/synapse/latest/postgres.html#fixing-incorrect-collate-or-ctype and here:
+# https://wiki.postgresql.org/wiki/Locale_data_changes
 #
 # 'args' gives options which are passed through to the database engine,
 # except for options starting 'cp_', which are used to configure the Twisted
@@ -851,6 +877,9 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #   - one for ratelimiting how often a user or IP can attempt to validate a 3PID.
 #   - two for ratelimiting how often invites can be sent in a room or to a
 #     specific user.
+#   - one for ratelimiting 3PID invites (i.e. invites sent to a third-party ID
+#     such as an email address or a phone number) based on the account that's
+#     sending the invite.
 #
 # The defaults are as shown below.
 #
@@ -900,6 +929,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #  per_user:
 #    per_second: 0.003
 #    burst_count: 5
+#
+#rc_third_party_invite:
+#  per_second: 0.2
+#  burst_count: 10
 
 # Ratelimiting settings for incoming federation
 #
@@ -1194,9 +1227,17 @@ oembed:
 # Registration can be rate-limited using the parameters in the "Ratelimiting"
 # section of this file.
 
-# Enable registration for new users.
+# Enable registration for new users. Defaults to 'false'. It is highly recommended that if you enable registration,
+# you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration
+# without any verification, you must also set `enable_registration_without_verification`, found below.
 #
 #enable_registration: false
+
+# Enable registration without email or captcha verification. Note: this option is *not* recommended,
+# as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
+# unless `enable_registration` is also enabled.
+#
+#enable_registration_without_verification: true
 
 # Time that a user's session remains valid for, after they log in.
 #
@@ -1208,6 +1249,44 @@ oembed:
 # By default, this is infinite.
 #
 #session_lifetime: 24h
+
+# Time that an access token remains valid for, if the session is
+# using refresh tokens.
+# For more information about refresh tokens, please see the manual.
+# Note that this only applies to clients which advertise support for
+# refresh tokens.
+#
+# Note also that this is calculated at login time and refresh time:
+# changes are not applied to existing sessions until they are refreshed.
+#
+# By default, this is 5 minutes.
+#
+#refreshable_access_token_lifetime: 5m
+
+# Time that a refresh token remains valid for (provided that it is not
+# exchanged for another one first).
+# This option can be used to automatically log-out inactive sessions.
+# Please see the manual for more information.
+#
+# Note also that this is calculated at login time and refresh time:
+# changes are not applied to existing sessions until they are refreshed.
+#
+# By default, this is infinite.
+#
+#refresh_token_lifetime: 24h
+
+# Time that an access token remains valid for, if the session is NOT
+# using refresh tokens.
+# Please note that not all clients support refresh tokens, so setting
+# this to a short value may be inconvenient for some users who will
+# then be logged out frequently.
+#
+# Note also that this is calculated at login time: changes are not applied
+# retrospectively to existing sessions for users that have already logged in.
+#
+# By default, this is infinite.
+#
+#nonrefreshable_access_token_lifetime: 24h
 
 # The user must provide all of the below types of 3PID when registering.
 #
@@ -1398,6 +1477,16 @@ account_threepid_delegates:
 #
 #auto_join_rooms_for_guests: false
 
+# Whether to inhibit errors raised when registering a new account if the user ID
+# already exists. If turned on, that requests to /register/available will always
+# show a user ID as available, and Synapse won't raise an error when starting
+# a registration with a user ID that already exists. However, Synapse will still
+# raise an error if the registration completes and the username conflicts.
+#
+# Defaults to false.
+#
+#inhibit_user_in_use_error: true
+
 
 ## Metrics ###
 
@@ -1450,6 +1539,7 @@ room_prejoin_state:
    # - m.room.encryption
    # - m.room.name
    # - m.room.create
+   # - m.room.topic
    #
    # Uncomment the following to disable these defaults (so that only the event
    # types listed in 'additional_event_types' are shared). Defaults to 'false'.
@@ -1463,6 +1553,21 @@ room_prejoin_state:
    #
    #additional_event_types:
    #  - org.example.custom.event.type
+
+# We record the IP address of clients used to access the API for various
+# reasons, including displaying it to the user in the "Where you're signed in"
+# dialog.
+#
+# By default, when puppeting another user via the admin API, the client IP
+# address is recorded against the user who created the access token (ie, the
+# admin user), and *not* the puppeted user.
+#
+# Uncomment the following to also record the IP address against the puppeted
+# user. (This also means that the puppeted user will count as an "active" user
+# for the purpose of monthly active user tracking - see 'limit_usage_by_mau' etc
+# above.)
+#
+#track_puppeted_user_ips: true
 
 
 # A list of application service config files to use
@@ -1831,10 +1936,13 @@ saml2_config:
 #       Defaults to false. Avoid this in production.
 #
 #   user_profile_method: Whether to fetch the user profile from the userinfo
-#       endpoint. Valid values are: 'auto' or 'userinfo_endpoint'.
+#       endpoint, or to rely on the data returned in the id_token from the
+#       token_endpoint.
 #
-#       Defaults to 'auto', which fetches the userinfo endpoint if 'openid' is
-#       included in 'scopes'. Set to 'userinfo_endpoint' to always fetch the
+#       Valid values are: 'auto' or 'userinfo_endpoint'.
+#
+#       Defaults to 'auto', which uses the userinfo endpoint if 'openid' is
+#       not included in 'scopes'. Set to 'userinfo_endpoint' to always use the
 #       userinfo endpoint.
 #
 #   allow_existing_users: set to 'true' to allow a user logging in via OIDC to
@@ -1862,8 +1970,14 @@ saml2_config:
 #
 #             localpart_template: Jinja2 template for the localpart of the MXID.
 #                 If this is not set, the user will be prompted to choose their
-#                 own username (see 'sso_auth_account_details.html' in the 'sso'
-#                 section of this file).
+#                 own username (see the documentation for the
+#                 'sso_auth_account_details.html' template). This template can
+#                 use the 'localpart_from_email' filter.
+#
+#             confirm_localpart: Whether to prompt the user to validate (or
+#                 change) the generated localpart (see the documentation for the
+#                 'sso_auth_account_details.html' template), instead of
+#                 registering the account right away.
 #
 #             display_name_template: Jinja2 template for the display name to set
 #                 on first login. If unset, no displayname will be set.
@@ -2644,3 +2758,35 @@ redis:
   # Optional password if configured on the Redis instance
   #
   #password: <secret_password>
+
+
+## Background Updates ##
+
+# Background updates are database updates that are run in the background in batches.
+# The duration, minimum batch size, default batch size, whether to sleep between batches and if so, how long to
+# sleep can all be configured. This is helpful to speed up or slow down the updates.
+#
+background_updates:
+    # How long in milliseconds to run a batch of background updates for. Defaults to 100. Uncomment and set
+    # a time to change the default.
+    #
+    #background_update_duration_ms: 500
+
+    # Whether to sleep between updates. Defaults to True. Uncomment to change the default.
+    #
+    #sleep_enabled: false
+
+    # If sleeping between updates, how long in milliseconds to sleep for. Defaults to 1000. Uncomment
+    # and set a duration to change the default.
+    #
+    #sleep_duration_ms: 300
+
+    # Minimum size a batch of background updates can be. Must be greater than 0. Defaults to 1. Uncomment and
+    # set a size to change the default.
+    #
+    #min_batch_size: 10
+
+    # The batch size to use for the first iteration of a new background update. The default is 100.
+    # Uncomment and set a size to change the default.
+    #
+    #default_batch_size: 50

@@ -13,8 +13,9 @@
 # limitations under the License.
 import logging
 import random
-from collections import namedtuple
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
+
+import attr
 
 from synapse.api.errors import AuthError, ShadowBanError, SynapseError
 from synapse.appservice import ApplicationService
@@ -37,7 +38,10 @@ logger = logging.getLogger(__name__)
 
 # A tiny object useful for storing a user's membership in a room, as a mapping
 # key
-RoomMember = namedtuple("RoomMember", ("room_id", "user_id"))
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class RoomMember:
+    room_id: str
+    user_id: str
 
 
 # How often we expect remote servers to resend us presence.
@@ -53,7 +57,7 @@ class FollowerTypingHandler:
     """
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.server_name = hs.config.server.server_name
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
@@ -119,7 +123,7 @@ class FollowerTypingHandler:
         self.wheel_timer.insert(now=now, obj=member, then=now + 60 * 1000)
 
     def is_typing(self, member: RoomMember) -> bool:
-        return member.user_id in self._room_typing.get(member.room_id, [])
+        return member.user_id in self._room_typing.get(member.room_id, set())
 
     async def _push_remote(self, member: RoomMember, typing: bool) -> None:
         if not self.federation:
@@ -156,8 +160,9 @@ class FollowerTypingHandler:
         """Should be called whenever we receive updates for typing stream."""
 
         if self._latest_room_serial > token:
-            # The master has gone backwards. To prevent inconsistent data, just
-            # clear everything.
+            # The typing worker has gone backwards (e.g. it may have restarted).
+            # To prevent inconsistent data, just clear everything.
+            logger.info("Typing handler stream went backwards; resetting")
             self._reset()
 
         # Set the latest serial token to whatever the server gave us.
@@ -166,9 +171,9 @@ class FollowerTypingHandler:
         for row in rows:
             self._room_serials[row.room_id] = token
 
-            prev_typing = set(self._room_typing.get(row.room_id, []))
+            prev_typing = self._room_typing.get(row.room_id, set())
             now_typing = set(row.user_ids)
-            self._room_typing[row.room_id] = row.user_ids
+            self._room_typing[row.room_id] = now_typing
 
             if self.federation:
                 run_as_background_process(
@@ -442,7 +447,7 @@ class TypingWriterHandler(FollowerTypingHandler):
 
 class TypingNotificationEventSource(EventSource[int, JsonDict]):
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
+        self._main_store = hs.get_datastores().main
         self.clock = hs.get_clock()
         # We can't call get_typing_handler here because there's a cycle:
         #
@@ -482,9 +487,7 @@ class TypingNotificationEventSource(EventSource[int, JsonDict]):
                 if handler._room_serials[room_id] <= from_key:
                     continue
 
-                if not await service.matches_user_in_member_list(
-                    room_id, handler.store
-                ):
+                if not await service.is_interested_in_room(room_id, self._main_store):
                     continue
 
                 events.append(self._make_event_for(room_id))

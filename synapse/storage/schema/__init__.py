@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCHEMA_VERSION = 65  # remember to update the list below when updating
+SCHEMA_VERSION = 69  # remember to update the list below when updating
 """Represents the expectations made by the codebase about the database schema
 
 This should be incremented whenever the codebase changes its requirements on the
@@ -46,11 +46,29 @@ Changes in SCHEMA_VERSION = 65:
     - MSC2716: Remove unique event_id constraint from insertion_event_edges
       because an insertion event can have multiple edges.
     - Remove unused tables `user_stats_historical` and `room_stats_historical`.
+
+Changes in SCHEMA_VERSION = 66:
+    - Queries on state_key columns are now disambiguated (ie, the codebase can handle
+      the `events` table having a `state_key` column).
+
+Changes in SCHEMA_VERSION = 67:
+    - state_events.prev_state is no longer written to.
+
+Changes in SCHEMA_VERSION = 68:
+    - event_reference_hashes is no longer read.
+    - `events` has `state_key` and `rejection_reason` columns, which are populated for
+      new events.
+
+Changes in SCHEMA_VERSION = 69:
+    - We now write to `device_lists_changes_in_room` table.
+    - Use sequence to generate future `application_services_txns.txn_id`s
 """
 
 
 SCHEMA_COMPAT_VERSION = (
-    61  # 61: Remove unused tables `user_stats_historical` and `room_stats_historical`
+    # We now assume that `device_lists_changes_in_room` has been filled out for
+    # recent device_list_updates.
+    69
 )
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
 

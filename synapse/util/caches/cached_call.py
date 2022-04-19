@@ -76,6 +76,7 @@ class CachedCall(Generic[TV]):
 
         # Fire off the callable now if this is our first time
         if not self._deferred:
+            assert self._callable is not None
             self._deferred = run_in_background(self._callable)
 
             # we will never need the callable again, so make sure it can be GCed

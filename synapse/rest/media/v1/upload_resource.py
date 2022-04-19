@@ -37,7 +37,7 @@ class UploadResource(DirectServeJsonResource):
 
         self.media_repo = media_repo
         self.filepaths = media_repo.filepaths
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
         self.auth = hs.get_auth()
@@ -49,10 +49,14 @@ class UploadResource(DirectServeJsonResource):
 
     async def _async_render_POST(self, request: SynapseRequest) -> None:
         requester = await self.auth.get_user_by_req(request)
-        content_length = request.getHeader("Content-Length")
-        if content_length is None:
+        raw_content_length = request.getHeader("Content-Length")
+        if raw_content_length is None:
             raise SynapseError(msg="Request must specify a Content-Length", code=400)
-        if int(content_length) > self.max_upload_size:
+        try:
+            content_length = int(raw_content_length)
+        except ValueError:
+            raise SynapseError(msg="Content-Length value is invalid", code=400)
+        if content_length > self.max_upload_size:
             raise SynapseError(
                 msg="Upload request body is too large",
                 code=413,
@@ -66,7 +70,8 @@ class UploadResource(DirectServeJsonResource):
                 upload_name: Optional[str] = upload_name_bytes.decode("utf8")
             except UnicodeDecodeError:
                 raise SynapseError(
-                    msg="Invalid UTF-8 filename parameter: %r" % (upload_name), code=400
+                    msg="Invalid UTF-8 filename parameter: %r" % (upload_name_bytes,),
+                    code=400,
                 )
 
         # If the name is falsey (e.g. an empty byte string) ensure it is None.

@@ -14,7 +14,7 @@
 
 import functools
 import sys
-from typing import Any, Callable, Generator, List, TypeVar
+from typing import Any, Callable, Generator, List, TypeVar, cast
 
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
@@ -174,7 +174,9 @@ def _check_yield_points(
                         )
                     )
                     changes.append(err)
-                return getattr(e, "value", None)
+                # The `StopIteration` or `_DefGen_Return` contains the return value from the
+                # generator.
+                return cast(T, e.value)
 
             frame = gen.gi_frame
 
@@ -215,13 +217,16 @@ def _check_yield_points(
                 # We don't raise here as its perfectly valid for contexts to
                 # change in a function, as long as it sets the correct context
                 # on resolving (which is checked separately).
-                err = "%s changed context from %s to %s, happened between lines %d and %d in %s" % (
-                    frame.f_code.co_name,
-                    expected_context,
-                    current_context(),
-                    last_yield_line_no,
-                    frame.f_lineno,
-                    frame.f_code.co_filename,
+                err = (
+                    "%s changed context from %s to %s, happened between lines %d and %d in %s"
+                    % (
+                        frame.f_code.co_name,
+                        expected_context,
+                        current_context(),
+                        last_yield_line_no,
+                        frame.f_lineno,
+                        frame.f_code.co_filename,
+                    )
                 )
                 changes.append(err)
 

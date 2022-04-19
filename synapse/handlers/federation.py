@@ -23,8 +23,6 @@ from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
 from unpaddedbase64 import decode_base64
 
-from twisted.internet import defer
-
 from synapse import event_auth
 from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
@@ -45,13 +43,8 @@ from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.http.servlet import assert_params_in_dict
-from synapse.logging.context import (
-    make_deferred_yieldable,
-    nested_logging_context,
-    preserve_fn,
-    run_in_background,
-)
-from synapse.logging.utils import log_function
+from synapse.logging.context import nested_logging_context
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationStoreRoomOnOutlierMembershipRestServlet,
@@ -68,6 +61,37 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def get_domains_from_state(state: StateMap[EventBase]) -> List[Tuple[str, int]]:
+    """Get joined domains from state
+
+    Args:
+        state: State map from type/state key to event.
+
+    Returns:
+        Returns a list of servers with the lowest depth of their joins.
+            Sorted by lowest depth first.
+    """
+    joined_users = [
+        (state_key, int(event.depth))
+        for (e_type, state_key), event in state.items()
+        if e_type == EventTypes.Member and event.membership == Membership.JOIN
+    ]
+
+    joined_domains: Dict[str, int] = {}
+    for u, d in joined_users:
+        try:
+            dom = get_domain_from_id(u)
+            old_d = joined_domains.get(dom)
+            if old_d:
+                joined_domains[dom] = min(d, old_d)
+            else:
+                joined_domains[dom] = d
+        except Exception:
+            pass
+
+    return sorted(joined_domains.items(), key=lambda d: d[1])
+
+
 class FederationHandler:
     """Handles general incoming federation requests
 
@@ -77,7 +101,7 @@ class FederationHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
         self.federation_client = hs.get_federation_client()
@@ -127,7 +151,7 @@ class FederationHandler:
                 return. This is used as part of the heuristic to decide if we
                 should back paginate.
         """
-        with (await self._room_backfill.queue(room_id)):
+        async with self._room_backfill.queue(room_id):
             return await self._maybe_backfill_inner(room_id, current_depth, limit)
 
     async def _maybe_backfill_inner(
@@ -136,9 +160,14 @@ class FederationHandler:
         oldest_events_with_depth = (
             await self.store.get_oldest_event_ids_with_depth_in_room(room_id)
         )
-        insertion_events_to_be_backfilled = (
-            await self.store.get_insertion_event_backwards_extremities_in_room(room_id)
-        )
+
+        insertion_events_to_be_backfilled: Dict[str, int] = {}
+        if self.hs.config.experimental.msc2716_enabled:
+            insertion_events_to_be_backfilled = (
+                await self.store.get_insertion_event_backward_extremities_in_room(
+                    room_id
+                )
+            )
         logger.debug(
             "_maybe_backfill_inner: extremities oldest_events_with_depth=%s insertion_events_to_be_backfilled=%s",
             oldest_events_with_depth,
@@ -241,11 +270,12 @@ class FederationHandler:
         ]
 
         logger.debug(
-            "room_id: %s, backfill: current_depth: %s, limit: %s, max_depth: %s, extrems: %s filtered_sorted_extremeties_tuple: %s",
+            "room_id: %s, backfill: current_depth: %s, limit: %s, max_depth: %s, extrems (%d): %s filtered_sorted_extremeties_tuple: %s",
             room_id,
             current_depth,
             limit,
             max_depth,
+            len(sorted_extremeties_tuple),
             sorted_extremeties_tuple,
             filtered_sorted_extremeties_tuple,
         )
@@ -267,36 +297,6 @@ class FederationHandler:
         # TODO: HEURISTIC ALERT.
 
         curr_state = await self.state_handler.get_current_state(room_id)
-
-        def get_domains_from_state(state: StateMap[EventBase]) -> List[Tuple[str, int]]:
-            """Get joined domains from state
-
-            Args:
-                state: State map from type/state key to event.
-
-            Returns:
-                Returns a list of servers with the lowest depth of their joins.
-                 Sorted by lowest depth first.
-            """
-            joined_users = [
-                (state_key, int(event.depth))
-                for (e_type, state_key), event in state.items()
-                if e_type == EventTypes.Member and event.membership == Membership.JOIN
-            ]
-
-            joined_domains: Dict[str, int] = {}
-            for u, d in joined_users:
-                try:
-                    dom = get_domain_from_id(u)
-                    old_d = joined_domains.get(dom)
-                    if old_d:
-                        joined_domains[dom] = min(d, old_d)
-                    else:
-                        joined_domains[dom] = d
-                except Exception:
-                    pass
-
-            return sorted(joined_domains.items(), key=lambda d: d[1])
 
         curr_domains = get_domains_from_state(curr_state)
 
@@ -349,53 +349,8 @@ class FederationHandler:
         if success:
             return True
 
-        # Huh, well *those* domains didn't work out. Lets try some domains
-        # from the time.
-
-        tried_domains = set(likely_domains)
-        tried_domains.add(self.server_name)
-
-        event_ids = list(extremities.keys())
-
-        logger.debug("calling resolve_state_groups in _maybe_backfill")
-        resolve = preserve_fn(self.state_handler.resolve_state_groups_for_events)
-        states = await make_deferred_yieldable(
-            defer.gatherResults(
-                [resolve(room_id, [e]) for e in event_ids], consumeErrors=True
-            )
-        )
-
-        # dict[str, dict[tuple, str]], a map from event_id to state map of
-        # event_ids.
-        states = dict(zip(event_ids, [s.state for s in states]))
-
-        state_map = await self.store.get_events(
-            [e_id for ids in states.values() for e_id in ids.values()],
-            get_prev_content=False,
-        )
-        states = {
-            key: {
-                k: state_map[e_id]
-                for k, e_id in state_dict.items()
-                if e_id in state_map
-            }
-            for key, state_dict in states.items()
-        }
-
-        for e_id in event_ids:
-            likely_extremeties_domains = get_domains_from_state(states[e_id])
-
-            success = await try_backfill(
-                [
-                    dom
-                    for dom, _ in likely_extremeties_domains
-                    if dom not in tried_domains
-                ]
-            )
-            if success:
-                return True
-
-            tried_domains.update(dom for dom, _ in likely_extremeties_domains)
+        # TODO: we could also try servers which were previously in the room, but
+        #   are no longer.
 
         return False
 
@@ -507,12 +462,35 @@ class FederationHandler:
             await self.store.upsert_room_on_join(
                 room_id=room_id,
                 room_version=room_version_obj,
-                auth_events=auth_chain,
+                state_events=state,
             )
 
+            if ret.partial_state:
+                # TODO(faster_joins): roll this back if we don't manage to start the
+                #   background resync (eg process_remote_join fails)
+                await self.store.store_partial_state_room(room_id, ret.servers_in_room)
+
             max_stream_id = await self._federation_event_handler.process_remote_join(
-                origin, room_id, auth_chain, state, event, room_version_obj
+                origin,
+                room_id,
+                auth_chain,
+                state,
+                event,
+                room_version_obj,
+                partial_state=ret.partial_state,
             )
+
+            if ret.partial_state:
+                # Kick off the process of asynchronously fetching the state for this
+                # room.
+                #
+                # TODO(faster_joins): pick this up again on restart
+                run_as_background_process(
+                    desc="sync_partial_state_room",
+                    func=self._sync_partial_state_room,
+                    destination=origin,
+                    room_id=room_id,
+                )
 
             # We wait here until this instance has seen the events come down
             # replication (if we're using replication) as the below uses caches.
@@ -550,9 +528,10 @@ class FederationHandler:
             # lots of requests for missing prev_events which we do actually
             # have. Hence we fire off the background task, but don't wait for it.
 
-            run_in_background(self._handle_queued_pdus, room_queue)
+            run_as_background_process(
+                "handle_queued_pdus", self._handle_queued_pdus, room_queue
+            )
 
-    @log_function
     async def do_knock(
         self,
         target_hosts: List[str],
@@ -924,7 +903,6 @@ class FederationHandler:
 
         return event
 
-    @log_function
     async def on_make_knock_request(
         self, origin: str, room_id: str, user_id: str
     ) -> EventBase:
@@ -986,56 +964,36 @@ class FederationHandler:
 
         return event
 
-    async def get_state_for_pdu(self, room_id: str, event_id: str) -> List[EventBase]:
-        """Returns the state at the event. i.e. not including said event."""
-
-        event = await self.store.get_event(event_id, check_room_id=room_id)
-
-        state_groups = await self.state_store.get_state_groups(room_id, [event_id])
-
-        if state_groups:
-            _, state = list(state_groups.items()).pop()
-            results = {(e.type, e.state_key): e for e in state}
-
-            if event.is_state():
-                # Get previous state
-                if "replaces_state" in event.unsigned:
-                    prev_id = event.unsigned["replaces_state"]
-                    if prev_id != event.event_id:
-                        prev_event = await self.store.get_event(prev_id)
-                        results[(event.type, event.state_key)] = prev_event
-                else:
-                    del results[(event.type, event.state_key)]
-
-            res = list(results.values())
-            return res
-        else:
-            return []
-
     async def get_state_ids_for_pdu(self, room_id: str, event_id: str) -> List[str]:
         """Returns the state at the event. i.e. not including said event."""
         event = await self.store.get_event(event_id, check_room_id=room_id)
+        if event.internal_metadata.outlier:
+            raise NotFoundError("State not known at event %s" % (event_id,))
 
         state_groups = await self.state_store.get_state_groups_ids(room_id, [event_id])
 
-        if state_groups:
-            _, state = list(state_groups.items()).pop()
-            results = state
+        # get_state_groups_ids should return exactly one result
+        assert len(state_groups) == 1
 
-            if event.is_state():
-                # Get previous state
-                if "replaces_state" in event.unsigned:
-                    prev_id = event.unsigned["replaces_state"]
-                    if prev_id != event.event_id:
-                        results[(event.type, event.state_key)] = prev_id
-                else:
-                    results.pop((event.type, event.state_key), None)
+        state_map = next(iter(state_groups.values()))
 
-            return list(results.values())
-        else:
-            return []
+        state_key = event.get_state_key()
+        if state_key is not None:
+            # the event was not rejected (get_event raises a NotFoundError for rejected
+            # events) so the state at the event should include the event itself.
+            assert (
+                state_map.get((event.type, state_key)) == event.event_id
+            ), "State at event did not include event itself"
 
-    @log_function
+            # ... but we need the state *before* that event
+            if "replaces_state" in event.unsigned:
+                prev_id = event.unsigned["replaces_state"]
+                state_map[(event.type, state_key)] = prev_id
+            else:
+                del state_map[(event.type, state_key)]
+
+        return list(state_map.values())
+
     async def on_backfill_request(
         self, origin: str, room_id: str, pdu_list: List[str], limit: int
     ) -> List[EventBase]:
@@ -1047,12 +1005,24 @@ class FederationHandler:
         limit = min(limit, 100)
 
         events = await self.store.get_backfill_events(room_id, pdu_list, limit)
+        logger.debug(
+            "on_backfill_request: backfill events=%s",
+            [
+                "event_id=%s,depth=%d,body=%s,prevs=%s\n"
+                % (
+                    event.event_id,
+                    event.depth,
+                    event.content.get("body", event.type),
+                    event.prev_event_ids(),
+                )
+                for event in events
+            ],
+        )
 
         events = await filter_events_for_server(self.storage, origin, events)
 
         return events
 
-    @log_function
     async def get_persisted_pdu(
         self, origin: str, event_id: str
     ) -> Optional[EventBase]:
@@ -1114,7 +1084,6 @@ class FederationHandler:
 
         return missing_events
 
-    @log_function
     async def exchange_third_party_invite(
         self, sender_user_id: str, target_user_id: str, room_id: str, signed: JsonDict
     ) -> None:
@@ -1415,3 +1384,64 @@ class FederationHandler:
         # We fell off the bottom, couldn't get the complexity from anyone. Oh
         # well.
         return None
+
+    async def _sync_partial_state_room(
+        self,
+        destination: str,
+        room_id: str,
+    ) -> None:
+        """Background process to resync the state of a partial-state room
+
+        Args:
+            destination: homeserver to pull the state from
+            room_id: room to be resynced
+        """
+
+        # TODO(faster_joins): do we need to lock to avoid races? What happens if other
+        #   worker processes kick off a resync in parallel? Perhaps we should just elect
+        #   a single worker to do the resync.
+        #
+        # TODO(faster_joins): what happens if we leave the room during a resync? if we
+        #   really leave, that might mean we have difficulty getting the room state over
+        #   federation.
+        #
+        # TODO(faster_joins): try other destinations if the one we have fails
+
+        logger.info("Syncing state for room %s via %s", room_id, destination)
+
+        # we work through the queue in order of increasing stream ordering.
+        while True:
+            batch = await self.store.get_partial_state_events_batch(room_id)
+            if not batch:
+                # all the events are updated, so we can update current state and
+                # clear the lazy-loading flag.
+                logger.info("Updating current state for %s", room_id)
+                assert (
+                    self.storage.persistence is not None
+                ), "TODO(faster_joins): support for workers"
+                await self.storage.persistence.update_current_state(room_id)
+
+                logger.info("Clearing partial-state flag for %s", room_id)
+                success = await self.store.clear_partial_state_room(room_id)
+                if success:
+                    logger.info("State resync complete for %s", room_id)
+
+                    # TODO(faster_joins) update room stats and user directory?
+                    return
+
+                # we raced against more events arriving with partial state. Go round
+                # the loop again. We've already logged a warning, so no need for more.
+                # TODO(faster_joins): there is still a race here, whereby incoming events which raced
+                #   with us will fail to be persisted after the call to `clear_partial_state_room` due to
+                #   having partial state.
+                continue
+
+            events = await self.store.get_events_as_list(
+                batch,
+                redact_behaviour=EventRedactBehaviour.AS_IS,
+                allow_rejected=True,
+            )
+            for event in events:
+                await self._federation_event_handler.update_state_for_partial_state_event(
+                    destination, event
+                )

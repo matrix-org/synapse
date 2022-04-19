@@ -23,6 +23,7 @@ from typing import (
     Optional,
     Tuple,
     Union,
+    cast,
 )
 
 from synapse.storage._base import SQLBaseStore
@@ -155,7 +156,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         hs: "HomeServer",
     ):
         super().__init__(database, db_conn, hs)
-        self.server_name = hs.hostname
+        self.server_name: str = hs.hostname
 
     async def get_local_media(self, media_id: str) -> Optional[Dict[str, Any]]:
         """Get the metadata for a local piece of media
@@ -220,7 +221,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 WHERE user_id = ?
             """
             txn.execute(sql, args)
-            count = txn.fetchone()[0]  # type: ignore[index]
+            count = cast(Tuple[int], txn.fetchone())[0]
 
             sql = """
                 SELECT

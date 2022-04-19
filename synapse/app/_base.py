@@ -16,7 +16,6 @@ import atexit
 import gc
 import logging
 import os
-import platform
 import signal
 import socket
 import sys
@@ -32,11 +31,13 @@ from typing import (
     Iterable,
     List,
     NoReturn,
+    Optional,
     Tuple,
     cast,
 )
 
 from cryptography.utils import CryptographyDeprecationWarning
+from matrix_common.versionstring import get_distribution_version_string
 
 import twisted
 from twisted.internet import defer, error, reactor as _reactor
@@ -59,7 +60,7 @@ from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.logging.context import PreserveLoggingContext
-from synapse.metrics import register_threadpool
+from synapse.metrics import install_gc_manager, register_threadpool
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.metrics.jemalloc import setup_jemalloc_stats
 from synapse.types import ISynapseReactor
@@ -67,7 +68,6 @@ from synapse.util.caches.lrucache import setup_expire_lru_cache_entries
 from synapse.util.daemonize import daemonize_process
 from synapse.util.gai_resolver import GAIResolver
 from synapse.util.rlimit import change_resource_limit
-from synapse.util.versionstring import get_version_string
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -129,8 +129,8 @@ def start_worker_reactor(
 def start_reactor(
     appname: str,
     soft_file_limit: int,
-    gc_thresholds: Tuple[int, int, int],
-    pid_file: str,
+    gc_thresholds: Optional[Tuple[int, int, int]],
+    pid_file: Optional[str],
     daemonize: bool,
     print_pidfile: bool,
     logger: logging.Logger,
@@ -158,6 +158,7 @@ def start_reactor(
         change_resource_limit(soft_file_limit)
         if gc_thresholds:
             gc.set_threshold(*gc_thresholds)
+        install_gc_manager()
         run_command()
 
     # make sure that we run the reactor with the sentinel log context,
@@ -170,6 +171,8 @@ def start_reactor(
     # appearing to go backwards.
     with PreserveLoggingContext():
         if daemonize:
+            assert pid_file is not None
+
             if print_pidfile:
                 print(pid_file)
 
@@ -434,7 +437,8 @@ async def start(hs: "HomeServer") -> None:
     # before we start the listeners.
     module_api = hs.get_module_api()
     for module, config in hs.config.modules.loaded_modules:
-        module(config=config, api=module_api)
+        m = module(config=config, api=module_api)
+        logger.info("Loaded module %s", m)
 
     load_legacy_spam_checkers(hs)
     load_legacy_third_party_event_rules(hs)
@@ -446,7 +450,7 @@ async def start(hs: "HomeServer") -> None:
 
     # It is now safe to start your Synapse.
     hs.start_listening()
-    hs.get_datastore().db_pool.start_profiling()
+    hs.get_datastores().main.db_pool.start_profiling()
     hs.get_pusherpool().start()
 
     # Log when we start the shut down process.
@@ -466,15 +470,13 @@ async def start(hs: "HomeServer") -> None:
     # everything currently allocated are things that will be used for the
     # rest of time. Doing so means less work each GC (hopefully).
     #
-    # This only works on Python 3.7
-    if platform.python_implementation() == "CPython" and sys.version_info >= (3, 7):
+    # PyPy does not (yet?) implement gc.freeze()
+    if hasattr(gc, "freeze"):
         gc.collect()
         gc.freeze()
 
-    # Speed up shutdowns by freezing all allocated objects. This moves everything
-    # into the permanent generation and excludes them from the final GC.
-    # Unfortunately only works on Python 3.7
-    if platform.python_implementation() == "CPython" and sys.version_info >= (3, 7):
+        # Speed up shutdowns by freezing all allocated objects. This moves everything
+        # into the permanent generation and excludes them from the final GC.
         atexit.register(gc.freeze)
 
 
@@ -487,7 +489,8 @@ def setup_sentry(hs: "HomeServer") -> None:
     import sentry_sdk
 
     sentry_sdk.init(
-        dsn=hs.config.metrics.sentry_dsn, release=get_version_string(synapse)
+        dsn=hs.config.metrics.sentry_dsn,
+        release=get_distribution_version_string("matrix-synapse"),
     )
 
     # We set some default tags that give some context to this instance

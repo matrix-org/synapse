@@ -15,7 +15,11 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.events.utils import format_event_for_client_v2_without_room_id
+from synapse.api.constants import ReceiptTypes
+from synapse.events.utils import (
+    SerializeEventConfig,
+    format_event_for_client_v2_without_room_id,
+)
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
@@ -34,7 +38,7 @@ class NotificationsServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self._event_serializer = hs.get_event_client_serializer()
@@ -54,10 +58,10 @@ class NotificationsServlet(RestServlet):
         )
 
         receipts_by_room = await self.store.get_receipts_for_user_with_orderings(
-            user_id, "m.read"
+            user_id, ReceiptTypes.READ
         )
 
-        notif_event_ids = [pa["event_id"] for pa in push_actions]
+        notif_event_ids = [pa.event_id for pa in push_actions]
         notif_events = await self.store.get_events(notif_event_ids)
 
         returned_push_actions = []
@@ -66,30 +70,32 @@ class NotificationsServlet(RestServlet):
 
         for pa in push_actions:
             returned_pa = {
-                "room_id": pa["room_id"],
-                "profile_tag": pa["profile_tag"],
-                "actions": pa["actions"],
-                "ts": pa["received_ts"],
+                "room_id": pa.room_id,
+                "profile_tag": pa.profile_tag,
+                "actions": pa.actions,
+                "ts": pa.received_ts,
                 "event": (
-                    await self._event_serializer.serialize_event(
-                        notif_events[pa["event_id"]],
+                    self._event_serializer.serialize_event(
+                        notif_events[pa.event_id],
                         self.clock.time_msec(),
-                        event_format=format_event_for_client_v2_without_room_id,
+                        config=SerializeEventConfig(
+                            event_format=format_event_for_client_v2_without_room_id
+                        ),
                     )
                 ),
             }
 
-            if pa["room_id"] not in receipts_by_room:
+            if pa.room_id not in receipts_by_room:
                 returned_pa["read"] = False
             else:
-                receipt = receipts_by_room[pa["room_id"]]
+                receipt = receipts_by_room[pa.room_id]
 
                 returned_pa["read"] = (
                     receipt["topological_ordering"],
                     receipt["stream_ordering"],
-                ) >= (pa["topological_ordering"], pa["stream_ordering"])
+                ) >= (pa.topological_ordering, pa.stream_ordering)
             returned_push_actions.append(returned_pa)
-            next_token = str(pa["stream_ordering"])
+            next_token = str(pa.stream_ordering)
 
         return 200, {"notifications": returned_push_actions, "next_token": next_token}
 

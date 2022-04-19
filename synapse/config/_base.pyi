@@ -19,6 +19,7 @@ from synapse.config import (
     api,
     appservice,
     auth,
+    background_updates,
     cache,
     captcha,
     cas,
@@ -113,6 +114,7 @@ class RootConfig:
     caches: cache.CacheConfig
     federation: federation.FederationConfig
     retention: retention.RetentionConfig
+    background_updates: background_updates.BackgroundUpdateConfig
 
     config_classes: List[Type["Config"]] = ...
     def __init__(self) -> None: ...
@@ -122,10 +124,7 @@ class RootConfig:
     @classmethod
     def invoke_all_static(cls, func_name: str, *args: Any, **kwargs: Any) -> None: ...
     def parse_config_dict(
-        self,
-        config_dict: Dict[str, Any],
-        config_dir_path: Optional[str] = ...,
-        data_dir_path: Optional[str] = ...,
+        self, config_dict: Dict[str, Any], config_dir_path: str, data_dir_path: str
     ) -> None: ...
     def generate_config(
         self,

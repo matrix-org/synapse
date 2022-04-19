@@ -15,7 +15,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import attr
-from nacl.signing import SigningKey
+from signedjson.types import SigningKey
 
 from synapse.api.constants import MAX_DEPTH
 from synapse.api.room_versions import (
@@ -189,7 +189,7 @@ class EventBuilderFactory:
         self.hostname = hs.hostname
         self.signing_key = hs.signing_key
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
 

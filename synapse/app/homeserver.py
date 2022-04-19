@@ -18,22 +18,23 @@ import os
 import sys
 from typing import Dict, Iterable, Iterator, List
 
+from matrix_common.versionstring import get_distribution_version_string
+
 from twisted.internet.tcp import Port
 from twisted.web.resource import EncodingResourceWrapper, Resource
 from twisted.web.server import GzipEncoderFactory
-from twisted.web.static import File
 
 import synapse
 import synapse.config.logger
 from synapse import events
 from synapse.api.urls import (
+    CLIENT_API_PREFIX,
     FEDERATION_PREFIX,
     LEGACY_MEDIA_PREFIX,
     MEDIA_R0_PREFIX,
     MEDIA_V3_PREFIX,
     SERVER_KEY_V2_PREFIX,
     STATIC_PREFIX,
-    WEB_CLIENT_PREFIX,
 )
 from synapse.app import _base
 from synapse.app._base import (
@@ -53,13 +54,11 @@ from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import (
     OptionsResource,
     RootOptionsRedirectResource,
-    RootRedirect,
     StaticResource,
 )
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
-from synapse.python_dependencies import check_requirements
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
@@ -70,9 +69,9 @@ from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.rest.well_known import well_known_resource
 from synapse.server import HomeServer
 from synapse.storage import DataStore
+from synapse.util.check_dependencies import check_requirements
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.module_loader import load_module
-from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("synapse.app.homeserver")
 
@@ -131,9 +130,15 @@ class SynapseHomeServer(HomeServer):
         resources.update(self._module_web_resources)
         self._module_web_resources_consumed = True
 
-        # try to find something useful to redirect '/' to
-        if WEB_CLIENT_PREFIX in resources:
-            root_resource: Resource = RootOptionsRedirectResource(WEB_CLIENT_PREFIX)
+        # Try to find something useful to serve at '/':
+        #
+        # 1. Redirect to the web client if it is an HTTP(S) URL.
+        # 2. Redirect to the static "Synapse is running" page.
+        # 3. Do not redirect and use a blank resource.
+        if self.config.server.web_client_location:
+            root_resource: Resource = RootOptionsRedirectResource(
+                self.config.server.web_client_location
+            )
         elif STATIC_PREFIX in resources:
             root_resource = RootOptionsRedirectResource(STATIC_PREFIX)
         else:
@@ -192,12 +197,7 @@ class SynapseHomeServer(HomeServer):
 
             resources.update(
                 {
-                    "/_matrix/client/api/v1": client_resource,
-                    "/_matrix/client/r0": client_resource,
-                    "/_matrix/client/v3": client_resource,
-                    "/_matrix/client/unstable": client_resource,
-                    "/_matrix/client/v2_alpha": client_resource,
-                    "/_matrix/client/versions": client_resource,
+                    CLIENT_API_PREFIX: client_resource,
                     "/.well-known": well_known_resource(self),
                     "/_synapse/admin": AdminRestResource(self),
                     **build_synapse_client_resource_tree(self),
@@ -260,30 +260,11 @@ class SynapseHomeServer(HomeServer):
         if name in ["keys", "federation"]:
             resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
-        if name == "webclient":
-            webclient_loc = self.config.server.web_client_location
-
-            if webclient_loc is None:
-                logger.warning(
-                    "Not enabling webclient resource, as web_client_location is unset."
-                )
-            elif webclient_loc.startswith("http://") or webclient_loc.startswith(
-                "https://"
-            ):
-                resources[WEB_CLIENT_PREFIX] = RootRedirect(webclient_loc)
-            else:
-                logger.warning(
-                    "Running webclient on the same domain is not recommended: "
-                    "https://github.com/matrix-org/synapse#security-note - "
-                    "after you move webclient to different host you can set "
-                    "web_client_location to its full URL to enable redirection."
-                )
-                # GZip is disabled here due to
-                # https://twistedmatrix.com/trac/ticket/7678
-                resources[WEB_CLIENT_PREFIX] = File(webclient_loc)
-
         if name == "metrics" and self.config.metrics.enable_metrics:
-            resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
+            metrics_resource: Resource = MetricsResource(RegistryProxy)
+            if compress:
+                metrics_resource = gz_wrap(metrics_resource)
+            resources[METRICS_PREFIX] = metrics_resource
 
         if name == "replication":
             resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
@@ -295,7 +276,7 @@ class SynapseHomeServer(HomeServer):
             # If redis is enabled we connect via the replication command handler
             # in the same way as the workers (since we're effectively a client
             # rather than a server).
-            self.get_tcp_replication().start_replication(self)
+            self.get_replication_command_handler().start_replication(self)
 
         for listener in self.config.server.listeners:
             if listener.type == "http":
@@ -357,16 +338,40 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
         # generating config files and shouldn't try to continue.
         sys.exit(0)
 
+    if config.worker.worker_app:
+        raise ConfigError(
+            "You have specified `worker_app` in the config but are attempting to start a non-worker "
+            "instance. Please use `python -m synapse.app.generic_worker` instead (or remove the option if this is the main process)."
+        )
+        sys.exit(1)
+
     events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
     synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage
 
     if config.server.gc_seconds:
         synapse.metrics.MIN_TIME_BETWEEN_GCS = config.server.gc_seconds
 
+    if (
+        config.registration.enable_registration
+        and not config.registration.enable_registration_without_verification
+    ):
+        if (
+            not config.captcha.enable_registration_captcha
+            and not config.registration.registrations_require_3pid
+            and not config.registration.registration_requires_token
+        ):
+
+            raise ConfigError(
+                "You have enabled open registration without any verification. This is a known vector for "
+                "spam and abuse. If you would like to allow public registration, please consider adding email, "
+                "captcha, or token-based verification. Otherwise this check can be removed by setting the "
+                "`enable_registration_without_verification` config option to `true`."
+            )
+
     hs = SynapseHomeServer(
         config.server.server_name,
         config=config,
-        version_string="Synapse/" + get_version_string(synapse),
+        version_string="Synapse/" + get_distribution_version_string("matrix-synapse"),
     )
 
     synapse.config.logger.setup_logging(hs, config, use_worker_options=False)
@@ -387,7 +392,7 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
 
         await _base.start(hs)
 
-        hs.get_datastore().db_pool.updates.start_doing_background_updates()
+        hs.get_datastores().main.db_pool.updates.start_doing_background_updates()
 
     register_start(start)
 

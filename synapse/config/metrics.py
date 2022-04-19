@@ -13,19 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any, Optional
+
 import attr
 
-from synapse.python_dependencies import DependencyException, check_requirements
+from synapse.types import JsonDict
+from synapse.util.check_dependencies import DependencyException, check_requirements
 
 from ._base import Config, ConfigError
 
 
 @attr.s
 class MetricsFlags:
-    known_servers = attr.ib(default=False, validator=attr.validators.instance_of(bool))
+    known_servers: bool = attr.ib(
+        default=False, validator=attr.validators.instance_of(bool)
+    )
 
     @classmethod
-    def all_off(cls):
+    def all_off(cls) -> "MetricsFlags":
         """
         Instantiate the flags with all options set to off.
         """
@@ -35,7 +40,7 @@ class MetricsFlags:
 class MetricsConfig(Config):
     section = "metrics"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.enable_metrics = config.get("enable_metrics", False)
         self.report_stats = config.get("report_stats", None)
         self.report_stats_endpoint = config.get(
@@ -65,7 +70,9 @@ class MetricsConfig(Config):
                     "sentry.dsn field is required when sentry integration is enabled"
                 )
 
-    def generate_config_section(self, report_stats=None, **kwargs):
+    def generate_config_section(
+        self, report_stats: Optional[bool] = None, **kwargs: Any
+    ) -> str:
         res = """\
         ## Metrics ###
 

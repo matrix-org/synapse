@@ -1,0 +1,1 @@
+Preparation for faster-room-join work: start a background process to resynchronise the room state after a room join.

@@ -14,7 +14,7 @@
 import logging
 from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
-from synapse.api.constants import ReadReceiptEventFields
+from synapse.api.constants import ReadReceiptEventFields, ReceiptTypes
 from synapse.appservice import ApplicationService
 from synapse.streams import EventSource
 from synapse.types import JsonDict, ReadReceipt, UserID, get_domain_from_id
@@ -29,7 +29,7 @@ class ReceiptsHandler:
     def __init__(self, hs: "HomeServer"):
         self.notifier = hs.get_notifier()
         self.server_name = hs.config.server.server_name
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.event_auth_handler = hs.get_event_auth_handler()
 
         self.hs = hs
@@ -163,7 +163,7 @@ class ReceiptsHandler:
 
 class ReceiptEventSource(EventSource[int, JsonDict]):
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.config = hs.config
 
     @staticmethod
@@ -178,7 +178,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
             for event_id in content.keys():
                 event_content = content.get(event_id, {})
-                m_read = event_content.get("m.read", {})
+                m_read = event_content.get(ReceiptTypes.READ, {})
 
                 # If m_read is missing copy over the original event_content as there is nothing to process here
                 if not m_read:
@@ -206,7 +206,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
                 # Set new users unless empty
                 if len(new_users.keys()) > 0:
-                    new_event["content"][event_id] = {"m.read": new_users}
+                    new_event["content"][event_id] = {ReceiptTypes.READ: new_users}
 
             # Append new_event to visible_events unless empty
             if len(new_event["content"].keys()) > 0:
@@ -269,7 +269,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         # Then filter down to rooms that the AS can read
         events = []
         for room_id, event in rooms_to_events.items():
-            if not await service.matches_user_in_member_list(room_id, self.store):
+            if not await service.is_interested_in_room(room_id, self.store):
                 continue
 
             events.append(event)

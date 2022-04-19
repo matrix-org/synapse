@@ -20,15 +20,11 @@ from typing import Any, Dict, List
 from synapse.push.rulekinds import PRIORITY_CLASS_INVERSE_MAP, PRIORITY_CLASS_MAP
 
 
-def list_with_base_rules(
-    rawrules: List[Dict[str, Any]], use_new_defaults: bool = False
-) -> List[Dict[str, Any]]:
+def list_with_base_rules(rawrules: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Combine the list of rules set by the user with the default push rules
 
     Args:
         rawrules: The rules the user has modified or set.
-        use_new_defaults: Whether to use the new experimental default rules when
-            appending or prepending default rules.
 
     Returns:
         A new list with the rules set by the user combined with the defaults.
@@ -48,9 +44,7 @@ def list_with_base_rules(
 
     ruleslist.extend(
         make_base_prepend_rules(
-            PRIORITY_CLASS_INVERSE_MAP[current_prio_class],
-            modified_base_rules,
-            use_new_defaults,
+            PRIORITY_CLASS_INVERSE_MAP[current_prio_class], modified_base_rules
         )
     )
 
@@ -61,7 +55,6 @@ def list_with_base_rules(
                     make_base_append_rules(
                         PRIORITY_CLASS_INVERSE_MAP[current_prio_class],
                         modified_base_rules,
-                        use_new_defaults,
                     )
                 )
                 current_prio_class -= 1
@@ -70,7 +63,6 @@ def list_with_base_rules(
                         make_base_prepend_rules(
                             PRIORITY_CLASS_INVERSE_MAP[current_prio_class],
                             modified_base_rules,
-                            use_new_defaults,
                         )
                     )
 
@@ -79,18 +71,14 @@ def list_with_base_rules(
     while current_prio_class > 0:
         ruleslist.extend(
             make_base_append_rules(
-                PRIORITY_CLASS_INVERSE_MAP[current_prio_class],
-                modified_base_rules,
-                use_new_defaults,
+                PRIORITY_CLASS_INVERSE_MAP[current_prio_class], modified_base_rules
             )
         )
         current_prio_class -= 1
         if current_prio_class > 0:
             ruleslist.extend(
                 make_base_prepend_rules(
-                    PRIORITY_CLASS_INVERSE_MAP[current_prio_class],
-                    modified_base_rules,
-                    use_new_defaults,
+                    PRIORITY_CLASS_INVERSE_MAP[current_prio_class], modified_base_rules
                 )
             )
 
@@ -98,24 +86,14 @@ def list_with_base_rules(
 
 
 def make_base_append_rules(
-    kind: str,
-    modified_base_rules: Dict[str, Dict[str, Any]],
-    use_new_defaults: bool = False,
+    kind: str, modified_base_rules: Dict[str, Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
     rules = []
 
     if kind == "override":
-        rules = (
-            NEW_APPEND_OVERRIDE_RULES
-            if use_new_defaults
-            else BASE_APPEND_OVERRIDE_RULES
-        )
+        rules = BASE_APPEND_OVERRIDE_RULES
     elif kind == "underride":
-        rules = (
-            NEW_APPEND_UNDERRIDE_RULES
-            if use_new_defaults
-            else BASE_APPEND_UNDERRIDE_RULES
-        )
+        rules = BASE_APPEND_UNDERRIDE_RULES
     elif kind == "content":
         rules = BASE_APPEND_CONTENT_RULES
 
@@ -134,7 +112,6 @@ def make_base_append_rules(
 def make_base_prepend_rules(
     kind: str,
     modified_base_rules: Dict[str, Dict[str, Any]],
-    use_new_defaults: bool = False,
 ) -> List[Dict[str, Any]]:
     rules = []
 
@@ -153,7 +130,9 @@ def make_base_prepend_rules(
     return rules
 
 
-BASE_APPEND_CONTENT_RULES = [
+# We have to annotate these types, otherwise mypy infers them as
+# `List[Dict[str, Sequence[Collection[str]]]]`.
+BASE_APPEND_CONTENT_RULES: List[Dict[str, Any]] = [
     {
         "rule_id": "global/content/.m.rule.contains_user_name",
         "conditions": [
@@ -172,7 +151,7 @@ BASE_APPEND_CONTENT_RULES = [
 ]
 
 
-BASE_PREPEND_OVERRIDE_RULES = [
+BASE_PREPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
     {
         "rule_id": "global/override/.m.rule.master",
         "enabled": False,
@@ -182,7 +161,7 @@ BASE_PREPEND_OVERRIDE_RULES = [
 ]
 
 
-BASE_APPEND_OVERRIDE_RULES = [
+BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
     {
         "rule_id": "global/override/.m.rule.suppress_notices",
         "conditions": [
@@ -190,7 +169,7 @@ BASE_APPEND_OVERRIDE_RULES = [
                 "kind": "event_match",
                 "key": "content.msgtype",
                 "pattern": "m.notice",
-                "_id": "_suppress_notices",
+                "_cache_key": "_suppress_notices",
             }
         ],
         "actions": ["dont_notify"],
@@ -204,13 +183,13 @@ BASE_APPEND_OVERRIDE_RULES = [
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.room.member",
-                "_id": "_member",
+                "_cache_key": "_member",
             },
             {
                 "kind": "event_match",
                 "key": "content.membership",
                 "pattern": "invite",
-                "_id": "_invite_member",
+                "_cache_key": "_invite_member",
             },
             {"kind": "event_match", "key": "state_key", "pattern_type": "user_id"},
         ],
@@ -233,7 +212,7 @@ BASE_APPEND_OVERRIDE_RULES = [
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.room.member",
-                "_id": "_member",
+                "_cache_key": "_member",
             }
         ],
         "actions": ["dont_notify"],
@@ -258,12 +237,12 @@ BASE_APPEND_OVERRIDE_RULES = [
                 "kind": "event_match",
                 "key": "content.body",
                 "pattern": "@room",
-                "_id": "_roomnotif_content",
+                "_cache_key": "_roomnotif_content",
             },
             {
                 "kind": "sender_notification_permission",
                 "key": "room",
-                "_id": "_roomnotif_pl",
+                "_cache_key": "_roomnotif_pl",
             },
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": True}],
@@ -275,13 +254,13 @@ BASE_APPEND_OVERRIDE_RULES = [
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.room.tombstone",
-                "_id": "_tombstone",
+                "_cache_key": "_tombstone",
             },
             {
                 "kind": "event_match",
                 "key": "state_key",
                 "pattern": "",
-                "_id": "_tombstone_statekey",
+                "_cache_key": "_tombstone_statekey",
             },
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": True}],
@@ -293,7 +272,7 @@ BASE_APPEND_OVERRIDE_RULES = [
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.reaction",
-                "_id": "_reaction",
+                "_cache_key": "_reaction",
             }
         ],
         "actions": ["dont_notify"],
@@ -301,136 +280,7 @@ BASE_APPEND_OVERRIDE_RULES = [
 ]
 
 
-NEW_APPEND_OVERRIDE_RULES = [
-    {
-        "rule_id": "global/override/.m.rule.encrypted",
-        "conditions": [
-            {
-                "kind": "event_match",
-                "key": "type",
-                "pattern": "m.room.encrypted",
-                "_id": "_encrypted",
-            }
-        ],
-        "actions": ["notify"],
-    },
-    {
-        "rule_id": "global/override/.m.rule.suppress_notices",
-        "conditions": [
-            {
-                "kind": "event_match",
-                "key": "type",
-                "pattern": "m.room.message",
-                "_id": "_suppress_notices_type",
-            },
-            {
-                "kind": "event_match",
-                "key": "content.msgtype",
-                "pattern": "m.notice",
-                "_id": "_suppress_notices",
-            },
-        ],
-        "actions": [],
-    },
-    {
-        "rule_id": "global/underride/.m.rule.suppress_edits",
-        "conditions": [
-            {
-                "kind": "event_match",
-                "key": "m.relates_to.m.rel_type",
-                "pattern": "m.replace",
-                "_id": "_suppress_edits",
-            }
-        ],
-        "actions": [],
-    },
-    {
-        "rule_id": "global/override/.m.rule.invite_for_me",
-        "conditions": [
-            {
-                "kind": "event_match",
-                "key": "type",
-                "pattern": "m.room.member",
-                "_id": "_member",
-            },
-            {
-                "kind": "event_match",
-                "key": "content.membership",
-                "pattern": "invite",
-                "_id": "_invite_member",
-            },
-            {"kind": "event_match", "key": "state_key", "pattern_type": "user_id"},
-        ],
-        "actions": ["notify", {"set_tweak": "sound", "value": "default"}],
-    },
-    {
-        "rule_id": "global/override/.m.rule.contains_display_name",
-        "conditions": [{"kind": "contains_display_name"}],
-        "actions": [
-            "notify",
-            {"set_tweak": "sound", "value": "default"},
-            {"set_tweak": "highlight"},
-        ],
-    },
-    {
-        "rule_id": "global/override/.m.rule.tombstone",
-        "conditions": [
-            {
-                "kind": "event_match",
-                "key": "type",
-                "pattern": "m.room.tombstone",
-                "_id": "_tombstone",
-            },
-            {
-                "kind": "event_match",
-                "key": "state_key",
-                "pattern": "",
-                "_id": "_tombstone_statekey",
-            },
-        ],
-        "actions": [
-            "notify",
-            {"set_tweak": "sound", "value": "default"},
-            {"set_tweak": "highlight"},
-        ],
-    },
-    {
-        "rule_id": "global/override/.m.rule.roomnotif",
-        "conditions": [
-            {
-                "kind": "event_match",
-                "key": "content.body",
-                "pattern": "@room",
-                "_id": "_roomnotif_content",
-            },
-            {
-                "kind": "sender_notification_permission",
-                "key": "room",
-                "_id": "_roomnotif_pl",
-            },
-        ],
-        "actions": [
-            "notify",
-            {"set_tweak": "highlight"},
-            {"set_tweak": "sound", "value": "default"},
-        ],
-    },
-    {
-        "rule_id": "global/override/.m.rule.call",
-        "conditions": [
-            {
-                "kind": "event_match",
-                "key": "type",
-                "pattern": "m.call.invite",
-                "_id": "_call",
-            }
-        ],
-        "actions": ["notify", {"set_tweak": "sound", "value": "ring"}],
-    },
-]
-
-
-BASE_APPEND_UNDERRIDE_RULES = [
+BASE_APPEND_UNDERRIDE_RULES: List[Dict[str, Any]] = [
     {
         "rule_id": "global/underride/.m.rule.call",
         "conditions": [
@@ -438,7 +288,7 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.call.invite",
-                "_id": "_call",
+                "_cache_key": "_call",
             }
         ],
         "actions": [
@@ -452,12 +302,12 @@ BASE_APPEND_UNDERRIDE_RULES = [
     {
         "rule_id": "global/underride/.m.rule.room_one_to_one",
         "conditions": [
-            {"kind": "room_member_count", "is": "2", "_id": "member_count"},
+            {"kind": "room_member_count", "is": "2", "_cache_key": "member_count"},
             {
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.room.message",
-                "_id": "_message",
+                "_cache_key": "_message",
             },
         ],
         "actions": [
@@ -471,12 +321,12 @@ BASE_APPEND_UNDERRIDE_RULES = [
     {
         "rule_id": "global/underride/.m.rule.encrypted_room_one_to_one",
         "conditions": [
-            {"kind": "room_member_count", "is": "2", "_id": "member_count"},
+            {"kind": "room_member_count", "is": "2", "_cache_key": "member_count"},
             {
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.room.encrypted",
-                "_id": "_encrypted",
+                "_cache_key": "_encrypted",
             },
         ],
         "actions": [
@@ -492,7 +342,7 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.room.message",
-                "_id": "_message",
+                "_cache_key": "_message",
             }
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": False}],
@@ -506,7 +356,7 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "m.room.encrypted",
-                "_id": "_encrypted",
+                "_cache_key": "_encrypted",
             }
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": False}],
@@ -518,52 +368,22 @@ BASE_APPEND_UNDERRIDE_RULES = [
                 "kind": "event_match",
                 "key": "type",
                 "pattern": "im.vector.modular.widgets",
-                "_id": "_type_modular_widgets",
+                "_cache_key": "_type_modular_widgets",
             },
             {
                 "kind": "event_match",
                 "key": "content.type",
                 "pattern": "jitsi",
-                "_id": "_content_type_jitsi",
+                "_cache_key": "_content_type_jitsi",
             },
             {
                 "kind": "event_match",
                 "key": "state_key",
                 "pattern": "*",
-                "_id": "_is_state_event",
+                "_cache_key": "_is_state_event",
             },
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": False}],
-    },
-]
-
-
-NEW_APPEND_UNDERRIDE_RULES = [
-    {
-        "rule_id": "global/underride/.m.rule.room_one_to_one",
-        "conditions": [
-            {"kind": "room_member_count", "is": "2", "_id": "member_count"},
-            {
-                "kind": "event_match",
-                "key": "content.body",
-                "pattern": "*",
-                "_id": "body",
-            },
-        ],
-        "actions": ["notify", {"set_tweak": "sound", "value": "default"}],
-    },
-    {
-        "rule_id": "global/underride/.m.rule.message",
-        "conditions": [
-            {
-                "kind": "event_match",
-                "key": "content.body",
-                "pattern": "*",
-                "_id": "body",
-            },
-        ],
-        "actions": ["notify"],
-        "enabled": False,
     },
 ]
 
@@ -589,26 +409,3 @@ for r in BASE_APPEND_UNDERRIDE_RULES:
     r["priority_class"] = PRIORITY_CLASS_MAP["underride"]
     r["default"] = True
     BASE_RULE_IDS.add(r["rule_id"])
-
-
-NEW_RULE_IDS = set()
-
-for r in BASE_APPEND_CONTENT_RULES:
-    r["priority_class"] = PRIORITY_CLASS_MAP["content"]
-    r["default"] = True
-    NEW_RULE_IDS.add(r["rule_id"])
-
-for r in BASE_PREPEND_OVERRIDE_RULES:
-    r["priority_class"] = PRIORITY_CLASS_MAP["override"]
-    r["default"] = True
-    NEW_RULE_IDS.add(r["rule_id"])
-
-for r in NEW_APPEND_OVERRIDE_RULES:
-    r["priority_class"] = PRIORITY_CLASS_MAP["override"]
-    r["default"] = True
-    NEW_RULE_IDS.add(r["rule_id"])
-
-for r in NEW_APPEND_UNDERRIDE_RULES:
-    r["priority_class"] = PRIORITY_CLASS_MAP["underride"]
-    r["default"] = True
-    NEW_RULE_IDS.add(r["rule_id"])

@@ -23,7 +23,8 @@ from synapse.storage.database import DatabasePool
 from synapse.storage.engines import create_engine
 
 from tests import unittest
-from tests.utils import TestHomeServer, default_config
+from tests.server import TestHomeServer
+from tests.utils import default_config
 
 
 class SQLBaseStoreTestCase(unittest.TestCase):
@@ -102,7 +103,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.assertEquals("Value", value)
+        self.assertEqual("Value", value)
         self.mock_txn.execute.assert_called_with(
             "SELECT retcol FROM tablename WHERE keycol = ?", ["TheKey"]
         )
@@ -120,7 +121,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.assertEquals({"colA": 1, "colB": 2, "colC": 3}, ret)
+        self.assertEqual({"colA": 1, "colB": 2, "colC": 3}, ret)
         self.mock_txn.execute.assert_called_with(
             "SELECT colA, colB, colC FROM tablename WHERE keycol = ?", ["TheKey"]
         )
@@ -153,7 +154,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
             )
         )
 
-        self.assertEquals([{"colA": 1}, {"colA": 2}, {"colA": 3}], ret)
+        self.assertEqual([{"colA": 1}, {"colA": 2}, {"colA": 3}], ret)
         self.mock_txn.execute.assert_called_with(
             "SELECT colA FROM tablename WHERE keycol = ?", ["A set"]
         )

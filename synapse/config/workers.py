@@ -1,4 +1,5 @@
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Union
+import argparse
+from typing import Any, List, Union
 
 import attr
+
+from synapse.types import JsonDict
 
 from ._base import (
     Config,
@@ -49,12 +53,12 @@ def _instance_to_list_converter(obj: Union[str, List[str]]) -> List[str]:
     return obj
 
 
-@attr.s
+@attr.s(auto_attribs=True)
 class InstanceLocationConfig:
     """The host and port to talk to an instance via HTTP replication."""
 
-    host = attr.ib(type=str)
-    port = attr.ib(type=int)
+    host: str
+    port: int
 
 
 @attr.s
@@ -75,34 +79,28 @@ class WriterLocations:
             can only be a single instance.
     """
 
-    events = attr.ib(
+    events: List[str] = attr.ib(
         default=["master"],
-        type=List[str],
         converter=_instance_to_list_converter,
     )
-    typing = attr.ib(
+    typing: List[str] = attr.ib(
         default=["master"],
-        type=List[str],
         converter=_instance_to_list_converter,
     )
-    to_device = attr.ib(
+    to_device: List[str] = attr.ib(
         default=["master"],
-        type=List[str],
         converter=_instance_to_list_converter,
     )
-    account_data = attr.ib(
+    account_data: List[str] = attr.ib(
         default=["master"],
-        type=List[str],
         converter=_instance_to_list_converter,
     )
-    receipts = attr.ib(
+    receipts: List[str] = attr.ib(
         default=["master"],
-        type=List[str],
         converter=_instance_to_list_converter,
     )
-    presence = attr.ib(
+    presence: List[str] = attr.ib(
         default=["master"],
-        type=List[str],
         converter=_instance_to_list_converter,
     )
 
@@ -114,7 +112,7 @@ class WorkerConfig(Config):
 
     section = "worker"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.worker_app = config.get("worker_app")
 
         # Canonicalise worker_app so that master always has None
@@ -124,9 +122,13 @@ class WorkerConfig(Config):
         self.worker_listeners = [
             parse_listener_def(x) for x in config.get("worker_listeners", [])
         ]
-        self.worker_daemonize = config.get("worker_daemonize")
+        self.worker_daemonize = bool(config.get("worker_daemonize"))
         self.worker_pid_file = config.get("worker_pid_file")
-        self.worker_log_config = config.get("worker_log_config")
+
+        worker_log_config = config.get("worker_log_config")
+        if worker_log_config is not None and not isinstance(worker_log_config, str):
+            raise ConfigError("worker_log_config must be a string")
+        self.worker_log_config = worker_log_config
 
         # The host used to connect to the main synapse
         self.worker_replication_host = config.get("worker_replication_host", None)
@@ -294,7 +296,7 @@ class WorkerConfig(Config):
             self.worker_name is None and background_tasks_instance == "master"
         ) or self.worker_name == background_tasks_instance
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         ## Workers ##
 
@@ -343,7 +345,7 @@ class WorkerConfig(Config):
         #worker_replication_secret: ""
         """
 
-    def read_arguments(self, args):
+    def read_arguments(self, args: argparse.Namespace) -> None:
         # We support a bunch of command line arguments that override options in
         # the config. A lot of these options have a worker_* prefix when running
         # on workers so we also have to override them when command line options

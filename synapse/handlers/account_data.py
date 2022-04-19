@@ -12,8 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 import random
-from typing import TYPE_CHECKING, Collection, List, Optional, Tuple
+from typing import TYPE_CHECKING, Awaitable, Callable, Collection, List, Optional, Tuple
 
 from synapse.replication.http.account_data import (
     ReplicationAddTagRestServlet,
@@ -27,10 +28,16 @@ from synapse.types import JsonDict, UserID
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
+logger = logging.getLogger(__name__)
+
+ON_ACCOUNT_DATA_UPDATED_CALLBACK = Callable[
+    [str, Optional[str], str, JsonDict], Awaitable
+]
+
 
 class AccountDataHandler:
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._instance_name = hs.get_instance_name()
         self._notifier = hs.get_notifier()
 
@@ -39,6 +46,44 @@ class AccountDataHandler:
         self._add_tag_client = ReplicationAddTagRestServlet.make_client(hs)
         self._remove_tag_client = ReplicationRemoveTagRestServlet.make_client(hs)
         self._account_data_writers = hs.config.worker.writers.account_data
+
+        self._on_account_data_updated_callbacks: List[
+            ON_ACCOUNT_DATA_UPDATED_CALLBACK
+        ] = []
+
+    def register_module_callbacks(
+        self, on_account_data_updated: Optional[ON_ACCOUNT_DATA_UPDATED_CALLBACK] = None
+    ) -> None:
+        """Register callbacks from modules."""
+        if on_account_data_updated is not None:
+            self._on_account_data_updated_callbacks.append(on_account_data_updated)
+
+    async def _notify_modules(
+        self,
+        user_id: str,
+        room_id: Optional[str],
+        account_data_type: str,
+        content: JsonDict,
+    ) -> None:
+        """Notifies modules about new account data changes.
+
+        A change can be either a new account data type being added, or the content
+        associated with a type being changed. Account data for a given type is removed by
+        changing the associated content to an empty dictionary.
+
+        Note that this is not called when the tags associated with a room change.
+
+        Args:
+            user_id: The user whose account data is changing.
+            room_id: The ID of the room the account data change concerns, if any.
+            account_data_type: The type of the account data.
+            content: The content that is now associated with this type.
+        """
+        for callback in self._on_account_data_updated_callbacks:
+            try:
+                await callback(user_id, room_id, account_data_type, content)
+            except Exception as e:
+                logger.exception("Failed to run module callback %s: %s", callback, e)
 
     async def add_account_data_to_room(
         self, user_id: str, room_id: str, account_data_type: str, content: JsonDict
@@ -63,6 +108,8 @@ class AccountDataHandler:
                 "account_data_key", max_stream_id, users=[user_id]
             )
 
+            await self._notify_modules(user_id, room_id, account_data_type, content)
+
             return max_stream_id
         else:
             response = await self._room_data_client(
@@ -77,7 +124,7 @@ class AccountDataHandler:
     async def add_account_data_for_user(
         self, user_id: str, account_data_type: str, content: JsonDict
     ) -> int:
-        """Add some account_data to a room for a user.
+        """Add some global account_data for a user.
 
         Args:
             user_id: The user to add a tag for.
@@ -96,6 +143,9 @@ class AccountDataHandler:
             self._notifier.on_new_event(
                 "account_data_key", max_stream_id, users=[user_id]
             )
+
+            await self._notify_modules(user_id, None, account_data_type, content)
+
             return max_stream_id
         else:
             response = await self._user_data_client(
@@ -166,7 +216,7 @@ class AccountDataHandler:
 
 class AccountDataEventSource(EventSource[int, JsonDict]):
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     def get_current_key(self, direction: str = "f") -> int:
         return self.store.get_max_account_data_stream_id()

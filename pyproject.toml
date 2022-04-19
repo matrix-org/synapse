@@ -35,22 +35,250 @@
         showcontent = true
 
 [tool.black]
-target-version = ['py36']
-exclude = '''
+target-version = ['py37', 'py38', 'py39', 'py310']
+# black ignores everything in .gitignore by default, see
+# https://black.readthedocs.io/en/stable/usage_and_configuration/file_collection_and_discovery.html#gitignore
+# Use `extend-exclude` if you want to exclude something in addition to this.
 
-(
-  /(
-      \.eggs         # exclude a few common directories in the
-    | \.git          # root of the project
-    | \.tox
-    | \.venv
-    | \.env
-    | env
-    | _build
-    | _trial_temp.*
-    | build
-    | dist
-    | debian
-  )/
-)
-'''
+[tool.isort]
+line_length = 88
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "TWISTED", "FIRSTPARTY", "TESTS", "LOCALFOLDER"]
+default_section = "THIRDPARTY"
+known_first_party = ["synapse"]
+known_tests = ["tests"]
+known_twisted = ["twisted", "OpenSSL"]
+multi_line_output = 3
+include_trailing_comma = true
+combine_as_imports = true
+skip_gitignore = true
+
+[tool.poetry]
+name = "matrix-synapse"
+version = "1.57.0"
+description = "Homeserver for the Matrix decentralised comms protocol"
+authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
+license = "Apache-2.0"
+readme = "README.rst"
+repository = "https://github.com/matrix-org/synapse"
+packages = [
+    { include = "synapse" },
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Topic :: Communications :: Chat",
+]
+include = [
+    { path = "AUTHORS.rst", format = "sdist" },
+    { path = "book.toml", format = "sdist" },
+    { path = "changelog.d", format = "sdist" },
+    { path = "CHANGES.md", format = "sdist" },
+    { path = "CONTRIBUTING.md", format = "sdist" },
+    { path = "demo", format = "sdist" },
+    { path = "docs", format = "sdist" },
+    { path = "INSTALL.md", format = "sdist" },
+    { path = "mypy.ini", format = "sdist" },
+    { path = "scripts-dev", format = "sdist" },
+    { path = "synmark", format="sdist" },
+    { path = "sytest-blacklist", format = "sdist" },
+    { path = "tests", format = "sdist" },
+    { path = "UPGRADE.rst", format = "sdist" },
+]
+
+[tool.poetry.scripts]
+synapse_homeserver = "synapse.app.homeserver:main"
+synapse_worker = "synapse.app.generic_worker:main"
+synctl = "synapse._scripts.synctl:main"
+
+export_signing_key = "synapse._scripts.export_signing_key:main"
+generate_config = "synapse._scripts.generate_config:main"
+generate_log_config = "synapse._scripts.generate_log_config:main"
+generate_signing_key = "synapse._scripts.generate_signing_key:main"
+hash_password = "synapse._scripts.hash_password:main"
+register_new_matrix_user = "synapse._scripts.register_new_matrix_user:main"
+synapse_port_db = "synapse._scripts.synapse_port_db:main"
+synapse_review_recent_signups = "synapse._scripts.review_recent_signups:main"
+update_synapse_database = "synapse._scripts.update_synapse_database:main"
+
+[tool.poetry.dependencies]
+python = "^3.7"
+
+# Mandatory Dependencies
+# ----------------------
+# we use the TYPE_CHECKER.redefine method added in jsonschema 3.0.0
+jsonschema = ">=3.0.0"
+# frozendict 2.1.2 is broken on Debian 10: https://github.com/Marco-Sulla/python-frozendict/issues/41
+frozendict = ">=1,!=2.1.2"
+# We require 2.1.0 or higher for type hints. Previous guard was >= 1.1.0
+unpaddedbase64 = ">=2.1.0"
+canonicaljson = ">=1.4.0"
+# we use the type definitions added in signedjson 1.1.
+signedjson = ">=1.1.0"
+PyNaCl = ">=1.2.1"
+# validating SSL certs for IP addresses requires service_identity 18.1.
+service-identity = ">=18.1.0"
+# Twisted 18.9 introduces some logger improvements that the structured
+# logger utilises
+Twisted = {extras = ["tls"], version = ">=18.9.0"}
+treq = ">=15.1"
+# Twisted has required pyopenssl 16.0 since about Twisted 16.6.
+pyOpenSSL = ">=16.0.0"
+PyYAML = ">=3.11"
+pyasn1 = ">=0.1.9"
+pyasn1-modules = ">=0.0.7"
+bcrypt = ">=3.1.0"
+Pillow = ">=5.4.0"
+sortedcontainers = ">=1.4.4"
+pymacaroons = ">=0.13.0"
+msgpack = ">=0.5.2"
+phonenumbers = ">=8.2.0"
+# we use GaugeHistogramMetric, which was added in prom-client 0.4.0.
+prometheus-client = ">=0.4.0"
+# we use `order`, which arrived in attrs 19.2.0.
+# Note: 21.1.0 broke `/sync`, see #9936
+attrs = ">=19.2.0,!=21.1.0"
+netaddr = ">=0.7.18"
+# Jinja 2.x is incompatible with MarkupSafe>=2.1. To ensure that admins do not
+# end up with a broken installation, with recent MarkupSafe but old Jinja, we
+# add a lower bound to the Jinja2 dependency.
+Jinja2 = ">=3.0"
+bleach = ">=1.4.3"
+# We use `ParamSpec`, which was added in `typing-extensions` 3.10.0.0.
+typing-extensions = ">=3.10.0"
+# We enforce that we have a `cryptography` version that bundles an `openssl`
+# with the latest security patches.
+cryptography = ">=3.4.7"
+# ijson 3.1.4 fixes a bug with "." in property names
+ijson = ">=3.1.4"
+matrix-common = "~=1.1.0"
+# We need packaging.requirements.Requirement, added in 16.1.
+packaging = ">=16.1"
+# At the time of writing, we only use functions from the version `importlib.metadata`
+# which shipped in Python 3.8. This corresponds to version 1.4 of the backport.
+importlib_metadata = { version = ">=1.4", python = "<3.8" }
+
+
+# Optional Dependencies
+# ---------------------
+matrix-synapse-ldap3 = { version = ">=0.1", optional = true }
+psycopg2 = { version = ">=2.8", markers = "platform_python_implementation != 'PyPy'", optional = true }
+psycopg2cffi = { version = ">=2.8", markers = "platform_python_implementation == 'PyPy'", optional = true }
+psycopg2cffi-compat = { version = "==1.1", markers = "platform_python_implementation == 'PyPy'", optional = true }
+pysaml2 = { version = ">=4.5.0", optional = true }
+authlib = { version = ">=0.14.0", optional = true }
+# systemd-python is necessary for logging to the systemd journal via
+# `systemd.journal.JournalHandler`, as is documented in
+# `contrib/systemd/log_config.yaml`.
+# Note: systemd-python 231 appears to have been yanked from pypi
+systemd-python = { version = ">=231", optional = true }
+lxml = { version = ">=4.2.0", optional = true }
+sentry-sdk = { version = ">=0.7.2", optional = true }
+opentracing = { version = ">=2.2.0", optional = true }
+jaeger-client = { version = ">=4.0.0", optional = true }
+pyjwt = { version = ">=1.6.4", optional = true }
+txredisapi = { version = ">=1.4.7", optional = true }
+hiredis = { version = "*", optional = true }
+Pympler = { version = "*", optional = true }
+parameterized = { version = ">=0.7.4", optional = true }
+idna = { version = ">=2.5", optional = true }
+
+[tool.poetry.extras]
+# NB: Packages that should be part of `pip install matrix-synapse[all]` need to be specified
+# twice: once here, and once in the `all` extra.
+matrix-synapse-ldap3 = ["matrix-synapse-ldap3"]
+postgres = ["psycopg2", "psycopg2cffi", "psycopg2cffi-compat"]
+saml2 = ["pysaml2"]
+oidc = ["authlib"]
+# systemd-python is necessary for logging to the systemd journal via
+# `systemd.journal.JournalHandler`, as is documented in
+# `contrib/systemd/log_config.yaml`.
+systemd = ["systemd-python"]
+url_preview = ["lxml"]
+sentry = ["sentry-sdk"]
+opentracing = ["jaeger-client", "opentracing"]
+jwt = ["pyjwt"]
+# hiredis is not a *strict* dependency, but it makes things much faster.
+# (if it is not installed, we fall back to slow code.)
+redis = ["txredisapi", "hiredis"]
+# Required to use experimental `caches.track_memory_usage` config option.
+cache_memory = ["pympler"]
+test = ["parameterized", "idna"]
+
+# The duplication here is awful. I hate hate hate hate hate it. However, for now I want
+# to ensure you can still `pip install matrix-synapse[all]` like today. Two motivations:
+# 1) for new installations, I want instructions in existing documentation and tutorials
+#    out there to still work.
+# 2) I don't want to hard-code a list of extras into CI if I can help it. The ideal
+#    solution here would be something like https://github.com/python-poetry/poetry/issues/3413
+# Poetry 1.2's dependency groups might make this easier. But I'm not trying that out
+# until there's a stable release of 1.2.
+#
+# NB: the strings in this list must be *package* names, not extra names.
+# Some of our extra names _are_ package names, which can lead to great confusion.
+all = [
+    # matrix-synapse-ldap3
+    "matrix-synapse-ldap3",
+    # postgres
+    "psycopg2", "psycopg2cffi", "psycopg2cffi-compat",
+    # saml2
+    "pysaml2",
+    # oidc
+    "authlib",
+    # url_preview
+    "lxml",
+    # sentry
+    "sentry-sdk",
+    # opentracing
+    "jaeger-client", "opentracing",
+    # jwt
+    "pyjwt",
+    #redis
+    "txredisapi", "hiredis"
+    # omitted:
+    #   - cache_memory: this is an experimental option
+    #   - test: it's useful to have this separate from dev deps in the olddeps job
+    #   - systemd: this is a system-based requirement
+]
+
+[tool.poetry.dev-dependencies]
+## We pin black so that our tests don't start failing on new releases.
+isort = "==5.7.0"
+black = "==22.3.0"
+flake8-comprehensions = "*"
+flake8-bugbear = "==21.3.2"
+flake8 = "*"
+
+# Typechecking
+mypy = "==0.931"
+mypy-zope = "==0.3.5"
+types-bleach = ">=4.1.0"
+types-jsonschema = ">=3.2.0"
+types-opentracing = ">=2.4.2"
+types-Pillow = ">=8.3.4"
+types-psycopg2 = ">=2.9.9"
+types-pyOpenSSL = ">=20.0.7"
+types-PyYAML = ">=5.4.10"
+types-requests = ">=2.26.0"
+types-setuptools = ">=57.4.0"
+
+# Dependencies which are exclusively required by unit test code. This is
+# NOT a list of all modules that are necessary to run the unit tests.
+# Tests assume that all optional dependencies are installed.
+# parameterized<0.7.4 can create classes with names that would normally be invalid
+# identifiers. trial really does not like this when running with multiple workers.
+parameterized = ">=0.7.4"
+idna = ">=2.5"
+
+# The following are used by the release script
+click = "==8.1.0"
+redbaron = "==0.9.2"
+GitPython = "==3.1.14"
+commonmark = "==0.9.1"
+pygithub = "==1.55"
+# The following are executed as commands by the release script.
+twine = "*"
+# Towncrier min version comes from #3425. Rationale unclear.
+towncrier = ">=18.6.0rc1"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"

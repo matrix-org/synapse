@@ -13,8 +13,10 @@
 # limitations under the License.
 
 import logging
+from typing import Any
 
 from synapse.api.constants import RoomCreationPreset
+from synapse.types import JsonDict
 
 from ._base import Config, ConfigError
 
@@ -32,7 +34,7 @@ class RoomDefaultEncryptionTypes:
 class RoomConfig(Config):
     section = "room"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         # Whether new, locally-created rooms should have encryption enabled
         encryption_for_room_type = config.get(
             "encryption_enabled_by_default_for_room_type",
@@ -61,7 +63,7 @@ class RoomConfig(Config):
                 "Invalid value for encryption_enabled_by_default_for_room_type"
             )
 
-    def generate_config_section(self, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         ## Rooms ##
 

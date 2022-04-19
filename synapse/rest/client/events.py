@@ -39,7 +39,7 @@ class EventStreamRestServlet(RestServlet):
         super().__init__()
         self.event_stream_handler = hs.get_event_stream_handler()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
@@ -91,7 +91,7 @@ class EventRestServlet(RestServlet):
 
         time_now = self.clock.time_msec()
         if event:
-            result = await self._event_serializer.serialize_event(event, time_now)
+            result = self._event_serializer.serialize_event(event, time_now)
             return 200, result
         else:
             return 404, "Event not found."

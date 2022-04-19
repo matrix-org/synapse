@@ -3,11 +3,13 @@
 
 # things to include
 !docker
-!scripts
 !synapse
-!MANIFEST.in
 !README.rst
+!pyproject.toml
+!poetry.lock
+
+# TODO: remove these once we have moved over to using poetry-core in pyproject.toml
+!MANIFEST.in
 !setup.py
-!synctl
 
 **/__pycache__

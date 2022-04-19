@@ -14,21 +14,30 @@
 # limitations under the License.
 import logging
 import re
-from typing import TYPE_CHECKING, List, Optional, Pattern, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Pattern, Tuple
 
 from synapse.appservice import (
     ApplicationService,
     ApplicationServiceState,
     AppServiceTransaction,
+    TransactionOneTimeKeyCounts,
+    TransactionUnusedFallbackKeys,
 )
 from synapse.config.appservice import load_appservices
 from synapse.events import EventBase
-from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import DatabasePool
+from synapse.storage._base import db_to_json
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
-from synapse.storage.types import Connection
-from synapse.types import JsonDict
+from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
+from synapse.storage.types import Cursor
+from synapse.storage.util.sequence import build_sequence_generator
+from synapse.types import DeviceListUpdates, JsonDict
 from synapse.util import json_encoder
+from synapse.util.caches.descriptors import _CacheContext, cached
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -57,16 +66,37 @@ def _make_exclusive_regex(
     return exclusive_user_pattern
 
 
-class ApplicationServiceWorkerStore(SQLBaseStore):
-    def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
+class ApplicationServiceWorkerStore(RoomMemberWorkerStore):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         self.services_cache = load_appservices(
             hs.hostname, hs.config.appservice.app_service_config_files
         )
         self.exclusive_user_regex = _make_exclusive_regex(self.services_cache)
 
+        def get_max_as_txn_id(txn: Cursor) -> int:
+            logger.warning("Falling back to slow query, you should port to postgres")
+            txn.execute(
+                "SELECT COALESCE(max(txn_id), 0) FROM application_services_txns"
+            )
+            return txn.fetchone()[0]  # type: ignore
+
+        self._as_txn_seq_gen = build_sequence_generator(
+            db_conn,
+            database.engine,
+            get_max_as_txn_id,
+            "application_services_txn_id_seq",
+            table="application_services_txns",
+            id_column="txn_id",
+        )
+
         super().__init__(database, db_conn, hs)
 
-    def get_app_services(self):
+    def get_app_services(self) -> List[ApplicationService]:
         return self.services_cache
 
     def get_if_app_services_interested_in_user(self, user_id: str) -> bool:
@@ -120,6 +150,18 @@ class ApplicationServiceWorkerStore(SQLBaseStore):
                 return service
         return None
 
+    @cached(iterable=True, cache_context=True)
+    async def get_app_service_users_in_room(
+        self,
+        room_id: str,
+        app_service: "ApplicationService",
+        cache_context: _CacheContext,
+    ) -> List[str]:
+        users_in_room = await self.get_users_in_room(
+            room_id, on_invalidate=cache_context.invalidate
+        )
+        return list(filter(app_service.is_interested_in_user, users_in_room))
+
 
 class ApplicationServiceStore(ApplicationServiceWorkerStore):
     # This is currently empty due to there not being any AS storage functions
@@ -143,7 +185,7 @@ class ApplicationServiceTransactionWorkerStore(
             A list of ApplicationServices, which may be empty.
         """
         results = await self.db_pool.simple_select_list(
-            "application_services_state", {"state": state}, ["as_id"]
+            "application_services_state", {"state": state.value}, ["as_id"]
         )
         # NB: This assumes this class is linked with ApplicationServiceStore
         as_list = self.get_app_services()
@@ -173,7 +215,7 @@ class ApplicationServiceTransactionWorkerStore(
             desc="get_appservice_state",
         )
         if result:
-            return result.get("state")
+            return ApplicationServiceState(result.get("state"))
         return None
 
     async def set_appservice_state(
@@ -186,7 +228,7 @@ class ApplicationServiceTransactionWorkerStore(
             state: The connectivity state to apply.
         """
         await self.db_pool.simple_upsert(
-            "application_services_state", {"as_id": service.id}, {"state": state}
+            "application_services_state", {"as_id": service.id}, {"state": state.value}
         )
 
     async def create_appservice_txn(
@@ -194,6 +236,10 @@ class ApplicationServiceTransactionWorkerStore(
         service: ApplicationService,
         events: List[EventBase],
         ephemeral: List[JsonDict],
+        to_device_messages: List[JsonDict],
+        one_time_key_counts: TransactionOneTimeKeyCounts,
+        unused_fallback_keys: TransactionUnusedFallbackKeys,
+        device_list_summary: DeviceListUpdates,
     ) -> AppServiceTransaction:
         """Atomically creates a new transaction for this application service
         with the given list of events. Ephemeral events are NOT persisted to the
@@ -203,27 +249,19 @@ class ApplicationServiceTransactionWorkerStore(
             service: The service who the transaction is for.
             events: A list of persistent events to put in the transaction.
             ephemeral: A list of ephemeral events to put in the transaction.
+            to_device_messages: A list of to-device messages to put in the transaction.
+            one_time_key_counts: Counts of remaining one-time keys for relevant
+                appservice devices in the transaction.
+            unused_fallback_keys: Lists of unused fallback keys for relevant
+                appservice devices in the transaction.
+            device_list_summary: The device list summary to include in the transaction.
 
         Returns:
             A new transaction.
         """
 
-        def _create_appservice_txn(txn):
-            # work out new txn id (highest txn id for this service += 1)
-            # The highest id may be the last one sent (in which case it is last_txn)
-            # or it may be the highest in the txns list (which are waiting to be/are
-            # being sent)
-            last_txn_id = self._get_last_txn(txn, service.id)
-
-            txn.execute(
-                "SELECT MAX(txn_id) FROM application_services_txns WHERE as_id=?",
-                (service.id,),
-            )
-            highest_txn_id = txn.fetchone()[0]
-            if highest_txn_id is None:
-                highest_txn_id = 0
-
-            new_txn_id = max(highest_txn_id, last_txn_id) + 1
+        def _create_appservice_txn(txn: LoggingTransaction) -> AppServiceTransaction:
+            new_txn_id = self._as_txn_seq_gen.get_next_id_txn(txn)
 
             # Insert new txn into txn table
             event_ids = json_encoder.encode([e.event_id for e in events])
@@ -233,7 +271,14 @@ class ApplicationServiceTransactionWorkerStore(
                 (service.id, new_txn_id, event_ids),
             )
             return AppServiceTransaction(
-                service=service, id=new_txn_id, events=events, ephemeral=ephemeral
+                service=service,
+                id=new_txn_id,
+                events=events,
+                ephemeral=ephemeral,
+                to_device_messages=to_device_messages,
+                one_time_key_counts=one_time_key_counts,
+                unused_fallback_keys=unused_fallback_keys,
+                device_list_summary=device_list_summary,
             )
 
         return await self.db_pool.runInteraction(
@@ -249,25 +294,8 @@ class ApplicationServiceTransactionWorkerStore(
             txn_id: The transaction ID being completed.
             service: The application service which was sent this transaction.
         """
-        txn_id = int(txn_id)
 
-        def _complete_appservice_txn(txn):
-            # Debugging query: Make sure the txn being completed is EXACTLY +1 from
-            # what was there before. If it isn't, we've got problems (e.g. the AS
-            # has probably missed some events), so whine loudly but still continue,
-            # since it shouldn't fail completion of the transaction.
-            last_txn_id = self._get_last_txn(txn, service.id)
-            if (last_txn_id + 1) != txn_id:
-                logger.error(
-                    "appservice: Completing a transaction which has an ID > 1 from "
-                    "the last ID sent to this AS. We've either dropped events or "
-                    "sent it to the AS out of order. FIX ME. last_txn=%s "
-                    "completing_txn=%s service_id=%s",
-                    last_txn_id,
-                    txn_id,
-                    service.id,
-                )
-
+        def _complete_appservice_txn(txn: LoggingTransaction) -> None:
             # Set current txn_id for AS to 'txn_id'
             self.db_pool.simple_upsert_txn(
                 txn,
@@ -298,7 +326,9 @@ class ApplicationServiceTransactionWorkerStore(
             An AppServiceTransaction or None.
         """
 
-        def _get_oldest_unsent_txn(txn):
+        def _get_oldest_unsent_txn(
+            txn: LoggingTransaction,
+        ) -> Optional[Dict[str, Any]]:
             # Monotonically increasing txn ids, so just select the smallest
             # one in the txns table (we delete them when they are sent)
             txn.execute(
@@ -325,23 +355,22 @@ class ApplicationServiceTransactionWorkerStore(
 
         events = await self.get_events_as_list(event_ids)
 
+        # TODO: to-device messages, one-time key counts, device list summaries and unused
+        #       fallback keys are not yet populated for catch-up transactions.
+        #       We likely want to populate those for reliability.
         return AppServiceTransaction(
-            service=service, id=entry["txn_id"], events=events, ephemeral=[]
+            service=service,
+            id=entry["txn_id"],
+            events=events,
+            ephemeral=[],
+            to_device_messages=[],
+            one_time_key_counts={},
+            unused_fallback_keys={},
+            device_list_summary=DeviceListUpdates(),
         )
-
-    def _get_last_txn(self, txn, service_id: Optional[str]) -> int:
-        txn.execute(
-            "SELECT last_txn FROM application_services_state WHERE as_id=?",
-            (service_id,),
-        )
-        last_txn_id = txn.fetchone()
-        if last_txn_id is None or last_txn_id[0] is None:  # no row exists
-            return 0
-        else:
-            return int(last_txn_id[0])  # select 'last_txn' col
 
     async def set_appservice_last_pos(self, pos: int) -> None:
-        def set_appservice_last_pos_txn(txn):
+        def set_appservice_last_pos_txn(txn: LoggingTransaction) -> None:
             txn.execute(
                 "UPDATE appservice_stream_position SET stream_ordering = ?", (pos,)
             )
@@ -355,7 +384,9 @@ class ApplicationServiceTransactionWorkerStore(
     ) -> Tuple[int, List[EventBase]]:
         """Get all new events for an appservice"""
 
-        def get_new_events_for_appservice_txn(txn):
+        def get_new_events_for_appservice_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[int, List[str]]:
             sql = (
                 "SELECT e.stream_ordering, e.event_id"
                 " FROM events AS e"
@@ -380,20 +411,20 @@ class ApplicationServiceTransactionWorkerStore(
             "get_new_events_for_appservice", get_new_events_for_appservice_txn
         )
 
-        events = await self.get_events_as_list(event_ids)
+        events = await self.get_events_as_list(event_ids, get_prev_content=True)
 
         return upper_bound, events
 
     async def get_type_stream_id_for_appservice(
         self, service: ApplicationService, type: str
     ) -> int:
-        if type not in ("read_receipt", "presence"):
+        if type not in ("read_receipt", "presence", "to_device", "device_list"):
             raise ValueError(
                 "Expected type to be a valid application stream id type, got %s"
                 % (type,)
             )
 
-        def get_type_stream_id_for_appservice_txn(txn):
+        def get_type_stream_id_for_appservice_txn(txn: LoggingTransaction) -> int:
             stream_id_type = "%s_stream_id" % type
             txn.execute(
                 # We do NOT want to escape `stream_id_type`.
@@ -403,7 +434,8 @@ class ApplicationServiceTransactionWorkerStore(
             )
             last_stream_id = txn.fetchone()
             if last_stream_id is None or last_stream_id[0] is None:  # no row exists
-                return 0
+                # Stream tokens always start from 1, to avoid foot guns around `0` being falsey.
+                return 1
             else:
                 return int(last_stream_id[0])
 
@@ -411,16 +443,16 @@ class ApplicationServiceTransactionWorkerStore(
             "get_type_stream_id_for_appservice", get_type_stream_id_for_appservice_txn
         )
 
-    async def set_type_stream_id_for_appservice(
+    async def set_appservice_stream_type_pos(
         self, service: ApplicationService, stream_type: str, pos: Optional[int]
     ) -> None:
-        if stream_type not in ("read_receipt", "presence"):
+        if stream_type not in ("read_receipt", "presence", "to_device", "device_list"):
             raise ValueError(
                 "Expected type to be a valid application stream id type, got %s"
                 % (stream_type,)
             )
 
-        def set_type_stream_id_for_appservice_txn(txn):
+        def set_appservice_stream_type_pos_txn(txn: LoggingTransaction) -> None:
             stream_id_type = "%s_stream_id" % stream_type
             txn.execute(
                 "UPDATE application_services_state SET %s = ? WHERE as_id=?"
@@ -429,7 +461,7 @@ class ApplicationServiceTransactionWorkerStore(
             )
 
         await self.db_pool.runInteraction(
-            "set_type_stream_id_for_appservice", set_type_stream_id_for_appservice_txn
+            "set_appservice_stream_type_pos", set_appservice_stream_type_pos_txn
         )
 
 

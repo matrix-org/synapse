@@ -36,6 +36,13 @@ Turns a `mxc://` URL for media content into an HTTP(S) one using the homeserver'
 
 Example: `message.sender_avatar_url|mxc_to_http(32,32)`
 
+```python
+localpart_from_email(address: str) -> str
+```
+
+Returns the local part of an email address (e.g. `alice` in `alice@example.com`).
+
+Example: `user.email_address|localpart_from_email`
 
 ## Email templates
 
@@ -71,7 +78,12 @@ Below are the templates Synapse will look for when generating the content of an 
                 * `sender_avatar_url`: the avatar URL (as a `mxc://` URL) for the event's
                   sender
                 * `sender_hash`: a hash of the user ID of the sender
+                * `msgtype`: the type of the message
+                * `body_text_html`: html representation of the message
+                * `body_text_plain`: plaintext representation of the message
+                * `image_url`: mxc url of an image, when "msgtype" is "m.image"
         * `link`: a `matrix.to` link to the room
+        * `avator_url`: url to the room's avator
     * `reason`: information on the event that triggered the email to be sent. It's an
       object with the following attributes:
         * `room_id`: the ID of the room the event was sent in
@@ -171,8 +183,11 @@ Below are the templates Synapse will look for when generating pages related to S
              for the brand of the IdP
     * `user_attributes`: an object containing details about the user that
       we received from the IdP. May have the following attributes:
-        * display_name: the user's display_name
-        * emails: a list of email addresses
+        * `display_name`: the user's display name
+        * `emails`: a list of email addresses
+        * `localpart`: the local part of the Matrix user ID to register,
+          if `localpart_template` is set in the mapping provider configuration (empty
+          string if not)
   The template should render a form which submits the following fields:
     * `username`: the localpart of the user's chosen user id
 * `sso_new_user_consent.html`: HTML page allowing the user to consent to the

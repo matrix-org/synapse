@@ -15,6 +15,10 @@ _trial_temp*/
 .DS_Store
 __pycache__/
 
+# We do want the poetry lockfile. TODO: is there a good reason for ignoring
+# '*.lock' above? If not, let's nuke it.
+!poetry.lock
+
 # stuff that is likely to exist when you run a server locally
 /*.db
 /*.log
@@ -29,6 +33,9 @@ __pycache__/
 /logs
 /media_store/
 /uploads
+
+# For direnv users
+/.envrc
 
 # IDEs
 /.idea/
@@ -50,3 +57,7 @@ __pycache__/
 
 # docs
 book/
+
+# complement
+/complement-*
+/master.tar.gz

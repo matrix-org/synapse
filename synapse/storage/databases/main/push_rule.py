@@ -20,7 +20,7 @@ from synapse.api.errors import NotFoundError, StoreError
 from synapse.push.baserules import list_with_base_rules
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.appservice import ApplicationServiceWorkerStore
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.pusher import PusherWorkerStore
@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _load_rules(rawrules, enabled_map, use_new_defaults=False):
+def _load_rules(rawrules, enabled_map):
     ruleslist = []
     for rawrule in rawrules:
         rule = dict(rawrule)
@@ -52,7 +52,7 @@ def _load_rules(rawrules, enabled_map, use_new_defaults=False):
         ruleslist.append(rule)
 
     # We're going to be mutating this a lot, so do a deep copy
-    rules = list(list_with_base_rules(ruleslist, use_new_defaults))
+    rules = list(list_with_base_rules(ruleslist))
 
     for i, rule in enumerate(rules):
         rule_id = rule["rule_id"]
@@ -81,7 +81,12 @@ class PushRulesWorkerStore(
     `get_max_push_rules_stream_id` which can be called in the initializer.
     """
 
-    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
         if hs.config.worker.worker_app is None:
@@ -105,10 +110,6 @@ class PushRulesWorkerStore(
             "PushRulesStreamChangeCache",
             push_rules_id,
             prefilled_cache=push_rules_prefill,
-        )
-
-        self._users_new_default_push_rules = (
-            hs.config.server.users_new_default_push_rules
         )
 
     @abc.abstractmethod
@@ -140,9 +141,7 @@ class PushRulesWorkerStore(
 
         enabled_map = await self.get_push_rules_enabled_for_user(user_id)
 
-        use_new_defaults = user_id in self._users_new_default_push_rules
-
-        return _load_rules(rows, enabled_map, use_new_defaults)
+        return _load_rules(rows, enabled_map)
 
     @cached(max_entries=5000)
     async def get_push_rules_enabled_for_user(self, user_id) -> Dict[str, bool]:
@@ -201,13 +200,7 @@ class PushRulesWorkerStore(
         enabled_map_by_user = await self.bulk_get_push_rules_enabled(user_ids)
 
         for user_id, rules in results.items():
-            use_new_defaults = user_id in self._users_new_default_push_rules
-
-            results[user_id] = _load_rules(
-                rules,
-                enabled_map_by_user.get(user_id, {}),
-                use_new_defaults,
-            )
+            results[user_id] = _load_rules(rules, enabled_map_by_user.get(user_id, {}))
 
         return results
 

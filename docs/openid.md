@@ -83,7 +83,7 @@ oidc_providers:
 
 ### Dex
 
-[Dex][dex-idp] is a simple, open-source, certified OpenID Connect Provider.
+[Dex][dex-idp] is a simple, open-source OpenID Connect Provider.
 Although it is designed to help building a full-blown provider with an
 external database, it can be configured with static passwords in a config file.
 
@@ -225,6 +225,8 @@ oidc_providers:
 3. Create an application for synapse in Authentik and link it to the provider.
 4. Note the slug of your application, Client ID and Client Secret.
 
+Note: RSA keys must be used for signing for Authentik, ECC keys do not work.
+
 Synapse config:
 ```yaml
 oidc_providers:
@@ -240,7 +242,7 @@ oidc_providers:
       - "email"
     user_mapping_provider:
       config:
-        localpart_template: "{{ user.preferred_username }}}"
+        localpart_template: "{{ user.preferred_username }}"
         display_name_template: "{{ user.preferred_username|capitalize }}" # TO BE FILLED: If your users have names in Authentik and you want those in Synapse, this should be replaced with user.name|capitalize.
 ```
 
@@ -390,9 +392,6 @@ oidc_providers:
 
 ### Facebook
 
-Like Github, Facebook provide a custom OAuth2 API rather than an OIDC-compliant
-one so requires a little more configuration.
-
 0. You will need a Facebook developer account. You can register for one
    [here](https://developers.facebook.com/async/registration/).
 1. On the [apps](https://developers.facebook.com/apps/) page of the developer
@@ -412,24 +411,28 @@ Synapse config:
     idp_name: Facebook
     idp_brand: "facebook"  # optional: styling hint for clients
     discover: false
-    issuer: "https://facebook.com"
+    issuer: "https://www.facebook.com"
     client_id: "your-client-id" # TO BE FILLED
     client_secret: "your-client-secret" # TO BE FILLED
     scopes: ["openid", "email"]
-    authorization_endpoint: https://facebook.com/dialog/oauth
-    token_endpoint: https://graph.facebook.com/v9.0/oauth/access_token
-    user_profile_method: "userinfo_endpoint"
-    userinfo_endpoint: "https://graph.facebook.com/v9.0/me?fields=id,name,email,picture"
+    authorization_endpoint: "https://facebook.com/dialog/oauth"
+    token_endpoint: "https://graph.facebook.com/v9.0/oauth/access_token"
+    jwks_uri: "https://www.facebook.com/.well-known/oauth/openid/jwks/"
     user_mapping_provider:
       config:
-        subject_claim: "id"
         display_name_template: "{{ user.name }}"
+        email_template: "{{ '{{ user.email }}' }}"
 ```
 
 Relevant documents:
- * https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow
- * Using Facebook's Graph API: https://developers.facebook.com/docs/graph-api/using-graph-api/
- * Reference to the User endpoint: https://developers.facebook.com/docs/graph-api/reference/user
+ * [Manually Build a Login Flow](https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow)
+ * [Using Facebook's Graph API](https://developers.facebook.com/docs/graph-api/using-graph-api/)
+ * [Reference to the User endpoint](https://developers.facebook.com/docs/graph-api/reference/user)
+
+Facebook do have an [OIDC discovery endpoint](https://www.facebook.com/.well-known/openid-configuration),
+but it has a `response_types_supported` which excludes "code" (which we rely on, and
+is even mentioned in their [documentation](https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow#login)),
+so we have to disable discovery and configure the URIs manually.
 
 ### Gitea
 
@@ -523,7 +526,7 @@ The synapse config will look like this:
         email_template: "{{ user.email }}"
 ```
 
-## Django OAuth Toolkit
+### Django OAuth Toolkit
 
 [django-oauth-toolkit](https://github.com/jazzband/django-oauth-toolkit) is a
 Django application providing out of the box all the endpoints, data and logic

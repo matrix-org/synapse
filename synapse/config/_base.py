@@ -383,7 +383,7 @@ class RootConfig:
         Build a default configuration file
 
         This is used when the user explicitly asks us to generate a config file
-        (eg with --generate_config).
+        (eg with --generate-config).
 
         Args:
             config_dir_path: The path where the config files are kept. Used to
@@ -702,10 +702,7 @@ class RootConfig:
         return obj
 
     def parse_config_dict(
-        self,
-        config_dict: Dict[str, Any],
-        config_dir_path: Optional[str] = None,
-        data_dir_path: Optional[str] = None,
+        self, config_dict: Dict[str, Any], config_dir_path: str, data_dir_path: str
     ) -> None:
         """Read the information from the config dict into this Config object.
 

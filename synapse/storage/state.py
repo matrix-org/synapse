@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class StateFilter:
     """A filter used when querying for state.
 
@@ -58,8 +58,8 @@ class StateFilter:
             appear in `types`.
     """
 
-    types = attr.ib(type="frozendict[str, Optional[FrozenSet[str]]]")
-    include_others = attr.ib(default=False, type=bool)
+    types: "frozendict[str, Optional[FrozenSet[str]]]"
+    include_others: bool = False
 
     def __attrs_post_init__(self):
         # If `include_others` is set we canonicalise the filter by removing
@@ -74,21 +74,21 @@ class StateFilter:
 
     @staticmethod
     def all() -> "StateFilter":
-        """Creates a filter that fetches everything.
+        """Returns a filter that fetches everything.
 
         Returns:
-            The new state filter.
+            The state filter.
         """
-        return StateFilter(types=frozendict(), include_others=True)
+        return _ALL_STATE_FILTER
 
     @staticmethod
     def none() -> "StateFilter":
-        """Creates a filter that fetches nothing.
+        """Returns a filter that fetches nothing.
 
         Returns:
             The new state filter.
         """
-        return StateFilter(types=frozendict(), include_others=False)
+        return _NONE_STATE_FILTER
 
     @staticmethod
     def from_types(types: Iterable[Tuple[str, Optional[str]]]) -> "StateFilter":
@@ -204,13 +204,16 @@ class StateFilter:
         if get_all_members:
             # We want to return everything.
             return StateFilter.all()
-        else:
+        elif EventTypes.Member in self.types:
             # We want to return all non-members, but only particular
             # memberships
             return StateFilter(
                 types=frozendict({EventTypes.Member: self.types[EventTypes.Member]}),
                 include_others=True,
             )
+        else:
+            # We want to return all non-members
+            return _ALL_NON_MEMBER_STATE_FILTER
 
     def make_sql_filter_clause(self) -> Tuple[str, List[str]]:
         """Converts the filter to an SQL clause.
@@ -527,6 +530,13 @@ class StateFilter:
         )
 
 
+_ALL_STATE_FILTER = StateFilter(types=frozendict(), include_others=True)
+_ALL_NON_MEMBER_STATE_FILTER = StateFilter(
+    types=frozendict({EventTypes.Member: frozenset()}), include_others=True
+)
+_NONE_STATE_FILTER = StateFilter(types=frozendict(), include_others=False)
+
+
 class StateGroupStorage:
     """High level interface to fetching state for event."""
 
@@ -551,7 +561,7 @@ class StateGroupStorage:
         return state_group_delta.prev_group, state_group_delta.delta_ids
 
     async def get_state_groups_ids(
-        self, _room_id: str, event_ids: Iterable[str]
+        self, _room_id: str, event_ids: Collection[str]
     ) -> Dict[int, MutableStateMap[str]]:
         """Get the event IDs of all the state for the state groups for the given events
 
@@ -561,6 +571,10 @@ class StateGroupStorage:
 
         Returns:
             dict of state_group_id -> (dict of (type, state_key) -> event id)
+
+        Raises:
+            RuntimeError if we don't have a state group for one or more of the events
+               (ie they are outliers or unknown)
         """
         if not event_ids:
             return {}
@@ -586,7 +600,7 @@ class StateGroupStorage:
         return group_to_state[state_group]
 
     async def get_state_groups(
-        self, room_id: str, event_ids: Iterable[str]
+        self, room_id: str, event_ids: Collection[str]
     ) -> Dict[int, List[EventBase]]:
         """Get the state groups for the given list of event_ids
 
@@ -638,7 +652,7 @@ class StateGroupStorage:
         return self.stores.state._get_state_groups_from_groups(groups, state_filter)
 
     async def get_state_for_events(
-        self, event_ids: Iterable[str], state_filter: Optional[StateFilter] = None
+        self, event_ids: Collection[str], state_filter: Optional[StateFilter] = None
     ) -> Dict[str, StateMap[EventBase]]:
         """Given a list of event_ids and type tuples, return a list of state
         dicts for each event.
@@ -649,6 +663,10 @@ class StateGroupStorage:
 
         Returns:
             A dict of (event_id) -> (type, state_key) -> [state_events]
+
+        Raises:
+            RuntimeError if we don't have a state group for one or more of the events
+               (ie they are outliers or unknown)
         """
         event_to_groups = await self.stores.main._get_state_group_for_events(event_ids)
 
@@ -674,7 +692,7 @@ class StateGroupStorage:
         return {event: event_to_state[event] for event in event_ids}
 
     async def get_state_ids_for_events(
-        self, event_ids: Iterable[str], state_filter: Optional[StateFilter] = None
+        self, event_ids: Collection[str], state_filter: Optional[StateFilter] = None
     ) -> Dict[str, StateMap[str]]:
         """
         Get the state dicts corresponding to a list of events, containing the event_ids
@@ -686,6 +704,10 @@ class StateGroupStorage:
 
         Returns:
             A dict from event_id -> (type, state_key) -> event_id
+
+        Raises:
+            RuntimeError if we don't have a state group for one or more of the events
+                (ie they are outliers or unknown)
         """
         event_to_groups = await self.stores.main._get_state_group_for_events(event_ids)
 
@@ -713,6 +735,10 @@ class StateGroupStorage:
 
         Returns:
             A dict from (type, state_key) -> state_event
+
+        Raises:
+            RuntimeError if we don't have a state group for the event (ie it is an
+                outlier or is unknown)
         """
         state_map = await self.get_state_for_events(
             [event_id], state_filter or StateFilter.all()
@@ -731,6 +757,10 @@ class StateGroupStorage:
 
         Returns:
             A dict from (type, state_key) -> state_event_id
+
+        Raises:
+            RuntimeError if we don't have a state group for the event (ie it is an
+                outlier or is unknown)
         """
         state_map = await self.get_state_ids_for_events(
             [event_id], state_filter or StateFilter.all()

@@ -6,16 +6,25 @@ on:
 
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   mypy:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-      - run: .ci/patch_for_twisted_trunk.sh
-      - run: pip install tox
-      - run: tox -e mypy
+      - uses: matrix-org/setup-python-poetry@v1
+        with:
+          python-version: "3.x"
+          extras: "all"
+      - run: |
+          poetry remove twisted
+          poetry add --extras tls git+https://github.com/twisted/twisted.git#trunk
+          poetry install --no-interaction --extras "all test"
+      - run: poetry run mypy
 
   trial:
     runs-on: ubuntu-latest
@@ -23,14 +32,15 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: sudo apt-get -qq install xmlsec1
-      - uses: actions/setup-python@v2
+      - uses: matrix-org/setup-python-poetry@v1
         with:
-          python-version: 3.6
-      - run: .ci/patch_for_twisted_trunk.sh
-      - run: pip install tox
-      - run: tox -e py
-        env:
-          TRIAL_FLAGS: "--jobs=2"
+          python-version: "3.x"
+          extras: "all test"
+      - run: |
+          poetry remove twisted
+          poetry add --extras tls git+https://github.com/twisted/twisted.git#trunk
+          poetry install --no-interaction --extras "all test"
+      - run: poetry run trial --jobs 2 tests
 
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
@@ -55,11 +65,23 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Patch dependencies
-        run: .ci/patch_for_twisted_trunk.sh
+        # Note: The poetry commands want to create a virtualenv in /src/.venv/,
+        #       but the sytest-synapse container expects it to be in /venv/.
+        #       We symlink it before running poetry so that poetry actually
+        #       ends up installing to `/venv`.
+        run: |
+          ln -s -T /venv /src/.venv
+          poetry remove twisted
+          poetry add --extras tls git+https://github.com/twisted/twisted.git#trunk
+          poetry install --no-interaction --extras "all test"
         working-directory: /src
       - name: Run SyTest
         run: /bootstrap.sh synapse
         working-directory: /src
+        env:
+          # Use offline mode to avoid reinstalling the pinned version of
+          # twisted.
+          OFFLINE: 1
       - name: Summarise results.tap
         if: ${{ always() }}
         run: /sytest/scripts/tap_to_gha.pl /logs/results.tap

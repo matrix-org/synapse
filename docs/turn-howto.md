@@ -15,8 +15,8 @@ The following sections describe how to install [coturn](<https://github.com/cotu
 
 For TURN relaying with `coturn` to work, it must be hosted on a server/endpoint with a public IP.
 
-Hosting TURN behind a NAT (even with appropriate port forwarding) is known to cause issues
-and to often not work.
+Hosting TURN behind NAT requires port forwaring and for the NAT gateway to have a public IP.
+However, even with appropriate configuration, NAT is known to cause issues and to often not work.
 
 ## `coturn` setup
 
@@ -103,7 +103,23 @@ This will install and start a systemd service called `coturn`.
     denied-peer-ip=192.168.0.0-192.168.255.255
     denied-peer-ip=172.16.0.0-172.31.255.255
 
+    # recommended additional local peers to block, to mitigate external access to internal services.
+    # https://www.rtcsec.com/article/slack-webrtc-turn-compromise-and-bug-bounty/#how-to-fix-an-open-turn-relay-to-address-this-vulnerability
+    no-multicast-peers
+    denied-peer-ip=0.0.0.0-0.255.255.255
+    denied-peer-ip=100.64.0.0-100.127.255.255
+    denied-peer-ip=127.0.0.0-127.255.255.255
+    denied-peer-ip=169.254.0.0-169.254.255.255
+    denied-peer-ip=192.0.0.0-192.0.0.255
+    denied-peer-ip=192.0.2.0-192.0.2.255
+    denied-peer-ip=192.88.99.0-192.88.99.255
+    denied-peer-ip=198.18.0.0-198.19.255.255
+    denied-peer-ip=198.51.100.0-198.51.100.255
+    denied-peer-ip=203.0.113.0-203.0.113.255
+    denied-peer-ip=240.0.0.0-255.255.255.255
+
     # special case the turn server itself so that client->TURN->TURN->client flows work
+    # this should be one of the turn server's listening IPs
     allowed-peer-ip=10.0.0.1
 
     # consider whether you want to limit the quota of relayed streams per user (or total) to avoid risk of DoS.
@@ -121,34 +137,58 @@ This will install and start a systemd service called `coturn`.
 
     # TLS private key file
     pkey=/path/to/privkey.pem
+
+    # Ensure the configuration lines that disable TLS/DTLS are commented-out or removed
+    #no-tls
+    #no-dtls
     ```
 
-    In this case, replace the `turn:` schemes in the `turn_uri` settings below
+    In this case, replace the `turn:` schemes in the `turn_uris` settings below
     with `turns:`.
 
     We recommend that you only try to set up TLS/DTLS once you have set up a
     basic installation and got it working.
+
+    NB: If your TLS certificate was provided by Let's Encrypt, TLS/DTLS will
+    not work with any Matrix client that uses Chromium's WebRTC library. This
+    currently includes Element Android & iOS; for more details, see their
+    [respective](https://github.com/vector-im/element-android/issues/1533)
+    [issues](https://github.com/vector-im/element-ios/issues/2712) as well as the underlying
+    [WebRTC issue](https://bugs.chromium.org/p/webrtc/issues/detail?id=11710).
+    Consider using a ZeroSSL certificate for your TURN server as a working alternative.
 
 1.  Ensure your firewall allows traffic into the TURN server on the ports
     you've configured it to listen on (By default: 3478 and 5349 for TURN
     traffic (remember to allow both TCP and UDP traffic), and ports 49152-65535
     for the UDP relay.)
 
-1.  We do not recommend running a TURN server behind NAT, and are not aware of
-    anyone doing so successfully.
-
-    If you want to try it anyway, you will at least need to tell coturn its
-    external IP address:
+1.  If your TURN server is behind NAT, the NAT gateway must have an external,
+    publicly-reachable IP address. You must configure coturn to advertise that
+    address to connecting clients:
 
     ```
-    external-ip=192.88.99.1
+    external-ip=EXTERNAL_NAT_IPv4_ADDRESS
     ```
 
-    ... and your NAT gateway must forward all of the relayed ports directly
-    (eg, port 56789 on the external IP must be always be forwarded to port
-    56789 on the internal IP).
+    You may optionally limit the TURN server to listen only on the local
+    address that is mapped by NAT to the external address:
 
-    If you get this working, let us know!
+    ```
+    listening-ip=INTERNAL_TURNSERVER_IPv4_ADDRESS
+    ```
+
+    If your NAT gateway is reachable over both IPv4 and IPv6, you may
+    configure coturn to advertise each available address:
+
+    ```
+    external-ip=EXTERNAL_NAT_IPv4_ADDRESS
+    external-ip=EXTERNAL_NAT_IPv6_ADDRESS
+    ```
+
+    When advertising an external IPv6 address, ensure that the firewall and
+    network settings of the system running your TURN server are configured to
+    accept IPv6 traffic, and that the TURN server is listening on the local
+    IPv6 address that is mapped by NAT to the external IPv6 address.
 
 1.  (Re)start the turn server:
 
@@ -198,8 +238,9 @@ After updating the homeserver configuration, you must restart synapse:
 
   * If you use synctl:
     ```sh
-    cd /where/you/run/synapse
-    ./synctl restart
+    # Depending on how Synapse is installed, synctl may already be on
+    # your PATH. If not, you may need to activate a virtual environment.
+    synctl restart
     ```
   * If you use systemd:
     ```sh
@@ -216,14 +257,15 @@ connecting". Unfortunately, troubleshooting this can be tricky.
 
 Here are a few things to try:
 
- * Check that your TURN server is not behind NAT. As above, we're not aware of
-   anyone who has successfully set this up.
-
  * Check that you have opened your firewall to allow TCP and UDP traffic to the
    TURN ports (normally 3478 and 5349).
 
  * Check that you have opened your firewall to allow UDP traffic to the UDP
    relay ports (49152-65535 by default).
+
+ * Try disabling `coturn`'s TLS/DTLS listeners and enable only its (unencrypted)
+   TCP/UDP listeners. (This will only leave signaling traffic unencrypted;
+   voice & video WebRTC traffic is always encrypted.)
 
  * Some WebRTC implementations (notably, that of Google Chrome) appear to get
    confused by TURN servers which are reachable over IPv6 (this appears to be
@@ -233,6 +275,18 @@ Here are a few things to try:
 
    Try removing any AAAA records for your TURN server, so that it is only
    reachable over IPv4.
+
+ * If your TURN server is behind NAT:
+
+    * double-check that your NAT gateway is correctly forwarding all TURN
+      ports (normally 3478 & 5349 for TCP & UDP TURN traffic, and 49152-65535 for the UDP
+      relay) to the NAT-internal address of your TURN server. If advertising
+      both IPv4 and IPv6 external addresses via the `external-ip` option, ensure
+      that the NAT is forwarding both IPv4 and IPv6 traffic to the IPv4 and IPv6
+      internal addresses of your TURN server. When in doubt, remove AAAA records
+      for your TURN server and specify only an IPv4 address as your `external-ip`.
+
+    * ensure that your TURN server uses the NAT gateway as its default route.
 
  * Enable more verbose logging in coturn via the `verbose` setting:
 

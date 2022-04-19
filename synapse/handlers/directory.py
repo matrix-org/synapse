@@ -44,7 +44,7 @@ class DirectoryHandler:
         self.state = hs.get_state_handler()
         self.appservice_handler = hs.get_application_service_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.config = hs.config
         self.enable_room_list_search = hs.config.roomdirectory.enable_room_list_search
         self.require_membership = hs.config.server.require_membership_for_aliases
@@ -119,7 +119,7 @@ class DirectoryHandler:
 
         service = requester.app_service
         if service:
-            if not service.is_interested_in_alias(room_alias_str):
+            if not service.is_room_alias_in_namespace(room_alias_str):
                 raise SynapseError(
                     400,
                     "This application service has not reserved this kind of alias.",
@@ -221,7 +221,7 @@ class DirectoryHandler:
     async def delete_appservice_association(
         self, service: ApplicationService, room_alias: RoomAlias
     ) -> None:
-        if not service.is_interested_in_alias(room_alias.to_string()):
+        if not service.is_room_alias_in_namespace(room_alias.to_string()):
             raise SynapseError(
                 400,
                 "This application service has not reserved this kind of alias",
@@ -278,13 +278,15 @@ class DirectoryHandler:
 
         users = await self.store.get_users_in_room(room_id)
         extra_servers = {get_domain_from_id(u) for u in users}
-        servers = set(extra_servers) | set(servers)
+        servers_set = set(extra_servers) | set(servers)
 
         # If this server is in the list of servers, return it first.
-        if self.server_name in servers:
-            servers = [self.server_name] + [s for s in servers if s != self.server_name]
+        if self.server_name in servers_set:
+            servers = [self.server_name] + [
+                s for s in servers_set if s != self.server_name
+            ]
         else:
-            servers = list(servers)
+            servers = list(servers_set)
 
         return {"room_id": room_id, "servers": servers}
 
@@ -374,7 +376,7 @@ class DirectoryHandler:
         # non-exclusive locks on the alias (or there are no interested services)
         services = self.store.get_app_services()
         interested_services = [
-            s for s in services if s.is_interested_in_alias(alias.to_string())
+            s for s in services if s.is_room_alias_in_namespace(alias.to_string())
         ]
 
         for service in interested_services:

@@ -1,4 +1,4 @@
-# Copyright 2020 The Matrix.org Foundation C.I.C.
+# Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@ from typing import Any, Dict, Optional
 
 import attr
 
+from synapse.types import JsonDict
+
 from ._base import Config
 
 logger = logging.getLogger(__name__)
@@ -29,13 +31,13 @@ https://matrix-org.github.io/synapse/latest/templates.html
 ---------------------------------------------------------------------------------------"""
 
 
-@attr.s(frozen=True)
+@attr.s(frozen=True, auto_attribs=True)
 class SsoAttributeRequirement:
     """Object describing a single requirement for SSO attributes."""
 
-    attribute = attr.ib(type=str)
+    attribute: str
     # If a value is not given, than the attribute must simply exist.
-    value = attr.ib(type=Optional[str])
+    value: Optional[str]
 
     JSON_SCHEMA = {
         "type": "object",
@@ -49,7 +51,7 @@ class SSOConfig(Config):
 
     section = "sso"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         sso_config: Dict[str, Any] = config.get("sso") or {}
 
         # The sso-specific template_dir
@@ -106,7 +108,7 @@ class SSOConfig(Config):
         )
         self.sso_client_whitelist.append(login_fallback_url)
 
-    def generate_config_section(self, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         # Additional settings to use with single-sign on systems such as OpenID Connect,
         # SAML2 and CAS.

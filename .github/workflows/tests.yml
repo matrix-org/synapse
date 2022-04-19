@@ -10,22 +10,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
+  check-sampleconfig:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        toxenv:
-          - "check-sampleconfig"
-          - "check_codestyle"
-          - "check_isort"
-          - "mypy"
-          - "packaging"
-
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
-      - run: pip install tox
-      - run: tox -e ${{ matrix.toxenv }}
+      - run: pip install -e .
+      - run: scripts-dev/generate_sample_config.sh --check
+      - run: scripts-dev/config-lint.sh
+
+  lint:
+    # This does a vanilla `poetry install` - no extras. I'm slightly anxious
+    # that we might skip some typechecks on code that uses extras. However,
+    # I think the right way to fix this is to mark any extras needed for
+    # typechecking as development dependencies. To detect this, we ought to
+    # turn up mypy's strictness: disallow unknown imports and be accept fewer
+    # uses of `Any`.
+    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v1"
 
   lint-crlf:
     runs-on: ubuntu-latest
@@ -43,29 +44,15 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - uses: actions/setup-python@v2
-      - run: pip install tox
-      - run: scripts-dev/check-newsfragment
+      - run: "pip install 'towncrier>=18.6.0rc1'"
+      - run: scripts-dev/check-newsfragment.sh
         env:
           PULL_REQUEST_NUMBER: ${{ github.event.number }}
-
-  lint-sdist:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-        with:
-          python-version: "3.x"
-      - run: pip install wheel
-      - run: python setup.py sdist bdist_wheel
-      - uses: actions/upload-artifact@v2
-        with:
-          name: Python Distributions
-          path: dist/*
 
   # Dummy step to gate other tests on without repeating the whole list
   linting-done:
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
-    needs: [lint, lint-crlf, lint-newsfile, lint-sdist]
+    needs: [lint, lint-crlf, lint-newsfile, check-sampleconfig]
     runs-on: ubuntu-latest
     steps:
       - run: "true"
@@ -76,25 +63,25 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10"]
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
         database: ["sqlite"]
-        toxenv: ["py"]
+        extras: ["all"]
         include:
           # Newest Python without optional deps
           - python-version: "3.10"
-            toxenv: "py-noextras"
+            extras: ""
 
           # Oldest Python with PostgreSQL
-          - python-version: "3.6"
+          - python-version: "3.7"
             database: "postgres"
-            postgres-version: "9.6"
-            toxenv: "py"
+            postgres-version: "10"
+            extras: "all"
 
           # Newest Python with newest PostgreSQL
           - python-version: "3.10"
             database: "postgres"
             postgres-version: "14"
-            toxenv: "py"
+            extras: "all"
 
     steps:
       - uses: actions/checkout@v2
@@ -106,17 +93,16 @@ jobs:
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_INITDB_ARGS="--lc-collate C --lc-ctype C --encoding UTF8" \
             postgres:${{ matrix.postgres-version }}
-      - uses: actions/setup-python@v2
+      - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install tox
+          extras: ${{ matrix.extras }}
       - name: Await PostgreSQL
         if: ${{ matrix.postgres-version }}
         timeout-minutes: 2
         run: until pg_isready -h localhost; do sleep 1; done
-      - run: tox -e ${{ matrix.toxenv }}
+      - run: poetry run trial --jobs=2 tests
         env:
-          TRIAL_FLAGS: "--jobs=2"
           SYNAPSE_POSTGRES: ${{ matrix.database == 'postgres' || '' }}
           SYNAPSE_POSTGRES_HOST: localhost
           SYNAPSE_POSTGRES_USER: postgres
@@ -135,18 +121,19 @@ jobs:
           || true
 
   trial-olddeps:
+    # Note: sqlite only; no postgres
     if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
     needs: linting-done
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - name: Test with old deps
-        uses: docker://ubuntu:bionic # For old python and sqlite
+        uses: docker://ubuntu:focal # For old python and sqlite
+        # Note: focal seems to be using 3.8, but the oldest is 3.7?
+        # See https://github.com/matrix-org/synapse/issues/12343
         with:
           workdir: /github/workspace
           entrypoint: .ci/scripts/test_old_deps.sh
-        env:
-          TRIAL_FLAGS: "--jobs=2"
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
@@ -162,23 +149,24 @@ jobs:
 
   trial-pypy:
     # Very slow; only run if the branch name includes 'pypy'
+    # Note: sqlite only; no postgres. Completely untested since poetry move.
     if: ${{ contains(github.ref, 'pypy') && !failure() && !cancelled() }}
     needs: linting-done
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["pypy-3.6"]
+        python-version: ["pypy-3.7"]
+        extras: ["all"]
 
     steps:
       - uses: actions/checkout@v2
+      # Install libs necessary for PyPy to build binary wheels for dependencies
       - run: sudo apt-get -qq install xmlsec1 libxml2-dev libxslt-dev
-      - uses: actions/setup-python@v2
+      - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install tox
-      - run: tox -e py
-        env:
-          TRIAL_FLAGS: "--jobs=2"
+          extras: ${{ matrix.extras }}
+      - run: poetry run trial --jobs=2 tests
       - name: Dump logs
         # Logs are most useful when the command fails, always include them.
         if: ${{ always() }}
@@ -213,15 +201,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - sytest-tag: bionic
+          - sytest-tag: focal
 
-          - sytest-tag: bionic
+          - sytest-tag: focal
             postgres: postgres
 
           - sytest-tag: testing
             postgres: postgres
 
-          - sytest-tag: bionic
+          - sytest-tag: focal
             postgres: multi-postgres
             workers: workers
 
@@ -277,9 +265,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: sudo apt-get -qq install xmlsec1
-      - uses: actions/setup-python@v2
+      - uses: matrix-org/setup-python-poetry@v1
         with:
-          python-version: "3.9"
+          python-version: ${{ matrix.python-version }}
+          extras: "postgres"
       - run: .ci/scripts/test_export_data_command.sh
 
   portdb:
@@ -291,8 +280,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - python-version: "3.6"
-            postgres-version: "9.6"
+          - python-version: "3.7"
+            postgres-version: "10"
 
           - python-version: "3.10"
             postgres-version: "14"
@@ -314,33 +303,39 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: sudo apt-get -qq install xmlsec1
-      - uses: actions/setup-python@v2
+      - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: ${{ matrix.python-version }}
+          extras: "postgres"
       - run: .ci/scripts/test_synapse_port_db.sh
 
   complement:
     if: ${{ !failure() && !cancelled() }}
     needs: linting-done
     runs-on: ubuntu-latest
-    container:
-      # https://github.com/matrix-org/complement/blob/master/dockerfiles/ComplementCIBuildkite.Dockerfile
-      image: matrixdotorg/complement:latest
-      env:
-        CI: true
-      ports:
-        - 8448:8448
-      volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
 
     steps:
+      # The path is set via a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on the path to run Complement.
+      # See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-system-path
+      - name: "Set Go Version"
+        run: |
+          # Add Go 1.17 to the PATH: see https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md#environment-variables-2
+          echo "$GOROOT_1_17_X64/bin" >> $GITHUB_PATH
+          # Add the Go path to the PATH: We need this so we can call gotestfmt
+          echo "~/go/bin" >> $GITHUB_PATH
+
+      - name: "Install Complement Dependencies"
+        run: |
+          sudo apt-get update && sudo apt-get install -y libolm3 libolm-dev
+          go get -v github.com/haveyoudebuggedit/gotestfmt/v2/cmd/gotestfmt@latest
+
       - name: Run actions/checkout@v2 for synapse
         uses: actions/checkout@v2
         with:
           path: synapse
 
       # Attempt to check out the same branch of Complement as the PR. If it
-      # doesn't exist, fallback to master.
+      # doesn't exist, fallback to HEAD.
       - name: Checkout complement
         shell: bash
         run: |
@@ -353,8 +348,8 @@ jobs:
           #    for pull requests, otherwise GITHUB_REF).
           # 2. Attempt to use the base branch, e.g. when merging into release-vX.Y
           #    (GITHUB_BASE_REF for pull requests).
-          # 3. Use the default complement branch ("master").
-          for BRANCH_NAME in "$GITHUB_HEAD_REF" "$GITHUB_BASE_REF" "${GITHUB_REF#refs/heads/}" "master"; do
+          # 3. Use the default complement branch ("HEAD").
+          for BRANCH_NAME in "$GITHUB_HEAD_REF" "$GITHUB_BASE_REF" "${GITHUB_REF#refs/heads/}" "HEAD"; do
             # Skip empty branch names and merge commits.
             if [[ -z "$BRANCH_NAME" || $BRANCH_NAME =~ ^refs/pull/.* ]]; then
               continue
@@ -363,55 +358,32 @@ jobs:
             (wget -O - "https://github.com/matrix-org/complement/archive/$BRANCH_NAME.tar.gz" | tar -xz --strip-components=1 -C complement) && break
           done
 
-      # Build initial Synapse image
-      - run: docker build -t matrixdotorg/synapse:latest -f docker/Dockerfile .
-        working-directory: synapse
-
-      # Build a ready-to-run Synapse image based on the initial image above.
-      # This new image includes a config file, keys for signing and TLS, and
-      # other settings to make it suitable for testing under Complement.
-      - run: docker build -t complement-synapse -f Synapse.Dockerfile .
-        working-directory: complement/dockerfiles
-
-      # Run Complement
-      - run: go test -v -tags synapse_blacklist,msc2403,msc2946,msc3083 ./tests/...
-        env:
-          COMPLEMENT_BASE_IMAGE: complement-synapse:latest
-        working-directory: complement
+      - run: |
+          set -o pipefail
+          COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | gotestfmt
+        shell: bash
+        name: Run Complement Tests
 
   # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
   tests-done:
     if: ${{ always() }}
     needs:
+      - check-sampleconfig
       - lint
       - lint-crlf
       - lint-newsfile
-      - lint-sdist
       - trial
       - trial-olddeps
       - sytest
+      - export-data
       - portdb
       - complement
     runs-on: ubuntu-latest
     steps:
-      - name: Set build result
-        env:
-          NEEDS_CONTEXT: ${{ toJSON(needs) }}
-        # the `jq` incantation dumps out a series of "<job> <result>" lines.
-        # we set it to an intermediate variable to avoid a pipe, which makes it
-        # hard to set $rc.
-        run: |
-          rc=0
-          results=$(jq -r 'to_entries[] | [.key,.value.result] | join(" ")' <<< $NEEDS_CONTEXT)
-          while read job result ; do
-              # The newsfile lint may be skipped on non PR builds
-              if [ $result == "skipped" ] && [ $job == "lint-newsfile" ]; then
-                continue
-              fi
+      - uses: matrix-org/done-action@v2
+        with:
+          needs: ${{ toJSON(needs) }}
 
-              if [ "$result" != "success" ]; then
-                  echo "::set-failed ::Job $job returned $result"
-                  rc=1
-              fi
-          done <<< $results
-          exit $rc
+          # The newsfile lint may be skipped on non PR builds
+          skippable:
+            lint-newsfile

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING, Dict, Set
 
 from signedjson.sign import sign_json
 
@@ -94,7 +94,7 @@ class RemoteKey(DirectServeJsonResource):
         super().__init__()
 
         self.fetcher = ServerKeyFetcher(hs)
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.federation_domain_whitelist = (
             hs.config.federation.federation_domain_whitelist
@@ -149,7 +149,7 @@ class RemoteKey(DirectServeJsonResource):
 
         cached = await self.store.get_server_keys_json(store_queries)
 
-        json_results = set()
+        json_results: Set[bytes] = set()
 
         time_now_ms = self.clock.time_msec()
 
@@ -234,8 +234,8 @@ class RemoteKey(DirectServeJsonResource):
             await self.query_keys(request, query, query_remote_on_cache_miss=False)
         else:
             signed_keys = []
-            for key_json in json_results:
-                key_json = json_decoder.decode(key_json.decode("utf-8"))
+            for key_json_raw in json_results:
+                key_json = json_decoder.decode(key_json_raw.decode("utf-8"))
                 for signing_key in self.config.key.key_server_signing_keys:
                     key_json = sign_json(
                         key_json, self.config.server.server_name, signing_key

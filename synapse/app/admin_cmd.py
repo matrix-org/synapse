@@ -19,6 +19,8 @@ import sys
 import tempfile
 from typing import List, Optional
 
+from matrix_common.versionstring import get_distribution_version_string
+
 from twisted.internet import defer, task
 
 import synapse
@@ -31,7 +33,6 @@ from synapse.handlers.admin import ExfiltrationWriter
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
-from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
 from synapse.replication.slave.storage.deviceinbox import SlavedDeviceInboxStore
 from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.events import SlavedEventStore
@@ -44,7 +45,6 @@ from synapse.server import HomeServer
 from synapse.storage.databases.main.room import RoomWorkerStore
 from synapse.types import StateMap
 from synapse.util.logcontext import LoggingContext
-from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("synapse.app.admin_cmd")
 
@@ -60,7 +60,6 @@ class AdminCmdSlavedStore(
     SlavedDeviceStore,
     SlavedPushRuleStore,
     SlavedEventStore,
-    SlavedClientIpStore,
     BaseSlavedStore,
     RoomWorkerStore,
 ):
@@ -223,7 +222,7 @@ def start(config_options: List[str]) -> None:
     ss = AdminCmdServer(
         config.server.server_name,
         config=config,
-        version_string="Synapse/" + get_version_string(synapse),
+        version_string="Synapse/" + get_distribution_version_string("matrix-synapse"),
     )
 
     setup_logging(ss, config, use_worker_options=True)

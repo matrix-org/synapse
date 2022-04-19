@@ -49,7 +49,7 @@ id_server_scheme = "https://"
 
 class IdentityHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         # An HTTP client for contacting trusted URLs.
         self.http_client = SimpleHttpClient(hs)
         # An HTTP client for contacting identity servers specified by clients.
@@ -858,8 +858,6 @@ class IdentityHandler:
 
         if room_type is not None:
             invite_config["room_type"] = room_type
-            # TODO The unstable field is deprecated and should be removed in the future.
-            invite_config["org.matrix.msc3288.room_type"] = room_type
 
         # If a custom web client location is available, include it in the request.
         if self._web_client_location:

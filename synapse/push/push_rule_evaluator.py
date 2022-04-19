@@ -15,11 +15,12 @@
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Pattern, Tuple, Union
+
+from matrix_common.regex import glob_to_regex, to_word_pattern
 
 from synapse.events import EventBase
-from synapse.types import JsonDict, UserID
-from synapse.util import glob_to_regex, re_word_boundary
+from synapse.types import UserID
 from synapse.util.caches.lrucache import LruCache
 
 logger = logging.getLogger(__name__)
@@ -184,7 +185,7 @@ class PushRuleEvaluatorForEvent:
         r = regex_cache.get((display_name, False, True), None)
         if not r:
             r1 = re.escape(display_name)
-            r1 = re_word_boundary(r1)
+            r1 = to_word_pattern(r1)
             r = re.compile(r1, flags=re.IGNORECASE)
             regex_cache[(display_name, False, True)] = r
 
@@ -213,7 +214,7 @@ def _glob_matches(glob: str, value: str, word_boundary: bool = False) -> bool:
     try:
         r = regex_cache.get((glob, True, word_boundary), None)
         if not r:
-            r = glob_to_regex(glob, word_boundary)
+            r = glob_to_regex(glob, word_boundary=word_boundary)
             regex_cache[(glob, True, word_boundary)] = r
         return bool(r.search(value))
     except re.error:
@@ -222,7 +223,7 @@ def _glob_matches(glob: str, value: str, word_boundary: bool = False) -> bool:
 
 
 def _flatten_dict(
-    d: Union[EventBase, JsonDict],
+    d: Union[EventBase, Mapping[str, Any]],
     prefix: Optional[List[str]] = None,
     result: Optional[Dict[str, str]] = None,
 ) -> Dict[str, str]:
@@ -233,7 +234,7 @@ def _flatten_dict(
     for key, value in d.items():
         if isinstance(value, str):
             result[".".join(prefix + [key])] = value.lower()
-        elif isinstance(value, dict):
+        elif isinstance(value, Mapping):
             _flatten_dict(value, prefix=(prefix + [key]), result=result)
 
     return result

@@ -12,21 +12,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import collections.abc
 import logging
-from collections import namedtuple
-from typing import TYPE_CHECKING, Iterable, Optional, Set
+from typing import TYPE_CHECKING, Collection, Dict, Iterable, Optional, Set, Tuple
+
+from frozendict import frozendict
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import NotFoundError, UnsupportedRoomVersionError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.database import DatabasePool, LoggingTransaction
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
 from synapse.storage.state import StateFilter
-from synapse.types import StateMap
+from synapse.types import JsonDict, JsonMapping, StateMap
 from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import cached, cachedList
 
@@ -39,24 +44,26 @@ logger = logging.getLogger(__name__)
 MAX_STATE_DELTA_HOPS = 100
 
 
-class _GetStateGroupDelta(
-    namedtuple("_GetStateGroupDelta", ("prev_group", "delta_ids"))
-):
-    """Return type of get_state_group_delta that implements __len__, which lets
-    us use the itrable flag when caching
-    """
-
-    __slots__ = []
-
-    def __len__(self):
-        return len(self.delta_ids) if self.delta_ids else 0
+def _retrieve_and_check_room_version(room_id: str, room_version_id: str) -> RoomVersion:
+    v = KNOWN_ROOM_VERSIONS.get(room_version_id)
+    if not v:
+        raise UnsupportedRoomVersionError(
+            "Room %s uses a room version %s which is no longer supported"
+            % (room_id, room_version_id)
+        )
+    return v
 
 
 # this inherits from EventsWorkerStore because it calls self.get_events
 class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
     """The parts of StateGroupStore that can be called from workers."""
 
-    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
     async def get_room_version(self, room_id: str) -> RoomVersion:
@@ -67,11 +74,8 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 Typically this happens if support for the room's version has been
                 removed from Synapse.
         """
-        return await self.db_pool.runInteraction(
-            "get_room_version_txn",
-            self.get_room_version_txn,
-            room_id,
-        )
+        room_version_id = await self.get_room_version_id(room_id)
+        return _retrieve_and_check_room_version(room_id, room_version_id)
 
     def get_room_version_txn(
         self, txn: LoggingTransaction, room_id: str
@@ -87,15 +91,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 removed from Synapse.
         """
         room_version_id = self.get_room_version_id_txn(txn, room_id)
-        v = KNOWN_ROOM_VERSIONS.get(room_version_id)
-
-        if not v:
-            raise UnsupportedRoomVersionError(
-                "Room %s uses a room version %s which is no longer supported"
-                % (room_id, room_version_id)
-            )
-
-        return v
+        return _retrieve_and_check_room_version(room_id, room_version_id)
 
     @cached(max_entries=10000)
     async def get_room_version_id(self, room_id: str) -> str:
@@ -134,11 +130,11 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         if room_version is None:
-            raise NotFoundError("Could not room_version for %s" % (room_id,))
+            raise NotFoundError("Could not find room_version for %s" % (room_id,))
 
         return room_version
 
-    async def get_room_predecessor(self, room_id: str) -> Optional[dict]:
+    async def get_room_predecessor(self, room_id: str) -> Optional[JsonMapping]:
         """Get the predecessor of an upgraded room if it exists.
         Otherwise return None.
 
@@ -164,9 +160,10 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         predecessor = create_event.content.get("predecessor", None)
 
         # Ensure the key is a dictionary
-        if not isinstance(predecessor, collections.abc.Mapping):
+        if not isinstance(predecessor, (dict, frozendict)):
             return None
 
+        # The keys must be strings since the data is JSON.
         return predecessor
 
     async def get_create_event_for_room(self, room_id: str) -> EventBase:
@@ -182,11 +179,15 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             NotFoundError if the room is unknown
         """
         state_ids = await self.get_current_state_ids(room_id)
+
+        if not state_ids:
+            raise NotFoundError(f"Current state for room {room_id} is empty")
+
         create_id = state_ids.get((EventTypes.Create, ""))
 
         # If we can't find the create event, assume we've hit a dead end
         if not create_id:
-            raise NotFoundError("Unknown room %s" % (room_id,))
+            raise NotFoundError(f"No create event in current state for room {room_id}")
 
         # Retrieve the room's create event and return
         create_event = await self.get_event(create_id)
@@ -204,7 +205,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             The current state of the room.
         """
 
-        def _get_current_state_ids_txn(txn):
+        def _get_current_state_ids_txn(txn: LoggingTransaction) -> StateMap[str]:
             txn.execute(
                 """SELECT type, state_key, event_id FROM current_state_events
                 WHERE room_id = ?
@@ -243,7 +244,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             # We delegate to the cached version
             return await self.get_current_state_ids(room_id)
 
-        def _get_filtered_current_state_ids_txn(txn):
+        def _get_filtered_current_state_ids_txn(
+            txn: LoggingTransaction,
+        ) -> StateMap[str]:
             results = {}
             sql = """
                 SELECT type, state_key, event_id FROM current_state_events
@@ -283,11 +286,11 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         event_id = state.get((EventTypes.CanonicalAlias, ""))
         if not event_id:
-            return
+            return None
 
         event = await self.get_event(event_id, allow_none=True)
         if not event:
-            return
+            return None
 
         return event.content.get("canonical_alias")
 
@@ -306,8 +309,14 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         list_name="event_ids",
         num_args=1,
     )
-    async def _get_state_group_for_events(self, event_ids):
-        """Returns mapping event_id -> state_group"""
+    async def _get_state_group_for_events(
+        self, event_ids: Collection[str]
+    ) -> Dict[str, int]:
+        """Returns mapping event_id -> state_group.
+
+        Raises:
+             RuntimeError if the state is unknown at any of the given events
+        """
         rows = await self.db_pool.simple_select_many_batch(
             table="event_to_state_groups",
             column="event_id",
@@ -317,7 +326,11 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             desc="_get_state_group_for_events",
         )
 
-        return {row["event_id"]: row["state_group"] for row in rows}
+        res = {row["event_id"]: row["state_group"] for row in rows}
+        for e in event_ids:
+            if e not in res:
+                raise RuntimeError("No state group for unknown or outlier event %s" % e)
+        return res
 
     async def get_referenced_state_groups(
         self, state_groups: Iterable[int]
@@ -342,6 +355,53 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         return {row["state_group"] for row in rows}
 
+    async def update_state_for_partial_state_event(
+        self,
+        event: EventBase,
+        context: EventContext,
+    ) -> None:
+        """Update the state group for a partial state event"""
+        await self.db_pool.runInteraction(
+            "update_state_for_partial_state_event",
+            self._update_state_for_partial_state_event_txn,
+            event,
+            context,
+        )
+
+    def _update_state_for_partial_state_event_txn(
+        self,
+        txn,
+        event: EventBase,
+        context: EventContext,
+    ):
+        # we shouldn't have any outliers here
+        assert not event.internal_metadata.is_outlier()
+
+        # anything that was rejected should have the same state as its
+        # predecessor.
+        if context.rejected:
+            assert context.state_group == context.state_group_before_event
+
+        self.db_pool.simple_update_txn(
+            txn,
+            table="event_to_state_groups",
+            keyvalues={"event_id": event.event_id},
+            updatevalues={"state_group": context.state_group},
+        )
+
+        self.db_pool.simple_delete_one_txn(
+            txn,
+            table="partial_state_events",
+            keyvalues={"event_id": event.event_id},
+        )
+
+        # TODO(faster_joins): need to do something about workers here
+        txn.call_after(
+            self._get_state_group_for_event.prefill,
+            (event.event_id,),
+            context.state_group,
+        )
+
 
 class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
 
@@ -349,10 +409,15 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
     EVENT_STATE_GROUP_INDEX_UPDATE_NAME = "event_to_state_groups_sg_index"
     DELETE_CURRENT_STATE_UPDATE_NAME = "delete_old_current_state_events"
 
-    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
-        self.server_name = hs.hostname
+        self.server_name: str = hs.hostname
 
         self.db_pool.updates.register_background_index_update(
             self.CURRENT_STATE_INDEX_UPDATE_NAME,
@@ -372,7 +437,9 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
             self._background_remove_left_rooms,
         )
 
-    async def _background_remove_left_rooms(self, progress, batch_size):
+    async def _background_remove_left_rooms(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
         """Background update to delete rows from `current_state_events` and
         `event_forward_extremities` tables of rooms that the server is no
         longer joined to.
@@ -380,7 +447,9 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
 
         last_room_id = progress.get("last_room_id", "")
 
-        def _background_remove_left_rooms_txn(txn):
+        def _background_remove_left_rooms_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[bool, Set[str]]:
             # get a batch of room ids to consider
             sql = """
                 SELECT DISTINCT room_id FROM current_state_events
@@ -512,7 +581,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
         )
 
         for user_id in potentially_left_users - joined_users:
-            await self.mark_remote_user_device_list_as_unsubscribed(user_id)
+            await self.mark_remote_user_device_list_as_unsubscribed(user_id)  # type: ignore[attr-defined]
 
         return batch_size
 
@@ -536,5 +605,10 @@ class StateStore(StateGroupWorkerStore, MainStateBackgroundUpdateStore):
       * `state_groups_state`: Maps state group to state events.
     """
 
-    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)

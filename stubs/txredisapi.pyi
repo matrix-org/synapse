@@ -17,11 +17,12 @@
 from typing import Any, List, Optional, Type, Union
 
 from twisted.internet import protocol
+from twisted.internet.defer import Deferred
 
 class RedisProtocol(protocol.Protocol):
-    def publish(self, channel: str, message: bytes): ...
-    async def ping(self) -> None: ...
-    async def set(
+    def publish(self, channel: str, message: bytes) -> "Deferred[None]": ...
+    def ping(self) -> "Deferred[None]": ...
+    def set(
         self,
         key: str,
         value: Any,
@@ -29,8 +30,8 @@ class RedisProtocol(protocol.Protocol):
         pexpire: Optional[int] = None,
         only_if_not_exists: bool = False,
         only_if_exists: bool = False,
-    ) -> None: ...
-    async def get(self, key: str) -> Any: ...
+    ) -> "Deferred[None]": ...
+    def get(self, key: str) -> "Deferred[Any]": ...
 
 class SubscriberProtocol(RedisProtocol):
     def __init__(self, *args, **kwargs): ...
@@ -51,11 +52,14 @@ def lazyConnection(
     convertNumbers: bool = ...,
 ) -> RedisProtocol: ...
 
-class ConnectionHandler: ...
+# ConnectionHandler doesn't actually inherit from RedisProtocol, but it proxies
+# most methods to it via ConnectionHandler.__getattr__.
+class ConnectionHandler(RedisProtocol):
+    def disconnect(self) -> "Deferred[None]": ...
 
 class RedisFactory(protocol.ReconnectingClientFactory):
     continueTrying: bool
-    handler: RedisProtocol
+    handler: ConnectionHandler
     pool: List[RedisProtocol]
     replyTimeout: Optional[int]
     def __init__(

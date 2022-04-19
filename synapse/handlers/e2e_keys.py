@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 class E2eKeysHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.federation = hs.get_federation_client()
         self.device_handler = hs.get_device_handler()
         self.is_mine = hs.is_mine
@@ -65,8 +65,12 @@ class E2eKeysHandler:
         else:
             # Only register this edu handler on master as it requires writing
             # device updates to the db
-            #
-            # FIXME: switch to m.signing_key_update when MSC1756 is merged into the spec
+            federation_registry.register_edu_handler(
+                "m.signing_key_update",
+                self._edu_updater.incoming_signing_key_update,
+            )
+            # also handle the unstable version
+            # FIXME: remove this when enough servers have upgraded
             federation_registry.register_edu_handler(
                 "org.matrix.signing_key_update",
                 self._edu_updater.incoming_signing_key_update,
@@ -114,7 +118,7 @@ class E2eKeysHandler:
             from_device_id: the device making the query. This is used to limit
                 the number of in-flight queries at a time.
         """
-        with await self._query_devices_linearizer.queue((from_user_id, from_device_id)):
+        async with self._query_devices_linearizer.queue((from_user_id, from_device_id)):
             device_keys_query: Dict[str, Iterable[str]] = query_body.get(
                 "device_keys", {}
             )
@@ -576,7 +580,9 @@ class E2eKeysHandler:
             log_kv(
                 {"message": "Did not update one_time_keys", "reason": "no keys given"}
             )
-        fallback_keys = keys.get("org.matrix.msc2732.fallback_keys", None)
+        fallback_keys = keys.get("fallback_keys") or keys.get(
+            "org.matrix.msc2732.fallback_keys"
+        )
         if fallback_keys and isinstance(fallback_keys, dict):
             log_kv(
                 {
@@ -1315,21 +1321,21 @@ def _one_time_keys_match(old_key_json: str, new_key: JsonDict) -> bool:
     return old_key == new_key_copy
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class SignatureListItem:
     """An item in the signature list as used by upload_signatures_for_device_keys."""
 
-    signing_key_id = attr.ib(type=str)
-    target_user_id = attr.ib(type=str)
-    target_device_id = attr.ib(type=str)
-    signature = attr.ib(type=JsonDict)
+    signing_key_id: str
+    target_user_id: str
+    target_device_id: str
+    signature: JsonDict
 
 
 class SigningKeyEduUpdater:
     """Handles incoming signing key updates from federation and updates the DB"""
 
     def __init__(self, hs: "HomeServer", e2e_keys_handler: E2eKeysHandler):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.federation = hs.get_federation_client()
         self.clock = hs.get_clock()
         self.e2e_keys_handler = e2e_keys_handler
@@ -1380,7 +1386,7 @@ class SigningKeyEduUpdater:
         device_handler = self.e2e_keys_handler.device_handler
         device_list_updater = device_handler.device_list_updater
 
-        with (await self._remote_edu_linearizer.queue(user_id)):
+        async with self._remote_edu_linearizer.queue(user_id):
             pending_updates = self._pending_updates.pop(user_id, [])
             if not pending_updates:
                 # This can happen since we batch updates

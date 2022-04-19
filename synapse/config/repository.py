@@ -14,12 +14,14 @@
 
 import logging
 import os
-from collections import namedtuple
-from typing import Dict, List
+from typing import Any, Dict, List, Tuple
 from urllib.request import getproxies_environment  # type: ignore
 
+import attr
+
 from synapse.config.server import DEFAULT_IP_RANGE_BLACKLIST, generate_ip_set
-from synapse.python_dependencies import DependencyException, check_requirements
+from synapse.types import JsonDict
+from synapse.util.check_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module
 
 from ._base import Config, ConfigError
@@ -43,33 +45,36 @@ THUMBNAIL_SIZE_YAML = """\
 HTTP_PROXY_SET_WARNING = """\
 The Synapse config url_preview_ip_range_blacklist will be ignored as an HTTP(s) proxy is configured."""
 
-ThumbnailRequirement = namedtuple(
-    "ThumbnailRequirement", ["width", "height", "method", "media_type"]
-)
 
-MediaStorageProviderConfig = namedtuple(
-    "MediaStorageProviderConfig",
-    (
-        "store_local",  # Whether to store newly uploaded local files
-        "store_remote",  # Whether to store newly downloaded remote files
-        "store_synchronous",  # Whether to wait for successful storage for local uploads
-    ),
-)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class ThumbnailRequirement:
+    width: int
+    height: int
+    method: str
+    media_type: str
 
 
-def parse_thumbnail_requirements(thumbnail_sizes):
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class MediaStorageProviderConfig:
+    store_local: bool  # Whether to store newly uploaded local files
+    store_remote: bool  # Whether to store newly downloaded remote files
+    store_synchronous: bool  # Whether to wait for successful storage for local uploads
+
+
+def parse_thumbnail_requirements(
+    thumbnail_sizes: List[JsonDict],
+) -> Dict[str, Tuple[ThumbnailRequirement, ...]]:
     """Takes a list of dictionaries with "width", "height", and "method" keys
     and creates a map from image media types to the thumbnail size, thumbnailing
     method, and thumbnail media type to precalculate
 
     Args:
-        thumbnail_sizes(list): List of dicts with "width", "height", and
-            "method" keys
+        thumbnail_sizes: List of dicts with "width", "height", and "method" keys
+
     Returns:
-        Dictionary mapping from media type string to list of
-        ThumbnailRequirement tuples.
+        Dictionary mapping from media type string to list of ThumbnailRequirement.
     """
-    requirements: Dict[str, List] = {}
+    requirements: Dict[str, List[ThumbnailRequirement]] = {}
     for size in thumbnail_sizes:
         width = size["width"]
         height = size["height"]
@@ -89,7 +94,7 @@ def parse_thumbnail_requirements(thumbnail_sizes):
 class ContentRepositoryConfig(Config):
     section = "media"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
 
         # Only enable the media repo if either the media repo is enabled or the
         # current worker app is the media repo.
@@ -218,7 +223,8 @@ class ContentRepositoryConfig(Config):
                 "url_preview_accept_language"
             ) or ["en"]
 
-    def generate_config_section(self, data_dir_path, **kwargs):
+    def generate_config_section(self, data_dir_path: str, **kwargs: Any) -> str:
+        assert data_dir_path is not None
         media_store = os.path.join(data_dir_path, "media_store")
 
         formatted_thumbnail_sizes = "".join(

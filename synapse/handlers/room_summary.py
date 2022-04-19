@@ -15,7 +15,6 @@
 import itertools
 import logging
 import re
-from collections import deque
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import attr
@@ -36,8 +35,9 @@ from synapse.api.errors import (
     SynapseError,
     UnsupportedRoomVersionError,
 )
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.events import EventBase
-from synapse.types import JsonDict
+from synapse.types import JsonDict, Requester
 from synapse.util.caches.response_cache import ResponseCache
 
 if TYPE_CHECKING:
@@ -89,10 +89,13 @@ class RoomSummaryHandler:
 
     def __init__(self, hs: "HomeServer"):
         self._event_auth_handler = hs.get_event_auth_handler()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._event_serializer = hs.get_event_client_serializer()
         self._server_name = hs.hostname
         self._federation_client = hs.get_federation_client()
+        self._ratelimiter = Ratelimiter(
+            store=self._store, clock=hs.get_clock(), rate_hz=5, burst_count=10
+        )
 
         # If a user tries to fetch the same page multiple times in quick succession,
         # only process the first attempt and return its result to subsequent requests.
@@ -103,153 +106,9 @@ class RoomSummaryHandler:
             "get_room_hierarchy",
         )
 
-    async def get_space_summary(
-        self,
-        requester: str,
-        room_id: str,
-        suggested_only: bool = False,
-        max_rooms_per_space: Optional[int] = None,
-    ) -> JsonDict:
-        """
-        Implementation of the space summary C-S API
-
-        Args:
-            requester:  user id of the user making this request
-
-            room_id: room id to start the summary at
-
-            suggested_only: whether we should only return children with the "suggested"
-                flag set.
-
-            max_rooms_per_space: an optional limit on the number of child rooms we will
-                return. This does not apply to the root room (ie, room_id), and
-                is overridden by MAX_ROOMS_PER_SPACE.
-
-        Returns:
-            summary dict to return
-        """
-        # First of all, check that the room is accessible.
-        if not await self._is_local_room_accessible(room_id, requester):
-            raise AuthError(
-                403,
-                "User %s not in room %s, and room previews are disabled"
-                % (requester, room_id),
-            )
-
-        # the queue of rooms to process
-        room_queue = deque((_RoomQueueEntry(room_id, ()),))
-
-        # rooms we have already processed
-        processed_rooms: Set[str] = set()
-
-        # events we have already processed. We don't necessarily have their event ids,
-        # so instead we key on (room id, state key)
-        processed_events: Set[Tuple[str, str]] = set()
-
-        rooms_result: List[JsonDict] = []
-        events_result: List[JsonDict] = []
-
-        while room_queue and len(rooms_result) < MAX_ROOMS:
-            queue_entry = room_queue.popleft()
-            room_id = queue_entry.room_id
-            if room_id in processed_rooms:
-                # already done this room
-                continue
-
-            logger.debug("Processing room %s", room_id)
-
-            is_in_room = await self._store.is_host_joined(room_id, self._server_name)
-
-            # The client-specified max_rooms_per_space limit doesn't apply to the
-            # room_id specified in the request, so we ignore it if this is the
-            # first room we are processing.
-            max_children = max_rooms_per_space if processed_rooms else None
-
-            if is_in_room:
-                room_entry = await self._summarize_local_room(
-                    requester, None, room_id, suggested_only, max_children
-                )
-
-                events: Sequence[JsonDict] = []
-                if room_entry:
-                    rooms_result.append(room_entry.room)
-                    events = room_entry.children_state_events
-
-                logger.debug(
-                    "Query of local room %s returned events %s",
-                    room_id,
-                    ["%s->%s" % (ev["room_id"], ev["state_key"]) for ev in events],
-                )
-            else:
-                fed_rooms = await self._summarize_remote_room(
-                    queue_entry,
-                    suggested_only,
-                    max_children,
-                    exclude_rooms=processed_rooms,
-                )
-
-                # The results over federation might include rooms that the we,
-                # as the requesting server, are allowed to see, but the requesting
-                # user is not permitted see.
-                #
-                # Filter the returned results to only what is accessible to the user.
-                events = []
-                for room_entry in fed_rooms:
-                    room = room_entry.room
-                    fed_room_id = room_entry.room_id
-
-                    # The user can see the room, include it!
-                    if await self._is_remote_room_accessible(
-                        requester, fed_room_id, room
-                    ):
-                        # Before returning to the client, remove the allowed_room_ids
-                        # and allowed_spaces keys.
-                        room.pop("allowed_room_ids", None)
-                        room.pop("allowed_spaces", None)
-
-                        rooms_result.append(room)
-                        events.extend(room_entry.children_state_events)
-
-                    # All rooms returned don't need visiting again (even if the user
-                    # didn't have access to them).
-                    processed_rooms.add(fed_room_id)
-
-                logger.debug(
-                    "Query of %s returned rooms %s, events %s",
-                    room_id,
-                    [room_entry.room.get("room_id") for room_entry in fed_rooms],
-                    ["%s->%s" % (ev["room_id"], ev["state_key"]) for ev in events],
-                )
-
-            # the room we queried may or may not have been returned, but don't process
-            # it again, anyway.
-            processed_rooms.add(room_id)
-
-            # XXX: is it ok that we blindly iterate through any events returned by
-            #   a remote server, whether or not they actually link to any rooms in our
-            #   tree?
-            for ev in events:
-                # remote servers might return events we have already processed
-                # (eg, Dendrite returns inward pointers as well as outward ones), so
-                # we need to filter them out, to avoid returning duplicate links to the
-                # client.
-                ev_key = (ev["room_id"], ev["state_key"])
-                if ev_key in processed_events:
-                    continue
-                events_result.append(ev)
-
-                # add the child to the queue. we have already validated
-                # that the vias are a list of server names.
-                room_queue.append(
-                    _RoomQueueEntry(ev["state_key"], ev["content"]["via"])
-                )
-                processed_events.add(ev_key)
-
-        return {"rooms": rooms_result, "events": events_result}
-
     async def get_room_hierarchy(
         self,
-        requester: str,
+        requester: Requester,
         requested_room_id: str,
         suggested_only: bool = False,
         max_depth: Optional[int] = None,
@@ -276,6 +135,8 @@ class RoomSummaryHandler:
         Returns:
             The JSON hierarchy dictionary.
         """
+        await self._ratelimiter.ratelimit(requester)
+
         # If a user tries to fetch the same page multiple times in quick succession,
         # only process the first attempt and return its result to subsequent requests.
         #
@@ -283,7 +144,7 @@ class RoomSummaryHandler:
         # to process multiple requests for the same page will result in errors.
         return await self._pagination_response_cache.wrap(
             (
-                requester,
+                requester.user.to_string(),
                 requested_room_id,
                 suggested_only,
                 max_depth,
@@ -291,7 +152,7 @@ class RoomSummaryHandler:
                 from_token,
             ),
             self._get_room_hierarchy,
-            requester,
+            requester.user.to_string(),
             requested_room_id,
             suggested_only,
             max_depth,
@@ -389,8 +250,6 @@ class RoomSummaryHandler:
                     None,
                     room_id,
                     suggested_only,
-                    # TODO Handle max children.
-                    max_children=None,
                 )
 
             # Otherwise, attempt to use information for federation.
@@ -436,7 +295,7 @@ class RoomSummaryHandler:
             # inaccessible to the requesting user.
             if room_entry:
                 # Add the room (including the stripped m.space.child events).
-                rooms_result.append(room_entry.as_json())
+                rooms_result.append(room_entry.as_json(for_client=True))
 
                 # If this room is not at the max-depth, check if there are any
                 # children to process.
@@ -479,70 +338,6 @@ class RoomSummaryHandler:
 
         return result
 
-    async def federation_space_summary(
-        self,
-        origin: str,
-        room_id: str,
-        suggested_only: bool,
-        max_rooms_per_space: Optional[int],
-        exclude_rooms: Iterable[str],
-    ) -> JsonDict:
-        """
-        Implementation of the space summary Federation API
-
-        Args:
-            origin: The server requesting the spaces summary.
-
-            room_id: room id to start the summary at
-
-            suggested_only: whether we should only return children with the "suggested"
-                flag set.
-
-            max_rooms_per_space: an optional limit on the number of child rooms we will
-                return. Unlike the C-S API, this applies to the root room (room_id).
-                It is clipped to MAX_ROOMS_PER_SPACE.
-
-            exclude_rooms: a list of rooms to skip over (presumably because the
-                calling server has already seen them).
-
-        Returns:
-            summary dict to return
-        """
-        # the queue of rooms to process
-        room_queue = deque((room_id,))
-
-        # the set of rooms that we should not walk further. Initialise it with the
-        # excluded-rooms list; we will add other rooms as we process them so that
-        # we do not loop.
-        processed_rooms: Set[str] = set(exclude_rooms)
-
-        rooms_result: List[JsonDict] = []
-        events_result: List[JsonDict] = []
-
-        while room_queue and len(rooms_result) < MAX_ROOMS:
-            room_id = room_queue.popleft()
-            if room_id in processed_rooms:
-                # already done this room
-                continue
-
-            room_entry = await self._summarize_local_room(
-                None, origin, room_id, suggested_only, max_rooms_per_space
-            )
-
-            processed_rooms.add(room_id)
-
-            if room_entry:
-                rooms_result.append(room_entry.room)
-                events_result.extend(room_entry.children_state_events)
-
-                # add any children to the queue
-                room_queue.extend(
-                    edge_event["state_key"]
-                    for edge_event in room_entry.children_state_events
-                )
-
-        return {"rooms": rooms_result, "events": events_result}
-
     async def get_federation_hierarchy(
         self,
         origin: str,
@@ -566,7 +361,7 @@ class RoomSummaryHandler:
             The JSON hierarchy dictionary.
         """
         root_room_entry = await self._summarize_local_room(
-            None, origin, requested_room_id, suggested_only, max_children=None
+            None, origin, requested_room_id, suggested_only
         )
         if root_room_entry is None:
             # Room is inaccessible to the requesting server.
@@ -577,7 +372,9 @@ class RoomSummaryHandler:
 
         # Iterate through each child and potentially add it, but not its children,
         # to the response.
-        for child_room in root_room_entry.children_state_events:
+        for child_room in itertools.islice(
+            root_room_entry.children_state_events, MAX_ROOMS_PER_SPACE
+        ):
             room_id = child_room.get("state_key")
             assert isinstance(room_id, str)
             # If the room is unknown, skip it.
@@ -585,7 +382,7 @@ class RoomSummaryHandler:
                 continue
 
             room_entry = await self._summarize_local_room(
-                None, origin, room_id, suggested_only, max_children=0
+                None, origin, room_id, suggested_only, include_children=False
             )
             # If the room is accessible, include it in the results.
             #
@@ -611,7 +408,7 @@ class RoomSummaryHandler:
         origin: Optional[str],
         room_id: str,
         suggested_only: bool,
-        max_children: Optional[int],
+        include_children: bool = True,
     ) -> Optional["_RoomEntry"]:
         """
         Generate a room entry and a list of event entries for a given room.
@@ -626,9 +423,8 @@ class RoomSummaryHandler:
             room_id: The room ID to summarize.
             suggested_only: True if only suggested children should be returned.
                 Otherwise, all children are returned.
-            max_children:
-                The maximum number of children rooms to include. This is capped
-                to a server-set limit.
+            include_children:
+                Whether to include the events of any children.
 
         Returns:
             A room entry if the room should be returned. None, otherwise.
@@ -638,9 +434,8 @@ class RoomSummaryHandler:
 
         room_entry = await self._build_room_entry(room_id, for_federation=bool(origin))
 
-        # If the room is not a space or the children don't matter, return just
-        # the room information.
-        if room_entry.get("room_type") != RoomTypes.SPACE or max_children == 0:
+        # If the room is not a space return just the room information.
+        if room_entry.get("room_type") != RoomTypes.SPACE or not include_children:
             return _RoomEntry(room_id, room_entry)
 
         # Otherwise, look for child rooms/spaces.
@@ -649,9 +444,6 @@ class RoomSummaryHandler:
         if suggested_only:
             # we only care about suggested children
             child_events = filter(_is_suggested_child_event, child_events)
-
-        if max_children is None or max_children > MAX_ROOMS_PER_SPACE:
-            max_children = MAX_ROOMS_PER_SPACE
 
         stripped_events: List[JsonDict] = [
             {
@@ -662,79 +454,9 @@ class RoomSummaryHandler:
                 "sender": e.sender,
                 "origin_server_ts": e.origin_server_ts,
             }
-            for e in itertools.islice(child_events, max_children)
+            for e in child_events
         ]
         return _RoomEntry(room_id, room_entry, stripped_events)
-
-    async def _summarize_remote_room(
-        self,
-        room: "_RoomQueueEntry",
-        suggested_only: bool,
-        max_children: Optional[int],
-        exclude_rooms: Iterable[str],
-    ) -> Iterable["_RoomEntry"]:
-        """
-        Request room entries and a list of event entries for a given room by querying a remote server.
-
-        Args:
-            room: The room to summarize.
-            suggested_only: True if only suggested children should be returned.
-                Otherwise, all children are returned.
-            max_children:
-                The maximum number of children rooms to include. This is capped
-                to a server-set limit.
-            exclude_rooms:
-                Rooms IDs which do not need to be summarized.
-
-        Returns:
-            An iterable of room entries.
-        """
-        room_id = room.room_id
-        logger.info("Requesting summary for %s via %s", room_id, room.via)
-
-        # we need to make the exclusion list json-serialisable
-        exclude_rooms = list(exclude_rooms)
-
-        via = itertools.islice(room.via, MAX_SERVERS_PER_SPACE)
-        try:
-            res = await self._federation_client.get_space_summary(
-                via,
-                room_id,
-                suggested_only=suggested_only,
-                max_rooms_per_space=max_children,
-                exclude_rooms=exclude_rooms,
-            )
-        except Exception as e:
-            logger.warning(
-                "Unable to get summary of %s via federation: %s",
-                room_id,
-                e,
-                exc_info=logger.isEnabledFor(logging.DEBUG),
-            )
-            return ()
-
-        # Group the events by their room.
-        children_by_room: Dict[str, List[JsonDict]] = {}
-        for ev in res.events:
-            if ev.event_type == EventTypes.SpaceChild:
-                children_by_room.setdefault(ev.room_id, []).append(ev.data)
-
-        # Generate the final results.
-        results = []
-        for fed_room in res.rooms:
-            fed_room_id = fed_room.get("room_id")
-            if not fed_room_id or not isinstance(fed_room_id, str):
-                continue
-
-            results.append(
-                _RoomEntry(
-                    fed_room_id,
-                    fed_room,
-                    children_by_room.get(fed_room_id, []),
-                )
-            )
-
-        return results
 
     async def _summarize_remote_room_hierarchy(
         self, room: "_RoomQueueEntry", suggested_only: bool
@@ -760,6 +482,7 @@ class RoomSummaryHandler:
         try:
             (
                 room_response,
+                children_state_events,
                 children,
                 inaccessible_children,
             ) = await self._federation_client.get_room_hierarchy(
@@ -784,7 +507,7 @@ class RoomSummaryHandler:
         }
 
         return (
-            _RoomEntry(room_id, room_response, room_response.pop("children_state", ())),
+            _RoomEntry(room_id, room_response, children_state_events),
             children_by_room_id,
             set(inaccessible_children),
         )
@@ -937,9 +660,8 @@ class RoomSummaryHandler:
         ):
             return True
 
-        # Check if the user is a member of any of the allowed spaces
-        # from the response.
-        allowed_rooms = room.get("allowed_room_ids") or room.get("allowed_spaces")
+        # Check if the user is a member of any of the allowed rooms from the response.
+        allowed_rooms = room.get("allowed_room_ids")
         if allowed_rooms and isinstance(allowed_rooms, list):
             if await self._event_auth_handler.is_user_in_rooms(
                 allowed_rooms, requester
@@ -982,12 +704,14 @@ class RoomSummaryHandler:
             "canonical_alias": stats["canonical_alias"],
             "num_joined_members": stats["joined_members"],
             "avatar_url": stats["avatar"],
+            # plural join_rules is a documentation error but kept for historical
+            # purposes. Should match /publicRooms.
             "join_rules": stats["join_rules"],
+            "join_rule": stats["join_rules"],
             "world_readable": (
                 stats["history_visibility"] == HistoryVisibility.WORLD_READABLE
             ),
             "guest_can_join": stats["guest_access"] == "can_join",
-            "creation_ts": create_event.origin_server_ts,
             "room_type": create_event.content.get(EventContentFields.ROOM_TYPE),
         }
 
@@ -1005,8 +729,6 @@ class RoomSummaryHandler:
                 )
                 if allowed_rooms:
                     entry["allowed_room_ids"] = allowed_rooms
-                    # TODO Remove this key once the API is stable.
-                    entry["allowed_spaces"] = allowed_rooms
 
         # Filter out Nones – rather omit the field altogether
         room_entry = {k: v for k, v in entry.items() if v is not None}
@@ -1071,7 +793,7 @@ class RoomSummaryHandler:
                 room_id,
                 # Suggested-only doesn't matter since no children are requested.
                 suggested_only=False,
-                max_children=0,
+                include_children=False,
             )
 
             if not room_entry:
@@ -1121,21 +843,32 @@ class _RoomEntry:
     # This may not include all children.
     children_state_events: Sequence[JsonDict] = ()
 
-    def as_json(self) -> JsonDict:
+    def as_json(self, for_client: bool = False) -> JsonDict:
         """
         Returns a JSON dictionary suitable for the room hierarchy endpoint.
 
         It returns the room summary including the stripped m.space.child events
         as a sub-key.
+
+        Args:
+            for_client: If true, any server-server only fields are stripped from
+                the result.
+
         """
         result = dict(self.room)
+
+        # Before returning to the client, remove the allowed_room_ids key, if it
+        # exists.
+        if for_client:
+            result.pop("allowed_room_ids", False)
+
         result["children_state"] = self.children_state_events
         return result
 
 
 def _has_valid_via(e: EventBase) -> bool:
     via = e.content.get("via")
-    if not via or not isinstance(via, Sequence):
+    if not via or not isinstance(via, list):
         return False
     for v in via:
         if not isinstance(v, str):

@@ -20,6 +20,7 @@ from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent, _EventInternalMetadata, make_event_from_dict
 from synapse.handlers.room import RoomEventSource
 from synapse.replication.slave.storage.events import SlavedEventStore
+from synapse.storage.databases.main.event_push_actions import NotifCounts
 from synapse.storage.roommember import GetRoomsForUserWithStreamOrdering, RoomsForUser
 from synapse.types import PersistedEventPosition
 
@@ -58,7 +59,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
 
     def setUp(self):
         # Patch up the equality operator for events so that we can check
-        # whether lists of events match using assertEquals
+        # whether lists of events match using assertEqual
         self.unpatches = [patch__eq__(_EventInternalMetadata), patch__eq__(FrozenEvent)]
         return super().setUp()
 
@@ -166,7 +167,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2, event1.event_id],
-            {"highlight_count": 0, "unread_count": 0, "notify_count": 0},
+            NotifCounts(highlight_count=0, unread_count=0, notify_count=0),
         )
 
         self.persist(
@@ -179,7 +180,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2, event1.event_id],
-            {"highlight_count": 0, "unread_count": 0, "notify_count": 1},
+            NotifCounts(highlight_count=0, unread_count=0, notify_count=1),
         )
 
         self.persist(
@@ -194,7 +195,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2, event1.event_id],
-            {"highlight_count": 1, "unread_count": 0, "notify_count": 2},
+            NotifCounts(highlight_count=1, unread_count=0, notify_count=2),
         )
 
     def test_get_rooms_for_user_with_stream_ordering(self):
@@ -267,7 +268,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
 
         event_source = RoomEventSource(self.hs)
         event_source.store = self.slaved_store
-        current_token = self.get_success(event_source.get_current_key())
+        current_token = event_source.get_current_key()
 
         # gradually stream out the replication
         while repl_transport.buffer:
@@ -276,7 +277,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             self.pump(0)
 
             prev_token = current_token
-            current_token = self.get_success(event_source.get_current_key())
+            current_token = event_source.get_current_key()
 
             # attempt to replicate the behaviour of the sync handler.
             #

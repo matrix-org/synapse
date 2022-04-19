@@ -1,4 +1,5 @@
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,9 +19,10 @@ import os
 import sys
 import threading
 from string import Template
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import yaml
+from matrix_common.versionstring import get_distribution_version_string
 from zope.interface import implementer
 
 from twisted.logger import (
@@ -31,15 +33,14 @@ from twisted.logger import (
     globalLogBeginner,
 )
 
-import synapse
-from synapse.logging._structured import setup_structured_logging
 from synapse.logging.context import LoggingContextFilter
 from synapse.logging.filter import MetadataFilter
-from synapse.util.versionstring import get_version_string
+from synapse.types import JsonDict
 
 from ._base import Config, ConfigError
 
 if TYPE_CHECKING:
+    from synapse.config.homeserver import HomeServerConfig
     from synapse.server import HomeServer
 
 DEFAULT_LOG_CONFIG = Template(
@@ -137,17 +138,25 @@ Support for the log_file configuration option and --log-file command-line option
 removed in Synapse 1.3.0. You should instead set up a separate log configuration file.
 """
 
+STRUCTURED_ERROR = """\
+Support for the structured configuration option was removed in Synapse 1.54.0.
+You should instead use the standard logging configuration. See
+https://matrix-org.github.io/synapse/v1.54/structured_logging.html
+"""
+
 
 class LoggingConfig(Config):
     section = "logging"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         if config.get("log_file"):
             raise ConfigError(LOG_FILE_ERROR)
         self.log_config = self.abspath(config.get("log_config"))
         self.no_redirect_stdio = config.get("no_redirect_stdio", False)
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(
+        self, config_dir_path: str, server_name: str, **kwargs: Any
+    ) -> str:
         log_config = os.path.join(config_dir_path, server_name + ".log.config")
         return (
             """\
@@ -161,14 +170,14 @@ class LoggingConfig(Config):
             % locals()
         )
 
-    def read_arguments(self, args):
+    def read_arguments(self, args: argparse.Namespace) -> None:
         if args.no_redirect_stdio is not None:
             self.no_redirect_stdio = args.no_redirect_stdio
         if args.log_file is not None:
             raise ConfigError(LOG_FILE_ERROR)
 
     @staticmethod
-    def add_arguments(parser):
+    def add_arguments(parser: argparse.ArgumentParser) -> None:
         logging_group = parser.add_argument_group("logging")
         logging_group.add_argument(
             "-n",
@@ -197,7 +206,9 @@ class LoggingConfig(Config):
                 log_config_file.write(DEFAULT_LOG_CONFIG.substitute(log_file=log_file))
 
 
-def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> None:
+def _setup_stdlib_logging(
+    config: "HomeServerConfig", log_config_path: Optional[str], logBeginner: LogBeginner
+) -> None:
     """
     Set up Python standard library logging.
     """
@@ -230,7 +241,7 @@ def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> 
     log_metadata_filter = MetadataFilter({"server_name": config.server.server_name})
     old_factory = logging.getLogRecordFactory()
 
-    def factory(*args, **kwargs):
+    def factory(*args: Any, **kwargs: Any) -> logging.LogRecord:
         record = old_factory(*args, **kwargs)
         log_context_filter.filter(record)
         log_metadata_filter.filter(record)
@@ -289,15 +300,14 @@ def _load_logging_config(log_config_path: str) -> None:
     if not log_config:
         logging.warning("Loaded a blank logging config?")
 
-    # If the old structured logging configuration is being used, convert it to
-    # the new style configuration.
+    # If the old structured logging configuration is being used, raise an error.
     if "structured" in log_config and log_config.get("structured"):
-        log_config = setup_structured_logging(log_config)
+        raise ConfigError(STRUCTURED_ERROR)
 
     logging.config.dictConfig(log_config)
 
 
-def _reload_logging_config(log_config_path):
+def _reload_logging_config(log_config_path: Optional[str]) -> None:
     """
     Reload the log configuration from the file and apply it.
     """
@@ -311,8 +321,8 @@ def _reload_logging_config(log_config_path):
 
 def setup_logging(
     hs: "HomeServer",
-    config,
-    use_worker_options=False,
+    config: "HomeServerConfig",
+    use_worker_options: bool = False,
     logBeginner: LogBeginner = globalLogBeginner,
 ) -> None:
     """
@@ -343,6 +353,10 @@ def setup_logging(
 
     # Log immediately so we can grep backwards.
     logging.warning("***** STARTING SERVER *****")
-    logging.warning("Server %s version %s", sys.argv[0], get_version_string(synapse))
+    logging.warning(
+        "Server %s version %s",
+        sys.argv[0],
+        get_distribution_version_string("matrix-synapse"),
+    )
     logging.info("Server hostname: %s", config.server.server_name)
     logging.info("Instance name: %s", hs.get_instance_name())

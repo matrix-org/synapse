@@ -16,23 +16,29 @@ import functools
 import logging
 import re
 from http import HTTPStatus
-from typing import Dict, Optional, Tuple
+import time
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional, Tuple, cast
 
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.urls import FEDERATION_V1_PREFIX
+from synapse.http.server import HttpServer, ServletCallback
 from synapse.http.servlet import parse_json_object_from_request
-from synapse.logging import opentracing
+from synapse.http.site import SynapseRequest
 from synapse.logging.context import run_in_background
 from synapse.logging.opentracing import (
-    SynapseTags,
+    active_span,
+    set_tag,
+    span_context_from_request,
     start_active_span,
-    start_active_span_from_request,
-    tags,
+    start_active_span_follows_from,
     whitelisted_homeserver,
 )
-from synapse.server import HomeServer
+from synapse.types import JsonDict
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import parse_and_validate_server_name
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +52,11 @@ class NoAuthenticationError(AuthenticationError):
 
 
 class Authenticator:
-    def __init__(self, hs: HomeServer):
+    def __init__(self, hs: "HomeServer"):
         self._clock = hs.get_clock()
         self.keyring = hs.get_keyring()
         self.server_name = hs.hostname
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.federation_domain_whitelist = (
             hs.config.federation.federation_domain_whitelist
         )
@@ -58,12 +64,14 @@ class Authenticator:
 
         self.replication_client = None
         if hs.config.worker.worker_app:
-            self.replication_client = hs.get_tcp_replication()
+            self.replication_client = hs.get_replication_command_handler()
 
     # A method just so we can pass 'self' as the authenticator to the Servlets
-    async def authenticate_request(self, request, content):
+    async def authenticate_request(
+        self, request: SynapseRequest, content: Optional[JsonDict]
+    ) -> str:
         now = self._clock.time_msec()
-        json_request = {
+        json_request: JsonDict = {
             "method": request.method.decode("ascii"),
             "uri": request.uri.decode("ascii"),
             "destination": self.server_name,
@@ -123,11 +131,11 @@ class Authenticator:
         # alive
         retry_timings = await self.store.get_destination_retry_timings(origin)
         if retry_timings and retry_timings.retry_last_ts:
-            run_in_background(self._reset_retry_timings, origin)
+            run_in_background(self.reset_retry_timings, origin)
 
         return origin
 
-    async def _reset_retry_timings(self, origin):
+    async def reset_retry_timings(self, origin: str) -> None:
         try:
             logger.info("Marking origin %r as up", origin)
             await self.store.set_destination_retry_timings(origin, None, 0, 0)
@@ -154,6 +162,7 @@ def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str, Optional[str
 
     Returns:
         origin, key id, signature, destination.
+        origin, key id, signature.
 
     Raises:
         AuthenticationError if the header could not be parsed
@@ -165,7 +174,7 @@ def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str, Optional[str
             k: v for k, v in [param.split("=", maxsplit=1) for param in params]
         }
 
-        def strip_quotes(value):
+        def strip_quotes(value: str) -> str:
             if value.startswith('"'):
                 return value[1:-1]
             else:
@@ -245,7 +254,7 @@ class BaseFederationServlet:
 
     def __init__(
         self,
-        hs: HomeServer,
+        hs: "HomeServer",
         authenticator: Authenticator,
         ratelimiter: FederationRateLimiter,
         server_name: str,
@@ -255,23 +264,25 @@ class BaseFederationServlet:
         self.ratelimiter = ratelimiter
         self.server_name = server_name
 
-    def _wrap(self, func):
+    def _wrap(self, func: Callable[..., Awaitable[Tuple[int, Any]]]) -> ServletCallback:
         authenticator = self.authenticator
         ratelimiter = self.ratelimiter
 
         @functools.wraps(func)
-        async def new_func(request, *args, **kwargs):
+        async def new_func(
+            request: SynapseRequest, *args: Any, **kwargs: str
+        ) -> Optional[Tuple[int, Any]]:
             """A callback which can be passed to HttpServer.RegisterPaths
 
             Args:
-                request (twisted.web.http.Request):
+                request:
                 *args: unused?
-                **kwargs (dict[unicode, unicode]): the dict mapping keys to path
-                    components as specified in the path match regexp.
+                **kwargs: the dict mapping keys to path components as specified
+                    in the path match regexp.
 
             Returns:
-                Tuple[int, object]|None: (response code, response object) as returned by
-                    the callback method. None if the request has already been handled.
+                (response code, response object) as returned by the callback method.
+                None if the request has already been handled.
             """
             content = None
             if request.method in [b"PUT", b"POST"]:
@@ -279,7 +290,10 @@ class BaseFederationServlet:
                 content = parse_json_object_from_request(request)
 
             try:
-                origin = await authenticator.authenticate_request(request, content)
+                with start_active_span("authenticate_request"):
+                    origin: Optional[str] = await authenticator.authenticate_request(
+                        request, content
+                    )
             except NoAuthenticationError:
                 origin = None
                 if self.REQUIRE_AUTH:
@@ -291,52 +305,66 @@ class BaseFederationServlet:
                 logger.warning("authenticate_request failed: %s", e)
                 raise
 
-            request_tags = {
-                SynapseTags.REQUEST_ID: request.get_request_id(),
-                tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
-                tags.HTTP_METHOD: request.get_method(),
-                tags.HTTP_URL: request.get_redacted_uri(),
-                tags.PEER_HOST_IPV6: request.getClientIP(),
-                "authenticated_entity": origin,
-                "servlet_name": request.request_metrics.name,
-            }
+            # update the active opentracing span with the authenticated entity
+            set_tag("authenticated_entity", origin)
 
-            # Only accept the span context if the origin is authenticated
-            # and whitelisted
+            # if the origin is authenticated and whitelisted, use its span context
+            # as the parent.
+            context = None
             if origin and whitelisted_homeserver(origin):
-                scope = start_active_span_from_request(
-                    request, "incoming-federation-request", tags=request_tags
+                context = span_context_from_request(request)
+
+            if context:
+                servlet_span = active_span()
+                # a scope which uses the origin's context as a parent
+                processing_start_time = time.time()
+                scope = start_active_span_follows_from(
+                    "incoming-federation-request",
+                    child_of=context,
+                    contexts=(servlet_span,),
+                    start_time=processing_start_time,
                 )
+
             else:
+                # just use our context as a parent
                 scope = start_active_span(
-                    "incoming-federation-request", tags=request_tags
+                    "incoming-federation-request",
                 )
 
-            with scope:
-                opentracing.inject_response_headers(request.responseHeaders)
-
-                if origin and self.RATELIMIT:
-                    with ratelimiter.ratelimit(origin) as d:
-                        await d
-                        if request._disconnected:
-                            logger.warning(
-                                "client disconnected before we started processing "
-                                "request"
+            try:
+                with scope:
+                    if origin and self.RATELIMIT:
+                        with ratelimiter.ratelimit(origin) as d:
+                            await d
+                            if request._disconnected:
+                                logger.warning(
+                                    "client disconnected before we started processing "
+                                    "request"
+                                )
+                                return None
+                            response = await func(
+                                origin, content, request.args, *args, **kwargs
                             )
-                            return -1, None
+                    else:
                         response = await func(
                             origin, content, request.args, *args, **kwargs
                         )
-                else:
-                    response = await func(
-                        origin, content, request.args, *args, **kwargs
+            finally:
+                # if we used the origin's context as the parent, add a new span using
+                # the servlet span as a parent, so that we have a link
+                if context:
+                    scope2 = start_active_span_follows_from(
+                        "process-federation_request",
+                        contexts=(scope.span,),
+                        start_time=processing_start_time,
                     )
+                    scope2.close()
 
             return response
 
-        return new_func
+        return cast(ServletCallback, new_func)
 
-    def register(self, server):
+    def register(self, server: HttpServer) -> None:
         pattern = re.compile("^" + self.PREFIX + self.PATH + "$")
 
         for method in ("GET", "PUT", "POST"):

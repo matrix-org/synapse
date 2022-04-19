@@ -58,7 +58,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@attr.s(slots=True, cmp=False)
+@attr.s(slots=True, frozen=True, cmp=False, auto_attribs=True)
 class VerifyJsonRequest:
     """
     A request to verify a JSON object.
@@ -78,10 +78,10 @@ class VerifyJsonRequest:
         key_ids: The set of key_ids to that could be used to verify the JSON object
     """
 
-    server_name = attr.ib(type=str)
-    get_json_object = attr.ib(type=Callable[[], JsonDict])
-    minimum_valid_until_ts = attr.ib(type=int)
-    key_ids = attr.ib(type=List[str])
+    server_name: str
+    get_json_object: Callable[[], JsonDict]
+    minimum_valid_until_ts: int
+    key_ids: List[str]
 
     @staticmethod
     def from_json_object(
@@ -124,7 +124,7 @@ class KeyLookupError(ValueError):
     pass
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class _FetchKeyRequest:
     """A request for keys for a given server.
 
@@ -138,9 +138,9 @@ class _FetchKeyRequest:
         key_ids: The IDs of the keys to attempt to fetch
     """
 
-    server_name = attr.ib(type=str)
-    minimum_valid_until_ts = attr.ib(type=int)
-    key_ids = attr.ib(type=List[str])
+    server_name: str
+    minimum_valid_until_ts: int
+    key_ids: List[str]
 
 
 class Keyring:
@@ -176,13 +176,13 @@ class Keyring:
         self._local_verify_keys: Dict[str, FetchKeyResult] = {}
         for key_id, key in hs.config.key.old_signing_keys.items():
             self._local_verify_keys[key_id] = FetchKeyResult(
-                verify_key=key, valid_until_ts=key.expired_ts
+                verify_key=key, valid_until_ts=key.expired
             )
 
         vk = get_verify_key(hs.signing_key)
         self._local_verify_keys[f"{vk.alg}:{vk.version}"] = FetchKeyResult(
             verify_key=vk,
-            valid_until_ts=2 ** 63,  # fake future timestamp
+            valid_until_ts=2**63,  # fake future timestamp
         )
 
     async def verify_json_for_server(
@@ -476,7 +476,7 @@ class StoreKeyFetcher(KeyFetcher):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def _fetch_keys(
         self, keys_to_fetch: List[_FetchKeyRequest]
@@ -498,7 +498,7 @@ class BaseV2KeyFetcher(KeyFetcher):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.config = hs.config
 
     async def process_v2_response(
@@ -667,27 +667,35 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             perspective_name,
         )
 
+        request: JsonDict = {}
+        for queue_value in keys_to_fetch:
+            # there may be multiple requests for each server, so we have to merge
+            # them intelligently.
+            request_for_server = {
+                key_id: {
+                    "minimum_valid_until_ts": queue_value.minimum_valid_until_ts,
+                }
+                for key_id in queue_value.key_ids
+            }
+            request.setdefault(queue_value.server_name, {}).update(request_for_server)
+
+        logger.debug("Request to notary server %s: %s", perspective_name, request)
+
         try:
             query_response = await self.client.post_json(
                 destination=perspective_name,
                 path="/_matrix/key/v2/query",
-                data={
-                    "server_keys": {
-                        queue_value.server_name: {
-                            key_id: {
-                                "minimum_valid_until_ts": queue_value.minimum_valid_until_ts,
-                            }
-                            for key_id in queue_value.key_ids
-                        }
-                        for queue_value in keys_to_fetch
-                    }
-                },
+                data={"server_keys": request},
             )
         except (NotRetryingDestination, RequestSendFailed) as e:
             # these both have str() representations which we can't really improve upon
             raise KeyLookupError(str(e))
         except HttpResponseException as e:
             raise KeyLookupError("Remote server returned an error: %s" % (e,))
+
+        logger.debug(
+            "Response from notary server %s: %s", perspective_name, query_response
+        )
 
         keys: Dict[str, Dict[str, FetchKeyResult]] = {}
         added_keys: List[Tuple[str, str, FetchKeyResult]] = []

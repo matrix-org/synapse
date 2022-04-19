@@ -13,8 +13,13 @@
 # limitations under the License.
 
 import logging
+from typing import Mapping, Optional
 
-from synapse.storage.engines._base import BaseDatabaseEngine, IncorrectDatabaseSetup
+from synapse.storage.engines._base import (
+    BaseDatabaseEngine,
+    IncorrectDatabaseSetup,
+    IsolationLevel,
+)
 from synapse.storage.types import Connection
 
 logger = logging.getLogger(__name__)
@@ -34,9 +39,26 @@ class PostgresEngine(BaseDatabaseEngine):
         self.synchronous_commit = database_config.get("synchronous_commit", True)
         self._version = None  # unknown as yet
 
+        self.isolation_level_map: Mapping[int, int] = {
+            IsolationLevel.READ_COMMITTED: self.module.extensions.ISOLATION_LEVEL_READ_COMMITTED,
+            IsolationLevel.REPEATABLE_READ: self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ,
+            IsolationLevel.SERIALIZABLE: self.module.extensions.ISOLATION_LEVEL_SERIALIZABLE,
+        }
+        self.default_isolation_level = (
+            self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
+        )
+        self.config = database_config
+
     @property
     def single_threaded(self) -> bool:
         return False
+
+    def get_db_locale(self, txn):
+        txn.execute(
+            "SELECT datcollate, datctype FROM pg_database WHERE datname = current_database()"
+        )
+        collation, ctype = txn.fetchone()
+        return collation, ctype
 
     def check_database(self, db_conn, allow_outdated_version: bool = False):
         # Get the version of PostgreSQL that we're using. As per the psycopg2
@@ -44,10 +66,11 @@ class PostgresEngine(BaseDatabaseEngine):
         # revision numbers into two-decimal-digit numbers and appending them
         # together. For example, version 8.1.5 will be returned as 80105
         self._version = db_conn.server_version
+        allow_unsafe_locale = self.config.get("allow_unsafe_locale", False)
 
         # Are we on a supported PostgreSQL version?
-        if not allow_outdated_version and self._version < 90600:
-            raise RuntimeError("Synapse requires PostgreSQL 9.6 or above.")
+        if not allow_outdated_version and self._version < 100000:
+            raise RuntimeError("Synapse requires PostgreSQL 10 or above.")
 
         with db_conn.cursor() as txn:
             txn.execute("SHOW SERVER_ENCODING")
@@ -58,33 +81,39 @@ class PostgresEngine(BaseDatabaseEngine):
                     "See docs/postgres.md for more information." % (rows[0][0],)
                 )
 
-            txn.execute(
-                "SELECT datcollate, datctype FROM pg_database WHERE datname = current_database()"
-            )
-            collation, ctype = txn.fetchone()
+            collation, ctype = self.get_db_locale(txn)
             if collation != "C":
                 logger.warning(
-                    "Database has incorrect collation of %r. Should be 'C'\n"
-                    "See docs/postgres.md for more information.",
+                    "Database has incorrect collation of %r. Should be 'C'",
                     collation,
                 )
+                if not allow_unsafe_locale:
+                    raise IncorrectDatabaseSetup(
+                        "Database has incorrect collation of %r. Should be 'C'\n"
+                        "See docs/postgres.md for more information. You can override this check by"
+                        "setting 'allow_unsafe_locale' to true in the database config.",
+                        collation,
+                    )
 
             if ctype != "C":
-                logger.warning(
-                    "Database has incorrect ctype of %r. Should be 'C'\n"
-                    "See docs/postgres.md for more information.",
-                    ctype,
-                )
+                if not allow_unsafe_locale:
+                    logger.warning(
+                        "Database has incorrect ctype of %r. Should be 'C'",
+                        ctype,
+                    )
+                    raise IncorrectDatabaseSetup(
+                        "Database has incorrect ctype of %r. Should be 'C'\n"
+                        "See docs/postgres.md for more information. You can override this check by"
+                        "setting 'allow_unsafe_locale' to true in the database config.",
+                        ctype,
+                    )
 
     def check_new_database(self, txn):
         """Gets called when setting up a brand new database. This allows us to
         apply stricter checks on new databases versus existing database.
         """
 
-        txn.execute(
-            "SELECT datcollate, datctype FROM pg_database WHERE datname = current_database()"
-        )
-        collation, ctype = txn.fetchone()
+        collation, ctype = self.get_db_locale(txn)
 
         errors = []
 
@@ -104,9 +133,7 @@ class PostgresEngine(BaseDatabaseEngine):
         return sql.replace("?", "%s")
 
     def on_new_connection(self, db_conn):
-        db_conn.set_isolation_level(
-            self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
-        )
+        db_conn.set_isolation_level(self.default_isolation_level)
 
         # Set the bytea output to escape, vs the default of hex
         cursor = db_conn.cursor()
@@ -175,3 +202,12 @@ class PostgresEngine(BaseDatabaseEngine):
 
     def attempt_to_set_autocommit(self, conn: Connection, autocommit: bool):
         return conn.set_session(autocommit=autocommit)  # type: ignore
+
+    def attempt_to_set_isolation_level(
+        self, conn: Connection, isolation_level: Optional[int]
+    ):
+        if isolation_level is None:
+            isolation_level = self.default_isolation_level
+        else:
+            isolation_level = self.isolation_level_map[isolation_level]
+        return conn.set_isolation_level(isolation_level)  # type: ignore

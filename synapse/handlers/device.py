@@ -37,7 +37,10 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.logging.opentracing import log_kv, set_tag, trace
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import (
+    run_as_background_process,
+    wrap_as_background_process,
+)
 from synapse.types import (
     JsonDict,
     StreamToken,
@@ -63,7 +66,7 @@ class DeviceWorkerHandler:
     def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
         self.state_store = hs.get_storage().state
@@ -106,10 +109,10 @@ class DeviceWorkerHandler:
         Raises:
             errors.NotFoundError: if the device was not found
         """
-        try:
-            device = await self.store.get_device(user_id, device_id)
-        except errors.StoreError:
-            raise errors.NotFoundError
+        device = await self.store.get_device(user_id, device_id)
+        if device is None:
+            raise errors.NotFoundError()
+
         ips = await self.store.get_last_client_ip_by_device(user_id, device_id)
         _update_device_from_client_ips(device, ips)
 
@@ -278,6 +281,16 @@ class DeviceHandler(DeviceWorkerHandler):
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
 
+        # Whether `_handle_new_device_update_async` is currently processing.
+        self._handle_new_device_update_is_processing = False
+
+        # If a new device update may have happened while the loop was
+        # processing.
+        self._handle_new_device_update_new_data = False
+
+        # On start up check if there are any updates pending.
+        hs.get_reactor().callWhenRunning(self._handle_new_device_update_async)
+
     def _check_device_name_length(self, name: Optional[str]) -> None:
         """
         Checks whether a device name is longer than the maximum allowed length.
@@ -301,6 +314,8 @@ class DeviceHandler(DeviceWorkerHandler):
         user_id: str,
         device_id: Optional[str],
         initial_device_display_name: Optional[str] = None,
+        auth_provider_id: Optional[str] = None,
+        auth_provider_session_id: Optional[str] = None,
     ) -> str:
         """
         If the given device has not been registered, register it with the
@@ -312,6 +327,8 @@ class DeviceHandler(DeviceWorkerHandler):
             user_id:  @user:id
             device_id: device id supplied by client
             initial_device_display_name: device display name from client
+            auth_provider_id: The SSO IdP the user used, if any.
+            auth_provider_session_id: The session ID (sid) got from the SSO IdP.
         Returns:
             device id (generated if none was supplied)
         """
@@ -323,6 +340,8 @@ class DeviceHandler(DeviceWorkerHandler):
                 user_id=user_id,
                 device_id=device_id,
                 initial_device_display_name=initial_device_display_name,
+                auth_provider_id=auth_provider_id,
+                auth_provider_session_id=auth_provider_session_id,
             )
             if new_device:
                 await self.notify_device_update(user_id, [device_id])
@@ -337,6 +356,8 @@ class DeviceHandler(DeviceWorkerHandler):
                 user_id=user_id,
                 device_id=new_device_id,
                 initial_device_display_name=initial_device_display_name,
+                auth_provider_id=auth_provider_id,
+                auth_provider_session_id=auth_provider_session_id,
             )
             if new_device:
                 await self.notify_device_update(user_id, [new_device_id])
@@ -363,7 +384,6 @@ class DeviceHandler(DeviceWorkerHandler):
                 log_kv(
                     {"reason": "User doesn't have device id.", "device_id": device_id}
                 )
-                pass
             else:
                 raise
 
@@ -406,7 +426,6 @@ class DeviceHandler(DeviceWorkerHandler):
                 # no match
                 set_tag("error", True)
                 set_tag("reason", "User doesn't have that device id.")
-                pass
             else:
                 raise
 
@@ -463,19 +482,12 @@ class DeviceHandler(DeviceWorkerHandler):
             # No changes to notify about, so this is a no-op.
             return
 
-        users_who_share_room = await self.store.get_users_who_share_room_with_user(
-            user_id
-        )
-
-        hosts: Set[str] = set()
-        if self.hs.is_mine_id(user_id):
-            hosts.update(get_domain_from_id(u) for u in users_who_share_room)
-            hosts.discard(self.server_name)
-
-        set_tag("target_hosts", hosts)
+        room_ids = await self.store.get_rooms_for_user(user_id)
 
         position = await self.store.add_device_change_to_streams(
-            user_id, device_ids, list(hosts)
+            user_id,
+            device_ids,
+            room_ids=room_ids,
         )
 
         if not position:
@@ -487,21 +499,14 @@ class DeviceHandler(DeviceWorkerHandler):
                 "Notifying about update %r/%r, ID: %r", user_id, device_id, position
             )
 
-        room_ids = await self.store.get_rooms_for_user(user_id)
-
         # specify the user ID too since the user should always get their own device list
         # updates, even if they aren't in any rooms.
         self.notifier.on_new_event(
-            "device_list_key", position, users=[user_id], rooms=room_ids
+            "device_list_key", position, users={user_id}, rooms=room_ids
         )
 
-        if hosts:
-            logger.info(
-                "Sending device list update notif for %r to: %r", user_id, hosts
-            )
-            for host in hosts:
-                self.federation_sender.send_device_messages(host)
-                log_kv({"message": "sent device update to host", "host": host})
+        # We may need to do some processing asynchronously.
+        self._handle_new_device_update_async()
 
     async def notify_user_signature_update(
         self, from_user_id: str, user_ids: List[str]
@@ -594,6 +599,8 @@ class DeviceHandler(DeviceWorkerHandler):
             access_token, device_id
         )
         old_device = await self.store.get_device(user_id, old_device_id)
+        if old_device is None:
+            raise errors.NotFoundError()
         await self.store.update_device(user_id, device_id, old_device["display_name"])
         # can't call self.delete_device because that will clobber the
         # access token so call the storage layer directly
@@ -608,6 +615,89 @@ class DeviceHandler(DeviceWorkerHandler):
 
         return {"success": True}
 
+    @wrap_as_background_process("_handle_new_device_update_async")
+    async def _handle_new_device_update_async(self) -> None:
+        """Called when we have a new local device list update that we need to
+        send out over federation.
+
+        This happens in the background so as not to block the original request
+        that generated the device update.
+        """
+        if self._handle_new_device_update_is_processing:
+            self._handle_new_device_update_new_data = True
+            return
+
+        self._handle_new_device_update_is_processing = True
+
+        # The stream ID we processed previous iteration (if any), and the set of
+        # hosts we've already poked about for this update. This is so that we
+        # don't poke the same remote server about the same update repeatedly.
+        current_stream_id = None
+        hosts_already_sent_to: Set[str] = set()
+
+        try:
+            while True:
+                self._handle_new_device_update_new_data = False
+                rows = await self.store.get_uncoverted_outbound_room_pokes()
+                if not rows:
+                    # If the DB returned nothing then there is nothing left to
+                    # do, *unless* a new device list update happened during the
+                    # DB query.
+                    if self._handle_new_device_update_new_data:
+                        continue
+                    else:
+                        return
+
+                for user_id, device_id, room_id, stream_id, opentracing_context in rows:
+                    hosts = set()
+
+                    # Ignore any users that aren't ours
+                    if self.hs.is_mine_id(user_id):
+                        joined_user_ids = await self.store.get_users_in_room(room_id)
+                        hosts = {get_domain_from_id(u) for u in joined_user_ids}
+                        hosts.discard(self.server_name)
+
+                    # Check if we've already sent this update to some hosts
+                    if current_stream_id == stream_id:
+                        hosts -= hosts_already_sent_to
+
+                    await self.store.add_device_list_outbound_pokes(
+                        user_id=user_id,
+                        device_id=device_id,
+                        room_id=room_id,
+                        stream_id=stream_id,
+                        hosts=hosts,
+                        context=opentracing_context,
+                    )
+
+                    # Notify replication that we've updated the device list stream.
+                    self.notifier.notify_replication()
+
+                    if hosts:
+                        logger.info(
+                            "Sending device list update notif for %r to: %r",
+                            user_id,
+                            hosts,
+                        )
+                        for host in hosts:
+                            self.federation_sender.send_device_messages(
+                                host, immediate=False
+                            )
+                            log_kv(
+                                {"message": "sent device update to host", "host": host}
+                            )
+
+                    if current_stream_id != stream_id:
+                        # Clear the set of hosts we've already sent to as we're
+                        # processing a new update.
+                        hosts_already_sent_to.clear()
+
+                    hosts_already_sent_to.update(hosts)
+                    current_stream_id = stream_id
+
+        finally:
+            self._handle_new_device_update_is_processing = False
+
 
 def _update_device_from_client_ips(
     device: JsonDict, client_ips: Mapping[Tuple[str, str], Mapping[str, Any]]
@@ -620,7 +710,7 @@ class DeviceListUpdater:
     "Handles incoming device list updates from federation and updates the DB"
 
     def __init__(self, hs: "HomeServer", device_handler: DeviceHandler):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.federation = hs.get_federation_client()
         self.clock = hs.get_clock()
         self.device_handler = device_handler
@@ -719,7 +809,7 @@ class DeviceListUpdater:
     async def _handle_device_updates(self, user_id: str) -> None:
         "Actually handle pending updates."
 
-        with (await self._remote_edu_linearizer.queue(user_id)):
+        async with self._remote_edu_linearizer.queue(user_id):
             pending_updates = self._pending_updates.pop(user_id, [])
             if not pending_updates:
                 # This can happen since we batch updates
@@ -938,8 +1028,16 @@ class DeviceListUpdater:
             devices = []
             ignore_devices = True
         else:
+            prev_stream_id = await self.store.get_device_list_last_stream_id_for_remote(
+                user_id
+            )
             cached_devices = await self.store.get_cached_devices_for_user(user_id)
-            if cached_devices == {d["device_id"]: d for d in devices}:
+
+            # To ensure that a user with no devices is cached, we skip the resync only
+            # if we have a stream_id from previously writing a cache entry.
+            if prev_stream_id is not None and cached_devices == {
+                d["device_id"]: d for d in devices
+            }:
                 logging.info(
                     "Skipping device list resync for %s, as our cache matches already",
                     user_id,

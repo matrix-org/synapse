@@ -12,20 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import inspect
+import os
 from typing import Iterable
 
-from synapse.rest.media.v1.filepath import MediaFilePaths
+from synapse.rest.media.v1.filepath import MediaFilePaths, _wrap_with_jail_check
 
 from tests import unittest
 
 
 class MediaFilePathsTestCase(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
 
         self.filepaths = MediaFilePaths("/media_store")
 
-    def test_local_media_filepath(self):
+    def test_local_media_filepath(self) -> None:
         """Test local media paths"""
         self.assertEqual(
             self.filepaths.local_media_filepath_rel("GerZNDnDZVjsOtardLuwfIBg"),
@@ -36,7 +37,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/local_content/Ge/rZ/NDnDZVjsOtardLuwfIBg",
         )
 
-    def test_local_media_thumbnail(self):
+    def test_local_media_thumbnail(self) -> None:
         """Test local media thumbnail paths"""
         self.assertEqual(
             self.filepaths.local_media_thumbnail_rel(
@@ -51,14 +52,14 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/local_thumbnails/Ge/rZ/NDnDZVjsOtardLuwfIBg/800-600-image-jpeg-scale",
         )
 
-    def test_local_media_thumbnail_dir(self):
+    def test_local_media_thumbnail_dir(self) -> None:
         """Test local media thumbnail directory paths"""
         self.assertEqual(
             self.filepaths.local_media_thumbnail_dir("GerZNDnDZVjsOtardLuwfIBg"),
             "/media_store/local_thumbnails/Ge/rZ/NDnDZVjsOtardLuwfIBg",
         )
 
-    def test_remote_media_filepath(self):
+    def test_remote_media_filepath(self) -> None:
         """Test remote media paths"""
         self.assertEqual(
             self.filepaths.remote_media_filepath_rel(
@@ -73,7 +74,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/remote_content/example.com/Ge/rZ/NDnDZVjsOtardLuwfIBg",
         )
 
-    def test_remote_media_thumbnail(self):
+    def test_remote_media_thumbnail(self) -> None:
         """Test remote media thumbnail paths"""
         self.assertEqual(
             self.filepaths.remote_media_thumbnail_rel(
@@ -98,7 +99,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/remote_thumbnail/example.com/Ge/rZ/NDnDZVjsOtardLuwfIBg/800-600-image-jpeg-scale",
         )
 
-    def test_remote_media_thumbnail_legacy(self):
+    def test_remote_media_thumbnail_legacy(self) -> None:
         """Test old-style remote media thumbnail paths"""
         self.assertEqual(
             self.filepaths.remote_media_thumbnail_rel_legacy(
@@ -107,7 +108,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "remote_thumbnail/example.com/Ge/rZ/NDnDZVjsOtardLuwfIBg/800-600-image-jpeg",
         )
 
-    def test_remote_media_thumbnail_dir(self):
+    def test_remote_media_thumbnail_dir(self) -> None:
         """Test remote media thumbnail directory paths"""
         self.assertEqual(
             self.filepaths.remote_media_thumbnail_dir(
@@ -116,7 +117,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/remote_thumbnail/example.com/Ge/rZ/NDnDZVjsOtardLuwfIBg",
         )
 
-    def test_url_cache_filepath(self):
+    def test_url_cache_filepath(self) -> None:
         """Test URL cache paths"""
         self.assertEqual(
             self.filepaths.url_cache_filepath_rel("2020-01-02_GerZNDnDZVjsOtar"),
@@ -127,7 +128,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/url_cache/2020-01-02/GerZNDnDZVjsOtar",
         )
 
-    def test_url_cache_filepath_legacy(self):
+    def test_url_cache_filepath_legacy(self) -> None:
         """Test old-style URL cache paths"""
         self.assertEqual(
             self.filepaths.url_cache_filepath_rel("GerZNDnDZVjsOtardLuwfIBg"),
@@ -138,7 +139,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/url_cache/Ge/rZ/NDnDZVjsOtardLuwfIBg",
         )
 
-    def test_url_cache_filepath_dirs_to_delete(self):
+    def test_url_cache_filepath_dirs_to_delete(self) -> None:
         """Test URL cache cleanup paths"""
         self.assertEqual(
             self.filepaths.url_cache_filepath_dirs_to_delete(
@@ -147,7 +148,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             ["/media_store/url_cache/2020-01-02"],
         )
 
-    def test_url_cache_filepath_dirs_to_delete_legacy(self):
+    def test_url_cache_filepath_dirs_to_delete_legacy(self) -> None:
         """Test old-style URL cache cleanup paths"""
         self.assertEqual(
             self.filepaths.url_cache_filepath_dirs_to_delete(
@@ -159,7 +160,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             ],
         )
 
-    def test_url_cache_thumbnail(self):
+    def test_url_cache_thumbnail(self) -> None:
         """Test URL cache thumbnail paths"""
         self.assertEqual(
             self.filepaths.url_cache_thumbnail_rel(
@@ -174,7 +175,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/url_cache_thumbnails/2020-01-02/GerZNDnDZVjsOtar/800-600-image-jpeg-scale",
         )
 
-    def test_url_cache_thumbnail_legacy(self):
+    def test_url_cache_thumbnail_legacy(self) -> None:
         """Test old-style URL cache thumbnail paths"""
         self.assertEqual(
             self.filepaths.url_cache_thumbnail_rel(
@@ -189,7 +190,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/url_cache_thumbnails/Ge/rZ/NDnDZVjsOtardLuwfIBg/800-600-image-jpeg-scale",
         )
 
-    def test_url_cache_thumbnail_directory(self):
+    def test_url_cache_thumbnail_directory(self) -> None:
         """Test URL cache thumbnail directory paths"""
         self.assertEqual(
             self.filepaths.url_cache_thumbnail_directory_rel(
@@ -202,7 +203,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/url_cache_thumbnails/2020-01-02/GerZNDnDZVjsOtar",
         )
 
-    def test_url_cache_thumbnail_directory_legacy(self):
+    def test_url_cache_thumbnail_directory_legacy(self) -> None:
         """Test old-style URL cache thumbnail directory paths"""
         self.assertEqual(
             self.filepaths.url_cache_thumbnail_directory_rel(
@@ -215,7 +216,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             "/media_store/url_cache_thumbnails/Ge/rZ/NDnDZVjsOtardLuwfIBg",
         )
 
-    def test_url_cache_thumbnail_dirs_to_delete(self):
+    def test_url_cache_thumbnail_dirs_to_delete(self) -> None:
         """Test URL cache thumbnail cleanup paths"""
         self.assertEqual(
             self.filepaths.url_cache_thumbnail_dirs_to_delete(
@@ -227,7 +228,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             ],
         )
 
-    def test_url_cache_thumbnail_dirs_to_delete_legacy(self):
+    def test_url_cache_thumbnail_dirs_to_delete_legacy(self) -> None:
         """Test old-style URL cache thumbnail cleanup paths"""
         self.assertEqual(
             self.filepaths.url_cache_thumbnail_dirs_to_delete(
@@ -240,7 +241,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             ],
         )
 
-    def test_server_name_validation(self):
+    def test_server_name_validation(self) -> None:
         """Test validation of server names"""
         self._test_path_validation(
             [
@@ -273,7 +274,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             ],
         )
 
-    def test_file_id_validation(self):
+    def test_file_id_validation(self) -> None:
         """Test validation of local, remote and legacy URL cache file / media IDs"""
         # File / media IDs get split into three parts to form paths, consisting of the
         # first two characters, next two characters and rest of the ID.
@@ -356,7 +357,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             invalid_values=invalid_file_ids,
         )
 
-    def test_url_cache_media_id_validation(self):
+    def test_url_cache_media_id_validation(self) -> None:
         """Test validation of URL cache media IDs"""
         self._test_path_validation(
             [
@@ -386,7 +387,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             ],
         )
 
-    def test_content_type_validation(self):
+    def test_content_type_validation(self) -> None:
         """Test validation of thumbnail content types"""
         self._test_path_validation(
             [
@@ -409,7 +410,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
             ],
         )
 
-    def test_thumbnail_method_validation(self):
+    def test_thumbnail_method_validation(self) -> None:
         """Test validation of thumbnail methods"""
         self._test_path_validation(
             [
@@ -439,7 +440,7 @@ class MediaFilePathsTestCase(unittest.TestCase):
         parameter: str,
         valid_values: Iterable[str],
         invalid_values: Iterable[str],
-    ):
+    ) -> None:
         """Test that the specified methods validate the named parameter as expected
 
         Args:
@@ -486,3 +487,109 @@ class MediaFilePathsTestCase(unittest.TestCase):
                         f"{value!r} unexpectedly passed validation: "
                         f"{method} returned {path_or_list!r}"
                     )
+
+
+class MediaFilePathsJailTestCase(unittest.TestCase):
+    def _check_relative_path(self, filepaths: MediaFilePaths, path: str) -> None:
+        """Passes a relative path through the jail check.
+
+        Args:
+            filepaths: The `MediaFilePaths` instance.
+            path: A path relative to the media store directory.
+
+        Raises:
+            ValueError: If the jail check fails.
+        """
+
+        @_wrap_with_jail_check(relative=True)
+        def _make_relative_path(self: MediaFilePaths, path: str) -> str:
+            return path
+
+        _make_relative_path(filepaths, path)
+
+    def _check_absolute_path(self, filepaths: MediaFilePaths, path: str) -> None:
+        """Passes an absolute path through the jail check.
+
+        Args:
+            filepaths: The `MediaFilePaths` instance.
+            path: A path relative to the media store directory.
+
+        Raises:
+            ValueError: If the jail check fails.
+        """
+
+        @_wrap_with_jail_check(relative=False)
+        def _make_absolute_path(self: MediaFilePaths, path: str) -> str:
+            return os.path.join(self.base_path, path)
+
+        _make_absolute_path(filepaths, path)
+
+    def test_traversal_inside(self) -> None:
+        """Test the jail check for paths that stay within the media directory."""
+        # Despite the `../`s, these paths still lie within the media directory and it's
+        # expected for the jail check to allow them through.
+        # These paths ought to trip the other checks in place and should never be
+        # returned.
+        filepaths = MediaFilePaths("/media_store")
+        path = "url_cache/2020-01-02/../../GerZNDnDZVjsOtar"
+        self._check_relative_path(filepaths, path)
+        self._check_absolute_path(filepaths, path)
+
+    def test_traversal_outside(self) -> None:
+        """Test that the jail check fails for paths that escape the media directory."""
+        filepaths = MediaFilePaths("/media_store")
+        path = "url_cache/2020-01-02/../../../GerZNDnDZVjsOtar"
+        with self.assertRaises(ValueError):
+            self._check_relative_path(filepaths, path)
+        with self.assertRaises(ValueError):
+            self._check_absolute_path(filepaths, path)
+
+    def test_traversal_reentry(self) -> None:
+        """Test the jail check for paths that exit and re-enter the media directory."""
+        # These paths lie outside the media directory if it is a symlink, and inside
+        # otherwise. Ideally the check should fail, but this proves difficult.
+        # This test documents the behaviour for this edge case.
+        # These paths ought to trip the other checks in place and should never be
+        # returned.
+        filepaths = MediaFilePaths("/media_store")
+        path = "url_cache/2020-01-02/../../../media_store/GerZNDnDZVjsOtar"
+        self._check_relative_path(filepaths, path)
+        self._check_absolute_path(filepaths, path)
+
+    def test_symlink(self) -> None:
+        """Test that a symlink does not cause the jail check to fail."""
+        media_store_path = self.mktemp()
+
+        # symlink the media store directory
+        os.symlink("/mnt/synapse/media_store", media_store_path)
+
+        # Test that relative and absolute paths don't trip the check
+        # NB: `media_store_path` is a relative path
+        filepaths = MediaFilePaths(media_store_path)
+        self._check_relative_path(filepaths, "url_cache/2020-01-02/GerZNDnDZVjsOtar")
+        self._check_absolute_path(filepaths, "url_cache/2020-01-02/GerZNDnDZVjsOtar")
+
+        filepaths = MediaFilePaths(os.path.abspath(media_store_path))
+        self._check_relative_path(filepaths, "url_cache/2020-01-02/GerZNDnDZVjsOtar")
+        self._check_absolute_path(filepaths, "url_cache/2020-01-02/GerZNDnDZVjsOtar")
+
+    def test_symlink_subdirectory(self) -> None:
+        """Test that a symlinked subdirectory does not cause the jail check to fail."""
+        media_store_path = self.mktemp()
+        os.mkdir(media_store_path)
+
+        # symlink `url_cache/`
+        os.symlink(
+            "/mnt/synapse/media_store_url_cache",
+            os.path.join(media_store_path, "url_cache"),
+        )
+
+        # Test that relative and absolute paths don't trip the check
+        # NB: `media_store_path` is a relative path
+        filepaths = MediaFilePaths(media_store_path)
+        self._check_relative_path(filepaths, "url_cache/2020-01-02/GerZNDnDZVjsOtar")
+        self._check_absolute_path(filepaths, "url_cache/2020-01-02/GerZNDnDZVjsOtar")
+
+        filepaths = MediaFilePaths(os.path.abspath(media_store_path))
+        self._check_relative_path(filepaths, "url_cache/2020-01-02/GerZNDnDZVjsOtar")
+        self._check_absolute_path(filepaths, "url_cache/2020-01-02/GerZNDnDZVjsOtar")

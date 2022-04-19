@@ -14,7 +14,7 @@
 # limitations under the License.
 import heapq
 import logging
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -45,7 +45,6 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, StateResolutionVersio
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.logging.context import ContextResourceUsage
-from synapse.logging.utils import log_function
 from synapse.state import v1, v2
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.roommember import ProfileInfo
@@ -67,9 +66,6 @@ state_groups_histogram = Histogram(
     "Number of state groups used when performing a state resolution",
     buckets=(1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf"),
 )
-
-
-KeyStateTuple = namedtuple("KeyStateTuple", ("context", "type", "state_key"))
 
 
 EVICTION_TIMEOUT_SECONDS = 60 * 60
@@ -130,7 +126,7 @@ class StateHandler:
 
     def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state_store = hs.get_storage().state
         self.hs = hs
         self._state_resolution_handler = hs.get_state_resolution_handler()
@@ -198,7 +194,7 @@ class StateHandler:
         }
 
     async def get_current_state_ids(
-        self, room_id: str, latest_event_ids: Optional[Iterable[str]] = None
+        self, room_id: str, latest_event_ids: Optional[Collection[str]] = None
     ) -> StateMap[str]:
         """Get the current state, or the state at a set of events, for a room
 
@@ -247,7 +243,7 @@ class StateHandler:
         return await self.get_hosts_in_room_at_events(room_id, event_ids)
 
     async def get_hosts_in_room_at_events(
-        self, room_id: str, event_ids: Iterable[str]
+        self, room_id: str, event_ids: Collection[str]
     ) -> Set[str]:
         """Get the hosts that were in a room at the given event ids
 
@@ -262,7 +258,10 @@ class StateHandler:
         return await self.store.get_joined_hosts(room_id, entry)
 
     async def compute_event_context(
-        self, event: EventBase, old_state: Optional[Iterable[EventBase]] = None
+        self,
+        event: EventBase,
+        old_state: Optional[Iterable[EventBase]] = None,
+        partial_state: bool = False,
     ) -> EventContext:
         """Build an EventContext structure for a non-outlier event.
 
@@ -277,6 +276,8 @@ class StateHandler:
                 calculated from existing events. This is normally only specified
                 when receiving an event from federation where we don't have the
                 prev events for, e.g. when backfilling.
+            partial_state: True if `old_state` is partial and omits non-critical
+                membership events
         Returns:
             The event context.
         """
@@ -299,8 +300,28 @@ class StateHandler:
 
         else:
             # otherwise, we'll need to resolve the state across the prev_events.
-            logger.debug("calling resolve_state_groups from compute_event_context")
 
+            # partial_state should not be set explicitly in this case:
+            # we work it out dynamically
+            assert not partial_state
+
+            # if any of the prev-events have partial state, so do we.
+            # (This is slightly racy - the prev-events might get fixed up before we use
+            # their states - but I don't think that really matters; it just means we
+            # might redundantly recalculate the state for this event later.)
+            prev_event_ids = event.prev_event_ids()
+            incomplete_prev_events = await self.store.get_partial_state_events(
+                prev_event_ids
+            )
+            if any(incomplete_prev_events.values()):
+                logger.debug(
+                    "New/incoming event %s refers to prev_events %s with partial state",
+                    event.event_id,
+                    [k for (k, v) in incomplete_prev_events.items() if v],
+                )
+                partial_state = True
+
+            logger.debug("calling resolve_state_groups from compute_event_context")
             entry = await self.resolve_state_groups_for_events(
                 event.room_id, event.prev_event_ids()
             )
@@ -346,6 +367,7 @@ class StateHandler:
                 prev_state_ids=state_ids_before_event,
                 prev_group=state_group_before_event_prev_group,
                 delta_ids=deltas_to_state_group_before_event,
+                partial_state=partial_state,
             )
 
         #
@@ -377,11 +399,12 @@ class StateHandler:
             prev_state_ids=state_ids_before_event,
             prev_group=state_group_before_event,
             delta_ids=delta_ids,
+            partial_state=partial_state,
         )
 
     @measure_func()
     async def resolve_state_groups_for_events(
-        self, room_id: str, event_ids: Iterable[str]
+        self, room_id: str, event_ids: Collection[str]
     ) -> _StateCacheEntry:
         """Given a list of event_ids this method fetches the state at each
         event, resolves conflicts between them and returns them.
@@ -453,19 +476,19 @@ class StateHandler:
         return {key: state_map[ev_id] for key, ev_id in new_state.items()}
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class _StateResMetrics:
     """Keeps track of some usage metrics about state res."""
 
     # System and User CPU time, in seconds
-    cpu_time = attr.ib(type=float, default=0.0)
+    cpu_time: float = 0.0
 
     # time spent on database transactions (excluding scheduling time). This roughly
     # corresponds to the amount of work done on the db server, excluding event fetches.
-    db_time = attr.ib(type=float, default=0.0)
+    db_time: float = 0.0
 
     # number of events fetched from the db.
-    db_events = attr.ib(type=int, default=0)
+    db_events: int = 0
 
 
 _biggest_room_by_cpu_counter = Counter(
@@ -515,7 +538,6 @@ class StateResolutionHandler:
 
         self.clock.looping_call(self._report_metrics, 120 * 1000)
 
-    @log_function
     async def resolve_state_groups(
         self,
         room_id: str,
@@ -551,7 +573,7 @@ class StateResolutionHandler:
         """
         group_names = frozenset(state_groups_ids.keys())
 
-        with (await self.resolve_linearizer.queue(group_names)):
+        async with self.resolve_linearizer.queue(group_names):
             cache = self._state_cache.get(group_names, None)
             if cache:
                 return cache

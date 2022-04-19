@@ -1,4 +1,5 @@
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,17 +12,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import argparse
+from typing import Any, Optional
 
 from synapse.api.constants import RoomCreationPreset
 from synapse.config._base import Config, ConfigError
-from synapse.types import RoomAlias, UserID
+from synapse.types import JsonDict, RoomAlias, UserID
 from synapse.util.stringutils import random_string_with_symbols, strtobool
 
 
 class RegistrationConfig(Config):
     section = "registration"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.enable_registration = strtobool(
             str(config.get("enable_registration", False))
         )
@@ -29,6 +32,10 @@ class RegistrationConfig(Config):
             self.enable_registration = not strtobool(
                 str(config["disable_registration"])
             )
+
+        self.enable_registration_without_verification = strtobool(
+            str(config.get("enable_registration_without_verification", False))
+        )
 
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
@@ -123,12 +130,63 @@ class RegistrationConfig(Config):
             refreshable_access_token_lifetime = self.parse_duration(
                 refreshable_access_token_lifetime
             )
-        self.refreshable_access_token_lifetime = refreshable_access_token_lifetime
+        self.refreshable_access_token_lifetime: Optional[
+            int
+        ] = refreshable_access_token_lifetime
+
+        if (
+            self.session_lifetime is not None
+            and "refreshable_access_token_lifetime" in config
+        ):
+            if self.session_lifetime < self.refreshable_access_token_lifetime:
+                raise ConfigError(
+                    "Both `session_lifetime` and `refreshable_access_token_lifetime` "
+                    "configuration options have been set, but `refreshable_access_token_lifetime` "
+                    " exceeds `session_lifetime`!"
+                )
+
+        # The `nonrefreshable_access_token_lifetime` applies for tokens that can NOT be
+        # refreshed using a refresh token.
+        # If it is None, then these tokens last for the entire length of the session,
+        # which is infinite by default.
+        # The intention behind this configuration option is to help with requiring
+        # all clients to use refresh tokens, if the homeserver administrator requires.
+        nonrefreshable_access_token_lifetime = config.get(
+            "nonrefreshable_access_token_lifetime",
+            None,
+        )
+        if nonrefreshable_access_token_lifetime is not None:
+            nonrefreshable_access_token_lifetime = self.parse_duration(
+                nonrefreshable_access_token_lifetime
+            )
+        self.nonrefreshable_access_token_lifetime = nonrefreshable_access_token_lifetime
+
+        if (
+            self.session_lifetime is not None
+            and self.nonrefreshable_access_token_lifetime is not None
+        ):
+            if self.session_lifetime < self.nonrefreshable_access_token_lifetime:
+                raise ConfigError(
+                    "Both `session_lifetime` and `nonrefreshable_access_token_lifetime` "
+                    "configuration options have been set, but `nonrefreshable_access_token_lifetime` "
+                    " exceeds `session_lifetime`!"
+                )
 
         refresh_token_lifetime = config.get("refresh_token_lifetime")
         if refresh_token_lifetime is not None:
             refresh_token_lifetime = self.parse_duration(refresh_token_lifetime)
-        self.refresh_token_lifetime = refresh_token_lifetime
+        self.refresh_token_lifetime: Optional[int] = refresh_token_lifetime
+
+        if (
+            self.session_lifetime is not None
+            and self.refresh_token_lifetime is not None
+        ):
+            if self.session_lifetime < self.refresh_token_lifetime:
+                raise ConfigError(
+                    "Both `session_lifetime` and `refresh_token_lifetime` "
+                    "configuration options have been set, but `refresh_token_lifetime` "
+                    " exceeds `session_lifetime`!"
+                )
 
         # The fallback template used for authenticating using a registration token
         self.registration_token_template = self.read_template("registration_token.html")
@@ -136,7 +194,11 @@ class RegistrationConfig(Config):
         # The success template used during fallback auth.
         self.fallback_success_template = self.read_template("auth_success.html")
 
-    def generate_config_section(self, generate_secrets=False, **kwargs):
+        self.inhibit_user_in_use_error = config.get("inhibit_user_in_use_error", False)
+
+    def generate_config_section(
+        self, generate_secrets: bool = False, **kwargs: Any
+    ) -> str:
         if generate_secrets:
             registration_shared_secret = 'registration_shared_secret: "%s"' % (
                 random_string_with_symbols(50),
@@ -151,9 +213,17 @@ class RegistrationConfig(Config):
         # Registration can be rate-limited using the parameters in the "Ratelimiting"
         # section of this file.
 
-        # Enable registration for new users.
+        # Enable registration for new users. Defaults to 'false'. It is highly recommended that if you enable registration,
+        # you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration
+        # without any verification, you must also set `enable_registration_without_verification`, found below.
         #
         #enable_registration: false
+
+        # Enable registration without email or captcha verification. Note: this option is *not* recommended,
+        # as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
+        # unless `enable_registration` is also enabled.
+        #
+        #enable_registration_without_verification: true
 
         # Time that a user's session remains valid for, after they log in.
         #
@@ -165,6 +235,44 @@ class RegistrationConfig(Config):
         # By default, this is infinite.
         #
         #session_lifetime: 24h
+
+        # Time that an access token remains valid for, if the session is
+        # using refresh tokens.
+        # For more information about refresh tokens, please see the manual.
+        # Note that this only applies to clients which advertise support for
+        # refresh tokens.
+        #
+        # Note also that this is calculated at login time and refresh time:
+        # changes are not applied to existing sessions until they are refreshed.
+        #
+        # By default, this is 5 minutes.
+        #
+        #refreshable_access_token_lifetime: 5m
+
+        # Time that a refresh token remains valid for (provided that it is not
+        # exchanged for another one first).
+        # This option can be used to automatically log-out inactive sessions.
+        # Please see the manual for more information.
+        #
+        # Note also that this is calculated at login time and refresh time:
+        # changes are not applied to existing sessions until they are refreshed.
+        #
+        # By default, this is infinite.
+        #
+        #refresh_token_lifetime: 24h
+
+        # Time that an access token remains valid for, if the session is NOT
+        # using refresh tokens.
+        # Please note that not all clients support refresh tokens, so setting
+        # this to a short value may be inconvenient for some users who will
+        # then be logged out frequently.
+        #
+        # Note also that this is calculated at login time: changes are not applied
+        # retrospectively to existing sessions for users that have already logged in.
+        #
+        # By default, this is infinite.
+        #
+        #nonrefreshable_access_token_lifetime: 24h
 
         # The user must provide all of the below types of 3PID when registering.
         #
@@ -354,12 +462,22 @@ class RegistrationConfig(Config):
         # Defaults to true.
         #
         #auto_join_rooms_for_guests: false
+
+        # Whether to inhibit errors raised when registering a new account if the user ID
+        # already exists. If turned on, that requests to /register/available will always
+        # show a user ID as available, and Synapse won't raise an error when starting
+        # a registration with a user ID that already exists. However, Synapse will still
+        # raise an error if the registration completes and the username conflicts.
+        #
+        # Defaults to false.
+        #
+        #inhibit_user_in_use_error: true
         """
             % locals()
         )
 
     @staticmethod
-    def add_arguments(parser):
+    def add_arguments(parser: argparse.ArgumentParser) -> None:
         reg_group = parser.add_argument_group("registration")
         reg_group.add_argument(
             "--enable-registration",
@@ -368,6 +486,6 @@ class RegistrationConfig(Config):
             help="Enable registration for new users.",
         )
 
-    def read_arguments(self, args):
+    def read_arguments(self, args: argparse.Namespace) -> None:
         if args.enable_registration is not None:
             self.enable_registration = strtobool(str(args.enable_registration))

@@ -343,7 +343,7 @@ class SpamMediaException(NotFoundError):
     """
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class ReadableFileWrapper:
     """Wrapper that allows reading a file in chunks, yielding to the reactor,
     and writing to a callback.
@@ -352,10 +352,10 @@ class ReadableFileWrapper:
     `IConsumer`.
     """
 
-    CHUNK_SIZE = 2 ** 14
+    CHUNK_SIZE = 2**14
 
-    clock = attr.ib(type=Clock)
-    path = attr.ib(type=str)
+    clock: Clock
+    path: str
 
     async def write_chunks_to(self, callback: Callable[[bytes], None]) -> None:
         """Reads the file in chunks and calls the callback with each chunk."""

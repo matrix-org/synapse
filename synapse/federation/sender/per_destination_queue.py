@@ -1,5 +1,6 @@
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +15,8 @@
 # limitations under the License.
 import datetime
 import logging
-from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Tuple
+from types import TracebackType
+from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Tuple, Type
 
 import attr
 from prometheus_client import Counter
@@ -74,7 +76,7 @@ class PerDestinationQueue:
     ):
         self._server_name = hs.hostname
         self._clock = hs.get_clock()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._transaction_manager = transaction_manager
         self._instance_name = hs.get_instance_name()
         self._federation_shard_config = hs.config.worker.federation_shard_config
@@ -213,9 +215,19 @@ class PerDestinationQueue:
         self._pending_edus_keyed[(edu.edu_type, key)] = edu
         self.attempt_new_transaction()
 
-    def send_edu(self, edu) -> None:
+    def send_edu(self, edu: Edu) -> None:
         self._pending_edus.append(edu)
         self.attempt_new_transaction()
+
+    def mark_new_data(self) -> None:
+        """Marks that the destination has new data to send, without starting a
+        new transaction.
+
+        If a transaction loop is already in progress then a new transcation will
+        be attempted when the current one finishes.
+        """
+
+        self._new_data_to_send = True
 
     def attempt_new_transaction(self) -> None:
         """Try to start a new transaction to this destination
@@ -379,7 +391,8 @@ class PerDestinationQueue:
                 )
             )
 
-        if self._last_successful_stream_ordering is None:
+        _tmp_last_successful_stream_ordering = self._last_successful_stream_ordering
+        if _tmp_last_successful_stream_ordering is None:
             # if it's still None, then this means we don't have the information
             # in our database ­ we haven't successfully sent a PDU to this server
             # (at least since the introduction of the feature tracking
@@ -389,11 +402,12 @@ class PerDestinationQueue:
             self._catching_up = False
             return
 
+        last_successful_stream_ordering: int = _tmp_last_successful_stream_ordering
+
         # get at most 50 catchup room/PDUs
         while True:
             event_ids = await self._store.get_catch_up_room_event_ids(
-                self._destination,
-                self._last_successful_stream_ordering,
+                self._destination, last_successful_stream_ordering
             )
 
             if not event_ids:
@@ -401,7 +415,7 @@ class PerDestinationQueue:
                 # of a race condition, so we check that no new events have been
                 # skipped due to us being in catch-up mode
 
-                if self._catchup_last_skipped > self._last_successful_stream_ordering:
+                if self._catchup_last_skipped > last_successful_stream_ordering:
                     # another event has been skipped because we were in catch-up mode
                     continue
 
@@ -468,7 +482,7 @@ class PerDestinationQueue:
                         # offline
                         if (
                             p.internal_metadata.stream_ordering
-                            < self._last_successful_stream_ordering
+                            < last_successful_stream_ordering
                         ):
                             continue
 
@@ -511,12 +525,11 @@ class PerDestinationQueue:
                 # from the *original* PDU, rather than the PDU(s) we actually
                 # send. This is because we use it to mark our position in the
                 # queue of missed PDUs to process.
-                self._last_successful_stream_ordering = (
-                    pdu.internal_metadata.stream_ordering
-                )
+                last_successful_stream_ordering = pdu.internal_metadata.stream_ordering
 
+                self._last_successful_stream_ordering = last_successful_stream_ordering
                 await self._store.set_destination_last_successful_stream_ordering(
-                    self._destination, self._last_successful_stream_ordering
+                    self._destination, last_successful_stream_ordering
                 )
 
     def _get_rr_edus(self, force_flush: bool) -> Iterable[Edu]:
@@ -605,18 +618,18 @@ class PerDestinationQueue:
         self._pending_pdus = []
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class _TransactionQueueManager:
     """A helper async context manager for pulling stuff off the queues and
     tracking what was last successfully sent, etc.
     """
 
-    queue = attr.ib(type=PerDestinationQueue)
+    queue: PerDestinationQueue
 
-    _device_stream_id = attr.ib(type=Optional[int], default=None)
-    _device_list_id = attr.ib(type=Optional[int], default=None)
-    _last_stream_ordering = attr.ib(type=Optional[int], default=None)
-    _pdus = attr.ib(type=List[EventBase], factory=list)
+    _device_stream_id: Optional[int] = None
+    _device_list_id: Optional[int] = None
+    _last_stream_ordering: Optional[int] = None
+    _pdus: List[EventBase] = attr.Factory(list)
 
     async def __aenter__(self) -> Tuple[List[EventBase], List[Edu]]:
         # First we calculate the EDUs we want to send, if any.
@@ -701,7 +714,12 @@ class _TransactionQueueManager:
 
         return self._pdus, pending_edus
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc: Optional[BaseException],
+        tb: Optional[TracebackType],
+    ) -> None:
         if exc_type is not None:
             # Failed to send transaction, so we bail out.
             return

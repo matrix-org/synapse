@@ -43,7 +43,7 @@ class AccountValidityHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.config = hs.config
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.send_email_handler = self.hs.get_send_email_handler()
         self.clock = self.hs.get_clock()
 
@@ -180,9 +180,9 @@ class AccountValidityHandler:
         expiring_users = await self.store.get_users_expiring_soon()
 
         if expiring_users:
-            for user in expiring_users:
+            for user_id, expiration_ts_ms in expiring_users:
                 await self._send_renewal_email(
-                    user_id=user["user_id"], expiration_ts=user["expiration_ts_ms"]
+                    user_id=user_id, expiration_ts=expiration_ts_ms
                 )
 
     async def send_renewal_email_to_user(self, user_id: str) -> None:

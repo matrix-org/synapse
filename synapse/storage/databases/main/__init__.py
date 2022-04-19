@@ -18,7 +18,7 @@ import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from synapse.config.homeserver import HomeServerConfig
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.stats import UserSortOrder
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import (
@@ -33,7 +33,7 @@ from .account_data import AccountDataStore
 from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
 from .cache import CacheInvalidationWorkerStore
 from .censor_events import CensorEventsStore
-from .client_ips import ClientIpStore
+from .client_ips import ClientIpWorkerStore
 from .deviceinbox import DeviceInboxStore
 from .devices import DeviceStore
 from .directory import DirectoryStore
@@ -49,7 +49,7 @@ from .keys import KeyStore
 from .lock import LockStore
 from .media_repository import MediaRepositoryStore
 from .metrics import ServerMetricsStore
-from .monthly_active_users import MonthlyActiveUsersStore
+from .monthly_active_users import MonthlyActiveUsersWorkerStore
 from .openid import OpenIdStore
 from .presence import PresenceStore
 from .profile import ProfileStore
@@ -68,7 +68,7 @@ from .session import SessionStore
 from .signatures import SignatureStore
 from .state import StateStore
 from .stats import StatsStore
-from .stream import StreamStore
+from .stream import StreamWorkerStore
 from .tags import TagsStore
 from .transactions import TransactionWorkerStore
 from .ui_auth import UIAuthStore
@@ -87,7 +87,7 @@ class DataStore(
     RoomStore,
     RoomBatchStore,
     RegistrationStore,
-    StreamStore,
+    StreamWorkerStore,
     ProfileStore,
     PresenceStore,
     TransactionWorkerStore,
@@ -112,13 +112,13 @@ class DataStore(
     AccountDataStore,
     EventPushActionsStore,
     OpenIdStore,
-    ClientIpStore,
+    ClientIpWorkerStore,
     DeviceStore,
     DeviceInboxStore,
     UserDirectoryStore,
     GroupServerStore,
     UserErasureStore,
-    MonthlyActiveUsersStore,
+    MonthlyActiveUsersWorkerStore,
     StatsStore,
     RelationsStore,
     CensorEventsStore,
@@ -129,7 +129,12 @@ class DataStore(
     LockStore,
     SessionStore,
 ):
-    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         self.hs = hs
         self._clock = hs.get_clock()
         self.database_engine = database.engine
@@ -141,13 +146,10 @@ class DataStore(
             extra_tables=[
                 ("user_signature_stream", "stream_id"),
                 ("device_lists_outbound_pokes", "stream_id"),
+                ("device_lists_changes_in_room", "stream_id"),
             ],
         )
-        self._cross_signing_id_gen = StreamIdGenerator(
-            db_conn, "e2e_cross_signing_keys", "stream_id"
-        )
 
-        self._event_reports_id_gen = IdGenerator(db_conn, "event_reports", "id")
         self._push_rule_id_gen = IdGenerator(db_conn, "push_rules", "id")
         self._push_rules_enable_id_gen = IdGenerator(db_conn, "push_rules_enable", "id")
         self._group_updates_id_gen = StreamIdGenerator(
@@ -180,17 +182,6 @@ class DataStore(
             self._cache_id_gen = None
 
         super().__init__(database, db_conn, hs)
-
-        device_list_max = self._device_list_id_gen.get_current_token()
-        self._device_list_stream_cache = StreamChangeCache(
-            "DeviceListStreamChangeCache", device_list_max
-        )
-        self._user_signature_stream_cache = StreamChangeCache(
-            "UserSignatureStreamChangeCache", device_list_max
-        )
-        self._device_list_federation_stream_cache = StreamChangeCache(
-            "DeviceListFederationStreamChangeCache", device_list_max
-        )
 
         events_max = self._stream_id_gen.get_current_token()
         curr_state_delta_prefill, min_curr_state_delta_id = self.db_pool.get_cache_dict(

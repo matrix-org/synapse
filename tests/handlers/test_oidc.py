@@ -13,14 +13,18 @@
 # limitations under the License.
 import json
 import os
+from typing import Any, Dict
 from unittest.mock import ANY, Mock, patch
 from urllib.parse import parse_qs, urlparse
 
 import pymacaroons
 
+from twisted.test.proto_helpers import MemoryReactor
+
 from synapse.handlers.sso import MappingException
 from synapse.server import HomeServer
-from synapse.types import UserID
+from synapse.types import JsonDict, UserID
+from synapse.util import Clock
 from synapse.util.macaroons import get_value_from_macaroon
 
 from tests.test_utils import FakeResponse, get_awaitable_result, simple_async_mock
@@ -98,7 +102,7 @@ class TestMappingProviderFailures(TestMappingProvider):
         }
 
 
-async def get_json(url):
+async def get_json(url: str) -> JsonDict:
     # Mock get_json calls to handle jwks & oidc discovery endpoints
     if url == WELL_KNOWN:
         # Minimal discovery document, as defined in OpenID.Discovery
@@ -115,6 +119,8 @@ async def get_json(url):
         }
     elif url == JWKS_URI:
         return {"keys": []}
+
+    return {}
 
 
 def _key_file_path() -> str:
@@ -147,15 +153,15 @@ class OidcHandlerTestCase(HomeserverTestCase):
     if not HAS_OIDC:
         skip = "requires OIDC"
 
-    def default_config(self):
+    def default_config(self) -> Dict[str, Any]:
         config = super().default_config()
         config["public_baseurl"] = BASE_URL
         return config
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         self.http_client = Mock(spec=["get_json"])
         self.http_client.get_json.side_effect = get_json
-        self.http_client.user_agent = "Synapse Test"
+        self.http_client.user_agent = b"Synapse Test"
 
         hs = self.setup_test_homeserver(proxied_http_client=self.http_client)
 
@@ -164,7 +170,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         sso_handler = hs.get_sso_handler()
         # Mock the render error method.
         self.render_error = Mock(return_value=None)
-        sso_handler.render_error = self.render_error
+        sso_handler.render_error = self.render_error  # type: ignore[assignment]
 
         # Reduce the number of attempts when generating MXIDs.
         sso_handler._MAP_USERNAME_RETRIES = 3
@@ -193,14 +199,14 @@ class OidcHandlerTestCase(HomeserverTestCase):
         return args
 
     @override_config({"oidc_config": DEFAULT_CONFIG})
-    def test_config(self):
+    def test_config(self) -> None:
         """Basic config correctly sets up the callback URL and client auth correctly."""
         self.assertEqual(self.provider._callback_url, CALLBACK_URL)
         self.assertEqual(self.provider._client_auth.client_id, CLIENT_ID)
         self.assertEqual(self.provider._client_auth.client_secret, CLIENT_SECRET)
 
     @override_config({"oidc_config": {**DEFAULT_CONFIG, "discover": True}})
-    def test_discovery(self):
+    def test_discovery(self) -> None:
         """The handler should discover the endpoints from OIDC discovery document."""
         # This would throw if some metadata were invalid
         metadata = self.get_success(self.provider.load_metadata())
@@ -219,13 +225,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.http_client.get_json.assert_not_called()
 
     @override_config({"oidc_config": EXPLICIT_ENDPOINT_CONFIG})
-    def test_no_discovery(self):
+    def test_no_discovery(self) -> None:
         """When discovery is disabled, it should not try to load from discovery document."""
         self.get_success(self.provider.load_metadata())
         self.http_client.get_json.assert_not_called()
 
     @override_config({"oidc_config": EXPLICIT_ENDPOINT_CONFIG})
-    def test_load_jwks(self):
+    def test_load_jwks(self) -> None:
         """JWKS loading is done once (then cached) if used."""
         jwks = self.get_success(self.provider.load_jwks())
         self.http_client.get_json.assert_called_once_with(JWKS_URI)
@@ -252,15 +258,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
         with patch.object(self.provider, "load_metadata", patched_load_metadata):
             self.get_failure(self.provider.load_jwks(force=True), RuntimeError)
 
-        # Return empty key set if JWKS are not used
-        self.provider._scopes = []  # not asking the openid scope
-        self.http_client.get_json.reset_mock()
-        jwks = self.get_success(self.provider.load_jwks(force=True))
-        self.http_client.get_json.assert_not_called()
-        self.assertEqual(jwks, {"keys": []})
-
     @override_config({"oidc_config": DEFAULT_CONFIG})
-    def test_validate_config(self):
+    def test_validate_config(self) -> None:
         """Provider metadatas are extensively validated."""
         h = self.provider
 
@@ -343,22 +342,23 @@ class OidcHandlerTestCase(HomeserverTestCase):
             force_load_metadata()
 
     @override_config({"oidc_config": {**DEFAULT_CONFIG, "skip_verification": True}})
-    def test_skip_verification(self):
+    def test_skip_verification(self) -> None:
         """Provider metadata validation can be disabled by config."""
         with self.metadata_edit({"issuer": "http://insecure"}):
             # This should not throw
             get_awaitable_result(self.provider.load_metadata())
 
     @override_config({"oidc_config": DEFAULT_CONFIG})
-    def test_redirect_request(self):
+    def test_redirect_request(self) -> None:
         """The redirect request has the right arguments & generates a valid session cookie."""
         req = Mock(spec=["cookies"])
         req.cookies = []
 
-        url = self.get_success(
-            self.provider.handle_redirect_request(req, b"http://client/redirect")
+        url = urlparse(
+            self.get_success(
+                self.provider.handle_redirect_request(req, b"http://client/redirect")
+            )
         )
-        url = urlparse(url)
         auth_endpoint = urlparse(AUTHORIZATION_ENDPOINT)
 
         self.assertEqual(url.scheme, auth_endpoint.scheme)
@@ -394,7 +394,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(redirect, "http://client/redirect")
 
     @override_config({"oidc_config": DEFAULT_CONFIG})
-    def test_callback_error(self):
+    def test_callback_error(self) -> None:
         """Errors from the provider returned in the callback are displayed."""
         request = Mock(args={})
         request.args[b"error"] = [b"invalid_client"]
@@ -406,7 +406,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertRenderedError("invalid_client", "some description")
 
     @override_config({"oidc_config": DEFAULT_CONFIG})
-    def test_callback(self):
+    def test_callback(self) -> None:
         """Code callback works and display errors if something went wrong.
 
         A lot of scenarios are tested here:
@@ -435,9 +435,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "username": username,
         }
         expected_user_id = "@%s:%s" % (username, self.hs.hostname)
-        self.provider._exchange_code = simple_async_mock(return_value=token)
-        self.provider._parse_id_token = simple_async_mock(return_value=userinfo)
-        self.provider._fetch_userinfo = simple_async_mock(return_value=userinfo)
+        self.provider._exchange_code = simple_async_mock(return_value=token)  # type: ignore[assignment]
+        self.provider._parse_id_token = simple_async_mock(return_value=userinfo)  # type: ignore[assignment]
+        self.provider._fetch_userinfo = simple_async_mock(return_value=userinfo)  # type: ignore[assignment]
         auth_handler = self.hs.get_auth_handler()
         auth_handler.complete_sso_login = simple_async_mock()
 
@@ -445,17 +445,20 @@ class OidcHandlerTestCase(HomeserverTestCase):
         state = "state"
         nonce = "nonce"
         client_redirect_url = "http://client/redirect"
-        user_agent = "Browser"
         ip_address = "10.0.0.1"
         session = self._generate_oidc_session_token(state, nonce, client_redirect_url)
-        request = _build_callback_request(
-            code, state, session, user_agent=user_agent, ip_address=ip_address
-        )
+        request = _build_callback_request(code, state, session, ip_address=ip_address)
 
         self.get_success(self.handler.handle_oidc_callback(request))
 
         auth_handler.complete_sso_login.assert_called_once_with(
-            expected_user_id, "oidc", request, client_redirect_url, None, new_user=True
+            expected_user_id,
+            "oidc",
+            request,
+            client_redirect_url,
+            None,
+            new_user=True,
+            auth_provider_session_id=None,
         )
         self.provider._exchange_code.assert_called_once_with(code)
         self.provider._parse_id_token.assert_called_once_with(token, nonce=nonce)
@@ -472,7 +475,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             self.assertRenderedError("mapping_error")
 
         # Handle ID token errors
-        self.provider._parse_id_token = simple_async_mock(raises=Exception())
+        self.provider._parse_id_token = simple_async_mock(raises=Exception())  # type: ignore[assignment]
         self.get_success(self.handler.handle_oidc_callback(request))
         self.assertRenderedError("invalid_token")
 
@@ -482,33 +485,74 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.provider._fetch_userinfo.reset_mock()
 
         # With userinfo fetching
-        self.provider._scopes = []  # do not ask the "openid" scope
+        self.provider._user_profile_method = "userinfo_endpoint"
+        token = {
+            "type": "bearer",
+            "access_token": "access_token",
+        }
+        self.provider._exchange_code = simple_async_mock(return_value=token)  # type: ignore[assignment]
         self.get_success(self.handler.handle_oidc_callback(request))
 
         auth_handler.complete_sso_login.assert_called_once_with(
-            expected_user_id, "oidc", request, client_redirect_url, None, new_user=False
+            expected_user_id,
+            "oidc",
+            request,
+            client_redirect_url,
+            None,
+            new_user=False,
+            auth_provider_session_id=None,
         )
         self.provider._exchange_code.assert_called_once_with(code)
         self.provider._parse_id_token.assert_not_called()
         self.provider._fetch_userinfo.assert_called_once_with(token)
         self.render_error.assert_not_called()
 
+        # With an ID token, userinfo fetching and sid in the ID token
+        self.provider._user_profile_method = "userinfo_endpoint"
+        token = {
+            "type": "bearer",
+            "access_token": "access_token",
+            "id_token": "id_token",
+        }
+        id_token = {
+            "sid": "abcdefgh",
+        }
+        self.provider._parse_id_token = simple_async_mock(return_value=id_token)  # type: ignore[assignment]
+        self.provider._exchange_code = simple_async_mock(return_value=token)  # type: ignore[assignment]
+        auth_handler.complete_sso_login.reset_mock()
+        self.provider._fetch_userinfo.reset_mock()
+        self.get_success(self.handler.handle_oidc_callback(request))
+
+        auth_handler.complete_sso_login.assert_called_once_with(
+            expected_user_id,
+            "oidc",
+            request,
+            client_redirect_url,
+            None,
+            new_user=False,
+            auth_provider_session_id=id_token["sid"],
+        )
+        self.provider._exchange_code.assert_called_once_with(code)
+        self.provider._parse_id_token.assert_called_once_with(token, nonce=nonce)
+        self.provider._fetch_userinfo.assert_called_once_with(token)
+        self.render_error.assert_not_called()
+
         # Handle userinfo fetching error
-        self.provider._fetch_userinfo = simple_async_mock(raises=Exception())
+        self.provider._fetch_userinfo = simple_async_mock(raises=Exception())  # type: ignore[assignment]
         self.get_success(self.handler.handle_oidc_callback(request))
         self.assertRenderedError("fetch_error")
 
         # Handle code exchange failure
         from synapse.handlers.oidc import OidcError
 
-        self.provider._exchange_code = simple_async_mock(
+        self.provider._exchange_code = simple_async_mock(  # type: ignore[assignment]
             raises=OidcError("invalid_request")
         )
         self.get_success(self.handler.handle_oidc_callback(request))
         self.assertRenderedError("invalid_request")
 
     @override_config({"oidc_config": DEFAULT_CONFIG})
-    def test_callback_session(self):
+    def test_callback_session(self) -> None:
         """The callback verifies the session presence and validity"""
         request = Mock(spec=["args", "getCookie", "cookies"])
 
@@ -553,7 +597,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
     @override_config(
         {"oidc_config": {**DEFAULT_CONFIG, "client_auth_method": "client_secret_post"}}
     )
-    def test_exchange_code(self):
+    def test_exchange_code(self) -> None:
         """Code exchange behaves correctly and handles various error scenarios."""
         token = {"type": "bearer"}
         token_json = json.dumps(token).encode("utf-8")
@@ -649,7 +693,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             }
         }
     )
-    def test_exchange_code_jwt_key(self):
+    def test_exchange_code_jwt_key(self) -> None:
         """Test that code exchange works with a JWK client secret."""
         from authlib.jose import jwt
 
@@ -704,7 +748,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             }
         }
     )
-    def test_exchange_code_no_auth(self):
+    def test_exchange_code_no_auth(self) -> None:
         """Test that code exchange works with no client secret."""
         token = {"type": "bearer"}
         self.http_client.request = simple_async_mock(
@@ -739,7 +783,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             }
         }
     )
-    def test_extra_attributes(self):
+    def test_extra_attributes(self) -> None:
         """
         Login while using a mapping provider that implements get_extra_attributes.
         """
@@ -753,8 +797,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "username": "foo",
             "phone": "1234567",
         }
-        self.provider._exchange_code = simple_async_mock(return_value=token)
-        self.provider._parse_id_token = simple_async_mock(return_value=userinfo)
+        self.provider._exchange_code = simple_async_mock(return_value=token)  # type: ignore[assignment]
+        self.provider._parse_id_token = simple_async_mock(return_value=userinfo)  # type: ignore[assignment]
         auth_handler = self.hs.get_auth_handler()
         auth_handler.complete_sso_login = simple_async_mock()
 
@@ -776,21 +820,28 @@ class OidcHandlerTestCase(HomeserverTestCase):
             client_redirect_url,
             {"phone": "1234567"},
             new_user=True,
+            auth_provider_session_id=None,
         )
 
     @override_config({"oidc_config": DEFAULT_CONFIG})
-    def test_map_userinfo_to_user(self):
+    def test_map_userinfo_to_user(self) -> None:
         """Ensure that mapping the userinfo returned from a provider to an MXID works properly."""
         auth_handler = self.hs.get_auth_handler()
         auth_handler.complete_sso_login = simple_async_mock()
 
-        userinfo = {
+        userinfo: dict = {
             "sub": "test_user",
             "username": "test_user",
         }
         self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@test_user:test", "oidc", ANY, ANY, None, new_user=True
+            "@test_user:test",
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=True,
+            auth_provider_session_id=None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -801,12 +852,18 @@ class OidcHandlerTestCase(HomeserverTestCase):
         }
         self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@test_user_2:test", "oidc", ANY, ANY, None, new_user=True
+            "@test_user_2:test",
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=True,
+            auth_provider_session_id=None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
         # Test if the mxid is already taken
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         user3 = UserID.from_string("@test_user_3:test")
         self.get_success(
             store.register_user(user_id=user3.to_string(), password_hash=None)
@@ -820,9 +877,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
         )
 
     @override_config({"oidc_config": {**DEFAULT_CONFIG, "allow_existing_users": True}})
-    def test_map_userinfo_to_existing_user(self):
+    def test_map_userinfo_to_existing_user(self) -> None:
         """Existing users can log in with OpenID Connect when allow_existing_users is True."""
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         user = UserID.from_string("@test_user:test")
         self.get_success(
             store.register_user(user_id=user.to_string(), password_hash=None)
@@ -838,14 +895,26 @@ class OidcHandlerTestCase(HomeserverTestCase):
         }
         self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            user.to_string(), "oidc", ANY, ANY, None, new_user=False
+            user.to_string(),
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=False,
+            auth_provider_session_id=None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
         # Subsequent calls should map to the same mxid.
         self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            user.to_string(), "oidc", ANY, ANY, None, new_user=False
+            user.to_string(),
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=False,
+            auth_provider_session_id=None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -860,7 +929,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
         }
         self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            user.to_string(), "oidc", ANY, ANY, None, new_user=False
+            user.to_string(),
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=False,
+            auth_provider_session_id=None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -896,11 +971,17 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@TEST_USER_2:test", "oidc", ANY, ANY, None, new_user=False
+            "@TEST_USER_2:test",
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=False,
+            auth_provider_session_id=None,
         )
 
     @override_config({"oidc_config": DEFAULT_CONFIG})
-    def test_map_userinfo_to_invalid_localpart(self):
+    def test_map_userinfo_to_invalid_localpart(self) -> None:
         """If the mapping provider generates an invalid localpart it should be rejected."""
         self.get_success(
             _make_callback_with_userinfo(self.hs, {"sub": "test2", "username": "föö"})
@@ -917,12 +998,12 @@ class OidcHandlerTestCase(HomeserverTestCase):
             }
         }
     )
-    def test_map_userinfo_to_user_retries(self):
+    def test_map_userinfo_to_user_retries(self) -> None:
         """The mapping provider can retry generating an MXID if the MXID is already in use."""
         auth_handler = self.hs.get_auth_handler()
         auth_handler.complete_sso_login = simple_async_mock()
 
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         self.get_success(
             store.register_user(user_id="@test_user:test", password_hash=None)
         )
@@ -934,7 +1015,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         # test_user is already taken, so test_user1 gets registered instead.
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@test_user1:test", "oidc", ANY, ANY, None, new_user=True
+            "@test_user1:test",
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=True,
+            auth_provider_session_id=None,
         )
         auth_handler.complete_sso_login.reset_mock()
 
@@ -959,7 +1046,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         )
 
     @override_config({"oidc_config": DEFAULT_CONFIG})
-    def test_empty_localpart(self):
+    def test_empty_localpart(self) -> None:
         """Attempts to map onto an empty localpart should be rejected."""
         userinfo = {
             "sub": "tester",
@@ -978,7 +1065,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             }
         }
     )
-    def test_null_localpart(self):
+    def test_null_localpart(self) -> None:
         """Mapping onto a null localpart via an empty OIDC attribute should be rejected"""
         userinfo = {
             "sub": "tester",
@@ -995,7 +1082,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             }
         }
     )
-    def test_attribute_requirements(self):
+    def test_attribute_requirements(self) -> None:
         """The required attributes must be met from the OIDC userinfo response."""
         auth_handler = self.hs.get_auth_handler()
         auth_handler.complete_sso_login = simple_async_mock()
@@ -1018,7 +1105,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         # check that the auth handler got called as expected
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@tester:test", "oidc", ANY, ANY, None, new_user=True
+            "@tester:test",
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=True,
+            auth_provider_session_id=None,
         )
 
     @override_config(
@@ -1029,7 +1122,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             }
         }
     )
-    def test_attribute_requirements_contains(self):
+    def test_attribute_requirements_contains(self) -> None:
         """Test that auth succeeds if userinfo attribute CONTAINS required value"""
         auth_handler = self.hs.get_auth_handler()
         auth_handler.complete_sso_login = simple_async_mock()
@@ -1043,7 +1136,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         # check that the auth handler got called as expected
         auth_handler.complete_sso_login.assert_called_once_with(
-            "@tester:test", "oidc", ANY, ANY, None, new_user=True
+            "@tester:test",
+            "oidc",
+            ANY,
+            ANY,
+            None,
+            new_user=True,
+            auth_provider_session_id=None,
         )
 
     @override_config(
@@ -1054,7 +1153,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
             }
         }
     )
-    def test_attribute_requirements_mismatch(self):
+    def test_attribute_requirements_mismatch(self) -> None:
         """
         Test that auth fails if attributes exist but don't match,
         or are non-string values.
@@ -1062,7 +1161,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         auth_handler = self.hs.get_auth_handler()
         auth_handler.complete_sso_login = simple_async_mock()
         # userinfo with "test": "not_foobar" attribute should fail
-        userinfo = {
+        userinfo: dict = {
             "sub": "tester",
             "username": "tester",
             "test": "not_foobar",
@@ -1156,9 +1255,9 @@ async def _make_callback_with_userinfo(
 
     handler = hs.get_oidc_handler()
     provider = handler._providers["oidc"]
-    provider._exchange_code = simple_async_mock(return_value={})
-    provider._parse_id_token = simple_async_mock(return_value=userinfo)
-    provider._fetch_userinfo = simple_async_mock(return_value=userinfo)
+    provider._exchange_code = simple_async_mock(return_value={"id_token": ""})  # type: ignore[assignment]
+    provider._parse_id_token = simple_async_mock(return_value=userinfo)  # type: ignore[assignment]
+    provider._fetch_userinfo = simple_async_mock(return_value=userinfo)  # type: ignore[assignment]
 
     state = "state"
     session = handler._token_generator.generate_oidc_session_token(
@@ -1179,7 +1278,6 @@ def _build_callback_request(
     code: str,
     state: str,
     session: str,
-    user_agent: str = "Browser",
     ip_address: str = "10.0.0.1",
 ):
     """Builds a fake SynapseRequest to mock the browser callback
@@ -1194,7 +1292,6 @@ def _build_callback_request(
            query param. Should be the same as was embedded in the session in
            _build_oidc_session.
         session: the "session" which would have been passed around in the cookie.
-        user_agent: the user-agent to present
         ip_address: the IP address to pretend the request came from
     """
     request = Mock(

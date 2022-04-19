@@ -23,6 +23,7 @@ from synapse.rest import admin
 from synapse.rest.client import login, register, room
 from synapse.server import HomeServer
 from synapse.storage import DataStore
+from synapse.storage.background_updates import _BackgroundUpdateHandler
 from synapse.storage.roommember import ProfileInfo
 from synapse.util import Clock
 
@@ -148,7 +149,7 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         return hs
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.user_dir_helper = GetUserDirectoryTables(self.store)
 
     def _purge_and_rebuild_user_dir(self) -> None:
@@ -340,7 +341,9 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         # Register an AS user.
         user = self.register_user("user", "pass")
         token = self.login(user, "pass")
-        as_user = self.register_appservice_user("as_user_potato", self.appservice.token)
+        as_user, _ = self.register_appservice_user(
+            "as_user_potato", self.appservice.token
+        )
 
         # Join the AS user to rooms owned by the normal user.
         public, private = self._create_rooms_and_inject_memberships(
@@ -391,7 +394,9 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
 
         with mock.patch.dict(
             self.store.db_pool.updates._background_update_handlers,
-            populate_user_directory_process_users=mocked_process_users,
+            populate_user_directory_process_users=_BackgroundUpdateHandler(
+                mocked_process_users,
+            ),
         ):
             self._purge_and_rebuild_user_dir()
 
@@ -410,7 +415,7 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
 
 class UserDirectoryStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         # alice and bob are both in !room_id. bobby is not but shares
         # a homeserver with alice.

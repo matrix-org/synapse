@@ -75,7 +75,7 @@ class MediaRepository:
         self.client = hs.get_federation_http_client()
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.max_upload_size = hs.config.media.max_upload_size
         self.max_image_pixels = hs.config.media.max_image_pixels
 
@@ -258,7 +258,7 @@ class MediaRepository:
         # We linearize here to ensure that we don't try and download remote
         # media multiple times concurrently
         key = (server_name, media_id)
-        with (await self.remote_media_linearizer.queue(key)):
+        async with self.remote_media_linearizer.queue(key):
             responder, media_info = await self._get_remote_media_impl(
                 server_name, media_id
             )
@@ -294,7 +294,7 @@ class MediaRepository:
         # We linearize here to ensure that we don't try and download remote
         # media multiple times concurrently
         key = (server_name, media_id)
-        with (await self.remote_media_linearizer.queue(key)):
+        async with self.remote_media_linearizer.queue(key):
             responder, media_info = await self._get_remote_media_impl(
                 server_name, media_id
             )
@@ -739,14 +739,21 @@ class MediaRepository:
         # We deduplicate the thumbnail sizes by ignoring the cropped versions if
         # they have the same dimensions of a scaled one.
         thumbnails: Dict[Tuple[int, int, str], str] = {}
-        for r_width, r_height, r_method, r_type in requirements:
-            if r_method == "crop":
-                thumbnails.setdefault((r_width, r_height, r_type), r_method)
-            elif r_method == "scale":
-                t_width, t_height = thumbnailer.aspect(r_width, r_height)
+        for requirement in requirements:
+            if requirement.method == "crop":
+                thumbnails.setdefault(
+                    (requirement.width, requirement.height, requirement.media_type),
+                    requirement.method,
+                )
+            elif requirement.method == "scale":
+                t_width, t_height = thumbnailer.aspect(
+                    requirement.width, requirement.height
+                )
                 t_width = min(m_width, t_width)
                 t_height = min(m_height, t_height)
-                thumbnails[(t_width, t_height, r_type)] = r_method
+                thumbnails[
+                    (t_width, t_height, requirement.media_type)
+                ] = requirement.method
 
         # Now we generate the thumbnails for each dimension, store it
         for (t_width, t_height, t_type), t_method in thumbnails.items():
@@ -843,7 +850,7 @@ class MediaRepository:
 
             # TODO: Should we delete from the backup store
 
-            with (await self.remote_media_linearizer.queue(key)):
+            async with self.remote_media_linearizer.queue(key):
                 full_path = self.filepaths.remote_media_filepath(origin, file_id)
                 try:
                     os.remove(full_path)

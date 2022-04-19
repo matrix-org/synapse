@@ -20,7 +20,7 @@ from tests import unittest
 
 class LockTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs: HomeServer):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     def test_simple_lock(self):
         """Test that we can take out a lock and that while we hold it nobody
@@ -28,7 +28,7 @@ class LockTestCase(unittest.HomeserverTestCase):
         """
         # First to acquire this lock, so it should complete
         lock = self.get_success(self.store.try_acquire_lock("name", "key"))
-        self.assertIsNotNone(lock)
+        assert lock is not None
 
         # Enter the context manager
         self.get_success(lock.__aenter__())
@@ -45,7 +45,7 @@ class LockTestCase(unittest.HomeserverTestCase):
 
         # We can now acquire the lock again.
         lock3 = self.get_success(self.store.try_acquire_lock("name", "key"))
-        self.assertIsNotNone(lock3)
+        assert lock3 is not None
         self.get_success(lock3.__aenter__())
         self.get_success(lock3.__aexit__(None, None, None))
 
@@ -53,7 +53,7 @@ class LockTestCase(unittest.HomeserverTestCase):
         """Test that we don't time out locks while they're still active"""
 
         lock = self.get_success(self.store.try_acquire_lock("name", "key"))
-        self.assertIsNotNone(lock)
+        assert lock is not None
 
         self.get_success(lock.__aenter__())
 
@@ -69,7 +69,7 @@ class LockTestCase(unittest.HomeserverTestCase):
         """Test that we time out locks if they're not updated for ages"""
 
         lock = self.get_success(self.store.try_acquire_lock("name", "key"))
-        self.assertIsNotNone(lock)
+        assert lock is not None
 
         self.get_success(lock.__aenter__())
 

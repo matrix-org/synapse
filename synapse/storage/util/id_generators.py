@@ -74,8 +74,6 @@ class IdGenerator:
 def _load_current_id(
     db_conn: LoggingDatabaseConnection, table: str, column: str, step: int = 1
 ) -> int:
-    # debug logging for https://github.com/matrix-org/synapse/issues/7968
-    logger.info("initialising stream generator for %s(%s)", table, column)
     cur = db_conn.cursor(txn_name="_load_current_id")
     if step == 1:
         cur.execute("SELECT MAX(%s) FROM %s" % (column, table))
@@ -86,7 +84,9 @@ def _load_current_id(
     (val,) = result
     cur.close()
     current_id = int(val) if val else step
-    return (max if step > 0 else min)(current_id, step)
+    res = (max if step > 0 else min)(current_id, step)
+    logger.info("Initialising stream generator for %s(%s): %i", table, column, res)
+    return res
 
 
 class AbstractStreamIdTracker(metaclass=abc.ABCMeta):
@@ -762,13 +762,13 @@ class _AsyncCtxManagerWrapper(Generic[T]):
         return self.inner.__exit__(exc_type, exc, tb)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class _MultiWriterCtxManager:
     """Async context manager returned by MultiWriterIdGenerator"""
 
-    id_gen = attr.ib(type=MultiWriterIdGenerator)
-    multiple_ids = attr.ib(type=Optional[int], default=None)
-    stream_ids = attr.ib(type=List[int], factory=list)
+    id_gen: MultiWriterIdGenerator
+    multiple_ids: Optional[int] = None
+    stream_ids: List[int] = attr.Factory(list)
 
     async def __aenter__(self) -> Union[int, List[int]]:
         # It's safe to run this in autocommit mode as fetching values from a

@@ -1,4 +1,4 @@
-# Copyright 2019 Matrix.org Foundation C.I.C.
+# Copyright 2019-2021 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import os
 import re
 import threading
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
-from synapse.python_dependencies import DependencyException, check_requirements
+import attr
+
+from synapse.types import JsonDict
+from synapse.util.check_dependencies import DependencyException, check_requirements
 
 from ._base import Config, ConfigError
+
+logger = logging.getLogger(__name__)
 
 # The prefix for all cache factor-related environment variables
 _CACHE_PREFIX = "SYNAPSE_CACHE_FACTOR"
@@ -34,13 +40,13 @@ _DEFAULT_FACTOR_SIZE = 0.5
 _DEFAULT_EVENT_CACHE_SIZE = "10K"
 
 
+@attr.s(slots=True, auto_attribs=True)
 class CacheProperties:
-    def __init__(self):
-        # The default factor size for all caches
-        self.default_factor_size = float(
-            os.environ.get(_CACHE_PREFIX, _DEFAULT_FACTOR_SIZE)
-        )
-        self.resize_all_caches_func = None
+    # The default factor size for all caches
+    default_factor_size: float = float(
+        os.environ.get(_CACHE_PREFIX, _DEFAULT_FACTOR_SIZE)
+    )
+    resize_all_caches_func: Optional[Callable[[], None]] = None
 
 
 properties = CacheProperties()
@@ -62,7 +68,7 @@ def _canonicalise_cache_name(cache_name: str) -> str:
 
 def add_resizable_cache(
     cache_name: str, cache_resize_callback: Callable[[float], None]
-):
+) -> None:
     """Register a cache that's size can dynamically change
 
     Args:
@@ -91,7 +97,7 @@ class CacheConfig(Config):
     _environ = os.environ
 
     @staticmethod
-    def reset():
+    def reset() -> None:
         """Resets the caches to their defaults. Used for tests."""
         properties.default_factor_size = float(
             os.environ.get(_CACHE_PREFIX, _DEFAULT_FACTOR_SIZE)
@@ -100,7 +106,7 @@ class CacheConfig(Config):
         with _CACHES_LOCK:
             _CACHES.clear()
 
-    def generate_config_section(self, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         ## Caching ##
 
@@ -146,11 +152,16 @@ class CacheConfig(Config):
           per_cache_factors:
             #get_users_who_share_room_with_user: 2.0
 
-          # Controls how long an entry can be in a cache without having been
-          # accessed before being evicted. Defaults to None, which means
-          # entries are never evicted based on time.
+          # Controls whether cache entries are evicted after a specified time
+          # period. Defaults to true. Uncomment to disable this feature.
           #
-          #expiry_time: 30m
+          #expire_caches: false
+
+          # If expire_caches is enabled, this flag controls how long an entry can
+          # be in a cache without having been accessed before being evicted.
+          # Defaults to 30m. Uncomment to set a different time to live for cache entries.
+          #
+          #cache_entry_ttl: 30m
 
           # Controls how long the results of a /sync request are cached for after
           # a successful response is returned. A higher duration can help clients with
@@ -162,7 +173,7 @@ class CacheConfig(Config):
           #sync_response_cache_duration: 2m
         """
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.event_cache_size = self.parse_size(
             config.get("event_cache_size", _DEFAULT_EVENT_CACHE_SIZE)
         )
@@ -215,11 +226,29 @@ class CacheConfig(Config):
                     e.message  # noqa: B306, DependencyException.message is a property
                 )
 
-        expiry_time = cache_config.get("expiry_time")
-        if expiry_time:
-            self.expiry_time_msec: Optional[int] = self.parse_duration(expiry_time)
+        expire_caches = cache_config.get("expire_caches", True)
+        cache_entry_ttl = cache_config.get("cache_entry_ttl", "30m")
+
+        if expire_caches:
+            self.expiry_time_msec: Optional[int] = self.parse_duration(cache_entry_ttl)
         else:
             self.expiry_time_msec = None
+
+        # Backwards compatibility support for the now-removed "expiry_time" config flag.
+        expiry_time = cache_config.get("expiry_time")
+
+        if expiry_time and expire_caches:
+            logger.warning(
+                "You have set two incompatible options, expiry_time and expire_caches. Please only use the "
+                "expire_caches and cache_entry_ttl options and delete the expiry_time option as it is "
+                "deprecated."
+            )
+        if expiry_time:
+            logger.warning(
+                "Expiry_time is a deprecated option, please use the expire_caches and cache_entry_ttl options "
+                "instead."
+            )
+            self.expiry_time_msec = self.parse_duration(expiry_time)
 
         self.sync_response_cache_duration = self.parse_duration(
             cache_config.get("sync_response_cache_duration", 0)
@@ -232,7 +261,7 @@ class CacheConfig(Config):
         # needing an instance of Config
         properties.resize_all_caches_func = self.resize_all_caches
 
-    def resize_all_caches(self):
+    def resize_all_caches(self) -> None:
         """Ensure all cache sizes are up to date
 
         For each cache, run the mapped callback function with either

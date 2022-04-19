@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import itertools
 import logging
 import os.path
@@ -27,6 +28,7 @@ from netaddr import AddrFormatError, IPNetwork, IPSet
 from twisted.conch.ssh.keys import Key
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.types import JsonDict
 from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_server_name
 
@@ -144,7 +146,7 @@ DEFAULT_IP_RANGE_BLACKLIST = [
     "fec0::/10",
 ]
 
-DEFAULT_ROOM_VERSION = "6"
+DEFAULT_ROOM_VERSION = "9"
 
 ROOM_COMPLEXITY_TOO_GREAT = (
     "Your homeserver is unable to join rooms this large or complex. "
@@ -177,7 +179,6 @@ KNOWN_RESOURCES = {
     "openid",
     "replication",
     "static",
-    "webclient",
 }
 
 
@@ -198,8 +199,8 @@ class HttpListenerConfig:
     """Object describing the http-specific parts of the config of a listener"""
 
     x_forwarded: bool = False
-    resources: List[HttpResourceConfig] = attr.ib(factory=list)
-    additional_resources: Dict[str, dict] = attr.ib(factory=dict)
+    resources: List[HttpResourceConfig] = attr.Factory(list)
+    additional_resources: Dict[str, dict] = attr.Factory(dict)
     tag: Optional[str] = None
 
 
@@ -247,7 +248,7 @@ class LimitRemoteRoomsConfig:
 class ServerConfig(Config):
     section = "server"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.server_name = config["server_name"]
         self.server_context = config.get("server_context", None)
 
@@ -257,10 +258,9 @@ class ServerConfig(Config):
             raise ConfigError(str(e))
 
         self.pid_file = self.abspath(config.get("pid_file"))
-        self.web_client_location = config.get("web_client_location", None)
         self.soft_file_limit = config.get("soft_file_limit", 0)
-        self.daemonize = config.get("daemonize")
-        self.print_pidfile = config.get("print_pidfile")
+        self.daemonize = bool(config.get("daemonize"))
+        self.print_pidfile = bool(config.get("print_pidfile"))
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
         self.serve_server_wellknown = config.get("serve_server_wellknown", False)
@@ -488,6 +488,19 @@ class ServerConfig(Config):
         # events with profile information that differ from the target's global profile.
         self.allow_per_room_profiles = config.get("allow_per_room_profiles", True)
 
+        # The maximum size an avatar can have, in bytes.
+        self.max_avatar_size = config.get("max_avatar_size")
+        if self.max_avatar_size is not None:
+            self.max_avatar_size = self.parse_size(self.max_avatar_size)
+
+        # The MIME types allowed for an avatar.
+        self.allowed_avatar_mimetypes = config.get("allowed_avatar_mimetypes")
+        if self.allowed_avatar_mimetypes and not isinstance(
+            self.allowed_avatar_mimetypes,
+            list,
+        ):
+            raise ConfigError("allowed_avatar_mimetypes must be a list")
+
         self.listeners = [parse_listener_def(x) for x in config.get("listeners", [])]
 
         # no_tls is not really supported any more, but let's grandfather it in
@@ -504,8 +517,13 @@ class ServerConfig(Config):
                     l2.append(listener)
             self.listeners = l2
 
-        if not self.web_client_location:
-            _warn_if_webclient_configured(self.listeners)
+        self.web_client_location = config.get("web_client_location", None)
+        # Non-HTTP(S) web client location is not supported.
+        if self.web_client_location and not (
+            self.web_client_location.startswith("http://")
+            or self.web_client_location.startswith("https://")
+        ):
+            raise ConfigError("web_client_location must point to a HTTP(S) URL.")
 
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
         self.gc_seconds = self.read_gc_intervals(config.get("gc_min_interval", None))
@@ -633,19 +651,6 @@ class ServerConfig(Config):
             False,
         )
 
-        # List of users trialing the new experimental default push rules. This setting is
-        # not included in the sample configuration file on purpose as it's a temporary
-        # hack, so that some users can trial the new defaults without impacting every
-        # user on the homeserver.
-        users_new_default_push_rules: list = (
-            config.get("users_new_default_push_rules") or []
-        )
-        if not isinstance(users_new_default_push_rules, list):
-            raise ConfigError("'users_new_default_push_rules' must be a list")
-
-        # Turn the list into a set to improve lookup speed.
-        self.users_new_default_push_rules: set = set(users_new_default_push_rules)
-
         # Whitelist of domain names that given next_link parameters must have
         next_link_domain_whitelist: Optional[List[str]] = config.get(
             "next_link_domain_whitelist"
@@ -671,18 +676,26 @@ class ServerConfig(Config):
         ):
             raise ConfigError("'custom_template_directory' must be a string")
 
+        self.use_account_validity_in_account_status: bool = (
+            config.get("use_account_validity_in_account_status") or False
+        )
+
+        self.rooms_to_exclude_from_sync: List[str] = (
+            config.get("exclude_rooms_from_sync") or []
+        )
+
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
 
     def generate_config_section(
         self,
-        server_name,
-        data_dir_path,
-        open_private_ports,
-        listeners,
-        config_dir_path,
-        **kwargs,
-    ):
+        config_dir_path: str,
+        data_dir_path: str,
+        server_name: str,
+        open_private_ports: bool,
+        listeners: Optional[List[dict]],
+        **kwargs: Any,
+    ) -> str:
         ip_range_blacklist = "\n".join(
             "        #  - '%s'" % ip for ip in DEFAULT_IP_RANGE_BLACKLIST
         )
@@ -791,13 +804,7 @@ class ServerConfig(Config):
         #
         pid_file: %(pid_file)s
 
-        # The absolute URL to the web client which /_matrix/client will redirect
-        # to if 'webclient' is configured under the 'listeners' configuration.
-        #
-        # This option can be also set to the filesystem path to the web client
-        # which will be served at /_matrix/client/ if 'webclient' is configured
-        # under the 'listeners' configuration, however this is a security risk:
-        # https://github.com/matrix-org/synapse#security-note
+        # The absolute URL to the web client which / will redirect to.
         #
         #web_client_location: https://riot.example.com/
 
@@ -881,7 +888,7 @@ class ServerConfig(Config):
         # The default room version for newly created rooms.
         #
         # Known room versions are listed here:
-        # https://matrix.org/docs/spec/#complete-list-of-room-versions
+        # https://spec.matrix.org/latest/rooms/#complete-list-of-room-versions
         #
         # For example, for room version 1, default_room_version should be set
         # to "1".
@@ -1008,8 +1015,6 @@ class ServerConfig(Config):
         #
         #   static: static resources under synapse/static (/_matrix/static). (Mostly
         #       useful for 'fallback authentication'.)
-        #
-        #   webclient: A web client. Requires web_client_location to be set.
         #
         listeners:
           # TLS-enabled listener: for when matrix traffic is sent directly to synapse.
@@ -1166,6 +1171,20 @@ class ServerConfig(Config):
         #
         #allow_per_room_profiles: false
 
+        # The largest allowed file size for a user avatar. Defaults to no restriction.
+        #
+        # Note that user avatar changes will not work if this is set without
+        # using Synapse's media repository.
+        #
+        #max_avatar_size: 10M
+
+        # The MIME types allowed for user avatars. Defaults to no restriction.
+        #
+        # Note that user avatar changes will not work if this is set without
+        # using Synapse's media repository.
+        #
+        #allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
+
         # How long to keep redacted events in unredacted form in the database. After
         # this period redacted events get replaced with their redacted form in the DB.
         #
@@ -1219,11 +1238,20 @@ class ServerConfig(Config):
           # information about using custom templates.
           #
           #custom_template_directory: /path/to/custom/templates/
+
+        # List of rooms to exclude from sync responses. This is useful for server
+        # administrators wishing to group users into a room without these users being able
+        # to see it from their client.
+        #
+        # By default, no room is excluded.
+        #
+        #exclude_rooms_from_sync:
+        #    - !foo:example.com
         """
             % locals()
         )
 
-    def read_arguments(self, args):
+    def read_arguments(self, args: argparse.Namespace) -> None:
         if args.manhole is not None:
             self.manhole = args.manhole
         if args.daemonize is not None:
@@ -1232,7 +1260,7 @@ class ServerConfig(Config):
             self.print_pidfile = args.print_pidfile
 
     @staticmethod
-    def add_arguments(parser):
+    def add_arguments(parser: argparse.ArgumentParser) -> None:
         server_group = parser.add_argument_group("server")
         server_group.add_argument(
             "-D",
@@ -1255,7 +1283,7 @@ class ServerConfig(Config):
             help="Turn on the twisted telnet manhole service on the given port.",
         )
 
-    def read_gc_intervals(self, durations) -> Optional[Tuple[float, float, float]]:
+    def read_gc_intervals(self, durations: Any) -> Optional[Tuple[float, float, float]]:
         """Reads the three durations for the GC min interval option, returning seconds."""
         if durations is None:
             return None
@@ -1274,14 +1302,16 @@ class ServerConfig(Config):
             )
 
 
-def is_threepid_reserved(reserved_threepids, threepid):
+def is_threepid_reserved(
+    reserved_threepids: List[JsonDict], threepid: JsonDict
+) -> bool:
     """Check the threepid against the reserved threepid config
     Args:
-        reserved_threepids([dict]) - list of reserved threepids
-        threepid(dict) - The threepid to test for
+        reserved_threepids: List of reserved threepids
+        threepid: The threepid to test for
 
     Returns:
-        boolean Is the threepid undertest reserved_user
+        Is the threepid undertest reserved_user
     """
 
     for tp in reserved_threepids:
@@ -1290,7 +1320,9 @@ def is_threepid_reserved(reserved_threepids, threepid):
     return False
 
 
-def read_gc_thresholds(thresholds):
+def read_gc_thresholds(
+    thresholds: Optional[List[Any]],
+) -> Optional[Tuple[int, int, int]]:
     """Reads the three integer thresholds for garbage collection. Ensures that
     the thresholds are integers if thresholds are supplied.
     """
@@ -1331,34 +1363,21 @@ def parse_listener_def(listener: Any) -> ListenerConfig:
 
     http_config = None
     if listener_type == "http":
+        try:
+            resources = [
+                HttpResourceConfig(**res) for res in listener.get("resources", [])
+            ]
+        except ValueError as e:
+            raise ConfigError("Unknown listener resource") from e
+
         http_config = HttpListenerConfig(
             x_forwarded=listener.get("x_forwarded", False),
-            resources=[
-                HttpResourceConfig(**res) for res in listener.get("resources", [])
-            ],
+            resources=resources,
             additional_resources=listener.get("additional_resources", {}),
             tag=listener.get("tag"),
         )
 
     return ListenerConfig(port, bind_addresses, listener_type, tls, http_config)
-
-
-NO_MORE_WEB_CLIENT_WARNING = """
-Synapse no longer includes a web client. To enable a web client, configure
-web_client_location. To remove this warning, remove 'webclient' from the 'listeners'
-configuration.
-"""
-
-
-def _warn_if_webclient_configured(listeners: Iterable[ListenerConfig]) -> None:
-    for listener in listeners:
-        if not listener.http_options:
-            continue
-        for res in listener.http_options.resources:
-            for name in res.names:
-                if name == "webclient":
-                    logger.warning(NO_MORE_WEB_CLIENT_WARNING)
-                    return
 
 
 _MANHOLE_SETTINGS_SCHEMA = {

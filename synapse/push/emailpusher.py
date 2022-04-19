@@ -21,6 +21,8 @@ from twisted.internet.interfaces import IDelayedCall
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import Pusher, PusherConfig, PusherConfigException, ThrottleParams
 from synapse.push.mailer import Mailer
+from synapse.push.push_types import EmailReason
+from synapse.storage.databases.main.event_push_actions import EmailPushAction
 from synapse.util.threepids import validate_email
 
 if TYPE_CHECKING:
@@ -64,7 +66,7 @@ class EmailPusher(Pusher):
         super().__init__(hs, pusher_config)
         self.mailer = mailer
 
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.email = pusher_config.pushkey
         self.timed_call: Optional[IDelayedCall] = None
         self.throttle_params: Dict[str, ThrottleParams] = {}
@@ -175,12 +177,12 @@ class EmailPusher(Pusher):
             return
 
         for push_action in unprocessed:
-            received_at = push_action["received_ts"]
+            received_at = push_action.received_ts
             if received_at is None:
                 received_at = 0
             notif_ready_at = received_at + DELAY_BEFORE_MAIL_MS
 
-            room_ready_at = self.room_ready_to_notify_at(push_action["room_id"])
+            room_ready_at = self.room_ready_to_notify_at(push_action.room_id)
 
             should_notify_at = max(notif_ready_at, room_ready_at)
 
@@ -190,24 +192,24 @@ class EmailPusher(Pusher):
                 # we then consider all previously outstanding notifications
                 # to be delivered.
 
-                reason = {
-                    "room_id": push_action["room_id"],
+                reason: EmailReason = {
+                    "room_id": push_action.room_id,
                     "now": self.clock.time_msec(),
                     "received_at": received_at,
                     "delay_before_mail_ms": DELAY_BEFORE_MAIL_MS,
-                    "last_sent_ts": self.get_room_last_sent_ts(push_action["room_id"]),
-                    "throttle_ms": self.get_room_throttle_ms(push_action["room_id"]),
+                    "last_sent_ts": self.get_room_last_sent_ts(push_action.room_id),
+                    "throttle_ms": self.get_room_throttle_ms(push_action.room_id),
                 }
 
                 await self.send_notification(unprocessed, reason)
 
                 await self.save_last_stream_ordering_and_success(
-                    max(ea["stream_ordering"] for ea in unprocessed)
+                    max(ea.stream_ordering for ea in unprocessed)
                 )
 
                 # we update the throttle on all the possible unprocessed push actions
                 for ea in unprocessed:
-                    await self.sent_notif_update_throttle(ea["room_id"], ea)
+                    await self.sent_notif_update_throttle(ea.room_id, ea)
                 break
             else:
                 if soonest_due_at is None or should_notify_at < soonest_due_at:
@@ -275,17 +277,17 @@ class EmailPusher(Pusher):
         return may_send_at
 
     async def sent_notif_update_throttle(
-        self, room_id: str, notified_push_action: dict
+        self, room_id: str, notified_push_action: EmailPushAction
     ) -> None:
         # We have sent a notification, so update the throttle accordingly.
         # If the event that triggered the notif happened more than
         # THROTTLE_RESET_AFTER_MS after the previous one that triggered a
         # notif, we release the throttle. Otherwise, the throttle is increased.
         time_of_previous_notifs = await self.store.get_time_of_last_push_action_before(
-            notified_push_action["stream_ordering"]
+            notified_push_action.stream_ordering
         )
 
-        time_of_this_notifs = notified_push_action["received_ts"]
+        time_of_this_notifs = notified_push_action.received_ts
 
         if time_of_previous_notifs is not None and time_of_this_notifs is not None:
             gap = time_of_this_notifs - time_of_previous_notifs
@@ -315,7 +317,9 @@ class EmailPusher(Pusher):
             self.pusher_id, room_id, self.throttle_params[room_id]
         )
 
-    async def send_notification(self, push_actions: List[dict], reason: dict) -> None:
+    async def send_notification(
+        self, push_actions: List[EmailPushAction], reason: EmailReason
+    ) -> None:
         logger.info("Sending notif email for user %r", self.user_id)
 
         await self.mailer.send_notification_mail(

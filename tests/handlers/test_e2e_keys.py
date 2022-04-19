@@ -13,37 +13,44 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Iterable
 from unittest import mock
 
+from parameterized import parameterized
 from signedjson import key as key, sign as sign
 
 from twisted.internet import defer
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import RoomEncryptionAlgorithms
 from synapse.api.errors import Codes, SynapseError
+from synapse.server import HomeServer
+from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests import unittest
+from tests.test_utils import make_awaitable
 
 
 class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         return self.setup_test_homeserver(federation_client=mock.Mock())
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.handler = hs.get_e2e_keys_handler()
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
 
-    def test_query_local_devices_no_devices(self):
+    def test_query_local_devices_no_devices(self) -> None:
         """If the user has no devices, we expect an empty list."""
         local_user = "@boris:" + self.hs.hostname
         res = self.get_success(self.handler.query_local_devices({local_user: None}))
         self.assertDictEqual(res, {local_user: {}})
 
-    def test_reupload_one_time_keys(self):
+    def test_reupload_one_time_keys(self) -> None:
         """we should be able to re-upload the same keys"""
         local_user = "@boris:" + self.hs.hostname
         device_id = "xyz"
-        keys = {
+        keys: JsonDict = {
             "alg1:k1": "key1",
             "alg2:k2": {"key": "key2", "signatures": {"k1": "sig1"}},
             "alg2:k3": {"key": "key3"},
@@ -71,7 +78,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             res, {"one_time_key_counts": {"alg1": 1, "alg2": 2, "signed_curve25519": 0}}
         )
 
-    def test_change_one_time_keys(self):
+    def test_change_one_time_keys(self) -> None:
         """attempts to change one-time-keys should be rejected"""
 
         local_user = "@boris:" + self.hs.hostname
@@ -131,7 +138,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             SynapseError,
         )
 
-    def test_claim_one_time_key(self):
+    def test_claim_one_time_key(self) -> None:
         local_user = "@boris:" + self.hs.hostname
         device_id = "xyz"
         keys = {"alg1:k1": "key1"}
@@ -158,11 +165,12 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             },
         )
 
-    def test_fallback_key(self):
+    def test_fallback_key(self) -> None:
         local_user = "@boris:" + self.hs.hostname
         device_id = "xyz"
-        fallback_key = {"alg1:k1": "key1"}
-        fallback_key2 = {"alg1:k2": "key2"}
+        fallback_key = {"alg1:k1": "fallback_key1"}
+        fallback_key2 = {"alg1:k2": "fallback_key2"}
+        fallback_key3 = {"alg1:k2": "fallback_key3"}
         otk = {"alg1:k2": "key2"}
 
         # we shouldn't have any unused fallback keys yet
@@ -175,7 +183,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             self.handler.upload_keys_for_user(
                 local_user,
                 device_id,
-                {"org.matrix.msc2732.fallback_keys": fallback_key},
+                {"fallback_keys": fallback_key},
             )
         )
 
@@ -220,7 +228,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             self.handler.upload_keys_for_user(
                 local_user,
                 device_id,
-                {"org.matrix.msc2732.fallback_keys": fallback_key},
+                {"fallback_keys": fallback_key},
             )
         )
 
@@ -234,7 +242,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             self.handler.upload_keys_for_user(
                 local_user,
                 device_id,
-                {"org.matrix.msc2732.fallback_keys": fallback_key2},
+                {"fallback_keys": fallback_key2},
             )
         )
 
@@ -271,7 +279,26 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key2}}},
         )
 
-    def test_replace_master_key(self):
+        # using the unstable prefix should also set the fallback key
+        self.get_success(
+            self.handler.upload_keys_for_user(
+                local_user,
+                device_id,
+                {"org.matrix.msc2732.fallback_keys": fallback_key3},
+            )
+        )
+
+        res = self.get_success(
+            self.handler.claim_one_time_keys(
+                {"one_time_keys": {local_user: {device_id: "alg1"}}}, timeout=None
+            )
+        )
+        self.assertEqual(
+            res,
+            {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key3}}},
+        )
+
+    def test_replace_master_key(self) -> None:
         """uploading a new signing key should make the old signing key unavailable"""
         local_user = "@boris:" + self.hs.hostname
         keys1 = {
@@ -305,7 +332,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         )
         self.assertDictEqual(devices["master_keys"], {local_user: keys2["master_key"]})
 
-    def test_reupload_signatures(self):
+    def test_reupload_signatures(self) -> None:
         """re-uploading a signature should not fail"""
         local_user = "@boris:" + self.hs.hostname
         keys1 = {
@@ -410,7 +437,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         self.assertDictEqual(devices["device_keys"][local_user]["abc"], device_key_1)
         self.assertDictEqual(devices["device_keys"][local_user]["def"], device_key_2)
 
-    def test_self_signing_key_doesnt_show_up_as_device(self):
+    def test_self_signing_key_doesnt_show_up_as_device(self) -> None:
         """signing keys should be hidden when fetching a user's devices"""
         local_user = "@boris:" + self.hs.hostname
         keys1 = {
@@ -436,10 +463,12 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         res = e.value.code
         self.assertEqual(res, 400)
 
-        res = self.get_success(self.handler.query_local_devices({local_user: None}))
-        self.assertDictEqual(res, {local_user: {}})
+        query_res = self.get_success(
+            self.handler.query_local_devices({local_user: None})
+        )
+        self.assertDictEqual(query_res, {local_user: {}})
 
-    def test_upload_signatures(self):
+    def test_upload_signatures(self) -> None:
         """should check signatures that are uploaded"""
         # set up a user with cross-signing keys and a device.  This user will
         # try uploading signatures
@@ -663,7 +692,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             other_master_key["signatures"][local_user]["ed25519:" + usersigning_pubkey],
         )
 
-    def test_query_devices_remote_no_sync(self):
+    def test_query_devices_remote_no_sync(self) -> None:
         """Tests that querying keys for a remote user that we don't share a room
         with returns the cross signing keys correctly.
         """
@@ -736,7 +765,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             },
         )
 
-    def test_query_devices_remote_sync(self):
+    def test_query_devices_remote_sync(self) -> None:
         """Tests that querying keys for a remote user that we share a room with,
         but haven't yet fetched the keys for, returns the cross signing keys
         correctly.
@@ -745,6 +774,8 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         remote_user_id = "@test:other"
         local_user_id = "@test:test"
 
+        # Pretend we're sharing a room with the user we're querying. If not,
+        # `_query_devices_for_destination` will return early.
         self.store.get_rooms_for_user = mock.Mock(
             return_value=defer.succeed({"some_room_id"})
         )
@@ -811,3 +842,94 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
                 }
             },
         )
+
+    @parameterized.expand(
+        [
+            # The remote homeserver's response indicates that this user has 0/1/2 devices.
+            ([],),
+            (["device_1"],),
+            (["device_1", "device_2"],),
+        ]
+    )
+    def test_query_all_devices_caches_result(self, device_ids: Iterable[str]) -> None:
+        """Test that requests for all of a remote user's devices are cached.
+
+        We do this by asserting that only one call over federation was made, and that
+        the two queries to the local homeserver produce the same response.
+        """
+        local_user_id = "@test:test"
+        remote_user_id = "@test:other"
+        request_body: JsonDict = {"device_keys": {remote_user_id: []}}
+
+        response_devices = [
+            {
+                "device_id": device_id,
+                "keys": {
+                    "algorithms": ["dummy"],
+                    "device_id": device_id,
+                    "keys": {f"dummy:{device_id}": "dummy"},
+                    "signatures": {device_id: {f"dummy:{device_id}": "dummy"}},
+                    "unsigned": {},
+                    "user_id": "@test:other",
+                },
+            }
+            for device_id in device_ids
+        ]
+
+        response_body = {
+            "devices": response_devices,
+            "user_id": remote_user_id,
+            "stream_id": 12345,  # an integer, according to the spec
+        }
+
+        e2e_handler = self.hs.get_e2e_keys_handler()
+
+        # Pretend we're sharing a room with the user we're querying. If not,
+        # `_query_devices_for_destination` will return early.
+        mock_get_rooms = mock.patch.object(
+            self.store,
+            "get_rooms_for_user",
+            new_callable=mock.MagicMock,
+            return_value=make_awaitable(["some_room_id"]),
+        )
+        mock_request = mock.patch.object(
+            self.hs.get_federation_client(),
+            "query_user_devices",
+            new_callable=mock.MagicMock,
+            return_value=make_awaitable(response_body),
+        )
+
+        with mock_get_rooms, mock_request as mocked_federation_request:
+            # Make the first query and sanity check it succeeds.
+            response_1 = self.get_success(
+                e2e_handler.query_devices(
+                    request_body,
+                    timeout=10,
+                    from_user_id=local_user_id,
+                    from_device_id="some_device_id",
+                )
+            )
+            self.assertEqual(response_1["failures"], {})
+
+            # We should have made a federation request to do so.
+            mocked_federation_request.assert_called_once()
+
+            # Reset the mock so we can prove we don't make a second federation request.
+            mocked_federation_request.reset_mock()
+
+            # Repeat the query.
+            response_2 = self.get_success(
+                e2e_handler.query_devices(
+                    request_body,
+                    timeout=10,
+                    from_user_id=local_user_id,
+                    from_device_id="some_device_id",
+                )
+            )
+            self.assertEqual(response_2["failures"], {})
+
+            # We should not have made a second federation request.
+            mocked_federation_request.assert_not_called()
+
+            # The two requests to the local homeserver should be identical.
+            self.assertEqual(response_1, response_2)

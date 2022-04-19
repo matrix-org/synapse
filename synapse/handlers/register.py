@@ -1,4 +1,5 @@
 # Copyright 2014 - 2016 OpenMarket Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -85,7 +86,7 @@ class LoginDict(TypedDict):
 
 class RegistrationHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.hs = hs
         self.auth = hs.get_auth()
@@ -116,6 +117,9 @@ class RegistrationHandler:
             self.pusher_pool = hs.get_pusherpool()
 
         self.session_lifetime = hs.config.registration.session_lifetime
+        self.nonrefreshable_access_token_lifetime = (
+            hs.config.registration.nonrefreshable_access_token_lifetime
+        )
         self.refreshable_access_token_lifetime = (
             hs.config.registration.refreshable_access_token_lifetime
         )
@@ -128,6 +132,7 @@ class RegistrationHandler:
         localpart: str,
         guest_access_token: Optional[str] = None,
         assigned_user_id: Optional[str] = None,
+        inhibit_user_in_use_error: bool = False,
     ) -> None:
         if types.contains_invalid_mxid_characters(localpart):
             raise SynapseError(
@@ -167,21 +172,22 @@ class RegistrationHandler:
 
         users = await self.store.get_users_by_id_case_insensitive(user_id)
         if users:
-            if not guest_access_token:
+            if not inhibit_user_in_use_error and not guest_access_token:
                 raise SynapseError(
                     400, "User ID already taken.", errcode=Codes.USER_IN_USE
                 )
-            user_data = await self.auth.get_user_by_access_token(guest_access_token)
-            if (
-                not user_data.is_guest
-                or UserID.from_string(user_data.user_id).localpart != localpart
-            ):
-                raise AuthError(
-                    403,
-                    "Cannot register taken user ID without valid guest "
-                    "credentials for that user.",
-                    errcode=Codes.FORBIDDEN,
-                )
+            if guest_access_token:
+                user_data = await self.auth.get_user_by_access_token(guest_access_token)
+                if (
+                    not user_data.is_guest
+                    or UserID.from_string(user_data.user_id).localpart != localpart
+                ):
+                    raise AuthError(
+                        403,
+                        "Cannot register taken user ID without valid guest "
+                        "credentials for that user.",
+                        errcode=Codes.FORBIDDEN,
+                    )
 
         if guest_access_token is None:
             try:
@@ -314,12 +320,12 @@ class RegistrationHandler:
                 if fail_count > 10:
                     raise SynapseError(500, "Unable to find a suitable guest user ID")
 
-                localpart = await self.store.generate_user_id()
-                user = UserID(localpart, self.hs.hostname)
+                generated_localpart = await self.store.generate_user_id()
+                user = UserID(generated_localpart, self.hs.hostname)
                 user_id = user.to_string()
                 self.check_user_id_not_appservice_exclusive(user_id)
                 if generate_display_name:
-                    default_display_name = localpart
+                    default_display_name = generated_localpart
                 try:
                     await self.register_with_store(
                         user_id=user_id,
@@ -742,6 +748,7 @@ class RegistrationHandler:
         is_appservice_ghost: bool = False,
         auth_provider_id: Optional[str] = None,
         should_issue_refresh_token: bool = False,
+        auth_provider_session_id: Optional[str] = None,
     ) -> Tuple[str, str, Optional[int], Optional[str]]:
         """Register a device for a user and generate an access token.
 
@@ -752,9 +759,9 @@ class RegistrationHandler:
             device_id: The device ID to check, or None to generate a new one.
             initial_display_name: An optional display name for the device.
             is_guest: Whether this is a guest account
-            auth_provider_id: The SSO IdP the user used, if any (just used for the
-                prometheus metrics).
+            auth_provider_id: The SSO IdP the user used, if any.
             should_issue_refresh_token: Whether it should also issue a refresh token
+            auth_provider_session_id: The session ID received during login from the SSO IdP.
         Returns:
             Tuple of device ID, access token, access token expiration time and refresh token
         """
@@ -765,6 +772,8 @@ class RegistrationHandler:
             is_guest=is_guest,
             is_appservice_ghost=is_appservice_ghost,
             should_issue_refresh_token=should_issue_refresh_token,
+            auth_provider_id=auth_provider_id,
+            auth_provider_session_id=auth_provider_session_id,
         )
 
         login_counter.labels(
@@ -787,6 +796,8 @@ class RegistrationHandler:
         is_guest: bool = False,
         is_appservice_ghost: bool = False,
         should_issue_refresh_token: bool = False,
+        auth_provider_id: Optional[str] = None,
+        auth_provider_session_id: Optional[str] = None,
     ) -> LoginDict:
         """Helper for register_device
 
@@ -794,26 +805,45 @@ class RegistrationHandler:
         class and RegisterDeviceReplicationServlet.
         """
         assert not self.hs.config.worker.worker_app
+        now_ms = self.clock.time_msec()
         access_token_expiry = None
         if self.session_lifetime is not None:
             if is_guest:
                 raise Exception(
                     "session_lifetime is not currently implemented for guest access"
                 )
-            access_token_expiry = self.clock.time_msec() + self.session_lifetime
+            access_token_expiry = now_ms + self.session_lifetime
+
+        if self.nonrefreshable_access_token_lifetime is not None:
+            if access_token_expiry is not None:
+                # Don't allow the non-refreshable access token to outlive the
+                # session.
+                access_token_expiry = min(
+                    now_ms + self.nonrefreshable_access_token_lifetime,
+                    access_token_expiry,
+                )
+            else:
+                access_token_expiry = now_ms + self.nonrefreshable_access_token_lifetime
 
         refresh_token = None
         refresh_token_id = None
 
         registered_device_id = await self.device_handler.check_device_registered(
-            user_id, device_id, initial_display_name
+            user_id,
+            device_id,
+            initial_display_name,
+            auth_provider_id=auth_provider_id,
+            auth_provider_session_id=auth_provider_session_id,
         )
         if is_guest:
             assert access_token_expiry is None
             access_token = self.macaroon_gen.generate_guest_access_token(user_id)
         else:
             if should_issue_refresh_token:
-                now_ms = self.clock.time_msec()
+                # A refreshable access token lifetime must be configured
+                # since we're told to issue a refresh token (the caller checks
+                # that this value is set before setting this flag).
+                assert self.refreshable_access_token_lifetime is not None
 
                 # Set the expiry time of the refreshable access token
                 access_token_expiry = now_ms + self.refreshable_access_token_lifetime
