@@ -1077,6 +1077,25 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         # only has a thread attached.
         self.assertNotIn("m.relations", thread_summary["latest_event"]["unsigned"])
 
+        # Ensure that requesting the room messages also does not return the sub-thread.
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/messages?dir=b",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        event = self._find_event_in_chunk(channel.json_body["chunk"])
+        relations = event["unsigned"]["m.relations"]
+
+        # The latest event should have bundled aggregations.
+        self.assertIn(RelationTypes.THREAD, relations)
+        thread_summary = relations[RelationTypes.THREAD]
+        self.assertIn("latest_event", thread_summary)
+
+        # The latest event should not have any bundled aggregations (since it
+        # only has a thread attached.
+        self.assertNotIn("m.relations", thread_summary["latest_event"]["unsigned"])
+
     def test_thread_edit_latest_event(self) -> None:
         """Test that editing the latest event in a thread works."""
 

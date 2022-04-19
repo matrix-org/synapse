@@ -510,11 +510,18 @@ class EventClientSerializer:
                 "sender": edit.sender,
             }
 
-        # If this event is the start of a thread, include a summary of the replies.
-        if event_aggregations.thread:
+        # Include any threaded replies to this event.
+        #
+        # Note that is it not valid to start a thread on an event which already
+        # has a relation. Doing so would cause an infinite loop.
+        event_relation = event.content.get("m.relates_to")
+        include_thread = (
+            not isinstance(event_relation, dict)
+            or event_relation.get("rel_type") is None
+        )
+        if include_thread and event_aggregations.thread:
             thread = event_aggregations.thread
 
-            # Don't bundle aggregations as this could recurse forever.
             serialized_latest_event = self.serialize_event(
                 thread.latest_event,
                 time_now,
