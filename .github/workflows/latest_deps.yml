@@ -38,9 +38,9 @@ jobs:
         with:
           python-version: "3.x"
       # Lacking a `pip install --upgrade-literally-everything` option, concoct our own.
-      - run: "poetry run pip freeze | cut -d' ' -f 1 | xargs pip install --upgrade --upgrade-strategy eager"
+      - run: "poetry run pip freeze | cut -d' ' -f 1 | xargs poetry run pip install --upgrade --upgrade-strategy eager"
       # Dump installed versions for debugging
-      - run: pip freeze
+      - run: poetry run pip freeze
       - run: poetry run mypy
   trial:
     runs-on: ubuntu-latest
