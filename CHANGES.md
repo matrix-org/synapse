@@ -3,7 +3,7 @@ Synapse 1.57.0 (2022-04-19)
 
 This version includes a [change](https://github.com/matrix-org/synapse/pull/12209) to the way transaction IDs are managed for application services. If your deployment uses a dedicated worker for application service traffic, **it must be stopped** when the database is upgraded (which normally happens when the main process is upgraded), to ensure the change is made safely without any risk of reusing transaction IDs.
 
-See the [upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1570) for more details.
+See the [upgrade notes](https://github.com/matrix-org/synapse/blob/v1.57.0rc1/docs/upgrade.md#upgrading-to-v1570) for more details.
 
 No significant changes since 1.57.0rc1.
 
