@@ -2,6 +2,101 @@
 
 This is a quick cheat sheet for developers on how to use [`poetry`](https://python-poetry.org/).
 
+# Background
+
+Synapse uses a variety of third-party Python packages to function as a homeserver.
+Some of these are direct dependencies, listed in `pyproject.toml` under the
+`[tool.poetry.dependencies]` section. The rest are transitive dependencies (the
+things that our direct dependencies themselves depend on, and so on recursively.)
+
+We maintain a locked list of all our dependencies (transitive included) so that
+we can track exactly which version of each dependency appears in a given release.
+See [here](https://github.com/matrix-org/synapse/issues/11537#issue-1074469665)
+for discussion of why we wanted this for Synapse. We chose to use
+[`poetry`](https://python-poetry.org/) to manage this locked list; see
+[this comment](https://github.com/matrix-org/synapse/issues/11537#issuecomment-1015975819)
+for the reasoning.
+
+The locked dependencies get included in our "self-contained" releases: namely,
+our docker images and our debian packages. We also use the locked dependencies
+in development and our continuous integration.
+
+Separately, our "broad" dependencies—the version ranges specified in
+`pyproject.toml`—are included as metadata in our "sdists" and "wheels" [uploaded
+to PyPI](https://pypi.org/project/matrix-synapse). Installing from PyPI or from
+the Synapse source tree directly will _not_ use the locked dependencies; instead,
+they'll pull in the latest version of each package available at install time.
+
+## Example dependency
+
+An example may help. We have a broad dependency on
+[`phonenumbers`](https://pypi.org/project/phonenumbers/), as declared in
+this snippet from pyproject.toml [as of Synapse 1.57](
+https://github.com/matrix-org/synapse/blob/release-v1.57/pyproject.toml#L133
+):
+
+```toml
+[tool.poetry.dependencies]
+# ...
+phonenumbers = ">=8.2.0"
+```
+
+In our lockfile this is
+[pinned]( https://github.com/matrix-org/synapse/blob/dfc7646504cef3e4ff396c36089e1c6f1b1634de/poetry.lock#L679-L685)
+to version 8.12.44, even though
+[newer versions are available](https://pypi.org/project/phonenumbers/#history).
+
+```toml
+[[package]]
+name = "phonenumbers"
+version = "8.12.44"
+description = "Python version of Google's common library for parsing, formatting, storing and validating international phone numbers."
+category = "main"
+optional = false
+python-versions = "*"
+```
+
+The lockfile also includes a
+[cryptographic checksum](https://github.com/matrix-org/synapse/blob/release-v1.57/poetry.lock#L2178-L2181)
+of the sdists and wheels provided for this version of `phonenumbers`.
+
+```toml
+[metadata.files]
+# ...
+phonenumbers = [
+    {file = "phonenumbers-8.12.44-py2.py3-none-any.whl", hash = "sha256:cc1299cf37b309ecab6214297663ab86cb3d64ae37fd5b88e904fe7983a874a6"},
+    {file = "phonenumbers-8.12.44.tar.gz", hash = "sha256:26cfd0257d1704fe2f88caff2caabb70d16a877b1e65b6aae51f9fbbe10aa8ce"},
+]
+```
+
+We can see this pinned version inside the docker image for that release:
+
+```
+$ docker pull matrixdotorg/synapse:v1.57.0
+...
+$ docker run --entrypoint pip matrixdotorg/synapse:v1.57.0 show phonenumbers
+Name: phonenumbers
+Version: 8.12.44
+Summary: Python version of Google's common library for parsing, formatting, storing and validating international phone numbers.
+Home-page: https://github.com/daviddrysdale/python-phonenumbers
+Author: David Drysdale
+Author-email: dmd@lurklurk.org
+License: Apache License 2.0
+Location: /usr/local/lib/python3.9/site-packages
+Requires:
+Required-by: matrix-synapse
+```
+
+Whereas the wheel metadata just contains the broad dependencies:
+
+```
+$ cd /tmp
+$ wget https://files.pythonhosted.org/packages/ca/5e/d722d572cc5b3092402b783d6b7185901b444427633bd8a6b00ea0dd41b7/matrix_synapse-1.57.0rc1-py3-none-any.whl
+...
+$ unzip -c matrix_synapse-1.57.0rc1-py3-none-any.whl matrix_synapse-1.57.0rc1.dist-info/METADATA | grep phonenumbers
+Requires-Dist: phonenumbers (>=8.2.0)
+```
+
 # Tooling recommendation: direnv
 
 [`direnv`](https://direnv.net/) is a tool for activating environments in your
