@@ -81,3 +81,9 @@ class ExperimentalConfig(Config):
 
         # MSC2654: Unread counts
         self.msc2654_enabled: bool = experimental.get("msc2654_enabled", False)
+
+        # Allow for the configuration of max request retries and min/max retry delays
+        # in the matrix federation client
+        self.max_long_retry_delay = experimental.get("max_long_retry_delay", 60)
+        self.min_retry_delay = experimental.get("min_retry_delay", 2)
+        self.max_long_retries = experimental.get("max_long_retries", 10)
