@@ -37,6 +37,7 @@ jobs:
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: "3.x"
+          poetry-version: "1.2.0b1"
       # Dump installed versions for debugging.
       - run: poetry run pip list > before.txt
       # Upgrade all runtime dependencies only. This is intended to mimic a fresh
