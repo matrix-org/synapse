@@ -41,15 +41,7 @@ jobs:
       - run: poetry run pip list > before.txt
       # Upgrade all runtime dependencies only. This is intended to mimic a fresh
       # `pip install matrix-synapse[all]` as closely as possible.
-      # AFAICS this will update transitive dependencies. E.g. try
-      #     pip install requests==2.24.0 idna==2.8
-      #     pip install --upgrade --upgrade-strategy eager requests
-      # The second command should update both requests and idna.
-      - run: poetry run pip install .[all] --upgrade --upgrade-strategy eager
-      # Doing the above makes mypy not process its list of ignores for some reason.
-      # I think this is because the above does a normal install of matrix-synapse rather
-      # than an editable install. We workaround this by uninstalling matrix-synapse.
-      - run: poetry run pip uninstall -y matrix-synapse
+      - run: poetry update --no-dev
       - run: poetry run pip list > after.txt && (diff -u before.txt after.txt || true)
       - run: poetry run mypy
   trial:
