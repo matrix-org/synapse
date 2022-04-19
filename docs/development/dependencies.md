@@ -2,7 +2,7 @@
 
 This is a quick cheat sheet for developers on how to use [`poetry`](https://python-poetry.org/).
 
-# Recommendation: direnv
+# Tooling recommendation: direnv
 
 [`direnv`](https://direnv.net/) is a tool for activating environments in your
 shell inside a given directory. Its support for poetry is unofficial (a 
@@ -66,6 +66,7 @@ Either:
 - manually update `pyproject.toml`; then `poetry lock --no-update`; or else
 - `poetry add packagename`. See `poetry add --help`; note the `--dev`,
   `--extras` and `--optional` flags in particular.
+  - **NB**: this specifies the new package with a version given by a "caret bound". This won't get forced to its lowest version in the old deps CI job: see [this TODO](https://github.com/matrix-org/synapse/blob/4e1374373857f2f7a911a31c50476342d9070681/.ci/scripts/test_old_deps.sh#L35-L39).
 
 Include the updated `pyproject.toml` and `poetry.lock` files in your commit.
 
@@ -130,7 +131,7 @@ be required.
 I usually use
 
 ```shell
-`poetry run pip install build && poetry run python -m build
+poetry run pip install build && poetry run python -m build
 ```
 
 because [`build`](https://github.com/pypa/build) is a standardish tool which 
