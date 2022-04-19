@@ -206,6 +206,29 @@ backend matrix
   server matrix 127.0.0.1:8008
 ```
 
+
+[Delegation](delegate.md) example:
+```
+frontend https
+  acl wellknownc path /.well-known/matrix/client
+  acl wellknowns path /.well-known/matrix/server
+  use_backend WKcli if wellknownc
+  use_backend WKserv if wellknowns
+ 
+backend WKcli
+  http-after-response set-header Access-Control-Allow-Origin "*"
+  http-after-response set-header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+  http-after-response set-header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+  http-request return status 200 content-type application/json string '{"m.homeserver":{"base_url":"https://matrix.example.com"}}'
+
+backend WKserv
+  http-after-response set-header Access-Control-Allow-Origin "*"
+  http-after-response set-header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+  http-after-response set-header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+  http-request return status 200 content-type application/json string '{"m.server":"matrix.example.com:443"}'
+
+```
+
 ### Relayd
 
 ```
