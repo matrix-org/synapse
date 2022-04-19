@@ -83,7 +83,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         )
 
         # mock up the response, and have the agent return it
-        self._mock_agent.request.return_value = defer.succeed(
+        self._mock_agent.request.side_effect = lambda *args, **kwargs: defer.succeed(
             _mock_response(
                 {
                     "pdus": [

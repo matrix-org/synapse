@@ -65,11 +65,11 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         # we mock out the keyring so as to skip the authentication check on the
         # federation API call.
         mock_keyring = Mock(spec=["verify_json_for_server"])
-        mock_keyring.verify_json_for_server.return_value = defer.succeed(True)
+        mock_keyring.verify_json_for_server.return_value = make_awaitable(True)
 
         # we mock out the federation client too
         mock_federation_client = Mock(spec=["put_json"])
-        mock_federation_client.put_json.return_value = defer.succeed((200, "OK"))
+        mock_federation_client.put_json.return_value = make_awaitable((200, "OK"))
 
         # the tests assume that we are starting at unix time 1000
         reactor.pump((1000,))
@@ -98,7 +98,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.datastore = hs.get_datastores().main
         self.datastore.get_destination_retry_timings = Mock(
-            return_value=defer.succeed(None)
+            return_value=make_awaitable(None)
         )
 
         self.datastore.get_device_updates_by_remote = Mock(

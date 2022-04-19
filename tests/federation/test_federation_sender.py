@@ -226,7 +226,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         # Send the server a device list EDU for the other user, this will cause
         # it to try and resync the device lists.
         self.hs.get_federation_transport_client().query_user_devices.return_value = (
-            defer.succeed(
+            make_awaitable(
                 {
                     "stream_id": "1",
                     "user_id": "@user2:host2",

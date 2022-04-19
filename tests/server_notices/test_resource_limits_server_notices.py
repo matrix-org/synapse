@@ -14,8 +14,6 @@
 
 from unittest.mock import Mock
 
-from twisted.internet import defer
-
 from synapse.api.constants import EventTypes, LimitBlockingTypes, ServerNoticeMsgType
 from synapse.api.errors import ResourceLimitError
 from synapse.rest import admin
@@ -68,16 +66,16 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
             return_value=make_awaitable(1000)
         )
         self._rlsn._server_notices_manager.send_notice = Mock(
-            return_value=defer.succeed(Mock())
+            return_value=make_awaitable(Mock())
         )
         self._send_notice = self._rlsn._server_notices_manager.send_notice
 
         self.user_id = "@user_id:test"
 
         self._rlsn._server_notices_manager.get_or_create_notice_room_for_user = Mock(
-            return_value=defer.succeed("!something:localhost")
+            return_value=make_awaitable("!something:localhost")
         )
-        self._rlsn._store.add_tag_to_room = Mock(return_value=defer.succeed(None))
+        self._rlsn._store.add_tag_to_room = Mock(return_value=make_awaitable(None))
         self._rlsn._store.get_tags_for_room = Mock(return_value=make_awaitable({}))
 
     @override_config({"hs_disabled": True})
@@ -95,7 +93,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
     def test_maybe_send_server_notice_to_user_remove_blocked_notice(self):
         """Test when user has blocked notice, but should have it removed"""
 
-        self._rlsn._auth.check_auth_blocking = Mock(return_value=defer.succeed(None))
+        self._rlsn._auth.check_auth_blocking = Mock(return_value=make_awaitable(None))
         mock_event = Mock(
             type=EventTypes.Message, content={"msgtype": ServerNoticeMsgType}
         )
@@ -111,7 +109,8 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         Test when user has blocked notice, but notice ought to be there (NOOP)
         """
         self._rlsn._auth.check_auth_blocking = Mock(
-            return_value=defer.succeed(None), side_effect=ResourceLimitError(403, "foo")
+            return_value=make_awaitable(None),
+            side_effect=ResourceLimitError(403, "foo"),
         )
 
         mock_event = Mock(
@@ -130,7 +129,8 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         Test when user does not have blocked notice, but should have one
         """
         self._rlsn._auth.check_auth_blocking = Mock(
-            return_value=defer.succeed(None), side_effect=ResourceLimitError(403, "foo")
+            return_value=make_awaitable(None),
+            side_effect=ResourceLimitError(403, "foo"),
         )
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
 
@@ -141,7 +141,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         """
         Test when user does not have blocked notice, nor should they (NOOP)
         """
-        self._rlsn._auth.check_auth_blocking = Mock(return_value=defer.succeed(None))
+        self._rlsn._auth.check_auth_blocking = Mock(return_value=make_awaitable(None))
 
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
 
@@ -152,7 +152,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         Test when user is not part of the MAU cohort - this should not ever
         happen - but ...
         """
-        self._rlsn._auth.check_auth_blocking = Mock(return_value=defer.succeed(None))
+        self._rlsn._auth.check_auth_blocking = Mock(return_value=make_awaitable(None))
         self._rlsn._store.user_last_seen_monthly_active = Mock(
             return_value=make_awaitable(None)
         )
@@ -167,7 +167,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         an alert message is not sent into the room
         """
         self._rlsn._auth.check_auth_blocking = Mock(
-            return_value=defer.succeed(None),
+            return_value=make_awaitable(None),
             side_effect=ResourceLimitError(
                 403, "foo", limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER
             ),
@@ -182,7 +182,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         Test that when a server is disabled, that MAU limit alerting is ignored.
         """
         self._rlsn._auth.check_auth_blocking = Mock(
-            return_value=defer.succeed(None),
+            return_value=make_awaitable(None),
             side_effect=ResourceLimitError(
                 403, "foo", limit_type=LimitBlockingTypes.HS_DISABLED
             ),
@@ -199,14 +199,14 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         is suppressed that the room is returned to an unblocked state.
         """
         self._rlsn._auth.check_auth_blocking = Mock(
-            return_value=defer.succeed(None),
+            return_value=make_awaitable(None),
             side_effect=ResourceLimitError(
                 403, "foo", limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER
             ),
         )
 
         self._rlsn._server_notices_manager.__is_room_currently_blocked = Mock(
-            return_value=defer.succeed((True, []))
+            return_value=make_awaitable((True, []))
         )
 
         mock_event = Mock(

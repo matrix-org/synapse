@@ -22,7 +22,6 @@ from typing import Any, Dict, Iterable, List, Optional
 from unittest.mock import Mock, call
 from urllib import parse as urlparse
 
-from twisted.internet import defer
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
@@ -1426,9 +1425,7 @@ class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
 
     def test_simple(self) -> None:
         "Simple test for searching rooms over federation"
-        self.federation_client.get_public_rooms.side_effect = lambda *a, **k: defer.succeed(  # type: ignore[attr-defined]
-            {}
-        )
+        self.federation_client.get_public_rooms.return_value = make_awaitable({})  # type: ignore[attr-defined]
 
         search_filter = {"generic_search_term": "foobar"}
 
@@ -1456,7 +1453,7 @@ class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
         # with a 404, when using search filters.
         self.federation_client.get_public_rooms.side_effect = (  # type: ignore[attr-defined]
             HttpResponseException(404, "Not Found", b""),
-            defer.succeed({}),
+            make_awaitable({}),
         )
 
         search_filter = {"generic_search_term": "foobar"}
