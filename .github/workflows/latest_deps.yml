@@ -39,19 +39,18 @@ jobs:
           python-version: "3.x"
       # Dump installed versions for debugging.
       - run: poetry run pip list > before.txt
-      # Work out which packages we want pip to upgrade. We use sed to strip out the
-      # version numbers from `poetry export`'s output.
-      - run: >-
-          poetry export --extras all --without-hashes
-          | sed -Ee 's/^([^=]+)==[^;]+/\1/'
-          > requirements.txt
-      # Upgrade all runtime dependencies to their latest version. This is intended to
-      # mimic a fresh `pip install matrix-synapse[all]` as closely as possible.
-      - run: poetry run pip install --upgrade --upgrade-strategy eager -r requirements.txt
-      # Dump the changes for confirmation and debugging.
-      - run: poetry run pip list | tee after.txt
-      - run: diff -u before.txt after.txt || true
-      # Now we can finally typecheck.
+      # Upgrade all runtime dependencies only. This is intended to mimic a fresh
+      # `pip install matrix-synapse[all]` as closely as possible.
+      # AFAICS this will update transitive dependencies. E.g. try
+      #     pip install requests==2.24.0 idna==2.8
+      #     pip install --upgrade --upgrade-strategy eager requests
+      # The second command should update both requests and idna.
+      - run: poetry run pip install .[all] --upgrade --upgrade-strategy eager
+      # Doing the above makes mypy not process its list of ignores for some reason.
+      # I think this is because the above does a normal install of matrix-synapse rather
+      # than an editable install. We workaround this by uninstalling matrix-synapse.
+      - run: poetry run pip uninstall matrix-synapse
+      - run: poetry run pip list > after.txt && (diff -u before.txt after.txt || true)
       - run: poetry run mypy
   trial:
     runs-on: ubuntu-latest
