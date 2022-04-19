@@ -115,7 +115,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - name: Ensure systest runs `pip install`
+      - name: Ensure sytest runs `pip install`
         # Delete the lockfile so sytest will `pip install` rather than `poetry install`
         run: rm /src/poetry.lock
         working-directory: /src
