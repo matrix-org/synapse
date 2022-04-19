@@ -380,13 +380,16 @@ class RelationsTestCase(BaseRelationsTestCase):
                 {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
             )
 
+        # /event should return the *original* event
         channel = self.make_request(
             "GET",
             f"/rooms/{self.room}/event/{self.parent_id}",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
-        self.assertEqual(channel.json_body["content"], new_body)
+        self.assertEqual(
+            channel.json_body["content"], {"body": "Hi!", "msgtype": "m.text"}
+        )
         assert_bundle(channel.json_body)
 
         # Request the room messages.
@@ -399,6 +402,7 @@ class RelationsTestCase(BaseRelationsTestCase):
         assert_bundle(self._find_event_in_chunk(channel.json_body["chunk"]))
 
         # Request the room context.
+        # /context should return the edited event.
         channel = self.make_request(
             "GET",
             f"/rooms/{self.room}/context/{self.parent_id}",
@@ -406,6 +410,7 @@ class RelationsTestCase(BaseRelationsTestCase):
         )
         self.assertEqual(200, channel.code, channel.json_body)
         assert_bundle(channel.json_body["event"])
+        self.assertEqual(channel.json_body["event"]["content"], new_body)
 
         # Request sync, but limit the timeline so it becomes limited (and includes
         # bundled aggregations).
@@ -470,14 +475,14 @@ class RelationsTestCase(BaseRelationsTestCase):
 
         channel = self.make_request(
             "GET",
-            f"/rooms/{self.room}/event/{self.parent_id}",
+            f"/rooms/{self.room}/context/{self.parent_id}",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
 
-        self.assertEqual(channel.json_body["content"], new_body)
+        self.assertEqual(channel.json_body["event"]["content"], new_body)
 
-        relations_dict = channel.json_body["unsigned"].get("m.relations")
+        relations_dict = channel.json_body["event"]["unsigned"].get("m.relations")
         self.assertIn(RelationTypes.REPLACE, relations_dict)
 
         m_replace_dict = relations_dict[RelationTypes.REPLACE]
@@ -492,10 +497,9 @@ class RelationsTestCase(BaseRelationsTestCase):
         """Test that editing a reply works."""
 
         # Create a reply to edit.
+        original_body = {"msgtype": "m.text", "body": "A reply!"}
         channel = self._send_relation(
-            RelationTypes.REFERENCE,
-            "m.room.message",
-            content={"msgtype": "m.text", "body": "A reply!"},
+            RelationTypes.REFERENCE, "m.room.message", content=original_body
         )
         reply = channel.json_body["event_id"]
 
@@ -508,38 +512,54 @@ class RelationsTestCase(BaseRelationsTestCase):
         )
         edit_event_id = channel.json_body["event_id"]
 
+        # /event returns the original event
         channel = self.make_request(
             "GET",
             f"/rooms/{self.room}/event/{reply}",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
+        event_result = channel.json_body
+        self.assertDictContainsSubset(original_body, event_result["content"])
 
-        # We expect to see the new body in the dict, as well as the reference
-        # metadata sill intact.
-        self.assertDictContainsSubset(new_body, channel.json_body["content"])
-        self.assertDictContainsSubset(
-            {
-                "m.relates_to": {
-                    "event_id": self.parent_id,
-                    "rel_type": "m.reference",
-                }
-            },
-            channel.json_body["content"],
+        # also check /context, which returns the *edited* event
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/context/{reply}",
+            access_token=self.user_token,
         )
+        self.assertEqual(200, channel.code, channel.json_body)
+        context_result = channel.json_body["event"]
 
-        # We expect that the edit relation appears in the unsigned relations
-        # section.
-        relations_dict = channel.json_body["unsigned"].get("m.relations")
-        self.assertIn(RelationTypes.REPLACE, relations_dict)
+        # check that the relations are correct for both APIs
+        for result_event_dict, desc in (
+            (event_result, "/event"),
+            (context_result, "/context"),
+        ):
+            # The reference metadata should still be intact.
+            self.assertDictContainsSubset(
+                {
+                    "m.relates_to": {
+                        "event_id": self.parent_id,
+                        "rel_type": "m.reference",
+                    }
+                },
+                result_event_dict["content"],
+                desc,
+            )
 
-        m_replace_dict = relations_dict[RelationTypes.REPLACE]
-        for key in ["event_id", "sender", "origin_server_ts"]:
-            self.assertIn(key, m_replace_dict)
+            # We expect that the edit relation appears in the unsigned relations
+            # section.
+            relations_dict = result_event_dict["unsigned"].get("m.relations")
+            self.assertIn(RelationTypes.REPLACE, relations_dict, desc)
 
-        self.assert_dict(
-            {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
-        )
+            m_replace_dict = relations_dict[RelationTypes.REPLACE]
+            for key in ["event_id", "sender", "origin_server_ts"]:
+                self.assertIn(key, m_replace_dict, desc)
+
+            self.assert_dict(
+                {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
+            )
 
     def test_edit_thread(self) -> None:
         """Test that editing a thread works."""
@@ -605,18 +625,30 @@ class RelationsTestCase(BaseRelationsTestCase):
         )
 
         # Request the original event.
+        # /event should return the original event.
         channel = self.make_request(
             "GET",
             f"/rooms/{self.room}/event/{self.parent_id}",
             access_token=self.user_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
-        # The edit to the edit should be ignored.
-        self.assertEqual(channel.json_body["content"], new_body)
+        self.assertEqual(
+            channel.json_body["content"], {"body": "Hi!", "msgtype": "m.text"}
+        )
 
         # The relations information should not include the edit to the edit.
         relations_dict = channel.json_body["unsigned"].get("m.relations")
         self.assertIn(RelationTypes.REPLACE, relations_dict)
+
+        # /context should return the event updated for the *first* edit
+        # (The edit to the edit should be ignored.)
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/context/{self.parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        self.assertEqual(channel.json_body["event"]["content"], new_body)
 
         m_replace_dict = relations_dict[RelationTypes.REPLACE]
         for key in ["event_id", "sender", "origin_server_ts"]:
