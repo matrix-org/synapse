@@ -402,6 +402,7 @@ class EventClientSerializer:
         *,
         config: SerializeEventConfig = _DEFAULT_SERIALIZE_EVENT_CONFIG,
         bundle_aggregations: Optional[Dict[str, "BundledAggregations"]] = None,
+        apply_edits: bool = True,
     ) -> JsonDict:
         """Serializes a single event.
 
@@ -409,10 +410,10 @@ class EventClientSerializer:
             event: The event being serialized.
             time_now: The current time in milliseconds
             config: Event serialization config
-            bundle_aggregations: Whether to include the bundled aggregations for this
-                event. Only applies to non-state events. (State events never include
-                bundled aggregations.)
-
+            bundle_aggregations: A map from event_id to the aggregations to be bundled
+               into the event.
+            apply_edits: Whether the content of the event should be modified to reflect
+               any replacement in `bundle_aggregations[<event_id>].replace`.
         Returns:
             The serialized event
         """
@@ -431,6 +432,7 @@ class EventClientSerializer:
                     config,
                     bundle_aggregations,
                     serialized_event,
+                    apply_edits=apply_edits,
                 )
 
         return serialized_event
@@ -469,6 +471,7 @@ class EventClientSerializer:
         config: SerializeEventConfig,
         bundled_aggregations: Dict[str, "BundledAggregations"],
         serialized_event: JsonDict,
+        apply_edits: bool,
     ) -> None:
         """Potentially injects bundled aggregations into the unsigned portion of the serialized event.
 
@@ -478,7 +481,8 @@ class EventClientSerializer:
             bundled_aggregations: The bundled aggregation to serialize.
             serialized_event: The serialized event which may be modified.
             config: Event serialization config
-
+            apply_edits: Whether the content of the event should be modified to reflect
+               any replacement in `aggregations.replace`.
         """
 
         # We have already checked that aggregations exist for this event.
@@ -499,9 +503,10 @@ class EventClientSerializer:
             ] = event_aggregations.references
 
         if event_aggregations.replace:
-            # If there is an edit, apply it to the event.
+            # If there is an edit, optionally apply it to the event.
             edit = event_aggregations.replace
-            self._apply_edit(event, serialized_event, edit)
+            if apply_edits:
+                self._apply_edit(event, serialized_event, edit)
 
             # Include information about it in the relations dict.
             serialized_aggregations[RelationTypes.REPLACE] = {

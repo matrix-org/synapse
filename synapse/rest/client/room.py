@@ -669,8 +669,10 @@ class RoomEventServlet(RestServlet):
             )
 
             time_now = self.clock.time_msec()
+            # per MSC2676, /rooms/{roomId}/event/{eventId}, should return the
+            # *original* event, rather than the edited version
             event_dict = self._event_serializer.serialize_event(
-                event, time_now, bundle_aggregations=aggregations
+                event, time_now, bundle_aggregations=aggregations, apply_edits=False
             )
             return 200, event_dict
 
