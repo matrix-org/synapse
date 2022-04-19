@@ -78,3 +78,6 @@ class ExperimentalConfig(Config):
 
         # MSC2654: Unread counts
         self.msc2654_enabled: bool = experimental.get("msc2654_enabled", False)
+
+        # MSC2477 (User-defined ephemeral events in rooms)
+        self.msc2477_enabled: bool = experimental.get("msc2477_enabled", False)
