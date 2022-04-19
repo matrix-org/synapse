@@ -1616,7 +1616,7 @@ worker for application service traffic, <strong>it must be stopped</strong> when
 (which normally happens when the main process is upgraded), to ensure the change is made safely
 without any risk of reusing transaction IDs.</p>
 <p>Deployments which do not use separate worker processes can be upgraded as normal. Similarly,
-deployments where no applciation services are in use can be upgraded as normal.</p>
+deployments where no application services are in use can be upgraded as normal.</p>
 <details>
 <summary><b>Recovering from an incorrect upgrade</b></summary>
 <p>If the database schema is upgraded <em>without</em> stopping the worker responsible
