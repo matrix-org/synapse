@@ -38,7 +38,10 @@ jobs:
         with:
           python-version: "3.x"
       # Lacking a `pip install --upgrade-literally-everything` option, concoct our own.
-      - run: "poetry run pip freeze | cut -d' ' -f 1 | xargs poetry run pip install --upgrade --upgrade-strategy eager"
+      # Ensure that we only invoke `pip install` once with at most 1000 package names
+      # by passing `-x -n 1000` to `xargs`. This ensures that pip resolves all
+      # dependencies together.
+      - run: "poetry run pip freeze | cut -d' ' -f 1 | xargs -x -n 1000 poetry run pip install --upgrade --upgrade-strategy eager"
       # Dump installed versions for debugging
       - run: poetry run pip freeze
       - run: poetry run mypy
