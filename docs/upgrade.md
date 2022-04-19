@@ -39,7 +39,7 @@ this document.
         source ~/synapse/env/bin/activate
         pip install --upgrade .
         ```
-        Include any relevant extras between square brackets, e.g. `pip install --upgrade .[postgres,oidc]`.
+        Include any relevant extras between square brackets, e.g. `pip install --upgrade ".[postgres,oidc]"`.
 
     3.  If you're using `poetry` to manage a Synapse installation, run:
         ```bash

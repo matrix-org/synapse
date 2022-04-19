@@ -167,7 +167,7 @@ Include the updated `pyproject.toml` and `poetry.lock` files in your commit.
 
 ## ...remove a dependency?
 
-I don't think we do this often, and I've not tried it myself, but
+This is not done often and is untested, but
 
 ```shell
 poetry remove packagename

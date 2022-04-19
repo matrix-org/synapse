@@ -60,7 +60,7 @@ pipx install poetry
 ```
 
 but see poetry's [installation instructions](https://python-poetry.org/docs/#installation)
-for more other installation methods.
+for other installation methods.
 
 Next, open a terminal and install dependencies as follows:
 
