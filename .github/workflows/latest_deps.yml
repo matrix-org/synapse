@@ -48,6 +48,8 @@ jobs:
       - run: poetry run pip install .[all] --upgrade --upgrade-strategy eager
       - run: poetry run pip freeze | tee after.txt
       - run: diff -u before.txt after.txt || true
+      - run: ls -alth
+      - run: cat mypy.ini
       - run: poetry run mypy
   trial:
     runs-on: ubuntu-latest
