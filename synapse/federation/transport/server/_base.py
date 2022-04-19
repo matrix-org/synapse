@@ -101,7 +101,7 @@ class Authenticator:
                 # if the origin_server sent a destination along it needs to match our own server_name
                 if destination is not None and destination != self.server_name:
                     raise AuthenticationError(
-                        HTTPStatus.BAD_REQUEST,
+                        HTTPStatus.UNAUTHORIZED,
                         "Destination mismatch in auth header",
                         Codes.UNAUTHORIZED,
                     )
