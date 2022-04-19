@@ -1,0 +1,1 @@
+Use `make_awaitable` instead of `defer.succeed` for return values of mocks in tests.
