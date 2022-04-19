@@ -100,7 +100,7 @@ Requires-Dist: phonenumbers (>=8.2.0)
 # Tooling recommendation: direnv
 
 [`direnv`](https://direnv.net/) is a tool for activating environments in your
-shell inside a given directory. Its support for poetry is unofficial (a 
+shell inside a given directory. Its support for poetry is unofficial (a
 community wiki recipe only), but works solidly in our experience. We thoroughly
 recommend it for daily use. To use it:
 
@@ -113,14 +113,14 @@ recommend it for daily use. To use it:
    Then formally confirm this to `direnv` by running `direnv allow`.
 
 Then whenever you navigate to the synapse checkout, you should be able to run
-e.g. `mypy` instead of `poetry run mypy`; `python` instead of 
+e.g. `mypy` instead of `poetry run mypy`; `python` instead of
 `poetry run python`; and your shell commands will automatically be ran in the
 context of poetry's venv, without having to run `poetry shell` beforehand.
 
 # Rules of thumb:
 
 - `poetry install --extras all` gets you into a good state.
-- `poetry install --extras all --remove-untracked` gets you into the precise 
+- `poetry install --extras all --remove-untracked` gets you into the precise
   locked state with no undeclared dependencies floating around.
 - Whenever you edit `pyproject.toml`, run `poetry lock --no-update` to keep them
   in sync.
@@ -151,7 +151,7 @@ poetry run pip list
 ```
 
 Note that `poetry show` describes the abstract *lock file* rather than your
-on-disk environment. With that said, `poetry show --tree` can sometimes be 
+on-disk environment. With that said, `poetry show --tree` can sometimes be
 useful.
 
 
@@ -173,7 +173,7 @@ I don't think we do this often, and I've not tried it myself, but
 poetry remove packagename
 ```
 
-ought to do the trick. Alternatively, manually update `pyproject.toml` and 
+ought to do the trick. Alternatively, manually update `pyproject.toml` and
 `poetry lock --no-update`. Include the updated `pyproject.toml` and poetry.lock`
 files in your commit.
 
@@ -184,16 +184,16 @@ Include the updated `pyproject.toml` and `poetry.lock` in your commit.
 
 ## ...update a dependency in the locked environment?
 
-Use 
+Use
 
 ```shell
 poetry update packagename
 ```
 
 to use the latest version of `packagename` in the locked environment, without
-affecting the broad dependencies listed in the wheel. 
+affecting the broad dependencies listed in the wheel.
 
-There doesn't seem to be away to do this whilst locking a _specific_ version of 
+There doesn't seem to be away to do this whilst locking a _specific_ version of
 `packagename`. We can workaround this (crudely) as follows:
 
 ```shell
@@ -229,6 +229,6 @@ I usually use
 poetry run pip install build && poetry run python -m build
 ```
 
-because [`build`](https://github.com/pypa/build) is a standardish tool which 
+because [`build`](https://github.com/pypa/build) is a standardish tool which
 doesn't require poetry. (It's what we use in CI too). However, you could try
 `poetry build` too.
