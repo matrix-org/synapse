@@ -15,9 +15,9 @@
 import functools
 import logging
 import re
-from http import HTTPStatus
 import time
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional, Tuple, cast
+from http import HTTPStatus
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Optional, Tuple, cast
 
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.urls import FEDERATION_V1_PREFIX
@@ -189,8 +189,9 @@ def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str, Optional[str
         sig = strip_quotes(param_dict["sig"])
 
         # get the destination server_name from the auth header if it exists
-        if param_dict.get("destination") is not None:
-            destination = strip_quotes(param_dict.get("destination"))
+        destination = param_dict.get("destination")
+        if destination is not None:
+            destination = strip_quotes(destination)
         else:
             destination = None
 
