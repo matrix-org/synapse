@@ -32,8 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       # The dev dependencies aren't exposed in the wheel metadata (at least with current
-      # poetry-core versions). So we'll have to be dirty: `poetry install` to get the
-      # dev deps, then upgrade them in situ with pip.
+      # poetry-core versions), so we install with poetry.
       - uses: matrix-org/setup-python-poetry@v1
         with:
           python-version: "3.x"
