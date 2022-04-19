@@ -41,15 +41,17 @@ jobs:
       - run: poetry run pip freeze > before.txt
       # Upgrade all runtime dependencies only. This is intended to mimic a fresh
       # `pip install matrix-synapse[all]` as closely as possible.
-      # AFAICS this will update transitive dependencies. E.g. try
-      #     pip install requests==2.24.0 idna==2.8
-      #     pip install --upgrade --upgrade-strategy eager requests
-      # The second command should update both requests and idna.
-      - run: poetry run pip install .[all] --upgrade --upgrade-strategy eager
+      # Notes:
+      # - AFAICS this will update transitive dependencies. E.g. try
+      #       pip install requests==2.24.0 idna==2.8
+      #       pip install --upgrade --upgrade-strategy eager requests
+      #   The second command should update both `requests` and `idna`.
+      - run: >-
+          poetry export --extras all 
+          | cut -d '=' -f1
+          | xargs poetry run pip install --upgrade --upgrade-strategy eager
       - run: poetry run pip freeze | tee after.txt
       - run: diff -u before.txt after.txt || true
-      - run: ls -alth
-      - run: cat mypy.ini
       - run: poetry run mypy
   trial:
     runs-on: ubuntu-latest
