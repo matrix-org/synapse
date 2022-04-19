@@ -808,10 +808,21 @@ def run_in_background(  # type: ignore[misc]
     # At this point we should have a Deferred, if not then f was a synchronous
     # function, wrap it in a Deferred for consistency.
     if not isinstance(res, defer.Deferred):
-        # `res` is not a `Deferred` and not a `Coroutine`.
-        # There are no other types of `Awaitable`s we expect to encounter in Synapse.
-        assert not isinstance(res, Awaitable)
+        if isinstance(res, Awaitable):
+            # `f` returned some kind of awaitable that is not a coroutine or `Deferred`.
+            # We assume that it is a completed awaitable, such as a `DoneAwaitable` or
+            # `Future` from `make_awaitable`, and await it manually.
+            iterator = res.__await__()  # `__await__` returns an iterator...
+            try:
+                next(iterator)
+                raise ValueError(
+                    f"Function {f} returned an unresolved awaitable: {res}"
+                )
+            except StopIteration as e:
+                # ...which raises a `StopIteration` once the awaitable is complete.
+                res = e.value
 
+        # res is now a plain value here.
         return defer.succeed(res)
 
     if res.called and not res.paused:
