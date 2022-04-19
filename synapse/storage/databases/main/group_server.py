@@ -32,6 +32,3 @@ class GroupServerStore(SQLBaseStore):
         # Register a legacy groups background update as a no-op.
         database.updates.register_noop_background_update("local_group_updates_index")
         super().__init__(database, db_conn, hs)
-
-    def get_group_stream_token(self) -> int:
-        return self._group_updates_id_gen.get_current_token()  # type: ignore[attr-defined]

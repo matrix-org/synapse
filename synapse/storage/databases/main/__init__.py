@@ -152,9 +152,6 @@ class DataStore(
 
         self._push_rule_id_gen = IdGenerator(db_conn, "push_rules", "id")
         self._push_rules_enable_id_gen = IdGenerator(db_conn, "push_rules_enable", "id")
-        self._group_updates_id_gen = StreamIdGenerator(
-            db_conn, "local_group_updates", "stream_id"
-        )
 
         self._cache_id_gen: Optional[MultiWriterIdGenerator]
         if isinstance(self.database_engine, PostgresEngine):
@@ -196,20 +193,6 @@ class DataStore(
             "_curr_state_delta_stream_cache",
             min_curr_state_delta_id,
             prefilled_cache=curr_state_delta_prefill,
-        )
-
-        _group_updates_prefill, min_group_updates_id = self.db_pool.get_cache_dict(
-            db_conn,
-            "local_group_updates",
-            entity_column="user_id",
-            stream_column="stream_id",
-            max_value=self._group_updates_id_gen.get_current_token(),
-            limit=1000,
-        )
-        self._group_updates_stream_cache = StreamChangeCache(
-            "_group_updates_stream_cache",
-            min_group_updates_id,
-            prefilled_cache=_group_updates_prefill,
         )
 
         self._stream_order_on_start = self.get_room_max_stream_ordering()
