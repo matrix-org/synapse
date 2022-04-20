@@ -1,3 +1,18 @@
+Synapse 1.57.1 (2022-04-20)
+===========================
+
+This is a patch release that only affects the Docker image. It is only of interest to administrators using [the LDAP module][LDAPModule] to authenticate their users.
+If you have already upgraded to Synapse 1.57.0 without problem, then you have no need to upgrade to this patch release.
+
+[LDAPModule]: https://github.com/matrix-org/matrix-synapse-ldap3
+
+
+Updates to the Docker image
+---------------------------
+
+- Include version 0.2.0 of the Synapse LDAP Auth Provider module in the Docker image. This matches the version that was present in the Docker image for Synapse v1.56.0. ([\#12512](https://github.com/matrix-org/synapse/issues/12512))
+
+
 Synapse 1.57.0 (2022-04-19)
 ===========================
 
