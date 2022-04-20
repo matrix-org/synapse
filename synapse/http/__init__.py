@@ -98,3 +98,8 @@ def get_request_user_agent(request: IRequest, default: str = "") -> str:
 
     h = request.getHeader(b"User-Agent")
     return h.decode("ascii", "replace") if h else default
+
+
+def get_request_beeper_bridge(request: IRequest) -> str:
+    h = request.getHeader(b"X-Beeper-Bridge")  # type: ignore
+    return h.decode("ascii", "replace") if h else ""
