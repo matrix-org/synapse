@@ -24,13 +24,13 @@ from synapse.util import Clock
 logger = logging.getLogger(__name__)
 
 # the initial backoff, after the first transaction fails
-MIN_RETRY_INTERVAL = 10 * 60 * 1000
+MIN_RETRY_INTERVAL = 30 * 1000
 
 # how much we multiply the backoff by after each subsequent fail
 RETRY_MULTIPLIER = 5
 
-# a cap on the backoff. (Essentially none)
-MAX_RETRY_INTERVAL = 2**62
+# a cap on the backoff.
+MAX_RETRY_INTERVAL = 30 * 1000
 
 
 class NotRetryingDestination(Exception):
