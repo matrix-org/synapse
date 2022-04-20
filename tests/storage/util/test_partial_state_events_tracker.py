@@ -75,6 +75,29 @@ class PartialStateEventsTrackerTestCase(TestCase):
             ensureDeferred(self.tracker.await_full_state(["event1", "event2"]))
         )
 
+    def test_un_partial_state_during_get_partial_state_events(self):
+        # we should correctly handle a call to notify_un_partial_stated during the
+        # second call to get_partial_state_events.
+
+        self._events_dict = {"event1": True, "event2": False}
+
+        async def get_partial_state_events1(events):
+            self.mock_store.get_partial_state_events.side_effect = (
+                get_partial_state_events2
+            )
+            return {e: self._events_dict[e] for e in events}
+
+        async def get_partial_state_events2(events):
+            self.tracker.notify_un_partial_stated("event1")
+            self._events_dict["event1"] = False
+            return {e: self._events_dict[e] for e in events}
+
+        self.mock_store.get_partial_state_events.side_effect = get_partial_state_events1
+
+        self.successResultOf(
+            ensureDeferred(self.tracker.await_full_state(["event1", "event2"]))
+        )
+
     def test_cancellation(self):
         self._events_dict = {"event1": True, "event2": False}
 

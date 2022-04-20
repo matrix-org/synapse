@@ -94,7 +94,9 @@ class PartialStateEventsTracker:
             for event_id, partial in (
                 await self._store.get_partial_state_events(observers.keys())
             ).items():
-                if not partial:
+                # there may have been a call to notify_un_partial_stated during the
+                # db query, so the observers may already have been called.
+                if not partial and not observers[event_id].called:
                     observers[event_id].callback(None)
 
             await make_deferred_yieldable(
