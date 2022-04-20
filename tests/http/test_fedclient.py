@@ -33,7 +33,7 @@ from synapse.http.matrixfederationclient import (
 from synapse.logging.context import SENTINEL_CONTEXT, LoggingContext, current_context
 
 from tests.server import FakeTransport
-from tests.unittest import HomeserverTestCase
+from tests.unittest import HomeserverTestCase, override_config
 
 
 def check_logcontext(context):
@@ -617,3 +617,19 @@ class FederationClientTests(HomeserverTestCase):
         self.assertIsInstance(f.value, RequestSendFailed)
 
         self.assertTrue(transport.disconnecting)
+
+    @override_config(
+        {
+            "experimental_features": {
+                "max_long_retry_delay": 100,
+                "max_short_retry_delay": 7,
+                "max_long_retries": 20,
+                "max_short_retries": 5,
+            }
+        }
+    )
+    def test_configurable_retry_and_delay_values(self):
+        self.assertEqual(self.cl.max_long_retry_delay, 100)
+        self.assertEqual(self.cl.max_short_retry_delay, 7)
+        self.assertEqual(self.cl.max_long_retries, 20)
+        self.assertEqual(self.cl.max_short_retries, 5)
