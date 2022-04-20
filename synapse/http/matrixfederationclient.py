@@ -358,9 +358,6 @@ class MatrixFederationHttpClient:
 
         self._sleeper = AwakenableSleeper(self.reactor)
 
-        self._notifier = hs.get_notifier()
-        self._replication_client = hs.get_replication_command_handler()
-
     def wake_destination(self, destination: str) -> None:
         """Called when the remote server may have come back online."""
 
@@ -487,8 +484,8 @@ class MatrixFederationHttpClient:
             self._store,
             backoff_on_404=backoff_on_404,
             ignore_backoff=ignore_backoff,
-            notifier=self._notifier,
-            replication_client=self._replication_client,
+            notifier=self.hs.get_notifier(),
+            replication_client=self.hs.get_replication_command_handler(),
         )
 
         method_bytes = request.method.encode("ascii")
