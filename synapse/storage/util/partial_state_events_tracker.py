@@ -31,7 +31,7 @@ class PartialStateEventsTracker:
 
     def __init__(self, store: EventsWorkerStore):
         self._store = store
-        self._observers: Dict[str, Set[Deferred]] = defaultdict(set)
+        self._observers: Dict[str, Set[Deferred[None]]] = defaultdict(set)
 
     def notify_un_partial_stated(self, event_id: str) -> None:
         """Notify that we now have full state for a given event
