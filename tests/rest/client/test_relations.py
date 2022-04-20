@@ -1112,13 +1112,13 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         relations_from_messages = event["unsigned"]["m.relations"]
 
         # Check the bundled aggregations from each point.
-        for relations, desc in (
+        for aggregations, desc in (
             (relations_from_event, "/event"),
             (relations_from_messages, "/messages"),
         ):
             # The latest event should have bundled aggregations.
-            self.assertIn(RelationTypes.THREAD, relations, desc)
-            thread_summary = relations[RelationTypes.THREAD]
+            self.assertIn(RelationTypes.THREAD, aggregations, desc)
+            thread_summary = aggregations[RelationTypes.THREAD]
             self.assertIn("latest_event", thread_summary, desc)
             self.assertEqual(
                 thread_summary["latest_event"]["event_id"], reply_event_id, desc
