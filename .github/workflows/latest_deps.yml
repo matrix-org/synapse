@@ -15,10 +15,6 @@ name: Latest dependencies
 on:
   schedule:
     - cron: 0 7 * * *
-  pull_request:
-    branches: [dmr/poetry-wheel-ci]
-  push:
-    branches: [dmr/poetry-wheel-ci]
   workflow_dispatch:
 
 concurrency:
@@ -139,21 +135,22 @@ jobs:
   # TODO: run complement (as with twisted trunk, see #12473).
 
   # open an issue if the build fails, so we know about it.
-#  open-issue:
-#    if: failure()
-#    needs:
-#      # TODO: should mypy be included here? It feels more brittle than the other two.
-#      - mypy
-#      - trial
-#      - sytest
-#
-#    runs-on: ubuntu-latest
-#
-#    steps:
-#      - uses: actions/checkout@v2
-#      - uses: JasonEtco/create-an-issue@5d9504915f79f9cc6d791934b8ef34f2353dd74d # v2.5.0, 2020-12-06
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#        with:
-#          update_existing: true
-#          filename: .ci/latest_deps_build_failed_issue_template.md
+  open-issue:
+    if: failure()
+    needs:
+      # TODO: should mypy be included here? It feels more brittle than the other two.
+      - mypy
+      - trial
+      - sytest
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: JasonEtco/create-an-issue@5d9504915f79f9cc6d791934b8ef34f2353dd74d # v2.5.0, 2020-12-06
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          update_existing: true
+          filename: .ci/latest_deps_build_failed_issue_template.md
+
