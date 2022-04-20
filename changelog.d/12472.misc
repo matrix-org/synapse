@@ -1,0 +1,1 @@
+Add a CI job which tests Synapse against the latest version of all dependencies.
