@@ -355,7 +355,6 @@ class RelationsTestCase(BaseRelationsTestCase):
         self.assertEqual(200, channel.code, channel.json_body)
         self.assertNotIn("m.relations", channel.json_body["unsigned"])
 
-    @unittest.override_config({"experimental_features": {"msc3666_enabled": True}})
     def test_edit(self) -> None:
         """Test that a simple edit works."""
 
@@ -961,7 +960,6 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         ]
         assert_bundle(self._find_event_in_chunk(chunk))
 
-    @unittest.override_config({"experimental_features": {"msc3666_enabled": True}})
     def test_annotation(self) -> None:
         """
         Test that annotations get correctly bundled.
@@ -986,7 +984,6 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
 
         self._test_bundled_aggregations(RelationTypes.ANNOTATION, assert_annotations, 7)
 
-    @unittest.override_config({"experimental_features": {"msc3666_enabled": True}})
     def test_reference(self) -> None:
         """
         Test that references get correctly bundled.
@@ -1005,7 +1002,6 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
 
         self._test_bundled_aggregations(RelationTypes.REFERENCE, assert_annotations, 7)
 
-    @unittest.override_config({"experimental_features": {"msc3666_enabled": True}})
     def test_thread(self) -> None:
         """
         Test that threads get correctly bundled.
@@ -1035,7 +1031,6 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
 
         self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 10)
 
-    @unittest.override_config({"experimental_features": {"msc3666_enabled": True}})
     def test_thread_with_bundled_aggregations_for_latest(self) -> None:
         """
         Bundled aggregations should get applied to the latest thread event.
