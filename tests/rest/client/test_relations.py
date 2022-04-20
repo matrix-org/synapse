@@ -1104,17 +1104,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
             )
 
         # Fetch the thread root, to get the bundled aggregation for the thread.
-        relations = self._get_bundled_aggregations()
-
-        # The latest event should have bundled aggregations.
-        self.assertIn(RelationTypes.THREAD, relations)
-        thread_summary = relations[RelationTypes.THREAD]
-        self.assertIn("latest_event", thread_summary)
-        self.assertEqual(thread_summary["latest_event"]["event_id"], reply_event_id)
-
-        # The latest event should not have any bundled aggregations (since the
-        # only relation to it is another thread, which is invalid).
-        self.assertNotIn("m.relations", thread_summary["latest_event"]["unsigned"])
+        relations_from_event = self._get_bundled_aggregations()
 
         # Ensure that requesting the room messages also does not return the sub-thread.
         channel = self.make_request(
@@ -1124,17 +1114,26 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         )
         self.assertEqual(200, channel.code, channel.json_body)
         event = self._find_event_in_chunk(channel.json_body["chunk"])
-        relations = event["unsigned"]["m.relations"]
+        relations_from_messages = event["unsigned"]["m.relations"]
 
-        # The latest event should have bundled aggregations.
-        self.assertIn(RelationTypes.THREAD, relations)
-        thread_summary = relations[RelationTypes.THREAD]
-        self.assertIn("latest_event", thread_summary)
-        self.assertEqual(thread_summary["latest_event"]["event_id"], reply_event_id)
+        # Check the bundled aggregations from each point.
+        for relations, desc in (
+            (relations_from_event, "/event"),
+            (relations_from_messages, "/messages"),
+        ):
+            # The latest event should have bundled aggregations.
+            self.assertIn(RelationTypes.THREAD, relations, desc)
+            thread_summary = relations[RelationTypes.THREAD]
+            self.assertIn("latest_event", thread_summary, desc)
+            self.assertEqual(
+                thread_summary["latest_event"]["event_id"], reply_event_id, desc
+            )
 
-        # The latest event should not have any bundled aggregations (since the
-        # only relation to it is another thread, which is invalid).
-        self.assertNotIn("m.relations", thread_summary["latest_event"]["unsigned"])
+            # The latest event should not have any bundled aggregations (since the
+            # only relation to it is another thread, which is invalid).
+            self.assertNotIn(
+                "m.relations", thread_summary["latest_event"]["unsigned"], desc
+            )
 
     def test_thread_edit_latest_event(self) -> None:
         """Test that editing the latest event in a thread works."""
