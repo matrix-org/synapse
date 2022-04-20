@@ -84,7 +84,7 @@ class ExperimentalConfig(Config):
 
         # Allow for the configuration of max request retries and min/max retry delays
         # in the matrix federation client
-        self.max_long_retry_delay = experimental.get("max_long_retry_delay", 60)
+        self.max_long_retry_delay = experimental.get("max_long_retry_delay", 10)
         self.max_short_retry_delay = experimental.get("max_short_retry_delay", 2)
         self.max_long_retries = experimental.get("max_long_retries", 10)
         self.max_short_retries = experimental.get("max_short_retries", 3)
