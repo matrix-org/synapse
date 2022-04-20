@@ -167,25 +167,33 @@ packages</a>, you will need to follow the
 normal process for upgrading those packages.</p>
 </li>
 <li>
-<p>If Synapse was installed from source, then:</p>
-<ol>
-<li>
-<p>Activate the virtualenv before upgrading. For example, if
-Synapse is installed in a virtualenv in <code>~/synapse/env</code> then
-run:</p>
-<pre><code class="language-bash">source ~/synapse/env/bin/activate
-</code></pre>
-</li>
-<li>
 <p>If Synapse was installed using pip then upgrade to the latest
 version by running:</p>
 <pre><code class="language-bash">pip install --upgrade matrix-synapse
 </code></pre>
-<p>If Synapse was installed using git then upgrade to the latest
-version by running:</p>
-<pre><code class="language-bash">git pull
+</li>
+<li>
+<p>If Synapse was installed from source, then:</p>
+<ol>
+<li>
+<p>Obtain the latest version of the source code. Git users can run
+<code>git pull</code> to do this.</p>
+</li>
+<li>
+<p>If you're running Synapse in a virtualenv, make sure to activate it before
+upgrading. For example, if Synapse is installed in a virtualenv in <code>~/synapse/env</code> then
+run:</p>
+<pre><code class="language-bash">source ~/synapse/env/bin/activate
 pip install --upgrade .
 </code></pre>
+<p>Include any relevant extras between square brackets, e.g. <code>pip install --upgrade &quot;.[postgres,oidc]&quot;</code>.</p>
+</li>
+<li>
+<p>If you're using <code>poetry</code> to manage a Synapse installation, run:</p>
+<pre><code class="language-bash">poetry install
+</code></pre>
+<p>Include any relevant extras with <code>--extras</code>, e.g. <code>poetry install --extras postgres --extras oidc</code>.
+It's probably easiest to run <code>poetry install --extras all</code>.</p>
 </li>
 <li>
 <p>Restart Synapse:</p>

@@ -177,16 +177,21 @@ git checkout develop
 <p>If you need help getting started with git, this is beyond the scope of the document, but you
 can find many good git tutorials on the web.</p>
 <h1 id="4-install-the-dependencies"><a class="header" href="#4-install-the-dependencies">4. Install the dependencies</a></h1>
-<p>Once you have installed Python 3 and added the source, please open a terminal and
-setup a <em>virtualenv</em>, as follows:</p>
-<pre><code class="language-sh">cd path/where/you/have/cloned/the/repository
-python3 -m venv ./env
-source ./env/bin/activate
-pip install wheel
-pip install -e &quot;.[all,dev]&quot;
-pip install tox
+<p>Synapse uses the <a href="https://python-poetry.org/">poetry</a> project to manage its dependencies
+and development environment. Once you have installed Python 3 and added the
+source, you should install <code>poetry</code>.
+Of their installation methods, we recommend
+<a href="https://python-poetry.org/docs/#installing-with-pipx">installing <code>poetry</code> using <code>pipx</code></a>,</p>
+<pre><code class="language-shell">pip install --user pipx
+pipx install poetry
 </code></pre>
-<p>This will install the developer dependencies for the project.</p>
+<p>but see poetry's <a href="https://python-poetry.org/docs/#installation">installation instructions</a>
+for other installation methods.</p>
+<p>Next, open a terminal and install dependencies as follows:</p>
+<pre><code class="language-sh">cd path/where/you/have/cloned/the/repository
+poetry install --extras all
+</code></pre>
+<p>This will install the runtime and developer dependencies for the project.</p>
 <h1 id="5-get-in-touch"><a class="header" href="#5-get-in-touch">5. Get in touch.</a></h1>
 <p>Join our developer community on Matrix: <a href="https://matrix.to/#/#synapse-dev:matrix.org">#synapse-dev:matrix.org</a>!</p>
 <h1 id="6-pick-an-issue"><a class="header" href="#6-pick-an-issue">6. Pick an issue.</a></h1>
@@ -226,37 +231,32 @@ want to test your code.</p>
 <li>ensure that your code follows the coding style adopted by the project;</li>
 <li>catch a number of errors in your code.</li>
 </ul>
-<p>The linter takes no time at all to run as soon as you've <a href="#4-install-the-dependencies">downloaded the dependencies into your python virtual environment</a>.</p>
-<pre><code class="language-sh">source ./env/bin/activate
-./scripts-dev/lint.sh
+<p>The linter takes no time at all to run as soon as you've <a href="#4-install-the-dependencies">downloaded the dependencies</a>.</p>
+<pre><code class="language-sh">poetry run ./scripts-dev/lint.sh
 </code></pre>
 <p>Note that this script <em>will modify your files</em> to fix styling errors.
 Make sure that you have saved all your files.</p>
 <p>If you wish to restrict the linters to only the files changed since the last commit
 (much faster!), you can instead run:</p>
-<pre><code class="language-sh">source ./env/bin/activate
-./scripts-dev/lint.sh -d
+<pre><code class="language-sh">poetry run ./scripts-dev/lint.sh -d
 </code></pre>
 <p>Or if you know exactly which files you wish to lint, you can instead run:</p>
-<pre><code class="language-sh">source ./env/bin/activate
-./scripts-dev/lint.sh path/to/file1.py path/to/file2.py path/to/folder
+<pre><code class="language-sh">poetry run ./scripts-dev/lint.sh path/to/file1.py path/to/file2.py path/to/folder
 </code></pre>
 <h2 id="run-the-unit-tests-twisted-trial"><a class="header" href="#run-the-unit-tests-twisted-trial">Run the unit tests (Twisted trial).</a></h2>
 <p>The unit tests run parts of Synapse, including your changes, to see if anything
 was broken. They are slower than the linters but will typically catch more errors.</p>
-<pre><code class="language-sh">source ./env/bin/activate
-trial tests
+<pre><code class="language-sh">poetry run trial tests
 </code></pre>
 <p>If you wish to only run <em>some</em> unit tests, you may specify
 another module instead of <code>tests</code> - or a test class or a method:</p>
-<pre><code class="language-sh">source ./env/bin/activate
-trial tests.rest.admin.test_room tests.handlers.test_admin.ExfiltrateData.test_invite
+<pre><code class="language-sh">poetry run trial tests.rest.admin.test_room tests.handlers.test_admin.ExfiltrateData.test_invite
 </code></pre>
 <p>If your tests fail, you may wish to look at the logs (the default log level is <code>ERROR</code>):</p>
 <pre><code class="language-sh">less _trial_temp/test.log
 </code></pre>
 <p>To increase the log level for the tests, set <code>SYNAPSE_TEST_LOG_LEVEL</code>:</p>
-<pre><code class="language-sh">SYNAPSE_TEST_LOG_LEVEL=DEBUG trial tests
+<pre><code class="language-sh">SYNAPSE_TEST_LOG_LEVEL=DEBUG poetry run trial tests
 </code></pre>
 <p>By default, tests will use an in-memory SQLite database for test data. For additional
 help with debugging, one can use an on-disk SQLite database file instead, in order to
@@ -264,7 +264,7 @@ review database state during and after running tests. This can be done by settin
 the <code>SYNAPSE_TEST_PERSIST_SQLITE_DB</code> environment variable. Doing so will cause the
 database state to be stored in a file named <code>test.db</code> under the trial process'
 working directory. Typically, this ends up being <code>_trial_temp/test.db</code>. For example:</p>
-<pre><code class="language-sh">SYNAPSE_TEST_PERSIST_SQLITE_DB=1 trial tests
+<pre><code class="language-sh">SYNAPSE_TEST_PERSIST_SQLITE_DB=1 poetry run trial tests
 </code></pre>
 <p>The database file can then be inspected with:</p>
 <pre><code class="language-sh">sqlite3 _trial_temp/test.db
