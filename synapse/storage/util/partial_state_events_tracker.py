@@ -31,6 +31,8 @@ class PartialStateEventsTracker:
 
     def __init__(self, store: EventsWorkerStore):
         self._store = store
+        # a map from event id to a set of Deferreds which are waiting for that event to be
+        # un-partial-stated.
         self._observers: Dict[str, Set[Deferred[None]]] = defaultdict(set)
 
     def notify_un_partial_stated(self, event_id: str) -> None:
