@@ -1082,20 +1082,26 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
 
         self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 10)
 
-    def test_thread_loop(self) -> None:
-        """Ensure that bogus events do not cause the bundled aggregations code to iterate forever."""
-        last_event = self.parent_id
+    def test_nested_thread(self) -> None:
+        """
+        Ensure that a nested thread gets ignored by bundled aggregations, as
+        those are forbidden.
+        """
 
-        # Disable the validation to pretend this came over federation.
+        # Start a thread.
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        reply_event_id = channel.json_body["event_id"]
+
+        # Disable the validation to pretend this came over federation, since it is
+        # not an event the Client-Server API will allow..
         with patch(
             "synapse.handlers.message.EventCreationHandler._validate_event_relation",
             new=lambda self, event: make_awaitable(None),
         ):
-            for _ in range(2):
-                channel = self._send_relation(
-                    RelationTypes.THREAD, "m.room.test", parent_id=last_event
-                )
-                last_event = channel.json_body["event_id"]
+            # Create a sub-thread off the thread, which is not allowed.
+            self._send_relation(
+                RelationTypes.THREAD, "m.room.test", parent_id=reply_event_id
+            )
 
         # Fetch the thread root, to get the bundled aggregation for the thread.
         relations = self._get_bundled_aggregations()
@@ -1104,9 +1110,10 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         self.assertIn(RelationTypes.THREAD, relations)
         thread_summary = relations[RelationTypes.THREAD]
         self.assertIn("latest_event", thread_summary)
+        self.assertEqual(thread_summary["latest_event"]["event_id"], reply_event_id)
 
-        # The latest event should not have any bundled aggregations (since it
-        # only has a thread attached.
+        # The latest event should not have any bundled aggregations (since the
+        # only relation to it is another thread, which is invalid).
         self.assertNotIn("m.relations", thread_summary["latest_event"]["unsigned"])
 
         # Ensure that requesting the room messages also does not return the sub-thread.
@@ -1123,9 +1130,10 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         self.assertIn(RelationTypes.THREAD, relations)
         thread_summary = relations[RelationTypes.THREAD]
         self.assertIn("latest_event", thread_summary)
+        self.assertEqual(thread_summary["latest_event"]["event_id"], reply_event_id)
 
-        # The latest event should not have any bundled aggregations (since it
-        # only has a thread attached.
+        # The latest event should not have any bundled aggregations (since the
+        # only relation to it is another thread, which is invalid).
         self.assertNotIn("m.relations", thread_summary["latest_event"]["unsigned"])
 
     def test_thread_edit_latest_event(self) -> None:
