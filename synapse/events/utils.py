@@ -479,7 +479,9 @@ class EventClientSerializer:
             event: The event being serialized.
             time_now: The current time in milliseconds
             config: Event serialization config
-            bundled_aggregations: The bundled aggregation to serialize.
+            bundled_aggregations: Bundled aggregations to be injected.
+                A map from event_id to aggregation data. Must contain at least an
+                entry for `event`.
             serialized_event: The serialized event which may be modified.
             apply_edits: Whether the content of the event should be modified to reflect
                any replacement in `aggregations.replace`.

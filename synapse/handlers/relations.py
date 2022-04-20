@@ -258,7 +258,7 @@ class RelationsHandler:
         self, event: EventBase, ignored_users: FrozenSet[str]
     ) -> Tuple[Optional[JsonDict], Optional[JsonDict]]:
         """
-        Generate bundled aggregations for annotation and reference relations for an event.
+        Generate aggregations for annotation (ie, reaction) and reference (ie, reply) relations for an event.
 
         Note that this does not use a cache, but depends on cached methods.
 
@@ -267,7 +267,9 @@ class RelationsHandler:
             ignored_users: The users ignored by the requesting user.
 
         Returns:
-            A tuple of the bundled aggregations for annotation and reference relations.
+            A 2-tuple consisting of the aggregations of:
+                - events with `m.annotation` relations to this event.
+                - events with `m.reference` relations to this event.
             Either or both entries in the tuple might be None if no relations
             of that type exist.
         """
