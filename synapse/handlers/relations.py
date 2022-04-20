@@ -254,65 +254,6 @@ class RelationsHandler:
 
         return filtered_results
 
-    async def _get_bundled_annotations_and_references_for_event(
-        self, event: EventBase, ignored_users: FrozenSet[str]
-    ) -> Tuple[Optional[JsonDict], Optional[JsonDict]]:
-        """
-        Generate aggregations for annotation (ie, reaction) and reference (ie, reply) relations for an event.
-
-        Note that this does not use a cache, but depends on cached methods.
-
-        Args:
-            event: The event to calculate bundled aggregations for.
-            ignored_users: The users ignored by the requesting user.
-
-        Returns:
-            A 2-tuple consisting of the aggregations of:
-                - events with `m.annotation` relations to this event.
-                - events with `m.reference` relations to this event.
-            Either or both entries in the tuple might be None if no relations
-            of that type exist.
-        """
-
-        # Do not bundle aggregations for an event which represents an edit or an
-        # annotation. It does not make sense for them to have related events.
-        relates_to = event.content.get("m.relates_to")
-        if isinstance(relates_to, (dict, frozendict)):
-            relation_type = relates_to.get("rel_type")
-            if relation_type in (RelationTypes.ANNOTATION, RelationTypes.REPLACE):
-                return None, None
-
-        event_id = event.event_id
-        room_id = event.room_id
-
-        annotations = await self.get_annotations_for_event(
-            event_id, room_id, ignored_users=ignored_users
-        )
-        serialized_annotations = None
-        if annotations:
-            serialized_annotations = {"chunk": annotations}
-
-        references, next_token = await self.get_relations_for_event(
-            event_id,
-            event,
-            room_id,
-            RelationTypes.REFERENCE,
-            ignored_users=ignored_users,
-        )
-        serialized_references: Optional[JsonDict] = None
-        if references:
-            serialized_references = {
-                "chunk": [{"event_id": event.event_id} for event in references]
-            }
-
-            if next_token:
-                serialized_references["next_batch"] = await next_token.to_string(
-                    self._main_store
-                )
-
-        # Store the bundled aggregations in the event metadata for later use.
-        return serialized_annotations, serialized_references
-
     async def get_threads_for_events(
         self, event_ids: Collection[str], user_id: str, ignored_users: FrozenSet[str]
     ) -> Dict[str, _ThreadAggregation]:
@@ -458,16 +399,40 @@ class RelationsHandler:
 
         # Fetch other relations per event.
         for event in events_by_id.values():
-            (
-                annotations,
-                references,
-            ) = await self._get_bundled_annotations_and_references_for_event(
-                event, ignored_users
+            # Do not bundle aggregations for an event which represents an edit or an
+            # annotation. It does not make sense for them to have related events.
+            relates_to = event.content.get("m.relates_to")
+            if isinstance(relates_to, (dict, frozendict)):
+                relation_type = relates_to.get("rel_type")
+                if relation_type in (RelationTypes.ANNOTATION, RelationTypes.REPLACE):
+                    continue
+
+            annotations = await self.get_annotations_for_event(
+                event.event_id, event.room_id, ignored_users=ignored_users
             )
-            if annotations or references:
+            if annotations:
                 aggregations = results.setdefault(event.event_id, BundledAggregations())
-                aggregations.annotations = annotations
-                aggregations.references = references
+                aggregations.annotations = {"chunk": annotations}
+
+            references, next_token = await self.get_relations_for_event(
+                event.event_id,
+                event,
+                event.room_id,
+                RelationTypes.REFERENCE,
+                ignored_users=ignored_users,
+            )
+            if references:
+                serialized_references: JsonDict = {
+                    "chunk": [{"event_id": event.event_id} for event in references]
+                }
+
+                if next_token:
+                    serialized_references["next_batch"] = await next_token.to_string(
+                        self._main_store
+                    )
+
+                aggregations = results.setdefault(event.event_id, BundledAggregations())
+                aggregations.references = serialized_references
 
         # Fetch any edits (but not for redacted events).
         #
