@@ -114,20 +114,9 @@ recommend it for daily use. To use it:
 
 Then whenever you navigate to the synapse checkout, you should be able to run
 e.g. `mypy` instead of `poetry run mypy`; `python` instead of
-`poetry run python`; and your shell commands will automatically be ran in the
+`poetry run python`; and your shell commands will automatically run in the
 context of poetry's venv, without having to run `poetry shell` beforehand.
 
-# Rules of thumb:
-
-- `poetry install --extras all` gets you into a good state.
-- `poetry install --extras all --remove-untracked` gets you into the precise
-  locked state with no undeclared dependencies floating around.
-- Whenever you edit `pyproject.toml`, run `poetry lock --no-update` to keep them
-  in sync.
-- `poetry run cmd args` when you need the python virtualenv context.
-  `poetry shell` is roughly the same as activating the virtualenv, execpt it
-  starts a new shell. (Though see the direnv recommendation above, which makes
-  both commands unnecessary.)
 
 # How do I...
 
@@ -137,7 +126,23 @@ context of poetry's venv, without having to run `poetry shell` beforehand.
 poetry install --extras all --remove-untracked
 ```
 
-## ... inspect the `poetry` virtualenv?
+## ...run a command in the `poetry` virtualenv?
+
+Use `poetry run cmd args` when you need the python virtualenv context.
+To avoid typing `poetry run` all the time, you can run  `poetry shell`
+to start a new shell in the poetry virtualenv context. Within `poetry shell`,
+`python`, `pip`, `mypy`, `trial`, etc. are all run inside the project virtualenv
+and isolated from the rest o the system.
+
+Roughly speaking, the translation from a traditional virtualenv is:
+- `env/bin/activate` -> `poetry shell`, and
+- `deactivate` -> close the terminal (Ctrl-D, `exit`, etc.)
+
+See also the direnv recommendation above, which makes `poetry run` and
+`poetry shell` unnecessary.
+
+
+## ...inspect the `poetry` virtualenv?
 
 Some suggestions:
 
