@@ -1051,16 +1051,10 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         )
 
         # Fetch the thread root, to get the bundled aggregation for the thread.
-        channel = self.make_request(
-            "GET",
-            f"/rooms/{self.room}/event/{self.parent_id}",
-            access_token=self.user_token,
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
+        relations_dict = self._get_bundled_aggregations()
 
         # We expect that the edit message appears in the thread summary in the
         # unsigned relations section.
-        relations_dict = channel.json_body["unsigned"].get("m.relations")
         self.assertIn(RelationTypes.THREAD, relations_dict)
 
         thread_summary = relations_dict[RelationTypes.THREAD]
