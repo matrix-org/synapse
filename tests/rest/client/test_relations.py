@@ -560,43 +560,6 @@ class RelationsTestCase(BaseRelationsTestCase):
                 {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
             )
 
-    def test_edit_thread(self) -> None:
-        """Test that editing a thread works."""
-
-        # Create a thread and edit the last event.
-        channel = self._send_relation(
-            RelationTypes.THREAD,
-            "m.room.message",
-            content={"msgtype": "m.text", "body": "A threaded reply!"},
-        )
-        threaded_event_id = channel.json_body["event_id"]
-
-        new_body = {"msgtype": "m.text", "body": "I've been edited!"}
-        self._send_relation(
-            RelationTypes.REPLACE,
-            "m.room.message",
-            content={"msgtype": "m.text", "body": "foo", "m.new_content": new_body},
-            parent_id=threaded_event_id,
-        )
-
-        # Fetch the thread root, to get the bundled aggregation for the thread.
-        channel = self.make_request(
-            "GET",
-            f"/rooms/{self.room}/event/{self.parent_id}",
-            access_token=self.user_token,
-        )
-        self.assertEqual(200, channel.code, channel.json_body)
-
-        # We expect that the edit message appears in the thread summary in the
-        # unsigned relations section.
-        relations_dict = channel.json_body["unsigned"].get("m.relations")
-        self.assertIn(RelationTypes.THREAD, relations_dict)
-
-        thread_summary = relations_dict[RelationTypes.THREAD]
-        self.assertIn("latest_event", thread_summary)
-        latest_event_in_thread = thread_summary["latest_event"]
-        self.assertEqual(latest_event_in_thread["content"]["body"], "I've been edited!")
-
     def test_edit_edit(self) -> None:
         """Test that an edit cannot be edited."""
         new_body = {"msgtype": "m.text", "body": "Initial edit"}
@@ -1067,6 +1030,43 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
             )
 
         self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 9)
+
+    def test_thread_edit_latest_event(self) -> None:
+        """Test that editing the latest event in a thread works."""
+
+        # Create a thread and edit the last event.
+        channel = self._send_relation(
+            RelationTypes.THREAD,
+            "m.room.message",
+            content={"msgtype": "m.text", "body": "A threaded reply!"},
+        )
+        threaded_event_id = channel.json_body["event_id"]
+
+        new_body = {"msgtype": "m.text", "body": "I've been edited!"}
+        channel = self._send_relation(
+            RelationTypes.REPLACE,
+            "m.room.message",
+            content={"msgtype": "m.text", "body": "foo", "m.new_content": new_body},
+            parent_id=threaded_event_id,
+        )
+
+        # Fetch the thread root, to get the bundled aggregation for the thread.
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/event/{self.parent_id}",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+
+        # We expect that the edit message appears in the thread summary in the
+        # unsigned relations section.
+        relations_dict = channel.json_body["unsigned"].get("m.relations")
+        self.assertIn(RelationTypes.THREAD, relations_dict)
+
+        thread_summary = relations_dict[RelationTypes.THREAD]
+        self.assertIn("latest_event", thread_summary)
+        latest_event_in_thread = thread_summary["latest_event"]
+        self.assertEqual(latest_event_in_thread["content"]["body"], "I've been edited!")
 
     def test_aggregation_get_event_for_annotation(self) -> None:
         """Test that annotations do not get bundled aggregations included
