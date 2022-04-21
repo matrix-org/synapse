@@ -802,28 +802,29 @@ def run_in_background(  # type: ignore[misc]
         # by synchronous exceptions, so let's turn them into Failures.
         return defer.fail()
 
+    # First we handle coroutines by wrapping them in a `Deferred`.
     if isinstance(res, typing.Coroutine):
         res = defer.ensureDeferred(res)
 
-    # At this point we should have a Deferred, if not then f was a synchronous
-    # function, wrap it in a Deferred for consistency.
+    # At this point, `res` may be a plain value, `Deferred`, or some other kind of
+    # non-coroutine awaitable.
     if not isinstance(res, defer.Deferred):
-        if isinstance(res, Awaitable):
-            # `f` returned some kind of awaitable that is not a coroutine or `Deferred`.
-            # We assume that it is a completed awaitable, such as a `DoneAwaitable` or
-            # `Future` from `make_awaitable`, and await it manually.
-            iterator = res.__await__()  # `__await__` returns an iterator...
-            try:
-                next(iterator)
-                raise ValueError(
-                    f"Function {f} returned an unresolved awaitable: {res}"
-                )
-            except StopIteration as e:
-                # ...which raises a `StopIteration` once the awaitable is complete.
-                return defer.succeed(e.value)
-        else:
-            # `f` returned a plain value.
+        # Wrap plain values in a `Deferred`.
+        if not isinstance(res, Awaitable):
             return defer.succeed(res)
+
+        # `res` is some kind of awaitable that is not a coroutine or `Deferred`.
+        # We assume that it is a completed awaitable, such as a `DoneAwaitable` or
+        # `Future` from `make_awaitable`, and await it manually.
+        iterator = res.__await__()  # `__await__` returns an iterator...
+        try:
+            next(iterator)
+            raise ValueError(
+                f"Function {f} returned an unresolved awaitable: {res}"
+            )
+        except StopIteration as e:
+            # ...which raises a `StopIteration` once the awaitable is complete.
+            return defer.succeed(e.value)
 
     if res.called and not res.paused:
         # The function should have maintained the logcontext, so we can
