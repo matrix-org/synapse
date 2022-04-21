@@ -15,7 +15,7 @@
 
 import itertools
 import logging
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from signedjson.key import decode_verify_key_bytes
 
@@ -37,8 +37,8 @@ class KeyStore(SQLBaseStore):
 
     @cached()
     def _get_server_verify_key(
-        self, server_name_and_key_id: Iterable[Tuple[str, str]]
-    ) -> Dict[Tuple[str, str], FetchKeyResult]:
+        self, server_name_and_key_id: Tuple[str, str]
+    ) -> FetchKeyResult:
         raise NotImplementedError()
 
     @cachedList(
@@ -182,21 +182,21 @@ class KeyStore(SQLBaseStore):
 
     async def get_server_keys_json(
         self, server_keys: Iterable[Tuple[str, Optional[str], Optional[str]]]
-    ) -> Dict[Tuple[str, Optional[str], Optional[str]], List[dict]]:
+    ) -> Dict[Tuple[str, Optional[str], Optional[str]], List[Dict[str, Any]]]:
         """Retrieve the key json for a list of server_keys and key ids.
         If no keys are found for a given server, key_id and source then
         that server, key_id, and source triplet entry will be an empty list.
         The JSON is returned as a byte array so that it can be efficiently
         used in an HTTP response.
         Args:
-            server_keys (list): List of (server_name, key_id, source) triplets.
+            server_keys: List of (server_name, key_id, source) triplets.
         Returns:
             A mapping from (server_name, key_id, source) triplets to a list of dicts
         """
 
         def _get_server_keys_json_txn(
             txn: LoggingTransaction,
-        ) -> Dict[Tuple[str, Optional[str], Optional[str]], List[dict]]:
+        ) -> Dict[Tuple[str, Optional[str], Optional[str]], List[Dict[str, Any]]]:
             results = {}
             for server_name, key_id, from_server in server_keys:
                 keyvalues = {"server_name": server_name}

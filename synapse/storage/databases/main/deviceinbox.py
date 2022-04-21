@@ -134,7 +134,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         stream_name: str,
         instance_name: str,
         token: int,
-        rows: Iterable[Any],
+        rows: Iterable[ToDeviceStream.ToDeviceStreamRow],
     ) -> None:
         if stream_name == ToDeviceStream.NAME:
             # If replication is happening than postgres must be being used.
@@ -475,7 +475,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
     @trace
     async def get_new_device_msgs_for_remote(
         self, destination: str, last_stream_id: int, current_stream_id: int, limit: int
-    ) -> Tuple[List[dict], int]:
+    ) -> Tuple[List[JsonDict], int]:
         """
         Args:
             destination: The name of the remote server.
@@ -505,7 +505,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         @trace
         def get_new_messages_for_remote_destination_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[List[dict], int]:
+        ) -> Tuple[List[JsonDict], int]:
             sql = (
                 "SELECT stream_id, messages_json FROM device_federation_outbox"
                 " WHERE destination = ?"
@@ -629,8 +629,8 @@ class DeviceInboxWorkerStore(SQLBaseStore):
     @trace
     async def add_messages_to_device_inbox(
         self,
-        local_messages_by_user_then_device: dict,
-        remote_messages_by_destination: dict,
+        local_messages_by_user_then_device: Dict[str, Dict[str, JsonDict]],
+        remote_messages_by_destination: Dict[str, JsonDict],
     ) -> int:
         """Used to send messages from this server.
 
@@ -701,7 +701,10 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         return self._device_inbox_id_gen.get_current_token()
 
     async def add_messages_from_remote_to_device_inbox(
-        self, origin: str, message_id: str, local_messages_by_user_then_device: dict
+        self,
+        origin: str,
+        message_id: str,
+        local_messages_by_user_then_device: Dict[str, Dict[str, JsonDict]],
     ) -> int:
         assert self._can_write_to_device
 
@@ -756,7 +759,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
         self,
         txn: LoggingTransaction,
         stream_id: int,
-        messages_by_user_then_device: dict,
+        messages_by_user_then_device: Dict[str, Dict[str, JsonDict]],
     ) -> None:
         assert self._can_write_to_device
 
