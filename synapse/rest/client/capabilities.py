@@ -15,7 +15,11 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, MSC3244_CAPABILITIES
+from synapse.api.room_versions import (
+    KNOWN_ROOM_VERSIONS,
+    MSC3244_CAPABILITIES,
+    MSC2716_CAPABILITIES,
+)
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
@@ -71,6 +75,12 @@ class CapabilitiesRestServlet(RestServlet):
             response["capabilities"]["m.room_versions"][
                 "org.matrix.msc3244.room_capabilities"
             ] = MSC3244_CAPABILITIES
+
+        logger.info("ewffewaafewafew")
+        if self.config.experimental.msc2716_enabled:
+            response["capabilities"]["m.room_versions"][
+                "org.matrix.msc2716.room_capabilities"
+            ] = MSC2716_CAPABILITIES
 
         if self.config.experimental.msc3720_enabled:
             response["capabilities"]["org.matrix.msc3720.account_status"] = {

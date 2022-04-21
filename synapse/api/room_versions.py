@@ -313,3 +313,28 @@ MSC3244_CAPABILITIES = {
         ),
     )
 }
+
+MSC2716_CAPABILITIES = {
+    cap.identifier: {
+        "preferred": cap.preferred_version.identifier
+        if cap.preferred_version is not None
+        else None,
+        "support": [
+            v.identifier
+            for v in KNOWN_ROOM_VERSIONS.values()
+            if cap.support_check_lambda(v)
+        ],
+    }
+    for cap in (
+        RoomVersionCapability(
+            "historical",
+            RoomVersions.MSC2716v3,
+            lambda room_version: room_version.msc2716_historical,
+        ),
+        RoomVersionCapability(
+            "redactions",
+            RoomVersions.MSC2716v3,
+            lambda room_version: room_version.msc2716_redactions,
+        ),
+    )
+}
