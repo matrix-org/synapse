@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
-    MSC2716_CAPABILITIES,
     MSC3244_CAPABILITIES,
 )
 from synapse.http.server import HttpServer
@@ -75,11 +74,6 @@ class CapabilitiesRestServlet(RestServlet):
             response["capabilities"]["m.room_versions"][
                 "org.matrix.msc3244.room_capabilities"
             ] = MSC3244_CAPABILITIES
-
-        if self.config.experimental.msc2716_enabled:
-            response["capabilities"]["m.room_versions"][
-                "org.matrix.msc2716.room_capabilities"
-            ] = MSC2716_CAPABILITIES
 
         if self.config.experimental.msc3720_enabled:
             response["capabilities"]["org.matrix.msc3720.account_status"] = {

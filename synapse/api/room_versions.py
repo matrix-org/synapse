@@ -79,8 +79,6 @@ class RoomVersion:
     # MSC2716: Adds m.room.power_levels -> content.historical field to control
     # whether "insertion", "chunk", "marker" events can be sent
     msc2716_historical: bool
-    # MSC2716: Adds support for redacting "insertion", "chunk", and "marker" events
-    msc2716_redactions: bool
 
 
 class RoomVersions:
@@ -98,7 +96,6 @@ class RoomVersions:
         msc3375_redaction_rules=False,
         msc2403_knocking=False,
         msc2716_historical=False,
-        msc2716_redactions=False,
     )
     V2 = RoomVersion(
         "2",
@@ -114,7 +111,6 @@ class RoomVersions:
         msc3375_redaction_rules=False,
         msc2403_knocking=False,
         msc2716_historical=False,
-        msc2716_redactions=False,
     )
     V3 = RoomVersion(
         "3",
@@ -130,7 +126,6 @@ class RoomVersions:
         msc3375_redaction_rules=False,
         msc2403_knocking=False,
         msc2716_historical=False,
-        msc2716_redactions=False,
     )
     V4 = RoomVersion(
         "4",
@@ -146,7 +141,6 @@ class RoomVersions:
         msc3375_redaction_rules=False,
         msc2403_knocking=False,
         msc2716_historical=False,
-        msc2716_redactions=False,
     )
     V5 = RoomVersion(
         "5",
@@ -162,7 +156,6 @@ class RoomVersions:
         msc3375_redaction_rules=False,
         msc2403_knocking=False,
         msc2716_historical=False,
-        msc2716_redactions=False,
     )
     V6 = RoomVersion(
         "6",
@@ -178,7 +171,6 @@ class RoomVersions:
         msc3375_redaction_rules=False,
         msc2403_knocking=False,
         msc2716_historical=False,
-        msc2716_redactions=False,
     )
     MSC2176 = RoomVersion(
         "org.matrix.msc2176",
@@ -194,7 +186,6 @@ class RoomVersions:
         msc3375_redaction_rules=False,
         msc2403_knocking=False,
         msc2716_historical=False,
-        msc2716_redactions=False,
     )
     V7 = RoomVersion(
         "7",
@@ -210,7 +201,6 @@ class RoomVersions:
         msc3375_redaction_rules=False,
         msc2403_knocking=True,
         msc2716_historical=False,
-        msc2716_redactions=False,
     )
     V8 = RoomVersion(
         "8",
@@ -226,7 +216,6 @@ class RoomVersions:
         msc3375_redaction_rules=False,
         msc2403_knocking=True,
         msc2716_historical=False,
-        msc2716_redactions=False,
     )
     V9 = RoomVersion(
         "9",
@@ -242,7 +231,6 @@ class RoomVersions:
         msc3375_redaction_rules=True,
         msc2403_knocking=True,
         msc2716_historical=False,
-        msc2716_redactions=False,
     )
     MSC2716v3 = RoomVersion(
         "org.matrix.msc2716v3",
@@ -258,7 +246,6 @@ class RoomVersions:
         msc3375_redaction_rules=False,
         msc2403_knocking=True,
         msc2716_historical=True,
-        msc2716_redactions=True,
     )
 
 
@@ -311,30 +298,10 @@ MSC3244_CAPABILITIES = {
             RoomVersions.V9,
             lambda room_version: room_version.msc3083_join_rules,
         ),
-    )
-}
-
-MSC2716_CAPABILITIES = {
-    cap.identifier: {
-        "preferred": cap.preferred_version.identifier
-        if cap.preferred_version is not None
-        else None,
-        "support": [
-            v.identifier
-            for v in KNOWN_ROOM_VERSIONS.values()
-            if cap.support_check_lambda(v)
-        ],
-    }
-    for cap in (
         RoomVersionCapability(
-            "historical",
+            "org.matrix.msc2716.historical",
             RoomVersions.MSC2716v3,
             lambda room_version: room_version.msc2716_historical,
-        ),
-        RoomVersionCapability(
-            "redactions",
-            RoomVersions.MSC2716v3,
-            lambda room_version: room_version.msc2716_redactions,
         ),
     )
 }

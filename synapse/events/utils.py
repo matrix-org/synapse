@@ -49,7 +49,7 @@ if TYPE_CHECKING:
 #       the literal fields "foo\" and "bar" but will instead be treated as "foo\\.bar"
 SPLIT_FIELD_REGEX = re.compile(r"(?<!\\)\.")
 
-CANONICALJSON_MAX_INT = (2**53) - 1
+CANONICALJSON_MAX_INT = (2 ** 53) - 1
 CANONICALJSON_MIN_INT = -CANONICALJSON_MAX_INT
 
 
@@ -157,11 +157,11 @@ def prune_event_dict(room_version: RoomVersion, event_dict: JsonDict) -> JsonDic
         add_fields("history_visibility")
     elif event_type == EventTypes.Redaction and room_version.msc2176_redaction_rules:
         add_fields("redacts")
-    elif room_version.msc2716_redactions and event_type == EventTypes.MSC2716_INSERTION:
+    elif room_version.msc2716_historical and event_type == EventTypes.MSC2716_INSERTION:
         add_fields(EventContentFields.MSC2716_NEXT_BATCH_ID)
-    elif room_version.msc2716_redactions and event_type == EventTypes.MSC2716_BATCH:
+    elif room_version.msc2716_historical and event_type == EventTypes.MSC2716_BATCH:
         add_fields(EventContentFields.MSC2716_BATCH_ID)
-    elif room_version.msc2716_redactions and event_type == EventTypes.MSC2716_MARKER:
+    elif room_version.msc2716_historical and event_type == EventTypes.MSC2716_MARKER:
         add_fields(EventContentFields.MSC2716_MARKER_INSERTION)
 
     allowed_fields = {k: v for k, v in event_dict.items() if k in allowed_keys}
