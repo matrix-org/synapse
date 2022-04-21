@@ -43,7 +43,7 @@ COPY conf-workers/start-complement-synapse-workers.sh /
 # Expose caddy's listener ports
 EXPOSE 8008 8448
 
-ENTRYPOINT /start-complement-synapse-workers.sh
+ENTRYPOINT ["/start-complement-synapse-workers.sh"]
 
 # Update the healthcheck to have a shorter check interval
 HEALTHCHECK --start-period=5s --interval=1s --timeout=1s \
