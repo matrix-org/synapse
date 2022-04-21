@@ -819,9 +819,7 @@ def run_in_background(  # type: ignore[misc]
         iterator = res.__await__()  # `__await__` returns an iterator...
         try:
             next(iterator)
-            raise ValueError(
-                f"Function {f} returned an unresolved awaitable: {res}"
-            )
+            raise ValueError(f"Function {f} returned an unresolved awaitable: {res}")
         except StopIteration as e:
             # ...which raises a `StopIteration` once the awaitable is complete.
             return defer.succeed(e.value)
