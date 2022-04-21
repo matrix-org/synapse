@@ -1787,10 +1787,16 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             txn: LoggingTransaction,
         ) -> List[Tuple[str, str, str, int, Optional[Dict[str, str]]]]:
             txn.execute(sql, (limit,))
-            return cast(
-                List[Tuple[str, str, str, int, Optional[Dict[str, str]]]],
-                txn.fetchall(),
-            )
+            return [
+                (
+                    row[0],
+                    row[1],
+                    row[2],
+                    row[3],
+                    db_to_json(row[4]) if row[4] else None,
+                )
+                for row in txn
+            ]
 
         return await self.db_pool.runInteraction(
             "get_uncoverted_outbound_room_pokes", get_uncoverted_outbound_room_pokes_txn
