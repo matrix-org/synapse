@@ -695,7 +695,9 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         # Return all events where not all sets can reach them.
         return {eid for eid, n in event_to_missing_sets.items() if n}
 
-    async def get_oldest_event_ids_with_depth_in_room(self, room_id) -> Dict[str, int]:
+    async def get_oldest_event_ids_with_depth_in_room(
+        self, room_id
+    ) -> List[Tuple[str, int]]:
         """Gets the oldest events(backwards extremities) in the room along with the
         aproximate depth.
 
@@ -708,7 +710,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             room_id: Room where we want to find the oldest events
 
         Returns:
-            Map from event_id to depth
+            List of (event_id, depth) tuples
         """
 
         def get_oldest_event_ids_with_depth_in_room_txn(txn, room_id):
@@ -741,7 +743,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
             txn.execute(sql, (room_id, False))
 
-            return dict(txn)
+            return txn.fetchall()
 
         return await self.db_pool.runInteraction(
             "get_oldest_event_ids_with_depth_in_room",
@@ -751,7 +753,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
     async def get_insertion_event_backward_extremities_in_room(
         self, room_id
-    ) -> Dict[str, int]:
+    ) -> List[Tuple[str, int]]:
         """Get the insertion events we know about that we haven't backfilled yet.
 
         We use this function so that we can compare and see if someones current
@@ -763,7 +765,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             room_id: Room where we want to find the oldest events
 
         Returns:
-            Map from event_id to depth
+            List of (event_id, depth) tuples
         """
 
         def get_insertion_event_backward_extremities_in_room_txn(txn, room_id):
@@ -778,8 +780,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             """
 
             txn.execute(sql, (room_id,))
-
-            return dict(txn)
+            return txn.fetchall()
 
         return await self.db_pool.runInteraction(
             "get_insertion_event_backward_extremities_in_room",

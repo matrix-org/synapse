@@ -162,7 +162,7 @@ class FederationHandler:
             await self.store.get_oldest_event_ids_with_depth_in_room(room_id)
         )
 
-        insertion_events_to_be_backfilled: Dict[str, int] = {}
+        insertion_events_to_be_backfilled: List[Tuple[str, int]] = []
         if self.hs.config.experimental.msc2716_enabled:
             insertion_events_to_be_backfilled = (
                 await self.store.get_insertion_event_backward_extremities_in_room(
@@ -183,8 +183,8 @@ class FederationHandler:
         # start with the most recent (ie, max depth), so let's sort the list.
         sorted_extremeties_tuple: List[Tuple[str, int]] = sorted(
             itertools.chain(
-                oldest_events_with_depth.items(),
-                insertion_events_to_be_backfilled.items(),
+                oldest_events_with_depth,
+                insertion_events_to_be_backfilled,
             ),
             key=lambda e: -int(e[1]),
         )
