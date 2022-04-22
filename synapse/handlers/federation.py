@@ -253,7 +253,8 @@ class FederationHandler:
         #
         # We do this by filtering all the backwards extremities and seeing if
         # any remain. Given we don't have the extremity events themselves, we
-        # need to actually check the events that reference them.
+        # need to actually check the events that reference them - their "successor"
+        # events.
         #
         # *Note*: the spec wants us to keep backfilling until we reach the start
         # of the room in case we are allowed to see some of the history. However
@@ -267,18 +268,18 @@ class FederationHandler:
         #   history.
         #
         # TODO: Correctly handle the case where we are allowed to see the
-        #   forward event but not the backward extremity, e.g. in the case of
+        #   successor event but not the backward extremity, e.g. in the case of
         #   initial join of the server where we are allowed to see the join
         #   event but not anything before it. This would require looking at the
         #   state *before* the event, ignoring the special casing certain event
         #   types have.
 
-        forward_event_ids = await self.store.get_successor_events(
+        successor_event_ids = await self.store.get_successor_events(
             list(oldest_events_with_depth)
         )
 
-        extremities_events = await self.store.get_events(
-            forward_event_ids,
+        successor_events = await self.store.get_events(
+            successor_event_ids,
             redact_behaviour=EventRedactBehaviour.AS_IS,
             get_prev_content=False,
         )
@@ -288,7 +289,7 @@ class FederationHandler:
         filtered_extremities = await filter_events_for_server(
             self.storage,
             self.server_name,
-            list(extremities_events.values()),
+            list(successor_events.values()),
             redact=False,
             check_history_visibility_only=True,
         )
