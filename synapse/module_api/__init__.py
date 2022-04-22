@@ -22,6 +22,7 @@ from typing import (
     Generator,
     Iterable,
     List,
+    Mapping,
     Optional,
     Tuple,
     TypeVar,
@@ -1419,7 +1420,9 @@ class AccountDataManager:
                 f"{user_id} is not local to this homeserver; can't access account data for remote users."
             )
 
-    async def get_global(self, user_id: str, data_type: str) -> Optional[JsonDict]:
+    async def get_global(
+        self, user_id: str, data_type: str
+    ) -> Optional[Mapping[str, Any]]:
         """
         Gets some global account data, of a specified type, for the specified user.
 
