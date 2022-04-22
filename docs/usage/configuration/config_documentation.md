@@ -64,7 +64,49 @@ apply if you want your config file to be read properly. A few helpful things to 
   In addition, each setting has an example of its usage, with the proper indentation
   shown. 
 
-  
+## Index
+[Modules](#modules)
+
+[Server](#server)
+
+[Homeserver Blocking](#homeserver-blocking)
+
+[TLS](#tls)
+
+[Federation](#federation)
+
+[Caching](#caching)
+
+[Database](#database)
+
+[Logging](#logging)
+
+[Ratelimiting](#ratelimiting)
+
+[Media Store](#media-store)
+
+[Captcha](#captcha)
+
+[TURN](#turn)
+
+[Registration](#registration)
+
+[API Configuration](#api-configuration)
+
+[Signing Keys](#signing-keys)
+
+[Single Sign On Integration](#single-sign-on-integration)
+
+[Push](#push)
+
+[Rooms](#rooms)
+
+[Opentracing](#opentracing)
+
+[Workers](#workers)
+
+[Background Updates](#background-updates)
+
 ## Modules
 
 Server admins can expand Synapse's functionality with external modules.
