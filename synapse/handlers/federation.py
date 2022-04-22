@@ -18,7 +18,7 @@
 import itertools
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
@@ -247,9 +247,12 @@ class FederationHandler:
                 "_maybe_backfill_inner: all extrems are *after* current depth. Backfilling anyway."
             )
 
-        # We only want to paginate if we can actually see the events we'll get,
-        # as otherwise we'll just spend a lot of resources to get redacted
-        # events.
+        # We still need to narrow down the list of extremities we pass to the remote
+        # server. We limit to 5 of them, to avoid the request URI becoming too long.
+        #
+        # However, we only want to paginate from a particular extremity if we can
+        # actually see the events we'll get, as otherwise we'll just spend a lot of
+        # resources to get redacted events.
         #
         # We do this by filtering all the backwards extremities and seeing if
         # any remain. Given we don't have the extremity events themselves, we
@@ -263,9 +266,9 @@ class FederationHandler:
         # there is its often sufficiently long ago that clients would stop
         # attempting to paginate before backfill reached the visible history.
         #
-        # TODO: If we do do a backfill then we should filter the backwards
-        #   extremities to only include those that point to visible portions of
-        #   history.
+        # Calculating the visibility of each extremity is quite expensive, and there
+        # can be thousands of them in a big gappy room, so we just check them one
+        # by one until we've checked them all, or we've got 5 of them.
         #
         # TODO: Correctly handle the case where we are allowed to see the
         #   successor event but not the backward extremity, e.g. in the case of
@@ -274,35 +277,48 @@ class FederationHandler:
         #   state *before* the event, ignoring the special casing certain event
         #   types have.
 
-        successor_event_ids = await self.store.get_successor_events(
-            (t[0] for t in sorted_extremeties_tuples)
-        )
+        extremities_to_request: Set[str] = set()
+        for extremity_event_id, _ in sorted_extremeties_tuples:
+            if len(extremities_to_request) >= 5:
+                break
 
-        successor_events = await self.store.get_events(
-            successor_event_ids,
-            redact_behaviour=EventRedactBehaviour.AS_IS,
-            get_prev_content=False,
-        )
+            successor_event_ids = await self.store.get_successor_events(
+                [extremity_event_id]
+            )
 
-        # We set `check_history_visibility_only` as we might otherwise get false
-        # positives from users having been erased.
-        filtered_extremities = await filter_events_for_server(
-            self.storage,
-            self.server_name,
-            list(successor_events.values()),
-            redact=False,
-            check_history_visibility_only=True,
-        )
-        logger.debug(
-            "_maybe_backfill_inner: filtered_extremities %s", filtered_extremities
-        )
+            successor_events = await self.store.get_events_as_list(
+                successor_event_ids,
+                redact_behaviour=EventRedactBehaviour.AS_IS,
+                get_prev_content=False,
+            )
 
-        if not filtered_extremities:
+            # We set `check_history_visibility_only` as we might otherwise get false
+            # positives from users having been erased.
+            filtered_extremities = await filter_events_for_server(
+                self.storage,
+                self.server_name,
+                successor_events,
+                redact=False,
+                check_history_visibility_only=True,
+            )
+
+            if filtered_extremities:
+                extremities_to_request.add(extremity_event_id)
+            else:
+                logger.debug(
+                    "_maybe_backfill_inner: skipping extremity %s as it would not be visible.",
+                    extremity_event_id,
+                )
+
+        if not extremities_to_request:
+            logger.debug(
+                "_maybe_backfill_inner: found no extremities which would be visible"
+            )
             return False
 
-        # We don't want to specify too many extremities as it causes the backfill
-        # request URI to be too long.
-        extremities = dict(sorted_extremeties_tuples[:5])
+        logger.debug(
+            "_maybe_backfill_inner: extremities_to_request %s", extremities_to_request
+        )
 
         # Now we need to decide which hosts to hit first.
 
@@ -322,7 +338,7 @@ class FederationHandler:
             for dom in domains:
                 try:
                     await self._federation_event_handler.backfill(
-                        dom, room_id, limit=100, extremities=extremities
+                        dom, room_id, limit=100, extremities=extremities_to_request
                     )
                     # If this succeeded then we probably already have the
                     # appropriate stuff.
