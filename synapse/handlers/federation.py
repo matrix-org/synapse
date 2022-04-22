@@ -189,7 +189,14 @@ class FederationHandler:
             key=lambda e: -int(e[1]),
         )
 
-        max_depth = sorted_extremeties_tuple[0][1]
+        logger.debug(
+            "_maybe_backfill_inner: room_id: %s: current_depth: %s, limit: %s, extrems (%d): %s",
+            room_id,
+            current_depth,
+            limit,
+            len(sorted_extremeties_tuple),
+            sorted_extremeties_tuple,
+        )
 
         # If we're approaching an extremity we trigger a backfill, otherwise we
         # no-op.
@@ -200,6 +207,11 @@ class FederationHandler:
         # chose more than one times the limit in case of failure, but choosing a
         # much larger factor will result in triggering a backfill request much
         # earlier than necessary.
+        #
+        # XXX: shouldn't we do this *after* the filter by depth below? Again, we don't
+        # care about events that have happened after our current position.
+        #
+        max_depth = sorted_extremeties_tuple[0][1]
         if current_depth - 2 * limit > max_depth:
             logger.debug(
                 "Not backfilling as we don't need to. %d < %d - 2 * %d",
@@ -216,27 +228,25 @@ class FederationHandler:
         #    2. we have likely previously tried and failed to backfill from that
         #       extremity, so to avoid getting "stuck" requesting the same
         #       backfill repeatedly we drop those extremities.
-        filtered_sorted_extremeties_tuple = [
-            t for t in sorted_extremeties_tuple if int(t[1]) <= current_depth
-        ]
-
-        logger.debug(
-            "room_id: %s, backfill: current_depth: %s, limit: %s, max_depth: %s, extrems (%d): %s filtered_sorted_extremeties_tuple: %s",
-            room_id,
-            current_depth,
-            limit,
-            max_depth,
-            len(sorted_extremeties_tuple),
-            sorted_extremeties_tuple,
-            filtered_sorted_extremeties_tuple,
-        )
-
+        #
         # However, we need to check that the filtered extremities are non-empty.
         # If they are empty then either we can a) bail or b) still attempt to
         # backfill. We opt to try backfilling anyway just in case we do get
         # relevant events.
+        #
+        filtered_sorted_extremeties_tuple = [
+            t for t in sorted_extremeties_tuple if int(t[1]) <= current_depth
+        ]
         if filtered_sorted_extremeties_tuple:
+            logger.debug(
+                "_maybe_backfill_inner: extrems before current depth: %s",
+                filtered_sorted_extremeties_tuple,
+            )
             sorted_extremeties_tuple = filtered_sorted_extremeties_tuple
+        else:
+            logger.debug(
+                "_maybe_backfill_inner: all extrems are *after* current depth. Backfilling anyway."
+            )
 
         # We only want to paginate if we can actually see the events we'll get,
         # as otherwise we'll just spend a lot of resources to get redacted
