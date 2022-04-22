@@ -237,8 +237,10 @@ class FederationHandler:
         }
 
         # Check if we reached a point where we should start backfilling.
-        sorted_extremeties_tuple = sorted(extremities.items(), key=lambda e: -int(e[1]))
-        max_depth = sorted_extremeties_tuple[0][1]
+        sorted_extremeties_tuples: List[Tuple[str, int]] = sorted(
+            extremities.items(), key=lambda e: -int(e[1])
+        )
+        max_depth = sorted_extremeties_tuples[0][1]
 
         # If we're approaching an extremity we trigger a backfill, otherwise we
         # no-op.
@@ -265,31 +267,31 @@ class FederationHandler:
         #    2. we have likely previously tried and failed to backfill from that
         #       extremity, so to avoid getting "stuck" requesting the same
         #       backfill repeatedly we drop those extremities.
-        filtered_sorted_extremeties_tuple = [
-            t for t in sorted_extremeties_tuple if int(t[1]) <= current_depth
+        filtered_sorted_extremeties_tuples = [
+            t for t in sorted_extremeties_tuples if int(t[1]) <= current_depth
         ]
 
         logger.debug(
-            "room_id: %s, backfill: current_depth: %s, limit: %s, max_depth: %s, extrems (%d): %s filtered_sorted_extremeties_tuple: %s",
+            "room_id: %s, backfill: current_depth: %s, limit: %s, max_depth: %s, extrems (%d): %s filtered_sorted_extremeties_tuples: %s",
             room_id,
             current_depth,
             limit,
             max_depth,
-            len(sorted_extremeties_tuple),
-            sorted_extremeties_tuple,
-            filtered_sorted_extremeties_tuple,
+            len(sorted_extremeties_tuples),
+            sorted_extremeties_tuples,
+            filtered_sorted_extremeties_tuples,
         )
 
         # However, we need to check that the filtered extremities are non-empty.
         # If they are empty then either we can a) bail or b) still attempt to
         # backfill. We opt to try backfilling anyway just in case we do get
         # relevant events.
-        if filtered_sorted_extremeties_tuple:
-            sorted_extremeties_tuple = filtered_sorted_extremeties_tuple
+        if filtered_sorted_extremeties_tuples:
+            sorted_extremeties_tuples = filtered_sorted_extremeties_tuples
 
         # We don't want to specify too many extremities as it causes the backfill
         # request URI to be too long.
-        extremities = dict(sorted_extremeties_tuple[:5])
+        extremities = dict(sorted_extremeties_tuples[:5])
 
         # Now we need to decide which hosts to hit first.
 
