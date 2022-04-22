@@ -179,60 +179,6 @@ class FederationHandler:
             logger.debug("Not backfilling as no extremeties found.")
             return False
 
-        # We only want to paginate if we can actually see the events we'll get,
-        # as otherwise we'll just spend a lot of resources to get redacted
-        # events.
-        #
-        # We do this by filtering all the backwards extremities and seeing if
-        # any remain. Given we don't have the extremity events themselves, we
-        # need to actually check the events that reference them.
-        #
-        # *Note*: the spec wants us to keep backfilling until we reach the start
-        # of the room in case we are allowed to see some of the history. However
-        # in practice that causes more issues than its worth, as a) its
-        # relatively rare for there to be any visible history and b) even when
-        # there is its often sufficiently long ago that clients would stop
-        # attempting to paginate before backfill reached the visible history.
-        #
-        # TODO: If we do do a backfill then we should filter the backwards
-        #   extremities to only include those that point to visible portions of
-        #   history.
-        #
-        # TODO: Correctly handle the case where we are allowed to see the
-        #   forward event but not the backward extremity, e.g. in the case of
-        #   initial join of the server where we are allowed to see the join
-        #   event but not anything before it. This would require looking at the
-        #   state *before* the event, ignoring the special casing certain event
-        #   types have.
-
-        forward_event_ids = await self.store.get_successor_events(
-            list(oldest_events_with_depth)
-        )
-
-        extremities_events = await self.store.get_events(
-            forward_event_ids,
-            redact_behaviour=EventRedactBehaviour.AS_IS,
-            get_prev_content=False,
-        )
-
-        # We set `check_history_visibility_only` as we might otherwise get false
-        # positives from users having been erased.
-        filtered_extremities = await filter_events_for_server(
-            self.storage,
-            self.server_name,
-            list(extremities_events.values()),
-            redact=False,
-            check_history_visibility_only=True,
-        )
-        logger.debug(
-            "_maybe_backfill_inner: filtered_extremities %s", filtered_extremities
-        )
-
-        if not filtered_extremities and not insertion_events_to_be_backfilled:
-            return False
-
-        # TODO: insertion_events_to_be_backfilled is currently skipping the filtered_extremities checks
-
         # we now have a list of potential places to backpaginate from. We prefer to
         # start with the most recent (ie, max depth), so let's sort the list.
         sorted_extremeties_tuples: List[Tuple[str, int]] = sorted(
@@ -291,6 +237,60 @@ class FederationHandler:
         # relevant events.
         if filtered_sorted_extremeties_tuples:
             sorted_extremeties_tuples = filtered_sorted_extremeties_tuples
+
+        # We only want to paginate if we can actually see the events we'll get,
+        # as otherwise we'll just spend a lot of resources to get redacted
+        # events.
+        #
+        # We do this by filtering all the backwards extremities and seeing if
+        # any remain. Given we don't have the extremity events themselves, we
+        # need to actually check the events that reference them.
+        #
+        # *Note*: the spec wants us to keep backfilling until we reach the start
+        # of the room in case we are allowed to see some of the history. However
+        # in practice that causes more issues than its worth, as a) its
+        # relatively rare for there to be any visible history and b) even when
+        # there is its often sufficiently long ago that clients would stop
+        # attempting to paginate before backfill reached the visible history.
+        #
+        # TODO: If we do do a backfill then we should filter the backwards
+        #   extremities to only include those that point to visible portions of
+        #   history.
+        #
+        # TODO: Correctly handle the case where we are allowed to see the
+        #   forward event but not the backward extremity, e.g. in the case of
+        #   initial join of the server where we are allowed to see the join
+        #   event but not anything before it. This would require looking at the
+        #   state *before* the event, ignoring the special casing certain event
+        #   types have.
+
+        forward_event_ids = await self.store.get_successor_events(
+            list(oldest_events_with_depth)
+        )
+
+        extremities_events = await self.store.get_events(
+            forward_event_ids,
+            redact_behaviour=EventRedactBehaviour.AS_IS,
+            get_prev_content=False,
+        )
+
+        # We set `check_history_visibility_only` as we might otherwise get false
+        # positives from users having been erased.
+        filtered_extremities = await filter_events_for_server(
+            self.storage,
+            self.server_name,
+            list(extremities_events.values()),
+            redact=False,
+            check_history_visibility_only=True,
+        )
+        logger.debug(
+            "_maybe_backfill_inner: filtered_extremities %s", filtered_extremities
+        )
+
+        if not filtered_extremities and not insertion_events_to_be_backfilled:
+            return False
+
+        # TODO: insertion_events_to_be_backfilled is currently skipping the filtered_extremities checks
 
         # We don't want to specify too many extremities as it causes the backfill
         # request URI to be too long.
