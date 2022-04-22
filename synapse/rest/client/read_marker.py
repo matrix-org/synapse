@@ -54,7 +54,7 @@ class ReadMarkerRestServlet(RestServlet):
         if self.config.experimental.msc2285_enabled:
             valid_receipt_types.add(ReceiptTypes.READ_PRIVATE)
 
-        if set(body.keys()) > (valid_receipt_types):
+        if set(body.keys()) > valid_receipt_types:
             raise SynapseError(
                 400,
                 "Receipt type must be 'm.read', 'org.matrix.msc2285.read.private' or 'm.fully_read'"
