@@ -1,4 +1,4 @@
-# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
+# Copyright 2014-2022 The Matrix.org Foundation C.I.C.
 # Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +15,7 @@
 
 """Contains handlers for federation events."""
 
+import itertools
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
@@ -230,14 +231,18 @@ class FederationHandler:
         if not filtered_extremities and not insertion_events_to_be_backfilled:
             return False
 
-        extremities = {
-            **oldest_events_with_depth,
-            # TODO: insertion_events_to_be_backfilled is currently skipping the filtered_extremities checks
-            **insertion_events_to_be_backfilled,
-        }
+        # TODO: insertion_events_to_be_backfilled is currently skipping the filtered_extremities checks
 
-        # Check if we reached a point where we should start backfilling.
-        sorted_extremeties_tuple = sorted(extremities.items(), key=lambda e: -int(e[1]))
+        # we now have a list of potential places to backpaginate from. We prefer to
+        # start with the most recent (ie, max depth), so let's sort the list.
+        sorted_extremeties_tuple: List[Tuple[str, int]] = sorted(
+            itertools.chain(
+                oldest_events_with_depth.items(),
+                insertion_events_to_be_backfilled.items(),
+            ),
+            key=lambda e: -int(e[1]),
+        )
+
         max_depth = sorted_extremeties_tuple[0][1]
 
         # If we're approaching an extremity we trigger a backfill, otherwise we
