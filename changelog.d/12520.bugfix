@@ -1,0 +1,1 @@
+Fix a bug in the implementation of MSC3202 where Synapse would use the field name `device_unused_fallback_keys`, rather than `device_unused_fallback_key_types`.

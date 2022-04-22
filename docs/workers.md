@@ -146,12 +146,10 @@ worker_replication_host: 127.0.0.1
 worker_replication_http_port: 9093
 
 worker_listeners:
- - type: http
-   port: 8083
-   resources:
-     - names:
-       - client
-       - federation
+  - type: http
+    port: 8083
+    resources:
+      - names: [client, federation]
 
 worker_log_config: /home/matrix/synapse/config/worker1_log_config.yaml
 ```
@@ -343,9 +341,9 @@ effects of bursts of events from that bridge on events sent by normal users.
 
 #### Stream writers
 
-Additionally, there is *experimental* support for moving writing of specific
-streams (such as events) off of the main process to a particular worker. (This
-is only supported with Redis-based replication.)
+Additionally, the writing of specific streams (such as events) can be moved off
+of the main process to a particular worker.
+(This is only supported with Redis-based replication.)
 
 To enable this, the worker must have a HTTP replication listener configured,
 have a `worker_name` and be listed in the `instance_map` config. The same worker
@@ -422,7 +420,7 @@ the stream writer for the `presence` stream:
 
 #### Background tasks
 
-There is also *experimental* support for moving background tasks to a separate
+There is also support for moving background tasks to a separate
 worker. Background tasks are run periodically or started via replication. Exactly
 which tasks are configured to run depends on your Synapse configuration (e.g. if
 stats is enabled).

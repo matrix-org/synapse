@@ -29,7 +29,7 @@
 import os
 import subprocess
 import sys
-from typing import Any, Dict, Set
+from typing import Any, Dict, Mapping, Set
 
 import jinja2
 import yaml
@@ -341,7 +341,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     # base shared worker jinja2 template.
     #
     # This config file will be passed to all workers, included Synapse's main process.
-    shared_config = {"listeners": listeners}
+    shared_config: Dict[str, Any] = {"listeners": listeners}
 
     # The supervisord config. The contents of which will be inserted into the
     # base supervisord jinja2 template.
@@ -446,21 +446,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
 
         # Write out the worker's logging config file
 
-        # Check whether we should write worker logs to disk, in addition to the console
-        extra_log_template_args = {}
-        if environ.get("SYNAPSE_WORKERS_WRITE_LOGS_TO_DISK"):
-            extra_log_template_args["LOG_FILE_PATH"] = "{dir}/logs/{name}.log".format(
-                dir=data_dir, name=worker_name
-            )
-
-        # Render and write the file
-        log_config_filepath = "/conf/workers/{name}.log.config".format(name=worker_name)
-        convert(
-            "/conf/log.config",
-            log_config_filepath,
-            worker_name=worker_name,
-            **extra_log_template_args,
-        )
+        log_config_filepath = generate_worker_log_config(environ, worker_name, data_dir)
 
         # Then a worker config file
         convert(
@@ -496,6 +482,10 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
 
     # Finally, we'll write out the config files.
 
+    # log config for the master process
+    master_log_config = generate_worker_log_config(environ, "master", data_dir)
+    shared_config["log_config"] = master_log_config
+
     # Shared homeserver config
     convert(
         "/conf/shared.yaml.j2",
@@ -512,9 +502,10 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     )
 
     # Supervisord config
+    os.makedirs("/etc/supervisor", exist_ok=True)
     convert(
         "/conf/supervisord.conf.j2",
-        "/etc/supervisor/conf.d/supervisord.conf",
+        "/etc/supervisor/supervisord.conf",
         main_config_path=config_path,
         worker_config=supervisord_config,
     )
@@ -532,12 +523,28 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
         os.mkdir(log_dir)
 
 
-def start_supervisord():
-    """Starts up supervisord which then starts and monitors all other necessary processes
+def generate_worker_log_config(
+    environ: Mapping[str, str], worker_name: str, data_dir: str
+) -> str:
+    """Generate a log.config file for the given worker.
 
-    Raises: CalledProcessError if calling start.py return a non-zero exit code.
+    Returns: the path to the generated file
     """
-    subprocess.run(["/usr/bin/supervisord"], stdin=subprocess.PIPE)
+    # Check whether we should write worker logs to disk, in addition to the console
+    extra_log_template_args = {}
+    if environ.get("SYNAPSE_WORKERS_WRITE_LOGS_TO_DISK"):
+        extra_log_template_args["LOG_FILE_PATH"] = "{dir}/logs/{name}.log".format(
+            dir=data_dir, name=worker_name
+        )
+    # Render and write the file
+    log_config_filepath = "/conf/workers/{name}.log.config".format(name=worker_name)
+    convert(
+        "/conf/log.config",
+        log_config_filepath,
+        worker_name=worker_name,
+        **extra_log_template_args,
+    )
+    return log_config_filepath
 
 
 def main(args, environ):
@@ -567,7 +574,13 @@ def main(args, environ):
 
     # Start supervisord, which will start Synapse, all of the configured worker
     # processes, redis, nginx etc. according to the config we created above.
-    start_supervisord()
+    log("Starting supervisord")
+    os.execl(
+        "/usr/local/bin/supervisord",
+        "supervisord",
+        "-c",
+        "/etc/supervisor/supervisord.conf",
+    )
 
 
 if __name__ == "__main__":

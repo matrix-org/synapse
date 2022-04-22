@@ -303,6 +303,24 @@ class EventsWorkerStore(SQLBaseStore):
             desc="get_received_ts",
         )
 
+    async def have_censored_event(self, event_id: str) -> bool:
+        """Check if an event has been censored, i.e. if the content of the event has been erased
+        from the database due to a redaction.
+
+        Args:
+            event_id: The event ID that was redacted.
+
+        Returns:
+            True if the event has been censored, False otherwise.
+        """
+        censored_redactions_list = await self.db_pool.simple_select_onecol(
+            table="redactions",
+            keyvalues={"redacts": event_id},
+            retcol="have_censored",
+            desc="get_have_censored",
+        )
+        return any(censored_redactions_list)
+
     # Inform mypy that if allow_none is False (the default) then get_event
     # always returns an EventBase.
     @overload
@@ -1956,7 +1974,15 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_partial_state_events(
         self, event_ids: Collection[str]
     ) -> Dict[str, bool]:
-        """Checks which of the given events have partial state"""
+        """Checks which of the given events have partial state
+
+        Args:
+            event_ids: the events we want to check for partial state.
+
+        Returns:
+            a dict mapping from event id to partial-stateness. We return True for
+            any of the events which are unknown (or are outliers).
+        """
         result = await self.db_pool.simple_select_many_batch(
             table="partial_state_events",
             column="event_id",
