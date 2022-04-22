@@ -481,7 +481,7 @@ class AuthHandler:
             sid = authdict["session"]
 
         # Convert the URI and method to strings.
-        uri = request.uri.decode("utf-8")  # type: ignore
+        uri = request.uri.decode("utf-8")
         method = request.method.decode("utf-8")
 
         # If there's no session ID, create a new session.

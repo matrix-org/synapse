@@ -186,7 +186,7 @@ KNOWN_RESOURCES = {
 class HttpResourceConfig:
     names: List[str] = attr.ib(
         factory=list,
-        validator=attr.validators.deep_iterable(attr.validators.in_(KNOWN_RESOURCES)),  # type: ignore
+        validator=attr.validators.deep_iterable(attr.validators.in_(KNOWN_RESOURCES)),
     )
     compress: bool = attr.ib(
         default=False,
@@ -232,7 +232,7 @@ class LimitRemoteRoomsConfig:
     enabled: bool = attr.ib(validator=attr.validators.instance_of(bool), default=False)
     complexity: Union[float, int] = attr.ib(
         validator=attr.validators.instance_of(
-            (float, int)  # type: ignore[arg-type] # noqa
+            (float, int)  # noqa
         ),
         default=1.0,
     )

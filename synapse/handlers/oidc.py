@@ -966,7 +966,7 @@ class OidcProvider:
                         "Mapping provider does not support de-duplicating Matrix IDs"
                     )
 
-                attributes = await self._user_mapping_provider.map_user_attributes(  # type: ignore
+                attributes = await self._user_mapping_provider.map_user_attributes(
                     userinfo, token
                 )
 

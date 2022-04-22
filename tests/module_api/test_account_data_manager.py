@@ -142,16 +142,18 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         with self.assertRaises(TypeError):
             # The account data type must be a string.
+            # noinspection PyTypeChecker
             self.get_success_or_raise(
                 self._module_api.account_data_manager.put_global(
-                    self.user_id, 42, {}  # type: ignore
+                    self.user_id, 42, {}
                 )
             )
 
         with self.assertRaises(TypeError):
             # The account data dict must be a dict.
+            # noinspection PyTypeChecker
             self.get_success_or_raise(
                 self._module_api.account_data_manager.put_global(
-                    self.user_id, "test.data", 42  # type: ignore
+                    self.user_id, "test.data", 42
                 )
             )
