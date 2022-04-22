@@ -29,7 +29,7 @@
 import os
 import subprocess
 import sys
-from typing import Any, Dict, Mapping, Set
+from typing import Any, Dict, List, Mapping, MutableMapping, NoReturn, Set
 
 import jinja2
 import yaml
@@ -201,7 +201,7 @@ upstream {upstream_worker_type} {{
 
 
 # Utility functions
-def log(txt: str):
+def log(txt: str) -> None:
     """Log something to the stdout.
 
     Args:
@@ -210,7 +210,7 @@ def log(txt: str):
     print(txt)
 
 
-def error(txt: str):
+def error(txt: str) -> NoReturn:
     """Log something and exit with an error code.
 
     Args:
@@ -220,7 +220,7 @@ def error(txt: str):
     sys.exit(2)
 
 
-def convert(src: str, dst: str, **template_vars):
+def convert(src: str, dst: str, **template_vars: object) -> None:
     """Generate a file from a template
 
     Args:
@@ -290,7 +290,7 @@ def add_sharding_to_shared_config(
         shared_config.setdefault("media_instance_running_background_jobs", worker_name)
 
 
-def generate_base_homeserver_config():
+def generate_base_homeserver_config() -> None:
     """Starts Synapse and generates a basic homeserver config, which will later be
     modified for worker support.
 
@@ -302,12 +302,14 @@ def generate_base_homeserver_config():
     subprocess.check_output(["/usr/local/bin/python", "/start.py", "migrate_config"])
 
 
-def generate_worker_files(environ, config_path: str, data_dir: str):
+def generate_worker_files(
+    environ: Mapping[str, str], config_path: str, data_dir: str
+) -> None:
     """Read the desired list of workers from environment variables and generate
     shared homeserver, nginx and supervisord configs.
 
     Args:
-        environ: _Environ[str]
+        environ: os.environ instance.
         config_path: The location of the generated Synapse main worker config file.
         data_dir: The location of the synapse data directory. Where log and
             user-facing config files live.
@@ -369,13 +371,13 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     nginx_locations = {}
 
     # Read the desired worker configuration from the environment
-    worker_types = environ.get("SYNAPSE_WORKER_TYPES")
-    if worker_types is None:
+    worker_types_env = environ.get("SYNAPSE_WORKER_TYPES")
+    if worker_types_env is None:
         # No workers, just the main process
         worker_types = []
     else:
         # Split type names by comma
-        worker_types = worker_types.split(",")
+        worker_types = worker_types_env.split(",")
 
     # Create the worker configuration directory if it doesn't already exist
     os.makedirs("/conf/workers", exist_ok=True)
@@ -547,7 +549,7 @@ def generate_worker_log_config(
     return log_config_filepath
 
 
-def main(args, environ):
+def main(args: List[str], environ: MutableMapping[str, str]) -> None:
     config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
     config_path = environ.get("SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml")
     data_dir = environ.get("SYNAPSE_DATA_DIR", "/data")
