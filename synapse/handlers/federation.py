@@ -275,7 +275,7 @@ class FederationHandler:
         #   types have.
 
         successor_event_ids = await self.store.get_successor_events(
-            list(oldest_events_with_depth)
+            (t[0] for t in sorted_extremeties_tuples)
         )
 
         successor_events = await self.store.get_events(
@@ -297,10 +297,8 @@ class FederationHandler:
             "_maybe_backfill_inner: filtered_extremities %s", filtered_extremities
         )
 
-        if not filtered_extremities and not insertion_events_to_be_backfilled:
+        if not filtered_extremities:
             return False
-
-        # TODO: insertion_events_to_be_backfilled is currently skipping the filtered_extremities checks
 
         # We don't want to specify too many extremities as it causes the backfill
         # request URI to be too long.
