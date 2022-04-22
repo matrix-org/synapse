@@ -231,9 +231,7 @@ class ManholeConfig:
 class LimitRemoteRoomsConfig:
     enabled: bool = attr.ib(validator=attr.validators.instance_of(bool), default=False)
     complexity: Union[float, int] = attr.ib(
-        validator=attr.validators.instance_of(
-            (float, int)  # noqa
-        ),
+        validator=attr.validators.instance_of((float, int)),  # noqa
         default=1.0,
     )
     complexity_error: str = attr.ib(
