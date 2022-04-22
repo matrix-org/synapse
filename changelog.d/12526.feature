@@ -1,0 +1,1 @@
+Add new `registration_token_without_3pids` configuration option to allow registrations via token without needing to verify a 3pid.

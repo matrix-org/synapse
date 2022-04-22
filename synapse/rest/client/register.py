@@ -948,7 +948,6 @@ def _calculate_registration_flows(
         for flow in flows:
             flow.insert(0, LoginType.RECAPTCHA)
 
-
     return flows
 
 
