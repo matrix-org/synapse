@@ -63,6 +63,19 @@ class RoomConfig(Config):
                 "Invalid value for encryption_enabled_by_default_for_room_type"
             )
 
+        self.default_power_level_content_override = config.get(
+            "default_power_level_content_override",
+            None,
+        )
+        if self.default_power_level_content_override is not None:
+            for preset in self.default_power_level_content_override:
+                if preset not in vars(RoomCreationPreset).values():
+                    raise ConfigError(
+                        "Unrecognised room preset %s in default_power_level_content_override"
+                        % preset
+                    )
+                # We validate the actual overrides when we try to apply them.
+
     def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         ## Rooms ##
@@ -83,4 +96,20 @@ class RoomConfig(Config):
         # will also not affect rooms created by other servers.
         #
         #encryption_enabled_by_default_for_room_type: invite
+
+        # Override the default power levels for rooms created on this server, per
+        # room creation preset.
+        #
+        # Useful if you know that your users need special permissions in rooms
+        # that they create (e.g. to send particular types of state events without
+        # needing an elevated power level).  This takes the same shape as the
+        # `power_level_content_override` parameter in the /createRoom API, but
+        # is applied before that parameter.
+        #
+        # This is something of a workaround in the absence of MSC3779 or MSC3761.
+        #
+        #default_power_level_content_override:
+        #   private_chat: null
+        #   trusted_private_chat: null
+        #   public_chat: null
         """

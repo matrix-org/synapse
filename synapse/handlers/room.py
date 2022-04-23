@@ -1046,6 +1046,18 @@ class RoomCreationHandler:
             if power_level_content_override:
                 power_level_content.update(power_level_content_override)
 
+            # override default_power_level_content_override for this room preset, if any
+            default_power_level_content_override = (
+                self.config.room.default_power_level_content_override
+            )
+            if (
+                default_power_level_content_override
+                and default_power_level_content_override.get(preset_config)
+            ):
+                power_level_content.update(
+                    default_power_level_content_override.get(preset_config)
+                )
+
             last_sent_stream_id = await send(
                 etype=EventTypes.PowerLevels, content=power_level_content
             )
