@@ -1,0 +1,1 @@
+Remove extraneous comma in users_admin_api device deletion section so example JSON is actually valid and working. Contributed by @olmari.
