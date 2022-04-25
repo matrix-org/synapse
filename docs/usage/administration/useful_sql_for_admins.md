@@ -12,6 +12,7 @@ pg_size_pretty
  6420 MB
 (1 row)
 ```
+
 ## Show top 20 larger rooms by state events count
 ```sql
 SELECT
@@ -265,4 +266,17 @@ WHERE
       '!OGEhHVWSdvArJzumhm:matrix.org',
       '!YTvKGNlinIzlkMTVRl:matrix.org' 
     );
+```
+
+## Show users and devices that have not been online for a while
+```sql
+SELECT
+  user_id,
+  device_id,
+  user_agent,
+  TO_TIMESTAMP(last_seen / 1000) AS "last_seen" 
+FROM
+  devices 
+WHERE
+  last_seen < DATE_PART('epoch', NOW() - INTERVAL '3 month') * 1000;
 ```
