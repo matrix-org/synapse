@@ -246,6 +246,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
         Args:
             from_key: the stream position at which events should be fetched from
+            to_key: the stream position up to which events should be fetched to
             service: The appservice which may be interested
 
         Returns:
