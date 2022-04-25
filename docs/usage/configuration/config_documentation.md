@@ -64,7 +64,7 @@ apply if you want your config file to be read properly. A few helpful things to 
   In addition, each setting has an example of its usage, with the proper indentation
   shown. 
 
-## Index
+## Contents
 [Modules](#modules)
 
 [Server](#server)
