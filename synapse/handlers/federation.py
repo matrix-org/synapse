@@ -20,7 +20,7 @@ import itertools
 import logging
 from enum import Enum
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import attr
 from signedjson.key import decode_verify_key_bytes
@@ -274,16 +274,19 @@ class FederationHandler:
                 "_maybe_backfill_inner: all backfill points are *after* current depth. Backfilling anyway."
             )
 
-        # We only want to paginate if we can actually see the events we'll get,
-        # as otherwise we'll just spend a lot of resources to get redacted
-        # events.
+        # We still need to narrow down the list of extremities we pass to the remote
+        # server. We limit to 5 of them, to avoid the request URI becoming too long.
+        #
+        # However, we only want to paginate from a particular extremity if we can
+        # actually see the events we'll get, as otherwise we'll just spend a lot of
+        # resources to get redacted events.
         #
         # We do this by filtering all the backwards extremities and seeing if
         # any remain.
         #
         # Doing this filtering can be expensive (we load the full state for the room
         # at each of the sucessor events), so we check them one at a time until we find
-        # one that is visible, and then stop.
+        # enough good ones, and then stop.
         #
         # *Note*: the spec wants us to keep backfilling until we reach the start
         # of the room in case we are allowed to see some of the history. However
@@ -291,13 +294,12 @@ class FederationHandler:
         # relatively rare for there to be any visible history and b) even when
         # there is its often sufficiently long ago that clients would stop
         # attempting to paginate before backfill reached the visible history.
-        #
-        # TODO: If we do do a backfill then we should filter the backwards
-        #   extremities to only include those that point to visible portions of
-        #   history.
 
-        found_filtered_extremity = False
+        extremities_to_request: Set[str] = set()
         for bp in sorted_backfill_points:
+            if len(extremities_to_request) >= 5:
+                break
+
             # For regular backwards extremities, we don't have the extremity events
             # themselves, so we need to actually check the events that reference them -
             # their "successor" events.
@@ -331,15 +333,22 @@ class FederationHandler:
                 check_history_visibility_only=True,
             )
             if filtered_extremities:
-                found_filtered_extremity = True
-                break
+                extremities_to_request.add(bp.event_id)
+            else:
+                logger.debug(
+                    "_maybe_backfill_inner: skipping extremity %s as it would not be visible",
+                    bp,
+                )
 
-        if not found_filtered_extremity:
+        if not extremities_to_request:
+            logger.debug(
+                "_maybe_backfill_inner: found no extremities which would be visible"
+            )
             return False
 
-        # We don't want to specify too many extremities as it causes the backfill
-        # request URI to be too long.
-        extremities = [e.event_id for e in sorted_backfill_points[:5]]
+        logger.debug(
+            "_maybe_backfill_inner: extremities_to_request %s", extremities_to_request
+        )
 
         # Now we need to decide which hosts to hit first.
 
@@ -359,7 +368,7 @@ class FederationHandler:
             for dom in domains:
                 try:
                     await self._federation_event_handler.backfill(
-                        dom, room_id, limit=100, extremities=extremities
+                        dom, room_id, limit=100, extremities=extremities_to_request
                     )
                     # If this succeeded then we probably already have the
                     # appropriate stuff.
