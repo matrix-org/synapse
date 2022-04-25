@@ -40,7 +40,10 @@ class SubscriberProtocol(RedisProtocol):
     password: Optional[str]
     def subscribe(self, channels: Union[str, List[str]]) -> "Deferred[None]": ...
     def connectionMade(self) -> None: ...
-    def connectionLost(self, reason: Failure = ...) -> None: ...
+    # type-ignore: twisted.internet.protocol.Protocol provides a default argument for
+    # `reason`. txredisapi's LineReceiver Protocol doesn't. But that's fine: it's what's
+    # actually specified in twisted.internet.interfaces.IProtocol.
+    def connectionLost(self, reason: Failure) -> None: ...  # type: ignore[override]
 
 def lazyConnection(
     host: str = ...,
