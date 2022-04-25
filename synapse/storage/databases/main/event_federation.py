@@ -1296,21 +1296,18 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         event_results.reverse()
         return event_results
 
-    async def get_successor_events(self, event_ids: Iterable[str]) -> List[str]:
-        """Fetch all events that have the given events as a prev event
+    async def get_successor_events(self, event_id: str) -> List[str]:
+        """Fetch all events that have the given event as a prev event
 
         Args:
-            event_ids: The events to use as the previous events.
+            event_id: The event to search for as a prev_event.
         """
-        rows = await self.db_pool.simple_select_many_batch(
+        return await self.db_pool.simple_select_onecol(
             table="event_edges",
-            column="prev_event_id",
-            iterable=event_ids,
-            retcols=("event_id",),
+            keyvalues={"prev_event_id": event_id},
+            retcol="event_id",
             desc="get_successor_events",
         )
-
-        return [row["event_id"] for row in rows]
 
     @wrap_as_background_process("delete_old_forward_extrem_cache")
     async def _delete_old_forward_extrem_cache(self) -> None:

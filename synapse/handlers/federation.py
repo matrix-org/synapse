@@ -313,9 +313,7 @@ class FederationHandler:
             if bp.type == _BackfillPointType.INSERTION_PONT:
                 event_ids_to_check = [bp.event_id]
             else:
-                event_ids_to_check = await self.store.get_successor_events(
-                    [bp.event_id]
-                )
+                event_ids_to_check = await self.store.get_successor_events(bp.event_id)
 
             events_to_check = await self.store.get_events_as_list(
                 event_ids_to_check,
