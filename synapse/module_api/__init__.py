@@ -1386,7 +1386,7 @@ class ModuleApi:
             actions: the actions to run when the rule's conditions match.
 
         Raises:
-            RuntimeError if this method is called on a worker.
+            RuntimeError if this method is called on a worker or `scope` is invalid.
             synapse.module_api.errors.RuleNotFoundException if the rule being modified
                 can't be found.
             synapse.module_api.errors.InvalidRuleException if the actions are invalid.
