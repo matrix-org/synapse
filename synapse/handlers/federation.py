@@ -15,11 +15,14 @@
 
 """Contains handlers for federation events."""
 
+import enum
 import itertools
 import logging
+from enum import Enum
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
 
+import attr
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
 from unpaddedbase64 import decode_base64
@@ -93,6 +96,24 @@ def get_domains_from_state(state: StateMap[EventBase]) -> List[Tuple[str, int]]:
     return sorted(joined_domains.items(), key=lambda d: d[1])
 
 
+class _BackfillPointType(Enum):
+    # a regular backwards extremity (ie, an event which we don't yet have, but which
+    # is referred to by other events in the DAG)
+    BACKWARDS_EXTREMITY = enum.auto()
+
+    # an MSC2716 "insertion event"
+    INSERTION_PONT = enum.auto()
+
+
+@attr.s(slots=True, auto_attribs=True, frozen=True)
+class _BackfillPoint:
+    """A potential point we might backfill from"""
+
+    event_id: str
+    depth: int
+    type: _BackfillPointType
+
+
 class FederationHandler:
     """Handles general incoming federation requests
 
@@ -158,44 +179,49 @@ class FederationHandler:
     async def _maybe_backfill_inner(
         self, room_id: str, current_depth: int, limit: int
     ) -> bool:
-        oldest_events_with_depth = (
-            await self.store.get_oldest_event_ids_with_depth_in_room(room_id)
-        )
+        backwards_extremities = [
+            _BackfillPoint(event_id, depth, _BackfillPointType.BACKWARDS_EXTREMITY)
+            for event_id, depth in await self.store.get_oldest_event_ids_with_depth_in_room(
+                room_id
+            )
+        ]
 
-        insertion_events_to_be_backfilled: List[Tuple[str, int]] = []
+        insertion_events_to_be_backfilled: List[_BackfillPoint] = []
         if self.hs.config.experimental.msc2716_enabled:
-            insertion_events_to_be_backfilled = (
-                await self.store.get_insertion_event_backward_extremities_in_room(
+            insertion_events_to_be_backfilled = [
+                _BackfillPoint(event_id, depth, _BackfillPointType.INSERTION_PONT)
+                for event_id, depth in await self.store.get_insertion_event_backward_extremities_in_room(
                     room_id
                 )
-            )
+            ]
         logger.debug(
-            "_maybe_backfill_inner: extremities oldest_events_with_depth=%s insertion_events_to_be_backfilled=%s",
-            oldest_events_with_depth,
+            "_maybe_backfill_inner: backwards_extremities=%s insertion_events_to_be_backfilled=%s",
+            backwards_extremities,
             insertion_events_to_be_backfilled,
         )
 
-        if not oldest_events_with_depth and not insertion_events_to_be_backfilled:
+        if not backwards_extremities and not insertion_events_to_be_backfilled:
             logger.debug("Not backfilling as no extremeties found.")
             return False
 
         # we now have a list of potential places to backpaginate from. We prefer to
         # start with the most recent (ie, max depth), so let's sort the list.
-        sorted_extremeties_tuple: List[Tuple[str, int]] = sorted(
+        sorted_backfill_points: List[_BackfillPoint] = sorted(
             itertools.chain(
-                oldest_events_with_depth,
+                backwards_extremities,
                 insertion_events_to_be_backfilled,
             ),
-            key=lambda e: -int(e[1]),
+            key=lambda e: -int(e.depth),
         )
 
         logger.debug(
-            "_maybe_backfill_inner: room_id: %s: current_depth: %s, limit: %s, extrems (%d): %s",
+            "_maybe_backfill_inner: room_id: %s: current_depth: %s, limit: %s, "
+            "backfill points (%d): %s",
             room_id,
             current_depth,
             limit,
-            len(sorted_extremeties_tuple),
-            sorted_extremeties_tuple,
+            len(sorted_backfill_points),
+            sorted_backfill_points,
         )
 
         # If we're approaching an extremity we trigger a backfill, otherwise we
@@ -211,7 +237,7 @@ class FederationHandler:
         # XXX: shouldn't we do this *after* the filter by depth below? Again, we don't
         # care about events that have happened after our current position.
         #
-        max_depth = sorted_extremeties_tuple[0][1]
+        max_depth = sorted_backfill_points[0].depth
         if current_depth - 2 * limit > max_depth:
             logger.debug(
                 "Not backfilling as we don't need to. %d < %d - 2 * %d",
@@ -234,18 +260,18 @@ class FederationHandler:
         # backfill. We opt to try backfilling anyway just in case we do get
         # relevant events.
         #
-        filtered_sorted_extremeties_tuple = [
-            t for t in sorted_extremeties_tuple if int(t[1]) <= current_depth
+        filtered_sorted_backfill_points = [
+            t for t in sorted_backfill_points if t.depth <= current_depth
         ]
-        if filtered_sorted_extremeties_tuple:
+        if filtered_sorted_backfill_points:
             logger.debug(
-                "_maybe_backfill_inner: extrems before current depth: %s",
-                filtered_sorted_extremeties_tuple,
+                "_maybe_backfill_inner: backfill points before current depth: %s",
+                filtered_sorted_backfill_points,
             )
-            sorted_extremeties_tuple = filtered_sorted_extremeties_tuple
+            sorted_backfill_points = filtered_sorted_backfill_points
         else:
             logger.debug(
-                "_maybe_backfill_inner: all extrems are *after* current depth. Backfilling anyway."
+                "_maybe_backfill_inner: all backfill points are *after* current depth. Backfilling anyway."
             )
 
         # We only want to paginate if we can actually see the events we'll get,
@@ -275,7 +301,7 @@ class FederationHandler:
         #   types have.
 
         forward_event_ids = await self.store.get_successor_events(
-            list(oldest_events_with_depth)
+            (e.event_id for e in backwards_extremities)
         )
 
         extremities_events = await self.store.get_events(
@@ -304,7 +330,7 @@ class FederationHandler:
 
         # We don't want to specify too many extremities as it causes the backfill
         # request URI to be too long.
-        extremities = dict(sorted_extremeties_tuple[:5])
+        extremities = [e.event_id for e in sorted_backfill_points[:5]]
 
         # Now we need to decide which hosts to hit first.
 
