@@ -11,13 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import importlib
 import json
 import re
 from typing import Any, Dict, Iterable, List, Optional, Pattern
 from urllib import parse as urlparse
 
 import attr
-import pkg_resources
 
 from synapse.types import JsonDict
 
@@ -58,7 +58,9 @@ class OembedConfig(Config):
         # Whether to use the packaged providers.json file.
         if not oembed_config.get("disable_default_providers") or False:
             providers = json.load(
-                pkg_resources.resource_stream("synapse", "res/providers.json")
+                importlib.resources.files("synapse")
+                .joinpath("res/providers.json")
+                .open("rb")
             )
             yield from self._parse_and_validate_provider(
                 providers, config_path=("oembed",)
