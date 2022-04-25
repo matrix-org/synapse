@@ -447,7 +447,7 @@ class ApplicationServicesHandler:
 
         receipts_source = self.event_sources.sources.receipt
         receipts, _ = await receipts_source.get_new_events_as(
-            service=service, from_key=from_key
+            service=service, from_key=from_key, to_key=new_token
         )
         return receipts
 
