@@ -20,7 +20,7 @@ import itertools
 import logging
 from enum import Enum
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
 
 import attr
 from signedjson.key import decode_verify_key_bytes
@@ -294,7 +294,7 @@ class FederationHandler:
         # there is it's often sufficiently long ago that clients would stop
         # attempting to paginate before backfill reached the visible history.
 
-        extremities_to_request: Set[str] = set()
+        extremities_to_request: List[str] = []
         for bp in sorted_backfill_points:
             if len(extremities_to_request) >= 5:
                 break
@@ -330,7 +330,7 @@ class FederationHandler:
                 check_history_visibility_only=True,
             )
             if filtered_extremities:
-                extremities_to_request.add(bp.event_id)
+                extremities_to_request.append(bp.event_id)
             else:
                 logger.debug(
                     "_maybe_backfill_inner: skipping extremity %s as it would not be visible",
