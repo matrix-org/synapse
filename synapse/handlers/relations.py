@@ -411,8 +411,9 @@ class RelationsHandler:
                 event.event_id, event.room_id, ignored_users=ignored_users
             )
             if annotations:
-                aggregations = results.setdefault(event.event_id, BundledAggregations())
-                aggregations.annotations = {"chunk": annotations}
+                results.setdefault(
+                    event.event_id, BundledAggregations()
+                ).annotations = {"chunk": annotations}
 
             references, next_token = await self.get_relations_for_event(
                 event.event_id,
@@ -422,17 +423,15 @@ class RelationsHandler:
                 ignored_users=ignored_users,
             )
             if references:
-                serialized_references: JsonDict = {
-                    "chunk": [{"event_id": event.event_id} for event in references]
+                aggregations = results.setdefault(event.event_id, BundledAggregations())
+                aggregations.references = {
+                    "chunk": [{"event_id": ev.event_id} for ev in references]
                 }
 
                 if next_token:
-                    serialized_references["next_batch"] = await next_token.to_string(
+                    aggregations.references["next_batch"] = await next_token.to_string(
                         self._main_store
                     )
-
-                aggregations = results.setdefault(event.event_id, BundledAggregations())
-                aggregations.references = serialized_references
 
         # Fetch any edits (but not for redacted events).
         #

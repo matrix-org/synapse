@@ -41,7 +41,6 @@ from prometheus_client import Histogram
 from typing_extensions import Literal
 
 from twisted.enterprise import adbapi
-from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 from synapse.config.database import DatabaseConnectionConfig
@@ -794,7 +793,7 @@ class DatabasePool:
         # We also wait until everything above is done before releasing the
         # `CancelledError`, so that logging contexts won't get used after they have been
         # finished.
-        return await delay_cancellation(defer.ensureDeferred(_runInteraction()))
+        return await delay_cancellation(_runInteraction())
 
     async def runWithConnection(
         self,

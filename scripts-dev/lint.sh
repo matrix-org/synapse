@@ -91,7 +91,7 @@ else
       files=(
           "synapse" "docker" "tests"
           "scripts-dev"
-          "contrib" "setup.py" "synmark" "stubs" ".ci"
+          "contrib" "synmark" "stubs" ".ci"
       )
   fi
 fi
