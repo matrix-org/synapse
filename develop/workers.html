@@ -250,7 +250,7 @@ replication port. If the worker will handle HTTP requests then the
 as the <code>listeners</code> option in the shared config.</p>
 <p>For example:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
-worker_name: worker1
+worker_name: generic_worker1
 
 # The replication listener on the main synapse process.
 worker_replication_host: 127.0.0.1
@@ -262,7 +262,7 @@ worker_listeners:
     resources:
       - names: [client, federation]
 
-worker_log_config: /home/matrix/synapse/config/worker1_log_config.yaml
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
 </code></pre>
 <p>...is a full configuration for a generic worker instance, which will expose a
 plain HTTP endpoint on port 8083 separately serving various endpoints, e.g.
@@ -445,6 +445,31 @@ configuration would include:</p>
 stream_writers:
     events: event_persister1
 </code></pre>
+<p>An example for a stream writer instance:</p>
+<pre><code class="language-yaml">worker_app: synapse.app.generic_worker
+worker_name: event_persister1 
+
+# The replication listener on the main synapse process.
+worker_replication_host: 127.0.0.1
+worker_replication_http_port: 9093
+
+worker_listeners:
+  - type: http
+    port: 8034
+    resources:
+      - names: [replication]
+
+  # Enable listener if this stream writer handles endpoints for the `typing` or
+  # `to_device` streams. Uses a different port to the `replication` listener to
+  # avoid exposing the `replication` listener publicly.
+  #
+  #- type: http
+  #  port: 8035
+  #  resources:
+  #    - names: [client]
+
+worker_log_config: /etc/matrix-synapse/event-persister-log.yaml
+</code></pre>
 <p>Some of the streams have associated endpoints which, for maximum efficiency, should
 be routed to the workers handling that stream. See below for the currently supported
 streams and the endpoints associated with them:</p>
@@ -497,6 +522,16 @@ the shared configuration would include:</p>
 </code></pre>
 <p>You might also wish to investigate the <code>update_user_directory</code> and
 <code>media_instance_running_background_jobs</code> settings.</p>
+<p>An example for a dedicated background worker instance:</p>
+<pre><code class="language-yaml">worker_app: synapse.app.generic_worker
+worker_name: background_worker
+
+# The replication listener on the main synapse process.
+worker_replication_host: 127.0.0.1
+worker_replication_http_port: 9093
+
+worker_log_config: /etc/matrix-synapse/background-worker-log.yaml
+</code></pre>
 <h3 id="synapseapppusher"><a class="header" href="#synapseapppusher"><code>synapse.app.pusher</code></a></h3>
 <p>Handles sending push notifications to sygnal and email. Doesn't handle any
 REST endpoints itself, but you should set <code>start_pushers: False</code> in the
@@ -627,15 +662,15 @@ in systemd service files, but not required for synctl).</p>
 |   Main       |  |   Generic    |  |   Generic    |  |  Event       |
 |   Process    |  |   Worker 1   |  |   Worker 2   |  |  Persister   |
 +--------------+  +--------------+  +--------------+  +--------------+
-      ^    ^          |   ^   |         |   ^   |          ^    ^
-      |    |          |   |   |         |   |   |          |    |
-      |    |          |   |   |  HTTP   |   |   |          |    |
-      |    +----------+&lt;--|---|---------+   |   |          |    |
-      |                   |   +-------------|--&gt;+----------+    |
-      |                   |                 |                   |
-      |                   |                 |                   |
-      v                   v                 v                   v
-====================================================================
+      ^    ^          |   ^   |         |   ^   |         |   ^   ^
+      |    |          |   |   |         |   |   |         |   |   |
+      |    |          |   |   |  HTTP   |   |   |         |   |   |
+      |    +----------+&lt;--|---|---------+&lt;--|---|---------+   |   |
+      |                   |   +-------------|--&gt;+-------------+   |
+      |                   |                 |                     |
+      |                   |                 |                     |
+      v                   v                 v                     v
+======================================================================
                                                          Redis pub/sub channel
 </code></pre>
 
