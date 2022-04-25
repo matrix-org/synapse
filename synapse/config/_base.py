@@ -126,7 +126,8 @@ class Config:
 
         # Get the path to the default Synapse template directory
         ref = importlib.resources.files("synapse") / "res/templates"
-        self.default_template_dir = importlib.resources.as_file(ref)
+        with importlib.resources.as_file(ref) as path:
+            self.default_template_dir = path
 
     @staticmethod
     def parse_size(value: Union[str, int]) -> int:
