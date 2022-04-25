@@ -274,26 +274,24 @@ class FederationHandler:
                 "_maybe_backfill_inner: all backfill points are *after* current depth. Backfilling anyway."
             )
 
-        # We still need to narrow down the list of extremities we pass to the remote
-        # server. We limit to 5 of them, to avoid the request URI becoming too long.
+        # For performance's sake, we only want to paginate from a particular extremity
+        # if we can actually see the events we'll get. Otherwise, we'd just spend a lot
+        # of resources to get redacted events. We check each extremity in turn and
+        # ignore those which users on our server wouldn't be able to see.
         #
-        # However, we only want to paginate from a particular extremity if we can
-        # actually see the events we'll get, as otherwise we'll just spend a lot of
-        # resources to get redacted events.
+        # Additionally, we limit ourselves to backfilling from at most 5 extremities,
+        # for two reasons:
         #
-        # We do this by filtering all the backwards extremities and seeing if
-        # any remain.
-        #
-        # Doing this filtering can be expensive (we load the full state for the room
-        # at each of the backfill points, or (worse) their successors), so we check 
-        # the backfill points one at a time until we find enough good ones, and then
-        # stop.
+        # - The check which determines if we can see an extremity's events can be
+        #   expensive (we load the full state for the room at each of the backfill
+        #   points, or (worse) their successors)
+        # - We want to avoid the server-server API request URI becoming too long.
         #
         # *Note*: the spec wants us to keep backfilling until we reach the start
-        # of the room in case we are allowed to see some of the history. However
-        # in practice that causes more issues than its worth, as a) its
-        # relatively rare for there to be any visible history and b) even when
-        # there is its often sufficiently long ago that clients would stop
+        # of the room in case we are allowed to see some of the history. However,
+        # in practice that causes more issues than its worth, as (a) it's
+        # relatively rare for there to be any visible history and (b) even when
+        # there is it's often sufficiently long ago that clients would stop
         # attempting to paginate before backfill reached the visible history.
 
         extremities_to_request: Set[str] = set()
