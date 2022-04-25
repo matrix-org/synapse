@@ -285,8 +285,9 @@ class FederationHandler:
         # any remain.
         #
         # Doing this filtering can be expensive (we load the full state for the room
-        # at each of the sucessor events), so we check them one at a time until we find
-        # enough good ones, and then stop.
+        # at each of the backfill points, or (worse) their successors), so we check 
+        # the backfill points one at a time until we find enough good ones, and then
+        # stop.
         #
         # *Note*: the spec wants us to keep backfilling until we reach the start
         # of the room in case we are allowed to see some of the history. However
