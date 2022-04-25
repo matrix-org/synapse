@@ -629,8 +629,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         with self.assertRaises(InvalidRuleException):
             self.module_api.check_push_rule_actions({"foo": "bar"})
 
-        with self.assertRaises(InvalidRuleException):
-            self.module_api.check_push_rule_actions(["notify"])
+        self.module_api.check_push_rule_actions(["notify"])
 
         self.module_api.check_push_rule_actions(
             [{"set_tweak": "sound", "value": "default"}]
