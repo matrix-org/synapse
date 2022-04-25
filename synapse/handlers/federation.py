@@ -311,8 +311,8 @@ class FederationHandler:
 
             forward_event_ids = await self.store.get_successor_events([bp.event_id])
 
-            extremities_events = await self.store.get_events(
-                forward_event_ids,
+            extremities_events = await self.store.get_events_as_list(
+                successor_event_ids,
                 redact_behaviour=EventRedactBehaviour.AS_IS,
                 get_prev_content=False,
             )
@@ -322,7 +322,7 @@ class FederationHandler:
             filtered_extremities = await filter_events_for_server(
                 self.storage,
                 self.server_name,
-                list(extremities_events.values()),
+                extremities_events,
                 redact=False,
                 check_history_visibility_only=True,
             )
