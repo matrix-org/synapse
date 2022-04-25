@@ -89,7 +89,7 @@ def generate_config_from_template(
 
     # Convert SYNAPSE_NO_TLS to boolean if exists
     if "SYNAPSE_NO_TLS" in environ:
-        tlsanswerstring = str.lower(environ["SYNAPSE_NO_TLS"])  # type
+        tlsanswerstring = str.lower(environ["SYNAPSE_NO_TLS"])
         if tlsanswerstring in ("true", "on", "1", "yes"):
             environ["SYNAPSE_NO_TLS"] = True
         else:
