@@ -19,6 +19,7 @@ from synapse.api.constants import EduTypes, EventTypes
 from synapse.events import EventBase
 from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
+from synapse.handlers.push_rules import InvalidRuleException
 from synapse.rest import admin
 from synapse.rest.client import login, notifications, presence, profile, room
 from synapse.types import create_requester
@@ -622,13 +623,17 @@ class ModuleApiTestCase(HomeserverTestCase):
         """Test that modules can check whether a list of push rules actions are spec
         compliant.
         """
-        self.assertFalse(self.module_api.check_push_rule_actions(["foo"]))
-        self.assertFalse(self.module_api.check_push_rule_actions({"foo": "bar"}))
-        self.assertTrue(self.module_api.check_push_rule_actions(["notify"]))
-        self.assertTrue(
-            self.module_api.check_push_rule_actions(
-                [{"set_tweak": "sound", "value": "default"}]
-            )
+        with self.assertRaises(InvalidRuleException):
+            self.module_api.check_push_rule_actions(["foo"])
+
+        with self.assertRaises(InvalidRuleException):
+            self.module_api.check_push_rule_actions({"foo": "bar"})
+
+        with self.assertRaises(InvalidRuleException):
+            self.module_api.check_push_rule_actions(["notify"])
+
+        self.module_api.check_push_rule_actions(
+            [{"set_tweak": "sound", "value": "default"}]
         )
 
 
