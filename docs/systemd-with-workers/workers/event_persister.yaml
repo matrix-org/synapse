@@ -11,9 +11,9 @@ worker_listeners:
     resources:
       - names: [replication]
 
-  # Enable listener if this stream writer handles endpoints like `typing` or `to_device`
-  # stream. Uses a different port than `replication` listener to protect
-  # `replication` listener for exposing.
+  # Enable listener if this stream writer handles endpoints for the `typing` or
+  # `to_device` streams. Uses a different port to the `replication` listener to
+  # avoid exposing the `replication` listener publicly.
   #
   #- type: http
   #  port: 8035
