@@ -1,0 +1,1 @@
+Bound read receipts being sent to app services to avoid runaway memory in AS worker. Contributed by Brad & Nick @ Beeper.
