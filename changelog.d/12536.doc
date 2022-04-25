@@ -1,0 +1,1 @@
+Update SQL statements and replace use of old table `user_stats_historical` in docs for Synapse Admins.
