@@ -129,7 +129,7 @@ def check_actions(actions: List[Union[str, JsonDict]]) -> None:
         elif isinstance(a, dict) and "set_tweak" in a:
             pass
         else:
-            raise InvalidRuleException("Unrecognised action")
+            raise InvalidRuleException("Unrecognised action %s" % a)
 
 
 class InvalidRuleException(Exception):
