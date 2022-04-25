@@ -15,8 +15,9 @@ from typing import TYPE_CHECKING, List, Optional, Union
 
 import attr
 
-from synapse.api.errors import NotFoundError, SynapseError, UnrecognizedRequestError
+from synapse.api.errors import SynapseError, UnrecognizedRequestError
 from synapse.push.baserules import BASE_RULE_IDS
+from synapse.storage.push_rule import RuleNotFoundException
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -32,6 +33,8 @@ class RuleSpec:
 
 
 class PushRulesHandler:
+    """A class to handle changes in push rules for users."""
+
     def __init__(self, hs: "HomeServer"):
         self._notifier = hs.get_notifier()
         self._store = hs.get_datastores().main
@@ -45,6 +48,13 @@ class PushRulesHandler:
             user_id: the user for which to modify the push rule.
             spec: the spec of the push rule to modify.
             val: the value to change the attribute to.
+
+        Raises:
+            RuleNotFoundException if the rule being modified doesn't exist.
+            SynapseError(400) if the value is malformed.
+            UnrecognizedRequestError if the attribute to change is unknown.
+            InvalidRuleException if we're trying to change the actions on a rule but
+                the provided actions aren't compliant with the spec.
         """
         if spec.attr not in ("enabled", "actions"):
             # for the sake of potential future expansion, shouldn't report
@@ -52,12 +62,12 @@ class PushRulesHandler:
             # a known attribute first.
             raise UnrecognizedRequestError()
 
-        namespaced_rule_id = namespaced_rule_id_from_spec(spec)
+        namespaced_rule_id = f"global/{spec.template}/{spec.rule_id}"
         rule_id = spec.rule_id
         is_default_rule = rule_id.startswith(".")
         if is_default_rule:
             if namespaced_rule_id not in BASE_RULE_IDS:
-                raise NotFoundError("Unknown rule %s" % (namespaced_rule_id,))
+                raise RuleNotFoundException("Unknown rule %r" % (namespaced_rule_id,))
         if spec.attr == "enabled":
             if isinstance(val, dict) and "enabled" in val:
                 val = val["enabled"]
@@ -80,14 +90,23 @@ class PushRulesHandler:
             is_default_rule = rule_id.startswith(".")
             if is_default_rule:
                 if namespaced_rule_id not in BASE_RULE_IDS:
-                    raise SynapseError(404, "Unknown rule %r" % (namespaced_rule_id,))
+                    raise RuleNotFoundException(
+                        "Unknown rule %r" % (namespaced_rule_id,)
+                    )
             await self._store.set_push_rule_actions(
                 user_id, namespaced_rule_id, actions, is_default_rule
             )
         else:
             raise UnrecognizedRequestError()
 
+        self.notify_user(user_id)
+
     def notify_user(self, user_id: str) -> None:
+        """Notify listeners about a push rule change.
+
+        Args:
+            user_id: the user ID the change is for.
+        """
         stream_id = self._store.get_max_push_rules_stream_id()
         self._notifier.on_new_event("push_rules_key", stream_id, users=[user_id])
 
@@ -111,18 +130,6 @@ def check_actions(actions: List[Union[str, JsonDict]]) -> None:
             pass
         else:
             raise InvalidRuleException("Unrecognised action")
-
-
-def namespaced_rule_id_from_spec(spec: RuleSpec) -> str:
-    """Generates a scope/kind/rule_id representation of a rule using only its spec."""
-    return namespaced_rule_id(spec, spec.rule_id)
-
-
-def namespaced_rule_id(spec: RuleSpec, rule_id: str) -> str:
-    """Generates a scope/kind/rule_id representation of a rule based on another rule's
-    spec and a rule ID.
-    """
-    return "global/%s/%s" % (spec.template, rule_id)
 
 
 class InvalidRuleException(Exception):

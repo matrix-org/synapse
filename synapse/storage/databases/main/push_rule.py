@@ -16,7 +16,7 @@ import abc
 import logging
 from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 
-from synapse.api.errors import NotFoundError, StoreError
+from synapse.api.errors import StoreError
 from synapse.push.baserules import list_with_base_rules
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.storage._base import SQLBaseStore, db_to_json
@@ -668,8 +668,7 @@ class PushRuleStore(PushRulesWorkerStore):
             )
             txn.execute(sql, (user_id, rule_id))
             if txn.fetchone() is None:
-                # needed to set NOT_FOUND code.
-                raise NotFoundError("Push rule does not exist.")
+                raise RuleNotFoundException("Push rule does not exist.")
 
         self.db_pool.simple_upsert_txn(
             txn,
@@ -744,7 +743,7 @@ class PushRuleStore(PushRulesWorkerStore):
                 except StoreError as serr:
                     if serr.code == 404:
                         # this sets the NOT_FOUND error Code
-                        raise NotFoundError("Push rule does not exist")
+                        raise RuleNotFoundException("Push rule does not exist")
                     else:
                         raise
 

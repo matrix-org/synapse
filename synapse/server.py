@@ -812,6 +812,10 @@ class HomeServer(metaclass=abc.ABCMeta):
         return AccountHandler(self)
 
     @cache_in_self
+    def get_push_rules_handler(self) -> PushRulesHandler:
+        return PushRulesHandler(self)
+
+    @cache_in_self
     def get_outbound_redis_connection(self) -> "ConnectionHandler":
         """
         The Redis connection used for replication.
@@ -851,7 +855,3 @@ class HomeServer(metaclass=abc.ABCMeta):
             self.config.ratelimiting.rc_message,
             self.config.ratelimiting.rc_admin_redaction,
         )
-
-    @cache_in_self
-    def get_push_rules_handler(self) -> PushRulesHandler:
-        return PushRulesHandler(self)

@@ -82,7 +82,7 @@ from synapse.handlers.auth import (
     ON_LOGGED_OUT_CALLBACK,
     AuthHandler,
 )
-from synapse.handlers.push_rules import InvalidRuleException, RuleSpec, check_actions
+from synapse.handlers.push_rules import RuleSpec, check_actions
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
     DirectServeHtmlResource,
@@ -1344,7 +1344,7 @@ class ModuleApi:
 
     def check_push_rule_actions(
         self, actions: List[Union[str, Dict[str, str]]]
-    ) -> bool:
+    ) -> None:
         """Checks if the given push rule actions are valid according to the Matrix
         specification.
 
@@ -1356,15 +1356,10 @@ class ModuleApi:
         Args:
             actions: the actions to check.
 
-        Returns:
-            True if the actions are valid, False otherwise.
+        Raises:
+            synapse.module_api.errors.InvalidRuleException if the actions are invalid.
         """
-        try:
-            check_actions(actions)
-        except InvalidRuleException:
-            return False
-
-        return True
+        check_actions(actions)
 
     async def set_push_rule_action(
         self,
@@ -1392,8 +1387,8 @@ class ModuleApi:
 
         Raises:
             RuntimeError if this method is called on a worker.
-            synapse.module_api.errors.NotFoundError if the rule being modified can't be
-                found.
+            synapse.module_api.errors.RuleNotFoundException if the rule being modified
+                can't be found.
             synapse.module_api.errors.InvalidRuleException if the actions are invalid.
         """
         if self.worker_app is not None:
@@ -1408,8 +1403,6 @@ class ModuleApi:
         await self._push_rules_handler.set_rule_attr(
             user_id, spec, {"actions": actions}
         )
-
-        self._push_rules_handler.notify_user(user_id)
 
 
 class PublicRoomListManager:

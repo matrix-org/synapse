@@ -20,13 +20,7 @@ from synapse.api.errors import (
     SynapseError,
     UnrecognizedRequestError,
 )
-from synapse.handlers.push_rules import (
-    InvalidRuleException,
-    RuleSpec,
-    check_actions,
-    namespaced_rule_id,
-    namespaced_rule_id_from_spec,
-)
+from synapse.handlers.push_rules import InvalidRuleException, RuleSpec, check_actions
 from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
@@ -82,8 +76,9 @@ class PushRuleRestServlet(RestServlet):
                 await self._push_rules_handler.set_rule_attr(user_id, spec, content)
             except InvalidRuleException as e:
                 raise SynapseError(400, "Invalid actions: %s" % e)
+            except RuleNotFoundException:
+                raise NotFoundError("Unknown rule")
 
-            self._push_rules_handler.notify_user(user_id)
             return 200, {}
 
         if spec.rule_id.startswith("."):
@@ -99,16 +94,16 @@ class PushRuleRestServlet(RestServlet):
 
         before = parse_string(request, "before")
         if before:
-            before = namespaced_rule_id(spec, before)
+            before = f"global/{spec.template}/{before}"
 
         after = parse_string(request, "after")
         if after:
-            after = namespaced_rule_id(spec, after)
+            after = f"global/{spec.template}/{after}"
 
         try:
             await self.store.add_push_rule(
                 user_id=user_id,
-                rule_id=namespaced_rule_id_from_spec(spec),
+                rule_id=f"global/{spec.template}/{spec.rule_id}",
                 priority_class=priority_class,
                 conditions=conditions,
                 actions=actions,
@@ -134,7 +129,7 @@ class PushRuleRestServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
-        namespaced_rule_id = namespaced_rule_id_from_spec(spec)
+        namespaced_rule_id = f"global/{spec.template}/{spec.rule_id}"
 
         try:
             await self.store.delete_push_rule(user_id, namespaced_rule_id)
