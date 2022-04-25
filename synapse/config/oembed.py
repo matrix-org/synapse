@@ -57,14 +57,12 @@ class OembedConfig(Config):
         """
         # Whether to use the packaged providers.json file.
         if not oembed_config.get("disable_default_providers") or False:
-            providers = json.load(
-                importlib.resources.files("synapse")
-                .joinpath("res/providers.json")
-                .open("rb")
-            )
-            yield from self._parse_and_validate_provider(
-                providers, config_path=("oembed",)
-            )
+            with importlib.resources.path("synapse", "") as path:
+                with path.joinpath("res/providers.json").open() as strm:
+                    providers = json.load(strm)
+                    yield from self._parse_and_validate_provider(
+                        providers, config_path=("oembed",)
+                    )
 
         # The JSON files which includes additional provider information.
         for i, file in enumerate(oembed_config.get("additional_providers") or []):
