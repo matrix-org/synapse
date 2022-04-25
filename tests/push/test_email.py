@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import email.message
+import importlib.resources
 import os
 from typing import Dict, List, Sequence, Tuple
 
 import attr
-import pkg_resources
 
 from twisted.internet.defer import Deferred
 
@@ -49,9 +49,6 @@ class EmailPusherTests(HomeserverTestCase):
         config = self.default_config()
         config["email"] = {
             "enable_notifs": True,
-            "template_dir": os.path.abspath(
-                pkg_resources.resource_filename("synapse", "res/templates")
-            ),
             "expiry_template_html": "notice_expiry.html",
             "expiry_template_text": "notice_expiry.txt",
             "notif_template_html": "notif_mail.html",
@@ -67,6 +64,10 @@ class EmailPusherTests(HomeserverTestCase):
         }
         config["public_baseurl"] = "http://aaa"
         config["start_pushers"] = True
+
+        ref = importlib.resources.files("synapse") / "res/templates"
+        with importlib.resources.as_file(ref) as path:
+            config["template_dir"] = os.path.abspath(path)
 
         hs = self.setup_test_homeserver(config=config)
 
