@@ -1,0 +1,1 @@
+Move from `pkg_resources` to `importlib.resources`.
