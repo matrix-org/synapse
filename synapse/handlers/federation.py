@@ -279,8 +279,11 @@ class FederationHandler:
         # events.
         #
         # We do this by filtering all the backwards extremities and seeing if
-        # any remain. Given we don't have the extremity events themselves, we
-        # need to actually check the events that reference them.
+        # any remain.
+        #
+        # Doing this filtering can be expensive (we load the full state for the room
+        # at each of the sucessor events), so we check them one at a time until we find
+        # one that is visible, and then stop.
         #
         # *Note*: the spec wants us to keep backfilling until we reach the start
         # of the room in case we are allowed to see some of the history. However
@@ -292,38 +295,42 @@ class FederationHandler:
         # TODO: If we do do a backfill then we should filter the backwards
         #   extremities to only include those that point to visible portions of
         #   history.
-        #
-        # TODO: Correctly handle the case where we are allowed to see the
-        #   forward event but not the backward extremity, e.g. in the case of
-        #   initial join of the server where we are allowed to see the join
-        #   event but not anything before it. This would require looking at the
-        #   state *before* the event, ignoring the special casing certain event
-        #   types have.
 
-        forward_event_ids = await self.store.get_successor_events(
-            (e.event_id for e in backwards_extremities)
-        )
+        found_filtered_extremity = False
+        for bp in backwards_extremities:
+            # Given we don't have the extremity events themselves, we
+            # need to actually check the events that reference them - their "successor"
+            # events.
+            #
+            # TODO: Correctly handle the case where we are allowed to see the
+            #   successor event but not the backward extremity, e.g. in the case of
+            #   initial join of the server where we are allowed to see the join
+            #   event but not anything before it. This would require looking at the
+            #   state *before* the event, ignoring the special casing certain event
+            #   types have.
 
-        extremities_events = await self.store.get_events(
-            forward_event_ids,
-            redact_behaviour=EventRedactBehaviour.AS_IS,
-            get_prev_content=False,
-        )
+            forward_event_ids = await self.store.get_successor_events([bp.event_id])
 
-        # We set `check_history_visibility_only` as we might otherwise get false
-        # positives from users having been erased.
-        filtered_extremities = await filter_events_for_server(
-            self.storage,
-            self.server_name,
-            list(extremities_events.values()),
-            redact=False,
-            check_history_visibility_only=True,
-        )
-        logger.debug(
-            "_maybe_backfill_inner: filtered_extremities %s", filtered_extremities
-        )
+            extremities_events = await self.store.get_events(
+                forward_event_ids,
+                redact_behaviour=EventRedactBehaviour.AS_IS,
+                get_prev_content=False,
+            )
 
-        if not filtered_extremities and not insertion_events_to_be_backfilled:
+            # We set `check_history_visibility_only` as we might otherwise get false
+            # positives from users having been erased.
+            filtered_extremities = await filter_events_for_server(
+                self.storage,
+                self.server_name,
+                list(extremities_events.values()),
+                redact=False,
+                check_history_visibility_only=True,
+            )
+            if filtered_extremities:
+                found_filtered_extremity = True
+                break
+
+        if not found_filtered_extremity and not insertion_events_to_be_backfilled:
             return False
 
         # TODO: insertion_events_to_be_backfilled is currently skipping the filtered_extremities checks
