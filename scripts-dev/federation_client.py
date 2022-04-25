@@ -124,7 +124,12 @@ def request(
     authorization_headers = []
 
     for key, sig in signed_json["signatures"][origin_name].items():
-        header = 'X-Matrix origin=%s,key="%s",sig="%s"' % (origin_name, key, sig)
+        header = 'X-Matrix origin=%s,key="%s",sig="%s",destination="%s"' % (
+            origin_name,
+            key,
+            sig,
+            destination,
+        )
         authorization_headers.append(header.encode("ascii"))
         print("Authorization: %s" % header, file=sys.stderr)
 

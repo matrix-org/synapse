@@ -1,0 +1,1 @@
+Reintroduce the list of targets to the linter script, to avoid linting unwanted local-only directories during development.

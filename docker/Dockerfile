@@ -59,7 +59,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 WORKDIR /synapse
 
 # Copy just what we need to run `poetry export`...
-COPY pyproject.toml poetry.lock README.rst /synapse/
+COPY pyproject.toml poetry.lock /synapse/
 
 RUN /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt
 
@@ -98,9 +98,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Copy over the rest of the synapse source code.
 COPY synapse /synapse/synapse/
 # ... and what we need to `pip install`.
-# TODO: once pyproject.toml declares poetry-core as its build system, we'll need to copy
-# pyproject.toml here, ditching setup.py and MANIFEST.in.
-COPY setup.py MANIFEST.in README.rst /synapse/
+COPY pyproject.toml README.rst /synapse/
 
 # Install the synapse package itself.
 RUN pip install --prefix="/install" --no-deps --no-warn-script-location /synapse

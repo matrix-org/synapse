@@ -66,9 +66,9 @@ Changes in SCHEMA_VERSION = 69:
 
 
 SCHEMA_COMPAT_VERSION = (
-    # we now have `state_key` columns in both `events` and `state_events`, so
-    # now incompatible with synapses wth SCHEMA_VERSION < 66.
-    66
+    # We now assume that `device_lists_changes_in_room` has been filled out for
+    # recent device_list_updates.
+    69
 )
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
 

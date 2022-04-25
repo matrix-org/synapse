@@ -1,0 +1,1 @@
+Fix bug with incremental sync missing events when rejoining/backfilling. Contributed by Nick @ Beeper.

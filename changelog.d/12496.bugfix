@@ -1,0 +1,1 @@
+Fix bug where the admin API for [deleting forward extremities](https://github.com/matrix-org/synapse/blob/erikj/fix_delete_event_response_count/docs/admin_api/rooms.md#deleting-forward-extremities) would always return a count of 1 no matter how many extremities were deleted. Broke in v1.27.0.

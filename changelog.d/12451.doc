@@ -1,0 +1,1 @@
+Update documentation to reflect that both the `run_background_tasks_on` option and the options for moving stream writers off of the main process are no longer experimental.

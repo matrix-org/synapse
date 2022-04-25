@@ -1,0 +1,1 @@
+Dockerfile-workers: give the master its own log config.

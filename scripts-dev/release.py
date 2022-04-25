@@ -69,11 +69,12 @@ def cli():
         # ... wait for assets to build ...
 
         ./scripts-dev/release.py publish
+
         ./scripts-dev/release.py upload
 
         # Optional: generate some nice links for the announcement
 
-        ./scripts-dev/release.py upload
+        ./scripts-dev/release.py announce
 
     If the env var GH_TOKEN (or GITHUB_TOKEN) is set, or passed into the
     `tag`/`publish` command, then a new draft release will be created/published.
@@ -229,7 +230,7 @@ def prepare():
         debian_version = new_version
 
     run_until_successful(
-        f'dch -M -v {debian_version} "New synapse release {debian_version}."',
+        f'dch -M -v {debian_version} "New Synapse release {new_version}."',
         shell=True,
     )
     run_until_successful('dch -M -r -D stable ""', shell=True)
