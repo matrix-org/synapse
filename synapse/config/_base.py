@@ -16,6 +16,7 @@
 
 import argparse
 import errno
+import importlib
 import os
 from collections import OrderedDict
 from hashlib import sha256
@@ -35,7 +36,6 @@ from typing import (
 
 import attr
 import jinja2
-import pkg_resources
 import yaml
 
 from synapse.util.templates import _create_mxc_to_http_filter, _format_ts_filter
@@ -125,9 +125,8 @@ class Config:
         self.root = root_config
 
         # Get the path to the default Synapse template directory
-        self.default_template_dir = pkg_resources.resource_filename(
-            "synapse", "res/templates"
-        )
+        ref = importlib.resources.files("synapse") / "res/templates"
+        self.default_template_dir = importlib.resources.as_file(ref)
 
     @staticmethod
     def parse_size(value: Union[str, int]) -> int:
