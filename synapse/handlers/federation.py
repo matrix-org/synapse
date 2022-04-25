@@ -297,10 +297,10 @@ class FederationHandler:
         #   history.
 
         found_filtered_extremity = False
-        for bp in backwards_extremities:
-            # Given we don't have the extremity events themselves, we
-            # need to actually check the events that reference them - their "successor"
-            # events.
+        for bp in sorted_backfill_points:
+            # For regular backwards extremities, we don't have the extremity events
+            # themselves, so we need to actually check the events that reference them -
+            # their "successor" events.
             #
             # TODO: Correctly handle the case where we are allowed to see the
             #   successor event but not the backward extremity, e.g. in the case of
@@ -308,11 +308,15 @@ class FederationHandler:
             #   event but not anything before it. This would require looking at the
             #   state *before* the event, ignoring the special casing certain event
             #   types have.
+            if bp.type == _BackfillPointType.INSERTION_PONT:
+                event_ids_to_check = [bp.event_id]
+            else:
+                event_ids_to_check = await self.store.get_successor_events(
+                    [bp.event_id]
+                )
 
-            forward_event_ids = await self.store.get_successor_events([bp.event_id])
-
-            extremities_events = await self.store.get_events_as_list(
-                successor_event_ids,
+            events_to_check = await self.store.get_events_as_list(
+                event_ids_to_check,
                 redact_behaviour=EventRedactBehaviour.AS_IS,
                 get_prev_content=False,
             )
@@ -322,7 +326,7 @@ class FederationHandler:
             filtered_extremities = await filter_events_for_server(
                 self.storage,
                 self.server_name,
-                extremities_events,
+                events_to_check,
                 redact=False,
                 check_history_visibility_only=True,
             )
@@ -330,10 +334,8 @@ class FederationHandler:
                 found_filtered_extremity = True
                 break
 
-        if not found_filtered_extremity and not insertion_events_to_be_backfilled:
+        if not found_filtered_extremity:
             return False
-
-        # TODO: insertion_events_to_be_backfilled is currently skipping the filtered_extremities checks
 
         # We don't want to specify too many extremities as it causes the backfill
         # request URI to be too long.
