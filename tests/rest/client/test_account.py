@@ -11,14 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import importlib.resources
 import json
 import os
 import re
 from email.parser import Parser
 from typing import Any, Dict, List, Optional, Union
 from unittest.mock import Mock
-
-import pkg_resources
 
 from twisted.internet.interfaces import IReactorTCP
 from twisted.test.proto_helpers import MemoryReactor
@@ -54,9 +53,6 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         # Email config.
         config["email"] = {
             "enable_notifs": False,
-            "template_dir": os.path.abspath(
-                pkg_resources.resource_filename("synapse", "res/templates")
-            ),
             "smtp_host": "127.0.0.1",
             "smtp_port": 20,
             "require_transport_security": False,
@@ -65,6 +61,10 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
             "notif_from": "test@example.com",
         }
         config["public_baseurl"] = "https://example.com"
+
+        ref = importlib.resources.files("synapse") / "res/templates"
+        with importlib.resources.as_file(ref) as path:
+            config["template_dir"] = os.path.abspath(path)
 
         hs = self.setup_test_homeserver(config=config)
 
@@ -591,9 +591,6 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         # Email config.
         config["email"] = {
             "enable_notifs": False,
-            "template_dir": os.path.abspath(
-                pkg_resources.resource_filename("synapse", "res/templates")
-            ),
             "smtp_host": "127.0.0.1",
             "smtp_port": 20,
             "require_transport_security": False,
@@ -602,6 +599,10 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             "notif_from": "test@example.com",
         }
         config["public_baseurl"] = "https://example.com"
+
+        ref = importlib.resources.files("synapse") / "res/templates"
+        with importlib.resources.as_file(ref) as path:
+            config["template_dir"] = os.path.abspath(path)
 
         self.hs = self.setup_test_homeserver(config=config)
 
