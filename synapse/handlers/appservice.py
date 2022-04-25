@@ -416,7 +416,7 @@ class ApplicationServicesHandler:
         return typing
 
     async def _handle_receipts(
-        self, service: ApplicationService, new_token: Optional[int]
+        self, service: ApplicationService, new_token: int
     ) -> List[JsonDict]:
         """
         Return the latest read receipts that the given application service should receive.
