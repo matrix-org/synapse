@@ -1,1 +1,1 @@
-Bound read receipts being sent to app services to avoid runaway memory in AS worker. Contributed by Brad & Nick @ Beeper.
+Fix a bug where attempting to send a large amount of read receipts to an application service all at once would result in duplicate content and abnormally high memory usage. Contributed by Brad & Nick @ Beeper.
