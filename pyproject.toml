@@ -270,7 +270,6 @@ idna = ">=2.5"
 
 # The following are used by the release script
 click = "==8.1.0"
-redbaron = "==0.9.2"
 GitPython = "==3.1.14"
 commonmark = "==0.9.1"
 pygithub = "==1.55"
