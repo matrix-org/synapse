@@ -42,7 +42,7 @@ Improved Documentation
 Deprecations and Removals
 -------------------------
 
-- **The groups/communities feature in Synapse is now disabled by default. ([\#12344](https://github.com/matrix-org/synapse/issues/12344))**
+- The groups/communities feature in Synapse is now disabled by default. ([\#12344](https://github.com/matrix-org/synapse/issues/12344))
 - Remove unstable identifiers from [MSC3440](https://github.com/matrix-org/matrix-doc/pull/3440). ([\#12382](https://github.com/matrix-org/synapse/issues/12382))
 
 
