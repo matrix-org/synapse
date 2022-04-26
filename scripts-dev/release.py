@@ -31,7 +31,6 @@ import attr
 import click
 import commonmark
 import git
-
 from click.exceptions import ClickException
 from github import Github
 from packaging import version
