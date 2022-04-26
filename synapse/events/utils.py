@@ -482,6 +482,9 @@ class EventClientSerializer:
             bundled_aggregations: Bundled aggregations to be injected.
                 A map from event_id to aggregation data. Must contain at least an
                 entry for `event`.
+
+                While serializing the bundled aggregations this map may be searched
+                again for additional events in a recursive manner.
             serialized_event: The serialized event which may be modified.
             apply_edits: Whether the content of the event should be modified to reflect
                any replacement in `aggregations.replace`.
