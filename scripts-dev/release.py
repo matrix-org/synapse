@@ -385,6 +385,13 @@ def upload():
     current_version = get_package_version()
     tag_name = f"v{current_version}"
 
+    # Check we have the right tag checked out.
+    repo = get_repo()
+    tag = repo.tag(f"refs/tags/{tag_name}")
+    if repo.head.commit != tag.commit:
+        click.echo("Tag {tag_name} (tag.commit) is not currently checked out!")
+        click.get_current_context().abort()
+
     pypi_asset_names = [
         f"matrix_synapse-{current_version}-py3-none-any.whl",
         f"matrix-synapse-{current_version}.tar.gz",
