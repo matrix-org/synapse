@@ -405,6 +405,8 @@ class RelationsHandler:
             latest_thread_event = thread.latest_event
             if latest_thread_event and latest_thread_event.event_id not in events_by_id:
                 events_by_id[latest_thread_event.event_id] = latest_thread_event
+                # The latest event in the thread must have a thread relation.
+                relations_by_id[latest_thread_event.event_id] = RelationTypes.THREAD
 
         # Fetch other relations per event.
         for event in events_by_id.values():
