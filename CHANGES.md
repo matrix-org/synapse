@@ -6,7 +6,7 @@ This release candidate fixes bugs related to Synapse 1.58.0rc1's logic for handl
 Bugfixes
 --------
 
-- Fix a bug introduced in Synapse 1.58.0rc1 where the main process could consume excessive amounts of CPU and memory handling sentry logging failures. ([\#12554](https://github.com/matrix-org/synapse/issues/12554))
+- Fix a bug introduced in Synapse 1.58.0rc1 where the main process could consume excessive amounts of CPU and memory while handling sentry logging failures. ([\#12554](https://github.com/matrix-org/synapse/issues/12554))
 - Fix a bug introduced in Synapse 1.58.0rc1 where opentracing contexts were not correctly sent to whitelisted remote servers with device lists updates. ([\#12555](https://github.com/matrix-org/synapse/issues/12555))
 
 
