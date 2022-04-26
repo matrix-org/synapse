@@ -14,6 +14,94 @@ pg_size_pretty
 (1 row)
 ```
 
+## Show top 20 larger tables by row count
+```sql
+SELECT
+  relname,
+  n_live_tup AS "rows" 
+FROM
+  pg_stat_user_tables 
+ORDER BY
+  n_live_tup DESC LIMIT 20;
+```
+This query is quick, but may be very approximate, for exact number of rows use:
+```sql
+SELECT
+  COUNT(*) 
+FROM
+  <table_name>;
+```
+
+### Result example:
+```
+state_groups_state - 161687170
+event_auth - 8584785
+event_edges - 6995633
+event_json - 6585916
+event_reference_hashes - 6580990
+events - 6578879
+received_transactions - 5713989
+event_to_state_groups - 4873377
+stream_ordering_to_exterm - 4136285
+current_state_delta_stream - 3770972
+event_search - 3670521
+state_events - 2845082
+room_memberships - 2785854
+cache_invalidation_stream - 2448218
+state_groups - 1255467
+state_group_edges - 1229849
+current_state_events - 1222905
+users_in_public_rooms - 364059
+device_lists_stream - 326903
+user_directory_search - 316433
+```
+
+## Show top 20 larger tables by storage size
+```sql
+SELECT
+  nspname || '.' || relname AS "relation",
+  pg_size_pretty(pg_total_relation_size(c.oid)) AS "total_size" 
+FROM
+  pg_class c 
+  LEFT JOIN
+    pg_namespace n 
+    ON (n.oid = c.relnamespace) 
+WHERE
+  nspname NOT IN 
+  (
+    'pg_catalog',
+    'information_schema'
+  )
+  AND c.relkind <> 'i' 
+  AND nspname !~ '^pg_toast' 
+ORDER BY
+  pg_total_relation_size(c.oid) DESC LIMIT 20;
+```
+
+### Result example:
+```
+public.state_groups_state - 27 GB
+public.event_json - 9855 MB
+public.events - 3675 MB
+public.event_edges - 3404 MB
+public.received_transactions - 2745 MB
+public.event_reference_hashes - 1864 MB
+public.event_auth - 1775 MB
+public.stream_ordering_to_exterm - 1663 MB
+public.event_search - 1370 MB
+public.room_memberships - 1050 MB
+public.event_to_state_groups - 948 MB
+public.current_state_delta_stream - 711 MB
+public.state_events - 611 MB
+public.presence_stream - 530 MB
+public.current_state_events - 525 MB
+public.cache_invalidation_stream - 466 MB
+public.receipts_linearized - 279 MB
+public.state_groups - 160 MB
+public.device_lists_remote_cache - 124 MB
+public.state_group_edges - 122 MB
+```
+
 ## Show top 20 larger rooms by state events count
 You get the same information when you use the
 [admin API](https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#list-room-api)
@@ -60,48 +148,6 @@ GROUP BY
   s.room_id 
 ORDER BY
   COUNT(s.room_id) DESC LIMIT 20;
-```
-
-## Show top 20 larger tables by row count
-```sql
-SELECT
-  relname,
-  n_live_tup AS "rows" 
-FROM
-  pg_stat_user_tables 
-ORDER BY
-  n_live_tup DESC LIMIT 20;
-```
-This query is quick, but may be very approximate, for exact number of rows use:
-```sql
-SELECT
-  COUNT(*) 
-FROM
-  <table_name>;
-```
-
-### Result example:
-```
-state_groups_state - 161687170
-event_auth - 8584785
-event_edges - 6995633
-event_json - 6585916
-event_reference_hashes - 6580990
-events - 6578879
-received_transactions - 5713989
-event_to_state_groups - 4873377
-stream_ordering_to_exterm - 4136285
-current_state_delta_stream - 3770972
-event_search - 3670521
-state_events - 2845082
-room_memberships - 2785854
-cache_invalidation_stream - 2448218
-state_groups - 1255467
-state_group_edges - 1229849
-current_state_events - 1222905
-users_in_public_rooms - 364059
-device_lists_stream - 326903
-user_directory_search - 316433
 ```
 
 ## Show top 20 rooms by new events count in last 1 day:
@@ -163,52 +209,6 @@ WHERE
   AND e.type = 'm.room.message' 
 ORDER BY
   stream_ordering DESC LIMIT 100;
-```
-
-## Show top 20 larger tables by storage size
-```sql
-SELECT
-  nspname || '.' || relname AS "relation",
-  pg_size_pretty(pg_total_relation_size(c.oid)) AS "total_size" 
-FROM
-  pg_class c 
-  LEFT JOIN
-    pg_namespace n 
-    ON (n.oid = c.relnamespace) 
-WHERE
-  nspname NOT IN 
-  (
-    'pg_catalog',
-    'information_schema'
-  )
-  AND c.relkind <> 'i' 
-  AND nspname !~ '^pg_toast' 
-ORDER BY
-  pg_total_relation_size(c.oid) DESC LIMIT 20;
-```
-
-### Result example:
-```
-public.state_groups_state - 27 GB
-public.event_json - 9855 MB
-public.events - 3675 MB
-public.event_edges - 3404 MB
-public.received_transactions - 2745 MB
-public.event_reference_hashes - 1864 MB
-public.event_auth - 1775 MB
-public.stream_ordering_to_exterm - 1663 MB
-public.event_search - 1370 MB
-public.room_memberships - 1050 MB
-public.event_to_state_groups - 948 MB
-public.current_state_delta_stream - 711 MB
-public.state_events - 611 MB
-public.presence_stream - 530 MB
-public.current_state_events - 525 MB
-public.cache_invalidation_stream - 466 MB
-public.receipts_linearized - 279 MB
-public.state_groups - 160 MB
-public.device_lists_remote_cache - 124 MB
-public.state_group_edges - 122 MB
 ```
 
 ## Show rooms with names, sorted by events in this rooms
