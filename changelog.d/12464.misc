@@ -1,0 +1,1 @@
+Dockerfile-workers: reduce the amount we install in the image.

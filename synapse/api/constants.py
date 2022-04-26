@@ -179,8 +179,6 @@ class RelationTypes:
     REPLACE: Final = "m.replace"
     REFERENCE: Final = "m.reference"
     THREAD: Final = "m.thread"
-    # TODO Remove this in Synapse >= v1.57.0.
-    UNSTABLE_THREAD: Final = "io.element.thread"
 
 
 class LimitBlockingTypes:

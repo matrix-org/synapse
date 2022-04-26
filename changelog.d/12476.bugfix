@@ -1,0 +1,1 @@
+Fix a long-standing bug which incorrectly caused `GET /_matrix/client/r3/rooms/{roomId}/event/{eventId}` to return edited events rather than the original.

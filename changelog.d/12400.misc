@@ -1,1 +1,0 @@
-Make missing `importlib_metadata` dependency explicit.

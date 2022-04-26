@@ -1,1 +1,0 @@
-Make `StreamToken.from_string` and `RoomStreamToken.parse` propagate cancellations instead of replacing them with `SynapseError`s.

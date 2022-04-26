@@ -10,15 +10,15 @@ See the folder [system](https://github.com/matrix-org/synapse/tree/develop/docs/
 for the systemd unit files.
 
 The folder [workers](https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/workers/)
-contains an example configuration for the `federation_reader` worker.
+contains an example configuration for the `generic_worker` worker.
 
 ## Synapse configuration files
 
 See [the worker documentation](../workers.md) for information on how to set up the
 configuration files and reverse-proxy correctly.
-Below is a sample `federation_reader` worker configuration file.
+Below is a sample `generic_worker` worker configuration file.
 ```yaml
-{{#include workers/federation_reader.yaml}}
+{{#include workers/generic_worker.yaml}}
 ```
 
 Systemd manages daemonization itself, so ensure that none of the configuration
@@ -61,9 +61,9 @@ systemctl stop matrix-synapse.target
 # Restart the master alone
 systemctl start matrix-synapse.service
 
-# Restart a specific worker (eg. federation_reader); the master is
+# Restart a specific worker (eg. generic_worker); the master is
 # unaffected by this.
-systemctl restart matrix-synapse-worker@federation_reader.service
+systemctl restart matrix-synapse-worker@generic_worker.service
 
 # Add a new worker (assuming all configs are set up already)
 systemctl enable matrix-synapse-worker@federation_writer.service

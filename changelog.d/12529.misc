@@ -1,0 +1,1 @@
+Handle cancellation in `EventsWorkerStore._get_events_from_cache_or_db`.

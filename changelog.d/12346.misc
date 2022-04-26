@@ -1,1 +1,0 @@
-Remove redundant `get_success` calls in test code.

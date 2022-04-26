@@ -680,14 +680,6 @@ class ServerConfig(Config):
             config.get("use_account_validity_in_account_status") or False
         )
 
-        # This is a temporary option that enables fully using the new
-        # `device_lists_changes_in_room` without the backwards compat code. This
-        # is primarily for testing. If enabled the server should *not* be
-        # downgraded, as it may lead to missing device list updates.
-        self.use_new_device_lists_changes_in_room = (
-            config.get("use_new_device_lists_changes_in_room") or False
-        )
-
         self.rooms_to_exclude_from_sync: List[str] = (
             config.get("exclude_rooms_from_sync") or []
         )

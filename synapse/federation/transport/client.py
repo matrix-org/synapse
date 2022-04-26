@@ -1380,16 +1380,6 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
                 prefix + "auth_chain.item",
                 use_float=True,
             ),
-            # TODO Remove the unstable prefix when servers have updated.
-            #
-            # By re-using the same event dictionary this will cause the parsing of
-            # org.matrix.msc3083.v2.event and event to stomp over each other.
-            # Generally this should be fine.
-            ijson.kvitems_coro(
-                _event_parser(self._response.event_dict),
-                prefix + "org.matrix.msc3083.v2.event",
-                use_float=True,
-            ),
             ijson.kvitems_coro(
                 _event_parser(self._response.event_dict),
                 prefix + "event",
