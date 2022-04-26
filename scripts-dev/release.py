@@ -25,13 +25,12 @@ import sys
 import urllib.request
 from os import path
 from tempfile import TemporaryDirectory
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import attr
 import click
 import commonmark
 import git
-import redbaron
 from click.exceptions import ClickException
 from github import Github
 from packaging import version
@@ -100,7 +99,7 @@ def prepare():
     repo.remote().fetch()
 
     # Get the current version and AST from root Synapse module.
-    current_version, parsed_synapse_ast, version_node = parse_version_from_module()
+    current_version = get_package_version()
 
     # Figure out what sort of release we're doing and calcuate the new version.
     rc = click.confirm("RC", default=True)
@@ -162,7 +161,7 @@ def prepare():
         click.get_current_context().abort()
 
     # Switch to the release branch.
-    parsed_new_version = version.parse(new_version)
+    parsed_new_version: version.Version = version.parse(new_version)
 
     # We assume for debian changelogs that we only do RCs or full releases.
     assert not parsed_new_version.is_devrelease
@@ -207,17 +206,15 @@ def prepare():
         # Create the new release branch
         release_branch = repo.create_head(release_branch_name, commit=base_branch)
 
-    # Switch to the release branch and ensure its up to date.
+    # Switch to the release branch and ensure it's up to date.
     repo.git.checkout(release_branch_name)
     update_branch(repo)
 
-    # Update the `__version__` variable and write it back to the file.
-    version_node.value = '"' + new_version + '"'
-    with open("synapse/__init__.py", "w") as f:
-        f.write(parsed_synapse_ast.dumps())
+    # Update the version specified in pyproject.toml.
+    subprocess.check_output(["poetry", "version", new_version])
 
     # Generate changelogs.
-    generate_and_write_changelog(current_version)
+    generate_and_write_changelog(current_version, new_version)
 
     # Generate debian changelogs
     if parsed_new_version.pre is not None:
@@ -284,7 +281,7 @@ def tag(gh_token: Optional[str]):
     repo.remote().fetch()
 
     # Find out the version and tag name.
-    current_version, _, _ = parse_version_from_module()
+    current_version = get_package_version()
     tag_name = f"v{current_version}"
 
     # Check we haven't released this version.
@@ -362,7 +359,7 @@ def publish(gh_token: str):
     if repo.is_dirty():
         raise click.ClickException("Uncommitted changes exist.")
 
-    current_version, _, _ = parse_version_from_module()
+    current_version = get_package_version()
     tag_name = f"v{current_version}"
 
     if not click.confirm(f"Publish {tag_name}?", default=True):
@@ -396,7 +393,7 @@ def publish(gh_token: str):
 def upload():
     """Upload release to pypi."""
 
-    current_version, _, _ = parse_version_from_module()
+    current_version = get_package_version()
     tag_name = f"v{current_version}"
 
     pypi_asset_names = [
@@ -424,7 +421,7 @@ def upload():
 def announce():
     """Generate markdown to announce the release."""
 
-    current_version, _, _ = parse_version_from_module()
+    current_version = get_package_version()
     tag_name = f"v{current_version}"
 
     click.echo(
@@ -455,37 +452,11 @@ Announce the release in
         )
 
 
-def parse_version_from_module() -> Tuple[
-    version.Version, redbaron.RedBaron, redbaron.Node
-]:
-    # Parse the AST and load the `__version__` node so that we can edit it
-    # later.
-    with open("synapse/__init__.py") as f:
-        red = redbaron.RedBaron(f.read())
-
-    version_node = None
-    for node in red:
-        if node.type != "assignment":
-            continue
-
-        if node.target.type != "name":
-            continue
-
-        if node.target.value != "__version__":
-            continue
-
-        version_node = node
-        break
-
-    if not version_node:
-        print("Failed to find '__version__' definition in synapse/__init__.py")
-        sys.exit(1)
-
-    # Parse the current version.
-    current_version = version.parse(version_node.value.value.strip('"'))
-    assert isinstance(current_version, version.Version)
-
-    return current_version, red, version_node
+def get_package_version() -> version.Version:
+    version_string = subprocess.check_output(["poetry", "version", "--short"]).decode(
+        "utf-8"
+    )
+    return version.Version(version_string)
 
 
 def find_ref(repo: git.Repo, ref_name: str) -> Optional[git.HEAD]:
@@ -565,11 +536,13 @@ def get_changes_for_version(wanted_version: version.Version) -> str:
     return "\n".join(version_changelog)
 
 
-def generate_and_write_changelog(current_version: version.Version):
+def generate_and_write_changelog(current_version: version.Version, new_version: str):
     # We do this by getting a draft so that we can edit it before writing to the
     # changelog.
     result = run_until_successful(
-        "python3 -m towncrier --draft", shell=True, capture_output=True
+        f"python3 -m towncrier build --draft --version {new_version}",
+        shell=True,
+        capture_output=True,
     )
     new_changes = result.stdout.decode("utf-8")
     new_changes = new_changes.replace(

@@ -1759,7 +1759,8 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                     device_id,
                     room_id,
                     stream_id,
-                    False,
+                    # We only need to calculate outbound pokes for local users
+                    not self.hs.is_mine_id(user_id),
                     encoded_context,
                 )
                 for room_id in room_ids
@@ -1789,15 +1790,16 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             txn: LoggingTransaction,
         ) -> List[Tuple[str, str, str, int, Optional[Dict[str, str]]]]:
             txn.execute(sql, (limit,))
+
             return [
                 (
-                    row[0],
-                    row[1],
-                    row[2],
-                    row[3],
-                    db_to_json(row[4]) if row[4] else None,
+                    user_id,
+                    device_id,
+                    room_id,
+                    stream_id,
+                    db_to_json(opentracing_context),
                 )
-                for row in txn
+                for user_id, device_id, room_id, stream_id, opentracing_context in txn
             ]
 
         return await self.db_pool.runInteraction(
