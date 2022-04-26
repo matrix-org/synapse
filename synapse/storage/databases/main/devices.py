@@ -1748,7 +1748,8 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                     device_id,
                     room_id,
                     stream_id,
-                    False,
+                    # We only need to calculate outbound pokes for local users
+                    not self.hs.is_mine_id(user_id),
                     encoded_context,
                 )
                 for room_id in room_ids
@@ -1776,7 +1777,17 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
 
         def get_uncoverted_outbound_room_pokes_txn(txn):
             txn.execute(sql, (limit,))
-            return txn.fetchall()
+
+            return [
+                (
+                    user_id,
+                    device_id,
+                    room_id,
+                    stream_id,
+                    db_to_json(opentracing_context),
+                )
+                for user_id, device_id, room_id, stream_id, opentracing_context in txn
+            ]
 
         return await self.db_pool.runInteraction(
             "get_uncoverted_outbound_room_pokes", get_uncoverted_outbound_room_pokes_txn

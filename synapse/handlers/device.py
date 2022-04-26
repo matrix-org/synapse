@@ -505,8 +505,9 @@ class DeviceHandler(DeviceWorkerHandler):
             "device_list_key", position, users={user_id}, rooms=room_ids
         )
 
-        # We may need to do some processing asynchronously.
-        self._handle_new_device_update_async()
+        # We may need to do some processing asynchronously for local user IDs.
+        if self.hs.is_mine_id(user_id):
+            self._handle_new_device_update_async()
 
     async def notify_user_signature_update(
         self, from_user_id: str, user_ids: List[str]
@@ -683,9 +684,12 @@ class DeviceHandler(DeviceWorkerHandler):
                             self.federation_sender.send_device_messages(
                                 host, immediate=False
                             )
-                            log_kv(
-                                {"message": "sent device update to host", "host": host}
-                            )
+                            # TODO: when called, this isn't in a logging context.
+                            # This leads to log spam, sentry event spam, and massive
+                            # memory usage. See #12552.
+                            # log_kv(
+                            #     {"message": "sent device update to host", "host": host}
+                            # )
 
                     if current_stream_id != stream_id:
                         # Clear the set of hosts we've already sent to as we're
