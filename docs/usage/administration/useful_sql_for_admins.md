@@ -104,7 +104,7 @@ public.state_group_edges - 122 MB
 
 ## Show top 20 larger rooms by state events count
 You get the same information when you use the
-[admin API](https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#list-room-api)
+[admin API](../../admin_api/rooms.md#list-room-api)
 and set parameter `order_by=state_events`.
 
 ```sql
@@ -253,7 +253,7 @@ ORDER BY
 
 ## Lookup room state info by list of room_id
 You get the same information when you use the
-[admin API](https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#room-details-api).
+[admin API](../../admin_api/admin_api/rooms.md#room-details-api).
 ```sql
 SELECT
   rss.room_id,
