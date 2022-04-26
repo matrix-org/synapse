@@ -1,4 +1,4 @@
-matrix-synapse-py3 (1.58.0+nmu1) UNRELEASED; urgency=medium
+matrix-synapse-py3 (1.57.1+nmu1) UNRELEASED; urgency=medium
 
   * Use poetry to manage the bundled virtualenv included with this package.
 
