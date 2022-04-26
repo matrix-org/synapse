@@ -1,0 +1,1 @@
+Preparation for faster-room-join work: Implement a tracking mechanism to allow functions to wait for full room state to arrive.

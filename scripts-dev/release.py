@@ -230,7 +230,7 @@ def prepare():
         debian_version = new_version
 
     run_until_successful(
-        f'dch -M -v {debian_version} "New synapse release {debian_version}."',
+        f'dch -M -v {debian_version} "New Synapse release {new_version}."',
         shell=True,
     )
     run_until_successful('dch -M -r -D stable ""', shell=True)

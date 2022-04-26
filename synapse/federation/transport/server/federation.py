@@ -160,7 +160,7 @@ class FederationStateV1Servlet(BaseFederationServerServlet):
         return await self.handler.on_room_state_request(
             origin,
             room_id,
-            parse_string_from_args(query, "event_id", None, required=False),
+            parse_string_from_args(query, "event_id", None, required=True),
         )
 
 

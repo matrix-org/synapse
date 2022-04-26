@@ -1,9 +1,30 @@
-Synapse 1.57.0rc1 (2022-04-12)
-==============================
+Synapse 1.57.1 (2022-04-20)
+===========================
+
+This is a patch release that only affects the Docker image. It is only of interest to administrators using [the LDAP module][LDAPModule] to authenticate their users.
+If you have already upgraded to Synapse 1.57.0 without problem, then you have no need to upgrade to this patch release.
+
+[LDAPModule]: https://github.com/matrix-org/matrix-synapse-ldap3
+
+
+Updates to the Docker image
+---------------------------
+
+- Include version 0.2.0 of the Synapse LDAP Auth Provider module in the Docker image. This matches the version that was present in the Docker image for Synapse v1.56.0. ([\#12512](https://github.com/matrix-org/synapse/issues/12512))
+
+
+Synapse 1.57.0 (2022-04-19)
+===========================
 
 This version includes a [change](https://github.com/matrix-org/synapse/pull/12209) to the way transaction IDs are managed for application services. If your deployment uses a dedicated worker for application service traffic, **it must be stopped** when the database is upgraded (which normally happens when the main process is upgraded), to ensure the change is made safely without any risk of reusing transaction IDs.
 
-See the [upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1570) for more details.
+See the [upgrade notes](https://github.com/matrix-org/synapse/blob/v1.57.0rc1/docs/upgrade.md#upgrading-to-v1570) for more details.
+
+No significant changes since 1.57.0rc1.
+
+
+Synapse 1.57.0rc1 (2022-04-12)
+==============================
 
 Features
 --------

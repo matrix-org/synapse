@@ -1,0 +1,1 @@
+Add type hints so `docker` and `stubs` directories pass `mypy --disallow-untyped-defs`.

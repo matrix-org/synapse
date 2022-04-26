@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
-      - run: pip install -e .
+      - run: pip install .
       - run: scripts-dev/generate_sample_config.sh --check
       - run: scripts-dev/config-lint.sh
 
