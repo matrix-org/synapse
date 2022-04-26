@@ -87,13 +87,7 @@ def prepare():
     """
 
     # Make sure we're in a git repo.
-    try:
-        repo = git.Repo()
-    except git.InvalidGitRepositoryError:
-        raise click.ClickException("Not in Synapse repo.")
-
-    if repo.is_dirty():
-        raise click.ClickException("Uncommitted changes exist.")
+    repo = get_repo()
 
     click.secho("Updating git repo...")
     repo.remote().fetch()
@@ -267,13 +261,7 @@ def tag(gh_token: Optional[str]):
     """Tags the release and generates a draft GitHub release"""
 
     # Make sure we're in a git repo.
-    try:
-        repo = git.Repo()
-    except git.InvalidGitRepositoryError:
-        raise click.ClickException("Not in Synapse repo.")
-
-    if repo.is_dirty():
-        raise click.ClickException("Uncommitted changes exist.")
+    repo = get_repo()
 
     click.secho("Updating git repo...")
     repo.remote().fetch()
@@ -358,13 +346,7 @@ def publish(gh_token: str):
     """Publish release."""
 
     # Make sure we're in a git repo.
-    try:
-        repo = git.Repo()
-    except git.InvalidGitRepositoryError:
-        raise click.ClickException("Not in Synapse repo.")
-
-    if repo.is_dirty():
-        raise click.ClickException("Uncommitted changes exist.")
+    repo = get_repo()
 
     current_version = get_package_version()
     tag_name = f"v{current_version}"
@@ -468,6 +450,17 @@ def get_package_version() -> version.Version:
 
 def get_release_branch_name(version_number: version.Version) -> str:
     return f"release-v{version_number.major}.{version_number.minor}"
+
+
+def get_repo() -> git.Repo:
+    """Get the project repo and check it's not got any uncommitted changes."""
+    try:
+        repo = git.Repo()
+    except git.InvalidGitRepositoryError:
+        raise click.ClickException("Not in Synapse repo.")
+    if repo.is_dirty():
+        raise click.ClickException("Uncommitted changes exist.")
+    return repo
 
 
 def find_ref(repo: git.Repo, ref_name: str) -> Optional[git.HEAD]:
