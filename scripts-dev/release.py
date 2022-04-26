@@ -285,8 +285,8 @@ def tag(gh_token: Optional[str]):
     tag_name = f"v{current_version}"
 
     # Check we haven't released this version.
-    # if tag_name in repo.tags:
-    #     raise click.ClickException(f"Tag {tag_name} already exists!\n")
+    if tag_name in repo.tags:
+        raise click.ClickException(f"Tag {tag_name} already exists!\n")
 
     # Get the appropriate changelogs and tag.
     changes = get_changes_for_version(current_version)
