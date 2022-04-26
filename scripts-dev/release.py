@@ -285,8 +285,8 @@ def tag(gh_token: Optional[str]):
     tag_name = f"v{current_version}"
 
     # Check we haven't released this version.
-    if tag_name in repo.tags:
-        raise click.ClickException(f"Tag {tag_name} already exists!\n")
+    # if tag_name in repo.tags:
+    #     raise click.ClickException(f"Tag {tag_name} already exists!\n")
 
     # Get the appropriate changelogs and tag.
     changes = get_changes_for_version(current_version)
@@ -295,6 +295,13 @@ def tag(gh_token: Optional[str]):
     if click.confirm("Edit text?", default=False):
         changes = click.edit(changes, require_save=False)
 
+    commit = repo.head.commit
+    click.echo(
+        f"{repo.head.ref} {commit} {commit.summary!r}\n"
+        f"by {commit.author} <{commit.author.email}>, "
+        f"committed at {commit.committed_datetime}"
+    )
+    click.confirm(f"Tag this commit as {tag_name}?", default=False, abort=True)
     repo.create_tag(tag_name, message=changes, sign=True)
 
     if not click.confirm("Push tag to GitHub?", default=True):
