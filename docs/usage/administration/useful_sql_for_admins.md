@@ -253,7 +253,7 @@ ORDER BY
 
 ## Lookup room state info by list of room_id
 You get the same information when you use the
-[admin API](../../admin_api/admin_api/rooms.md#room-details-api).
+[admin API](../../admin_api/rooms.md#room-details-api).
 ```sql
 SELECT
   rss.room_id,
