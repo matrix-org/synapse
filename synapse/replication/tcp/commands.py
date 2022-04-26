@@ -356,7 +356,7 @@ class UserIpCommand(Command):
         access_token: str,
         ip: str,
         user_agent: str,
-        device_id: str,
+        device_id: Optional[str],
         last_seen: int,
     ):
         self.user_id = user_id
@@ -387,6 +387,12 @@ class UserIpCommand(Command):
                     self.last_seen,
                 )
             )
+        )
+
+    def __repr__(self) -> str:
+        return (
+            f"UserIpCommand({self.user_id!r}, .., {self.ip!r}, "
+            f"{self.user_agent!r}, {self.device_id!r}, {self.last_seen})"
         )
 
 

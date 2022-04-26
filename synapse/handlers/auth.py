@@ -211,6 +211,7 @@ class AuthHandler:
         self.macaroon_gen = hs.get_macaroon_generator()
         self._password_enabled = hs.config.auth.password_enabled
         self._password_localdb_enabled = hs.config.auth.password_localdb_enabled
+        self._third_party_rules = hs.get_third_party_event_rules()
 
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
         # as per `rc_login.failed_attempts`.
@@ -1504,6 +1505,8 @@ class AuthHandler:
         await self.store.user_add_threepid(
             user_id, medium, address, validated_at, self.hs.get_clock().time_msec()
         )
+
+        await self._third_party_rules.on_threepid_bind(user_id, medium, address)
 
     async def delete_threepid(
         self, user_id: str, medium: str, address: str, id_server: Optional[str] = None

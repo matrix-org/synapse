@@ -42,6 +42,7 @@ CHECK_CAN_SHUTDOWN_ROOM_CALLBACK = Callable[[str, str], Awaitable[bool]]
 CHECK_CAN_DEACTIVATE_USER_CALLBACK = Callable[[str, bool], Awaitable[bool]]
 ON_PROFILE_UPDATE_CALLBACK = Callable[[str, ProfileInfo, bool, bool], Awaitable]
 ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK = Callable[[str, bool, bool], Awaitable]
+ON_THREEPID_BIND_CALLBACK = Callable[[str, str, str], Awaitable]
 
 
 def load_legacy_third_party_event_rules(hs: "HomeServer") -> None:
@@ -169,6 +170,7 @@ class ThirdPartyEventRules:
         self._on_user_deactivation_status_changed_callbacks: List[
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = []
+        self._on_threepid_bind_callbacks: List[ON_THREEPID_BIND_CALLBACK] = []
 
     def register_third_party_rules_callbacks(
         self,
@@ -187,6 +189,7 @@ class ThirdPartyEventRules:
         on_user_deactivation_status_changed: Optional[
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = None,
+        on_threepid_bind: Optional[ON_THREEPID_BIND_CALLBACK] = None,
     ) -> None:
         """Register callbacks from modules for each hook."""
         if check_event_allowed is not None:
@@ -220,6 +223,9 @@ class ThirdPartyEventRules:
             self._on_user_deactivation_status_changed_callbacks.append(
                 on_user_deactivation_status_changed,
             )
+
+        if on_threepid_bind is not None:
+            self._on_threepid_bind_callbacks.append(on_threepid_bind)
 
     async def check_event_allowed(
         self, event: EventBase, context: EventContext
@@ -475,6 +481,26 @@ class ThirdPartyEventRules:
         for callback in self._on_user_deactivation_status_changed_callbacks:
             try:
                 await callback(user_id, deactivated, by_admin)
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )
+
+    async def on_threepid_bind(self, user_id: str, medium: str, address: str) -> None:
+        """Called after a threepid association has been verified and stored.
+
+        Note that this callback is called when an association is created on the
+        local homeserver, not when it's created on an identity server (and then kept track
+        of so that it can be unbound on the same IS later on).
+
+        Args:
+            user_id: the user being associated with the threepid.
+            medium: the threepid's medium.
+            address: the threepid's address.
+        """
+        for callback in self._on_threepid_bind_callbacks:
+            try:
+                await callback(user_id, medium, address)
             except Exception as e:
                 logger.exception(
                     "Failed to run module API callback %s: %s", callback, e

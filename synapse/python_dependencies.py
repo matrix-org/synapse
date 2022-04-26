@@ -48,14 +48,13 @@ REQUIREMENTS = [
     "unpaddedbase64>=1.1.0",
     "canonicaljson>=1.4.0",
     # we use the type definitions added in signedjson 1.1.
-    "signedjson>=1.1.0,<=1.1.1",
+    "signedjson>=1.1.0",
     "pynacl>=1.2.1",
-    "idna>=2.5",
     # validating SSL certs for IP addresses requires service_identity 18.1.
     "service_identity>=18.1.0",
     # Twisted 18.9 introduces some logger improvements that the structured
     # logger utilises
-    "Twisted>=18.9.0",
+    "Twisted[tls]>=18.9.0",
     "treq>=15.1",
     # Twisted has required pyopenssl 16.0 since about Twisted 16.6.
     "pyopenssl>=16.0.0",
@@ -89,6 +88,9 @@ REQUIREMENTS = [
     "matrix-common~=1.1.0",
     # We need packaging.requirements.Requirement, added in 16.1.
     "packaging>=16.1",
+    # At the time of writing, we only use functions from the version `importlib.metadata`
+    # which shipped in Python 3.8. This corresponds to version 1.4 of the backport.
+    "importlib_metadata>=1.4 ; python_version < '3.8'",
 ]
 
 CONDITIONAL_REQUIREMENTS = {

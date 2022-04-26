@@ -107,6 +107,8 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
         # TODO: get this from the homeserver rather than creating a new one for
         # each request
         try:
+            assert self._secret is not None
+
             resp_body = await self._http_client.post_urlencoded_get_json(
                 self._url,
                 args={

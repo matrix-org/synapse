@@ -15,19 +15,19 @@
 import argparse
 import sys
 import time
-from typing import Optional
+from typing import NoReturn, Optional
 
-import nacl.signing
 from signedjson.key import encode_verify_key_base64, get_verify_key, read_signing_keys
+from signedjson.types import VerifyKey
 
 
-def exit(status: int = 0, message: Optional[str] = None):
+def exit(status: int = 0, message: Optional[str] = None) -> NoReturn:
     if message:
         print(message, file=sys.stderr)
     sys.exit(status)
 
 
-def format_plain(public_key: nacl.signing.VerifyKey):
+def format_plain(public_key: VerifyKey) -> None:
     print(
         "%s:%s %s"
         % (
@@ -38,7 +38,7 @@ def format_plain(public_key: nacl.signing.VerifyKey):
     )
 
 
-def format_for_config(public_key: nacl.signing.VerifyKey, expiry_ts: int):
+def format_for_config(public_key: VerifyKey, expiry_ts: int) -> None:
     print(
         '  "%s:%s": { key: "%s", expired_ts: %i }'
         % (
@@ -50,7 +50,7 @@ def format_for_config(public_key: nacl.signing.VerifyKey, expiry_ts: int):
     )
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
@@ -94,7 +94,6 @@ def main():
                 message="Error reading key from file %s: %s %s"
                 % (file.name, type(e), e),
             )
-            res = []
         for key in res:
             formatter(get_verify_key(key))
 

@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import Any
 
 from synapse.config._base import Config, ConfigError
+from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +31,7 @@ https://matrix-org.github.io/synapse/latest/templates.html
 class AccountValidityConfig(Config):
     section = "account_validity"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         """Parses the old account validity config. The config format looks like this:
 
         account_validity:

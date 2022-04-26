@@ -35,6 +35,11 @@ LEAVE_DB = os.environ.get("SYNAPSE_LEAVE_DB", False)
 POSTGRES_USER = os.environ.get("SYNAPSE_POSTGRES_USER", None)
 POSTGRES_HOST = os.environ.get("SYNAPSE_POSTGRES_HOST", None)
 POSTGRES_PASSWORD = os.environ.get("SYNAPSE_POSTGRES_PASSWORD", None)
+POSTGRES_PORT = (
+    int(os.environ["SYNAPSE_POSTGRES_PORT"])
+    if "SYNAPSE_POSTGRES_PORT" in os.environ
+    else None
+)
 POSTGRES_BASE_DB = "_synapse_unit_tests_base_%s" % (os.getpid(),)
 
 # When debugging a specific test, it's occasionally useful to write the
@@ -55,6 +60,7 @@ def setupdb():
         db_conn = db_engine.module.connect(
             user=POSTGRES_USER,
             host=POSTGRES_HOST,
+            port=POSTGRES_PORT,
             password=POSTGRES_PASSWORD,
             dbname=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
         )
@@ -73,6 +79,7 @@ def setupdb():
             database=POSTGRES_BASE_DB,
             user=POSTGRES_USER,
             host=POSTGRES_HOST,
+            port=POSTGRES_PORT,
             password=POSTGRES_PASSWORD,
         )
         db_conn = LoggingDatabaseConnection(db_conn, db_engine, "tests")
@@ -83,6 +90,7 @@ def setupdb():
             db_conn = db_engine.module.connect(
                 user=POSTGRES_USER,
                 host=POSTGRES_HOST,
+                port=POSTGRES_PORT,
                 password=POSTGRES_PASSWORD,
                 dbname=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
             )

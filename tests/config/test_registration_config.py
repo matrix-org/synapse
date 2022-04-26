@@ -37,7 +37,9 @@ class RegistrationConfigTestCase(ConfigFileTestCase):
                     "session_lifetime": "30m",
                     "nonrefreshable_access_token_lifetime": "31m",
                     **config_dict,
-                }
+                },
+                "",
+                "",
             )
 
         with self.assertRaises(ConfigError):
@@ -46,7 +48,9 @@ class RegistrationConfigTestCase(ConfigFileTestCase):
                     "session_lifetime": "30m",
                     "refreshable_access_token_lifetime": "31m",
                     **config_dict,
-                }
+                },
+                "",
+                "",
             )
 
         with self.assertRaises(ConfigError):
@@ -55,7 +59,9 @@ class RegistrationConfigTestCase(ConfigFileTestCase):
                     "session_lifetime": "30m",
                     "refresh_token_lifetime": "31m",
                     **config_dict,
-                }
+                },
+                "",
+                "",
             )
 
         # Then test all the fine conditions
@@ -64,7 +70,9 @@ class RegistrationConfigTestCase(ConfigFileTestCase):
                 "session_lifetime": "31m",
                 "nonrefreshable_access_token_lifetime": "31m",
                 **config_dict,
-            }
+            },
+            "",
+            "",
         )
 
         HomeServerConfig().parse_config_dict(
@@ -72,11 +80,15 @@ class RegistrationConfigTestCase(ConfigFileTestCase):
                 "session_lifetime": "31m",
                 "refreshable_access_token_lifetime": "31m",
                 **config_dict,
-            }
+            },
+            "",
+            "",
         )
 
         HomeServerConfig().parse_config_dict(
-            {"session_lifetime": "31m", "refresh_token_lifetime": "31m", **config_dict}
+            {"session_lifetime": "31m", "refresh_token_lifetime": "31m", **config_dict},
+            "",
+            "",
         )
 
     def test_refuse_to_start_if_open_registration_and_no_verification(self):

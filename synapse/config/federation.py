@@ -11,16 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Optional
+from typing import Any, Optional
 
 from synapse.config._base import Config
 from synapse.config._util import validate_config
+from synapse.types import JsonDict
 
 
 class FederationConfig(Config):
     section = "federation"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist: Optional[dict] = None
         federation_domain_whitelist = config.get("federation_domain_whitelist", None)
@@ -48,7 +49,7 @@ class FederationConfig(Config):
             "allow_device_name_lookup_over_federation", True
         )
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         ## Federation ##
 

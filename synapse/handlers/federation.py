@@ -151,7 +151,7 @@ class FederationHandler:
                 return. This is used as part of the heuristic to decide if we
                 should back paginate.
         """
-        with (await self._room_backfill.queue(room_id)):
+        async with self._room_backfill.queue(room_id):
             return await self._maybe_backfill_inner(room_id, current_depth, limit)
 
     async def _maybe_backfill_inner(

@@ -158,9 +158,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
             )
 
         # Blow away caches (supported room versions can only change due to a restart).
-        self.get_success(
-            self.store.get_rooms_for_user_with_stream_ordering.invalidate_all()
-        )
+        self.store.get_rooms_for_user_with_stream_ordering.invalidate_all()
         self.store._get_event_cache.clear()
 
         # The rooms should be excluded from the sync response.

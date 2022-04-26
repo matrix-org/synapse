@@ -35,6 +35,7 @@ from twisted.logger import (
 
 from synapse.logging.context import LoggingContextFilter
 from synapse.logging.filter import MetadataFilter
+from synapse.types import JsonDict
 
 from ._base import Config, ConfigError
 
@@ -147,13 +148,15 @@ https://matrix-org.github.io/synapse/v1.54/structured_logging.html
 class LoggingConfig(Config):
     section = "logging"
 
-    def read_config(self, config, **kwargs) -> None:
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         if config.get("log_file"):
             raise ConfigError(LOG_FILE_ERROR)
         self.log_config = self.abspath(config.get("log_config"))
         self.no_redirect_stdio = config.get("no_redirect_stdio", False)
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs) -> str:
+    def generate_config_section(
+        self, config_dir_path: str, server_name: str, **kwargs: Any
+    ) -> str:
         log_config = os.path.join(config_dir_path, server_name + ".log.config")
         return (
             """\

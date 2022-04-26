@@ -157,10 +157,10 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.assertEqual(id_gen.get_positions(), {"master": 7})
         self.assertEqual(id_gen.get_current_token_for_writer("master"), 7)
 
-        ctx1 = self.get_success(id_gen.get_next())
-        ctx2 = self.get_success(id_gen.get_next())
-        ctx3 = self.get_success(id_gen.get_next())
-        ctx4 = self.get_success(id_gen.get_next())
+        ctx1 = id_gen.get_next()
+        ctx2 = id_gen.get_next()
+        ctx3 = id_gen.get_next()
+        ctx4 = id_gen.get_next()
 
         s1 = self.get_success(ctx1.__aenter__())
         s2 = self.get_success(ctx2.__aenter__())
@@ -362,8 +362,8 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.assertEqual(id_gen.get_current_token_for_writer("master"), 7)
 
         # Persist two rows at once
-        ctx1 = self.get_success(id_gen.get_next())
-        ctx2 = self.get_success(id_gen.get_next())
+        ctx1 = id_gen.get_next()
+        ctx2 = id_gen.get_next()
 
         s1 = self.get_success(ctx1.__aenter__())
         s2 = self.get_success(ctx2.__aenter__())

@@ -451,7 +451,7 @@ class FederationSenderHandler:
             # service for robustness? Or could we replace it with an assertion that
             # we're not being re-entered?
 
-            with (await self._fed_position_linearizer.queue(None)):
+            async with self._fed_position_linearizer.queue(None):
                 # We persist and ack the same position, so we take a copy of it
                 # here as otherwise it can get modified from underneath us.
                 current_position = self.federation_position

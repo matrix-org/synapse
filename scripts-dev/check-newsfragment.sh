@@ -19,7 +19,7 @@ if ! git diff --quiet FETCH_HEAD... -- debian; then
     if git diff --quiet FETCH_HEAD... -- debian/changelog; then
         echo "Updates to debian directory, but no update to the changelog." >&2
         echo "!! Please see the contributing guide for help writing your changelog entry:" >&2
-        echo "https://github.com/matrix-org/synapse/blob/develop/CONTRIBUTING.md#debian-changelog" >&2
+        echo "https://matrix-org.github.io/synapse/latest/development/contributing_guide.html#debian-changelog" >&2
         exit 1
     fi
 fi
@@ -32,7 +32,7 @@ fi
 
 # Print a link to the contributing guide if the user makes a mistake
 CONTRIBUTING_GUIDE_TEXT="!! Please see the contributing guide for help writing your changelog entry:
-https://github.com/matrix-org/synapse/blob/develop/CONTRIBUTING.md#changelog"
+https://matrix-org.github.io/synapse/latest/development/contributing_guide.html#changelog"
 
 # If check-newsfragment returns a non-zero exit code, print the contributing guide and exit
 python -m towncrier.check --compare-with=origin/develop || (echo -e "$CONTRIBUTING_GUIDE_TEXT" >&2 && exit 1)

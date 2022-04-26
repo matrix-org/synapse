@@ -44,6 +44,7 @@ from synapse.api.urls import (
 from synapse.events import EventBase, make_event_from_dict
 from synapse.federation.units import Transaction
 from synapse.http.matrixfederationclient import ByteParser
+from synapse.http.types import QueryParams
 from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
@@ -255,7 +256,7 @@ class TransportLayerClient:
         self,
         destination: str,
         query_type: str,
-        args: dict,
+        args: QueryParams,
         retry_on_dns_fail: bool,
         ignore_backoff: bool = False,
         prefix: str = FEDERATION_V1_PREFIX,
@@ -481,7 +482,7 @@ class TransportLayerClient:
             if third_party_instance_id:
                 data["third_party_instance_id"] = third_party_instance_id
             if limit:
-                data["limit"] = str(limit)
+                data["limit"] = limit
             if since_token:
                 data["since"] = since_token
 
@@ -503,7 +504,7 @@ class TransportLayerClient:
         else:
             path = _create_v1_path("/publicRooms")
 
-            args: Dict[str, Any] = {
+            args: Dict[str, Union[str, Iterable[str]]] = {
                 "include_all_networks": "true" if include_all_networks else "false"
             }
             if third_party_instance_id:

@@ -40,8 +40,8 @@ class ReadWriteLockTestCase(unittest.TestCase):
 
         Returns:
             A tuple of three `Deferred`s:
-             * A `Deferred` that resolves with `return_value` once the reader or writer
-               completes successfully.
+             * A cancellable `Deferred` for the entire read or write operation that
+               resolves with `return_value` on successful completion.
              * A `Deferred` that resolves once the reader or writer acquires the lock.
              * A `Deferred` that blocks the reader or writer. Must be resolved by the
                caller to allow the reader or writer to release the lock and complete.
@@ -87,8 +87,8 @@ class ReadWriteLockTestCase(unittest.TestCase):
 
         Returns:
             A tuple of two `Deferred`s:
-             * A `Deferred` that resolves with `return_value` once the reader completes
-               successfully.
+             * A cancellable `Deferred` for the entire read operation that resolves with
+               `return_value` on successful completion.
              * A `Deferred` that resolves once the reader acquires the lock.
         """
         d, acquired_d, unblock_d = self._start_reader_or_writer(
@@ -106,8 +106,8 @@ class ReadWriteLockTestCase(unittest.TestCase):
 
         Returns:
             A tuple of two `Deferred`s:
-             * A `Deferred` that resolves with `return_value` once the writer completes
-               successfully.
+             * A cancellable `Deferred` for the entire write operation that resolves
+               with `return_value` on successful completion.
              * A `Deferred` that resolves once the writer acquires the lock.
         """
         d, acquired_d, unblock_d = self._start_reader_or_writer(

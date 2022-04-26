@@ -62,8 +62,10 @@ from synapse.events.third_party_rules import (
     ON_CREATE_ROOM_CALLBACK,
     ON_NEW_EVENT_CALLBACK,
     ON_PROFILE_UPDATE_CALLBACK,
+    ON_THREEPID_BIND_CALLBACK,
     ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK,
 )
+from synapse.handlers.account_data import ON_ACCOUNT_DATA_UPDATED_CALLBACK
 from synapse.handlers.account_validity import (
     IS_USER_EXPIRED_CALLBACK,
     ON_LEGACY_ADMIN_REQUEST,
@@ -117,6 +119,7 @@ from synapse.types import (
 from synapse.util import Clock
 from synapse.util.async_helpers import maybe_awaitable
 from synapse.util.caches.descriptors import cached
+from synapse.util.frozenutils import freeze
 
 if TYPE_CHECKING:
     from synapse.app.generic_worker import GenericWorkerSlavedStore
@@ -209,12 +212,14 @@ class ModuleApi:
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client: SimpleHttpClient = hs.get_simple_http_client()
         self._public_room_list_manager = PublicRoomListManager(hs)
+        self._account_data_manager = AccountDataManager(hs)
 
         self._spam_checker = hs.get_spam_checker()
         self._account_validity_handler = hs.get_account_validity_handler()
         self._third_party_event_rules = hs.get_third_party_event_rules()
         self._password_auth_provider = hs.get_password_auth_provider()
         self._presence_router = hs.get_presence_router()
+        self._account_data_handler = hs.get_account_data_handler()
 
     #################################################################################
     # The following methods should only be called during the module's initialisation.
@@ -293,6 +298,7 @@ class ModuleApi:
         on_user_deactivation_status_changed: Optional[
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = None,
+        on_threepid_bind: Optional[ON_THREEPID_BIND_CALLBACK] = None,
     ) -> None:
         """Registers callbacks for third party event rules capabilities.
 
@@ -308,6 +314,7 @@ class ModuleApi:
             check_can_deactivate_user=check_can_deactivate_user,
             on_profile_update=on_profile_update,
             on_user_deactivation_status_changed=on_user_deactivation_status_changed,
+            on_threepid_bind=on_threepid_bind,
         )
 
     def register_presence_router_callbacks(
@@ -373,6 +380,19 @@ class ModuleApi:
                 min_batch_size=min_batch_size,
             )
 
+    def register_account_data_callbacks(
+        self,
+        *,
+        on_account_data_updated: Optional[ON_ACCOUNT_DATA_UPDATED_CALLBACK] = None,
+    ) -> None:
+        """Registers account data callbacks.
+
+        Added in Synapse 1.57.0.
+        """
+        return self._account_data_handler.register_module_callbacks(
+            on_account_data_updated=on_account_data_updated,
+        )
+
     def register_web_resource(self, path: str, resource: Resource) -> None:
         """Registers a web resource to be served at the given path.
 
@@ -412,6 +432,14 @@ class ModuleApi:
         Added in Synapse v1.22.0.
         """
         return self._public_room_list_manager
+
+    @property
+    def account_data_manager(self) -> "AccountDataManager":
+        """Allows reading and modifying users' account data.
+
+        Added in Synapse v1.57.0.
+        """
+        return self._account_data_manager
 
     @property
     def public_baseurl(self) -> str:
@@ -511,6 +539,17 @@ class ModuleApi:
             True if the user is a server admin, False otherwise.
         """
         return await self._store.is_server_admin(UserID.from_string(user_id))
+
+    async def set_user_admin(self, user_id: str, admin: bool) -> None:
+        """Sets if a user is a server admin.
+
+        Added in Synapse v1.56.0.
+
+        Args:
+            user_id: The Matrix ID of the user to set admin status for.
+            admin: True iff the user is to be a server admin, false otherwise.
+        """
+        await self._store.set_server_admin(UserID.from_string(user_id), admin)
 
     def get_qualified_user_id(self, username: str) -> str:
         """Qualify a user id, if necessary
@@ -1357,3 +1396,69 @@ class PublicRoomListManager:
             room_id: The ID of the room.
         """
         await self._store.set_room_is_public(room_id, False)
+
+
+class AccountDataManager:
+    """
+    Allows modules to manage account data.
+    """
+
+    def __init__(self, hs: "HomeServer") -> None:
+        self._hs = hs
+        self._store = hs.get_datastores().main
+        self._handler = hs.get_account_data_handler()
+
+    def _validate_user_id(self, user_id: str) -> None:
+        """
+        Validates a user ID is valid and local.
+        Private method to be used in other account data methods.
+        """
+        user = UserID.from_string(user_id)
+        if not self._hs.is_mine(user):
+            raise ValueError(
+                f"{user_id} is not local to this homeserver; can't access account data for remote users."
+            )
+
+    async def get_global(self, user_id: str, data_type: str) -> Optional[JsonDict]:
+        """
+        Gets some global account data, of a specified type, for the specified user.
+
+        The provided user ID must be a valid user ID of a local user.
+
+        Added in Synapse v1.57.0.
+        """
+        self._validate_user_id(user_id)
+
+        data = await self._store.get_global_account_data_by_type_for_user(
+            user_id, data_type
+        )
+        # We clone and freeze to prevent the module accidentally mutating the
+        # dict that lives in the cache, as that could introduce nasty bugs.
+        return freeze(data)
+
+    async def put_global(
+        self, user_id: str, data_type: str, new_data: JsonDict
+    ) -> None:
+        """
+        Puts some global account data, of a specified type, for the specified user.
+
+        The provided user ID must be a valid user ID of a local user.
+
+        Please note that this will overwrite existing the account data of that type
+        for that user!
+
+        Added in Synapse v1.57.0.
+        """
+        self._validate_user_id(user_id)
+
+        if not isinstance(data_type, str):
+            raise TypeError(f"data_type must be a str; got {type(data_type).__name__}")
+
+        if not isinstance(new_data, dict):
+            raise TypeError(f"new_data must be a dict; got {type(new_data).__name__}")
+
+        # Ensure the user exists, so we don't just write to users that aren't there.
+        if await self._store.get_userinfo_by_id(user_id) is None:
+            raise ValueError(f"User {user_id} does not exist on this server.")
+
+        await self._handler.add_account_data_for_user(user_id, data_type, new_data)

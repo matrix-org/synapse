@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any
+
+from synapse.types import JsonDict
 
 from ._base import Config
 
@@ -18,7 +21,7 @@ from ._base import Config
 class BackgroundUpdateConfig(Config):
     section = "background_updates"
 
-    def generate_config_section(self, **kwargs) -> str:
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         ## Background Updates ##
 
@@ -52,7 +55,7 @@ class BackgroundUpdateConfig(Config):
             #default_batch_size: 50
         """
 
-    def read_config(self, config, **kwargs) -> None:
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         bg_update_config = config.get("background_updates") or {}
 
         self.update_duration_ms = bg_update_config.get(

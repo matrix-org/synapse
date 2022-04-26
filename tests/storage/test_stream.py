@@ -111,7 +111,7 @@ class PaginationTestCase(HomeserverTestCase):
         """Make a request to /messages with a filter, returns the chunk of events."""
 
         from_token = self.get_success(
-            self.hs.get_event_sources().get_current_token_for_pagination()
+            self.hs.get_event_sources().get_current_token_for_pagination(self.room_id)
         )
 
         events, next_key = self.get_success(

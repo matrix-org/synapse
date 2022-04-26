@@ -27,7 +27,7 @@ feeds streams of newly written data between processes so they can be kept in
 sync with the database state.
 
 When configured to do so, Synapse uses a
-[Redis pub/sub channel](https://redis.io/topics/pubsub) to send the replication
+[Redis pub/sub channel](https://redis.io/docs/manual/pubsub/) to send the replication
 stream between all configured Synapse processes. Additionally, processes may
 make HTTP requests to each other, primarily for operations which need to wait
 for a reply ─ such as sending an event.

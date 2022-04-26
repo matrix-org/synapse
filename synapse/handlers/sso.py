@@ -430,7 +430,7 @@ class SsoHandler:
         # grab a lock while we try to find a mapping for this user. This seems...
         # optimistic, especially for implementations that end up redirecting to
         # interstitial pages.
-        with await self._mapping_lock.queue(auth_provider_id):
+        async with self._mapping_lock.queue(auth_provider_id):
             # first of all, check if we already have a mapping for this user
             user_id = await self.get_sso_user_by_remote_user_id(
                 auth_provider_id,

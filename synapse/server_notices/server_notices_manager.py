@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Optional
 
 from synapse.api.constants import EventTypes, Membership, RoomCreationPreset
 from synapse.events import EventBase
-from synapse.types import UserID, create_requester
+from synapse.types import Requester, UserID, create_requester
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
@@ -35,6 +35,7 @@ class ServerNoticesManager:
         self._room_creation_handler = hs.get_room_creation_handler()
         self._room_member_handler = hs.get_room_member_handler()
         self._event_creation_handler = hs.get_event_creation_handler()
+        self._message_handler = hs.get_message_handler()
         self._is_mine_id = hs.is_mine_id
         self._server_name = hs.hostname
 
@@ -107,6 +108,10 @@ class ServerNoticesManager:
 
         assert self._is_mine_id(user_id), "Cannot send server notices to remote users"
 
+        requester = create_requester(
+            self.server_notices_mxid, authenticated_entity=self._server_name
+        )
+
         rooms = await self._store.get_rooms_for_local_user_where_membership_is(
             user_id, [Membership.INVITE, Membership.JOIN]
         )
@@ -124,6 +129,12 @@ class ServerNoticesManager:
                     "Using existing server notices room %s for user %s",
                     room.room_id,
                     user_id,
+                )
+                await self._update_notice_user_profile_if_changed(
+                    requester,
+                    room.room_id,
+                    self._config.servernotices.server_notices_mxid_display_name,
+                    self._config.servernotices.server_notices_mxid_avatar_url,
                 )
                 return room.room_id
 
@@ -143,9 +154,6 @@ class ServerNoticesManager:
                 "avatar_url": self._config.servernotices.server_notices_mxid_avatar_url,
             }
 
-        requester = create_requester(
-            self.server_notices_mxid, authenticated_entity=self._server_name
-        )
         info, _ = await self._room_creation_handler.create_room(
             requester,
             config={
@@ -194,3 +202,46 @@ class ServerNoticesManager:
             room_id=room_id,
             action="invite",
         )
+
+    async def _update_notice_user_profile_if_changed(
+        self,
+        requester: Requester,
+        room_id: str,
+        display_name: Optional[str],
+        avatar_url: Optional[str],
+    ) -> None:
+        """
+        Updates the notice user's profile if it's different from what is in the room.
+
+        Args:
+            requester: The user who is performing the update.
+            room_id: The ID of the server notice room
+            display_name: The displayname of the server notice user
+            avatar_url: The avatar url of the server notice user
+        """
+        logger.debug("Checking whether notice user profile has changed for %s", room_id)
+
+        assert self.server_notices_mxid is not None
+
+        notice_user_data_in_room = await self._message_handler.get_room_data(
+            self.server_notices_mxid,
+            room_id,
+            EventTypes.Member,
+            self.server_notices_mxid,
+        )
+
+        assert notice_user_data_in_room is not None
+
+        notice_user_profile_changed = (
+            display_name != notice_user_data_in_room.content.get("displayname")
+            or avatar_url != notice_user_data_in_room.content.get("avatar_url")
+        )
+        if notice_user_profile_changed:
+            logger.info("Updating notice user profile in room %s", room_id)
+            await self._room_member_handler.update_membership(
+                requester=requester,
+                target=UserID.from_string(self.server_notices_mxid),
+                room_id=room_id,
+                action="join",
+                content={"displayname": display_name, "avatar_url": avatar_url},
+            )

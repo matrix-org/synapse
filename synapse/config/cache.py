@@ -16,10 +16,11 @@ import logging
 import os
 import re
 import threading
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 import attr
 
+from synapse.types import JsonDict
 from synapse.util.check_dependencies import DependencyException, check_requirements
 
 from ._base import Config, ConfigError
@@ -105,7 +106,7 @@ class CacheConfig(Config):
         with _CACHES_LOCK:
             _CACHES.clear()
 
-    def generate_config_section(self, **kwargs) -> str:
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         ## Caching ##
 
@@ -172,7 +173,7 @@ class CacheConfig(Config):
           #sync_response_cache_duration: 2m
         """
 
-    def read_config(self, config, **kwargs) -> None:
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.event_cache_size = self.parse_size(
             config.get("event_cache_size", _DEFAULT_EVENT_CACHE_SIZE)
         )

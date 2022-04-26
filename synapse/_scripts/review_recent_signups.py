@@ -138,9 +138,7 @@ def main() -> None:
     config_args = parser.parse_args(sys.argv[1:])
     config_files = find_config_files(search_paths=config_args.config_path)
     config_dict = read_config_files(config_files)
-    config.parse_config_dict(
-        config_dict,
-    )
+    config.parse_config_dict(config_dict, "", "")
 
     since_ms = time.time() * 1000 - Config.parse_duration(config_args.since)
     exclude_users_with_email = config_args.exclude_emails

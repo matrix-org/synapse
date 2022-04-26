@@ -24,7 +24,7 @@ pip install -e ".[lint,mypy]"
     functionality) with:
 
     ```sh
-    black . --exclude="\.tox|build|env"
+    black .
     ```
 
 -   **flake8**
@@ -35,7 +35,7 @@ pip install -e ".[lint,mypy]"
     Check all application and test code with:
 
     ```sh
-    flake8 synapse tests
+    flake8 .
     ```
 
 -   **isort**
@@ -46,10 +46,8 @@ pip install -e ".[lint,mypy]"
     Auto-fix imports with:
 
     ```sh
-    isort -rc synapse tests
+    isort .
     ```
-
-    `-rc` means to recursively search the given directories.
 
 It's worth noting that modern IDEs and text editors can run these tools
 automatically on save. It may be worth looking into whether this
