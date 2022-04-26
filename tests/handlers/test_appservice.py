@@ -476,14 +476,22 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         # Using our txn send mock, we can see what the AS received. After iterating over every
         # transaction, we'd like to see all 300 read receipts accounted for.
         # No more, no less.
-        total_ephemeral_events = 0
+        all_ephemeral_events = []
         for call in self.send_mock.call_args_list:
             ephemeral_events = call[0][2]
-            print(ephemeral_events)
-            total_ephemeral_events += len(ephemeral_events)
+            all_ephemeral_events += ephemeral_events
 
         # Ensure that no duplicate events were sent
-        self.assertEqual(total_ephemeral_events, 300)
+        self.assertEqual(len(all_ephemeral_events), 300)
+
+        # Check that the ephemeral event is a read receipt with the expected structure
+        latest_read_receipt = all_ephemeral_events[-1]
+        self.assertEqual(latest_read_receipt["type"], "m.receipt")
+
+        event_id = list(latest_read_receipt["content"].keys())[0]
+        self.assertEqual(
+            latest_read_receipt["content"][event_id]["m.read"], {self.local_user: {}}
+        )
 
     @unittest.override_config(
         {"experimental_features": {"msc2409_to_device_messages_enabled": True}}
