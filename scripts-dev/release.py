@@ -343,7 +343,7 @@ def tag(gh_token: Optional[str]):
 @cli.command()
 @click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=True)
 def publish(gh_token: str):
-    """Publish release."""
+    """Publish release on GitHub."""
 
     # Make sure we're in a git repo.
     repo = get_repo()
@@ -351,7 +351,7 @@ def publish(gh_token: str):
     current_version = get_package_version()
     tag_name = f"v{current_version}"
 
-    if not click.confirm(f"Publish {tag_name}?", default=True):
+    if not click.confirm(f"Publish release {tag_name} on GitHub?", default=True):
         return
 
     # Publish the draft release
