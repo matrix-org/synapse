@@ -318,7 +318,7 @@ class RootConfig:
             try:
                 conf = config_class(self)
             except Exception as e:
-                raise Exception("Failed making %s: %r" % (config_class.section, e))
+                raise Exception("Failed making %s" % config_class.section) from e
             setattr(self, config_class.section, conf)
 
     def invoke_all(
