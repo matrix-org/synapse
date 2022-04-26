@@ -371,6 +371,15 @@ class RelationsHandler:
             event.event_id: event for event in events if not event.is_state()
         }
 
+        # A map of event ID to the relation in that event, if there is one.
+        relations_by_id = {}
+        for event_id, event in events_by_id.items():
+            relates_to = event.content.get("m.relates_to")
+            if isinstance(relates_to, (dict, frozendict)):
+                relation_type = relates_to.get("rel_type")
+                if relation_type is not None:
+                    relations_by_id[event_id] = relation_type
+
         # event ID -> bundled aggregation in non-serialized form.
         results: Dict[str, BundledAggregations] = {}
 
@@ -381,11 +390,11 @@ class RelationsHandler:
         # events to be fetched. Thus, we check those first!
 
         # Fetch thread summaries (but only for the directly requested events).
-        #
-        # Note that you can't have threads off of other related events, but it is
-        # possible for a malicious homeserver to inject them anyway.
         threads = await self.get_threads_for_events(
-            events_by_id.keys(), user_id, ignored_users
+            # It is not valid to start a thread on an event which already has a relation.
+            [eid for eid in events_by_id.keys() if eid not in relations_by_id],
+            user_id,
+            ignored_users,
         )
         for event_id, thread in threads.items():
             results.setdefault(event_id, BundledAggregations()).thread = thread
@@ -399,13 +408,12 @@ class RelationsHandler:
 
         # Fetch other relations per event.
         for event in events_by_id.values():
-            # Do not bundle aggregations for an event which represents an edit or an
-            # annotation. It does not make sense for them to have related events.
-            relates_to = event.content.get("m.relates_to")
-            if isinstance(relates_to, (dict, frozendict)):
-                relation_type = relates_to.get("rel_type")
-                if relation_type in (RelationTypes.ANNOTATION, RelationTypes.REPLACE):
-                    continue
+            # Edits and annotations may not have related annotations or references.
+            if relations_by_id.get(event.event_id) in (
+                RelationTypes.ANNOTATION,
+                RelationTypes.REPLACE,
+            ):
+                continue
 
             annotations = await self.get_annotations_for_event(
                 event.event_id, event.room_id, ignored_users=ignored_users
