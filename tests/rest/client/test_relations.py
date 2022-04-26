@@ -1161,7 +1161,8 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         self.assertIn("latest_event", thread_summary)
         latest_event_in_thread = thread_summary["latest_event"]
         self.assertEqual(latest_event_in_thread["content"]["body"], "I've been edited!")
-        # The event should also have edit appear under the bundled aggregations.
+        # The latest event in the thread should have the edit appear under the
+        # bundled aggregations.
         self.assertDictContainsSubset(
             {"event_id": edit_event_id, "sender": "@alice:test"},
             latest_event_in_thread["unsigned"]["m.relations"][RelationTypes.REPLACE],
