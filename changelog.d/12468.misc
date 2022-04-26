@@ -1,1 +1,0 @@
-Update `delay_cancellation` to accept any awaitable, rather than just `Deferred`s.

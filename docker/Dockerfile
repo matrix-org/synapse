@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Dockerfile to build the matrixdotorg/synapse docker images.
 #
 # Note that it uses features which are only available in BuildKit - see
