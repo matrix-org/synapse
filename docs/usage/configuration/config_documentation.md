@@ -3074,25 +3074,6 @@ Example configuration:
 encryption_enabled_by_default_for_room_type: invite
 ```
 ---
-Config option: `enable_group_creation`
-
-Set to true to allow non-server-admin users to create groups on this server
-
-Example configuration:
-```yaml
-enable_group_creation: true
-```
----
-Config option: `group_creation_prefix`
-
-If enabled/present, non-server admins can only create groups with local parts
-starting with this prefix.
-
-Example configuration:
-```yaml
-group_creation_prefix: "unofficial_"
-```
----
 Config option: `user_directory`
 
 This setting defines options related to the user directory. 
