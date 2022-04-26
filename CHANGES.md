@@ -1,3 +1,80 @@
+Synapse 1.58.0rc1 (2022-04-26)
+==============================
+
+Features
+--------
+
+- Implement [MSC3383](https://github.com/matrix-org/matrix-spec-proposals/pull/3383) for including the destination in server-to-server authentication headers. Contributed by @Bubu and @jcgruenhage for Famedly GmbH. ([\#11398](https://github.com/matrix-org/synapse/issues/11398))
+- Use poetry to manage Synapse's dependencies. ([\#12337](https://github.com/matrix-org/synapse/issues/12337))
+- Enable processing of device list updates asynchronously. ([\#12365](https://github.com/matrix-org/synapse/issues/12365), [\#12465](https://github.com/matrix-org/synapse/issues/12465))
+- Implement [MSC2815](https://github.com/matrix-org/matrix-spec-proposals/pull/2815) to allow room moderators to view redacted event content. Contributed by @tulir. ([\#12427](https://github.com/matrix-org/synapse/issues/12427))
+
+
+Bugfixes
+--------
+
+- Prevent a sync request from removing a user's busy presence status. ([\#12213](https://github.com/matrix-org/synapse/issues/12213))
+- Fix bug with incremental sync missing events when rejoining/backfilling. Contributed by Nick @ Beeper. ([\#12319](https://github.com/matrix-org/synapse/issues/12319))
+- Fix a long-standing bug which incorrectly caused `GET /_matrix/client/r3/rooms/{roomId}/event/{eventId}` to return edited events rather than the original. ([\#12476](https://github.com/matrix-org/synapse/issues/12476))
+- Fix bug where the admin API for [deleting forward extremities](https://github.com/matrix-org/synapse/blob/erikj/fix_delete_event_response_count/docs/admin_api/rooms.md#deleting-forward-extremities) would always return a count of 1 no matter how many extremities were deleted. Broke in v1.27.0. ([\#12496](https://github.com/matrix-org/synapse/issues/12496))
+- Fix a long-standing bug where the image thumbanils embedded into email notifications were broken. ([\#12510](https://github.com/matrix-org/synapse/issues/12510))
+- Fix a bug in the implementation of MSC3202 where Synapse would use the field name `device_unused_fallback_keys`, rather than `device_unused_fallback_key_types`. ([\#12520](https://github.com/matrix-org/synapse/issues/12520))
+- Fix a bug introduced in Synapse 0.99.3 which could cause Synapse to consume large amounts of RAM when back-paginating in a large room. ([\#12522](https://github.com/matrix-org/synapse/issues/12522))
+
+
+Improved Documentation
+----------------------
+
+- Fix rendering of the documentation site when using the 'print' feature. ([\#12340](https://github.com/matrix-org/synapse/issues/12340))
+- Add a manual documenting config file options. ([\#12368](https://github.com/matrix-org/synapse/issues/12368))
+- Update documentation to reflect that both the `run_background_tasks_on` option and the options for moving stream writers off of the main process are no longer experimental. ([\#12451](https://github.com/matrix-org/synapse/issues/12451))
+- Update worker documentation and replace old `federation_reader` with `generic_worker`. ([\#12457](https://github.com/matrix-org/synapse/issues/12457))
+- Strongly recommend `poetry` for development. ([\#12475](https://github.com/matrix-org/synapse/issues/12475))
+- Add some example configurations for workers and update architectural diagram. ([\#12492](https://github.com/matrix-org/synapse/issues/12492))
+- Fix a broken link in `README.rst`. ([\#12495](https://github.com/matrix-org/synapse/issues/12495))
+- Add HAProxy delegation example with CORS headers to docs. ([\#12501](https://github.com/matrix-org/synapse/issues/12501))
+- Add an index to the configuration manual. ([\#12527](https://github.com/matrix-org/synapse/issues/12527))
+- Remove extraneous comma in User Admin API's device deletion section so that the example JSON is actually valid and works. Contributed by @olmari. ([\#12533](https://github.com/matrix-org/synapse/issues/12533))
+
+
+Deprecations and Removals
+-------------------------
+
+- The groups/communities feature in Synapse has been disabled by default. ([\#12344](https://github.com/matrix-org/synapse/issues/12344))
+- Remove unstable identifiers from [MSC3440](https://github.com/matrix-org/matrix-doc/pull/3440). ([\#12382](https://github.com/matrix-org/synapse/issues/12382))
+
+
+Internal Changes
+----------------
+
+- Preparation for faster-room-join work: start a background process to resynchronise the room state after a room join. ([\#12394](https://github.com/matrix-org/synapse/issues/12394))
+- Remove an unstable identifier from [MSC3083](https://github.com/matrix-org/matrix-doc/pull/3083). ([\#12395](https://github.com/matrix-org/synapse/issues/12395))
+- Preparation for faster-room-join work: Implement a tracking mechanism to allow functions to wait for full room state to arrive. ([\#12399](https://github.com/matrix-org/synapse/issues/12399))
+- Run twisted trunk CI job in the locked poetry environment. ([\#12425](https://github.com/matrix-org/synapse/issues/12425))
+- Run lints under poetry in CI, and remove corresponding tox lint jobs. ([\#12434](https://github.com/matrix-org/synapse/issues/12434))
+- Run "main" trial tests under `poetry`. ([\#12438](https://github.com/matrix-org/synapse/issues/12438))
+- Bump twisted version in `poetry.lock` to work around [pip bug #9644](https://github.com/pypa/pip/issues/9644). ([\#12441](https://github.com/matrix-org/synapse/issues/12441))
+- Change Mutual Rooms' `unstable_features` flag to `uk.half-shot.msc2666.mutual_rooms` which matches the current MSC iteration. ([\#12445](https://github.com/matrix-org/synapse/issues/12445))
+- Use `poetry` to manage the virtualenv in debian packages. ([\#12449](https://github.com/matrix-org/synapse/issues/12449))
+- Fix typo in the release script help string. ([\#12450](https://github.com/matrix-org/synapse/issues/12450))
+- Limit length of device_id to less than 512 characters. ([\#12454](https://github.com/matrix-org/synapse/issues/12454))
+- Reintroduce the list of targets to the linter script, to avoid linting unwanted local-only directories during development. ([\#12455](https://github.com/matrix-org/synapse/issues/12455))
+- Dockerfile-workers: reduce the amount we install in the image. ([\#12464](https://github.com/matrix-org/synapse/issues/12464))
+- Dockerfile-workers: give the master its own log config. ([\#12466](https://github.com/matrix-org/synapse/issues/12466))
+- complement-synapse-workers: factor out separate entry point script. ([\#12467](https://github.com/matrix-org/synapse/issues/12467))
+- Update `delay_cancellation` to accept any awaitable, rather than just `Deferred`s. ([\#12468](https://github.com/matrix-org/synapse/issues/12468))
+- Add a CI job which tests Synapse against the latest version of all dependencies. ([\#12472](https://github.com/matrix-org/synapse/issues/12472))
+- Back out experimental implementation of [MSC2314](https://github.com/matrix-org/matrix-spec-proposals/pull/2314). ([\#12474](https://github.com/matrix-org/synapse/issues/12474))
+- Use poetry-core instead of setuptools to build wheels. ([\#12478](https://github.com/matrix-org/synapse/issues/12478), [\#12514](https://github.com/matrix-org/synapse/issues/12514))
+- Fix grammatical error in federation error response when the room version of a room is unknown. ([\#12483](https://github.com/matrix-org/synapse/issues/12483))
+- Fix a minor typo in the Debian changelogs generated by the release script. ([\#12497](https://github.com/matrix-org/synapse/issues/12497))
+- Remove unnecessary configuration overrides in tests. ([\#12511](https://github.com/matrix-org/synapse/issues/12511))
+- Refactor the relations code for clarity. ([\#12519](https://github.com/matrix-org/synapse/issues/12519))
+- Add type hints so `docker` and `stubs` directories pass `mypy --disallow-untyped-defs`. ([\#12528](https://github.com/matrix-org/synapse/issues/12528))
+- Handle cancellation in `EventsWorkerStore._get_events_from_cache_or_db`. ([\#12529](https://github.com/matrix-org/synapse/issues/12529))
+- Build debian packages for Ubuntu 22.04 "Jammy Jellyfish". ([\#12543](https://github.com/matrix-org/synapse/issues/12543))
+
+
 Synapse 1.57.1 (2022-04-20)
 ===========================
 
