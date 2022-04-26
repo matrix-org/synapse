@@ -27,7 +27,7 @@ Features
 - Implement [MSC3383](https://github.com/matrix-org/matrix-spec-proposals/pull/3383) for including the destination in server-to-server authentication headers. Contributed by @Bubu and @jcgruenhage for Famedly. ([\#11398](https://github.com/matrix-org/synapse/issues/11398))
 - Docker images and Debian packages from matrix.org now contain a locked set of Python dependencies, greatly improving build reproducibility. ([Board](https://github.com/orgs/matrix-org/projects/54), [\#11537](https://github.com/matrix-org/synapse/issues/11537))
 - Enable processing of device list updates asynchronously. ([\#12365](https://github.com/matrix-org/synapse/issues/12365), [\#12465](https://github.com/matrix-org/synapse/issues/12465))
-- Implement [MSC2815](https://github.com/matrix-org/matrix-spec-proposals/pull/2815) to allow room moderators to view redacted event content. Contributed by @tulir. ([\#12427](https://github.com/matrix-org/synapse/issues/12427))
+- Implement [MSC2815](https://github.com/matrix-org/matrix-spec-proposals/pull/2815) to allow room moderators to view redacted event content. Contributed by @tulir @ Beeper. ([\#12427](https://github.com/matrix-org/synapse/issues/12427))
 - Build Debian packages for Ubuntu 22.04 "Jammy Jellyfish". ([\#12543](https://github.com/matrix-org/synapse/issues/12543))
 
 
