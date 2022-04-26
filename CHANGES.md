@@ -1,11 +1,13 @@
 Synapse 1.58.0rc1 (2022-04-26)
 ==============================
 
+As of this release, the groups/communities feature in Synapse is now disabled by default. See [\#11584](https://github.com/matrix-org/synapse/issues/11584) for details. As mentioned in [the upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1580), this feature will be removed in Synapse 1.61.
+
 Features
 --------
 
 - Implement [MSC3383](https://github.com/matrix-org/matrix-spec-proposals/pull/3383) for including the destination in server-to-server authentication headers. Contributed by @Bubu and @jcgruenhage for Famedly. ([\#11398](https://github.com/matrix-org/synapse/issues/11398))
-- Docker images and Debian packages from matrix.org now contain a locked set of Python dependencies, greatly improving reproducibility. ([Board](https://github.com/orgs/matrix-org/projects/54), [\#11537](https://github.com/matrix-org/synapse/issues/11537))
+- Docker images and Debian packages from matrix.org now contain a locked set of Python dependencies, greatly improving build reproducibility. ([Board](https://github.com/orgs/matrix-org/projects/54), [\#11537](https://github.com/matrix-org/synapse/issues/11537))
 - Enable processing of device list updates asynchronously. ([\#12365](https://github.com/matrix-org/synapse/issues/12365), [\#12465](https://github.com/matrix-org/synapse/issues/12465))
 - Implement [MSC2815](https://github.com/matrix-org/matrix-spec-proposals/pull/2815) to allow room moderators to view redacted event content. Contributed by @tulir. ([\#12427](https://github.com/matrix-org/synapse/issues/12427))
 - Build Debian packages for Ubuntu 22.04 "Jammy Jellyfish". ([\#12543](https://github.com/matrix-org/synapse/issues/12543))
@@ -30,7 +32,7 @@ Improved Documentation
 - Add a manual documenting config file options. ([\#12368](https://github.com/matrix-org/synapse/issues/12368), [\#12527](https://github.com/matrix-org/synapse/issues/12527))
 - Update documentation to reflect that both the `run_background_tasks_on` option and the options for moving stream writers off of the main process are no longer experimental. ([\#12451](https://github.com/matrix-org/synapse/issues/12451))
 - Update worker documentation and replace old `federation_reader` with `generic_worker`. ([\#12457](https://github.com/matrix-org/synapse/issues/12457))
-- Strongly recommend Poetry for development. ([\#12475](https://github.com/matrix-org/synapse/issues/12475))
+- Strongly recommend [Poetry](https://python-poetry.org/) for development. ([\#12475](https://github.com/matrix-org/synapse/issues/12475))
 - Add some example configurations for workers and update architectural diagram. ([\#12492](https://github.com/matrix-org/synapse/issues/12492))
 - Fix a broken link in `README.rst`. ([\#12495](https://github.com/matrix-org/synapse/issues/12495))
 - Add HAProxy delegation example with CORS headers to docs. ([\#12501](https://github.com/matrix-org/synapse/issues/12501))
@@ -50,7 +52,7 @@ Internal Changes
 - Preparation for faster-room-join work: start a background process to resynchronise the room state after a room join. ([\#12394](https://github.com/matrix-org/synapse/issues/12394))
 - Preparation for faster-room-join work: Implement a tracking mechanism to allow functions to wait for full room state to arrive. ([\#12399](https://github.com/matrix-org/synapse/issues/12399))
 - Remove an unstable identifier from [MSC3083](https://github.com/matrix-org/matrix-doc/pull/3083). ([\#12395](https://github.com/matrix-org/synapse/issues/12395))
-- Run CI in the locked Poetry environment, and remove corresponding `tox` jobs. ([\#12425](https://github.com/matrix-org/synapse/issues/12425)), [\#12434](https://github.com/matrix-org/synapse/issues/12434), [\#12438](https://github.com/matrix-org/synapse/issues/12438), [\#12441](https://github.com/matrix-org/synapse/issues/12441), [\#12449](https://github.com/matrix-org/synapse/issues/12449), [\#12478](https://github.com/matrix-org/synapse/issues/12478), [\#12514](https://github.com/matrix-org/synapse/issues/12514), [\#12472](https://github.com/matrix-org/synapse/issues/12472))
+- Run CI in the locked [Poetry](https://python-poetry.org/) environment, and remove corresponding `tox` jobs. ([\#12425](https://github.com/matrix-org/synapse/issues/12425), [\#12434](https://github.com/matrix-org/synapse/issues/12434), [\#12438](https://github.com/matrix-org/synapse/issues/12438), [\#12441](https://github.com/matrix-org/synapse/issues/12441), [\#12449](https://github.com/matrix-org/synapse/issues/12449), [\#12478](https://github.com/matrix-org/synapse/issues/12478), [\#12514](https://github.com/matrix-org/synapse/issues/12514), [\#12472](https://github.com/matrix-org/synapse/issues/12472))
 - Change Mutual Rooms' `unstable_features` flag to `uk.half-shot.msc2666.mutual_rooms` which matches the current iteration of [MSC2666](https://github.com/matrix-org/matrix-spec-proposals/pull/2666). ([\#12445](https://github.com/matrix-org/synapse/issues/12445))
 - Fix typo in the release script help string. ([\#12450](https://github.com/matrix-org/synapse/issues/12450))
 - Fix a minor typo in the Debian changelogs generated by the release script. ([\#12497](https://github.com/matrix-org/synapse/issues/12497))
