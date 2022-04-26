@@ -1,0 +1,1 @@
+Fix sending opentracing contexts to whitelisted remote servers with device lists updates. Broken in v1.58.0rc1.
