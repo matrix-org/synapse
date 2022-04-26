@@ -1,3 +1,9 @@
+matrix-synapse-py3 (1.58.0~rc2) stable; urgency=medium
+
+  * New Synapse release 1.58.0rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 26 Apr 2022 17:14:56 +0100
+
 matrix-synapse-py3 (1.58.0~rc1) stable; urgency=medium
 
   * Use poetry to manage the bundled virtualenv included with this package.

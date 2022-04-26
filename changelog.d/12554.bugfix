@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse 1.58.0rc1 where the main process could consume excessive amounts of CPU and memory handling sentry logging failures.
