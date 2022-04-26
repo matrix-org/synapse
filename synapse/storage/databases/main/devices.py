@@ -1748,7 +1748,8 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                     device_id,
                     room_id,
                     stream_id,
-                    False,
+                    # We only need to calculate outbound pokes for local users
+                    not self.hs.is_mine_id(user_id),
                     encoded_context,
                 )
                 for room_id in room_ids
