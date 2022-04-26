@@ -5,6 +5,7 @@
 SELECT
    pg_size_pretty( pg_database_size( 'matrix' ) );
 ```
+
 ### Result example:
 ``` 
 pg_size_pretty 
@@ -14,6 +15,10 @@ pg_size_pretty
 ```
 
 ## Show top 20 larger rooms by state events count
+You get the same information when you use the
+[admin API](https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#list-room-api)
+and set parameter `order_by=state_events`.
+
 ```sql
 SELECT
   r.name,
@@ -43,6 +48,7 @@ GROUP BY
 ORDER BY
   COUNT(s.room_id) DESC LIMIT 20;
 ```
+
 plus same, but with join removed for performance reasons:
 ```sql
 SELECT
@@ -73,6 +79,7 @@ SELECT
 FROM
   <table_name>;
 ```
+
 ### Result example:
 ```
 state_groups_state - 161687170
@@ -117,6 +124,7 @@ ORDER BY
 ```
 
 ## Show top 20 users on homeserver by sent events (messages) at last month:
+Caution. This query does not use any indexes, can be slow and create load on the database.
 ```sql
 SELECT
   COUNT(*),
@@ -178,6 +186,7 @@ WHERE
 ORDER BY
   pg_total_relation_size(c.oid) DESC LIMIT 20;
 ```
+
 ### Result example:
 ```
 public.state_groups_state - 27 GB
@@ -243,6 +252,8 @@ ORDER BY
 ```
 
 ## Lookup room state info by list of room_id
+You get the same information when you use the
+[admin API](https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#room-details-api).
 ```sql
 SELECT
   rss.room_id,
