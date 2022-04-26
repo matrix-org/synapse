@@ -419,6 +419,13 @@ async def _event_to_memberships(
         return {}
 
     # for each event, get the event_ids of the membership state at those events.
+    #
+    # TODO: this means that we request the entire membership list. If there  are only
+    #   one or two users on this server, and the room is huge, this is very wasteful
+    #   (it means more db work, and churns the *stateGroupMembersCache*).
+    #   It might be that we could extend StateFilter to specify "give me keys matching
+    #   *:<server_name>", to avoid this.
+
     event_to_state_ids = await storage.state.get_state_ids_for_events(
         frozenset(e.event_id for e in events),
         state_filter=StateFilter.from_types(types=((EventTypes.Member, None),)),

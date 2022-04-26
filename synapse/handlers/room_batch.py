@@ -54,7 +54,7 @@ class RoomBatchHandler:
         # it has a larger `depth` but before the successor event because the `stream_ordering`
         # is negative before the successor event.
         successor_event_ids = await self.store.get_successor_events(
-            [most_recent_prev_event_id]
+            most_recent_prev_event_id
         )
 
         # If we can't find any successor events, then it's a forward extremity of
