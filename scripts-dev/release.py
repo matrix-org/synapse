@@ -167,9 +167,7 @@ def prepare():
     assert not parsed_new_version.is_devrelease
     assert not parsed_new_version.is_postrelease
 
-    release_branch_name = (
-        f"release-v{parsed_new_version.major}.{parsed_new_version.minor}"
-    )
+    release_branch_name = get_release_branch_name(parsed_new_version)
     release_branch = find_ref(repo, release_branch_name)
     if release_branch:
         if release_branch.is_remote():
@@ -288,6 +286,15 @@ def tag(gh_token: Optional[str]):
     if tag_name in repo.tags:
         raise click.ClickException(f"Tag {tag_name} already exists!\n")
 
+    # Check we're on the right release branch
+    release_branch = get_release_branch_name(current_version)
+    if repo.active_branch.name != release_branch:
+        click.echo(
+            f"Need to be on the release branch ({release_branch}) before tagging. "
+            f"Currently on ({repo.active_branch.name})."
+        )
+        click.get_current_context().abort()
+
     # Get the appropriate changelogs and tag.
     changes = get_changes_for_version(current_version)
 
@@ -295,13 +302,6 @@ def tag(gh_token: Optional[str]):
     if click.confirm("Edit text?", default=False):
         changes = click.edit(changes, require_save=False)
 
-    commit = repo.head.commit
-    click.echo(
-        f"{repo.head.ref} {commit} {commit.summary!r}\n"
-        f"by {commit.author} <{commit.author.email}>, "
-        f"committed at {commit.committed_datetime}"
-    )
-    click.confirm(f"Tag this commit as {tag_name}?", default=False, abort=True)
     repo.create_tag(tag_name, message=changes, sign=True)
 
     if not click.confirm("Push tag to GitHub?", default=True):
@@ -464,6 +464,10 @@ def get_package_version() -> version.Version:
         "utf-8"
     )
     return version.Version(version_string)
+
+
+def get_release_branch_name(version_number: version.Version) -> str:
+    return f"release-v{version_number.major}.{version_number.minor}"
 
 
 def find_ref(repo: git.Repo, ref_name: str) -> Optional[git.HEAD]:
