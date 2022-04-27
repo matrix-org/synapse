@@ -625,6 +625,22 @@ class RoomStreamToken:
             return "s%d" % (self.stream,)
 
 
+class StreamKeyType:
+    """Known stream types.
+
+    A stream is a list of entities ordered by an incrementing "stream token".
+    """
+
+    ROOM = "room_key"
+    PRESENCE = "presence_key"
+    TYPING = "typing_key"
+    RECEIPT = "receipt_key"
+    ACCOUNT_DATA = "account_data_key"
+    PUSH_RULES = "push_rules_key"
+    TO_DEVICE = "to_device_key"
+    DEVICE_LIST = "device_list_key"
+
+
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class StreamToken:
     """A collection of keys joined together by underscores in the following
