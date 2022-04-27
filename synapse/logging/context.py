@@ -722,6 +722,11 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
+async def _unwrap_awaitable(awaitable: Awaitable[R]) -> R:
+    """Unwraps an arbitrary awaitable by awaiting it."""
+    return await awaitable
+
+
 @overload
 def preserve_fn(  # type: ignore[misc]
     f: Callable[P, Awaitable[R]],
@@ -812,10 +817,7 @@ def run_in_background(  # type: ignore[misc]
     elif isinstance(res, Awaitable):
         # `res` is probably some kind of completed awaitable, such as a `DoneAwaitable`
         # or `Future` from `make_awaitable`.
-        async def awaiter(awaitable: Awaitable[R]) -> R:
-            return await awaitable
-
-        res = defer.ensureDeferred(awaiter(res))
+        res = defer.ensureDeferred(_unwrap_awaitable(res))
     else:
         # `res` is a plain value. Wrap it in a `Deferred`.
         res = defer.succeed(res)
