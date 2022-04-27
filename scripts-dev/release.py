@@ -87,7 +87,7 @@ def prepare():
     """
 
     # Make sure we're in a git repo.
-    repo = get_repo()
+    repo = get_repo_and_check_clean_checkout()
 
     click.secho("Updating git repo...")
     repo.remote().fetch()
@@ -261,7 +261,7 @@ def tag(gh_token: Optional[str]):
     """Tags the release and generates a draft GitHub release"""
 
     # Make sure we're in a git repo.
-    repo = get_repo()
+    repo = get_repo_and_check_clean_checkout()
 
     click.secho("Updating git repo...")
     repo.remote().fetch()
@@ -346,7 +346,7 @@ def publish(gh_token: str):
     """Publish release on GitHub."""
 
     # Make sure we're in a git repo.
-    get_repo()
+    get_repo_and_check_clean_checkout()
 
     current_version = get_package_version()
     tag_name = f"v{current_version}"
@@ -386,7 +386,7 @@ def upload():
     tag_name = f"v{current_version}"
 
     # Check we have the right tag checked out.
-    repo = get_repo()
+    repo = get_repo_and_check_clean_checkout()
     tag = repo.tag(f"refs/tags/{tag_name}")
     if repo.head.commit != tag.commit:
         click.echo("Tag {tag_name} (tag.commit) is not currently checked out!")
@@ -459,7 +459,7 @@ def get_release_branch_name(version_number: version.Version) -> str:
     return f"release-v{version_number.major}.{version_number.minor}"
 
 
-def get_repo() -> git.Repo:
+def get_repo_and_check_clean_checkout() -> git.Repo:
     """Get the project repo and check it's not got any uncommitted changes."""
     try:
         repo = git.Repo()
