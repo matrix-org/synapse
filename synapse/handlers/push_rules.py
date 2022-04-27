@@ -37,12 +37,13 @@ class PushRulesHandler:
 
     def __init__(self, hs: "HomeServer"):
         self._notifier = hs.get_notifier()
-        self._store = hs.get_datastores().main
+        self._main_store = hs.get_datastores().main
 
     async def set_rule_attr(
         self, user_id: str, spec: RuleSpec, val: Union[bool, JsonDict]
     ) -> None:
-        """Set an attribute (enabled or actions) on an existing push rule.
+        """Set an attribute (enabled or actions) on an existing push rule, and notify
+        listeners (e.g. sync handler) of the change.
 
         Args:
             user_id: the user for which to modify the push rule.
@@ -76,7 +77,7 @@ class PushRulesHandler:
                 # This should *actually* take a dict, but many clients pass
                 # bools directly, so let's not break them.
                 raise SynapseError(400, "Value for 'enabled' must be boolean")
-            await self._store.set_push_rule_enabled(
+            await self._main_store.set_push_rule_enabled(
                 user_id, namespaced_rule_id, val, is_default_rule
             )
         elif spec.attr == "actions":
@@ -93,7 +94,7 @@ class PushRulesHandler:
                     raise RuleNotFoundException(
                         "Unknown rule %r" % (namespaced_rule_id,)
                     )
-            await self._store.set_push_rule_actions(
+            await self._main_store.set_push_rule_actions(
                 user_id, namespaced_rule_id, actions, is_default_rule
             )
         else:
@@ -107,7 +108,7 @@ class PushRulesHandler:
         Args:
             user_id: the user ID the change is for.
         """
-        stream_id = self._store.get_max_push_rules_stream_id()
+        stream_id = self._main_store.get_max_push_rules_stream_id()
         self._notifier.on_new_event("push_rules_key", stream_id, users=[user_id])
 
 

@@ -618,7 +618,7 @@ class PushRuleStore(PushRulesWorkerStore):
                 are always stored in the database `push_rules` table).
 
         Raises:
-            NotFoundError if the rule does not exist.
+            RuleNotFoundException if the rule does not exist.
         """
         async with self._push_rules_stream_id_gen.get_next() as stream_id:
             event_stream_ordering = self._stream_id_gen.get_current_token()
@@ -697,9 +697,6 @@ class PushRuleStore(PushRulesWorkerStore):
         """
         Sets the `actions` state of a push rule.
 
-        Will throw NotFoundError if the rule does not exist; the Code for this
-        is NOT_FOUND.
-
         Args:
             user_id: the user ID of the user who wishes to enable/disable the rule
                 e.g. '@tina:example.org'
@@ -711,6 +708,9 @@ class PushRuleStore(PushRulesWorkerStore):
             is_default_rule: True if and only if this is a server-default rule.
                 This skips the check for existence (as only user-created rules
                 are always stored in the database `push_rules` table).
+
+        Raises:
+            RuleNotFoundException if the rule does not exist.
         """
         actions_json = json_encoder.encode(actions)
 
