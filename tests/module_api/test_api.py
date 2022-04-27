@@ -635,6 +635,13 @@ class ModuleApiTestCase(HomeserverTestCase):
             [{"set_tweak": "sound", "value": "default"}]
         )
 
+    def test_normalize_username(self) -> None:
+       username = "Haxxor"
+       username2 = "_leet"
+       username3 = "aNoThErTeSt"
+       self.assertEqual(self.module_api.normalize_username(username), "haxxor")
+       self.assertEqual(self.module_api.normalize_username(username2), "=5fleet")
+       self.assertEqual(self.module_api.normalize_username(username3), "anothertest")
 
 class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
     """For testing ModuleApi functionality in a multi-worker setup"""
