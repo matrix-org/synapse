@@ -355,6 +355,39 @@ class FederationSender(AbstractFederationSender):
                     if not is_mine and send_on_behalf_of is None:
                         return
 
+                    # We also want to not send out-of-band membership events.
+                    #
+                    # OOB memberships are used in three (and a half) situations:
+                    #
+                    # (1) invite events which we have received over federation. Those
+                    #     will have a `sender` on a different server, so will be
+                    #     skipped by the "is_mine" test above anyway.
+                    #
+                    # (2) rejections of invites to federated rooms. These are normally
+                    #     created via federation (in which case the remote server is
+                    #     responsible for sending out the rejection). If that fails,
+                    #     we'll create a leave event locally, but that's only really
+                    #     for the benefit of the invited user - we don't have enough
+                    #     information to send it out over federation.
+                    #
+                    # (2a) rescinded knocks. These are identical to rejected invites.
+                    #
+                    # (3) knock events which we have sent over federation. As with
+                    #     invite rejections, the remote server should send them out to
+                    #     the federation.
+                    #
+                    # So, in all the above cases, we want to ignore such events.
+                    #
+                    # OOB memberships are always(?) outliers anyway, so if we *don't*
+                    # ignore them, we'll get an exception further down when we try to
+                    # fetch the membership list for the room.
+                    #
+                    if event.internal_metadata.is_out_of_band_membership():
+                        return
+
+                    # Finally, there are some other events that we should not send out
+                    # until someone asks for them. They are explicitly flagged as such
+                    # with `proactively_send: False`.
                     if not event.internal_metadata.should_proactively_send():
                         return
 
