@@ -38,6 +38,7 @@ from synapse.types import (
     JsonDict,
     RoomAlias,
     RoomStreamToken,
+    StreamKeyType,
     UserID,
 )
 from synapse.util.async_helpers import Linearizer
@@ -213,7 +214,7 @@ class ApplicationServicesHandler:
         Args:
             stream_key: The stream the event came from.
 
-                `stream_key` can be "typing_key", "receipt_key", "presence_key",
+                `stream_key` can be "typing_key", "receipt_key", StreamKeyType.PRESENCE,
                 "to_device_key" or "device_list_key". Any other value for `stream_key`
                 will cause this function to return early.
 
@@ -237,7 +238,7 @@ class ApplicationServicesHandler:
         if stream_key not in (
             "typing_key",
             "receipt_key",
-            "presence_key",
+            StreamKeyType.PRESENCE,
             "to_device_key",
             "device_list_key",
         ):
@@ -285,7 +286,7 @@ class ApplicationServicesHandler:
                 in (
                     "typing_key",
                     "receipt_key",
-                    "presence_key",
+                    StreamKeyType.PRESENCE,
                     "to_device_key",
                 )
                 and service.supports_ephemeral
@@ -342,7 +343,7 @@ class ApplicationServicesHandler:
                             service, "read_receipt", new_token
                         )
 
-                    elif stream_key == "presence_key":
+                    elif stream_key == StreamKeyType.PRESENCE:
                         events = await self._handle_presence(service, users, new_token)
                         self.scheduler.enqueue_for_appservice(service, ephemeral=events)
 
