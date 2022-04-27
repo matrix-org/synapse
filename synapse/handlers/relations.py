@@ -405,12 +405,18 @@ class RelationsHandler:
             latest_thread_event = thread.latest_event
             if latest_thread_event and latest_thread_event.event_id not in events_by_id:
                 events_by_id[latest_thread_event.event_id] = latest_thread_event
-                # The latest event in the thread must have a thread relation.
+                # Keep relations_by_id in sync with events_by_id:
+                #
+                # We know that the latest event in a thread has a thread relation
+                # (as that is what makes it part of the thread).
                 relations_by_id[latest_thread_event.event_id] = RelationTypes.THREAD
 
         # Fetch other relations per event.
         for event in events_by_id.values():
-            # Edits and annotations may not have related annotations or references.
+            # An event which is a replacement (ie edit) or annotation (ie, reaction)
+            # may not have any other event related to it.
+            #
+            # XXX This is buggy, see https://github.com/matrix-org/synapse/issues/12566
             if relations_by_id.get(event.event_id) in (
                 RelationTypes.ANNOTATION,
                 RelationTypes.REPLACE,
