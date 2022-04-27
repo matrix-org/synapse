@@ -43,8 +43,8 @@ class RegistrationConfig(Config):
         self.registration_requires_token = config.get(
             "registration_requires_token", False
         )
-        self.registration_token_without_3pids = config.get(
-            "registration_token_without_3pids", False
+        self.enable_registration_token_3pid_bypasss = config.get(
+            "enable_registration_token_3pid_bypasss", False
         )
         self.registration_shared_secret = config.get("registration_shared_secret")
 
@@ -312,15 +312,11 @@ class RegistrationConfig(Config):
         #
         #registration_requires_token: true
 
-        # Allow users to submit a token during registration without requiring them to complete any
-        # 3pid steps.
-        # Tokens can be managed using the admin API:
-        # https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/registration_tokens.html
-        # Note that `enable_registration` must be set to `true`.
-        # Disabling this option will not delete any tokens previously generated.
-        # Defaults to false. Uncomment the following to require tokens:
+        # Allow users to submit a token during registration to bypass any required 3pid
+        # steps configured in `registrations_require_3pid`.
+        # Defaults to false, requiring that registration tokens (if enabled) complete a 3pid flow.
         #
-        #registration_token_without_3pid: false
+        #enable_registration_token_3pid_bypass: false
 
         # If set, allows registration of standard or admin accounts by anyone who
         # has the shared secret, even if registration is otherwise disabled.

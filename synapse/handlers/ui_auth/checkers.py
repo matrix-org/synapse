@@ -258,7 +258,7 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
         self.hs = hs
         self._enabled = bool(
             hs.config.registration.registration_requires_token
-        ) or bool(hs.config.registration.registration_token_without_3pids)
+        ) or bool(hs.config.registration.enable_registration_token_3pid_bypasss)
         self.store = hs.get_datastores().main
 
     def is_enabled(self) -> bool:
