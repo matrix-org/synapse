@@ -117,7 +117,7 @@ from synapse.types import (
     UserInfo,
     UserProfile,
     create_requester,
-    map_username_to_mxid_localpart
+    map_username_to_mxid_localpart,
 )
 from synapse.util import Clock
 from synapse.util.async_helpers import maybe_awaitable
@@ -574,7 +574,8 @@ class ModuleApi:
             return username
         return UserID(username, self._hs.hostname).to_string()
 
-    def normalize_username(self, username: Union[str, bytes]
+    def normalize_username(
+        self, username: Union[str, bytes], case_sensitive: bool = False
     ) -> str:
         """Map a username onto a string suitable for a MXID
 
@@ -582,11 +583,13 @@ class ModuleApi:
 
         Args:
             username: username to be mapped
+            case_sensitive: true if TEST and test should be mapped
+            onto different mxids
 
             Returns:
                 string suitable for a mxid localpart
-            """
-        return map_username_to_mxid_localpart(username)
+        """
+        return map_username_to_mxid_localpart(username, case_sensitive)
 
     async def get_profile_for_user(self, localpart: str) -> ProfileInfo:
         """Look up the profile info for the user with the given localpart.
