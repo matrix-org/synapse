@@ -752,9 +752,9 @@ class StreamToken:
         """Advance the given key in the token to a new value if and only if the
         new value is after the old value.
         """
-        if key == "room_key":
+        if key == StreamKeyType.ROOM:
             new_token = self.copy_and_replace(
-                "room_key", self.room_key.copy_and_advance(new_value)
+                StreamKeyType.ROOM, self.room_key.copy_and_advance(new_value)
             )
             return new_token
 
