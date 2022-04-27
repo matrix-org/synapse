@@ -302,6 +302,9 @@ def tag(gh_token: Optional[str]) -> None:
     click.echo_via_pager(changes)
     if click.confirm("Edit text?", default=False):
         edited_changes = click.edit(changes, require_save=False)
+        # This assert is for mypy's benefit. click's docs are a little unclear, but
+        # when `require_save=False`, not saving the temp file in the editor returns
+        # the original string.
         assert edited_changes is not None
         changes = edited_changes
 
