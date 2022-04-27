@@ -215,7 +215,7 @@ class ApplicationServicesHandler:
             stream_key: The stream the event came from.
 
                 `stream_key` can be StreamKeyType.TYPING, StreamKeyType.RECEIPT, StreamKeyType.PRESENCE,
-                StreamKeyType.TO_DEVICE or "device_list_key". Any other value for `stream_key`
+                StreamKeyType.TO_DEVICE or StreamKeyType.DEVICE_LIST. Any other value for `stream_key`
                 will cause this function to return early.
 
                 Ephemeral events will only be pushed to appservices that have opted into
@@ -240,7 +240,7 @@ class ApplicationServicesHandler:
             StreamKeyType.RECEIPT,
             StreamKeyType.PRESENCE,
             StreamKeyType.TO_DEVICE,
-            "device_list_key",
+            StreamKeyType.DEVICE_LIST,
         ):
             return
 
@@ -266,7 +266,7 @@ class ApplicationServicesHandler:
 
         # Ignore device lists if the feature flag is not enabled
         if (
-            stream_key == "device_list_key"
+            stream_key == StreamKeyType.DEVICE_LIST
             and not self._msc3202_transaction_extensions_enabled
         ):
             return
@@ -292,7 +292,7 @@ class ApplicationServicesHandler:
                 and service.supports_ephemeral
             )
             or (
-                stream_key == "device_list_key"
+                stream_key == StreamKeyType.DEVICE_LIST
                 and service.msc3202_transaction_extensions
             )
         ]
@@ -367,7 +367,7 @@ class ApplicationServicesHandler:
                             service, "to_device", new_token
                         )
 
-                    elif stream_key == "device_list_key":
+                    elif stream_key == StreamKeyType.DEVICE_LIST:
                         device_list_summary = await self._get_device_list_summary(
                             service, new_token
                         )
