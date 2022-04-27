@@ -27,7 +27,6 @@ from typing import (
 )
 
 import attr
-from frozendict import frozendict
 
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
 from synapse.api.errors import Codes, SynapseError
@@ -204,7 +203,9 @@ def _copy_field(src: JsonDict, dst: JsonDict, field: List[str]) -> None:
     key_to_move = field.pop(-1)
     sub_dict = src
     for sub_field in field:  # e.g. sub_field => "content"
-        if sub_field in sub_dict and type(sub_dict[sub_field]) in [dict, frozendict]:
+        if sub_field in sub_dict and isinstance(
+            sub_dict[sub_field], collections.abc.Mapping
+        ):
             sub_dict = sub_dict[sub_field]
         else:
             return
@@ -622,7 +623,7 @@ def validate_canonicaljson(value: Any) -> None:
         # Note that Infinity, -Infinity, and NaN are also considered floats.
         raise SynapseError(400, "Bad JSON value: float", Codes.BAD_JSON)
 
-    elif isinstance(value, (dict, frozendict)):
+    elif isinstance(value, collections.abc.Mapping):
         for v in value.values():
             validate_canonicaljson(v)
 
