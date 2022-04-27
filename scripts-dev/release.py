@@ -346,7 +346,7 @@ def publish(gh_token: str):
     """Publish release on GitHub."""
 
     # Make sure we're in a git repo.
-    repo = get_repo()
+    get_repo()
 
     current_version = get_package_version()
     tag_name = f"v{current_version}"
