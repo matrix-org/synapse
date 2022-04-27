@@ -11,26 +11,36 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Optional
+from typing import Any, Mapping, Optional
 from unittest.mock import Mock
+
+from frozendict import frozendict
 
 from synapse.config import ConfigError
 from synapse.config.workers import WorkerConfig
 
 from tests.unittest import TestCase
 
+_EMPTY_FROZENDICT: Mapping[str, Any] = frozendict()
+
 
 class WorkerDutyConfigTestCase(TestCase):
     def _make_worker_config(
-        self, worker_app: str, worker_name: Optional[str]
+        self,
+        worker_app: str,
+        worker_name: Optional[str],
+        extras: Mapping[str, Any] = _EMPTY_FROZENDICT,
     ) -> WorkerConfig:
         root_config = Mock()
         root_config.worker_app = worker_app
         root_config.worker_name = worker_name
         worker_config = WorkerConfig(root_config)
-        worker_config.read_config(
-            {"worker_name": worker_name, "worker_app": worker_app}
-        )
+        worker_config_dict = {
+            "worker_name": worker_name,
+            "worker_app": worker_app,
+            **extras,
+        }
+        worker_config.read_config(worker_config_dict)
         return worker_config
 
     def test_old_configs_master(self) -> None:
@@ -77,7 +87,13 @@ class WorkerDutyConfigTestCase(TestCase):
         Tests old (legacy) config options. This is for the worker's config.
         """
         appservice_worker_config = self._make_worker_config(
-            worker_app="synapse.app.appservice", worker_name="worker1"
+            worker_app="synapse.app.appservice",
+            worker_name="worker1",
+            extras={
+                # Set notify_appservices to false for the initialiser's config,
+                # so that it doesn't raise an exception here.
+                "notify_appservices": False,
+            },
         )
 
         with self.assertRaises(ConfigError):
@@ -179,7 +195,13 @@ class WorkerDutyConfigTestCase(TestCase):
         Tests transitional (legacy + new) config options. This is for the worker's config.
         """
         appservice_worker_config = self._make_worker_config(
-            worker_app="synapse.app.appservice", worker_name="worker1"
+            worker_app="synapse.app.appservice",
+            worker_name="worker1",
+            extras={
+                # Set notify_appservices to false for the initialiser's config,
+                # so that it doesn't raise an exception here.
+                "notify_appservices": False,
+            },
         )
 
         self.assertTrue(
