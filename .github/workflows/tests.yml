@@ -20,7 +20,7 @@ jobs:
       - run: scripts-dev/config-lint.sh
 
   lint:
-    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@dmr/extras-for-typechecking"
+    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v1"
     with:
       typechecking-extras: "all"
 
