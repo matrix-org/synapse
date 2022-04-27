@@ -14,7 +14,6 @@
 from http import HTTPStatus
 from unittest.mock import Mock
 
-from twisted.internet import defer
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.handlers.presence import PresenceHandler
@@ -24,6 +23,7 @@ from synapse.types import UserID
 from synapse.util import Clock
 
 from tests import unittest
+from tests.test_utils import make_awaitable
 
 
 class PresenceTestCase(unittest.HomeserverTestCase):
@@ -37,7 +37,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
 
         presence_handler = Mock(spec=PresenceHandler)
-        presence_handler.set_state.return_value = defer.succeed(None)
+        presence_handler.set_state.return_value = make_awaitable(None)
 
         hs = self.setup_test_homeserver(
             "red",

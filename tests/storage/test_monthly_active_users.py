@@ -14,7 +14,6 @@
 from typing import Any, Dict, List
 from unittest.mock import Mock
 
-from twisted.internet import defer
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import UserTypes
@@ -259,10 +258,10 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
     def test_populate_monthly_users_should_update(self):
         self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))  # type: ignore[assignment]
 
-        self.store.is_trial_user = Mock(return_value=defer.succeed(False))  # type: ignore[assignment]
+        self.store.is_trial_user = Mock(return_value=make_awaitable(False))  # type: ignore[assignment]
 
         self.store.user_last_seen_monthly_active = Mock(
-            return_value=defer.succeed(None)
+            return_value=make_awaitable(None)
         )
         d = self.store.populate_monthly_active_users("user_id")
         self.get_success(d)
@@ -272,9 +271,9 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
     def test_populate_monthly_users_should_not_update(self):
         self.store.upsert_monthly_active_user = Mock(return_value=make_awaitable(None))  # type: ignore[assignment]
 
-        self.store.is_trial_user = Mock(return_value=defer.succeed(False))  # type: ignore[assignment]
+        self.store.is_trial_user = Mock(return_value=make_awaitable(False))  # type: ignore[assignment]
         self.store.user_last_seen_monthly_active = Mock(
-            return_value=defer.succeed(self.hs.get_clock().time_msec())
+            return_value=make_awaitable(self.hs.get_clock().time_msec())
         )
 
         d = self.store.populate_monthly_active_users("user_id")
