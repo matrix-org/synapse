@@ -432,7 +432,7 @@ class RelationsHandler:
                     event.event_id, BundledAggregations()
                 ).annotations = {"chunk": annotations}
 
-            # Fetch any references (ie, replies) to bundle with this event.
+            # Fetch any references to bundle with this event.
             references, next_token = await self.get_relations_for_event(
                 event.event_id,
                 event,
