@@ -54,7 +54,7 @@ skip_gitignore = true
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.57.1"
+version = "1.58.0rc2"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -271,7 +271,6 @@ idna = ">=2.5"
 
 # The following are used by the release script
 click = "==8.1.0"
-redbaron = "==0.9.2"
 # GitPython was == 3.1.14; bumped to 3.1.20, the first release with type hints.
 GitPython = ">=3.1.20"
 commonmark = "==0.9.1"

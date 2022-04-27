@@ -278,7 +278,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                 ] = one_time_key_counts
             if unused_fallback_keys:
                 body[
-                    "org.matrix.msc3202.device_unused_fallback_keys"
+                    "org.matrix.msc3202.device_unused_fallback_key_types"
                 ] = unused_fallback_keys
             if device_list_summary:
                 body["org.matrix.msc3202.device_lists"] = {
