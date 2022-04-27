@@ -43,7 +43,7 @@ class PushRulesHandler:
         self, user_id: str, spec: RuleSpec, val: Union[bool, JsonDict]
     ) -> None:
         """Set an attribute (enabled or actions) on an existing push rule.
-        
+
         Notifies listeners (e.g. sync handler) of the change.
 
         Args:
