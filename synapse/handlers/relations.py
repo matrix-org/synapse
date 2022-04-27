@@ -391,7 +391,7 @@ class RelationsHandler:
 
         # Fetch thread summaries (but only for the directly requested events).
         threads = await self.get_threads_for_events(
-            # It is not valid to start a thread on an event which already has a relation.
+            # It is not valid to start a thread on an event which itself relates to another event.
             [eid for eid in events_by_id.keys() if eid not in relations_by_id],
             user_id,
             ignored_users,
