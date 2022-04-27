@@ -215,7 +215,7 @@ class ApplicationServicesHandler:
             stream_key: The stream the event came from.
 
                 `stream_key` can be StreamKeyType.TYPING, StreamKeyType.RECEIPT, StreamKeyType.PRESENCE,
-                "to_device_key" or "device_list_key". Any other value for `stream_key`
+                StreamKeyType.TO_DEVICE or "device_list_key". Any other value for `stream_key`
                 will cause this function to return early.
 
                 Ephemeral events will only be pushed to appservices that have opted into
@@ -239,7 +239,7 @@ class ApplicationServicesHandler:
             StreamKeyType.TYPING,
             StreamKeyType.RECEIPT,
             StreamKeyType.PRESENCE,
-            "to_device_key",
+            StreamKeyType.TO_DEVICE,
             "device_list_key",
         ):
             return
@@ -259,7 +259,7 @@ class ApplicationServicesHandler:
 
         # Ignore to-device messages if the feature flag is not enabled
         if (
-            stream_key == "to_device_key"
+            stream_key == StreamKeyType.TO_DEVICE
             and not self._msc2409_to_device_messages_enabled
         ):
             return
@@ -287,7 +287,7 @@ class ApplicationServicesHandler:
                     StreamKeyType.TYPING,
                     StreamKeyType.RECEIPT,
                     StreamKeyType.PRESENCE,
-                    "to_device_key",
+                    StreamKeyType.TO_DEVICE,
                 )
                 and service.supports_ephemeral
             )
@@ -352,7 +352,7 @@ class ApplicationServicesHandler:
                             service, "presence", new_token
                         )
 
-                    elif stream_key == "to_device_key":
+                    elif stream_key == StreamKeyType.TO_DEVICE:
                         # Retrieve a list of to-device message events, as well as the
                         # maximum stream token of the messages we were able to retrieve.
                         to_device_messages = await self._get_to_device_messages(

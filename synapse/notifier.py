@@ -443,7 +443,7 @@ class Notifier:
             for room in rooms:
                 user_streams |= self.room_to_user_streams.get(room, set())
 
-            if stream_key == "to_device_key":
+            if stream_key == StreamKeyType.TO_DEVICE:
                 issue9533_logger.debug(
                     "to-device messages stream id %s, awaking streams for %s",
                     new_token,
