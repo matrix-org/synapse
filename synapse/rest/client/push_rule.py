@@ -32,7 +32,7 @@ from synapse.push.clientformat import format_push_rules_for_user
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 from synapse.rest.client._base import client_patterns
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
-from synapse.types import JsonDict
+from synapse.types import JsonDict, StreamKeyType
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
