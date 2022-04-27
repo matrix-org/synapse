@@ -214,7 +214,7 @@ class ApplicationServicesHandler:
         Args:
             stream_key: The stream the event came from.
 
-                `stream_key` can be StreamKeyType.TYPING, "receipt_key", StreamKeyType.PRESENCE,
+                `stream_key` can be StreamKeyType.TYPING, StreamKeyType.RECEIPT, StreamKeyType.PRESENCE,
                 "to_device_key" or "device_list_key". Any other value for `stream_key`
                 will cause this function to return early.
 
@@ -237,7 +237,7 @@ class ApplicationServicesHandler:
         # FIXME: We should use constants for these values.
         if stream_key not in (
             StreamKeyType.TYPING,
-            "receipt_key",
+            StreamKeyType.RECEIPT,
             StreamKeyType.PRESENCE,
             "to_device_key",
             "device_list_key",
@@ -285,7 +285,7 @@ class ApplicationServicesHandler:
                 stream_key
                 in (
                     StreamKeyType.TYPING,
-                    "receipt_key",
+                    StreamKeyType.RECEIPT,
                     StreamKeyType.PRESENCE,
                     "to_device_key",
                 )
@@ -334,7 +334,7 @@ class ApplicationServicesHandler:
                 async with self._ephemeral_events_linearizer.queue(
                     (service.id, stream_key)
                 ):
-                    if stream_key == "receipt_key":
+                    if stream_key == StreamKeyType.RECEIPT:
                         events = await self._handle_receipts(service, new_token)
                         self.scheduler.enqueue_for_appservice(service, ephemeral=events)
 
