@@ -42,8 +42,9 @@ class PushRulesHandler:
     async def set_rule_attr(
         self, user_id: str, spec: RuleSpec, val: Union[bool, JsonDict]
     ) -> None:
-        """Set an attribute (enabled or actions) on an existing push rule, and notify
-        listeners (e.g. sync handler) of the change.
+        """Set an attribute (enabled or actions) on an existing push rule.
+        
+        Notifies listeners (e.g. sync handler) of the change.
 
         Args:
             user_id: the user for which to modify the push rule.
