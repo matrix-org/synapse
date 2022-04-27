@@ -372,12 +372,12 @@ class RelationsHandler:
         }
 
         # A map of event ID to the relation in that event, if there is one.
-        relations_by_id = {}
+        relations_by_id: Dict[str, str] = {}
         for event_id, event in events_by_id.items():
             relates_to = event.content.get("m.relates_to")
             if isinstance(relates_to, collections.abc.Mapping):
                 relation_type = relates_to.get("rel_type")
-                if relation_type is not None:
+                if isinstance(relation_type, str):
                     relations_by_id[event_id] = relation_type
 
         # event ID -> bundled aggregation in non-serialized form.
