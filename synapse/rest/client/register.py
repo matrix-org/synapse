@@ -929,13 +929,8 @@ def _calculate_registration_flows(
         # always let users provide both MSISDN & email
         flows.append([LoginType.MSISDN, LoginType.EMAIL_IDENTITY])
 
-    # Prepend registration token to all flows if we're requiring a token
-    if config.registration.registration_requires_token:
-        for flow in flows:
-            flow.insert(0, LoginType.REGISTRATION_TOKEN)
-
     # Add a flow that doesn't require any 3pids, if the config requests it.
-    if config.registration.registration_token_without_3pids:
+    if config.registration.enable_registration_token_3pid_bypasss:
         flows.append([LoginType.REGISTRATION_TOKEN])
 
     # Prepend m.login.terms to all flows if we're requiring consent
@@ -947,6 +942,12 @@ def _calculate_registration_flows(
     if config.captcha.enable_registration_captcha:
         for flow in flows:
             flow.insert(0, LoginType.RECAPTCHA)
+
+    # Prepend registration token to all flows if we're requiring a token
+    if config.registration.registration_requires_token:
+        for flow in flows:
+            if LoginType.REGISTRATION_TOKEN not in flow:
+                flow.insert(0, LoginType.REGISTRATION_TOKEN)
 
     return flows
 
