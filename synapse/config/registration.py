@@ -43,6 +43,9 @@ class RegistrationConfig(Config):
         self.registration_requires_token = config.get(
             "registration_requires_token", False
         )
+        self.enable_registration_token_3pid_bypasss = config.get(
+            "enable_registration_token_3pid_bypasss", False
+        )
         self.registration_shared_secret = config.get("registration_shared_secret")
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
@@ -308,6 +311,12 @@ class RegistrationConfig(Config):
         # Defaults to false. Uncomment the following to require tokens:
         #
         #registration_requires_token: true
+
+        # Allow users to submit a token during registration to bypass any required 3pid
+        # steps configured in `registrations_require_3pid`.
+        # Defaults to false, requiring that registration tokens (if enabled) complete a 3pid flow.
+        #
+        #enable_registration_token_3pid_bypass: false
 
         # If set, allows registration of standard or admin accounts by anyone who
         # has the shared secret, even if registration is otherwise disabled.

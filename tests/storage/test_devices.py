@@ -29,7 +29,7 @@ class DeviceStoreTestCase(HomeserverTestCase):
         for device_id in device_ids:
             stream_id = self.get_success(
                 self.store.add_device_change_to_streams(
-                    "user_id", [device_id], ["!some:room"]
+                    user_id, [device_id], ["!some:room"]
                 )
             )
 

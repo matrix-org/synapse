@@ -228,13 +228,14 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         return events, to_key
 
     async def get_new_events_as(
-        self, from_key: int, service: ApplicationService
+        self, from_key: int, to_key: int, service: ApplicationService
     ) -> Tuple[List[JsonDict], int]:
         """Returns a set of new read receipt events that an appservice
         may be interested in.
 
         Args:
             from_key: the stream position at which events should be fetched from
+            to_key: the stream position up to which events should be fetched to
             service: The appservice which may be interested
 
         Returns:
@@ -244,7 +245,6 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
                 * The current read receipt stream token.
         """
         from_key = int(from_key)
-        to_key = self.get_current_key()
 
         if from_key == to_key:
             return [], to_key
