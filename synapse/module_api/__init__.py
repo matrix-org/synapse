@@ -22,7 +22,6 @@ from typing import (
     Generator,
     Iterable,
     List,
-    Mapping,
     Optional,
     Tuple,
     TypeVar,
@@ -110,6 +109,7 @@ from synapse.storage.state import StateFilter
 from synapse.types import (
     DomainSpecificString,
     JsonDict,
+    JsonMapping,
     Requester,
     StateMap,
     UserID,
@@ -152,6 +152,7 @@ __all__ = [
     "PRESENCE_ALL_USERS",
     "LoginResponse",
     "JsonDict",
+    "JsonMapping",
     "EventBase",
     "StateMap",
     "ProfileInfo",
@@ -1420,9 +1421,7 @@ class AccountDataManager:
                 f"{user_id} is not local to this homeserver; can't access account data for remote users."
             )
 
-    async def get_global(
-        self, user_id: str, data_type: str
-    ) -> Optional[Mapping[str, Any]]:
+    async def get_global(self, user_id: str, data_type: str) -> Optional[JsonMapping]:
         """
         Gets some global account data, of a specified type, for the specified user.
 
