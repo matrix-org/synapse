@@ -22,6 +22,7 @@ from synapse.api.constants import (
 )
 from synapse.api.errors import AuthError, ResourceLimitError, SynapseError
 from synapse.server_notices.server_notices_manager import SERVER_NOTICE_ROOM_TAG
+from synapse.types import StreamKeyType
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -179,7 +180,9 @@ class ResourceLimitsServerNotices:
             max_id = await self._account_data_handler.add_tag_to_room(
                 user_id, room_id, SERVER_NOTICE_ROOM_TAG, {}
             )
-            self._notifier.on_new_event("account_data_key", max_id, users=[user_id])
+            self._notifier.on_new_event(
+                StreamKeyType.ACCOUNT_DATA, max_id, users=[user_id]
+            )
 
     async def _is_room_currently_blocked(self, room_id: str) -> Tuple[bool, List[str]]:
         """

@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Optional
 
 from synapse.api.constants import EventTypes, Membership, RoomCreationPreset
 from synapse.events import EventBase
-from synapse.types import Requester, UserID, create_requester
+from synapse.types import Requester, StreamKeyType, UserID, create_requester
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
@@ -169,7 +169,7 @@ class ServerNoticesManager:
         max_id = await self._account_data_handler.add_tag_to_room(
             user_id, room_id, SERVER_NOTICE_ROOM_TAG, {}
         )
-        self._notifier.on_new_event("account_data_key", max_id, users=[user_id])
+        self._notifier.on_new_event(StreamKeyType.ACCOUNT_DATA, max_id, users=[user_id])
 
         logger.info("Created server notices room %s for %s", room_id, user_id)
         return room_id
