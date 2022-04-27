@@ -214,7 +214,7 @@ class ApplicationServicesHandler:
         Args:
             stream_key: The stream the event came from.
 
-                `stream_key` can be "typing_key", "receipt_key", StreamKeyType.PRESENCE,
+                `stream_key` can be StreamKeyType.TYPING, "receipt_key", StreamKeyType.PRESENCE,
                 "to_device_key" or "device_list_key". Any other value for `stream_key`
                 will cause this function to return early.
 
@@ -236,7 +236,7 @@ class ApplicationServicesHandler:
         # Only the following streams are currently supported.
         # FIXME: We should use constants for these values.
         if stream_key not in (
-            "typing_key",
+            StreamKeyType.TYPING,
             "receipt_key",
             StreamKeyType.PRESENCE,
             "to_device_key",
@@ -284,7 +284,7 @@ class ApplicationServicesHandler:
             if (
                 stream_key
                 in (
-                    "typing_key",
+                    StreamKeyType.TYPING,
                     "receipt_key",
                     StreamKeyType.PRESENCE,
                     "to_device_key",
@@ -318,7 +318,7 @@ class ApplicationServicesHandler:
         logger.debug("Checking interested services for %s", stream_key)
         with Measure(self.clock, "notify_interested_services_ephemeral"):
             for service in services:
-                if stream_key == "typing_key":
+                if stream_key == StreamKeyType.TYPING:
                     # Note that we don't persist the token (via set_appservice_stream_type_pos)
                     # for typing_key due to performance reasons and due to their highly
                     # ephemeral nature.
