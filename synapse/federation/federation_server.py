@@ -268,8 +268,8 @@ class FederationServer(FederationBase):
             transaction_id=transaction_id,
             destination=destination,
             origin=origin,
-            origin_server_ts=transaction_data.get("origin_server_ts"),  # type: ignore
-            pdus=transaction_data.get("pdus"),  # type: ignore
+            origin_server_ts=transaction_data.get("origin_server_ts"),  # type: ignore[arg-type]
+            pdus=transaction_data.get("pdus"),
             edus=transaction_data.get("edus"),
         )
 
