@@ -54,10 +54,16 @@ class DependencyException(Exception):
 
 
 DEV_EXTRAS = {"lint", "mypy", "test", "dev"}
-RUNTIME_EXTRAS = (
-    set(metadata.metadata(DISTRIBUTION_NAME).get_all("Provides-Extra")) - DEV_EXTRAS
-)
-VERSION = metadata.version(DISTRIBUTION_NAME)
+try:
+    RUNTIME_EXTRAS = (
+        set(metadata.metadata(DISTRIBUTION_NAME).get_all("Provides-Extra")) - DEV_EXTRAS
+    )
+    VERSION = metadata.version(DISTRIBUTION_NAME)
+except Exception as e:
+    raise RuntimeError(
+        "Unable to read Synapse's package installation metadata. "
+        "This may be a problem with how Synapse has been packaged."
+    ) from e
 
 
 def _is_dev_dependency(req: Requirement) -> bool:
