@@ -417,6 +417,7 @@ class RelationsHandler:
             ):
                 continue
 
+            # Fetch any annotations (ie, reactions) to bundle with this event.
             annotations = await self.get_annotations_for_event(
                 event.event_id, event.room_id, ignored_users=ignored_users
             )
@@ -425,6 +426,7 @@ class RelationsHandler:
                     event.event_id, BundledAggregations()
                 ).annotations = {"chunk": annotations}
 
+            # Fetch any references (ie, replies) to bundle with this event.
             references, next_token = await self.get_relations_for_event(
                 event.event_id,
                 event,
