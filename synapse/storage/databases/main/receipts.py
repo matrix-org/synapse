@@ -136,6 +136,17 @@ class ReceiptsWorkerStore(SQLBaseStore):
     async def get_last_receipt_event_id_for_user(
         self, user_id: str, room_id: str, receipt_types: List[str]
     ) -> Optional[str]:
+        """
+        Fetch the latest receipt's event ID for a rooms for a user for the given receipt types.
+
+        Args:
+            user_id: The user to fetch receipts for.
+            room_id: The room ID to fetch the receipt for.
+            receipt_types: The receipt types to check.
+
+        Returns:
+            The latest receipt, if one exists, for any of the given types.
+        """
         def f(txn: LoggingTransaction) -> List[Tuple[str, str]]:
             clause, args = make_in_list_sql_clause(
                 self.database_engine, "rl.receipt_type", receipt_types
@@ -165,6 +176,16 @@ class ReceiptsWorkerStore(SQLBaseStore):
     async def get_latest_receipts_for_user(
         self, user_id: str, receipt_types: List[str]
     ) -> Dict[str, str]:
+        """
+        Fetch the latest receipt's event ID for all rooms for a user for the given receipt types.
+
+        Args:
+            user_id: The user to fetch receipts for.
+            receipt_types: The receipt types to check.
+
+        Returns:
+            A map of room ID to the latest receipt for that room for any of the given types.
+        """
         def f(txn: LoggingTransaction) -> List[Tuple[str, str]]:
             clause, args = make_in_list_sql_clause(
                 self.database_engine, "rl.receipt_type", receipt_types
@@ -192,6 +213,16 @@ class ReceiptsWorkerStore(SQLBaseStore):
     async def get_receipts_for_user_with_orderings(
         self, user_id: str, receipt_types: List[str]
     ) -> JsonDict:
+        """
+        Fetch receipts in all rooms for a user.
+
+        Args:
+            user_id: The user to fetch receipts for.
+            receipt_types: The receipt types to fetch.
+
+        Returns:
+            A map of room ID to the latest receipt (for the given types).
+        """
         def f(txn: LoggingTransaction) -> List[Tuple[str, str, str, int, int]]:
             clause, args = make_in_list_sql_clause(
                 self.database_engine, "rl.receipt_type", receipt_types
@@ -216,6 +247,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
         rows = await self.db_pool.runInteraction(
             "get_receipts_for_user_with_orderings", f
         )
+        # TODO This looks wrong, there's no ordering being applied and the above
+        #      query may return multiple results per room.
         return {
             row[0]: {
                 "event_id": row[1],
@@ -573,7 +606,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         data: JsonDict,
         stream_id: int,
     ) -> Optional[int]:
-        """Inserts a read-receipt into the database if it's newer than the current RR
+        """Inserts a receipt into the database if it's newer than the current one.
 
         Returns:
             None if the RR is older than the current RR
