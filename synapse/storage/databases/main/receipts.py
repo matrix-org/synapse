@@ -134,7 +134,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
             receipt_type: The receipt type to fetch.
 
         Returns:
-            A list of dictionaries of the user ID and event ID of the latest receipt for each user.
+            A list of dictionaries, one for each user ID. Each dictionary
+            contains a user ID and the event ID of that user's latest receipt.
         """
         return await self.db_pool.simple_select_list(
             table="receipts_linearized",
