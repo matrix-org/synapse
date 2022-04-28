@@ -417,7 +417,8 @@ class Auth:
         """
 
         if rights == "access":
-            # first look in the database
+            # First look in the database to see if the access token is present
+            # as an opaque token.
             r = await self.store.get_user_by_access_token(token)
             if r:
                 valid_until_ms = r.valid_until_ms
@@ -434,7 +435,8 @@ class Auth:
 
                 return r
 
-        # otherwise it needs to be a valid macaroon
+        # If the token isn't found in the database, then it could still be a
+        # macaroon, so we check that here.
         try:
             user_id, guest = self._parse_and_validate_macaroon(token, rights)
 
@@ -482,8 +484,14 @@ class Auth:
             TypeError,
             ValueError,
         ) as e:
-            logger.warning("Invalid macaroon in auth: %s %s", type(e), e)
-            raise InvalidClientTokenError("Invalid macaroon passed.")
+            logger.warning(
+                "Invalid access token in auth: %s %s. (Neither a known token nor a valid macaroon.)",
+                type(e),
+                e,
+            )
+            raise InvalidClientTokenError(
+                "Invalid access token passed. (Neither a known token nor a valid macaroon.)"
+            )
 
     def _parse_and_validate_macaroon(
         self, token: str, rights: str = "access"
@@ -504,10 +512,9 @@ class Auth:
         try:
             macaroon = pymacaroons.Macaroon.deserialize(token)
         except Exception:  # deserialize can throw more-or-less anything
-            # doesn't look like a macaroon: treat it as an opaque token which
-            # must be in the database.
-            # TODO: it would be nice to get rid of this, but apparently some
-            # people use access tokens which aren't macaroons
+            # The access token doesn't look like a macaroon.
+            # In that case, we assume it's an opaque token which must be in the
+            # database.
             raise _InvalidMacaroonException()
 
         try:
