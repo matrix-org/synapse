@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Optional, Tupl
 
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.urls import FEDERATION_V1_PREFIX
-from synapse.http.server import HttpServer, ServletCallback
+from synapse.http.server import HttpServer, ServletCallback, is_method_cancellable
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import run_in_background
@@ -372,6 +372,15 @@ class BaseFederationServlet:
             code = getattr(self, "on_%s" % (method), None)
             if code is None:
                 continue
+
+            if is_method_cancellable(code):
+                # The wrapper added by `self._wrap` will inherit the cancellable flag,
+                # but the wrapper itself does not support cancellation yet.
+                raise Exception(
+                    f"{self.__class__.__name__}.on_{method} has been marked as "
+                    "cancellable, but federation servlets do not support cancellation "
+                    "yet."
+                )
 
             server.register_paths(
                 method,
