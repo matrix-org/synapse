@@ -1,1 +1,1 @@
-Fix a long standing bug where status codes would almost always get logged as 200, irrespective of the actual status code, when clients disconnect before a request has finished processing.
+Fix a long standing bug where status codes would almost always get logged as 200!, irrespective of the actual status code, when clients disconnect before a request has finished processing.
