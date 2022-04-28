@@ -683,6 +683,9 @@ def respond_with_json(
     Returns:
         twisted.web.server.NOT_DONE_YET if the request is still active.
     """
+    # The response code must always be set, for logging purposes.
+    request.setResponseCode(code)
+
     # could alternatively use request.notifyFinish() and flip a flag when
     # the Deferred fires, but since the flag is RIGHT THERE it seems like
     # a waste.
@@ -697,7 +700,6 @@ def respond_with_json(
     else:
         encoder = _encode_json_bytes
 
-    request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"application/json")
     request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
 
@@ -728,13 +730,15 @@ def respond_with_json_bytes(
     Returns:
         twisted.web.server.NOT_DONE_YET if the request is still active.
     """
+    # The response code must always be set, for logging purposes.
+    request.setResponseCode(code)
+
     if request._disconnected:
         logger.warning(
             "Not sending response to request %s, already disconnected.", request
         )
         return None
 
-    request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"application/json")
     request.setHeader(b"Content-Length", b"%d" % (len(json_bytes),))
     request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
@@ -840,6 +844,9 @@ def respond_with_html_bytes(request: Request, code: int, html_bytes: bytes) -> N
         code: The HTTP response code.
         html_bytes: The HTML bytes to use as the response body.
     """
+    # The response code must always be set, for logging purposes.
+    request.setResponseCode(code)
+
     # could alternatively use request.notifyFinish() and flip a flag when
     # the Deferred fires, but since the flag is RIGHT THERE it seems like
     # a waste.
@@ -849,7 +856,6 @@ def respond_with_html_bytes(request: Request, code: int, html_bytes: bytes) -> N
         )
         return None
 
-    request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
     request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
 
