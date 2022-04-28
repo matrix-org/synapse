@@ -176,7 +176,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         self, user_id: str, receipt_type: str
     ) -> Dict[str, str]:
         """
-        Fetch the event IDs for the latest receipt sent by the given user.
+        Fetch the event IDs for the latest receipts sent by the given user.
 
         Args:
             user_id: The user to fetch receipts for.
