@@ -376,6 +376,8 @@ class BaseFederationServlet:
             if is_method_cancellable(code):
                 # The wrapper added by `self._wrap` will inherit the cancellable flag,
                 # but the wrapper itself does not support cancellation yet.
+                # Once resolved, the cancellation tests in
+                # `tests/federation/transport/server/test__base.py` can be re-enabled.
                 raise Exception(
                     f"{self.__class__.__name__}.on_{method} has been marked as "
                     "cancellable, but federation servlets do not support cancellation "
