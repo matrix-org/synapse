@@ -20,6 +20,7 @@ from typing import (
     Any,
     ClassVar,
     Dict,
+    Final,
     List,
     Mapping,
     Match,
@@ -631,14 +632,14 @@ class StreamKeyType:
     A stream is a list of entities ordered by an incrementing "stream token".
     """
 
-    ROOM = "room_key"
-    PRESENCE = "presence_key"
-    TYPING = "typing_key"
-    RECEIPT = "receipt_key"
-    ACCOUNT_DATA = "account_data_key"
-    PUSH_RULES = "push_rules_key"
-    TO_DEVICE = "to_device_key"
-    DEVICE_LIST = "device_list_key"
+    ROOM: Final = "room_key"
+    PRESENCE: Final = "presence_key"
+    TYPING: Final = "typing_key"
+    RECEIPT: Final = "receipt_key"
+    ACCOUNT_DATA: Final = "account_data_key"
+    PUSH_RULES: Final = "push_rules_key"
+    TO_DEVICE: Final = "to_device_key"
+    DEVICE_LIST: Final = "device_list_key"
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
