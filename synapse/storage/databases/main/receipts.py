@@ -176,7 +176,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         self, user_id: str, receipt_type: str
     ) -> Dict[str, str]:
         """
-        Fetch the event IDs for the latest receipt in all rooms with the given receipt type.
+        Fetch the event IDs for the latest receipt sent by the given user.
 
         Args:
             user_id: The user to fetch receipts for.
@@ -184,6 +184,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         Returns:
             A map of room ID to the event ID of the latest receipt for that room.
+
+            If the user has not sent a receipt to a room then it will not appear
+            in the returned dictionary.
         """
         rows = await self.db_pool.simple_select_list(
             table="receipts_linearized",
