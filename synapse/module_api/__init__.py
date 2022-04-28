@@ -579,6 +579,9 @@ class ModuleApi:
     ) -> str:
         """Map a username onto a string suitable for a MXID
 
+        This follows the algorithm laid out at
+        https://matrix.org/docs/spec/appendices.html#mapping-from-other-character-sets.
+
         Added in Synapse v1.58.0
 
         Args:
