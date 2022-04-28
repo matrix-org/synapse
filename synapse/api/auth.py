@@ -513,8 +513,6 @@ class Auth:
             macaroon = pymacaroons.Macaroon.deserialize(token)
         except Exception:  # deserialize can throw more-or-less anything
             # The access token doesn't look like a macaroon.
-            # In that case, we assume it's an opaque token which must be in the
-            # database.
             raise _InvalidMacaroonException()
 
         try:
