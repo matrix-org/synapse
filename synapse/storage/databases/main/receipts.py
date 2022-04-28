@@ -150,7 +150,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
         latest_event_id: Optional[str] = None
         latest_stream_ordering = 0
         for receipt_type in receipt_types:
-            result = await self._get_last_receipt_event_id_for_user(user_id, room_id, receipt_type)
+            result = await self._get_last_receipt_event_id_for_user(
+                user_id, room_id, receipt_type
+            )
             if result is None:
                 continue
             event_id, stream_ordering = result
@@ -192,10 +194,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
         return await self.db_pool.runInteraction("get_own_receipt_for_user", f)
 
     async def get_latest_receipts_for_user(
-        self, user_id: str, receipt_types: List[str]
+        self, user_id: str, receipt_types: Iterable[str]
     ) -> Dict[str, str]:
         """
-        Fetch the latest receipt's event ID for all rooms for a user for the given receipt types.
+        Fetch the event IDs of a user's receipts for all rooms for the given receipt types.
 
         Args:
             user_id: The user to fetch receipts for.
@@ -204,31 +206,17 @@ class ReceiptsWorkerStore(SQLBaseStore):
         Returns:
             A map of room ID to the latest receipt for that room for any of the given types.
         """
-        def f(txn: LoggingTransaction) -> List[Tuple[str, str]]:
-            clause, args = make_in_list_sql_clause(
-                self.database_engine, "rl.receipt_type", receipt_types
-            )
-            sql = """
-                SELECT t.room_id, t.event_id FROM (
-                    SELECT rl.room_id, rl.event_id, row_number() over (partition by rl.room_id order by e.stream_ordering desc) rw
-                    FROM receipts_linearized AS rl
-                    INNER JOIN events AS e USING (room_id, event_id)
-                    WHERE rl.user_id = ?
-                    AND %s
-                ) t
-                WHERE t.rw = 1;
-            """ % (
-                clause,
-            )
+        results = await self.get_receipts_for_user_with_orderings(
+            user_id, receipt_types
+        )
 
-            txn.execute(sql, [user_id] + list(args))
-            return cast(List[Tuple[str, str]], txn.fetchall())
-
-        rows = await self.db_pool.runInteraction("get_latest_receipts_for_user", f)
-        return {row[0]: row[1] for row in rows}
+        # Reduce the result to room ID -> event ID.
+        return {
+            room_id: room_result["event_id"] for room_id, room_result in results.items()
+        }
 
     async def get_receipts_for_user_with_orderings(
-        self, user_id: str, receipt_types: List[str]
+        self, user_id: str, receipt_types: Iterable[str]
     ) -> JsonDict:
         """
         Fetch receipts in all rooms for a user.
@@ -240,38 +228,60 @@ class ReceiptsWorkerStore(SQLBaseStore):
         Returns:
             A map of room ID to the latest receipt (for the given types).
         """
-        def f(txn: LoggingTransaction) -> List[Tuple[str, str, str, int, int]]:
-            clause, args = make_in_list_sql_clause(
-                self.database_engine, "rl.receipt_type", receipt_types
+        results: JsonDict = {}
+        for receipt_type in receipt_types:
+            partial_result = await self._get_receipts_for_user_with_orderings(
+                user_id, receipt_type
             )
+            for room_id, room_result in partial_result.items():
+                # If the room has not yet been seen, or the receipt is newer,
+                # use it.
+                if (
+                    room_id not in results
+                    or results[room_id]["stream_ordering"]
+                    < room_result["stream_ordering"]
+                ):
+                    results[room_id] = room_result
 
-            sql = """
-                SELECT rl.room_id, rl.event_id, rl.receipt_type,
-                e.topological_ordering, e.stream_ordering
-                FROM receipts_linearized AS rl
-                INNER JOIN events AS e USING (room_id, event_id)
-                WHERE rl.room_id = e.room_id
-                AND rl.event_id = e.event_id
-                AND user_id = ?
-                AND %s
-            """ % (
-                clause,
+        return results
+
+    @cached()
+    async def _get_receipts_for_user_with_orderings(
+        self, user_id: str, receipt_type: str
+    ) -> JsonDict:
+        """
+        Fetch receipts in all rooms for a user.
+
+        Args:
+            user_id: The user to fetch receipts for.
+            receipt_type: The receipt type to fetch.
+
+        Returns:
+            A map of room ID to the latest receipt information.
+        """
+
+        def f(txn: LoggingTransaction) -> List[Tuple[str, str, int, int]]:
+            sql = (
+                "SELECT rl.room_id, rl.event_id,"
+                " e.topological_ordering, e.stream_ordering"
+                " FROM receipts_linearized AS rl"
+                " INNER JOIN events AS e USING (room_id, event_id)"
+                " WHERE rl.room_id = e.room_id"
+                " AND rl.event_id = e.event_id"
+                " AND user_id = ?"
+                " AND receipt_type = ?"
             )
-
-            txn.execute(sql, [user_id] + list(args))
-            return cast(List[Tuple[str, str, str, int, int]], txn.fetchall())
+            txn.execute(sql, (user_id, receipt_type))
+            return cast(List[Tuple[str, str, int, int]], txn.fetchall())
 
         rows = await self.db_pool.runInteraction(
             "get_receipts_for_user_with_orderings", f
         )
-        # TODO This looks wrong, there's no ordering being applied and the above
-        #      query may return multiple results per room.
         return {
             row[0]: {
                 "event_id": row[1],
-                "receipt_type": row[2],
-                "topological_ordering": row[3],
-                "stream_ordering": row[4],
+                "topological_ordering": row[2],
+                "stream_ordering": row[3],
             }
             for row in rows
         }
@@ -592,6 +602,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     def invalidate_caches_for_receipt(
         self, room_id: str, receipt_type: str, user_id: str
     ) -> None:
+        self._get_receipts_for_user_with_orderings.invalidate((user_id, receipt_type))
         self._get_linearized_receipts_for_room.invalidate((room_id,))
         self._get_last_receipt_event_id_for_user.invalidate(
             (user_id, room_id, receipt_type)
@@ -824,6 +835,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
             room_id,
             receipt_type,
             user_id,
+        )
+        txn.call_after(
+            self._get_receipts_for_user_with_orderings.invalidate,
+            (user_id, receipt_type),
         )
         # FIXME: This shouldn't invalidate the whole cache
         txn.call_after(self._get_linearized_receipts_for_room.invalidate, (room_id,))
