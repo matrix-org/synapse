@@ -193,7 +193,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         return await self.db_pool.runInteraction("get_own_receipt_for_user", f)
 
-    async def get_latest_receipts_for_user(
+    async def get_receipts_for_user(
         self, user_id: str, receipt_types: Iterable[str]
     ) -> Dict[str, str]:
         """

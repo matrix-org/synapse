@@ -24,7 +24,7 @@ async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -
     invites = await store.get_invited_rooms_for_local_user(user_id)
     joins = await store.get_rooms_for_user(user_id)
 
-    my_receipts_by_room = await store.get_latest_receipts_for_user(
+    my_receipts_by_room = await store.get_receipts_for_user(
         user_id, (ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE)
     )
 
