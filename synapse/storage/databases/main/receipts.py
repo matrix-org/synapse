@@ -134,44 +134,62 @@ class ReceiptsWorkerStore(SQLBaseStore):
         )
 
     async def get_last_receipt_event_id_for_user(
-        self, user_id: str, room_id: str, receipt_types: List[str]
+        self, user_id: str, room_id: str, receipt_types: Iterable[str]
     ) -> Optional[str]:
         """
-        Fetch the latest receipt's event ID for a rooms for a user for the given receipt types.
+        Fetch the event ID for the latest receipt (of any of the given types).
 
         Args:
             user_id: The user to fetch receipts for.
             room_id: The room ID to fetch the receipt for.
-            receipt_types: The receipt types to check.
+            receipt_type: The receipt type to fetch.
 
         Returns:
-            The latest receipt, if one exists, for any of the given types.
+            The latest receipt and stream ordering, if one exists.
         """
-        def f(txn: LoggingTransaction) -> List[Tuple[str, str]]:
-            clause, args = make_in_list_sql_clause(
-                self.database_engine, "rl.receipt_type", receipt_types
-            )
-            sql = """
-                SELECT rl.event_id, e.stream_ordering
-                FROM receipts_linearized AS rl
-                INNER JOIN events AS e USING (room_id, event_id)
-                WHERE rl.user_id = ?
-                AND rl.room_id = ?
-                AND %s
-                ORDER BY e.stream_ordering DESC
-                LIMIT 1
-            """ % (
-                clause,
-            )
+        latest_event_id: Optional[str] = None
+        latest_stream_ordering = 0
+        for receipt_type in receipt_types:
+            result = await self._get_last_receipt_event_id_for_user(user_id, room_id, receipt_type)
+            if result is None:
+                continue
+            event_id, stream_ordering = result
 
-            txn.execute(sql, [user_id, room_id] + list(args))
-            return cast(List[Tuple[str, str]], txn.fetchall())
+            if latest_event_id is None or latest_stream_ordering < stream_ordering:
+                latest_event_id = event_id
+                latest_stream_ordering = stream_ordering
 
-        rows = await self.db_pool.runInteraction("get_own_receipt_for_user", f)
+        return latest_event_id
 
-        if len(rows) == 0:
-            return None
-        return rows[0][0]
+    @cached()
+    async def _get_last_receipt_event_id_for_user(
+        self, user_id: str, room_id: str, receipt_type: str
+    ) -> Optional[Tuple[str, int]]:
+        """
+        Fetch the event ID and stream ordering for the latest receipt.
+
+        Args:
+            user_id: The user to fetch receipts for.
+            room_id: The room ID to fetch the receipt for.
+            receipt_type: The receipt type to fetch.
+
+        Returns:
+            The latest receipt and stream ordering, if one exists.
+        """
+        sql = """
+            SELECT event_id, stream_ordering
+            FROM receipts_linearized
+            INNER JOIN events USING (room_id, event_id)
+            WHERE user_id = ?
+            AND room_id = ?
+            AND receipt_type = ?
+        """
+
+        def f(txn: LoggingTransaction) -> Optional[Tuple[str, int]]:
+            txn.execute(sql, (user_id, room_id, receipt_type))
+            return cast(Optional[Tuple[str, int]], txn.fetchone())
+
+        return await self.db_pool.runInteraction("get_own_receipt_for_user", f)
 
     async def get_latest_receipts_for_user(
         self, user_id: str, receipt_types: List[str]
@@ -199,7 +217,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
                     AND %s
                 ) t
                 WHERE t.rw = 1;
-
             """ % (
                 clause,
             )
@@ -576,6 +593,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
         self, room_id: str, receipt_type: str, user_id: str
     ) -> None:
         self._get_linearized_receipts_for_room.invalidate((room_id,))
+        self._get_last_receipt_event_id_for_user.invalidate(
+            (user_id, room_id, receipt_type)
+        )
         self._invalidate_get_users_with_receipts_in_room(room_id, receipt_type, user_id)
         self.get_receipts_for_room.invalidate((room_id, receipt_type))
 
