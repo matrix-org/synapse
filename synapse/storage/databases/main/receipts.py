@@ -180,7 +180,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         Args:
             user_id: The user to fetch receipts for.
-            receipt_type: The receipt types to fetch.
+            receipt_type: The receipt type to fetch.
 
         Returns:
             A map of room ID to the event ID of the latest receipt for that room.
