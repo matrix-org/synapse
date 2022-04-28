@@ -122,10 +122,21 @@ class ReceiptsWorkerStore(SQLBaseStore):
         receipts = await self.get_receipts_for_room(room_id, ReceiptTypes.READ)
         return {r["user_id"] for r in receipts}
 
-    @cached(num_args=2)
+    @cached()
     async def get_receipts_for_room(
         self, room_id: str, receipt_type: str
     ) -> List[Dict[str, Any]]:
+        """
+        Fetch the event IDs for the latest receipt for all users in a room with the given receipt type.
+
+        Args:
+            room_id: The room ID to fetch the receipt for.
+            receipt_type: The receipt type to fetch.
+
+        Returns:
+            A list of dictionaries, one for each user ID. Each dictionary
+            contains a user ID and the event ID of that user's latest receipt.
+        """
         return await self.db_pool.simple_select_list(
             table="receipts_linearized",
             keyvalues={"room_id": room_id, "receipt_type": receipt_type},
@@ -137,7 +148,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         self, user_id: str, room_id: str, receipt_types: Iterable[str]
     ) -> Optional[str]:
         """
-        Fetch the event ID for the latest receipt (of any of the given types).
+        Fetch the event ID for the latest receipt in a room with one of the given receipt types.
 
         Args:
             user_id: The user to fetch receipts for.
@@ -176,7 +187,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
             receipt_type: The receipt type to fetch.
 
         Returns:
-            The latest receipt and stream ordering, if one exists.
+            The event ID and stream ordering of the latest receipt, if one exists;
+            otherwise `None`.
         """
         sql = """
             SELECT event_id, stream_ordering
@@ -197,14 +209,17 @@ class ReceiptsWorkerStore(SQLBaseStore):
         self, user_id: str, receipt_types: Iterable[str]
     ) -> Dict[str, str]:
         """
-        Fetch the event IDs of a user's receipts for all rooms for the given receipt types.
+        Fetch the event IDs for the latest receipts sent by the given user.
 
         Args:
             user_id: The user to fetch receipts for.
             receipt_types: The receipt types to check.
 
         Returns:
-            A map of room ID to the latest receipt for that room for any of the given types.
+            A map of room ID to the event ID of the latest receipt for that room.
+
+            If the user has not sent a receipt to a room then it will not appear
+            in the returned dictionary.
         """
         results = await self.get_receipts_for_user_with_orderings(
             user_id, receipt_types
@@ -219,7 +234,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         self, user_id: str, receipt_types: Iterable[str]
     ) -> JsonDict:
         """
-        Fetch receipts in all rooms for a user.
+        Fetch receipts for all rooms that the given user is joined to.
 
         Args:
             user_id: The user to fetch receipts for.
@@ -250,7 +265,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         self, user_id: str, receipt_type: str
     ) -> JsonDict:
         """
-        Fetch receipts in all rooms for a user.
+        Fetch receipts for all rooms that the given user is joined to.
 
         Args:
             user_id: The user to fetch receipts for.
@@ -337,7 +352,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         return await self._get_linearized_receipts_for_room(room_id, to_key, from_key)
 
-    @cached(num_args=3, tree=True)
+    @cached(tree=True)
     async def _get_linearized_receipts_for_room(
         self, room_id: str, to_key: int, from_key: Optional[int] = None
     ) -> List[JsonDict]:

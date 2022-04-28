@@ -296,8 +296,8 @@ directory of your choice::
 Synapse has a number of external dependencies. We maintain a fixed development
 environment using [poetry](https://python-poetry.org/). First, install poetry. We recommend
 
-    pip install --user pipx
-    pipx install poetry
+    | pip install --user pipx
+    | pipx install poetry
 
 as described `here <https://python-poetry.org/docs/#installing-with-pipx>`_.
 (See `poetry's installation docs <https://python-poetry.org/docs/#installation>`

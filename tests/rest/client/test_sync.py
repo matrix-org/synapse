@@ -619,7 +619,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(1)
 
         # Send a read receipt to tell the server we've read the latest event.
-        body = json.dumps({"m.read": res["event_id"]}).encode("utf8")
+        body = json.dumps({ReceiptTypes.READ: res["event_id"]}).encode("utf8")
         channel = self.make_request(
             "POST",
             f"/rooms/{self.room_id}/read_markers",
