@@ -156,7 +156,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             receipt_type: The receipt type to fetch.
 
         Returns:
-            The event ID of the latest receipt, if one exists.
+            The event ID of the latest receipt, if one exists; otherwise `None`.
         """
         return await self.db_pool.simple_select_one_onecol(
             table="receipts_linearized",
@@ -197,7 +197,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         self, user_id: str, receipt_type: str
     ) -> JsonDict:
         """
-        Fetch receipts in all rooms for a user.
+Fetch receipts for all rooms that the given user is joined to.
 
         Args:
             user_id: The user to fetch receipts for.
