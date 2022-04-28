@@ -59,6 +59,8 @@ class BaseFederationServletCancellationTests(
 ):
     """Tests for `BaseFederationServlet` cancellation."""
 
+    skip = "`BaseFederationServlet` does not support cancellation yet."
+
     path = f"{CancellableFederationServlet.PREFIX}{CancellableFederationServlet.PATH}"
 
     def create_test_resource(self):
