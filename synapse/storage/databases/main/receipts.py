@@ -201,7 +201,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         self, user_id: str, receipt_type: str
     ) -> JsonDict:
         """
-Fetch receipts for all rooms that the given user is joined to.
+        Fetch receipts for all rooms that the given user is joined to.
 
         Args:
             user_id: The user to fetch receipts for.
