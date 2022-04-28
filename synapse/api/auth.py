@@ -485,7 +485,7 @@ class Auth:
             ValueError,
         ) as e:
             logger.warning(
-                "Invalid access token in auth: %s %s. (Neither a known token nor a valid macaroon.)",
+                "Invalid access token in auth: %s %s.",
                 type(e),
                 e,
             )
