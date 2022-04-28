@@ -122,7 +122,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         receipts = await self.get_receipts_for_room(room_id, ReceiptTypes.READ)
         return {r["user_id"] for r in receipts}
 
-    @cached(num_args=2)
+    @cached()
     async def get_receipts_for_room(
         self, room_id: str, receipt_type: str
     ) -> List[Dict[str, Any]]:
@@ -143,7 +143,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             desc="get_receipts_for_room",
         )
 
-    @cached(num_args=3)
+    @cached()
     async def get_last_receipt_event_id_for_user(
         self, user_id: str, room_id: str, receipt_type: str
     ) -> Optional[str]:
@@ -170,7 +170,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             allow_none=True,
         )
 
-    @cached(num_args=2)
+    @cached()
     async def get_receipts_for_user(
         self, user_id: str, receipt_type: str
     ) -> Dict[str, str]:
@@ -283,7 +283,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         return await self._get_linearized_receipts_for_room(room_id, to_key, from_key)
 
-    @cached(num_args=3, tree=True)
+    @cached(tree=True)
     async def _get_linearized_receipts_for_room(
         self, room_id: str, to_key: int, from_key: Optional[int] = None
     ) -> List[JsonDict]:
