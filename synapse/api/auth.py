@@ -489,9 +489,7 @@ class Auth:
                 type(e),
                 e,
             )
-            raise InvalidClientTokenError(
-                "Invalid access token passed. (Neither a known token nor a valid macaroon.)"
-            )
+            raise InvalidClientTokenError("Invalid access token passed.")
 
     def _parse_and_validate_macaroon(
         self, token: str, rights: str = "access"
