@@ -1,0 +1,3 @@
+Update docker.yml of GitHub Action, use docker/metadata-action to generate docker image tags.
+Refer to <https://github.com/docker/metadata-action>
+Contributed by henryclw.
