@@ -43,7 +43,7 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             # set latest tag for master branch
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
+            type=raw,value=latest,enable=${{ github.ref == "refs/heads/master" }}
 
       - name: Build and push all platforms
         uses: docker/build-push-action@v2
