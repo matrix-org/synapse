@@ -109,6 +109,17 @@ class FakeChannel:
     _ip: str = "127.0.0.1"
     _producer: Optional[Union[IPullProducer, IPushProducer]] = None
     resource_usage: Optional[ContextResourceUsage] = None
+    _request: Optional[Request] = None
+
+    @property
+    def request(self) -> Request:
+        assert self._request is not None
+        return self._request
+
+    @request.setter
+    def request(self, request: Request) -> None:
+        assert self._request is None
+        self._request = request
 
     @property
     def json_body(self):
@@ -322,6 +333,8 @@ def make_request(
     channel = FakeChannel(site, reactor, ip=client_ip)
 
     req = request(channel, site)
+    channel.request = req
+
     req.content = BytesIO(content)
     # Twisted expects to be at the end of the content when parsing the request.
     req.content.seek(0, SEEK_END)
