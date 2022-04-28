@@ -20,7 +20,6 @@ from typing import (
     Any,
     ClassVar,
     Dict,
-    Final,
     List,
     Mapping,
     Match,
@@ -36,7 +35,7 @@ from typing import (
 import attr
 from frozendict import frozendict
 from signedjson.key import decode_verify_key_bytes
-from typing_extensions import TypedDict
+from typing_extensions import Final, TypedDict
 from unpaddedbase64 import decode_base64
 from zope.interface import Interface
 
