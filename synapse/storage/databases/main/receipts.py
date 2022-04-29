@@ -153,7 +153,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
         Args:
             user_id: The user to fetch receipts for.
             room_id: The room ID to fetch the receipt for.
-            receipt_type: The receipt type to fetch.
+            receipt_type: The receipt types to fetch. Earlier receipt types
+                are given priority if multiple receipts point to the same event.
 
         Returns:
             The latest receipt and stream ordering, if one exists.
@@ -238,7 +239,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         Args:
             user_id: The user to fetch receipts for.
-            receipt_types: The receipt types to fetch.
+            receipt_types: The receipt types to fetch. Earlier receipt types
+                are given priority if multiple receipts point to the same event.
 
         Returns:
             A map of room ID to the latest receipt (for the given types).
@@ -676,23 +678,14 @@ class ReceiptsWorkerStore(SQLBaseStore):
         # have to compare orderings of existing receipts
         if stream_ordering is not None:
             sql = (
-                "SELECT e.stream_ordering, e.event_id, r.receipt_type FROM events AS e"
+                "SELECT stream_ordering, event_id FROM events"
                 " INNER JOIN receipts_linearized AS r USING (event_id, room_id)"
-                " WHERE r.room_id = ? AND r.user_id = ?"
+                " WHERE r.room_id = ? AND r.receipt_type = ? AND r.user_id = ?"
             )
-            txn.execute(sql, (room_id, user_id))
+            txn.execute(sql, (room_id, receipt_type, user_id))
 
-            for so, eid, rt in txn:
-                if int(so) >= stream_ordering and (
-                    receipt_type == rt
-                    # We don't allow private read receipts to override public
-                    # ones since that would look as if the read receipt is going
-                    # up in the timeline from the perspective of the other users
-                    or (
-                        rt == ReceiptTypes.READ
-                        and receipt_type == ReceiptTypes.READ_PRIVATE
-                    )
-                ):
+            for so, eid in txn:
+                if int(so) >= stream_ordering:
                     logger.debug(
                         "Ignoring new receipt for %s in favour of existing "
                         "one for later event %s",
