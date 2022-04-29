@@ -2,8 +2,7 @@
 
 ## Size of full matrix db
 ```sql
-SELECT
-   pg_size_pretty( pg_database_size( 'matrix' ) );
+SELECT pg_size_pretty( pg_database_size( 'matrix' ) );
 ```
 
 ### Result example:
@@ -16,20 +15,14 @@ pg_size_pretty
 
 ## Show top 20 larger tables by row count
 ```sql
-SELECT
-  relname,
-  n_live_tup AS "rows" 
-FROM
-  pg_stat_user_tables 
-ORDER BY
-  n_live_tup DESC LIMIT 20;
+SELECT relname, n_live_tup AS "rows"
+  FROM pg_stat_user_tables 
+  ORDER BY n_live_tup DESC
+  LIMIT 20;
 ```
 This query is quick, but may be very approximate, for exact number of rows use:
 ```sql
-SELECT
-  COUNT(*) 
-FROM
-  <table_name>;
+SELECT COUNT(*) FROM <table_name>;
 ```
 
 ### Result example:
@@ -58,24 +51,15 @@ user_directory_search - 316433
 
 ## Show top 20 larger tables by storage size
 ```sql
-SELECT
-  nspname || '.' || relname AS "relation",
-  pg_size_pretty(pg_total_relation_size(c.oid)) AS "total_size" 
-FROM
-  pg_class c 
-  LEFT JOIN
-    pg_namespace n 
-    ON (n.oid = c.relnamespace) 
-WHERE
-  nspname NOT IN 
-  (
-    'pg_catalog',
-    'information_schema'
-  )
-  AND c.relkind <> 'i' 
-  AND nspname !~ '^pg_toast' 
-ORDER BY
-  pg_total_relation_size(c.oid) DESC LIMIT 20;
+SELECT nspname || '.' || relname AS "relation",
+    pg_size_pretty(pg_total_relation_size(c.oid)) AS "total_size"
+  FROM pg_class c
+  LEFT JOIN pg_namespace n ON (n.oid = c.relnamespace)
+  WHERE nspname NOT IN ('pg_catalog', 'information_schema')
+    AND c.relkind <> 'i'
+    AND nspname !~ '^pg_toast'
+  ORDER BY pg_total_relation_size(c.oid) DESC
+  LIMIT 20;
 ```
 
 ### Result example:
@@ -108,107 +92,64 @@ You get the same information when you use the
 and set parameter `order_by=state_events`.
 
 ```sql
-SELECT
-  r.name,
-  s.room_id,
-  s.current_state_events 
-FROM
-  room_stats_current s 
-  LEFT JOIN
-    room_stats_state r USING (room_id) 
-ORDER BY
-  current_state_events DESC LIMIT 20;
+SELECT r.name, s.room_id, s.current_state_events
+  FROM room_stats_current s
+  LEFT JOIN room_stats_state r USING (room_id)
+  ORDER BY current_state_events DESC
+  LIMIT 20;
 ```
 
 and by state_group_events count:
 ```sql
-SELECT
-  rss.name,
-  s.room_id,
-  COUNT(s.room_id) 
-FROM
-  state_groups_state s 
-  LEFT JOIN
-    room_stats_state rss USING (room_id) 
-GROUP BY
-  s.room_id,
-  rss.name 
-ORDER BY
-  COUNT(s.room_id) DESC LIMIT 20;
+SELECT rss.name, s.room_id, COUNT(s.room_id)
+  FROM state_groups_state s
+  LEFT JOIN room_stats_state rss USING (room_id)
+  GROUP BY s.room_id, rss.name
+  ORDER BY COUNT(s.room_id) DESC
+  LIMIT 20;
 ```
 
 plus same, but with join removed for performance reasons:
 ```sql
-SELECT
-  s.room_id,
-  COUNT(s.room_id) 
-FROM
-  state_groups_state s 
-GROUP BY
-  s.room_id 
-ORDER BY
-  COUNT(s.room_id) DESC LIMIT 20;
+SELECT s.room_id, COUNT(s.room_id)
+  FROM state_groups_state s
+  GROUP BY s.room_id 
+  ORDER BY COUNT(s.room_id) DESC
+  LIMIT 20;
 ```
 
 ## Show top 20 rooms by new events count in last 1 day:
 ```sql
-SELECT
-  e.room_id,
-  r.name,
-  COUNT(e.event_id) cnt 
-FROM
-  events e 
-  LEFT JOIN
-    room_stats_state r USING (room_id) 
-WHERE
-  e.origin_server_ts >= DATE_PART('epoch', NOW() - INTERVAL '1 day') * 1000 
-GROUP BY
-  e.room_id,
-  r.name 
-ORDER BY
-   cnt DESC LIMIT 20;
+SELECT e.room_id, r.name, COUNT(e.event_id) cnt
+  FROM events e
+  LEFT JOIN room_stats_state r USING (room_id)
+  WHERE e.origin_server_ts >= DATE_PART('epoch', NOW() - INTERVAL '1 day') * 1000
+  GROUP BY e.room_id, r.name 
+  ORDER BY cnt DESC
+  LIMIT 20;
 ```
 
 ## Show top 20 users on homeserver by sent events (messages) at last month:
 Caution. This query does not use any indexes, can be slow and create load on the database.
 ```sql
-SELECT
-  COUNT(*),
-  sender 
-FROM
-  events 
-WHERE
-  (
-    type = 'm.room.encrypted' 
-    OR type = 'm.room.message'
-  )
-  AND origin_server_ts >= DATE_PART('epoch', NOW() - INTERVAL '1 month') * 1000 
-GROUP BY
-  sender 
-ORDER BY
-  COUNT(*) DESC LIMIT 20;
+SELECT COUNT(*), sender
+  FROM events WHERE (type = 'm.room.encrypted' OR type = 'm.room.message')
+    AND origin_server_ts >= DATE_PART('epoch', NOW() - INTERVAL '1 month') * 1000
+  GROUP BY sender
+  ORDER BY COUNT(*) DESC
+  LIMIT 20;
 ```
 
 ## Show last 100 messages from needed user, with room names:
 ```sql
-SELECT
-  e.room_id,
-  r.name,
-  e.event_id,
-  e.type,
-  e.content,
-  j.json 
-FROM
-  events e 
-  LEFT JOIN
-    event_json j USING (room_id) 
-  LEFT JOIN
-    room_stats_state r USING (room_id) 
-WHERE
-  sender = '@LOGIN:example.com' 
-  AND e.type = 'm.room.message' 
-ORDER BY
-  stream_ordering DESC LIMIT 100;
+SELECT e.room_id, r.name, e.event_id, e.type, e.content, j.json
+  FROM events e
+  LEFT JOIN event_json j USING (room_id)
+  LEFT JOIN room_stats_state r USING (room_id)
+  WHERE sender = '@LOGIN:example.com'
+    AND e.type = 'm.room.message'
+  ORDER BY stream_ordering DESC
+  LIMIT 100;
 ```
 
 ## Show rooms with names, sorted by events in this rooms
@@ -223,20 +164,12 @@ Documentation for `psql` command line parameters: https://www.postgresql.org/doc
 
 **Sort and order with SQL**
 ```sql
-SELECT
-  COUNT(*),
-  event_json.room_id,
-  room_stats_state.name 
-FROM
-  event_json,
-  room_stats_state 
-WHERE
-  room_stats_state.room_id = event_json.room_id 
-GROUP BY
-  event_json.room_id,
-  room_stats_state.name 
-ORDER BY
-  COUNT(*) DESC LIMIT 50;
+SELECT COUNT(*), event_json.room_id, room_stats_state.name
+  FROM event_json, room_stats_state
+  WHERE room_stats_state.room_id = event_json.room_id
+  GROUP BY event_json.room_id, room_stats_state.name
+  ORDER BY COUNT(*) DESC
+  LIMIT 50;
 ```
 
 ### Result example:
@@ -255,39 +188,19 @@ ORDER BY
 You get the same information when you use the
 [admin API](../../admin_api/rooms.md#room-details-api).
 ```sql
-SELECT
-  rss.room_id,
-  rss.name,
-  rss.canonical_alias,
-  rss.topic,
-  rss.encryption,
-  rsc.joined_members,
-  rsc.local_users_in_room,
-  rss.join_rules 
-FROM
-  room_stats_state rss 
-  LEFT JOIN
-    room_stats_current rsc USING (room_id) 
-WHERE
-  room_id IN 
-  (
-  WHERE
-    room_id IN 
-    (
-      '!OGEhHVWSdvArJzumhm:matrix.org',
-      '!YTvKGNlinIzlkMTVRl:matrix.org' 
-    );
+SELECT rss.room_id, rss.name, rss.canonical_alias, rss.topic, rss.encryption,
+    rsc.joined_members, rsc.local_users_in_room, rss.join_rules
+  FROM room_stats_state rss
+  LEFT JOIN room_stats_current rsc USING (room_id)
+  WHERE room_id IN ( WHERE room_id IN (
+    '!OGEhHVWSdvArJzumhm:matrix.org',
+    '!YTvKGNlinIzlkMTVRl:matrix.org' 
+  );
 ```
 
 ## Show users and devices that have not been online for a while
 ```sql
-SELECT
-  user_id,
-  device_id,
-  user_agent,
-  TO_TIMESTAMP(last_seen / 1000) AS "last_seen" 
-FROM
-  devices 
-WHERE
-  last_seen < DATE_PART('epoch', NOW() - INTERVAL '3 month') * 1000;
+SELECT user_id, device_id, user_agent, TO_TIMESTAMP(last_seen / 1000) AS "last_seen"
+  FROM devices
+  WHERE last_seen < DATE_PART('epoch', NOW() - INTERVAL '3 month') * 1000;
 ```
