@@ -1,0 +1,1 @@
+Fix race when persisting an event and deleting a room that could lead to outbound federation breaking.
