@@ -424,7 +424,11 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(self._get_read_receipt(), None)
 
     @override_config({"experimental_features": {"msc2285_enabled": True}})
-    def test_public_receipt_cannot_override_private(self) -> None:
+    def test_public_receipt_can_override_private(self) -> None:
+        """
+        Sending a public read receipt to the same event which has a private read
+        receipt should cause that receipt to become public.
+        """
         # Send a message as the first user
         res = self.helper.send(self.room_id, body="hello", tok=self.tok)
 
@@ -452,6 +456,10 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
 
     @override_config({"experimental_features": {"msc2285_enabled": True}})
     def test_private_receipt_cannot_override_public(self) -> None:
+        """
+        Sending a private read receipt to the same event which has a public read
+        receipt should cause no change.
+        """
         # Send a message as the first user
         res = self.helper.send(self.room_id, body="hello", tok=self.tok)
 

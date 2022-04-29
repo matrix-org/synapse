@@ -655,8 +655,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
         """Inserts a receipt into the database if it's newer than the current one.
 
         Returns:
-            None if the RR is older than the current RR
-            otherwise, the rx timestamp of the event that the RR corresponds to
+            None if the receipt is older than the current receipt
+            otherwise, the rx timestamp of the event that the receipt corresponds to
                 (or 0 if the event is unknown)
         """
         assert self._can_write_to_receipts
@@ -749,6 +749,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         Automatically does conversion between linearized and graph
         representations.
+
+        Returns:
+            The new receipts stream ID and token, if the receipt is newer than
+            what was previously persisted. None, otherwise.
         """
         assert self._can_write_to_receipts
 
@@ -796,6 +800,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 stream_id=stream_id,
             )
 
+        # If the receipt was older than the currently persisted one, nothing to do.
         if event_ts is None:
             return None
 

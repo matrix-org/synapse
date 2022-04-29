@@ -112,7 +112,7 @@ class ReceiptsHandler:
             )
 
             if not res:
-                # res will be None if this read receipt is 'old'
+                # res will be None if this receipt is 'old'
                 continue
 
             stream_id, max_persisted_id = res
