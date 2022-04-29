@@ -194,6 +194,20 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
         ],
         "actions": ["dont_notify"],
     },
+    # We don't want to notify on edits in Beeper land. Not only can this be confusing in real time (2 notifications,
+    # one message) but it's also especially confusing when a bridge needs to edit a previously backfilled message.
+    {
+        "rule_id": "global/override/.com.beeper.suppress_edits",
+        "conditions": [
+            {
+                "kind": "event_match",
+                "key": "content.m.relates_to.rel_type",
+                "pattern": "m.replace",
+                "_cache_key": "_m_relates_to_rel_type",
+            },
+        ],
+        "actions": ["dont_notify"],
+    },
     # NB. .m.rule.invite_for_me must be higher prio than .m.rule.member_event
     # otherwise invites will be matched by .m.rule.member_event
     {
