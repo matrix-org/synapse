@@ -421,7 +421,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
 
         # Test that the first user can't see the other user's private read receipt
-        self.assertEqual(self._get_read_receipt(), None)
+        self.assertIsNone(self._get_read_receipt())
 
     @override_config({"experimental_features": {"msc2285_enabled": True}})
     def test_public_receipt_can_override_private(self) -> None:
@@ -440,7 +440,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
             access_token=self.tok2,
         )
         self.assertEqual(channel.code, 200)
-        self.assertEqual(self._get_read_receipt(), None)
+        self.assertIsNone(self._get_read_receipt())
 
         # Send a public read receipt
         channel = self.make_request(
@@ -483,7 +483,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
 
         # Test that we didn't override the public read receipt
-        self.assertEqual(self._get_read_receipt(), None)
+        self.assertIsNone(self._get_read_receipt())
 
     @parameterized.expand(
         [

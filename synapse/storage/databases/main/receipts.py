@@ -721,7 +721,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         )
 
         if (
-            receipt_type in [ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE]
+            receipt_type in (ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE)
             and stream_ordering is not None
         ):
             self._remove_old_push_actions_before_txn(  # type: ignore[attr-defined]
