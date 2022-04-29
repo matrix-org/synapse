@@ -1,3 +1,1 @@
-Update docker.yml of GitHub Action, use docker/metadata-action to generate docker image tags.
-Refer to <https://github.com/docker/metadata-action>
-Contributed by henryclw.
+Update the "Build docker images" GitHub Actions workflow to use `docker/metadata-action` to generate docker image tags, instead of a custom shell script. Contributed by henryclw.
