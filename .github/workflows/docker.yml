@@ -41,7 +41,7 @@ jobs:
           images: matrixdotorg/synapse
           tags: |
             type=ref,event=branch
-            type=semver,pattern={{version}}
+            type=pep440,pattern={{raw}}
             # set latest tag for master branch
             type=raw,value=latest,enable=${{ github.ref == "refs/heads/master" }}
 
