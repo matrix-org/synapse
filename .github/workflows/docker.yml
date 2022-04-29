@@ -50,6 +50,6 @@ jobs:
         with:
           push: true
           labels: "gitsha1=${{ github.sha }}"
-          tags: "${{ steps.set-tag.outputs.tag }}"
+          tags: "${{ steps.set-tag.outputs.tags }}"
           file: "docker/Dockerfile"
           platforms: linux/amd64,linux/arm64
