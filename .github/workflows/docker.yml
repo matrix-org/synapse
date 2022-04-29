@@ -39,6 +39,8 @@ jobs:
         uses: docker/metadata-action@master
         with:
           images: matrixdotorg/synapse
+          flavor: |
+            latest=false
           tags: |
             type=ref,event=branch
             type=pep440,pattern={{raw}}
