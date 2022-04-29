@@ -60,3 +60,9 @@ book/
 # complement
 /complement-*
 /master.tar.gz
+
+# rust
+/rust/target/
+
+# Poetry will create a setup.py, which we don't want to include.
+/setup.py

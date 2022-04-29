@@ -82,7 +82,12 @@ include = [
     { path = "sytest-blacklist", format = "sdist" },
     { path = "tests", format = "sdist" },
     { path = "UPGRADE.rst", format = "sdist" },
+    { path = "rust/Cargo.toml", format = "sdist" },
+    { path = "rust/Cargo.lock", format = "sdist" },
+    { path = "rust/src/**", format = "sdist" },
 ]
+
+build = "build.py"
 
 [tool.poetry.scripts]
 synapse_homeserver = "synapse.app.homeserver:main"
@@ -285,5 +290,5 @@ twine = "*"
 towncrier = ">=18.6.0rc1"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=1.0.0", "setuptools_rust>=1.3"]
 build-backend = "poetry.core.masonry.api"
