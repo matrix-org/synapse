@@ -24,6 +24,8 @@ jobs:
           poetry remove twisted
           poetry add --extras tls git+https://github.com/twisted/twisted.git#trunk
           poetry install --no-interaction --extras "all test"
+      - name: Remove warn_unused_ignores from mypy config
+        run: sed '/warn_unused_ignores = True/d' -i mypy.ini
       - run: poetry run mypy
 
   trial:
