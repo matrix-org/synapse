@@ -157,7 +157,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 are given priority if multiple receipts point to the same event.
 
         Returns:
-            The latest receipt and stream ordering, if one exists.
+            The latest receipt, if one exists.
         """
         latest_event_id: Optional[str] = None
         latest_stream_ordering = 0
