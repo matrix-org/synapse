@@ -278,7 +278,7 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
         "actions": ["dont_notify"],
     },
     {
-        "rule_id": "global/override/org.matrix.msc3786.rule.room.server_acl",
+        "rule_id": "global/override/.org.matrix.msc3786.rule.room.server_acl",
         "conditions": [
             {
                 "kind": "event_match",
