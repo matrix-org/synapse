@@ -12,7 +12,7 @@ ignore=W503,W504,E203,E731,E501
 
 # Default + Enabled flake8 error codes:
 #  E/W: pycodestyle errors and warnings
-#    F: PyFlakes lintings
+#    F: PyFlakes lints
 #  C90: complexity (mccabe)
 #    B: Bugbear
 select=E,F,W,C90,B
