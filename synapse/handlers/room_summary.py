@@ -816,14 +816,16 @@ class RoomSummaryHandler:
             if remote_room_hosts is None:
                 raise SynapseError(400, "Missing via to query remote room")
 
-            fed_rooms = await self._summarize_remote_room(
+            (
+                room_entry,
+                children_room_entries,
+                inaccessible_children,
+            ) = await self._summarize_remote_room_hierarchy(
                 _RoomQueueEntry(room_id, remote_room_hosts),
                 suggested_only=True,
-                max_children=1,
-                exclude_rooms=[],
             )
 
-            for room_entry in fed_rooms:
+            if room_entry:
                 room = room_entry.room
                 fed_room_id = room_entry.room_id
 
@@ -850,9 +852,6 @@ class RoomSummaryHandler:
 
                         return room
 
-                    else:
-                        break
-
             raise NotFoundError("Room not found or is not accessible")
 
         return room_summary
@@ -860,6 +859,7 @@ class RoomSummaryHandler:
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)
 class _RoomQueueEntry:
+
     # The room ID of this entry.
     room_id: str
     # The server to query if the room is not known locally.
