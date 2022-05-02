@@ -630,7 +630,7 @@ class RoomSummaryHandler:
         return False
 
     async def _is_remote_room_accessible(
-        self, requester: str, room_id: str, room: JsonDict
+        self, requester: Optional[str], room_id: str, room: JsonDict
     ) -> bool:
         """
         Calculate whether the room received over federation should be shown to the requester.
@@ -645,7 +645,7 @@ class RoomSummaryHandler:
         due to an invite, etc.
 
         Args:
-            requester: The user requesting the summary.
+            requester: The user requesting the summary. If not passed only world readability is checked.
             room_id: The room ID returned over federation.
             room: The summary of the room returned over federation.
 
@@ -659,6 +659,8 @@ class RoomSummaryHandler:
             or room.get("world_readable") is True
         ):
             return True
+        elif not requester:
+            return False
 
         # Check if the user is a member of any of the allowed rooms from the response.
         allowed_rooms = room.get("allowed_room_ids")
@@ -713,6 +715,7 @@ class RoomSummaryHandler:
             ),
             "guest_can_join": stats["guest_access"] == "can_join",
             "room_type": create_event.content.get(EventContentFields.ROOM_TYPE),
+            "im.nheko.summary.version": stats["version"],
         }
 
         if stats["encryption"]:
@@ -833,10 +836,6 @@ class RoomSummaryHandler:
                 fed_room_id = room_entry.room_id
 
                 if fed_room_id == room_id:
-                    # If no user is specified, test against an invalid userid
-                    if requester is None:
-                        requester = ""
-
                     # The results over federation might include rooms that the we,
                     # as the requesting server, are allowed to see, but the requesting
                     # user is not permitted to see.
