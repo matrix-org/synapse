@@ -29,7 +29,7 @@ __pycache__/
 /*.signing.key
 /env/
 /.venv*/
-/homeserver*.yaml
+#/homeserver*.yaml
 /logs
 /media_store/
 /uploads
