@@ -27,7 +27,7 @@ from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.util import json_encoder
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="""Adds a signature to a JSON object.
 

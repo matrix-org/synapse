@@ -122,10 +122,21 @@ class ReceiptsWorkerStore(SQLBaseStore):
         receipts = await self.get_receipts_for_room(room_id, ReceiptTypes.READ)
         return {r["user_id"] for r in receipts}
 
-    @cached(num_args=2)
+    @cached()
     async def get_receipts_for_room(
         self, room_id: str, receipt_type: str
     ) -> List[Dict[str, Any]]:
+        """
+        Fetch the event IDs for the latest receipt for all users in a room with the given receipt type.
+
+        Args:
+            room_id: The room ID to fetch the receipt for.
+            receipt_type: The receipt type to fetch.
+
+        Returns:
+            A list of dictionaries, one for each user ID. Each dictionary
+            contains a user ID and the event ID of that user's latest receipt.
+        """
         return await self.db_pool.simple_select_list(
             table="receipts_linearized",
             keyvalues={"room_id": room_id, "receipt_type": receipt_type},
@@ -133,10 +144,21 @@ class ReceiptsWorkerStore(SQLBaseStore):
             desc="get_receipts_for_room",
         )
 
-    @cached(num_args=3)
+    @cached()
     async def get_last_receipt_event_id_for_user(
         self, user_id: str, room_id: str, receipt_type: str
     ) -> Optional[str]:
+        """
+        Fetch the event ID for the latest receipt in a room with the given receipt type.
+
+        Args:
+            user_id: The user to fetch receipts for.
+            room_id: The room ID to fetch the receipt for.
+            receipt_type: The receipt type to fetch.
+
+        Returns:
+            The event ID of the latest receipt, if one exists; otherwise `None`.
+        """
         return await self.db_pool.simple_select_one_onecol(
             table="receipts_linearized",
             keyvalues={
@@ -149,10 +171,23 @@ class ReceiptsWorkerStore(SQLBaseStore):
             allow_none=True,
         )
 
-    @cached(num_args=2)
+    @cached()
     async def get_receipts_for_user(
         self, user_id: str, receipt_type: str
     ) -> Dict[str, str]:
+        """
+        Fetch the event IDs for the latest receipts sent by the given user.
+
+        Args:
+            user_id: The user to fetch receipts for.
+            receipt_type: The receipt type to fetch.
+
+        Returns:
+            A map of room ID to the event ID of the latest receipt for that room.
+
+            If the user has not sent a receipt to a room then it will not appear
+            in the returned dictionary.
+        """
         rows = await self.db_pool.simple_select_list(
             table="receipts_linearized",
             keyvalues={"user_id": user_id, "receipt_type": receipt_type},
@@ -165,6 +200,17 @@ class ReceiptsWorkerStore(SQLBaseStore):
     async def get_receipts_for_user_with_orderings(
         self, user_id: str, receipt_type: str
     ) -> JsonDict:
+        """
+        Fetch receipts for all rooms that the given user is joined to.
+
+        Args:
+            user_id: The user to fetch receipts for.
+            receipt_type: The receipt type to fetch.
+
+        Returns:
+            A map of room ID to the latest receipt information.
+        """
+
         def f(txn: LoggingTransaction) -> List[Tuple[str, str, int, int]]:
             sql = (
                 "SELECT rl.room_id, rl.event_id,"
@@ -241,7 +287,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         return await self._get_linearized_receipts_for_room(room_id, to_key, from_key)
 
-    @cached(num_args=3, tree=True)
+    @cached(tree=True)
     async def _get_linearized_receipts_for_room(
         self, room_id: str, to_key: int, from_key: Optional[int] = None
     ) -> List[JsonDict]:
@@ -541,7 +587,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         data: JsonDict,
         stream_id: int,
     ) -> Optional[int]:
-        """Inserts a read-receipt into the database if it's newer than the current RR
+        """Inserts a receipt into the database if it's newer than the current one.
 
         Returns:
             None if the RR is older than the current RR

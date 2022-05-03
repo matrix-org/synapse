@@ -32,12 +32,15 @@ jobs:
         with:
           python-version: "3.x"
           poetry-version: "1.2.0b1"
+          extras: "all"
       # Dump installed versions for debugging.
       - run: poetry run pip list > before.txt
       # Upgrade all runtime dependencies only. This is intended to mimic a fresh
       # `pip install matrix-synapse[all]` as closely as possible.
       - run: poetry update --no-dev
       - run: poetry run pip list > after.txt && (diff -u before.txt after.txt || true)
+      - name: Remove warn_unused_ignores from mypy config
+        run: sed '/warn_unused_ignores = True/d' -i mypy.ini
       - run: poetry run mypy
   trial:
     runs-on: ubuntu-latest

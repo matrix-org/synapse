@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.api.constants import ReceiptTypes
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 
 from ._base import BaseSlavedStoreTestCase
@@ -26,9 +27,13 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
     STORE_TYPE = SlavedReceiptsStore
 
     def test_receipt(self):
-        self.check("get_receipts_for_user", [USER_ID, "m.read"], {})
+        self.check("get_receipts_for_user", [USER_ID, ReceiptTypes.READ], {})
         self.get_success(
-            self.master_store.insert_receipt(ROOM_ID, "m.read", USER_ID, [EVENT_ID], {})
+            self.master_store.insert_receipt(
+                ROOM_ID, ReceiptTypes.READ, USER_ID, [EVENT_ID], {}
+            )
         )
         self.replicate()
-        self.check("get_receipts_for_user", [USER_ID, "m.read"], {ROOM_ID: EVENT_ID})
+        self.check(
+            "get_receipts_for_user", [USER_ID, ReceiptTypes.READ], {ROOM_ID: EVENT_ID}
+        )

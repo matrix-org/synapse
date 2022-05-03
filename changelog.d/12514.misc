@@ -1,1 +1,0 @@
-Use poetry-core instead of setuptools to build wheels.

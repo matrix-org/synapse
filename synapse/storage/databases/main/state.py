@@ -12,10 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import collections.abc
 import logging
 from typing import TYPE_CHECKING, Collection, Dict, Iterable, Optional, Set, Tuple
-
-from frozendict import frozendict
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import NotFoundError, UnsupportedRoomVersionError
@@ -160,7 +159,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         predecessor = create_event.content.get("predecessor", None)
 
         # Ensure the key is a dictionary
-        if not isinstance(predecessor, (dict, frozendict)):
+        if not isinstance(predecessor, collections.abc.Mapping):
             return None
 
         # The keys must be strings since the data is JSON.
@@ -370,10 +369,10 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
     def _update_state_for_partial_state_event_txn(
         self,
-        txn,
+        txn: LoggingTransaction,
         event: EventBase,
         context: EventContext,
-    ):
+    ) -> None:
         # we shouldn't have any outliers here
         assert not event.internal_metadata.is_outlier()
 

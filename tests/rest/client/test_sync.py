@@ -24,6 +24,7 @@ from synapse.api.constants import (
     EventContentFields,
     EventTypes,
     ReadReceiptEventFields,
+    ReceiptTypes,
     RelationTypes,
 )
 from synapse.rest.client import devices, knock, login, read_marker, receipts, room, sync
@@ -560,7 +561,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(1)
 
         # Send a read receipt to tell the server we've read the latest event.
-        body = json.dumps({"m.read": res["event_id"]}).encode("utf8")
+        body = json.dumps({ReceiptTypes.READ: res["event_id"]}).encode("utf8")
         channel = self.make_request(
             "POST",
             "/rooms/%s/read_markers" % self.room_id,
