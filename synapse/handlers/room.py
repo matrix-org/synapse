@@ -1040,7 +1040,12 @@ class RoomCreationHandler:
                 for invitee in invite_list:
                     power_level_content["users"][invitee] = 100
 
-            # override default_power_level_content_override for this room preset, if any
+            # If the user supplied a preset name e.g. "private_chat",
+            # we apply that preset
+            power_level_content.update(config["power_level_content_override"])
+
+            # If the server config contains default_power_level_content_override,
+            # and that contains information for this room preset, apply it.
             default_power_level_content_override = (
                 self.config.room.default_power_level_content_override
             )
@@ -1052,9 +1057,8 @@ class RoomCreationHandler:
                     default_power_level_content_override.get(preset_config)
                 )
 
-            # Power levels overrides are defined per chat preset
-            power_level_content.update(config["power_level_content_override"])
-
+            # Finally, if the user supplied specific permissions for this room,
+            # apply those.
             if power_level_content_override:
                 power_level_content.update(power_level_content_override)
 
