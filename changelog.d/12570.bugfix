@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.57 which could cause `Failed to calculate hosts in room` errors to be logged for outbound federation.
