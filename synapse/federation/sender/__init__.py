@@ -363,12 +363,13 @@ class FederationSender(AbstractFederationSender):
                     #     will have a `sender` on a different server, so will be
                     #     skipped by the "is_mine" test above anyway.
                     #
-                    # (2) rejections of invites to federated rooms. These are normally
-                    #     created via federation (in which case the remote server is
-                    #     responsible for sending out the rejection). If that fails,
+                    # (2) rejections of invites to federated rooms - either remotely
+                    #     or locally generated. (Such rejections are normally
+                    #     created via federation, in which case the remote server is
+                    #     responsible for sending out the rejection. If that fails,
                     #     we'll create a leave event locally, but that's only really
                     #     for the benefit of the invited user - we don't have enough
-                    #     information to send it out over federation.
+                    #     information to send it out over federation).
                     #
                     # (2a) rescinded knocks. These are identical to rejected invites.
                     #
@@ -381,6 +382,11 @@ class FederationSender(AbstractFederationSender):
                     # OOB memberships are always(?) outliers anyway, so if we *don't*
                     # ignore them, we'll get an exception further down when we try to
                     # fetch the membership list for the room.
+                    #
+                    # Arguably, we could equivalently ignore all outliers here, since
+                    # in theory the only way for an outlier with a local `sender` to
+                    # exist is by being an OOB membership (via one of (2), (2a) or (3)
+                    # above).
                     #
                     if event.internal_metadata.is_out_of_band_membership():
                         return
