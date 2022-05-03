@@ -413,6 +413,7 @@ class ServerConfig(Config):
         )
 
         self.mau_trial_days = config.get("mau_trial_days", 0)
+        self.mau_appservice_trial_days = config.get("mau_appservice_trial_days", {})
         self.mau_limit_alerting = config.get("mau_limit_alerting", True)
 
         # How long to keep redacted events in the database in unredacted form
@@ -1105,6 +1106,11 @@ class ServerConfig(Config):
         # sign up in a short space of time never to return after their initial
         # session.
         #
+        # 'mau_appservice_trial_days' is similar to the above, but applies a different
+        # trial number depending on the appservice ID registered to the user. A value
+        # of 0 means no trial days are applied.
+        # 
+        #
         # 'mau_limit_alerting' is a means of limiting client side alerting
         # should the mau limit be reached. This is useful for small instances
         # where the admin has 5 mau seats (say) for 5 specific people and no
@@ -1115,6 +1121,8 @@ class ServerConfig(Config):
         #max_mau_value: 50
         #mau_trial_days: 2
         #mau_limit_alerting: false
+        #mau_appservice_trial_days:
+        #  "appservice-id": 1
 
         # If enabled, the metrics for the number of monthly active users will
         # be populated, however no one will be limited. If limit_usage_by_mau

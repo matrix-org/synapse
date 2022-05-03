@@ -416,6 +416,9 @@ manhole_settings:
 #limit_usage_by_mau: false
 #max_mau_value: 50
 #mau_trial_days: 2
+#mau_appservice_trial_days:
+#  "appservice-id": 1
+#
 #mau_limit_alerting: false
 
 # If enabled, the metrics for the number of monthly active users will

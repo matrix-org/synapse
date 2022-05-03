@@ -215,7 +215,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
     async def is_trial_user(self, user_id: str) -> bool:
         """Checks if user is in the "trial" period, i.e. within the first
-        N days of registration defined by `mau_trial_days` config
+        N days of registration defined by `mau_trial_days` config or the
+        `mau_appservice_trial_days` config.
 
         Args:
             user_id: The user to check for trial status.
@@ -226,7 +227,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             return False
 
         now = self._clock.time_msec()
-        trial_duration_ms = self.config.server.mau_trial_days * 24 * 60 * 60 * 1000
+        days = self.config.mau_appservice_trial_days.get(info["appservice_id"], self.config.mau_trial_days)
+        trial_duration_ms = days * 24 * 60 * 60 * 1000
         is_trial = (now - info["creation_ts"] * 1000) < trial_duration_ms
         return is_trial
 
