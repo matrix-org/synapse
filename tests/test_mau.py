@@ -243,9 +243,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
 
         # Create and sync so that the MAU counts get updated
         token1 = self.create_user("kermit1")
-        self.do_sync_for_user(token1)
         token2 = self.create_user("kermit2")
-        self.do_sync_for_user(token2)
 
         # Cheekily add an application service that we use to register a new user
         # with.
@@ -272,22 +270,24 @@ class TestMauLimit(unittest.HomeserverTestCase):
         )
 
         token3 = self.create_user("as_kermit3", token=as_token_1, appservice=True)
-        self.do_sync_for_user(token3)
         token4 = self.create_user("as_kermit4", token=as_token_2, appservice=True)
-        self.do_sync_for_user(token4)
 
         # Advance time by a day to include the first appservice
-        self.reactor.advance(24 * 60 * 60)
+        self.reactor.advance(24 * 60 * 61)
+        self.do_sync_for_user(token3)
         count = self.store.get_monthly_active_count()
         self.assertEqual(1, self.successResultOf(count))
 
         # Advance time by a day to include the next appservice
-        self.reactor.advance(24 * 60 * 60)
+        self.reactor.advance(24 * 60 * 61)
+        self.do_sync_for_user(token4)
         count = self.store.get_monthly_active_count()
         self.assertEqual(2, self.successResultOf(count))
 
         # Advance time by 2 days to include the native users
-        self.reactor.advance(2 * 24 * 60 * 60)
+        self.reactor.advance(2 * 24 * 60 * 61)
+        self.do_sync_for_user(token1)
+        self.do_sync_for_user(token2)
         count = self.store.get_monthly_active_count()
         self.assertEqual(4, self.successResultOf(count))
 
