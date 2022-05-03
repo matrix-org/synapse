@@ -229,6 +229,64 @@ class TestMauLimit(unittest.HomeserverTestCase):
         self.reactor.advance(100)
         self.assertEqual(2, self.successResultOf(count))
 
+    @override_config({"mau_trial_days": 3, "mau_appservice_trial_days": {"SomeASID": 1, "AnotherASID": 2}})
+    def test_as_trial_days(self):
+        """Test that application services can still create users when the MAU
+        limit has been reached. This only works when application service
+        user ip tracking is disabled.
+        """
+
+        # Create and sync so that the MAU counts get updated
+        token1 = self.create_user("kermit1")
+        self.do_sync_for_user(token1)
+        token2 = self.create_user("kermit2")
+        self.do_sync_for_user(token2)
+
+        # Cheekily add an application service that we use to register a new user
+        # with.
+        as_token_1 = "foobartoken1"
+        self.store.services_cache.append(
+            ApplicationService(
+                token=as_token_1,
+                hostname=self.hs.hostname,
+                id="SomeASID",
+                sender="@as_sender_1:test",
+                namespaces={"users": [{"regex": "@as_2*", "exclusive": True}]},
+            )
+        )
+
+        as_token_2 = "foobartoken2"
+        self.store.services_cache.append(
+            ApplicationService(
+                token=as_token,
+                hostname=self.hs.hostname,
+                id="AnotherASID",
+                sender="@as_sender_2:test",
+                namespaces={"users": [{"regex": "@as_2*", "exclusive": True}]},
+            )
+        )
+
+        token3 = self.create_user("as_kermit3", token=as_token_1, appservice=True)
+        self.do_sync_for_user(token3)
+        token4 = self.create_user("as_kermit4", token=as_token_2, appservice=True)
+        self.do_sync_for_user(token4)
+
+        # Advance time by a day to include the first appservice
+        self.reactor.advance(24 * 60 * 60)
+        count = self.store.get_monthly_active_count()
+        self.assertEqual(1, self.successResultOf(count))
+
+        # Advance time by a day to include the next appservice
+        self.reactor.advance(24 * 60 * 60)
+        count = self.store.get_monthly_active_count()
+        self.assertEqual(2, self.successResultOf(count))
+
+        # Advance time by 2 days to include the native users
+        self.reactor.advance(2 *24 * 60 * 60)
+        count = self.store.get_monthly_active_count()
+        self.assertEqual(4, self.successResultOf(count))
+
+
     def create_user(self, localpart, token=None, appservice=False):
         request_data = {
             "username": localpart,
