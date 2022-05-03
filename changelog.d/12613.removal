@@ -1,0 +1,1 @@
+Synapse now requires at least Python 3.7.1 (up from 3.7.0), for compatibility with the latest Twisted trunk.
