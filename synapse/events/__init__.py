@@ -213,10 +213,17 @@ class _EventInternalMetadata:
         return self.outlier
 
     def is_out_of_band_membership(self) -> bool:
-        """Whether this is an out of band membership, like an invite or an invite
-        rejection. This is needed as those events are marked as outliers, but
-        they still need to be processed as if they're new events (e.g. updating
-        invite state in the database, relaying to clients, etc).
+        """Whether this event is an out-of-band membership.
+
+        OOB memberships are a special case of outlier events: they are membership events
+        for federated rooms that we aren't full members. Examples include invites
+        received over federation, and rejections for such invites.
+
+        The concept of an OOB membership is needed because these events need to be
+        processed as if they're new regular events (e.g. updating membership state in
+        the database, relaying to clients via /sync, etc) despite being outliers.
+
+        See also https://matrix-org.github.io/synapse/develop/development/room-dag-concepts.html#out-of-band-membership-events.
 
         (Added in synapse 0.99.0, so may be unreliable for events received before that)
         """
