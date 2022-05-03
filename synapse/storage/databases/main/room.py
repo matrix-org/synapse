@@ -699,7 +699,9 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         await self.db_pool.runInteraction("delete_ratelimit", delete_ratelimit_txn)
 
     @cached()
-    async def get_retention_policy_for_room(self, room_id: str) -> Dict[str, Optional[int]]:
+    async def get_retention_policy_for_room(
+        self, room_id: str
+    ) -> Dict[str, Optional[int]]:
         """Get the retention policy for a given room.
 
         If no retention policy has been found for this room, returns a policy defined
