@@ -567,6 +567,11 @@ class ReplicationCommandHandler:
         # between then and now.
         missing_updates = cmd.prev_token != current_token
         while missing_updates:
+            # Note: There may very well not be any new updates, but we check to
+            # make sure. This can particularly happen for the event stream where
+            # event persisters continuously send `POSITION`. See `resource.py`
+            # for why this can happen.
+
             logger.info(
                 "Fetching replication rows for '%s' between %i and %i",
                 stream_name,
