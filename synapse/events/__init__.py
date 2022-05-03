@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import abc
-import os
+import abcimport os
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -216,7 +215,7 @@ class _EventInternalMetadata:
         """Whether this event is an out-of-band membership.
 
         OOB memberships are a special case of outlier events: they are membership events
-        for federated rooms that we aren't full members. Examples include invites
+        for federated rooms that we aren't full members of. Examples include invites
         received over federation, and rejections for such invites.
 
         The concept of an OOB membership is needed because these events need to be
