@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import collections.abc
 import logging
 from typing import (
     TYPE_CHECKING,
@@ -24,7 +25,6 @@ from typing import (
 )
 
 import attr
-from frozendict import frozendict
 
 from synapse.api.constants import RelationTypes
 from synapse.api.errors import SynapseError
@@ -380,7 +380,7 @@ class RelationsHandler:
             # Do not bundle aggregations for an event which represents an edit or an
             # annotation. It does not make sense for them to have related events.
             relates_to = event.content.get("m.relates_to")
-            if isinstance(relates_to, (dict, frozendict)):
+            if isinstance(relates_to, collections.abc.Mapping):
                 relation_type = relates_to.get("rel_type")
                 if relation_type in (RelationTypes.ANNOTATION, RelationTypes.REPLACE):
                     continue
