@@ -370,7 +370,7 @@ class PersistEventsStore:
         #
         # Annoyingly SQLite doesn't support row level locking.
         if isinstance(self.database_engine, PostgresEngine):
-            for room_id in set(e.room_id for e, _ in events_and_contexts):
+            for room_id in {e.room_id for e, _ in events_and_contexts}:
                 txn.execute(
                     "SELECT room_version FROM rooms WHERE room_id = ? FOR SHARE",
                     (room_id,),
