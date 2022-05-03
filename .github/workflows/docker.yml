@@ -42,7 +42,9 @@ jobs:
           flavor: |
             latest=false
           tags: |
-            type=ref,event=branch
+            type=raw,value=develop,enable=${{ github.ref == "refs/heads/develop" }}
+            type=raw,value=latest,enable=${{ github.ref == "refs/heads/master" }}
+            type=raw,value=latest,enable=${{ github.ref == "refs/heads/main" }}
             type=pep440,pattern={{raw}}
             # set latest tag for master branch
             type=raw,value=latest,enable=${{ github.ref == "refs/heads/master" }}
