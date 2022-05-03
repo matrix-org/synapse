@@ -16,7 +16,7 @@ pg_size_pretty
 ## Show top 20 larger tables by row count
 ```sql
 SELECT relname, n_live_tup AS "rows"
-  FROM pg_stat_user_tables 
+  FROM pg_stat_user_tables
   ORDER BY n_live_tup DESC
   LIMIT 20;
 ```
@@ -133,7 +133,8 @@ SELECT e.room_id, r.name, COUNT(e.event_id) cnt
 Caution. This query does not use any indexes, can be slow and create load on the database.
 ```sql
 SELECT COUNT(*), sender
-  FROM events WHERE (type = 'm.room.encrypted' OR type = 'm.room.message')
+  FROM events
+  WHERE (type = 'm.room.encrypted' OR type = 'm.room.message')
     AND origin_server_ts >= DATE_PART('epoch', NOW() - INTERVAL '1 month') * 1000
   GROUP BY sender
   ORDER BY COUNT(*) DESC
