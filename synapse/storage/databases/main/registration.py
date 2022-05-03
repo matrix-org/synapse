@@ -227,8 +227,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             return False
 
         now = self._clock.time_msec()
-        days = self.config.mau_appservice_trial_days.get(
-            info["appservice_id"], self.config.mau_trial_days
+        days = self.config.server.mau_appservice_trial_days.get(
+            info["appservice_id"], self.config.server.mau_trial_days
         )
         trial_duration_ms = days * 24 * 60 * 60 * 1000
         is_trial = (now - info["creation_ts"] * 1000) < trial_duration_ms
