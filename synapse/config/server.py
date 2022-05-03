@@ -1109,7 +1109,6 @@ class ServerConfig(Config):
         # 'mau_appservice_trial_days' is similar to the above, but applies a different
         # trial number depending on the appservice ID registered to the user. A value
         # of 0 means no trial days are applied.
-        # 
         #
         # 'mau_limit_alerting' is a means of limiting client side alerting
         # should the mau limit be reached. This is useful for small instances
