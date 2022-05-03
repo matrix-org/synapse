@@ -1,0 +1,1 @@
+Add a consistency check on events which we read from the database.
