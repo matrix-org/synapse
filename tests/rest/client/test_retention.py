@@ -254,9 +254,13 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         config = self.default_config()
-        config["retention"] = {
+
+        retention_config = {
             "enabled": True,
         }
+
+        retention_config.update(config.get("retention", {}))
+        config["retention"] = retention_config
 
         mock_federation_client = Mock(spec=["backfill"])
 
@@ -294,6 +298,23 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
         )
 
         self._test_retention(room_id, expected_code_for_first_event=404)
+
+    @unittest.override_config({"retention": {"enabled": False}})
+    def test_visibility_when_disabled(self) -> None:
+        room_id = self.helper.create_room_as(self.user_id, tok=self.token)
+
+        self.helper.send_state(
+            room_id=room_id,
+            event_type=EventTypes.Retention,
+            body={"max_lifetime": one_day_ms},
+            tok=self.token,
+        )
+
+        resp = self.helper.send(room_id=room_id, body="test", tok=self.token)
+
+        self.reactor.advance(one_day_ms * 2 / 1000)
+
+        self.get_event(room_id, resp["event_id"])
 
     def _test_retention(
         self, room_id: str, expected_code_for_first_event: int = 200
