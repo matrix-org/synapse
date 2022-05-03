@@ -42,12 +42,10 @@ jobs:
           flavor: |
             latest=false
           tags: |
-            type=raw,value=develop,enable=${{ github.ref == "refs/heads/develop" }}
-            type=raw,value=latest,enable=${{ github.ref == "refs/heads/master" }}
-            type=raw,value=latest,enable=${{ github.ref == "refs/heads/main" }}
+            type=raw,value=develop,enable=${{ github.ref == format('refs/heads/{0}', 'develop') }}
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
             type=pep440,pattern={{raw}}
-            # set latest tag for master branch
-            type=raw,value=latest,enable=${{ github.ref == "refs/heads/master" }}
 
       - name: Build and push all platforms
         uses: docker/build-push-action@v2
