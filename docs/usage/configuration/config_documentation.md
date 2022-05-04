@@ -1035,13 +1035,13 @@ allow_profile_lookup_over_federation: false
 ---
 Config option: `allow_device_name_lookup_over_federation`
 
-Set this option to false to disable device display name lookup over federation. By default, the
-Federation API allows other homeservers to obtain device display names of any user
+Set this option to true to allow device display name lookup over federation. By default, the
+Federation API prevents other homeservers from obtaining the display names of any user devices
 on this homeserver.
 
 Example configuration:
 ```yaml
-allow_device_name_lookup_over_federation: false
+allow_device_name_lookup_over_federation: true
 ```
 ---
 ## Caching ##
