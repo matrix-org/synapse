@@ -321,6 +321,7 @@ class RoomVersions:
         msc2403_knocking=True,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3667_int_only_power_levels=False,
         msc3787_knock_restricted_join_rule=True,
     )
     MSC3604Opt1 = RoomVersion(
@@ -338,6 +339,8 @@ class RoomVersions:
         msc2403_knocking=True,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3667_int_only_power_levels=False,
+        msc3787_knock_restricted_join_rule=False,
     )
     MSC3604Opt2 = RoomVersion(
         # v9 + MSC2176 + MSC3667
@@ -356,6 +359,7 @@ class RoomVersions:
         msc2716_historical=False,
         msc2716_redactions=False,
         msc3667_int_only_power_levels=True,
+        msc3787_knock_restricted_join_rule=False,
     )
 
 
