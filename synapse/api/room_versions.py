@@ -361,6 +361,25 @@ class RoomVersions:
         msc3667_int_only_power_levels=True,
         msc3787_knock_restricted_join_rule=False,
     )
+    MSC3604Opt3 = RoomVersion(
+        # v9 + MSC2176 + MSC3667 + MSC3787
+        "org.matrix.msc3604.opt3",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2176_redaction_rules=True,
+        msc3083_join_rules=True,
+        msc3375_redaction_rules=True,
+        msc2403_knocking=True,
+        msc2716_historical=False,
+        msc2716_redactions=False,
+        msc3667_int_only_power_levels=True,
+        msc3787_knock_restricted_join_rule=True,
+    )
 
 
 KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
@@ -381,6 +400,7 @@ KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
         RoomVersions.MSC3787,
         RoomVersions.MSC3604Opt1,
         RoomVersions.MSC3604Opt2,
+        RoomVersions.MSC3604Opt3,
     )
 }
 
