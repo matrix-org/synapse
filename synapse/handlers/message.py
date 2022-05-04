@@ -1407,7 +1407,7 @@ class EventCreationHandler:
 
                 original_event = await self.store.get_event(
                     event.redacts,
-                    redact_behaviour=EventRedactBehaviour.AS_IS,
+                    redact_behaviour=EventRedactBehaviour.as_is,
                     get_prev_content=False,
                     allow_rejected=False,
                     allow_none=True,
@@ -1504,7 +1504,7 @@ class EventCreationHandler:
 
             original_event = await self.store.get_event(
                 event.redacts,
-                redact_behaviour=EventRedactBehaviour.AS_IS,
+                redact_behaviour=EventRedactBehaviour.as_is,
                 get_prev_content=False,
                 allow_rejected=False,
                 allow_none=True,

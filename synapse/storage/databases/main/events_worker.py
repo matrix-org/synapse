@@ -14,6 +14,7 @@
 
 import logging
 import threading
+from enum import Enum, auto
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -30,7 +31,6 @@ from typing import (
 )
 
 import attr
-from constantly import NamedConstant, Names
 from prometheus_client import Gauge
 from typing_extensions import Literal
 
@@ -150,14 +150,14 @@ class _EventRow:
     outlier: bool
 
 
-class EventRedactBehaviour(Names):
+class EventRedactBehaviour(Enum):
     """
     What to do when retrieving a redacted event from the database.
     """
 
-    AS_IS = NamedConstant()
-    REDACT = NamedConstant()
-    BLOCK = NamedConstant()
+    as_is = auto()
+    redact = auto()
+    block = auto()
 
 
 class EventsWorkerStore(SQLBaseStore):
@@ -327,7 +327,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_event(
         self,
         event_id: str,
-        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.REDACT,
+        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.redact,
         get_prev_content: bool = ...,
         allow_rejected: bool = ...,
         allow_none: Literal[False] = ...,
@@ -339,7 +339,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_event(
         self,
         event_id: str,
-        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.REDACT,
+        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.redact,
         get_prev_content: bool = ...,
         allow_rejected: bool = ...,
         allow_none: Literal[True] = ...,
@@ -350,7 +350,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_event(
         self,
         event_id: str,
-        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.REDACT,
+        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.redact,
         get_prev_content: bool = False,
         allow_rejected: bool = False,
         allow_none: bool = False,
@@ -362,9 +362,9 @@ class EventsWorkerStore(SQLBaseStore):
             event_id: The event_id of the event to fetch
 
             redact_behaviour: Determine what to do with a redacted event. Possible values:
-                * AS_IS - Return the full event body with no redacted content
-                * REDACT - Return the event but with a redacted body
-                * DISALLOW - Do not return redacted events (behave as per allow_none
+                * as_is - Return the full event body with no redacted content
+                * redact - Return the event but with a redacted body
+                * block - Do not return redacted events (behave as per allow_none
                     if the event is redacted)
 
             get_prev_content: If True and event is a state event,
@@ -406,7 +406,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_events(
         self,
         event_ids: Collection[str],
-        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.REDACT,
+        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.redact,
         get_prev_content: bool = False,
         allow_rejected: bool = False,
     ) -> Dict[str, EventBase]:
@@ -417,9 +417,9 @@ class EventsWorkerStore(SQLBaseStore):
 
             redact_behaviour: Determine what to do with a redacted event. Possible
                 values:
-                * AS_IS - Return the full event body with no redacted content
-                * REDACT - Return the event but with a redacted body
-                * DISALLOW - Do not return redacted events (omit them from the response)
+                * as_is - Return the full event body with no redacted content
+                * redact - Return the event but with a redacted body
+                * block - Do not return redacted events (omit them from the response)
 
             get_prev_content: If True and event is a state event,
                 include the previous states content in the unsigned field.
@@ -442,7 +442,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_events_as_list(
         self,
         event_ids: Collection[str],
-        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.REDACT,
+        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.redact,
         get_prev_content: bool = False,
         allow_rejected: bool = False,
     ) -> List[EventBase]:
@@ -455,9 +455,9 @@ class EventsWorkerStore(SQLBaseStore):
             event_ids: The event_ids of the events to fetch
 
             redact_behaviour: Determine what to do with a redacted event. Possible values:
-                * AS_IS - Return the full event body with no redacted content
-                * REDACT - Return the event but with a redacted body
-                * DISALLOW - Do not return redacted events (omit them from the response)
+                * as_is - Return the full event body with no redacted content
+                * redact - Return the event but with a redacted body
+                * block - Do not return redacted events (omit them from the response)
 
             get_prev_content: If True and event is a state event,
                 include the previous states content in the unsigned field.
@@ -568,10 +568,10 @@ class EventsWorkerStore(SQLBaseStore):
             event = entry.event
 
             if entry.redacted_event:
-                if redact_behaviour == EventRedactBehaviour.BLOCK:
+                if redact_behaviour == EventRedactBehaviour.block:
                     # Skip this event
                     continue
-                elif redact_behaviour == EventRedactBehaviour.REDACT:
+                elif redact_behaviour == EventRedactBehaviour.redact:
                     event = entry.redacted_event
 
             events.append(event)

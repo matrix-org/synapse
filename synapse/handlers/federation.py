@@ -316,7 +316,7 @@ class FederationHandler:
 
             events_to_check = await self.store.get_events_as_list(
                 event_ids_to_check,
-                redact_behaviour=EventRedactBehaviour.AS_IS,
+                redact_behaviour=EventRedactBehaviour.as_is,
                 get_prev_content=False,
             )
 
@@ -1494,7 +1494,7 @@ class FederationHandler:
 
             events = await self.store.get_events_as_list(
                 batch,
-                redact_behaviour=EventRedactBehaviour.AS_IS,
+                redact_behaviour=EventRedactBehaviour.as_is,
                 allow_rejected=True,
             )
             for event in events:
