@@ -831,7 +831,7 @@ class RoomSummaryHandler:
             )
 
             if room_entry:
-                room = room_entry.room
+                room = dict(room_entry.room)
                 fed_room_id = room_entry.room_id
 
                 if fed_room_id == room_id:
