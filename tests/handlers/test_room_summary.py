@@ -1098,11 +1098,11 @@ class RoomSummaryTestCase(unittest.HomeserverTestCase):
         Return data over federation and ensure that it is handled properly.
         """
         fed_hostname = self.hs.hostname + "2"
-        fedroom = "#subroom:" + fed_hostname
+        fed_room = "#fed_room:" + fed_hostname
 
         requested_room_entry = _RoomEntry(
-            fedroom,
-            {"room_id": fedroom, "world_readable": True},
+            fed_room,
+            {"room_id": fed_room, "world_readable": True},
         )
 
         async def summarize_remote_room_hierarchy(_self, room, suggested_only):
@@ -1114,7 +1114,7 @@ class RoomSummaryTestCase(unittest.HomeserverTestCase):
         ):
             result = self.get_success(
                 self.handler.get_room_summary(
-                    self.user, fedroom, remote_room_hosts=[fed_hostname]
+                    self.user, fed_room, remote_room_hosts=[fed_hostname]
                 )
             )
-        self.assertEqual(result.get("room_id"), fedroom)
+        self.assertEqual(result.get("room_id"), fed_room)
