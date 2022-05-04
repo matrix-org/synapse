@@ -3297,6 +3297,11 @@ needing an elevated power level).  This takes the same shape as the
 `power_level_content_override` parameter in the /createRoom API, but
 is applied before that parameter.
 
+Note that each key provided inside a preset (for example `events` in the example
+below) will overwrite all existing defaults inside that key. So in the example
+below, newly-created private_chat rooms will have no rules for any event types
+except `com.example.foo`.
+
 Example configuration:
 ```yaml
 default_power_level_content_override:
