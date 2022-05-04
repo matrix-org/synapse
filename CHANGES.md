@@ -1,3 +1,9 @@
+Synapse 1.59.0
+==============
+
+The non-standard `m.login.jwt` login type has been removed from Synapse. It can be replaced with `org.matrix.login.jwt` for identical behaviour. This is only used if `jwt_config.enabled` is set to `true` in the configuration.
+
+
 Synapse 1.58.0 (2022-05-03)
 ===========================
 

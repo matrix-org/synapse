@@ -69,9 +69,7 @@ class LoginRestServlet(RestServlet):
     SSO_TYPE = "m.login.sso"
     TOKEN_TYPE = "m.login.token"
     JWT_TYPE = "org.matrix.login.jwt"
-    JWT_TYPE_DEPRECATED = "m.login.jwt"
     APPSERVICE_TYPE = "m.login.application_service"
-    APPSERVICE_TYPE_UNSTABLE = "uk.half-shot.msc2778.login.application_service"
     REFRESH_TOKEN_PARAM = "refresh_token"
 
     def __init__(self, hs: "HomeServer"):
@@ -126,7 +124,6 @@ class LoginRestServlet(RestServlet):
         flows: List[JsonDict] = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
-            flows.append({"type": LoginRestServlet.JWT_TYPE_DEPRECATED})
 
         if self.cas_enabled:
             # we advertise CAS for backwards compat, though MSC1721 renamed it
@@ -156,7 +153,6 @@ class LoginRestServlet(RestServlet):
         flows.extend({"type": t} for t in self.auth_handler.get_supported_login_types())
 
         flows.append({"type": LoginRestServlet.APPSERVICE_TYPE})
-        flows.append({"type": LoginRestServlet.APPSERVICE_TYPE_UNSTABLE})
 
         return 200, {"flows": flows}
 
@@ -175,10 +171,7 @@ class LoginRestServlet(RestServlet):
         )
 
         try:
-            if login_submission["type"] in (
-                LoginRestServlet.APPSERVICE_TYPE,
-                LoginRestServlet.APPSERVICE_TYPE_UNSTABLE,
-            ):
+            if login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
                 appservice = self.auth.get_appservice_by_req(request)
 
                 if appservice.is_rate_limited():
@@ -191,9 +184,9 @@ class LoginRestServlet(RestServlet):
                     appservice,
                     should_issue_refresh_token=should_issue_refresh_token,
                 )
-            elif self.jwt_enabled and (
-                login_submission["type"] == LoginRestServlet.JWT_TYPE
-                or login_submission["type"] == LoginRestServlet.JWT_TYPE_DEPRECATED
+            elif (
+                self.jwt_enabled
+                and login_submission["type"] == LoginRestServlet.JWT_TYPE
             ):
                 await self._address_ratelimiter.ratelimit(None, request.getClientIP())
                 result = await self._do_jwt_login(
