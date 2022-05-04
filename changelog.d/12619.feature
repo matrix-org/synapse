@@ -1,1 +1,1 @@
-Add new `enable_registration_token_3pid_bypass` configuration option to specify a different trial period for users registered via an appservice.
+Add new `mau_appservice_trial_days` configuration option to specify a different trial period for users registered via an appservice.
