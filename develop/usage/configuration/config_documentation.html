@@ -975,11 +975,11 @@ on this homeserver.</p>
 </code></pre>
 <hr />
 <p>Config option: <code>allow_device_name_lookup_over_federation</code></p>
-<p>Set this option to false to disable device display name lookup over federation. By default, the
-Federation API allows other homeservers to obtain device display names of any user
+<p>Set this option to true to allow device display name lookup over federation. By default, the
+Federation API prevents other homeservers from obtaining the display names of any user devices
 on this homeserver.</p>
 <p>Example configuration:</p>
-<pre><code class="language-yaml">allow_device_name_lookup_over_federation: false
+<pre><code class="language-yaml">allow_device_name_lookup_over_federation: true
 </code></pre>
 <hr />
 <h2 id="caching"><a class="header" href="#caching">Caching</a></h2>

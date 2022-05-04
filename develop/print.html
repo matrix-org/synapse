@@ -1631,6 +1631,13 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1590"><a class="header" href="#upgrading-to-v1590">Upgrading to v1.59.0</a></h1>
+<h2 id="device-name-lookup-over-federation-has-been-disabled-by-default"><a class="header" href="#device-name-lookup-over-federation-has-been-disabled-by-default">Device name lookup over federation has been disabled by default</a></h2>
+<p>The names of user devices are no longer visible to users on other homeservers by default.
+Device IDs are unaffected, as these are necessary to facilitate end-to-end encryption.</p>
+<p>To re-enable this functionality, set the
+<a href="https://matrix-org.github.io/synapse/v1.59/usage/configuration/config_documentation.html#federation"><code>allow_device_name_lookup_over_federation</code></a>
+homeserver config option to <code>true</code>.</p>
 <h1 id="upgrading-to-v1580"><a class="header" href="#upgrading-to-v1580">Upgrading to v1.58.0</a></h1>
 <h2 id="groupscommunities-feature-has-been-disabled-by-default"><a class="header" href="#groupscommunities-feature-has-been-disabled-by-default">Groups/communities feature has been disabled by default</a></h2>
 <p>The non-standard groups/communities feature in Synapse has been disabled by default
@@ -3816,11 +3823,11 @@ on this homeserver.</p>
 </code></pre>
 <hr />
 <p>Config option: <code>allow_device_name_lookup_over_federation</code></p>
-<p>Set this option to false to disable device display name lookup over federation. By default, the
-Federation API allows other homeservers to obtain device display names of any user
+<p>Set this option to true to allow device display name lookup over federation. By default, the
+Federation API prevents other homeservers from obtaining the display names of any user devices
 on this homeserver.</p>
 <p>Example configuration:</p>
-<pre><code class="language-yaml">allow_device_name_lookup_over_federation: false
+<pre><code class="language-yaml">allow_device_name_lookup_over_federation: true
 </code></pre>
 <hr />
 <h2 id="caching"><a class="header" href="#caching">Caching</a></h2>
@@ -6647,11 +6654,11 @@ retention:
 #
 #allow_profile_lookup_over_federation: false
 
-# Uncomment to disable device display name lookup over federation. By default, the
-# Federation API allows other homeservers to obtain device display names of any user
-# on this homeserver. Defaults to 'true'.
+# Uncomment to allow device display name lookup over federation. By default, the
+# Federation API prevents other homeservers from obtaining the display names of
+# user devices on this homeserver. Defaults to 'false'.
 #
-#allow_device_name_lookup_over_federation: false
+#allow_device_name_lookup_over_federation: true
 
 
 ## Caching ##
