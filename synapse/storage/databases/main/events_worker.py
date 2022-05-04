@@ -1094,6 +1094,18 @@ class EventsWorkerStore(SQLBaseStore):
             original_ev.internal_metadata.stream_ordering = row.stream_ordering
             original_ev.internal_metadata.outlier = row.outlier
 
+            # Consistency check: if the content of the event has been modified in the
+            # database, then the calculated event ID will not match the event id in the
+            # database.
+            if original_ev.event_id != event_id:
+                # it's difficult to see what to do here. Pretty much all bets are off
+                # if Synapse cannot rely on the consistency of its database.
+                raise RuntimeError(
+                    f"Database corruption: Event {event_id} in room {d['room_id']} "
+                    f"from the database appears to have been modified (calculated "
+                    f"event id {original_ev.event_id})"
+                )
+
             event_map[event_id] = original_ev
 
         # finally, we can decide whether each one needs redacting, and build

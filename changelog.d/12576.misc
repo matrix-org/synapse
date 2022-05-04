@@ -1,0 +1,1 @@
+Allow unused `#type: ignore` comments in bleeding edge CI jobs.
