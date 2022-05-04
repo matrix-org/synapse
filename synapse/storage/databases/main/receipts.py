@@ -22,7 +22,6 @@ from typing import (
     Iterable,
     List,
     Optional,
-    Set,
     Tuple,
     cast,
 )
@@ -116,11 +115,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
     def get_max_receipt_stream_id(self) -> int:
         """Get the current max stream ID for receipts stream"""
         return self._receipts_id_gen.get_current_token()
-
-    @cached()
-    async def get_users_with_read_receipts_in_room(self, room_id: str) -> Set[str]:
-        receipts = await self.get_receipts_for_room(room_id, ReceiptTypes.READ)
-        return {r["user_id"] for r in receipts}
 
     @cached()
     async def get_receipts_for_room(
@@ -599,23 +593,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
             "get_all_updated_receipts", get_all_updated_receipts_txn
         )
 
-    def _invalidate_get_users_with_receipts_in_room(
-        self, room_id: str, receipt_type: str, user_id: str
-    ) -> None:
-        if receipt_type != ReceiptTypes.READ:
-            return
-
-        res = self.get_users_with_read_receipts_in_room.cache.get_immediate(
-            room_id, None, update_metrics=False
-        )
-
-        if res and user_id in res:
-            # We'd only be adding to the set, so no point invalidating if the
-            # user is already there
-            return
-
-        self.get_users_with_read_receipts_in_room.invalidate((room_id,))
-
     def invalidate_caches_for_receipt(
         self, room_id: str, receipt_type: str, user_id: str
     ) -> None:
@@ -624,7 +601,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
         self._get_last_receipt_event_id_for_user.invalidate(
             (user_id, room_id, receipt_type)
         )
-        self._invalidate_get_users_with_receipts_in_room(room_id, receipt_type, user_id)
         self.get_receipts_for_room.invalidate((room_id, receipt_type))
 
     def process_replication_rows(
@@ -843,12 +819,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
         assert self._can_write_to_receipts
 
         txn.call_after(self.get_receipts_for_room.invalidate, (room_id, receipt_type))
-        txn.call_after(
-            self._invalidate_get_users_with_receipts_in_room,
-            room_id,
-            receipt_type,
-            user_id,
-        )
         txn.call_after(
             self._get_receipts_for_user_with_orderings.invalidate,
             (user_id, receipt_type),
