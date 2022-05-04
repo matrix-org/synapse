@@ -468,7 +468,7 @@ class SsoHandler:
                     auth_provider_id,
                     remote_user_id,
                     get_request_user_agent(request),
-                    request.getClientIP(),
+                    request.getClientAddress().host,
                 )
                 new_user = True
             elif self._sso_update_profile_information:
@@ -928,7 +928,7 @@ class SsoHandler:
             session.auth_provider_id,
             session.remote_user_id,
             get_request_user_agent(request),
-            request.getClientIP(),
+            request.getClientAddress().host,
         )
 
         logger.info(

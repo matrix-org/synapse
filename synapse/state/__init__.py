@@ -800,7 +800,7 @@ class StateResolutionStore:
 
         return self.store.get_events(
             event_ids,
-            redact_behaviour=EventRedactBehaviour.AS_IS,
+            redact_behaviour=EventRedactBehaviour.as_is,
             get_prev_content=False,
             allow_rejected=allow_rejected,
         )
