@@ -1106,9 +1106,10 @@ class ServerConfig(Config):
         # sign up in a short space of time never to return after their initial
         # session.
         #
-        # 'mau_appservice_trial_days' is similar to the above, but applies a different
-        # trial number depending on the appservice ID registered to the user. A value
-        # of 0 means no trial days are applied.
+        # The option `mau_appservice_trial_days` is similar to `mau_trial_days`, but
+        # applies a different trial number if the user was registered by an appservice.
+        # A value of 0 means no trial days are applied. Appservices not listed in this
+        # dictionary use the value of `mau_trial_days` instead.
         #
         # 'mau_limit_alerting' is a means of limiting client side alerting
         # should the mau limit be reached. This is useful for small instances
