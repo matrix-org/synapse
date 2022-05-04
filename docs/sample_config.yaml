@@ -710,8 +710,8 @@ retention:
 #allow_profile_lookup_over_federation: false
 
 # Uncomment to allow device display name lookup over federation. By default, the
-# Federation API prevents other homeservers from obtaining device display names of
-# users on this homeserver. Defaults to 'false'.
+# Federation API prevents other homeservers from obtaining the display names of
+# user devices on this homeserver. Defaults to 'false'.
 #
 #allow_device_name_lookup_over_federation: true
 
