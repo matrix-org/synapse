@@ -645,7 +645,8 @@ class RoomSummaryHandler:
         due to an invite, etc.
 
         Args:
-            requester: The user requesting the summary. If not passed only world readability is checked.
+            requester: The user requesting the summary. If not passed only world
+                readability is checked.
             room_id: The room ID returned over federation.
             room: The summary of the room returned over federation.
 
@@ -843,9 +844,8 @@ class RoomSummaryHandler:
                         requester, fed_room_id, room
                     ):
                         # Before returning to the client, remove the allowed_room_ids
-                        # and allowed_spaces keys.
+                        # key.
                         room.pop("allowed_room_ids", None)
-                        room.pop("allowed_spaces", None)
 
                         # A remote room can't be in the joined state
                         room["membership"] = "leave"
@@ -859,7 +859,6 @@ class RoomSummaryHandler:
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)
 class _RoomQueueEntry:
-
     # The room ID of this entry.
     room_id: str
     # The server to query if the room is not known locally.
