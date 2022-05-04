@@ -835,7 +835,7 @@ class RoomSummaryHandler:
                 fed_room_id = room_entry.room_id
 
                 if fed_room_id == room_id:
-                    # The results over federation might include rooms that the we,
+                    # The results over federation might include rooms that we,
                     # as the requesting server, are allowed to see, but the requesting
                     # user is not permitted to see.
                     #
