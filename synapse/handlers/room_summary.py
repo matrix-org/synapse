@@ -105,6 +105,7 @@ class RoomSummaryHandler:
             hs.get_clock(),
             "get_room_hierarchy",
         )
+        self._msc3266_enabled = hs.config.experimental.msc3266_enabled
 
     async def get_room_hierarchy(
         self,
@@ -716,9 +717,11 @@ class RoomSummaryHandler:
             ),
             "guest_can_join": stats["guest_access"] == "can_join",
             "room_type": create_event.content.get(EventContentFields.ROOM_TYPE),
-            "im.nheko.summary.version": stats["version"],
-            "im.nheko.summary.encryption": stats["encryption"],
         }
+
+        if self._msc3266_enabled:
+            entry["im.nheko.summary.version"] = stats["version"]
+            entry["im.nheko.summary.encryption"] = stats["encryption"]
 
         # Federation requests need to provide additional information so the
         # requested server is able to filter the response appropriately.
