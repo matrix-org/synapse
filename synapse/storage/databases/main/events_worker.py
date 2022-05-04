@@ -362,9 +362,9 @@ class EventsWorkerStore(SQLBaseStore):
             event_id: The event_id of the event to fetch
 
             redact_behaviour: Determine what to do with a redacted event. Possible values:
-                * AS_IS - Return the full event body with no redacted content
-                * REDACT - Return the event but with a redacted body
-                * DISALLOW - Do not return redacted events (behave as per allow_none
+                * as_is - Return the full event body with no redacted content
+                * redact - Return the event but with a redacted body
+                * block - Do not return redacted events (behave as per allow_none
                     if the event is redacted)
 
             get_prev_content: If True and event is a state event,
@@ -417,9 +417,9 @@ class EventsWorkerStore(SQLBaseStore):
 
             redact_behaviour: Determine what to do with a redacted event. Possible
                 values:
-                * AS_IS - Return the full event body with no redacted content
-                * REDACT - Return the event but with a redacted body
-                * DISALLOW - Do not return redacted events (omit them from the response)
+                * as_is - Return the full event body with no redacted content
+                * redact - Return the event but with a redacted body
+                * block - Do not return redacted events (omit them from the response)
 
             get_prev_content: If True and event is a state event,
                 include the previous states content in the unsigned field.
@@ -455,9 +455,9 @@ class EventsWorkerStore(SQLBaseStore):
             event_ids: The event_ids of the events to fetch
 
             redact_behaviour: Determine what to do with a redacted event. Possible values:
-                * AS_IS - Return the full event body with no redacted content
-                * REDACT - Return the event but with a redacted body
-                * DISALLOW - Do not return redacted events (omit them from the response)
+                * as_is - Return the full event body with no redacted content
+                * redact - Return the event but with a redacted body
+                * block - Do not return redacted events (omit them from the response)
 
             get_prev_content: If True and event is a state event,
                 include the previous states content in the unsigned field.
