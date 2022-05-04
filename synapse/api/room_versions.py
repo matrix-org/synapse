@@ -339,7 +339,7 @@ class RoomVersions:
         msc2716_historical=False,
         msc2716_redactions=False,
     )
-    MSC3604opt2 = RoomVersion(
+    MSC3604Opt2 = RoomVersion(
         # v9 + MSC2176 + MSC3667
         "org.matrix.msc3604.opt2",
         RoomDisposition.UNSTABLE,
@@ -376,7 +376,7 @@ KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
         RoomVersions.MSC3667,
         RoomVersions.MSC3787,
         RoomVersions.MSC3604Opt1,
-        RoomVersions.MSC3604opt2,
+        RoomVersions.MSC3604Opt2,
     )
 }
 
