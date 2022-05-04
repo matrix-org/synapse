@@ -110,6 +110,17 @@ _cancellable_method_names = frozenset(
 def cancellable(method: F) -> F:
     """Marks a servlet method as cancellable.
 
+    Methods with this decorator will be cancelled if the client disconnects before we
+    finish processing the request.
+
+    During cancellation, `Deferred.cancel()` will be invoked on the `Deferred` wrapping
+    the method. The `cancel()` call will propagate down to the `Deferred` that is
+    currently being waited on. That `Deferred` will raise a `CancelledError`, which will
+    propagate up, as per normal exception handling.
+
+    Before applying this decorator to a new endpoint, it is wise to recursively check
+    that all `await`s are on coroutines or `Deferred`s that handle cancellation cleanly.
+
     Usage:
         class SomeServlet(RestServlet):
             @cancellable
@@ -126,7 +137,7 @@ def cancellable(method: F) -> F:
 
 
 def is_method_cancellable(method: Callable[..., Any]) -> bool:
-    """Checks whether a servlet method is cancellable."""
+    """Checks whether a servlet method has the `@cancellable` flag."""
     return getattr(method, "cancellable", False)
 
 
