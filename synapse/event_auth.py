@@ -452,7 +452,7 @@ def _is_membership_change_allowed(
                 room_version.msc3787_knock_restricted_join_rule
                 and join_rule == JoinRules.KNOCK_RESTRICTED
             )
-         ):
+        ):
             if not caller_in_room and not caller_invited:
                 raise AuthError(403, "You are not invited to this room.")
         else:

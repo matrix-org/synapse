@@ -568,7 +568,7 @@ class RoomSummaryHandler:
                     room_version.msc3787_knock_restricted_join_rule
                     and join_rule == JoinRules.KNOCK_RESTRICTED
                 )
-             ):
+            ):
                 return True
 
         # Include the room if it is peekable.
