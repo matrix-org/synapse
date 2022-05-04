@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse v1.48.0 where latest thread reply provided failed to include the proper bundled aggregations.
