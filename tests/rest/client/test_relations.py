@@ -620,6 +620,19 @@ class RelationsTestCase(BaseRelationsTestCase):
             {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
         )
 
+        # Directly requesting the edit should not have the edit to the edit applied.
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/event/{edit_event_id}",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        self.assertEqual("Wibble", channel.json_body["content"]["body"])
+        self.assertIn("m.new_content", channel.json_body["content"])
+
+        # The relations information should not include the edit to the edit.
+        self.assertNotIn("m.relations", channel.json_body["unsigned"])
+
     def test_unknown_relations(self) -> None:
         """Unknown relations should be accepted."""
         channel = self._send_relation("m.relation.test", "m.room.test")
