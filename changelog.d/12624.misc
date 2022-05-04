@@ -1,2 +1,1 @@
-Remove use of constantly library and switch to enums for EventRedactBehaviour.
-Contributed by @andrewdoh.
+Remove use of constantly library and switch to enums for EventRedactBehaviour. Contributed by @andrewdoh.
