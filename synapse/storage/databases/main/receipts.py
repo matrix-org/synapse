@@ -116,28 +116,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
         """Get the current max stream ID for receipts stream"""
         return self._receipts_id_gen.get_current_token()
 
-    @cached()
-    async def get_receipts_for_room(
-        self, room_id: str, receipt_type: str
-    ) -> List[Dict[str, Any]]:
-        """
-        Fetch the event IDs for the latest receipt for all users in a room with the given receipt type.
-
-        Args:
-            room_id: The room ID to fetch the receipt for.
-            receipt_type: The receipt type to fetch.
-
-        Returns:
-            A list of dictionaries, one for each user ID. Each dictionary
-            contains a user ID and the event ID of that user's latest receipt.
-        """
-        return await self.db_pool.simple_select_list(
-            table="receipts_linearized",
-            keyvalues={"room_id": room_id, "receipt_type": receipt_type},
-            retcols=("user_id", "event_id"),
-            desc="get_receipts_for_room",
-        )
-
     async def get_last_receipt_event_id_for_user(
         self, user_id: str, room_id: str, receipt_types: Iterable[str]
     ) -> Optional[str]:
@@ -601,7 +579,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
         self._get_last_receipt_event_id_for_user.invalidate(
             (user_id, room_id, receipt_type)
         )
-        self.get_receipts_for_room.invalidate((room_id, receipt_type))
 
     def process_replication_rows(
         self,
@@ -818,7 +795,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
     ) -> None:
         assert self._can_write_to_receipts
 
-        txn.call_after(self.get_receipts_for_room.invalidate, (room_id, receipt_type))
         txn.call_after(
             self._get_receipts_for_user_with_orderings.invalidate,
             (user_id, receipt_type),
