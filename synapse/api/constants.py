@@ -65,6 +65,8 @@ class JoinRules:
     PRIVATE: Final = "private"
     # As defined for MSC3083.
     RESTRICTED: Final = "restricted"
+    # As defined for MSC3787.
+    KNOCK_RESTRICTED: Final = "knock_restricted"
 
 
 class RestrictedJoinRuleTypes:
