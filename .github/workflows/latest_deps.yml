@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@v2
       # The dev dependencies aren't exposed in the wheel metadata (at least with current
       # poetry-core versions), so we install with poetry.
-      - uses: matrix-org/setup-python-poetry@v1
+      - uses: matrix-org/setup-python-poetry@dmr/extras-poetry-1.2
         with:
           python-version: "3.x"
           poetry-version: "1.2.0b1"
