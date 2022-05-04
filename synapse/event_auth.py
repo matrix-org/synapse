@@ -445,12 +445,14 @@ def _is_membership_change_allowed(
                 if authorising_user_level < invite_level:
                     raise AuthError(403, "Join event authorised by invalid server.")
 
-        elif join_rule == JoinRules.INVITE or (
-            room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
-        ) or (
-            room_version.msc3787_knock_restricted_join_rule
-            and join_rule == JoinRules.KNOCK_RESTRICTED
-        ):
+        elif (
+            join_rule == JoinRules.INVITE
+            or (room_version.msc2403_knocking and join_rule == JoinRules.KNOCK)
+            or (
+                room_version.msc3787_knock_restricted_join_rule
+                and join_rule == JoinRules.KNOCK_RESTRICTED
+            )
+         ):
             if not caller_in_room and not caller_invited:
                 raise AuthError(403, "You are not invited to this room.")
         else:
