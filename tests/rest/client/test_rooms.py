@@ -1402,6 +1402,8 @@ class RoomPowerLevelOverridesInPracticeTestCase(RoomBase):
         {
             "default_power_level_content_override": {
                 "public_chat": {"events": {"custom.event": 0}},
+                "private_chat": None,
+                "trusted_private_chat": None,
             }
         },
     )
