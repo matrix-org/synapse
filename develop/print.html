@@ -16040,7 +16040,7 @@ WHERE room_id IN (WHERE room_id IN (
 <tr><td>NNNN</td><td>Total time waiting for response to DB queries across all parallel DB work from this request</td></tr>
 <tr><td>OOOO</td><td>Count of DB transactions performed</td></tr>
 <tr><td>PPPP</td><td>Response body size</td></tr>
-<tr><td>QQQQ</td><td>Response status code (prefixed with ! if the socket was closed before the response was generated)</td></tr>
+<tr><td>QQQQ</td><td>Response status code<br/>Suffixed with <code>!</code> if the socket was closed before the response was generated.<br/>A <code>499!</code> status code indicates that Synapse also cancelled request processing after the socket was closed.<br/></td></tr>
 <tr><td>RRRR</td><td>Request</td></tr>
 <tr><td>SSSS</td><td>User-agent</td></tr>
 <tr><td>TTTT</td><td>Events fetched from DB to service this request (note that this does not include events fetched from the cache)</td></tr>
