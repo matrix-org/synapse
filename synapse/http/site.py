@@ -238,7 +238,7 @@ class SynapseRequest(Request):
             request_id,
             request=ContextRequest(
                 request_id=request_id,
-                ip_address=self.getClientIP(),
+                ip_address=self.getClientAddress().host,
                 site_tag=self.synapse_site.site_tag,
                 # The requester is going to be unknown at this point.
                 requester=None,
@@ -381,7 +381,7 @@ class SynapseRequest(Request):
 
         self.synapse_site.access_logger.debug(
             "%s - %s - Received request: %s %s",
-            self.getClientIP(),
+            self.getClientAddress().host,
             self.synapse_site.site_tag,
             self.get_method(),
             self.get_redacted_uri(),
@@ -429,7 +429,7 @@ class SynapseRequest(Request):
             "%s - %s - {%s}"
             " Processed request: %.3fsec/%.3fsec (%.3fsec, %.3fsec) (%.3fsec/%.3fsec/%d)"
             ' %sB %s "%s %s %s" "%s" [%d dbevts]',
-            self.getClientIP(),
+            self.getClientAddress().host,
             self.synapse_site.site_tag,
             requester,
             processing_time,

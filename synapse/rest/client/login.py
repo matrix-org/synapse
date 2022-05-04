@@ -176,7 +176,7 @@ class LoginRestServlet(RestServlet):
 
                 if appservice.is_rate_limited():
                     await self._address_ratelimiter.ratelimit(
-                        None, request.getClientIP()
+                        None, request.getClientAddress().host
                     )
 
                 result = await self._do_appservice_login(
@@ -188,19 +188,25 @@ class LoginRestServlet(RestServlet):
                 self.jwt_enabled
                 and login_submission["type"] == LoginRestServlet.JWT_TYPE
             ):
-                await self._address_ratelimiter.ratelimit(None, request.getClientIP())
+                await self._address_ratelimiter.ratelimit(
+                    None, request.getClientAddress().host
+                )
                 result = await self._do_jwt_login(
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
                 )
             elif login_submission["type"] == LoginRestServlet.TOKEN_TYPE:
-                await self._address_ratelimiter.ratelimit(None, request.getClientIP())
+                await self._address_ratelimiter.ratelimit(
+                    None, request.getClientAddress().host
+                )
                 result = await self._do_token_login(
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
                 )
             else:
-                await self._address_ratelimiter.ratelimit(None, request.getClientIP())
+                await self._address_ratelimiter.ratelimit(
+                    None, request.getClientAddress().host
+                )
                 result = await self._do_other_login(
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
