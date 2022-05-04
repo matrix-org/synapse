@@ -847,8 +847,17 @@ class RoomSummaryHandler:
                         # key.
                         room.pop("allowed_room_ids", None)
 
-                        # A remote room can't be in the joined state
-                        room["membership"] = "leave"
+                        # If there was a requester, add their membership.
+                        # We keep the membership in the local membership table
+                        # unless the room is purged even for remote rooms.
+                        if requester:
+                            (
+                                membership,
+                                _,
+                            ) = await self._store.get_local_current_membership_for_user_in_room(
+                                requester, room_id
+                            )
+                            room["membership"] = membership or "leave"
 
                         return room
 
