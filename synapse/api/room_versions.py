@@ -244,6 +244,7 @@ class RoomVersions:
         msc2716_historical=False,
         msc2716_redactions=False,
     )
+    # Not to be confused with MSC2176
     MSC2716v3 = RoomVersion(
         "org.matrix.msc2716v3",
         RoomDisposition.UNSTABLE,
@@ -259,6 +260,22 @@ class RoomVersions:
         msc2403_knocking=True,
         msc2716_historical=True,
         msc2716_redactions=True,
+    )
+    MSC3604Opt1 = RoomVersion(
+        "org.matrix.msc3604.opt1",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2176_redaction_rules=True,
+        msc3083_join_rules=True,
+        msc3375_redaction_rules=True,
+        msc2403_knocking=True,
+        msc2716_historical=False,
+        msc2716_redactions=False,
     )
 
 
@@ -276,6 +293,7 @@ KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
         RoomVersions.V8,
         RoomVersions.V9,
         RoomVersions.MSC2716v3,
+        RoomVersions.MSC3604Opt1,
     )
 }
 
