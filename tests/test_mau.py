@@ -14,6 +14,8 @@
 
 """Tests REST events for /rooms paths."""
 
+from typing import List
+
 from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.appservice import ApplicationService
@@ -236,14 +238,12 @@ class TestMauLimit(unittest.HomeserverTestCase):
         }
     )
     def test_as_trial_days(self):
-        """Test that application services can still create users when the MAU
-        limit has been reached. This only works when application service
-        user ip tracking is disabled.
-        """
+        user_tokens: List[str] = []
 
-        # Create and sync so that the MAU counts get updated
-        token1 = self.create_user("kermit1")
-        token2 = self.create_user("kermit2")
+        def advance_time_and_sync():
+            self.reactor.advance(24 * 60 * 61)
+            for token in user_tokens:
+                self.do_sync_for_user(token)
 
         # Cheekily add an application service that we use to register a new user
         # with.
@@ -254,7 +254,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
                 hostname=self.hs.hostname,
                 id="SomeASID",
                 sender="@as_sender_1:test",
-                namespaces={"users": [{"regex": "@as_2*", "exclusive": True}]},
+                namespaces={"users": [{"regex": "@as_1.*", "exclusive": True}]},
             )
         )
 
@@ -265,31 +265,43 @@ class TestMauLimit(unittest.HomeserverTestCase):
                 hostname=self.hs.hostname,
                 id="AnotherASID",
                 sender="@as_sender_2:test",
-                namespaces={"users": [{"regex": "@as_2*", "exclusive": True}]},
+                namespaces={"users": [{"regex": "@as_2.*", "exclusive": True}]},
             )
         )
 
-        token3 = self.create_user("as_kermit3", token=as_token_1, appservice=True)
-        token4 = self.create_user("as_kermit4", token=as_token_2, appservice=True)
+        user_tokens.append(self.create_user("kermit1"))
+        user_tokens.append(self.create_user("kermit2"))
+        user_tokens.append(
+            self.create_user("as_1kermit3", token=as_token_1, appservice=True)
+        )
+        user_tokens.append(
+            self.create_user("as_2kermit4", token=as_token_2, appservice=True)
+        )
 
-        # Advance time by a day to include the first appservice
-        self.reactor.advance(24 * 60 * 61)
-        self.do_sync_for_user(token3)
-        count = self.store.get_monthly_active_count()
-        self.assertEqual(1, self.successResultOf(count))
+        # Advance time by 1 day to include the first appservice
+        advance_time_and_sync()
+        self.assertEqual(
+            self.get_success(self.store.get_monthly_active_count_by_service()),
+            {"SomeASID": 1},
+        )
 
-        # Advance time by a day to include the next appservice
-        self.reactor.advance(24 * 60 * 61)
-        self.do_sync_for_user(token4)
-        count = self.store.get_monthly_active_count()
-        self.assertEqual(2, self.successResultOf(count))
+        # Advance time by 1 day to include the next appservice
+        advance_time_and_sync()
+        self.assertEqual(
+            self.get_success(self.store.get_monthly_active_count_by_service()),
+            {"SomeASID": 1, "AnotherASID": 1},
+        )
 
-        # Advance time by 2 days to include the native users
-        self.reactor.advance(2 * 24 * 60 * 61)
-        self.do_sync_for_user(token1)
-        self.do_sync_for_user(token2)
-        count = self.store.get_monthly_active_count()
-        self.assertEqual(4, self.successResultOf(count))
+        # Advance time by 1 day to include the native users
+        advance_time_and_sync()
+        self.assertEqual(
+            self.get_success(self.store.get_monthly_active_count_by_service()),
+            {
+                "SomeASID": 1,
+                "AnotherASID": 1,
+                "native": 2,
+            },
+        )
 
     def create_user(self, localpart, token=None, appservice=False):
         request_data = {
