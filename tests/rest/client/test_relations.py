@@ -984,6 +984,24 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
 
         self._test_bundled_aggregations(RelationTypes.ANNOTATION, assert_annotations, 7)
 
+    def test_annotation_to_annotation(self) -> None:
+        """Any relation to an annotation should be ignored."""
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
+        event_id = channel.json_body["event_id"]
+        self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "b", parent_id=event_id
+        )
+
+        # Fetch the initial annotation event to see if it has bundled aggregations.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v3/rooms/{self.room}/event/{event_id}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        # The first annotationt should not have any bundled aggregations.
+        self.assertNotIn("m.relations", channel.json_body["unsigned"])
+
     def test_reference(self) -> None:
         """
         Test that references get correctly bundled.
