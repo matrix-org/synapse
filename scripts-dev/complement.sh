@@ -61,7 +61,7 @@ if [[ -n "$WORKERS" ]]; then
   export COMPLEMENT_SPAWN_HS_TIMEOUT_SECS=120
 
   # ... and it takes longer than 10m to run the whole suite.
-  extra_test_args+=("-timeout=20m")
+  extra_test_args+=("-timeout=60m")
 else
   export COMPLEMENT_BASE_IMAGE=complement-synapse
   COMPLEMENT_DOCKERFILE=Dockerfile
