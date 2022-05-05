@@ -522,7 +522,9 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_joined_groups",
         )
 
-    async def get_all_groups_for_user(self, user_id, now_token) -> List[JsonDict]:
+    async def get_all_groups_for_user(
+        self, user_id: str, now_token: int
+    ) -> List[JsonDict]:
         def _get_all_groups_for_user_txn(txn: LoggingTransaction) -> List[JsonDict]:
             sql = """
                 SELECT group_id, type, membership, u.content

@@ -620,6 +620,19 @@ class RelationsTestCase(BaseRelationsTestCase):
             {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
         )
 
+        # Directly requesting the edit should not have the edit to the edit applied.
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/event/{edit_event_id}",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        self.assertEqual("Wibble", channel.json_body["content"]["body"])
+        self.assertIn("m.new_content", channel.json_body["content"])
+
+        # The relations information should not include the edit to the edit.
+        self.assertNotIn("m.relations", channel.json_body["unsigned"])
+
     def test_unknown_relations(self) -> None:
         """Unknown relations should be accepted."""
         channel = self._send_relation("m.relation.test", "m.room.test")
@@ -984,6 +997,24 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
 
         self._test_bundled_aggregations(RelationTypes.ANNOTATION, assert_annotations, 7)
 
+    def test_annotation_to_annotation(self) -> None:
+        """Any relation to an annotation should be ignored."""
+        channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
+        event_id = channel.json_body["event_id"]
+        self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "b", parent_id=event_id
+        )
+
+        # Fetch the initial annotation event to see if it has bundled aggregations.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v3/rooms/{self.room}/event/{event_id}",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        # The first annotationt should not have any bundled aggregations.
+        self.assertNotIn("m.relations", channel.json_body["unsigned"])
+
     def test_reference(self) -> None:
         """
         Test that references get correctly bundled.
@@ -1029,7 +1060,106 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations.get("latest_event"),
             )
 
-        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 9)
+        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 10)
+
+    def test_thread_with_bundled_aggregations_for_latest(self) -> None:
+        """
+        Bundled aggregations should get applied to the latest thread event.
+        """
+        self._send_relation(RelationTypes.THREAD, "m.room.test")
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        thread_2 = channel.json_body["event_id"]
+
+        self._send_relation(
+            RelationTypes.ANNOTATION, "m.reaction", "a", parent_id=thread_2
+        )
+
+        def assert_thread(bundled_aggregations: JsonDict) -> None:
+            self.assertEqual(2, bundled_aggregations.get("count"))
+            self.assertTrue(bundled_aggregations.get("current_user_participated"))
+            # The latest thread event has some fields that don't matter.
+            self.assert_dict(
+                {
+                    "content": {
+                        "m.relates_to": {
+                            "event_id": self.parent_id,
+                            "rel_type": RelationTypes.THREAD,
+                        }
+                    },
+                    "event_id": thread_2,
+                    "sender": self.user_id,
+                    "type": "m.room.test",
+                },
+                bundled_aggregations.get("latest_event"),
+            )
+            # Check the unsigned field on the latest event.
+            self.assert_dict(
+                {
+                    "m.relations": {
+                        RelationTypes.ANNOTATION: {
+                            "chunk": [
+                                {"type": "m.reaction", "key": "a", "count": 1},
+                            ]
+                        },
+                    }
+                },
+                bundled_aggregations["latest_event"].get("unsigned"),
+            )
+
+        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 10)
+
+    def test_nested_thread(self) -> None:
+        """
+        Ensure that a nested thread gets ignored by bundled aggregations, as
+        those are forbidden.
+        """
+
+        # Start a thread.
+        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        reply_event_id = channel.json_body["event_id"]
+
+        # Disable the validation to pretend this came over federation, since it is
+        # not an event the Client-Server API will allow..
+        with patch(
+            "synapse.handlers.message.EventCreationHandler._validate_event_relation",
+            new=lambda self, event: make_awaitable(None),
+        ):
+            # Create a sub-thread off the thread, which is not allowed.
+            self._send_relation(
+                RelationTypes.THREAD, "m.room.test", parent_id=reply_event_id
+            )
+
+        # Fetch the thread root, to get the bundled aggregation for the thread.
+        relations_from_event = self._get_bundled_aggregations()
+
+        # Ensure that requesting the room messages also does not return the sub-thread.
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{self.room}/messages?dir=b",
+            access_token=self.user_token,
+        )
+        self.assertEqual(200, channel.code, channel.json_body)
+        event = self._find_event_in_chunk(channel.json_body["chunk"])
+        relations_from_messages = event["unsigned"]["m.relations"]
+
+        # Check the bundled aggregations from each point.
+        for aggregations, desc in (
+            (relations_from_event, "/event"),
+            (relations_from_messages, "/messages"),
+        ):
+            # The latest event should have bundled aggregations.
+            self.assertIn(RelationTypes.THREAD, aggregations, desc)
+            thread_summary = aggregations[RelationTypes.THREAD]
+            self.assertIn("latest_event", thread_summary, desc)
+            self.assertEqual(
+                thread_summary["latest_event"]["event_id"], reply_event_id, desc
+            )
+
+            # The latest event should not have any bundled aggregations (since the
+            # only relation to it is another thread, which is invalid).
+            self.assertNotIn(
+                "m.relations", thread_summary["latest_event"]["unsigned"], desc
+            )
 
     def test_thread_edit_latest_event(self) -> None:
         """Test that editing the latest event in a thread works."""
@@ -1049,6 +1179,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
             content={"msgtype": "m.text", "body": "foo", "m.new_content": new_body},
             parent_id=threaded_event_id,
         )
+        edit_event_id = channel.json_body["event_id"]
 
         # Fetch the thread root, to get the bundled aggregation for the thread.
         relations_dict = self._get_bundled_aggregations()
@@ -1061,6 +1192,12 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         self.assertIn("latest_event", thread_summary)
         latest_event_in_thread = thread_summary["latest_event"]
         self.assertEqual(latest_event_in_thread["content"]["body"], "I've been edited!")
+        # The latest event in the thread should have the edit appear under the
+        # bundled aggregations.
+        self.assertDictContainsSubset(
+            {"event_id": edit_event_id, "sender": "@alice:test"},
+            latest_event_in_thread["unsigned"]["m.relations"][RelationTypes.REPLACE],
+        )
 
     def test_aggregation_get_event_for_annotation(self) -> None:
         """Test that annotations do not get bundled aggregations included

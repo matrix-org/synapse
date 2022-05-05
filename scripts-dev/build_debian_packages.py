@@ -17,7 +17,8 @@ import subprocess
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional, Sequence
+from types import FrameType
+from typing import Collection, Optional, Sequence, Set
 
 DISTS = (
     "debian:buster",  # oldstable: EOL 2022-08
@@ -41,15 +42,17 @@ projdir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 class Builder(object):
     def __init__(
-        self, redirect_stdout=False, docker_build_args: Optional[Sequence[str]] = None
+        self,
+        redirect_stdout: bool = False,
+        docker_build_args: Optional[Sequence[str]] = None,
     ):
         self.redirect_stdout = redirect_stdout
         self._docker_build_args = tuple(docker_build_args or ())
-        self.active_containers = set()
+        self.active_containers: Set[str] = set()
         self._lock = threading.Lock()
         self._failed = False
 
-    def run_build(self, dist, skip_tests=False):
+    def run_build(self, dist: str, skip_tests: bool = False) -> None:
         """Build deb for a single distribution"""
 
         if self._failed:
@@ -63,7 +66,7 @@ class Builder(object):
             self._failed = True
             raise
 
-    def _inner_build(self, dist, skip_tests=False):
+    def _inner_build(self, dist: str, skip_tests: bool = False) -> None:
         tag = dist.split(":", 1)[1]
 
         # Make the dir where the debs will live.
@@ -138,7 +141,7 @@ class Builder(object):
             stdout.close()
             print("Completed build of %s" % (dist,))
 
-    def kill_containers(self):
+    def kill_containers(self) -> None:
         with self._lock:
             active = list(self.active_containers)
 
@@ -156,8 +159,10 @@ class Builder(object):
                 self.active_containers.remove(c)
 
 
-def run_builds(builder, dists, jobs=1, skip_tests=False):
-    def sig(signum, _frame):
+def run_builds(
+    builder: Builder, dists: Collection[str], jobs: int = 1, skip_tests: bool = False
+) -> None:
+    def sig(signum: int, _frame: Optional[FrameType]) -> None:
         print("Caught SIGINT")
         builder.kill_containers()
 

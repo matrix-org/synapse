@@ -1,3 +1,17 @@
+Synapse 1.59.0
+==============
+
+The non-standard `m.login.jwt` login type has been removed from Synapse. It can be replaced with `org.matrix.login.jwt` for identical behaviour. This is only used if `jwt_config.enabled` is set to `true` in the configuration.
+
+
+Synapse 1.58.0 (2022-05-03)
+===========================
+
+As of this release, the groups/communities feature in Synapse is now disabled by default. See [\#11584](https://github.com/matrix-org/synapse/issues/11584) for details. As mentioned in [the upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1580), this feature will be removed in Synapse 1.61.
+
+No significant changes since 1.58.0rc2.
+
+
 Synapse 1.58.0rc2 (2022-04-26)
 ==============================
 
@@ -18,8 +32,6 @@ Internal Changes
 
 Synapse 1.58.0rc1 (2022-04-26)
 ==============================
-
-As of this release, the groups/communities feature in Synapse is now disabled by default. See [\#11584](https://github.com/matrix-org/synapse/issues/11584) for details. As mentioned in [the upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1580), this feature will be removed in Synapse 1.61.
 
 Features
 --------

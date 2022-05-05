@@ -357,7 +357,7 @@ class SearchHandler:
             itertools.chain(
                 # The events_before and events_after for each context.
                 itertools.chain.from_iterable(
-                    itertools.chain(context["events_before"], context["events_after"])  # type: ignore[arg-type]
+                    itertools.chain(context["events_before"], context["events_after"])
                     for context in contexts.values()
                 ),
                 # The returned events.
@@ -373,10 +373,10 @@ class SearchHandler:
 
         for context in contexts.values():
             context["events_before"] = self._event_serializer.serialize_events(
-                context["events_before"], time_now, bundle_aggregations=aggregations  # type: ignore[arg-type]
+                context["events_before"], time_now, bundle_aggregations=aggregations
             )
             context["events_after"] = self._event_serializer.serialize_events(
-                context["events_after"], time_now, bundle_aggregations=aggregations  # type: ignore[arg-type]
+                context["events_after"], time_now, bundle_aggregations=aggregations
             )
 
         results = [
