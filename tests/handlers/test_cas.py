@@ -204,7 +204,7 @@ def _mock_request():
     mock = Mock(
         spec=[
             "finish",
-            "getClientIP",
+            "getClientAddress",
             "getHeader",
             "setHeader",
             "setResponseCode",
