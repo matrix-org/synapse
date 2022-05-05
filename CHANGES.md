@@ -6,7 +6,7 @@ This patch release includes a fix to the Debian packages, installing the
 omitted in v1.58.0. This primarily prevented Synapse from starting
 when the `systemd.journal.JournalHandler` log handler was configured.
 
-No significant changes since 1.58.0.
+Otherwise, no significant changes since 1.58.0.
 
 
 Synapse 1.58.0 (2022-05-03)
