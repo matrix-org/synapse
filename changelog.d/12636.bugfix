@@ -1,1 +1,0 @@
-Update `_on_new_receipts()` to work with [MSC2285](https://github.com/matrix-org/matrix-spec-proposals/pull/2285) changes. This was missed in https://github.com/matrix-org/synapse/pull/12168.
