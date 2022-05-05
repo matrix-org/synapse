@@ -1,6 +1,7 @@
 matrix-synapse-py3 (1.58.0+nmu1) UNRELEASED; urgency=medium
 
-  * Re-include python dependencies from the `systemd` and `cache_memory` extras package groups.
+  * Include python dependencies from the `systemd` and `cache_memory` extras package groups, which
+    were incorrectly omitted from the 1.58.0 package.
 
  -- Synapse Packaging team <packages@matrix.org>  Thu, 05 May 2022 12:26:36 +0100
 
