@@ -52,7 +52,11 @@ if [[ -n "$WORKERS" ]]; then
   COMPLEMENT_DOCKERFILE=SynapseWorkers.Dockerfile
 
   # And provide some more configuration to complement.
-  export COMPLEMENT_SPAWN_HS_TIMEOUT_SECS=60
+
+  # It can take quite a while to spin up a worker-mode Synapse for the first
+  # time (the main problem is that we start 14 python processes for each test,
+  # and complement likes to do two of them in parallel).
+  export COMPLEMENT_SPAWN_HS_TIMEOUT_SECS=120
 else
   export COMPLEMENT_BASE_IMAGE=complement-synapse
   COMPLEMENT_DOCKERFILE=Dockerfile
