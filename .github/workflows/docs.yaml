@@ -14,7 +14,7 @@ on:
 
 jobs:
   pages:
-    name: GitHub Pages
+    name: Build and deploy docs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -63,3 +63,29 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./book
           destination_dir: ./${{ steps.vars.outputs.branch-version }}
+
+  list_available_versions:
+    needs: pages
+    runs-on: ubuntu-latest
+    steps:
+      # Check out the current branch
+      - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+
+      - name: Save the script
+        run: cp .ci/scripts/record_available_doc_versions.py /
+
+      - uses: actions/setup-python@v3
+
+      # Check out the gh-pages branch, which we'll be pushing the doc versions to
+      - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+          # Check out the gh-pages branch
+          ref: 'gh-pages'
+
+      - name: Record the available documentation versions
+        run: |
+          # Download the script
+          /record_available_doc_versions
