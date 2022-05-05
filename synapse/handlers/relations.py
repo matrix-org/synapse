@@ -364,21 +364,29 @@ class RelationsHandler:
             The results may include additional events which are related to the
             requested events.
         """
-        # De-duplicate events by ID to handle the same event requested multiple times.
-        #
-        # State events do not get bundled aggregations.
-        events_by_id = {
-            event.event_id: event for event in events if not event.is_state()
-        }
-
+        # De-duplicated events by ID to handle the same event requested multiple times.
+        events_by_id = {}
         # A map of event ID to the relation in that event, if there is one.
         relations_by_id: Dict[str, str] = {}
-        for event_id, event in events_by_id.items():
+        for event in events:
+            # State events do not get bundled aggregations.
+            if event.is_state():
+                continue
+
             relates_to = event.content.get("m.relates_to")
+            relation_type = None
             if isinstance(relates_to, collections.abc.Mapping):
                 relation_type = relates_to.get("rel_type")
-                if isinstance(relation_type, str):
-                    relations_by_id[event_id] = relation_type
+                # An event which is a replacement (ie edit) or annotation (ie,
+                # reaction) may not have any other event related to it.
+                if relation_type in (RelationTypes.ANNOTATION, RelationTypes.REPLACE):
+                    continue
+
+            # The event should get bundled aggregations.
+            events_by_id[event.event_id] = event
+            # Track the event's relation information for later.
+            if isinstance(relation_type, str):
+                relations_by_id[event.event_id] = relation_type
 
         # event ID -> bundled aggregation in non-serialized form.
         results: Dict[str, BundledAggregations] = {}
@@ -413,16 +421,6 @@ class RelationsHandler:
 
         # Fetch other relations per event.
         for event in events_by_id.values():
-            # An event which is a replacement (ie edit) or annotation (ie, reaction)
-            # may not have any other event related to it.
-            #
-            # XXX This is buggy, see https://github.com/matrix-org/synapse/issues/12566
-            if relations_by_id.get(event.event_id) in (
-                RelationTypes.ANNOTATION,
-                RelationTypes.REPLACE,
-            ):
-                continue
-
             # Fetch any annotations (ie, reactions) to bundle with this event.
             annotations = await self.get_annotations_for_event(
                 event.event_id, event.room_id, ignored_users=ignored_users
