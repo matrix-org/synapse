@@ -4,8 +4,8 @@ Synapse 1.58.1 (2022-05-05)
 This patch release includes a fix to the Debian packages, installing the
 `systemd` and `cache_memory` extra package groups, which were incorrectly
 omitted in v1.58.0. This primarily prevented Synapse from starting
-when the `systemd.journal.JournalHandler` log handler was configured
-(closes [#12631](https://github.com/matrix-org/synapse/issues/12631)).
+when the `systemd.journal.JournalHandler` log handler was configured.
+See [#12631](https://github.com/matrix-org/synapse/issues/12631) for further information.
 
 Otherwise, no significant changes since 1.58.0.
 
