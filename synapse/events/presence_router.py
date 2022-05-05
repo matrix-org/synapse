@@ -153,7 +153,9 @@ class PresenceRouter:
                 continue
 
             if not isinstance(result, Dict):
-                logger.warning(
+                # Type ignore: we don't trust modules to return the types that
+                # they're supposed to.
+                logger.warning(  # type: ignore[unreachable]
                     "Wrong type returned by module API callback %s: %s, expected Dict",
                     callback,
                     result,
@@ -162,7 +164,9 @@ class PresenceRouter:
 
             for key, new_entries in result.items():
                 if not isinstance(new_entries, Set):
-                    logger.warning(
+                    # Type ignore: we don't trust modules to return the types that
+                    # they're supposed to.
+                    logger.warning(  # type: ignore[unreachable]
                         "Wrong type returned by module API callback %s: %s, expected Set",
                         callback,
                         new_entries,
