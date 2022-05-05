@@ -833,9 +833,9 @@ class RoomSummaryHandler:
                 suggested_only=True,
             )
 
-            # The results over federation might include rooms that we,
-            # as the requesting server, are allowed to see, but the requesting
-            # user is not permitted to see.
+            # The results over federation might include rooms that we, as the
+            # requesting server, are allowed to see, but the requesting user is
+            # not permitted to see.
             #
             # Filter the returned results to only what is accessible to the user.
             if not room_entry or not await self._is_remote_room_accessible(
@@ -847,8 +847,8 @@ class RoomSummaryHandler:
             room.pop("allowed_room_ids", None)
 
             # If there was a requester, add their membership.
-            # We keep the membership in the local membership table
-            # unless the room is purged even for remote rooms.
+            # We keep the membership in the local membership table unless the
+            # room is purged even for remote rooms.
             if requester:
                 (
                     membership,
