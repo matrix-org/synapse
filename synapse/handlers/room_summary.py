@@ -833,35 +833,32 @@ class RoomSummaryHandler:
                 suggested_only=True,
             )
 
-            if room_entry:
-                room = dict(room_entry.room)
-                fed_room_id = room_entry.room_id
+            # The results over federation might include rooms that we,
+            # as the requesting server, are allowed to see, but the requesting
+            # user is not permitted to see.
+            #
+            # Filter the returned results to only what is accessible to the user.
+            if not room_entry or not await self._is_remote_room_accessible(
+                requester, room_entry.room_id, room_entry.room
+            ):
+                raise NotFoundError("Room not found or is not accessible")
 
-                # The results over federation might include rooms that we,
-                # as the requesting server, are allowed to see, but the requesting
-                # user is not permitted to see.
-                #
-                # Filter the returned results to only what is accessible to the user.
-                if await self._is_remote_room_accessible(requester, fed_room_id, room):
-                    # Before returning to the client, remove the allowed_room_ids
-                    # key.
-                    room.pop("allowed_room_ids", None)
+            room = dict(room_entry.room)
+            room.pop("allowed_room_ids", None)
 
-                    # If there was a requester, add their membership.
-                    # We keep the membership in the local membership table
-                    # unless the room is purged even for remote rooms.
-                    if requester:
-                        (
-                            membership,
-                            _,
-                        ) = await self._store.get_local_current_membership_for_user_in_room(
-                            requester, room_id
-                        )
-                        room["membership"] = membership or "leave"
+            # If there was a requester, add their membership.
+            # We keep the membership in the local membership table
+            # unless the room is purged even for remote rooms.
+            if requester:
+                (
+                    membership,
+                    _,
+                ) = await self._store.get_local_current_membership_for_user_in_room(
+                    requester, room_id
+                )
+                room["membership"] = membership or "leave"
 
-                    return room
-
-            raise NotFoundError("Room not found or is not accessible")
+            return room
 
         return room_summary
 
