@@ -21,7 +21,7 @@ from twisted.internet.interfaces import IAddress, IConnector
 from twisted.internet.protocol import ReconnectingClientFactory
 from twisted.python.failure import Failure
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, ReceiptTypes
 from synapse.federation import send_queue
 from synapse.federation.sender import FederationSender
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
@@ -402,7 +402,7 @@ class FederationSenderHandler:
             if not self._is_mine_id(receipt.user_id):
                 continue
             if (
-                receipt.data.get("hidden", False)
+                receipt.receipt_type == ReceiptTypes.READ_PRIVATE
                 and self._hs.config.experimental.msc2285_enabled
             ):
                 continue
