@@ -1426,7 +1426,7 @@ class FederationClient(FederationBase):
             room = res.get("room")
             if not isinstance(room, dict):
                 raise InvalidResponseError("'room' must be a dict")
-            if not room.get("room_id") == room_id:
+            if room.get("room_id") != room_id:
                 raise InvalidResponseError("wrong room returned in hierarchy response")
 
             # Validate children_state of the room.
