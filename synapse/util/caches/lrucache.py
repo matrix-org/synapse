@@ -106,10 +106,17 @@ GLOBAL_ROOT = ListNode["_Node"].create_root_node()
 
 
 @wrap_as_background_process("LruCache._expire_old_entries")
-async def _expire_old_entries(clock: Clock, expiry_seconds: int) -> None:
+async def _expire_old_entries(
+    clock: Clock, expiry_seconds: int, autotune_config: Optional[dict]
+) -> None:
     """Walks the global cache list to find cache entries that haven't been
-    accessed in the given number of seconds.
+    accessed in the given number of seconds, or if a given memory threshold has been breached.
     """
+
+    if autotune_config:
+        max_cache_memory_usage = autotune_config.get("max_cache_memory_usage")
+        target_cache_memory_usage = autotune_config.get("target_cache_memory_usage")
+        min_cache_ttl = autotune_config.get("min_cache_ttl")
 
     now = int(clock.time())
     node = GLOBAL_ROOT.prev_node
@@ -119,11 +126,32 @@ async def _expire_old_entries(clock: Clock, expiry_seconds: int) -> None:
 
     logger.debug("Searching for stale caches")
 
+    # determine if we're evicting due to memory
+    jemalloc_interface = get_jemalloc_stats()
+
+    if jemalloc_interface and cache_config.autotune_config:
+        # todo: add a try/catch as this may throw
+        mem_usage = jemalloc_interface.get_stat("allocated")
+        if mem_usage > max_cache_memory_usage:
+            evicting_due_to_memory = True
+        else:
+            evicting_due_to_memory = False
+
     while node is not GLOBAL_ROOT:
+
         # Only the root node isn't a `_TimedListNode`.
         assert isinstance(node, _TimedListNode)
 
-        if node.last_access_ts_secs > now - expiry_seconds:
+        # if the cache has not aged past expiry_seconds and we are not evicting due to memory usage, there's
+        # nothing to do here
+        if (
+            node.last_access_ts_secs > now - expiry_seconds
+            and not evicting_due_to_memory
+        ):
+            break
+
+        # if entry is newer than min_cache_entry_ttl then do not evict and don't evict anything newer
+        if evicting_due_to_memory and now - node.last_access_ts_secs < min_cache_ttl:
             break
 
         cache_entry = node.get_cache_entry()
@@ -135,6 +163,13 @@ async def _expire_old_entries(clock: Clock, expiry_seconds: int) -> None:
         assert next_node is not None
         assert cache_entry is not None
         cache_entry.drop_from_cache()
+
+        # Check mem allocation periodically
+        if jemalloc_interface and cache_config.autotune_config and (i + 1) % 100 == 0:
+            # todo: add try/catch
+            mem_usage = jemalloc_interface.get_stat("allocated")
+            if mem_usage < target_cache_memory_usage:
+                evicting_due_to_memory = False
 
         # If we do lots of work at once we yield to allow other stuff to happen.
         if (i + 1) % 10000 == 0:
@@ -156,21 +191,26 @@ async def _expire_old_entries(clock: Clock, expiry_seconds: int) -> None:
 
 def setup_expire_lru_cache_entries(hs: "HomeServer") -> None:
     """Start a background job that expires all cache entries if they have not
-    been accessed for the given number of seconds.
+    been accessed for the given number of seconds, or if a given memory usage threshold has been
+    breached.
     """
-    if not hs.config.caches.expiry_time_msec:
+    if not hs.config.caches.expiry_time_msec or hs.config.caches.cache_autotuning:
         return
 
-    logger.info(
-        "Expiring LRU caches after %d seconds", hs.config.caches.expiry_time_msec / 1000
-    )
+    expiry_time = hs.config.caches.expiry_time_msec / 1000
+
+    logger.info("Expiring LRU caches after %d seconds", expiry_time)
 
     global USE_GLOBAL_LIST
     USE_GLOBAL_LIST = True
 
     clock = hs.get_clock()
     clock.looping_call(
-        _expire_old_entries, 30 * 1000, clock, hs.config.caches.expiry_time_msec / 1000
+        _expire_old_entries,
+        30 * 1000,
+        clock,
+        expiry_time,
+        hs.config.caches.cache_autotuning,
     )
 
 
