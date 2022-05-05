@@ -43,6 +43,8 @@ fi
 # Build the base Synapse image from the local checkout
 docker build -t matrixdotorg/synapse -f "docker/Dockerfile" .
 
+extra_test_args=()
+
 # If we're using workers, modify the docker files slightly.
 if [[ -n "$WORKERS" ]]; then
   # Build the workers docker image (from the base Synapse image).
@@ -57,6 +59,9 @@ if [[ -n "$WORKERS" ]]; then
   # time (the main problem is that we start 14 python processes for each test,
   # and complement likes to do two of them in parallel).
   export COMPLEMENT_SPAWN_HS_TIMEOUT_SECS=120
+
+  # ... and it takes longer than 10m to run the whole suite.
+  extra_test_args+=("-timeout=20m")
 else
   export COMPLEMENT_BASE_IMAGE=complement-synapse
   COMPLEMENT_DOCKERFILE=Dockerfile
@@ -68,4 +73,4 @@ docker build -t $COMPLEMENT_BASE_IMAGE -f "docker/complement/$COMPLEMENT_DOCKERF
 # Run the tests!
 echo "Images built; running complement"
 cd "$COMPLEMENT_DIR"
-go test -v -tags synapse_blacklist,msc2716,msc3030,faster_joins -count=1 "$@" ./tests/...
+go test -v -tags synapse_blacklist,msc2716,msc3030,faster_joins -count=1 "${extra_test_args[@]}" "$@" ./tests/...
