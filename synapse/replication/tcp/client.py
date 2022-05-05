@@ -401,6 +401,7 @@ class FederationSenderHandler:
             # we only want to send on receipts for our own users
             if not self._is_mine_id(receipt.user_id):
                 continue
+            # Private read receipts never get sent over federation.
             if receipt.receipt_type == ReceiptTypes.READ_PRIVATE:
                 continue
             receipt_info = ReadReceipt(
