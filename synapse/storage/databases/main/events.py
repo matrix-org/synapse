@@ -1538,15 +1538,18 @@ class PersistEventsStore:
             return
 
         for event, _ in events_and_contexts:
-            if event.type == EventTypes.Redaction and event.redacts is not None:
+            redacts = event.redacts
+            if event.room_version.msc2174_redacts_key_content:
+                redacts = event.content["redacts"]
+            if event.type == EventTypes.Redaction and redacts is not None:
                 # Remove the entries in the event_push_actions table for the
                 # redacted event.
                 self._remove_push_actions_for_event_id_txn(
-                    txn, event.room_id, event.redacts
+                    txn, event.room_id, redacts
                 )
 
                 # Remove from relations table.
-                self._handle_redact_relations(txn, event.redacts)
+                self._handle_redact_relations(txn, redacts)
 
         # Update the event_forward_extremities, event_backward_extremities and
         # event_edges tables.
@@ -1564,9 +1567,13 @@ class PersistEventsStore:
             elif event.type == EventTypes.Message:
                 # Insert into the event_search table.
                 self._store_room_message_txn(txn, event)
-            elif event.type == EventTypes.Redaction and event.redacts is not None:
-                # Insert into the redactions table.
-                self._store_redaction(txn, event)
+            elif event.type == EventTypes.Redaction:
+                redacts = event.redacts
+                if event.room_version.msc2174_redacts_key_content:
+                    redacts = event.content["redacts"]
+                if redacts is not None:
+                    # Insert into the redactions table.
+                    self._store_redaction(txn, event)
             elif event.type == EventTypes.Retention:
                 # Update the room_retention table.
                 self._store_retention_policy_for_room_txn(txn, event)
@@ -1617,6 +1624,7 @@ class PersistEventsStore:
         if not ev_map:
             return
 
+        # TODO: Support `redacts` being in `content` rather than at the top level.
         sql = (
             "SELECT "
             " e.event_id as event_id, "
@@ -1648,18 +1656,22 @@ class PersistEventsStore:
         txn.call_after(prefill)
 
     def _store_redaction(self, txn: LoggingTransaction, event: EventBase) -> None:
+        redacts = event.redacts
+        if event.room_version.msc2174_redacts_key_content:
+            redacts = event.content["redacts"]
+
         # Invalidate the caches for the redacted event, note that these caches
         # are also cleared as part of event replication in _invalidate_caches_for_event.
-        txn.call_after(self.store._invalidate_get_event_cache, event.redacts)
-        txn.call_after(self.store.get_relations_for_event.invalidate, (event.redacts,))
-        txn.call_after(self.store.get_applicable_edit.invalidate, (event.redacts,))
+        txn.call_after(self.store._invalidate_get_event_cache, redacts)
+        txn.call_after(self.store.get_relations_for_event.invalidate, (redacts,))
+        txn.call_after(self.store.get_applicable_edit.invalidate, (redacts,))
 
         self.db_pool.simple_upsert_txn(
             txn,
             table="redactions",
             keyvalues={"event_id": event.event_id},
             values={
-                "redacts": event.redacts,
+                "redacts": redacts,
                 "received_ts": self._clock.time_msec(),
             },
         )

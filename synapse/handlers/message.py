@@ -1403,10 +1403,14 @@ class EventCreationHandler:
             # user is actually admin or not).
             is_admin_redaction = False
             if event.type == EventTypes.Redaction:
-                assert event.redacts is not None
+                redacts = event.redacts
+                if event.room_version.msc2174_redacts_key_content:
+                    redacts = event.content["redacts"]
+
+                assert redacts is not None
 
                 original_event = await self.store.get_event(
-                    event.redacts,
+                    redacts,
                     redact_behaviour=EventRedactBehaviour.as_is,
                     get_prev_content=False,
                     allow_rejected=False,
@@ -1500,10 +1504,13 @@ class EventCreationHandler:
                 )
 
         if event.type == EventTypes.Redaction:
-            assert event.redacts is not None
+            redacts = event.redacts
+            if event.room_version.msc2174_redacts_key_content:
+                redacts = event.content["redacts"]
+            assert redacts is not None
 
             original_event = await self.store.get_event(
-                event.redacts,
+                redacts,
                 redact_behaviour=EventRedactBehaviour.as_is,
                 get_prev_content=False,
                 allow_rejected=False,
@@ -1560,7 +1567,7 @@ class EventCreationHandler:
                 # checks on the original event. Let's start by checking the original
                 # event exists.
                 if not original_event:
-                    raise NotFoundError("Could not find event %s" % (event.redacts,))
+                    raise NotFoundError("Could not find event %s" % (redacts,))
 
                 if event.user_id != original_event.user_id:
                     raise AuthError(403, "You don't have permission to redact events")

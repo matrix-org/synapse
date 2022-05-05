@@ -635,6 +635,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
         def _event_fix_redactions_bytes_txn(txn: LoggingTransaction) -> None:
             # This update is quite fast due to new index.
+            # TODO: Support `redacts` being in `content` rather than at the top level.
             txn.execute(
                 """
                 UPDATE event_json

@@ -386,6 +386,15 @@ def serialize_event(
             raise TypeError("only_event_fields must be a list of strings")
         d = only_fields(d, only_event_fields)
 
+    if d["content"] is not None and e.type == EventTypes.Redaction:
+        # If the redacts key is in the `content`, copy it to the top level for
+        # older clients. Similarly, if the redacts key is already at the top
+        # level then copy it to `content` for newer clients.
+        if e.room_version.msc2174_redacts_key_content:
+            d["redacts"] = d["content"]["redacts"]
+        else:
+            d["content"]["redacts"] = d["redacts"]
+
     return d
 
 

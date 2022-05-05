@@ -497,7 +497,10 @@ class EventsWorkerStore(SQLBaseStore):
             # we have to recheck auth now.
 
             if not allow_rejected and entry.event.type == EventTypes.Redaction:
-                if entry.event.redacts is None:
+                redacted_event_id = entry.event.redacts
+                if entry.event.room_version.msc2174_redacts_key_content:
+                    redacted_event_id = entry.event.content["redacts"]
+                if redacted_event_id is None:
                     # A redacted redaction doesn't have a `redacts` key, in
                     # which case lets just withhold the event.
                     #
@@ -511,7 +514,6 @@ class EventsWorkerStore(SQLBaseStore):
                     )
                     continue
 
-                redacted_event_id = entry.event.redacts
                 event_map = await self._get_events_from_cache_or_db([redacted_event_id])
                 original_event_entry = event_map.get(redacted_event_id)
                 if not original_event_entry:

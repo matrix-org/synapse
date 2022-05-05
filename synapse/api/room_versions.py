@@ -68,6 +68,8 @@ class RoomVersion:
     limit_notifications_power_levels: bool
     # MSC2174/MSC2176: Apply updated redaction rules algorithm.
     msc2176_redaction_rules: bool
+    # MSC2174: Move `redacts` into `content`
+    msc2174_redacts_key_content: bool
     # MSC3083: Support the 'restricted' join_rule.
     msc3083_join_rules: bool
     # MSC3375: Support for the proper redaction rules for MSC3083. This mustn't
@@ -94,6 +96,7 @@ class RoomVersions:
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
         msc2176_redaction_rules=False,
+        msc2174_redacts_key_content=False,
         msc3083_join_rules=False,
         msc3375_redaction_rules=False,
         msc2403_knocking=False,
@@ -110,6 +113,7 @@ class RoomVersions:
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
         msc2176_redaction_rules=False,
+        msc2174_redacts_key_content=False,
         msc3083_join_rules=False,
         msc3375_redaction_rules=False,
         msc2403_knocking=False,
@@ -126,6 +130,7 @@ class RoomVersions:
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
         msc2176_redaction_rules=False,
+        msc2174_redacts_key_content=False,
         msc3083_join_rules=False,
         msc3375_redaction_rules=False,
         msc2403_knocking=False,
@@ -142,6 +147,7 @@ class RoomVersions:
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
         msc2176_redaction_rules=False,
+        msc2174_redacts_key_content=False,
         msc3083_join_rules=False,
         msc3375_redaction_rules=False,
         msc2403_knocking=False,
@@ -158,6 +164,7 @@ class RoomVersions:
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
         msc2176_redaction_rules=False,
+        msc2174_redacts_key_content=False,
         msc3083_join_rules=False,
         msc3375_redaction_rules=False,
         msc2403_knocking=False,
@@ -174,6 +181,7 @@ class RoomVersions:
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
         msc2176_redaction_rules=False,
+        msc2174_redacts_key_content=False,
         msc3083_join_rules=False,
         msc3375_redaction_rules=False,
         msc2403_knocking=False,
@@ -190,6 +198,25 @@ class RoomVersions:
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
         msc2176_redaction_rules=True,
+        msc2174_redacts_key_content=False,
+        msc3083_join_rules=False,
+        msc3375_redaction_rules=False,
+        msc2403_knocking=False,
+        msc2716_historical=False,
+        msc2716_redactions=False,
+    )
+    MSC2174 = RoomVersion(
+        # v6 + MSC2174
+        "org.matrix.msc2174",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2176_redaction_rules=False,
+        msc2174_redacts_key_content=True,
         msc3083_join_rules=False,
         msc3375_redaction_rules=False,
         msc2403_knocking=False,
@@ -206,6 +233,7 @@ class RoomVersions:
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
         msc2176_redaction_rules=False,
+        msc2174_redacts_key_content=False,
         msc3083_join_rules=False,
         msc3375_redaction_rules=False,
         msc2403_knocking=True,
@@ -222,6 +250,7 @@ class RoomVersions:
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
         msc2176_redaction_rules=False,
+        msc2174_redacts_key_content=False,
         msc3083_join_rules=True,
         msc3375_redaction_rules=False,
         msc2403_knocking=True,
@@ -238,6 +267,7 @@ class RoomVersions:
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
         msc2176_redaction_rules=False,
+        msc2174_redacts_key_content=False,
         msc3083_join_rules=True,
         msc3375_redaction_rules=True,
         msc2403_knocking=True,
@@ -254,6 +284,7 @@ class RoomVersions:
         strict_canonicaljson=True,
         limit_notifications_power_levels=True,
         msc2176_redaction_rules=False,
+        msc2174_redacts_key_content=False,
         msc3083_join_rules=False,
         msc3375_redaction_rules=False,
         msc2403_knocking=True,
@@ -272,6 +303,7 @@ KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
         RoomVersions.V5,
         RoomVersions.V6,
         RoomVersions.MSC2176,
+        RoomVersions.MSC2174,
         RoomVersions.V7,
         RoomVersions.V8,
         RoomVersions.V9,

@@ -125,6 +125,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                     row.room_id,
                     row.type,
                     row.state_key,
+                    # TODO: Support `redacts` being in `content` rather than at the top level.
                     row.redacts,
                     row.relates_to,
                     backfilled=True,
@@ -159,6 +160,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                 data.room_id,
                 data.type,
                 data.state_key,
+                # TODO: Support `redacts` being in `content` rather than at the top level.
                 data.redacts,
                 data.relates_to,
                 backfilled=False,

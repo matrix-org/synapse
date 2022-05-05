@@ -579,6 +579,8 @@ def check_redaction(
 
     if room_version_obj.event_format == EventFormatVersions.V1:
         redacter_domain = get_domain_from_id(event.event_id)
+        # Note: Room versions with v1-formatted events *cannot* have the
+        # `redacts` key in `content` from MSC2174/MSC2176.
         if not isinstance(event.redacts, str):
             return False
         redactee_domain = get_domain_from_id(event.redacts)
