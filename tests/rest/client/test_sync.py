@@ -407,7 +407,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
 
     @override_config({"experimental_features": {"msc2285_enabled": True}})
-    def test_hidden_read_receipts(self) -> None:
+    def test_private_read_receipts(self) -> None:
         # Send a message as the first user
         res = self.helper.send(self.room_id, body="hello", tok=self.tok)
 
@@ -639,7 +639,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         # Check that the unread counter is back to 0.
         self._check_unread_count(0)
 
-        # Check that hidden read receipts don't break unread counts
+        # Check that private read receipts don't break unread counts
         res = self.helper.send(self.room_id, "hello", tok=self.tok2)
         self._check_unread_count(1)
 

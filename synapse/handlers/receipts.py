@@ -165,7 +165,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         self.config = hs.config
 
     @staticmethod
-    def filter_out_hidden(events: List[JsonDict], user_id: str) -> List[JsonDict]:
+    def filter_out_private(events: List[JsonDict], user_id: str) -> List[JsonDict]:
         """
         This method takes in what is returned by
         get_linearized_receipts_for_rooms() and goes through read receipts
@@ -175,7 +175,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
         visible_events = []
 
-        # filter out hidden receipts the user shouldn't see
+        # filter out private receipts the user shouldn't see
         for event in events:
             content = event.get("content", {})
             new_event = event.copy()
@@ -223,7 +223,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         )
 
         if self.config.experimental.msc2285_enabled:
-            events = ReceiptEventSource.filter_out_hidden(events, user.to_string())
+            events = ReceiptEventSource.filter_out_private(events, user.to_string())
 
         return events, to_key
 

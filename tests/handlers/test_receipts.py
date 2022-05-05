@@ -25,8 +25,8 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.event_source = hs.get_event_sources().sources.receipt
 
-    def test_filters_out_hidden_receipt(self):
-        self._test_filters_hidden(
+    def test_filters_out_private_receipt(self):
+        self._test_filters_private(
             [
                 {
                     "content": {
@@ -45,8 +45,8 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             [],
         )
 
-    def test_filters_out_hidden_receipt_and_ignores_rest(self):
-        self._test_filters_hidden(
+    def test_filters_out_private_receipt_and_ignores_rest(self):
+        self._test_filters_private(
             [
                 {
                     "content": {
@@ -84,8 +84,8 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def test_filters_out_event_with_only_hidden_receipts_and_ignores_the_rest(self):
-        self._test_filters_hidden(
+    def test_filters_out_event_with_only_private_receipts_and_ignores_the_rest(self):
+        self._test_filters_private(
             [
                 {
                     "content": {
@@ -126,7 +126,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         )
 
     def test_handles_missing_content_of_m_read(self):
-        self._test_filters_hidden(
+        self._test_filters_private(
             [
                 {
                     "content": {
@@ -162,7 +162,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         )
 
     def test_handles_empty_event(self):
-        self._test_filters_hidden(
+        self._test_filters_private(
             [
                 {
                     "content": {
@@ -196,8 +196,8 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def test_filters_out_receipt_event_with_only_hidden_receipt_and_ignores_rest(self):
-        self._test_filters_hidden(
+    def test_filters_out_receipt_event_with_only_private_receipt_and_ignores_rest(self):
+        self._test_filters_private(
             [
                 {
                     "content": {
@@ -249,7 +249,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         Context: https://github.com/matrix-org/synapse/issues/10603
         """
 
-        self._test_filters_hidden(
+        self._test_filters_private(
             [
                 {
                     "content": {
@@ -278,8 +278,8 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def test_leaves_our_hidden_and_their_public(self):
-        self._test_filters_hidden(
+    def test_leaves_our_private_and_their_public(self):
+        self._test_filters_private(
             [
                 {
                     "content": {
@@ -332,9 +332,9 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def _test_filters_hidden(
+    def _test_filters_private(
         self, events: List[JsonDict], expected_output: List[JsonDict]
     ):
-        """Tests that the _filter_out_hidden returns the expected output"""
-        filtered_events = self.event_source.filter_out_hidden(events, "@me:server.org")
+        """Tests that the _filter_out_private returns the expected output"""
+        filtered_events = self.event_source.filter_out_private(events, "@me:server.org")
         self.assertEqual(filtered_events, expected_output)
