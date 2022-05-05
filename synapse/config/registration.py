@@ -43,8 +43,8 @@ class RegistrationConfig(Config):
         self.registration_requires_token = config.get(
             "registration_requires_token", False
         )
-        self.enable_registration_token_3pid_bypasss = config.get(
-            "enable_registration_token_3pid_bypasss", False
+        self.enable_registration_token_3pid_bypass = config.get(
+            "enable_registration_token_3pid_bypass", False
         )
         self.registration_shared_secret = config.get("registration_shared_secret")
 
