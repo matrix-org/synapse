@@ -1455,7 +1455,10 @@ class EventCreationHandler:
             # If the old version of alt_aliases is of an unknown form,
             # completely replace it.
             if not isinstance(original_alt_aliases, (list, tuple)):
-                original_alt_aliases = []
+                # type-ignore: although original_alt_aliases is defined as List[str],
+                # it may be set to `alt_aliases` from `original_event`, i.e. to any
+                # JSON value. Therefore this is not unreachable.
+                original_alt_aliases = []  # type: ignore[unreachable]
 
             # Check that each alias is currently valid.
             new_alt_aliases = set(alt_aliases) - set(original_alt_aliases)
