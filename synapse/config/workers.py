@@ -331,10 +331,13 @@ class WorkerConfig(Config):
             config: The config dictionary
             legacy_master_option_name: The name of a legacy option, whose value is boolean,
                 specifying whether it's the master that should handle a certain duty.
-            legacy_worker_app_name: The name of a legacy Synapse worker application name
+                e.g. "notify_appservices"
+            legacy_worker_app_name: The name of a legacy Synapse worker application
                 that would traditionally perform this duty.
+                e.g. "synapse.app.appservice"
             new_option_name: The name of the new option, whose value is the name of a
                 designated worker to perform the duty.
+                e.g. "notify_appservices_from_worker"
         """
 
         # None means 'unspecified'; True means 'run here' and False means
@@ -397,6 +400,7 @@ class WorkerConfig(Config):
 
         # We've already validated that these aren't conflicting; now just see if
         # either is True.
+        # (By this point, these are either the same value or only one is not None.)
         return bool(new_option_should_run_here or legacy_option_should_run_here)
 
     def generate_config_section(self, **kwargs: Any) -> str:

@@ -92,6 +92,7 @@ class WorkerDutyConfigTestCase(TestCase):
             extras={
                 # Set notify_appservices to false for the initialiser's config,
                 # so that it doesn't raise an exception here.
+                # (This is not read by `_should_this_worker_perform_duty`.)
                 "notify_appservices": False,
             },
         )
@@ -200,6 +201,7 @@ class WorkerDutyConfigTestCase(TestCase):
             extras={
                 # Set notify_appservices to false for the initialiser's config,
                 # so that it doesn't raise an exception here.
+                # (This is not read by `_should_this_worker_perform_duty`.)
                 "notify_appservices": False,
             },
         )
