@@ -930,7 +930,7 @@ def _calculate_registration_flows(
         flows.append([LoginType.MSISDN, LoginType.EMAIL_IDENTITY])
 
     # Add a flow that doesn't require any 3pids, if the config requests it.
-    if config.registration.enable_registration_token_3pid_bypasss:
+    if config.registration.enable_registration_token_3pid_bypass:
         flows.append([LoginType.REGISTRATION_TOKEN])
 
     # Prepend m.login.terms to all flows if we're requiring consent
