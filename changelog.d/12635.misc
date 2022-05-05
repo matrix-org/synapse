@@ -1,0 +1,1 @@
+Use `private` instead of `hidden` in [MSC2285](https://github.com/matrix-org/matrix-spec-proposals/pull/2285) related code.
