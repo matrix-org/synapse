@@ -476,6 +476,49 @@ class RoomPermissionsTestCase(RoomBase):
         )
 
 
+class RoomStateTestCase(RoomBase, EndpointCancellationTestHelperMixin):
+    """Tests /rooms/$room_id/state."""
+
+    user_id = "@sid1:red"
+
+    def test_get_state_cancellation(self) -> None:
+        """Test cancellation of a `/rooms/$room_id/state` request."""
+        room_id = self.helper.create_room_as(self.user_id)
+        body = self._test_cancellation_at_every_await(
+            self.reactor,
+            lambda: self.make_request(
+                "GET", "/rooms/%s/state" % room_id, await_result=False
+            ),
+            test_name="test_state_cancellation",
+        )
+
+        self.assertCountEqual(
+            [state_event["type"] for state_event in body],
+            {
+                "m.room.create",
+                "m.room.power_levels",
+                "m.room.join_rules",
+                "m.room.member",
+                "m.room.history_visibility",
+            },
+        )
+
+    def test_get_state_event_cancellation(self) -> None:
+        """Test cancellation of a `/rooms/$room_id/state/$event_type` request."""
+        room_id = self.helper.create_room_as(self.user_id)
+        body = self._test_cancellation_at_every_await(
+            self.reactor,
+            lambda: self.make_request(
+                "GET",
+                "/rooms/%s/state/m.room.member/%s" % (room_id, self.user_id),
+                await_result=False,
+            ),
+            test_name="test_state_cancellation",
+        )
+
+        self.assertEqual(body, {"membership": "join"})
+
+
 class RoomsMemberListTestCase(RoomBase, EndpointCancellationTestHelperMixin):
     """Tests /rooms/$room_id/members/list REST events."""
 
