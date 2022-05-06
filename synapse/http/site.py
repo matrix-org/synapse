@@ -372,7 +372,8 @@ class SynapseRequest(Request):
                         # that it will finish up sooner than it normally would.
                         # The `self.processing()` context manager will call
                         # `_finished_processing()` when done.
-                        self.render_deferred.cancel()
+                        with PreserveLoggingContext():
+                            self.render_deferred.cancel()
                     else:
                         logger.error(
                             "Connection from client lost, but have no Deferred to "
