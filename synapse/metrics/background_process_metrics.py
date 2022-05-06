@@ -283,14 +283,6 @@ def wrap_as_background_process(
     The former can be convenient if `func` needs to be run as a background process in
     multiple places.
     """
-    # Note: the decorated version of `func` (`wrap_as_background_process_inner`) could be
-    # considered an asynchronous function. However, recent mypy versions warn us that
-    # we have forgotten to `await` a coroutine if we mark the decorated function as
-    # returning an Awaitable.
-    #
-    #     error: Value of type "Coroutine[Any, Any, None]" must be used  [unused-coroutine]
-    #     note: Are you missing an await?
-    # It seems happier when the decorated version of `func` returns a Deferred.
     def wrap_as_background_process_inner(
         func: Callable[P, Awaitable[Optional[R]]]
     ) -> Callable[P, "defer.Deferred[Optional[R]]"]:
