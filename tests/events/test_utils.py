@@ -573,10 +573,8 @@ class CopyPowerLevelsContentTestCase(unittest.TestCase):
     def test_strings_that_dont_represent_decimal_integers(self) -> None:
         """Should raise when given inputs `s` for which `int(s, base=10)` raises."""
         for invalid_string in ["0x123", "123.0", "123.45", "hello", "0b1", "0o777"]:
-            print(invalid_string)
             with self.assertRaises(TypeError):
                 copy_and_fixup_power_levels_contents({"a": invalid_string})
-            print("ok")
 
     def test_invalid_types_raise_type_error(self) -> None:
         with self.assertRaises(TypeError):
