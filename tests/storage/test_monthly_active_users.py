@@ -222,10 +222,11 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
                     self.store.user_add_threepid(user, "email", email, now, now)
                 )
 
-        d: Awaitable[None] = self.store.db_pool.runInteraction(
-            "initialise", self.store._initialise_reserved_users, threepids
+        self.get_success(
+            self.store.db_pool.runInteraction(
+                "initialise", self.store._initialise_reserved_users, threepids
+            )
         )
-        self.get_success(d)
 
         count = self.get_success(self.store.get_monthly_active_count())
         self.assertEqual(count, initial_users)
@@ -233,8 +234,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         users = self.get_success(self.store.get_registered_reserved_users())
         self.assertEqual(len(users), reserved_user_number)
 
-        d = self.store.reap_monthly_active_users()
-        self.get_success(d)
+        self.get_success(self.store.reap_monthly_active_users())
 
         count = self.get_success(self.store.get_monthly_active_count())
         self.assertEqual(count, self.hs.config.server.max_mau_value)
