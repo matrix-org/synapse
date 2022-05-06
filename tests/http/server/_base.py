@@ -48,6 +48,8 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
             expect_cancellation: `True` if request processing is expected to be
                 cancelled, `False` if the request should run to completion.
             expected_body: The expected response for the request.
+            expected_code: The expected status code for the request. Defaults to `200`
+                or `499` depending on `expect_cancellation`.
         """
         # Determine the expected status code.
         if expected_code is None:
