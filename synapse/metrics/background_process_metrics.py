@@ -298,7 +298,11 @@ def wrap_as_background_process(
         def wrap_as_background_process_inner_2(
             *args: P.args, **kwargs: P.kwargs
         ) -> "defer.Deferred[Optional[R]]":
-            return run_as_background_process(desc, func, *args, **kwargs)
+            # type-ignore: mypy is confusing kwargs with the bg_start_span kwarg.
+            #     Argument 4 to "run_as_background_process" has incompatible type
+            #     "**P.kwargs"; expected "bool"
+            # See https://github.com/python/mypy/issues/8862
+            return run_as_background_process(desc, func, *args, **kwargs)  # type: ignore[arg-type]
 
         return wrap_as_background_process_inner_2
 
