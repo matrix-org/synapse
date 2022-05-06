@@ -475,11 +475,13 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         upload_name: Optional[str],
         filesystem_id: str,
     ) -> None:
-        await self.db_pool.simple_insert(
+        await self.db_pool.simple_upsert(
             "remote_media_cache",
             {
                 "media_origin": origin,
                 "media_id": media_id,
+            },
+            {
                 "media_type": media_type,
                 "media_length": media_length,
                 "created_ts": time_now_ms,

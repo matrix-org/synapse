@@ -492,7 +492,7 @@ class MediaRepository:
                 time_now_ms=self.clock.time_msec(),
                 upload_name=upload_name,
                 media_length=length,
-                filesystem_id=file_id,
+                filesystem_id=file_info.file_id,
             )
 
         logger.info("Stored remote media in file %r", fname)
@@ -502,7 +502,7 @@ class MediaRepository:
             "media_length": length,
             "upload_name": upload_name,
             "created_ts": time_now_ms,
-            "filesystem_id": file_id,
+            "filesystem_id": file_info.file_id,
         }
 
         return media_info
