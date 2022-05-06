@@ -1,1 +1,1 @@
-Add `@cancellable` decorator, for use on endpoint methods that can be cancelled when clients disconnect.
+Add a helper class to test cancellation of requests.
