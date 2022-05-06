@@ -34,7 +34,7 @@ from synapse.api.errors import (
 )
 from synapse.api.filtering import Filter
 from synapse.events.utils import format_event_for_client_v2
-from synapse.http.server import HttpServer
+from synapse.http.server import HttpServer, cancellable
 from synapse.http.servlet import (
     ResolveRoomIdMixin,
     RestServlet,
@@ -481,6 +481,7 @@ class RoomMemberListRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
 
+    @cancellable
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
