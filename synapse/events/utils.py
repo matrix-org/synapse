@@ -580,7 +580,7 @@ class EventClientSerializer:
         ]
 
 
-def copy_power_levels_contents(
+def copy_and_fixup_power_levels_contents(
     old_power_levels: Mapping[str, Union[int, Mapping[str, int]]]
 ) -> Dict[str, Union[int, Dict[str, int]]]:
     """Copy the content of a power_levels event, unfreezing frozendicts along the way

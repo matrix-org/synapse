@@ -17,7 +17,7 @@ from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
 from synapse.events.utils import (
     SerializeEventConfig,
-    copy_power_levels_contents,
+    copy_and_fixup_power_levels_contents,
     prune_event,
     serialize_event,
 )
@@ -529,7 +529,7 @@ class CopyPowerLevelsContentTestCase(unittest.TestCase):
         }
 
     def _test(self, input):
-        a = copy_power_levels_contents(input)
+        a = copy_and_fixup_power_levels_contents(input)
 
         self.assertEqual(a["ban"], 50)
         self.assertEqual(a["events"]["m.room.name"], 100)

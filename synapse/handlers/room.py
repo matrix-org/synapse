@@ -57,7 +57,7 @@ from synapse.api.filtering import Filter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase
-from synapse.events.utils import copy_power_levels_contents
+from synapse.events.utils import copy_and_fixup_power_levels_contents
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.handlers.federation import get_domains_from_state
 from synapse.handlers.relations import BundledAggregations
@@ -471,7 +471,7 @@ class RoomCreationHandler:
         # dict so we can't just copy.deepcopy it.
         initial_state[
             (EventTypes.PowerLevels, "")
-        ] = power_levels = copy_power_levels_contents(
+        ] = power_levels = copy_and_fixup_power_levels_contents(
             initial_state[(EventTypes.PowerLevels, "")]
         )
 
