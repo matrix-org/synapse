@@ -360,13 +360,14 @@ class MediaRepository:
             media_info = await self.store.get_cached_remote_media(server_name, media_id)
 
             is_cached = False
-            try:
-                await self.media_storage.ensure_media_is_in_local_cache(file_info)
-                is_cached = True
-            except NotFoundError:
-                pass
+            if file_info is not None:
+                try:
+                    await self.media_storage.ensure_media_is_in_local_cache(file_info)
+                    is_cached = True
+                except NotFoundError:
+                    pass
 
-            if not media_info and not is_cached:
+            if not media_info or (media_info and not is_cached):
                 raise e
             else:
                 logger.warning("Ignoring _download_remote_file exception", exc_info=e)
@@ -390,10 +391,7 @@ class MediaRepository:
         return responder, media_info
 
     async def _download_remote_file(
-        self,
-        server_name: str,
-        media_id: str,
-        file_info: Optional[FileInfo]
+        self, server_name: str, media_id: str, file_info: Optional[FileInfo]
     ) -> dict:
         """Attempt to download the remote file from the given server name,
         using the given file_id as the local id.
