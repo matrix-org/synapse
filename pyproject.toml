@@ -231,10 +231,11 @@ all = [
     "jaeger-client", "opentracing",
     # jwt
     "pyjwt",
-    #redis
-    "txredisapi", "hiredis"
+    # redis
+    "txredisapi", "hiredis",
+    # cache_memory
+    "pympler",
     # omitted:
-    #   - cache_memory: this is an experimental option
     #   - test: it's useful to have this separate from dev deps in the olddeps job
     #   - systemd: this is a system-based requirement
 ]
