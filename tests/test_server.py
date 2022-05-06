@@ -34,7 +34,7 @@ from synapse.types import JsonDict
 from synapse.util import Clock
 
 from tests import unittest
-from tests.http.server._base import EndpointCancellationTestCase
+from tests.http.server._base import EndpointCancellationTestHelperMixin
 from tests.server import (
     FakeSite,
     ThreadedMemoryReactorClock,
@@ -407,7 +407,7 @@ class CancellableDirectServeHtmlResource(DirectServeHtmlResource):
         return HTTPStatus.OK, b"ok"
 
 
-class DirectServeJsonResourceCancellationTests(EndpointCancellationTestCase):
+class DirectServeJsonResourceCancellationTests(EndpointCancellationTestHelperMixin):
     """Tests for `DirectServeJsonResource` cancellation."""
 
     def setUp(self):
@@ -441,7 +441,7 @@ class DirectServeJsonResourceCancellationTests(EndpointCancellationTestCase):
         )
 
 
-class DirectServeHtmlResourceCancellationTests(EndpointCancellationTestCase):
+class DirectServeHtmlResourceCancellationTests(EndpointCancellationTestHelperMixin):
     """Tests for `DirectServeHtmlResource` cancellation."""
 
     def setUp(self):

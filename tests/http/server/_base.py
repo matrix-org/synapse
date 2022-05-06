@@ -29,7 +29,7 @@ from tests import unittest
 from tests.server import FakeChannel, ThreadedMemoryReactorClock
 
 
-class EndpointCancellationTestCase(unittest.TestCase):
+class EndpointCancellationTestHelperMixin(unittest.TestCase):
     """Provides helper methods for testing cancellation of endpoints."""
 
     def _test_disconnect(

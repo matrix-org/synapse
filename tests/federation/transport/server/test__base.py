@@ -24,7 +24,7 @@ from synapse.types import JsonDict
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests import unittest
-from tests.http.server._base import EndpointCancellationTestCase
+from tests.http.server._base import EndpointCancellationTestHelperMixin
 
 
 class CancellableFederationServlet(BaseFederationServlet):
@@ -55,7 +55,7 @@ class CancellableFederationServlet(BaseFederationServlet):
 
 
 class BaseFederationServletCancellationTests(
-    unittest.FederatingHomeserverTestCase, EndpointCancellationTestCase
+    unittest.FederatingHomeserverTestCase, EndpointCancellationTestHelperMixin
 ):
     """Tests for `BaseFederationServlet` cancellation."""
 

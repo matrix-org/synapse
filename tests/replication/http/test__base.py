@@ -25,7 +25,7 @@ from synapse.server import HomeServer
 from synapse.types import JsonDict
 
 from tests import unittest
-from tests.http.server._base import EndpointCancellationTestCase
+from tests.http.server._base import EndpointCancellationTestHelperMixin
 
 
 class CancellableReplicationEndpoint(ReplicationEndpoint):
@@ -70,7 +70,7 @@ class UncancellableReplicationEndpoint(ReplicationEndpoint):
 
 
 class ReplicationEndpointCancellationTestCase(
-    unittest.HomeserverTestCase, EndpointCancellationTestCase
+    unittest.HomeserverTestCase, EndpointCancellationTestHelperMixin
 ):
     """Tests for `ReplicationEndpoint` cancellation."""
 
