@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict, List
+from typing import Any, Awaitable, Dict, List
 from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -222,7 +222,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
                     self.store.user_add_threepid(user, "email", email, now, now)
                 )
 
-        d = self.store.db_pool.runInteraction(
+        d: Awaitable[None] = self.store.db_pool.runInteraction(
             "initialise", self.store._initialise_reserved_users, threepids
         )
         self.get_success(d)
