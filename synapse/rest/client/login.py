@@ -47,6 +47,10 @@ from synapse.rest.client._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import JsonDict, UserID
 
+from magic_admin import Magic
+from magic_admin.utils.http import parse_authorization_header_value
+from magic_admin.error import DIDTokenError
+
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -68,8 +72,11 @@ class LoginRestServlet(RestServlet):
     CAS_TYPE = "m.login.cas"
     SSO_TYPE = "m.login.sso"
     TOKEN_TYPE = "m.login.token"
+    MAGIC_LINK_TYPE = "m.login.magic"
     JWT_TYPE = "org.matrix.login.jwt"
+    JWT_TYPE_DEPRECATED = "m.login.jwt"
     APPSERVICE_TYPE = "m.login.application_service"
+    APPSERVICE_TYPE_UNSTABLE = "uk.half-shot.msc2778.login.application_service"
     REFRESH_TOKEN_PARAM = "refresh_token"
 
     def __init__(self, hs: "HomeServer"):
@@ -124,6 +131,7 @@ class LoginRestServlet(RestServlet):
         flows: List[JsonDict] = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
+            flows.append({"type": LoginRestServlet.JWT_TYPE_DEPRECATED})
 
         if self.cas_enabled:
             # we advertise CAS for backwards compat, though MSC1721 renamed it
@@ -153,6 +161,7 @@ class LoginRestServlet(RestServlet):
         flows.extend({"type": t} for t in self.auth_handler.get_supported_login_types())
 
         flows.append({"type": LoginRestServlet.APPSERVICE_TYPE})
+        flows.append({"type": LoginRestServlet.APPSERVICE_TYPE_UNSTABLE})
 
         return 200, {"flows": flows}
 
@@ -171,12 +180,15 @@ class LoginRestServlet(RestServlet):
         )
 
         try:
-            if login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
+            if login_submission["type"] in (
+                LoginRestServlet.APPSERVICE_TYPE,
+                LoginRestServlet.APPSERVICE_TYPE_UNSTABLE,
+            ):
                 appservice = self.auth.get_appservice_by_req(request)
 
                 if appservice.is_rate_limited():
                     await self._address_ratelimiter.ratelimit(
-                        None, request.getClientAddress().host
+                        None, request.getClientIP()
                     )
 
                 result = await self._do_appservice_login(
@@ -184,29 +196,29 @@ class LoginRestServlet(RestServlet):
                     appservice,
                     should_issue_refresh_token=should_issue_refresh_token,
                 )
-            elif (
-                self.jwt_enabled
-                and login_submission["type"] == LoginRestServlet.JWT_TYPE
+            elif self.jwt_enabled and (
+                login_submission["type"] == LoginRestServlet.JWT_TYPE
+                or login_submission["type"] == LoginRestServlet.JWT_TYPE_DEPRECATED
             ):
-                await self._address_ratelimiter.ratelimit(
-                    None, request.getClientAddress().host
-                )
+                await self._address_ratelimiter.ratelimit(None, request.getClientIP())
                 result = await self._do_jwt_login(
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
                 )
             elif login_submission["type"] == LoginRestServlet.TOKEN_TYPE:
-                await self._address_ratelimiter.ratelimit(
-                    None, request.getClientAddress().host
-                )
+                await self._address_ratelimiter.ratelimit(None, request.getClientIP())
                 result = await self._do_token_login(
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
                 )
-            else:
-                await self._address_ratelimiter.ratelimit(
-                    None, request.getClientAddress().host
+            elif login_submission["type"] == LoginRestServlet.MAGIC_LINK_TYPE:
+                await self._address_ratelimiter.ratelimit(None, request.getClientIP())
+                result = await self._do_magic_login(
+                    login_submission,
+                    should_issue_refresh_token=should_issue_refresh_token,
                 )
+            else:
+                await self._address_ratelimiter.ratelimit(None, request.getClientIP())
                 result = await self._do_other_login(
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
@@ -410,6 +422,47 @@ class LoginRestServlet(RestServlet):
             should_issue_refresh_token=should_issue_refresh_token,
             auth_provider_session_id=res.auth_provider_session_id,
         )
+
+    async def _do_magic_login(
+        self, login_submission: JsonDict, should_issue_refresh_token: bool = False
+    ) -> LoginResponse:
+        token = login_submission.get("token", None)
+        if token is None:
+            raise LoginError(
+                403, "Token field is missing", errcode=Codes.FORBIDDEN
+            )
+
+        magic = Magic(api_secret_key='sk_live_AD8507AEF3813E74')
+       
+
+        try:
+            magic.Token.validate(token)
+            public_address = magic.Token.get_public_address(token)
+
+            issuer = magic.Token.get_issuer(token)
+            magic_response = magic.User.get_metadata_by_issuer(issuer)
+            
+        
+            user_id = UserID(public_address.replace("0x", "").lower() , self.hs.hostname).to_string();
+
+        except DIDTokenError as e:
+            raise LoginError(403, 'DID Token is invalid', errcode=Codes.FORBIDDEN)
+        
+
+
+        logger.info("_do_magic_login user id: %r", user_id);
+
+
+        result = await self._complete_login(
+            user_id,
+            login_submission,
+            create_non_existent_users=True,
+            should_issue_refresh_token=should_issue_refresh_token,
+        )
+
+        return result
+
+
 
     async def _do_jwt_login(
         self, login_submission: JsonDict, should_issue_refresh_token: bool = False
