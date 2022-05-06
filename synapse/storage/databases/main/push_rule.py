@@ -17,6 +17,7 @@ import logging
 from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 
 from synapse.api.errors import StoreError
+from synapse.config.homeserver import ExperimentalConfig
 from synapse.push.baserules import list_with_base_rules
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.storage._base import SQLBaseStore, db_to_json
@@ -42,7 +43,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _load_rules(rawrules, enabled_map):
+def _is_experimental_rule_enabled(
+    rule_id: str, experimental_config: ExperimentalConfig
+) -> bool:
+    if (
+        rule_id == "global/override/.org.matrix.msc3786.rule.room.server_acl"
+        and not experimental_config.msc3786_enabled
+    ):
+        return False
+    return True
+
+
+def _load_rules(rawrules, enabled_map, experimental_config: ExperimentalConfig):
     ruleslist = []
     for rawrule in rawrules:
         rule = dict(rawrule)
@@ -56,12 +68,19 @@ def _load_rules(rawrules, enabled_map):
 
     for i, rule in enumerate(rules):
         rule_id = rule["rule_id"]
-        if rule_id in enabled_map:
-            if rule.get("enabled", True) != bool(enabled_map[rule_id]):
-                # Rules are cached across users.
-                rule = dict(rule)
-                rule["enabled"] = bool(enabled_map[rule_id])
-                rules[i] = rule
+
+        if not _is_experimental_rule_enabled(rule_id, experimental_config):
+            rules.remove(rules[i])
+            continue
+        if rule_id not in enabled_map:
+            continue
+        if rule.get("enabled", True) == bool(enabled_map[rule_id]):
+            continue
+
+        # Rules are cached across users.
+        rule = dict(rule)
+        rule["enabled"] = bool(enabled_map[rule_id])
+        rules[i] = rule
 
     return rules
 
@@ -141,7 +160,7 @@ class PushRulesWorkerStore(
 
         enabled_map = await self.get_push_rules_enabled_for_user(user_id)
 
-        return _load_rules(rows, enabled_map)
+        return _load_rules(rows, enabled_map, self.hs.config.experimental)
 
     @cached(max_entries=5000)
     async def get_push_rules_enabled_for_user(self, user_id) -> Dict[str, bool]:
@@ -200,7 +219,9 @@ class PushRulesWorkerStore(
         enabled_map_by_user = await self.bulk_get_push_rules_enabled(user_ids)
 
         for user_id, rules in results.items():
-            results[user_id] = _load_rules(rules, enabled_map_by_user.get(user_id, {}))
+            results[user_id] = _load_rules(
+                rules, enabled_map_by_user.get(user_id, {}), self.hs.config.experimental
+            )
 
         return results
 

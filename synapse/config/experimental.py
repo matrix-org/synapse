@@ -81,3 +81,6 @@ class ExperimentalConfig(Config):
 
         # MSC2815 (allow room moderators to view redacted event content)
         self.msc2815_enabled: bool = experimental.get("msc2815_enabled", False)
+
+        # MSC3786 (Add a default push rule to ignore m.room.server_acl events)
+        self.msc3786_enabled: bool = experimental.get("msc3786_enabled", False)
