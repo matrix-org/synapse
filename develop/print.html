@@ -1638,6 +1638,23 @@ Device IDs are unaffected, as these are necessary to facilitate end-to-end encry
 <p>To re-enable this functionality, set the
 <a href="https://matrix-org.github.io/synapse/v1.59/usage/configuration/config_documentation.html#federation"><code>allow_device_name_lookup_over_federation</code></a>
 homeserver config option to <code>true</code>.</p>
+<h2 id="deprecation-of-the-synapseappappservice-worker-application-type"><a class="header" href="#deprecation-of-the-synapseappappservice-worker-application-type">Deprecation of the <code>synapse.app.appservice</code> worker application type</a></h2>
+<p>The <code>synapse.app.appservice</code> worker application type allowed you to configure a
+single worker to use to notify application services of new events, as long
+as this functionality was disabled on the main process with <code>notify_appservices: False</code>.</p>
+<p>To unify Synapse's worker types, the <code>synapse.app.appservice</code> worker application
+type and the <code>notify_appservices</code> configuration option have been deprecated.</p>
+<p>To get the same functionality, it's now recommended that the <code>synapse.app.generic_worker</code>
+worker application type is used and that the <code>notify_appservices_from_worker</code> option
+is set to the name of a worker.</p>
+<p>For the time being, <code>notify_appservices_from_worker</code> can be used alongside
+<code>synapse.app.appservice</code> and <code>notify_appservices</code> to make it easier to transition
+between the two configurations, however please note that:</p>
+<ul>
+<li>the options must not contradict each other (otherwise Synapse won't start); and</li>
+<li>the <code>notify_appservices</code> option will be removed in a future release of Synapse.</li>
+</ul>
+<p>Please see <a href="workers.html#notifying-application-services">the relevant section of the worker documentation</a> for more information.</p>
 <h1 id="upgrading-to-v1580"><a class="header" href="#upgrading-to-v1580">Upgrading to v1.58.0</a></h1>
 <h2 id="groupscommunities-feature-has-been-disabled-by-default"><a class="header" href="#groupscommunities-feature-has-been-disabled-by-default">Groups/communities feature has been disabled by default</a></h2>
 <p>The non-standard groups/communities feature in Synapse has been disabled by default
@@ -12313,6 +12330,15 @@ worker_replication_http_port: 9093
 
 worker_log_config: /etc/matrix-synapse/background-worker-log.yaml
 </code></pre>
+<h4 id="notifying-application-services"><a class="header" href="#notifying-application-services">Notifying Application Services</a></h4>
+<p>You can designate one worker to send output traffic to Application Services.</p>
+<p>Specify its name in the shared configuration as follows:</p>
+<pre><code class="language-yaml">notify_appservices_from_worker: worker_name
+</code></pre>
+<p>This work cannot be load-balanced; please ensure the main process is restarted
+after setting this option in the shared configuration!</p>
+<p>This style of configuration supersedes the legacy <code>synapse.app.appservice</code>
+worker application type.</p>
 <h3 id="synapseapppusher"><a class="header" href="#synapseapppusher"><code>synapse.app.pusher</code></a></h3>
 <p>Handles sending push notifications to sygnal and email. Doesn't handle any
 REST endpoints itself, but you should set <code>start_pushers: False</code> in the
@@ -12324,6 +12350,8 @@ pusher instances by their worker name, e.g.:</p>
     - pusher_worker2
 </code></pre>
 <h3 id="synapseappappservice"><a class="header" href="#synapseappappservice"><code>synapse.app.appservice</code></a></h3>
+<p><strong>Deprecated as of Synapse v1.58.</strong> <a href="workers.html#notifying-application-services">Use <code>synapse.app.generic_worker</code> with the
+<code>notify_appservices_from_worker</code> option instead.</a></p>
 <p>Handles sending output traffic to Application Services. Doesn't handle any
 REST endpoints itself, but you should set <code>notify_appservices: False</code> in the
 shared configuration file to stop the main synapse sending appservice notifications.</p>

@@ -532,6 +532,15 @@ worker_replication_http_port: 9093
 
 worker_log_config: /etc/matrix-synapse/background-worker-log.yaml
 </code></pre>
+<h4 id="notifying-application-services"><a class="header" href="#notifying-application-services">Notifying Application Services</a></h4>
+<p>You can designate one worker to send output traffic to Application Services.</p>
+<p>Specify its name in the shared configuration as follows:</p>
+<pre><code class="language-yaml">notify_appservices_from_worker: worker_name
+</code></pre>
+<p>This work cannot be load-balanced; please ensure the main process is restarted
+after setting this option in the shared configuration!</p>
+<p>This style of configuration supersedes the legacy <code>synapse.app.appservice</code>
+worker application type.</p>
 <h3 id="synapseapppusher"><a class="header" href="#synapseapppusher"><code>synapse.app.pusher</code></a></h3>
 <p>Handles sending push notifications to sygnal and email. Doesn't handle any
 REST endpoints itself, but you should set <code>start_pushers: False</code> in the
@@ -543,6 +552,8 @@ pusher instances by their worker name, e.g.:</p>
     - pusher_worker2
 </code></pre>
 <h3 id="synapseappappservice"><a class="header" href="#synapseappappservice"><code>synapse.app.appservice</code></a></h3>
+<p><strong>Deprecated as of Synapse v1.58.</strong> <a href="#notifying-application-services">Use <code>synapse.app.generic_worker</code> with the
+<code>notify_appservices_from_worker</code> option instead.</a></p>
 <p>Handles sending output traffic to Application Services. Doesn't handle any
 REST endpoints itself, but you should set <code>notify_appservices: False</code> in the
 shared configuration file to stop the main synapse sending appservice notifications.</p>
