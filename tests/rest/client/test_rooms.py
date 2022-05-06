@@ -41,6 +41,7 @@ from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 from tests import unittest
+from tests.http.server._base import EndpointCancellationTestHelperMixin
 from tests.test_utils import make_awaitable
 
 PATH_PREFIX = b"/_matrix/client/api/v1"
@@ -475,7 +476,7 @@ class RoomPermissionsTestCase(RoomBase):
         )
 
 
-class RoomsMemberListTestCase(RoomBase):
+class RoomsMemberListTestCase(RoomBase, EndpointCancellationTestHelperMixin):
     """Tests /rooms/$room_id/members/list REST events."""
 
     servlets = RoomBase.servlets + [sync.register_servlets]
@@ -594,6 +595,62 @@ class RoomsMemberListTestCase(RoomBase):
         # can see old list once left
         channel = self.make_request("GET", room_path)
         self.assertEqual(200, channel.code, msg=channel.result["body"])
+
+    def test_get_member_list_cancellation(self) -> None:
+        """Test cancellation of a `/rooms/$room_id/members` request."""
+        room_id = self.helper.create_room_as(self.user_id)
+        body = self._test_cancellation_at_every_await(
+            self.reactor,
+            lambda: self.make_request(
+                "GET", "/rooms/%s/members" % room_id, await_result=False
+            ),
+            test_name="test_get_member_list_cancellation",
+        )
+
+        self.assertEqual(len(body["chunk"]), 1)
+        self.assertLessEqual(
+            {
+                "content": {"membership": "join"},
+                "room_id": room_id,
+                "sender": self.user_id,
+                "state_key": self.user_id,
+                "type": "m.room.member",
+                "user_id": self.user_id,
+            }.items(),
+            body["chunk"][0].items(),
+        )
+
+    def test_get_member_list_with_at_token_cancellation(self) -> None:
+        """Test cancellation of a `/rooms/$room_id/members?at=<sync token>` request."""
+        room_id = self.helper.create_room_as(self.user_id)
+
+        # first sync to get an at token
+        channel = self.make_request("GET", "/sync")
+        self.assertEqual(200, channel.code)
+        sync_token = channel.json_body["next_batch"]
+
+        body = self._test_cancellation_at_every_await(
+            self.reactor,
+            lambda: self.make_request(
+                "GET",
+                "/rooms/%s/members?at=%s" % (room_id, sync_token),
+                await_result=False,
+            ),
+            test_name="test_get_member_list_with_at_token_cancellation",
+        )
+
+        self.assertEqual(len(body["chunk"]), 1)
+        self.assertLessEqual(
+            {
+                "content": {"membership": "join"},
+                "room_id": room_id,
+                "sender": self.user_id,
+                "state_key": self.user_id,
+                "type": "m.room.member",
+                "user_id": self.user_id,
+            }.items(),
+            body["chunk"][0].items(),
+        )
 
 
 class RoomsCreateTestCase(RoomBase):
