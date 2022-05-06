@@ -139,7 +139,9 @@ def cancellable(method: F) -> F:
             async def on_GET(self, request: SynapseRequest) -> ...:
                 ...
     """
-    if method.__name__ not in _cancellable_method_names:
+    if method.__name__ not in _cancellable_method_names and not any(
+        method.__name__.startswith(name) for name in _cancellable_method_names
+    ):
         raise ValueError(
             "@cancellable decorator can only be applied to servlet methods."
         )
