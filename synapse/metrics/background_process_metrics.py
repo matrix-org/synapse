@@ -283,6 +283,7 @@ def wrap_as_background_process(
     The former can be convenient if `func` needs to be run as a background process in
     multiple places.
     """
+
     def wrap_as_background_process_inner(
         func: Callable[P, Awaitable[Optional[R]]]
     ) -> Callable[P, "defer.Deferred[Optional[R]]"]:
