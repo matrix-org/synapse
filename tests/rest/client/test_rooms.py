@@ -18,7 +18,7 @@
 """Tests REST events for /rooms paths."""
 
 import json
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, ClassVar, Dict, Iterable, List, Optional
 from unittest.mock import Mock, call
 from urllib import parse as urlparse
 
@@ -33,7 +33,7 @@ from synapse.api.constants import (
 )
 from synapse.api.errors import Codes, HttpResponseException
 from synapse.handlers.pagination import PurgeStatus
-from synapse.rest import admin
+from synapse.rest import RegisterServletsFunc, admin
 from synapse.rest.client import account, directory, login, profile, room, sync
 from synapse.server import HomeServer
 from synapse.types import JsonDict, RoomAlias, UserID, create_requester
@@ -49,7 +49,12 @@ PATH_PREFIX = b"/_matrix/client/api/v1"
 class RoomBase(unittest.HomeserverTestCase):
     rmcreator_id: Optional[str] = None
 
-    servlets = [room.register_servlets, room.register_deprecated_servlets]
+    # mypy: `room.register_servlets` has an extra parameter, so mypy thinks `servlets`
+    #       is a `List[function]` without the hint.
+    servlets: ClassVar[List[RegisterServletsFunc]] = [
+        room.register_servlets,
+        room.register_deprecated_servlets,
+    ]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
 
