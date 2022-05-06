@@ -441,22 +441,6 @@ def start(config_options: List[str]) -> None:
         "synapse.app.user_dir",
     )
 
-    if config.worker.worker_app == "synapse.app.appservice":
-        if config.appservice.notify_appservices:
-            sys.stderr.write(
-                "\nThe appservices must be disabled in the main synapse process"
-                "\nbefore they can be run in a separate worker."
-                "\nPlease add ``notify_appservices: false`` to the main config"
-                "\n"
-            )
-            sys.exit(1)
-
-        # Force the appservice to start since they will be disabled in the main config
-        config.appservice.notify_appservices = True
-    else:
-        # For other worker types we force this to off.
-        config.appservice.notify_appservices = False
-
     if config.worker.worker_app == "synapse.app.user_dir":
         if config.server.update_user_directory:
             sys.stderr.write(
