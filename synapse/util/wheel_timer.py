@@ -14,20 +14,17 @@
 import logging
 from typing import Generic, Hashable, List, Set, TypeVar
 
+import attr
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=Hashable)
 
 
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class _Entry(Generic[T]):
-    __slots__ = ["end_key", "queue"]
-
-    def __init__(self, end_key: int) -> None:
-        self.end_key: int = end_key
-
-        # We use a set here as otherwise we can end up with a lot of duplicate
-        # entries.
-        self.queue: Set[T] = set()
+    end_key: int
+    elements: Set[T] = attr.Factory(set)
 
 
 class WheelTimer(Generic[T]):
@@ -71,7 +68,7 @@ class WheelTimer(Generic[T]):
 
             if then_key <= max_key:
                 # The max here is to protect against inserts for times in the past
-                self.entries[max(min_key, then_key) - min_key].queue.add(obj)
+                self.entries[max(min_key, then_key) - min_key].elements.add(obj)
                 return
 
         next_key = now_key + 1
@@ -87,7 +84,7 @@ class WheelTimer(Generic[T]):
         # to insert. This ensures there are no gaps.
         self.entries.extend(_Entry(key) for key in range(last_key, then_key + 1))
 
-        self.entries[-1].queue.add(obj)
+        self.entries[-1].elements.add(obj)
 
     def fetch(self, now: int) -> List[T]:
         """Fetch any objects that have timed out
@@ -102,9 +99,9 @@ class WheelTimer(Generic[T]):
 
         ret: List[T] = []
         while self.entries and self.entries[0].end_key <= now_key:
-            ret.extend(self.entries.pop(0).queue)
+            ret.extend(self.entries.pop(0).elements)
 
         return ret
 
     def __len__(self) -> int:
-        return sum(len(entry.queue) for entry in self.entries)
+        return sum(len(entry.elements) for entry in self.entries)
