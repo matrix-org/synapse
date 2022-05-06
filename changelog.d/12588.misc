@@ -1,1 +1,1 @@
-Add `@cancellable` decorator, for use on endpoint methods that can be cancelled when clients disconnect.
+Add ability to cancel disconnected requests to `SynapseRequest`.
