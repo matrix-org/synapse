@@ -426,7 +426,7 @@ the shared configuration would include:
 run_background_tasks_on: background_worker
 ```
 
-You might also wish to investigate the `update_user_directory` and
+You might also wish to investigate the `update_user_directory_from_worker` and
 `media_instance_running_background_jobs` settings.
 
 An example for a dedicated background worker instance:
@@ -434,6 +434,23 @@ An example for a dedicated background worker instance:
 ```yaml
 {{#include systemd-with-workers/workers/background_worker.yaml}}
 ```
+
+#### Updating the User Directory
+
+You can designate one worker to update the user directory.
+
+Specify its name in the shared configuration as follows:
+
+```yaml
+update_user_directory_from_worker: worker_name
+```
+
+This work cannot be load-balanced; please ensure the main process is restarted
+after setting this option in the shared configuration!
+
+This style of configuration supersedes the legacy `synapse.app.user_dir`
+worker application type.
+
 
 #### Notifying Application Services
 
@@ -470,7 +487,7 @@ pusher_instances:
 
 ### `synapse.app.appservice`
 
-**Deprecated as of Synapse v1.58.** [Use `synapse.app.generic_worker` with the
+**Deprecated as of Synapse v1.59.** [Use `synapse.app.generic_worker` with the
 `notify_appservices_from_worker` option instead.](#notifying-application-services)
 
 Handles sending output traffic to Application Services. Doesn't handle any
@@ -539,6 +556,9 @@ media_instance_running_background_jobs: "media-repository-1"
 Note that if a reverse proxy is used , then `/_matrix/media/` must be routed for both inbound client and federation requests (if they are handled separately).
 
 ### `synapse.app.user_dir`
+
+**Deprecated as of Synapse v1.59.** [Use `synapse.app.generic_worker` with the
+`update_user_directory_from_worker` option instead.](#updating-the-user-directory)
 
 Handles searches in the user directory. It can handle REST endpoints matching
 the following regular expressions:
