@@ -66,11 +66,12 @@ def _load_rules(rawrules, enabled_map, experimental_config: ExperimentalConfig):
     # We're going to be mutating this a lot, so do a deep copy
     rules = list(list_with_base_rules(ruleslist))
 
+    rules_to_remove = []
     for i, rule in enumerate(rules):
         rule_id = rule["rule_id"]
 
         if not _is_experimental_rule_enabled(rule_id, experimental_config):
-            rules.remove(rules[i])
+            rules_to_remove.append(i)
             continue
         if rule_id not in enabled_map:
             continue
@@ -81,6 +82,9 @@ def _load_rules(rawrules, enabled_map, experimental_config: ExperimentalConfig):
         rule = dict(rule)
         rule["enabled"] = bool(enabled_map[rule_id])
         rules[i] = rule
+
+    for rule_index in rules_to_remove:
+        rules.remove(rules[rule_index])
 
     return rules
 
