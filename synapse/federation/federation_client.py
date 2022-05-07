@@ -618,7 +618,7 @@ class FederationClient(FederationBase):
         #
         # Dendrite returns a 404 (with a body of "404 page not found");
         # Conduit returns a 404 (with no body); and Synapse returns a 400
-        # with M_UNRECOGNISED.
+        # with M_UNRECOGNIZED.
         #
         # This needs to be rather specific as some endpoints truly do return 404
         # errors.
@@ -1006,7 +1006,7 @@ class FederationClient(FederationBase):
                 content=pdu.get_pdu_json(time_now),
             )
         except HttpResponseException as e:
-            # If an error is received that is due to an unrecognised endpoint,
+            # If an error is received that is due to an unrecognized endpoint,
             # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
             # and raise.
             if not self._is_unknown_endpoint(e):
@@ -1074,7 +1074,7 @@ class FederationClient(FederationBase):
                 },
             )
         except HttpResponseException as e:
-            # If an error is received that is due to an unrecognised endpoint,
+            # If an error is received that is due to an unrecognized endpoint,
             # fallback to the v1 endpoint if the room uses old-style event IDs.
             # Otherwise, consider it a legitimate error and raise.
             err = e.to_synapse_error()
@@ -1136,7 +1136,7 @@ class FederationClient(FederationBase):
                 content=pdu.get_pdu_json(time_now),
             )
         except HttpResponseException as e:
-            # If an error is received that is due to an unrecognised endpoint,
+            # If an error is received that is due to an unrecognized endpoint,
             # fallback to the v1 endpoint. Otherwise, consider it a legitimate error
             # and raise.
             if not self._is_unknown_endpoint(e):
@@ -1407,7 +1407,7 @@ class FederationClient(FederationBase):
                     suggested_only=suggested_only,
                 )
             except HttpResponseException as e:
-                # If an error is received that is due to an unrecognised endpoint,
+                # If an error is received that is due to an unrecognized endpoint,
                 # fallback to the unstable endpoint. Otherwise, consider it a
                 # legitimate error and raise.
                 if not self._is_unknown_endpoint(e):
