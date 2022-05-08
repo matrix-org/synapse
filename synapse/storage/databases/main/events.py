@@ -1648,9 +1648,15 @@ class PersistEventsStore:
         txn.call_after(prefill)
 
     def _store_redaction(self, txn: LoggingTransaction, event: EventBase) -> None:
-        # Invalidate the caches for the redacted event, note that these caches
-        # are also cleared as part of event replication in _invalidate_caches_for_event.
-        txn.call_after(self.store._invalidate_get_event_cache, event.redacts)
+        """Invalidate the caches for the redacted event.
+
+        Note that these caches are also cleared as part of event replication in
+        _invalidate_caches_for_event.
+        """
+
+        # type-ignore: mypy detects that event.redacts may be None. Presumably the
+        # application has ensured that this is not the case if we call this function.
+        txn.call_after(self.store._invalidate_get_event_cache, event.redacts)  # type: ignore[arg-type]
         txn.call_after(self.store.get_relations_for_event.invalidate, (event.redacts,))
         txn.call_after(self.store.get_applicable_edit.invalidate, (event.redacts,))
 
