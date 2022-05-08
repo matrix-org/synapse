@@ -30,6 +30,7 @@ from typing import (
 
 import attr
 import jinja2
+from typing_extensions import ParamSpec
 
 from twisted.internet import defer
 from twisted.web.resource import Resource
@@ -129,6 +130,7 @@ if TYPE_CHECKING:
 
 
 T = TypeVar("T")
+P = ParamSpec("P")
 
 """
 This package defines the 'stable' API which can be used by extension modules which
@@ -799,9 +801,9 @@ class ModuleApi:
     def run_db_interaction(
         self,
         desc: str,
-        func: Callable[..., T],
-        *args: Any,
-        **kwargs: Any,
+        func: Callable[P, T],
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> "defer.Deferred[T]":
         """Run a function with a database connection
 
@@ -817,8 +819,9 @@ class ModuleApi:
         Returns:
             Deferred[object]: result of func
         """
+        # type-ignore: See https://github.com/python/mypy/issues/8862
         return defer.ensureDeferred(
-            self._store.db_pool.runInteraction(desc, func, *args, **kwargs)
+            self._store.db_pool.runInteraction(desc, func, *args, **kwargs)  # type: ignore[arg-type]
         )
 
     def complete_sso_login(
@@ -1296,9 +1299,9 @@ class ModuleApi:
 
     async def defer_to_thread(
         self,
-        f: Callable[..., T],
-        *args: Any,
-        **kwargs: Any,
+        f: Callable[P, T],
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> T:
         """Runs the given function in a separate thread from Synapse's thread pool.
 
