@@ -22,8 +22,11 @@ from typing import (
     List,
     Optional,
     Set,
+    TypeVar,
     Union,
 )
+
+from typing_extensions import ParamSpec
 
 from synapse.api.presence import UserPresenceState
 from synapse.util.async_helpers import maybe_awaitable
@@ -38,6 +41,10 @@ GET_USERS_FOR_STATES_CALLBACK = Callable[
 GET_INTERESTED_USERS_CALLBACK = Callable[[str], Awaitable[Union[Set[str], str]]]
 
 logger = logging.getLogger(__name__)
+
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 def load_legacy_presence_router(hs: "HomeServer") -> None:
@@ -63,13 +70,15 @@ def load_legacy_presence_router(hs: "HomeServer") -> None:
 
     # All methods that the module provides should be async, but this wasn't enforced
     # in the old module system, so we wrap them if needed
-    def async_wrapper(f: Optional[Callable]) -> Optional[Callable[..., Awaitable]]:
+    def async_wrapper(
+        f: Optional[Callable[P, R]]
+    ) -> Optional[Callable[P, Awaitable[R]]]:
         # f might be None if the callback isn't implemented by the module. In this
         # case we don't want to register a callback at all so we return None.
         if f is None:
             return None
 
-        def run(*args: Any, **kwargs: Any) -> Awaitable:
+        def run(*args: P.args, **kwargs: P.kwargs) -> Awaitable[R]:
             # Assertion required because mypy can't prove we won't change `f`
             # back to `None`. See
             # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
@@ -80,7 +89,7 @@ def load_legacy_presence_router(hs: "HomeServer") -> None:
         return run
 
     # Register the hooks through the module API.
-    hooks = {
+    hooks: Dict[str, Optional[Callable[..., Any]]] = {
         hook: async_wrapper(getattr(presence_router, hook, None))
         for hook in presence_router_methods
     }
