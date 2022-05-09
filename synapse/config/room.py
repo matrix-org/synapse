@@ -100,6 +100,9 @@ class RoomConfig(Config):
         # Override the default power levels for rooms created on this server, per
         # room creation preset.
         #
+        # The appropriate dictionary for the room preset will be applied on top
+        # of the existing power levels content.
+        #
         # Useful if you know that your users need special permissions in rooms
         # that they create (e.g. to send particular types of state events without
         # needing an elevated power level).  This takes the same shape as the
