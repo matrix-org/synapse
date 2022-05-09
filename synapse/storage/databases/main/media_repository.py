@@ -474,23 +474,40 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         time_now_ms: int,
         upload_name: Optional[str],
         filesystem_id: str,
+        update: bool = False,
     ) -> None:
-        await self.db_pool.simple_upsert(
-            "remote_media_cache",
-            {
-                "media_origin": origin,
-                "media_id": media_id,
-            },
-            {
-                "media_type": media_type,
-                "media_length": media_length,
-                "created_ts": time_now_ms,
-                "upload_name": upload_name,
-                "filesystem_id": filesystem_id,
-                "last_access_ts": time_now_ms,
-            },
-            desc="store_cached_remote_media",
-        )
+        if update:
+            await self.db_pool.simple_upsert(
+                "remote_media_cache",
+                {
+                    "media_origin": origin,
+                    "media_id": media_id,
+                },
+                {
+                    "media_type": media_type,
+                    "media_length": media_length,
+                    "created_ts": time_now_ms,
+                    "upload_name": upload_name,
+                    "filesystem_id": filesystem_id,
+                    "last_access_ts": time_now_ms,
+                },
+                desc="update_store_cached_remote_media",
+            )
+        else:
+            await self.db_pool.simple_insert(
+                "remote_media_cache",
+                {
+                    "media_origin": origin,
+                    "media_id": media_id,
+                    "media_type": media_type,
+                    "media_length": media_length,
+                    "created_ts": time_now_ms,
+                    "upload_name": upload_name,
+                    "filesystem_id": filesystem_id,
+                    "last_access_ts": time_now_ms,
+                },
+                desc="store_cached_remote_media",
+            )
 
     async def update_cached_last_access_time(
         self,

@@ -360,9 +360,12 @@ class MediaRepository:
             media_info = await self.store.get_cached_remote_media(server_name, media_id)
 
             is_cached = False
-            if file_info is not None:
+
+            if media_info is not None:
                 try:
-                    await self.media_storage.ensure_media_is_in_local_cache(file_info)
+                    await self.media_storage.ensure_media_is_in_local_cache(
+                        FileInfo(server_name, media_info["filesystem_id"])
+                    )
                     is_cached = True
                 except NotFoundError:
                     pass
@@ -406,6 +409,9 @@ class MediaRepository:
         Returns:
             The media info of the file.
         """
+
+        # Only update the store if we have a pre-existing file somewhere.
+        update_store = file_info is not None
 
         if not file_info:
             file_id = random_string(24)
@@ -493,6 +499,7 @@ class MediaRepository:
                 upload_name=upload_name,
                 media_length=length,
                 filesystem_id=file_info.file_id,
+                update=update_store,
             )
 
         logger.info("Stored remote media in file %r", fname)
