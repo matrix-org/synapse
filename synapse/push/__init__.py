@@ -81,9 +81,9 @@ The general interaction of the classes are:
         +------------------------+     +-----------------------------------------------+
                 |
                 v
-        +------------------+
-        | SimpleHttpClient |
-        +------------------+
+        +-------------------------+
+        | Mailer/SimpleHttpClient |
+        +-------------------------+
 
 The Pusher instance also calls out to various utilities for generating payloads
 (or email templates), but those interactions are not detailed in this diagram
