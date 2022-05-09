@@ -135,6 +135,17 @@ class PushRuleEvaluatorForEvent:
     def check_conditions(
         self, conditions: List[dict], uid: str, display_name: Optional[str]
     ) -> bool:
+        """
+        Returns true if a user's conditions/user ID/display name match the event.
+
+        Args:
+            conditions: The user's conditions to match.
+            uid: The user's MXID.
+            display_name: The display name.
+
+        Returns:
+             True if all conditions match the event, False otherwise.
+        """
         for cond in conditions:
             _cache_key = cond.get("_cache_key", None)
             if _cache_key:
@@ -156,6 +167,17 @@ class PushRuleEvaluatorForEvent:
     def matches(
         self, condition: Dict[str, Any], user_id: str, display_name: Optional[str]
     ) -> bool:
+        """
+        Returns true if a user's condition/user ID/display name match the event.
+
+        Args:
+            condition: The user's condition to match.
+            uid: The user's MXID.
+            display_name: The display name, or None if there is not one.
+
+        Returns:
+             True if the condition matches the event, False otherwise.
+        """
         if condition["kind"] == "event_match":
             return self._event_match(condition, user_id)
         elif condition["kind"] == "contains_display_name":
@@ -170,6 +192,16 @@ class PushRuleEvaluatorForEvent:
             return True
 
     def _event_match(self, condition: dict, user_id: str) -> bool:
+        """
+        Check an "event_match" push rule condition.
+
+        Args:
+            condition: The "event_match" push rule condition to match.
+            user_id: The user's MXID.
+
+        Returns:
+             True if the condition matches the event, False otherwise.
+        """
         pattern = condition.get("pattern", None)
 
         if not pattern:
@@ -198,6 +230,15 @@ class PushRuleEvaluatorForEvent:
             return _glob_matches(pattern, haystack)
 
     def _contains_display_name(self, display_name: Optional[str]) -> bool:
+        """
+        Check an "event_match" push rule condition.
+
+        Args:
+            display_name: The display name, or None if there is not one.
+
+        Returns:
+             True if the display name is found in the event body, False otherwise.
+        """
         if not display_name:
             return False
 
