@@ -1653,10 +1653,8 @@ class PersistEventsStore:
         Note that these caches are also cleared as part of event replication in
         _invalidate_caches_for_event.
         """
-
-        # type-ignore: mypy detects that event.redacts may be None. Presumably the
-        # application has ensured that this is not the case if we call this function.
-        txn.call_after(self.store._invalidate_get_event_cache, event.redacts)  # type: ignore[arg-type]
+        assert event.redacts is not None
+        txn.call_after(self.store._invalidate_get_event_cache, event.redacts)
         txn.call_after(self.store.get_relations_for_event.invalidate, (event.redacts,))
         txn.call_after(self.store.get_applicable_edit.invalidate, (event.redacts,))
 
