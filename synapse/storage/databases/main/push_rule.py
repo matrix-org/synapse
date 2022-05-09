@@ -46,6 +46,9 @@ logger = logging.getLogger(__name__)
 def _is_experimental_rule_enabled(
     rule_id: str, experimental_config: ExperimentalConfig
 ) -> bool:
+    """Used by `_load_rules` to filter out experimental rules when they
+    have not been enabled.
+    """
     if (
         rule_id == "global/override/.org.matrix.msc3786.rule.room.server_acl"
         and not experimental_config.msc3786_enabled
