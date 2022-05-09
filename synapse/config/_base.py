@@ -22,6 +22,7 @@ from hashlib import sha256
 from textwrap import dedent
 from typing import (
     Any,
+    ClassVar,
     Dict,
     Iterable,
     List,
@@ -119,7 +120,7 @@ class Config:
             defined in subclasses.
     """
 
-    section: str
+    section: ClassVar[str]
 
     def __init__(self, root_config: "RootConfig" = None):
         self.root = root_config
@@ -309,7 +310,7 @@ class RootConfig:
     class, lower-cased and with "Config" removed.
     """
 
-    config_classes = []
+    config_classes: List[Type[Config]] = []
 
     def __init__(self):
         for config_class in self.config_classes:
