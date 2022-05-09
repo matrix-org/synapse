@@ -16,6 +16,7 @@
 
 import argparse
 import errno
+import logging
 import os
 from collections import OrderedDict
 from hashlib import sha256
@@ -23,6 +24,7 @@ from textwrap import dedent
 from typing import (
     Any,
     ClassVar,
+    Collection,
     Dict,
     Iterable,
     List,
@@ -40,6 +42,8 @@ import pkg_resources
 import yaml
 
 from synapse.util.templates import _create_mxc_to_http_filter, _format_ts_filter
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigError(Exception):
@@ -312,7 +316,10 @@ class RootConfig:
 
     config_classes: List[Type[Config]] = []
 
-    def __init__(self):
+    def __init__(self, config_files: Collection[str] = ()):
+        # Capture absolute paths here, so we can reload config after we daemonize.
+        self.config_files = [os.path.abspath(path) for path in config_files]
+
         for config_class in self.config_classes:
             if config_class.section is None:
                 raise ValueError("%r requires a section name" % (config_class,))
@@ -513,12 +520,10 @@ class RootConfig:
             object from parser.parse_args(..)`
         """
 
-        obj = cls()
-
         config_args = parser.parse_args(argv)
 
         config_files = find_config_files(search_paths=config_args.config_path)
-
+        obj = cls(config_files)
         if not config_files:
             parser.error("Must supply a config file.")
 
@@ -628,7 +633,7 @@ class RootConfig:
 
         generate_missing_configs = config_args.generate_missing_configs
 
-        obj = cls()
+        obj = cls(config_files)
 
         if config_args.generate_config:
             if config_args.report_stats is None:
@@ -727,6 +732,20 @@ class RootConfig:
         self, config_dict: Dict[str, Any], config_dir_path: str
     ) -> None:
         self.invoke_all("generate_files", config_dict, config_dir_path)
+
+    def reload_config_section(self, section_name: str) -> None:
+        """Reconstruct the given config section, leaving all others unchanged.
+
+        :raises ValueError: if the given `section` does not exist.
+        :raises ConfigError: for any other problems reloading config.
+        """
+        existing_config: Optional[Config] = getattr(self, section_name, None)
+        if existing_config is None:
+            raise ValueError(f"Unknown config section '{section_name}'")
+        logger.info("Reloading config section '%s'", section_name)
+
+        new_config_data = read_config_files(self.config_files)
+        existing_config.read_config(new_config_data)
 
 
 def read_config_files(config_files: Iterable[str]) -> Dict[str, Any]:
