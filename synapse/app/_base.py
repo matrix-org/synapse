@@ -51,6 +51,8 @@ from twisted.python.threadpool import ThreadPool
 from synapse.api.constants import MAX_PDU_SIZE
 from synapse.app import check_bind_error
 from synapse.app.phone_stats_home import start_phone_stats_home
+from synapse.config import ConfigError
+from synapse.config._base import format_config_error
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import ManholeConfig
 from synapse.crypto import context_factory
@@ -426,6 +428,7 @@ async def start(hs: "HomeServer") -> None:
         signal.signal(signal.SIGHUP, run_sighup)
 
         register_sighup(refresh_certificate, hs)
+        register_sighup(reload_cache_config, hs.config)
 
     # Load the certificate from disk.
     refresh_certificate(hs)
@@ -478,6 +481,22 @@ async def start(hs: "HomeServer") -> None:
         # Speed up shutdowns by freezing all allocated objects. This moves everything
         # into the permanent generation and excludes them from the final GC.
         atexit.register(gc.freeze)
+
+
+def reload_cache_config(config: HomeServerConfig) -> None:
+    # For mypy's benefit. It can't know that we haven't altered `config` by the time
+    # we call this closure.
+    assert config is not None
+    try:
+        # This will call CacheConfig.read_config, which will automatically call
+        # CacheConfig.resize_all_caches.
+        config.reload_config_section("caches")
+    except ConfigError as e:
+        logger.warning("Failed to reload cache config")
+        for f in format_config_error(e):
+            logger.warning(f)
+    else:
+        logger.debug("New cache config: %s", config.caches.__dict__)
 
 
 def setup_sentry(hs: "HomeServer") -> None:
