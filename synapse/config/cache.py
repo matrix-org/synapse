@@ -180,9 +180,7 @@ class CacheConfig(Config):
         self.cache_factors: Dict[str, float] = {}
 
         cache_config = config.get("caches") or {}
-        self.global_factor = cache_config.get(
-            "global_factor", properties.default_factor_size
-        )
+        self.global_factor = cache_config.get("global_factor", _DEFAULT_FACTOR_SIZE)
         if not isinstance(self.global_factor, (int, float)):
             raise ConfigError("caches.global_factor must be a number.")
 
