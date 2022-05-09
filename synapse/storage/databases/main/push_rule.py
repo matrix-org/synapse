@@ -77,9 +77,6 @@ def _load_rules(rawrules, enabled_map, experimental_config: ExperimentalConfig):
     for i, rule in enumerate(rules):
         rule_id = rule["rule_id"]
 
-        if not _is_experimental_rule_enabled(rule_id, experimental_config):
-            rules_to_remove.append(i)
-            continue
         if rule_id not in enabled_map:
             continue
         if rule.get("enabled", True) == bool(enabled_map[rule_id]):
