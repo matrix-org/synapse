@@ -64,7 +64,7 @@ Changes in SCHEMA_VERSION = 69:
     - Use sequence to generate future `application_services_txns.txn_id`s
 
 Changes in SCHEMA_VERSION = 70:
-    - event_reference_hashes is no longer written.
+    - event_reference_hashes is no longer written to.
 """
 
 
