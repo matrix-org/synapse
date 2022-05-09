@@ -1371,7 +1371,7 @@ python-versions = "*"
 
 [[package]]
 name = "types-pillow"
-version = "9.0.6"
+version = "9.0.15"
 description = "Typing stubs for Pillow"
 category = "dev"
 optional = false
@@ -2626,8 +2626,8 @@ types-opentracing = [
     {file = "types_opentracing-2.4.7-py3-none-any.whl", hash = "sha256:861fb8103b07cf717f501dd400cb274ca9992552314d4d6c7a824b11a215e512"},
 ]
 types-pillow = [
-    {file = "types-Pillow-9.0.6.tar.gz", hash = "sha256:79b350b1188c080c27558429f1e119e69c9f020b877a82df761d9283070e0185"},
-    {file = "types_Pillow-9.0.6-py3-none-any.whl", hash = "sha256:bd1e0a844fc718398aa265bf50fcad550fc520cc54f80e5ffeb7b3226b3cc507"},
+    {file = "types-Pillow-9.0.15.tar.gz", hash = "sha256:d2e385fe5c192e75970f18accce69f5c2a9f186f3feb578a9b91cd6fdf64211d"},
+    {file = "types_Pillow-9.0.15-py3-none-any.whl", hash = "sha256:c9646595dfafdf8b63d4b1443292ead17ee0fc7b18a143e497b68e0ea2dc1eb6"},
 ]
 types-psycopg2 = [
     {file = "types-psycopg2-2.9.9.tar.gz", hash = "sha256:4f9d4d52eeb343dc00fd5ed4f1513a8a5c18efba0a072eb82706d15cf4f20a2e"},
