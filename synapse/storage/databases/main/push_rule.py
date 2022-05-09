@@ -69,7 +69,8 @@ def _load_rules(rawrules, enabled_map, experimental_config: ExperimentalConfig):
     # We're going to be mutating this a lot, so copy it. We also filter out
     # any experimental default push rules that aren't enabled.
     rules = [
-        rule for rule in list_with_base_rules(ruleslist)
+        rule
+        for rule in list_with_base_rules(ruleslist)
         if _is_experimental_rule_enabled(rule["rule_id"], experimental_config)
     ]
 
@@ -138,7 +139,7 @@ class PushRulesWorkerStore(
             prefilled_cache=push_rules_prefill,
         )
 
-    @ abc.abstractmethod
+    @abc.abstractmethod
     def get_max_push_rules_stream_id(self):
         """Get the position of the push rules stream.
 
@@ -147,7 +148,7 @@ class PushRulesWorkerStore(
         """
         raise NotImplementedError()
 
-    @ cached(max_entries=5000)
+    @cached(max_entries=5000)
     async def get_push_rules_for_user(self, user_id):
         rows = await self.db_pool.simple_select_list(
             table="push_rules",
@@ -169,7 +170,7 @@ class PushRulesWorkerStore(
 
         return _load_rules(rows, enabled_map, self.hs.config.experimental)
 
-    @ cached(max_entries=5000)
+    @cached(max_entries=5000)
     async def get_push_rules_enabled_for_user(self, user_id) -> Dict[str, bool]:
         results = await self.db_pool.simple_select_list(
             table="push_rules_enable",
@@ -199,7 +200,7 @@ class PushRulesWorkerStore(
                 "have_push_rules_changed", have_push_rules_changed_txn
             )
 
-    @ cachedList(
+    @cachedList(
         cached_method_name="get_push_rules_for_user",
         list_name="user_ids",
         num_args=1,
@@ -283,7 +284,7 @@ class PushRulesWorkerStore(
             ):
                 await self.copy_push_rule_from_room_to_room(new_room_id, user_id, rule)
 
-    @ cachedList(
+    @cachedList(
         cached_method_name="get_push_rules_enabled_for_user",
         list_name="user_ids",
         num_args=1,
