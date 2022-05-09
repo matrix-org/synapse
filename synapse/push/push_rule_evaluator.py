@@ -223,7 +223,7 @@ class PushRuleEvaluatorForEvent:
 
             return _glob_matches(pattern, body, word_boundary=True)
         else:
-            haystack = self._get_value(condition["key"])
+            haystack = self._value_cache.get(condition["key"], None)
             if haystack is None:
                 return False
 
@@ -255,9 +255,6 @@ class PushRuleEvaluatorForEvent:
             regex_cache[(display_name, False, True)] = r
 
         return bool(r.search(body))
-
-    def _get_value(self, dotted_key: str) -> Optional[str]:
-        return self._value_cache.get(dotted_key, None)
 
 
 # Caches (string, is_glob, word_boundary) -> regex for push. See _glob_matches
