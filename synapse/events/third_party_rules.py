@@ -14,12 +14,14 @@
 import logging
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, List, Optional, Tuple
 
+from twisted.internet.defer import CancelledError
+
 from synapse.api.errors import ModuleFailedException, SynapseError
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.storage.roommember import ProfileInfo
 from synapse.types import Requester, StateMap
-from synapse.util.async_helpers import maybe_awaitable
+from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -263,7 +265,11 @@ class ThirdPartyEventRules:
 
         for callback in self._check_event_allowed_callbacks:
             try:
-                res, replacement_data = await callback(event, state_events)
+                res, replacement_data = await delay_cancellation(
+                    callback(event, state_events)
+                )
+            except CancelledError:
+                raise
             except SynapseError as e:
                 # FIXME: Being able to throw SynapseErrors is relied upon by
                 # some modules. PR #10386 accidentally broke this ability.
@@ -333,8 +339,13 @@ class ThirdPartyEventRules:
 
         for callback in self._check_threepid_can_be_invited_callbacks:
             try:
-                if await callback(medium, address, state_events) is False:
+                threepid_can_be_invited = await delay_cancellation(
+                    callback(medium, address, state_events)
+                )
+                if threepid_can_be_invited is False:
                     return False
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
 
@@ -361,8 +372,13 @@ class ThirdPartyEventRules:
 
         for callback in self._check_visibility_can_be_modified_callbacks:
             try:
-                if await callback(room_id, state_events, new_visibility) is False:
+                visibility_can_be_modified = await delay_cancellation(
+                    callback(room_id, state_events, new_visibility)
+                )
+                if visibility_can_be_modified is False:
                     return False
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
 
@@ -400,8 +416,11 @@ class ThirdPartyEventRules:
         """
         for callback in self._check_can_shutdown_room_callbacks:
             try:
-                if await callback(user_id, room_id) is False:
+                can_shutdown_room = await delay_cancellation(callback(user_id, room_id))
+                if can_shutdown_room is False:
                     return False
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.exception(
                     "Failed to run module API callback %s: %s", callback, e
@@ -422,8 +441,13 @@ class ThirdPartyEventRules:
         """
         for callback in self._check_can_deactivate_user_callbacks:
             try:
-                if await callback(user_id, by_admin) is False:
+                can_deactivate_user = await delay_cancellation(
+                    callback(user_id, by_admin)
+                )
+                if can_deactivate_user is False:
                     return False
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.exception(
                     "Failed to run module API callback %s: %s", callback, e

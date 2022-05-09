@@ -28,8 +28,10 @@ from typing import (
 
 from typing_extensions import ParamSpec
 
+from twisted.internet.defer import CancelledError
+
 from synapse.api.presence import UserPresenceState
-from synapse.util.async_helpers import maybe_awaitable
+from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -158,7 +160,9 @@ class PresenceRouter:
             try:
                 # Note: result is an object here, because we don't trust modules to
                 # return the types they're supposed to.
-                result: object = await callback(state_updates)
+                result: object = await delay_cancellation(callback(state_updates))
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue
@@ -210,7 +214,9 @@ class PresenceRouter:
         # run all the callbacks for get_interested_users and combine the results
         for callback in self._get_interested_users_callbacks:
             try:
-                result = await callback(user_id)
+                result = await delay_cancellation(callback(user_id))
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue
