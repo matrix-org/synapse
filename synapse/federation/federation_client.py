@@ -618,7 +618,7 @@ class FederationClient(FederationBase):
         #
         # Dendrite returns a 404 (with a body of "404 page not found");
         # Conduit returns a 404 (with no body); and Synapse returns a 400
-        # with M_UNRECOGNISED.
+        # with M_UNRECOGNIZED.
         #
         # This needs to be rather specific as some endpoints truly do return 404
         # errors.
