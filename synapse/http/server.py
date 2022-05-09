@@ -43,6 +43,7 @@ from typing_extensions import Protocol
 from zope.interface import implementer
 
 from twisted.internet import defer, interfaces
+from twisted.internet.defer import CancelledError
 from twisted.python import failure
 from twisted.web import resource
 from twisted.web.server import NOT_DONE_YET, Request
@@ -82,6 +83,14 @@ HTML_ERROR_TEMPLATE = """<!DOCTYPE html>
 </html>
 """
 
+# A fictional HTTP status code for requests where the client has disconnected and we
+# successfully cancelled the request. Used only for logging purposes. Clients will never
+# observe this code unless cancellations leak across requests or we raise a
+# `CancelledError` ourselves.
+# Analogous to nginx's 499 status code:
+# https://github.com/nginx/nginx/blob/release-1.21.6/src/http/ngx_http_request.h#L128-L134
+HTTP_STATUS_REQUEST_CANCELLED = 499
+
 
 def return_json_error(f: failure.Failure, request: SynapseRequest) -> None:
     """Sends a JSON error response to clients."""
@@ -93,6 +102,17 @@ def return_json_error(f: failure.Failure, request: SynapseRequest) -> None:
         error_dict = exc.error_dict()
 
         logger.info("%s SynapseError: %s - %s", request, error_code, exc.msg)
+    elif f.check(CancelledError):
+        error_code = HTTP_STATUS_REQUEST_CANCELLED
+        error_dict = {"error": "Request cancelled", "errcode": Codes.UNKNOWN}
+
+        if not request._disconnected:
+            logger.error(
+                "Got cancellation before client disconnection from %r: %r",
+                request.request_metrics.name,
+                request,
+                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
+            )
     else:
         error_code = 500
         error_dict = {"error": "Internal server error", "errcode": Codes.UNKNOWN}
@@ -152,6 +172,16 @@ def return_html_error(
         else:
             logger.error(
                 "Failed handle request %r",
+                request,
+                exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
+            )
+    elif f.check(CancelledError):
+        code = HTTP_STATUS_REQUEST_CANCELLED
+        msg = "Request cancelled"
+
+        if not request._disconnected:
+            logger.error(
+                "Got cancellation before client disconnection when handling request %r",
                 request,
                 exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore[arg-type]
             )
@@ -683,6 +713,9 @@ def respond_with_json(
     Returns:
         twisted.web.server.NOT_DONE_YET if the request is still active.
     """
+    # The response code must always be set, for logging purposes.
+    request.setResponseCode(code)
+
     # could alternatively use request.notifyFinish() and flip a flag when
     # the Deferred fires, but since the flag is RIGHT THERE it seems like
     # a waste.
@@ -697,7 +730,6 @@ def respond_with_json(
     else:
         encoder = _encode_json_bytes
 
-    request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"application/json")
     request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
 
@@ -728,13 +760,15 @@ def respond_with_json_bytes(
     Returns:
         twisted.web.server.NOT_DONE_YET if the request is still active.
     """
+    # The response code must always be set, for logging purposes.
+    request.setResponseCode(code)
+
     if request._disconnected:
         logger.warning(
             "Not sending response to request %s, already disconnected.", request
         )
         return None
 
-    request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"application/json")
     request.setHeader(b"Content-Length", b"%d" % (len(json_bytes),))
     request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
@@ -840,6 +874,9 @@ def respond_with_html_bytes(request: Request, code: int, html_bytes: bytes) -> N
         code: The HTTP response code.
         html_bytes: The HTML bytes to use as the response body.
     """
+    # The response code must always be set, for logging purposes.
+    request.setResponseCode(code)
+
     # could alternatively use request.notifyFinish() and flip a flag when
     # the Deferred fires, but since the flag is RIGHT THERE it seems like
     # a waste.
@@ -849,7 +886,6 @@ def respond_with_html_bytes(request: Request, code: int, html_bytes: bytes) -> N
         )
         return None
 
-    request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
     request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
 

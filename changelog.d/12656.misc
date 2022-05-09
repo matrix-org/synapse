@@ -1,0 +1,1 @@
+Prevent memory leak from reoccurring when presence is disabled.

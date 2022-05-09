@@ -627,6 +627,20 @@ Example configuration:
 mau_trial_days: 5
 ```
 ---
+Config option: `mau_appservice_trial_days`
+
+The option `mau_appservice_trial_days` is similar to `mau_trial_days`, but applies a different
+trial number if the user was registered by an appservice. A value
+of 0 means no trial days are applied. Appservices not listed in this dictionary
+use the value of `mau_trial_days` instead.
+
+Example configuration:
+```yaml
+mau_appservice_trial_days: 
+  my_appservice_id: 3
+  another_appservice_id: 6
+```
+---
 Config option: `mau_limit_alerting`
 
 The option `mau_limit_alerting` is a means of limiting client-side alerting
@@ -1035,13 +1049,13 @@ allow_profile_lookup_over_federation: false
 ---
 Config option: `allow_device_name_lookup_over_federation`
 
-Set this option to false to disable device display name lookup over federation. By default, the
-Federation API allows other homeservers to obtain device display names of any user
+Set this option to true to allow device display name lookup over federation. By default, the
+Federation API prevents other homeservers from obtaining the display names of any user devices
 on this homeserver.
 
 Example configuration:
 ```yaml
-allow_device_name_lookup_over_federation: false
+allow_device_name_lookup_over_federation: true
 ```
 ---
 ## Caching ##

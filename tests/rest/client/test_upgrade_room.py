@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import Optional
+from unittest.mock import patch
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -166,6 +167,49 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
             tok=self.creator_token,
         )
         self.assertNotIn(self.other, power_levels["users"])
+
+    def test_stringy_power_levels(self) -> None:
+        """The room upgrade converts stringy power levels to proper integers."""
+        # Retrieve the room's current power levels.
+        power_levels = self.helper.get_state(
+            self.room_id,
+            "m.room.power_levels",
+            tok=self.creator_token,
+        )
+
+        # Set creator's power level to the string "100" instead of the integer `100`.
+        power_levels["users"][self.creator] = "100"
+
+        # Synapse refuses to accept new stringy power level events. Bypass this by
+        # neutering the validation.
+        with patch("synapse.events.validator.jsonschema.validate"):
+            # Note: https://github.com/matrix-org/matrix-spec/issues/853 plans to forbid
+            # string power levels in new rooms. For this test to have a clean
+            # conscience, we ought to ensure it's upgrading from a sufficiently old
+            # version of room.
+            self.helper.send_state(
+                self.room_id,
+                "m.room.power_levels",
+                body=power_levels,
+                tok=self.creator_token,
+            )
+
+        # Upgrade the room. Check the homeserver reports success.
+        channel = self._upgrade_room()
+        self.assertEqual(200, channel.code, channel.result)
+
+        # Extract the new room ID.
+        new_room_id = channel.json_body["replacement_room"]
+
+        # Fetch the new room's power level event.
+        new_power_levels = self.helper.get_state(
+            new_room_id,
+            "m.room.power_levels",
+            tok=self.creator_token,
+        )
+
+        # We should now have an integer power level.
+        self.assertEqual(new_power_levels["users"][self.creator], 100, new_power_levels)
 
     def test_space(self) -> None:
         """Test upgrading a space."""
