@@ -2227,7 +2227,7 @@ class PersistEventsStore:
     def _store_event_state_mappings_txn(
         self,
         txn: LoggingTransaction,
-        events_and_contexts: Iterable[Tuple[EventBase, EventContext]],
+        events_and_contexts: Collection[Tuple[EventBase, EventContext]],
     ) -> None:
         state_groups = {}
         for event, context in events_and_contexts:
