@@ -481,7 +481,7 @@ class AuthHandler:
             sid = authdict["session"]
 
         # Convert the URI and method to strings.
-        uri = request.uri.decode("utf-8")  # type: ignore
+        uri = request.uri.decode("utf-8")
         method = request.method.decode("utf-8")
 
         # If there's no session ID, create a new session.
@@ -551,7 +551,7 @@ class AuthHandler:
             await self.store.set_ui_auth_clientdict(sid, clientdict)
 
         user_agent = get_request_user_agent(request)
-        clientip = request.getClientIP()
+        clientip = request.getClientAddress().host
 
         await self.store.add_user_agent_ip_to_ui_auth_session(
             session.session_id, user_agent, clientip

@@ -515,6 +515,7 @@ class FederationEventHandler:
                 )
                 return
             await self._store.update_state_for_partial_state_event(event, context)
+            self._state_store.notify_event_un_partial_stated(event.event_id)
 
     async def backfill(
         self, dest: str, room_id: str, limit: int, extremities: Collection[str]
@@ -859,7 +860,7 @@ class FederationEventHandler:
             evs = await self._store.get_events(
                 list(state_map.values()),
                 get_prev_content=False,
-                redact_behaviour=EventRedactBehaviour.AS_IS,
+                redact_behaviour=EventRedactBehaviour.as_is,
             )
             event_map.update(evs)
 

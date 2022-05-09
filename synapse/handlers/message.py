@@ -175,17 +175,13 @@ class MessageHandler:
         state_filter = state_filter or StateFilter.all()
 
         if at_token:
-            # FIXME this claims to get the state at a stream position, but
-            # get_recent_events_for_room operates by topo ordering. This therefore
-            # does not reliably give you the state at the given stream position.
-            # (https://github.com/matrix-org/synapse/issues/3305)
-            last_events, _ = await self.store.get_recent_events_for_room(
-                room_id, end_token=at_token.room_key, limit=1
+            last_event = await self.store.get_last_event_in_room_before_stream_ordering(
+                room_id,
+                end_token=at_token.room_key,
             )
 
-            if not last_events:
+            if not last_event:
                 raise NotFoundError("Can't find event for token %s" % (at_token,))
-            last_event = last_events[0]
 
             # check whether the user is in the room at that time to determine
             # whether they should be treated as peeking.
@@ -204,7 +200,7 @@ class MessageHandler:
             visible_events = await filter_events_for_client(
                 self.storage,
                 user_id,
-                last_events,
+                [last_event],
                 filter_send_to_client=False,
                 is_peeking=is_peeking,
             )
@@ -1411,7 +1407,7 @@ class EventCreationHandler:
 
                 original_event = await self.store.get_event(
                     event.redacts,
-                    redact_behaviour=EventRedactBehaviour.AS_IS,
+                    redact_behaviour=EventRedactBehaviour.as_is,
                     get_prev_content=False,
                     allow_rejected=False,
                     allow_none=True,
@@ -1431,7 +1427,7 @@ class EventCreationHandler:
             # Validate a newly added alias or newly added alt_aliases.
 
             original_alias = None
-            original_alt_aliases: List[str] = []
+            original_alt_aliases: object = []
 
             original_event_id = event.unsigned.get("replaces_state")
             if original_event_id:
@@ -1459,6 +1455,7 @@ class EventCreationHandler:
             # If the old version of alt_aliases is of an unknown form,
             # completely replace it.
             if not isinstance(original_alt_aliases, (list, tuple)):
+                # TODO: check that the original_alt_aliases' entries are all strings
                 original_alt_aliases = []
 
             # Check that each alias is currently valid.
@@ -1508,7 +1505,7 @@ class EventCreationHandler:
 
             original_event = await self.store.get_event(
                 event.redacts,
-                redact_behaviour=EventRedactBehaviour.AS_IS,
+                redact_behaviour=EventRedactBehaviour.as_is,
                 get_prev_content=False,
                 allow_rejected=False,
                 allow_none=True,

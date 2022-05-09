@@ -48,6 +48,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.events_worker import EventCacheEntry
 from synapse.storage.databases.main.search import SearchEntry
+from synapse.storage.engines.postgres import PostgresEngine
 from synapse.storage.util.id_generators import AbstractStreamIdGenerator
 from synapse.storage.util.sequence import SequenceGenerator
 from synapse.types import JsonDict, StateMap, get_domain_from_id
@@ -368,6 +369,20 @@ class PersistEventsStore:
 
         min_stream_order = events_and_contexts[0][0].internal_metadata.stream_ordering
         max_stream_order = events_and_contexts[-1][0].internal_metadata.stream_ordering
+
+        # We check that the room still exists for events we're trying to
+        # persist. This is to protect against races with deleting a room.
+        #
+        # Annoyingly SQLite doesn't support row level locking.
+        if isinstance(self.database_engine, PostgresEngine):
+            for room_id in {e.room_id for e, _ in events_and_contexts}:
+                txn.execute(
+                    "SELECT room_version FROM rooms WHERE room_id = ? FOR SHARE",
+                    (room_id,),
+                )
+                row = txn.fetchone()
+                if row is None:
+                    raise Exception(f"Room does not exist {room_id}")
 
         # stream orderings should have been assigned by now
         assert min_stream_order

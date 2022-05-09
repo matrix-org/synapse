@@ -500,11 +500,11 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         results = list(filter(lambda row: row["room_id"] in room_ids, results))
 
-        # We set redact_behaviour to BLOCK here to prevent redacted events being returned in
+        # We set redact_behaviour to block here to prevent redacted events being returned in
         # search results (which is a data leak)
         events = await self.get_events_as_list(  # type: ignore[attr-defined]
             [r["event_id"] for r in results],
-            redact_behaviour=EventRedactBehaviour.BLOCK,
+            redact_behaviour=EventRedactBehaviour.block,
         )
 
         event_map = {ev.event_id: ev for ev in events}
@@ -659,11 +659,11 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         results = list(filter(lambda row: row["room_id"] in room_ids, results))
 
-        # We set redact_behaviour to BLOCK here to prevent redacted events being returned in
+        # We set redact_behaviour to block here to prevent redacted events being returned in
         # search results (which is a data leak)
         events = await self.get_events_as_list(  # type: ignore[attr-defined]
             [r["event_id"] for r in results],
-            redact_behaviour=EventRedactBehaviour.BLOCK,
+            redact_behaviour=EventRedactBehaviour.block,
         )
 
         event_map = {ev.event_id: ev for ev in events}

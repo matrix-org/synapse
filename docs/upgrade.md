@@ -19,32 +19,36 @@ this document.
     packages](setup/installation.md#prebuilt-packages), you will need to follow the
     normal process for upgrading those packages.
 
+-   If Synapse was installed using pip then upgrade to the latest
+    version by running:
+
+    ```bash
+    pip install --upgrade matrix-synapse
+    ```
+
 -   If Synapse was installed from source, then:
 
-    1.  Activate the virtualenv before upgrading. For example, if
-        Synapse is installed in a virtualenv in `~/synapse/env` then
+    1.  Obtain the latest version of the source code. Git users can run
+        `git pull` to do this.
+
+    2.  If you're running Synapse in a virtualenv, make sure to activate it before
+        upgrading. For example, if Synapse is installed in a virtualenv in `~/synapse/env` then
         run:
 
         ```bash
         source ~/synapse/env/bin/activate
-        ```
-
-    2.  If Synapse was installed using pip then upgrade to the latest
-        version by running:
-
-        ```bash
-        pip install --upgrade matrix-synapse
-        ```
-
-        If Synapse was installed using git then upgrade to the latest
-        version by running:
-
-        ```bash
-        git pull
         pip install --upgrade .
         ```
+        Include any relevant extras between square brackets, e.g. `pip install --upgrade ".[postgres,oidc]"`.
 
-    3.  Restart Synapse:
+    3.  If you're using `poetry` to manage a Synapse installation, run:
+        ```bash
+        poetry install
+        ```
+        Include any relevant extras with `--extras`, e.g. `poetry install --extras postgres --extras oidc`.
+        It's probably easiest to run `poetry install --extras all`.
+
+    4.  Restart Synapse:
 
         ```bash
         synctl restart
@@ -85,12 +89,50 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.59.0
+
+## Device name lookup over federation has been disabled by default
+
+The names of user devices are no longer visible to users on other homeservers by default.
+Device IDs are unaffected, as these are necessary to facilitate end-to-end encryption.
+
+To re-enable this functionality, set the
+[`allow_device_name_lookup_over_federation`](https://matrix-org.github.io/synapse/v1.59/usage/configuration/config_documentation.html#federation)
+homeserver config option to `true`.
+
+
+## Deprecation of the `synapse.app.appservice` worker application type
+
+The `synapse.app.appservice` worker application type allowed you to configure a
+single worker to use to notify application services of new events, as long
+as this functionality was disabled on the main process with `notify_appservices: False`.
+
+To unify Synapse's worker types, the `synapse.app.appservice` worker application
+type and the `notify_appservices` configuration option have been deprecated.
+
+To get the same functionality, it's now recommended that the `synapse.app.generic_worker`
+worker application type is used and that the `notify_appservices_from_worker` option
+is set to the name of a worker.
+
+For the time being, `notify_appservices_from_worker` can be used alongside
+`synapse.app.appservice` and `notify_appservices` to make it easier to transition
+between the two configurations, however please note that:
+
+- the options must not contradict each other (otherwise Synapse won't start); and
+- the `notify_appservices` option will be removed in a future release of Synapse.
+
+Please see [the relevant section of the worker documentation][v1_59_notify_ases_from] for more information.
+
+[v1_59_notify_ases_from]: workers.md#notifying-application-services
+
+
 # Upgrading to v1.58.0
 
 ## Groups/communities feature has been disabled by default
 
 The non-standard groups/communities feature in Synapse has been disabled by default
 and will be removed in Synapse v1.61.0.
+
 
 # Upgrading to v1.57.0
 
@@ -103,7 +145,7 @@ worker for application service traffic, **it must be stopped** when the database
 without any risk of reusing transaction IDs.
 
 Deployments which do not use separate worker processes can be upgraded as normal. Similarly,
-deployments where no applciation services are in use can be upgraded as normal.
+deployments where no application services are in use can be upgraded as normal.
 
 <details>
 <summary><b>Recovering from an incorrect upgrade</b></summary>

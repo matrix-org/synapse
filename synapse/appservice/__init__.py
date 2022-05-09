@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 #   user ID -> {device ID -> {algorithm -> count}}
 TransactionOneTimeKeyCounts = Dict[str, Dict[str, Dict[str, int]]]
 
-# Type for the `device_unused_fallback_keys` field in an appservice transaction
+# Type for the `device_unused_fallback_key_types` field in an appservice transaction
 #   user ID -> {device ID -> [algorithm]}
 TransactionUnusedFallbackKeys = Dict[str, Dict[str, List[str]]]
 

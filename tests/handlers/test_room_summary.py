@@ -1092,3 +1092,29 @@ class RoomSummaryTestCase(unittest.HomeserverTestCase):
         )
         result = self.get_success(self.handler.get_room_summary(user2, self.room))
         self.assertEqual(result.get("room_id"), self.room)
+
+    def test_fed(self):
+        """
+        Return data over federation and ensure that it is handled properly.
+        """
+        fed_hostname = self.hs.hostname + "2"
+        fed_room = "#fed_room:" + fed_hostname
+
+        requested_room_entry = _RoomEntry(
+            fed_room,
+            {"room_id": fed_room, "world_readable": True},
+        )
+
+        async def summarize_remote_room_hierarchy(_self, room, suggested_only):
+            return requested_room_entry, {}, set()
+
+        with mock.patch(
+            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room_hierarchy",
+            new=summarize_remote_room_hierarchy,
+        ):
+            result = self.get_success(
+                self.handler.get_room_summary(
+                    self.user, fed_room, remote_room_hosts=[fed_hostname]
+                )
+            )
+        self.assertEqual(result.get("room_id"), fed_room)

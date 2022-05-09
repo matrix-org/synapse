@@ -147,7 +147,9 @@ class PresenceRouter:
         # run all the callbacks for get_users_for_states and combine the results
         for callback in self._get_users_for_states_callbacks:
             try:
-                result = await callback(state_updates)
+                # Note: result is an object here, because we don't trust modules to
+                # return the types they're supposed to.
+                result: object = await callback(state_updates)
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue
