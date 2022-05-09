@@ -47,8 +47,8 @@ def daemonize_process(pid_file: str, logger: logging.Logger, chdir: str = "/") -
         # Try to get an exclusive lock on the file. This will fail if another process
         # has the file locked.
         fcntl.flock(lock_fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError:
-        print("Unable to lock on the pidfile.")
+    except OSError as e:
+        print(f"Unable to lock on the pidfile because of {e}.")
         # We need to overwrite the pidfile if we got here.
         #
         # XXX better to avoid overwriting it, surely. this looks racey as the pid file
@@ -120,7 +120,7 @@ def daemonize_process(pid_file: str, logger: logging.Logger, chdir: str = "/") -
         lock_fh.write("%s" % (os.getpid()))
         lock_fh.flush()
     except OSError:
-        logger.error("Unable to write pid to the pidfile.")
+        logger.error("Unable to write pid to the pidfile.", exc_info=True)
         print("Unable to write pid to the pidfile.")
         sys.exit(1)
 

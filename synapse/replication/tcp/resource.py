@@ -181,7 +181,7 @@ class ReplicationStreamer:
                             updates, current_token, limited = await stream.get_updates()
                             self.pending_updates |= limited
                         except Exception:
-                            logger.info("Failed to handle stream %s", stream.NAME)
+                            logger.warning("Failed to handle stream %s", stream.NAME)
                             raise
 
                         logger.debug(

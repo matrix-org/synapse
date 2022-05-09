@@ -245,7 +245,7 @@ class RemoteHandler(logging.Handler):
             # If handling backpressure fails, clear the buffer and log the
             # exception.
             self._buffer.clear()
-            logger.warning("Failed clearing backpressure")
+            logger.warning("Failed clearing backpressure", exc_info=True)
 
         # Try and write immediately.
         self._connect()

@@ -137,7 +137,7 @@ class ApplicationServicesHandler:
                                 try:
                                     await self.scheduler.start()
                                 except Exception:
-                                    logger.error("Application Services Failure")
+                                    logger.exception("Application Services Failure")
 
                             run_as_background_process("as_scheduler", start_scheduler)
                             self.started_scheduler = True
