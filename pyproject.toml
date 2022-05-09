@@ -143,7 +143,9 @@ netaddr = ">=0.7.18"
 Jinja2 = ">=3.0"
 bleach = ">=1.4.3"
 # We use `ParamSpec` and `Concatenate`, which were added in `typing-extensions` 3.10.0.0.
-typing-extensions = ">=3.10.0"
+# Additionally we need https://github.com/python/typing/pull/817 to allow types to be
+# generic over ParamSpecs.
+typing-extensions = ">=3.10.0.1"
 # We enforce that we have a `cryptography` version that bundles an `openssl`
 # with the latest security patches.
 cryptography = ">=3.4.7"
