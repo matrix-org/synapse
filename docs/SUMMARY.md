@@ -88,19 +88,158 @@
   - [OpenTracing](opentracing.md)
   - [Database Schemas](development/database_schema.md)
   - [Experimental features](development/experimental_features.md)
-  - [Synapse Architecture]()
-    - [Log Contexts](log_contexts.md)
-    - [Replication](replication.md)
-    - [TCP Replication](tcp_replication.md)
-  - [Internal Documentation](development/internal_documentation/README.md)
+  - [Synapse Architecture](development/synapse_architechture.md)
+    - [Overview]()
+      - Flows of data through Synapse
+        - Starts with a Request/BG Job/Module
+        - Processing
+        - Maybe Response
+      - Config
+      - Request Handling
+        - Clients
+        - Federation
+        - Internal Processing - there could be an exception!
+      - Storage
+      - Federation
+      - External Entities: Remote homeservers, Appservices, Pushers, Identity Servers
+      - Modules
+      - Workers/Replication/Redis/Organization of a large homeserver instance
+  - [Configuration]()
+    - Experimental config options
+      - Define how long they should live after the corresponding msc has merged
+  - [Logging]()
+    - combine with [Log Contexts](log_contexts.md)
+  - [Storage]()
+    - What is current database schema?
+      - Start by linking script that can compile full schema
+      - Is there a tool that can visualize a postgres db? - Shay to check
+    - [Database Backends]()
+    - [Database Migrations]()
+      - Background [Schema] Updates
+    - [Caching]()
+      - Cache tuning
+      - How to check sizes
+        - Nice to have a metric for max cache sizes
+      - How to add a cache to a [storage] function
+        - Why would you
+      - How to invalidate (with support for workers)
+  - [Request Listening]()
+    - Mention that we use Twisted
+    - [Servlets and Resources]()
+      - When to use one over the other (always use a servlet?)
+      - Unstable/release-based endpoints
+      - Don't put too many servlets on the same resource
+    - [Handlers]()
+      - Machinery behind the servlet that does all the processing
+  - [Background Jobs]()
+  - [Federation]()
+    - Federation Catchup
+  - [Data Types]()
+    - [Users]()
+      - Allowed username characters
+    - [Devices]()
+    - [Events]()
+      - What is an event?
+      - Different event formats depending on room version
+      - Outlier events, rejected events, dropped events
+    - [Rooms]()
+      - [Room DAG concepts](development/room-dag-concepts.md)
+  - [Sync]()
+  - [State Resolution]()
+    - [The Auth Chain Difference Algorithm](auth_chain_difference_algorithm.md)
+  - [User Authentication]()
     - [Single Sign-On]()
       - [SAML](development/saml.md)
       - [CAS](development/cas.md)
-    - [Room DAG concepts](development/room-dag-concepts.md)
-    - [State Resolution]()
-      - [The Auth Chain Difference Algorithm](auth_chain_difference_algorithm.md)
-    - [Media Repository](media_repository.md)
-    - [Room and User Statistics](room_and_user_statistics.md)
+    - [User-Interactive Auth]()
+    - [Password-based]()
+    - [Password Auth Modules]()
+    - [Token-based]()
+  - [Rate Limiting]()
+    - Different rate limiting classes (Ratelimiter vs RequestRatelimiter)
+    - How does our rate limiting work
+    - When to use/add rate limiting
+    - Rate limiting for federation traffic
+  - [Media Repository](media_repository.md)
+  - [Email and HTML Templating]()
+  - [Presence]()
+    - What is Presence?
+    - How is it designed to work currently
+      - Why it is recommended to be disabled
+      - Why is this resource intensive
+        - Links and issues on how to fix this
+      - How it's implemented
+  - [Application Services]()
+  - [Push Notifications]()
+  - [Synapse Admin API]()
+  - [Synapse Modules]()
+  - [Workers]()
+    - Things to be mindful of in order to make your feature work with workers
+    - How to test a feature on workers
+  - [Replication](replication.md)
+    - [TCP Replication](tcp_replication.md)
+  - [Sources]()
+    - TypingSource, ReceiptSource, PresenceSource, etc
+    - Classes containing methods for storing and getting different types of data
+  - [Streams]()
+    - Stream Types (the ID of the stream)
+    - Stream Token: each entity added to the stream gets a unique, incremental token
+    - StreamReplication classes and clients
+    - How this interacts with sync?
+    - Stream token generators: Single Writer Only (sqlite), MultiWriterStreamIDGenerator (Postgres)
+  - [Notifier]()
+  - [Monitoring and Metrics]() # opentracing, phone home and metrics
+    - [Opentracing]()
+      - How does this work?
+      - How is this helpful?
+      - What's jaeger?
+      - How do I create and mutate a span?
+      - How are spans sent between homeservers?
+        - Only between whitelisted homeservers
+      - What areas are currently traced
+        - Database layer
+        - Servlets
+        - Crypto stuff
+    - [Metrics]()
+      - Prometheus
+      - How to make a new metrics / good practices
+        - What are all the current metrics and what each one means
+        - How to view in grafana
+          - Here's a quick example of making a new panel to visualize metrics
+        - Btw it would be nice to have a tooltip with an explainer for every graph in graphana
+      - [Room and User Statistics](room_and_user_statistics.md)  # TODO: This page is currently useless    
+  - [Testing]()
+    - [Unit Tests]()
+      - How to run the tests (partially in the contributing guide)
+        - IDE-specific examples
+        - How to run one test / one test case / run in parallel
+        - Documenting test environment variables: SYNAPSE_TEST_LOG_LEVEL, SYNAPSE_TEST_PERSISTENT_SQLITE_DB, SYNAPSE_POSTGRES etc.
+      - Test case versus test method
+        - prepare, make_homeserver, default_config, @override_config decorator, @parameterized decorator, pump/reactor.advance
+        - Test utilities: fake homeserver, federation, workers, channels, requests, HomeServerTestCase.helper
+          - How to use them in your tests at a high level
+          - How they are implemented
+      - Different inherited TestCase classes: HomeServerTestCase, FederatedHomeServerTestCase(sp?), TestCase
+      - Test pattern: How to start a request, check the state of the homeserver, respond to the request
+      - Ensuring the right servlets for your test are registered
+      - Good practice: use storage methods vs. tampering with the database directly (database schema changes)
+      - Dealing with deferreds/async (get_success/get_failure).
+      - Mocking - async mocks
+      - Organization of tests
+      - Skipping tests
+    - [Integration Tests]()
+        - [Complement]()
+            - Point to Complement's documentation on its structure and how to write a test
+            - How to run Complement against Synapse
+            - Document Synapse's Complement images and how they're built
+            - Which Complement build flags does Synapse support
+                - Unstable features
+                - Synapse's Complement Blacklist
+        - [Sytest]()
+            - You should prefer Complement :)
+            - Helper functions
+            - Dealing with race conditions
+            - Link to that one perl helper doc Matthew wrote
   - [Scripts]()
 
 # Other
