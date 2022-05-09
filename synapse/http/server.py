@@ -128,8 +128,10 @@ def cancellable(method: F) -> F:
     currently being waited on. That `Deferred` will raise a `CancelledError`, which will
     propagate up, as per normal exception handling.
 
-    Before applying this decorator to a new endpoint, it is wise to recursively check
-    that all `await`s are on coroutines or `Deferred`s that handle cancellation cleanly.
+    Before applying this decorator to a new endpoint, you MUST recursively check
+    that all `await`s in the function are on `async` functions or `Deferred`s that
+    handle cancellation cleanly, otherwise a variety of bugs may occur, ranging from
+    premature logging context closure, to stuck requests, to database corruption.
 
     Usage:
         class SomeServlet(RestServlet):
