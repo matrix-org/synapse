@@ -42,7 +42,7 @@ from typing import (
 )
 
 import attr
-from typing_extensions import AsyncContextManager, Literal
+from typing_extensions import AsyncContextManager, Concatenate, Literal, ParamSpec
 
 from twisted.internet import defer
 from twisted.internet.defer import CancelledError
@@ -237,9 +237,16 @@ async def concurrently_execute(
     )
 
 
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
 async def yieldable_gather_results(
-    func: Callable[..., Awaitable[T]], iter: Iterable, *args: Any, **kwargs: Any
-) -> List[T]:
+    func: Callable[Concatenate[T, P], Awaitable[R]],
+    iter: Iterable[T],
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> List[R]:
     """Executes the function with each argument concurrently.
 
     Args:
@@ -255,7 +262,15 @@ async def yieldable_gather_results(
     try:
         return await make_deferred_yieldable(
             defer.gatherResults(
-                [run_in_background(func, item, *args, **kwargs) for item in iter],
+                # type-ignore: mypy reports two errors:
+                # error: Argument 1 to "run_in_background" has incompatible type
+                #     "Callable[[T, **P], Awaitable[R]]"; expected
+                #     "Callable[[T, **P], Awaitable[R]]"  [arg-type]
+                # error: Argument 2 to "run_in_background" has incompatible type
+                #     "T"; expected "[T, **P.args]"  [arg-type]
+                # The former looks like a mypy bug, and the latter looks like a
+                # false positive.
+                [run_in_background(func, item, *args, **kwargs) for item in iter],  # type: ignore[arg-type]
                 consumeErrors=True,
             )
         )
@@ -575,9 +590,6 @@ class ReadWriteLock:
                     self.key_to_current_writer.pop(key)
 
         return _ctx_manager()
-
-
-R = TypeVar("R")
 
 
 def timeout_deferred(

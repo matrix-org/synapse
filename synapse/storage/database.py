@@ -192,7 +192,7 @@ class LoggingDatabaseConnection:
 
 
 # The type of entry which goes on our after_callbacks and exception_callbacks lists.
-_CallbackListEntry = Tuple[Callable[..., object], Iterable[Any], Dict[str, Any]]
+_CallbackListEntry = Tuple[Callable[..., object], Tuple[object, ...], Dict[str, object]]
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -239,7 +239,9 @@ class LoggingTransaction:
         self.after_callbacks = after_callbacks
         self.exception_callbacks = exception_callbacks
 
-    def call_after(self, callback: Callable[..., object], *args: Any, **kwargs: Any):
+    def call_after(
+        self, callback: Callable[P, object], *args: P.args, **kwargs: P.kwargs
+    ) -> None:
         """Call the given callback on the main twisted thread after the transaction has
         finished.
 
@@ -256,11 +258,12 @@ class LoggingTransaction:
         # LoggingTransaction isn't expecting there to be any callbacks; assert that
         # is not the case.
         assert self.after_callbacks is not None
-        self.after_callbacks.append((callback, args, kwargs))
+        # type-ignore: need mypy containing https://github.com/python/mypy/pull/12668
+        self.after_callbacks.append((callback, args, kwargs))  # type: ignore[arg-type]
 
     def call_on_exception(
-        self, callback: Callable[..., object], *args: Any, **kwargs: Any
-    ):
+        self, callback: Callable[P, object], *args: P.args, **kwargs: P.kwargs
+    ) -> None:
         """Call the given callback on the main twisted thread after the transaction has
         failed.
 
@@ -274,7 +277,8 @@ class LoggingTransaction:
         # LoggingTransaction isn't expecting there to be any callbacks; assert that
         # is not the case.
         assert self.exception_callbacks is not None
-        self.exception_callbacks.append((callback, args, kwargs))
+        # type-ignore: need mypy containing https://github.com/python/mypy/pull/12668
+        self.exception_callbacks.append((callback, args, kwargs))  # type: ignore[arg-type]
 
     def fetchone(self) -> Optional[Tuple]:
         return self.txn.fetchone()
@@ -549,9 +553,9 @@ class DatabasePool:
         desc: str,
         after_callbacks: List[_CallbackListEntry],
         exception_callbacks: List[_CallbackListEntry],
-        func: Callable[..., R],
-        *args: Any,
-        **kwargs: Any,
+        func: Callable[Concatenate[LoggingTransaction, P], R],
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> R:
         """Start a new database transaction with the given connection.
 
@@ -581,7 +585,10 @@ class DatabasePool:
         # will fail if we have to repeat the transaction.
         # For now, we just log an error, and hope that it works on the first attempt.
         # TODO: raise an exception.
-        for i, arg in enumerate(args):
+
+        # Type-ignore Mypy doesn't yet consider ParamSpec.args to be iterable; see
+        # https://github.com/python/mypy/pull/12668
+        for i, arg in enumerate(args):  # type: ignore[arg-type, var-annotated]
             if inspect.isgenerator(arg):
                 logger.error(
                     "Programming error: generator passed to new_transaction as "
@@ -589,7 +596,9 @@ class DatabasePool:
                     i,
                     func,
                 )
-        for name, val in kwargs.items():
+        # Type-ignore Mypy doesn't yet consider ParamSpec.args to be a mapping; see
+        # https://github.com/python/mypy/pull/12668
+        for name, val in kwargs.items():  # type: ignore[attr-defined]
             if inspect.isgenerator(val):
                 logger.error(
                     "Programming error: generator passed to new_transaction as "
