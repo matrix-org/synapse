@@ -109,8 +109,6 @@ class RoomConfig(Config):
         # `power_level_content_override` parameter in the /createRoom API, but
         # is applied before that parameter.
         #
-        # This is something of a workaround in the absence of MSC3779 or MSC3761.
-        #
         #default_power_level_content_override:
         #   private_chat: { "events": { "com.example.foo" : 0 } }
         #   trusted_private_chat: null
