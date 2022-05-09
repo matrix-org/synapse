@@ -264,7 +264,9 @@ class SynapseRedisFactory(txredisapi.RedisFactory):
             try:
                 await make_deferred_yieldable(connection.ping())
             except Exception:
-                logger.warning("Failed to send ping to a redis connection", exc_info=True)
+                logger.warning(
+                    "Failed to send ping to a redis connection", exc_info=True
+                )
 
     # ReconnectingClientFactory has some logging (if you enable `self.noisy`), but
     # it's rubbish. We add our own here.

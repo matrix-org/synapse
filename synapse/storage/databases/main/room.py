@@ -1870,7 +1870,9 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
                     s = db_to_json(row[5]).get("score")
                     r = db_to_json(row[5]).get("reason")
                 except Exception:
-                    logger.exception("Unable to parse json from event_reports: %s", row[0])
+                    logger.exception(
+                        "Unable to parse json from event_reports: %s", row[0]
+                    )
                     continue
                 event_reports.append(
                     {

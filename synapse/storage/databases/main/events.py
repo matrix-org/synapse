@@ -1346,7 +1346,9 @@ class PersistEventsStore:
                 try:
                     self._store_event_state_mappings_txn(txn, ((event, context),))
                 except Exception:
-                    logger.exception("Failed to store state mappings for %s:", event.event_id)
+                    logger.exception(
+                        "Failed to store state mappings for %s:", event.event_id
+                    )
                     raise
 
                 # Add an entry to the ex_outlier_stream table to replicate the

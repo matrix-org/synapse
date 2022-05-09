@@ -128,5 +128,7 @@ def db_to_json(db_content: Union[memoryview, bytes, bytearray, str]) -> Any:
     try:
         return json_decoder.decode(db_content)
     except Exception:
-        logging.warning("Tried to decode '%r' as JSON and failed", db_content, exc_info=True)
+        logging.warning(
+            "Tried to decode '%r' as JSON and failed", db_content, exc_info=True
+        )
         raise
