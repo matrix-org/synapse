@@ -943,7 +943,7 @@ class EventsPersistenceStorage:
         dropped_events = await self.main_store.get_events(
             dropped_extrems,
             allow_rejected=True,
-            redact_behaviour=EventRedactBehaviour.AS_IS,
+            redact_behaviour=EventRedactBehaviour.as_is,
         )
 
         new_senders = {get_domain_from_id(e.sender) for e, _ in events_context}
@@ -974,7 +974,7 @@ class EventsPersistenceStorage:
                 prev_events = await self.main_store.get_events(
                     new_events,
                     allow_rejected=True,
-                    redact_behaviour=EventRedactBehaviour.AS_IS,
+                    redact_behaviour=EventRedactBehaviour.as_is,
                 )
                 events_to_check = prev_events.values()
 

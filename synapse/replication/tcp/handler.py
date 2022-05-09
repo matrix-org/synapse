@@ -537,7 +537,7 @@ class ReplicationCommandHandler:
             # Ignore POSITION that are just our own echoes
             return
 
-        logger.info("Handling '%s %s'", cmd.NAME, cmd.to_line())
+        logger.debug("Handling '%s %s'", cmd.NAME, cmd.to_line())
 
         self._add_command_to_stream_queue(conn, cmd)
 
@@ -567,6 +567,11 @@ class ReplicationCommandHandler:
         # between then and now.
         missing_updates = cmd.prev_token != current_token
         while missing_updates:
+            # Note: There may very well not be any new updates, but we check to
+            # make sure. This can particularly happen for the event stream where
+            # event persisters continuously send `POSITION`. See `resource.py`
+            # for why this can happen.
+
             logger.info(
                 "Fetching replication rows for '%s' between %i and %i",
                 stream_name,
@@ -590,7 +595,7 @@ class ReplicationCommandHandler:
                     [stream.parse_row(row) for row in rows],
                 )
 
-        logger.info("Caught up with stream '%s' to %i", stream_name, cmd.new_token)
+            logger.info("Caught up with stream '%s' to %i", stream_name, cmd.new_token)
 
         # We've now caught up to position sent to us, notify handler.
         await self._replication_data_handler.on_position(

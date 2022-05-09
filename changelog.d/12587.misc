@@ -1,0 +1,1 @@
+Log status code of cancelled requests as 499 and avoid logging stack traces for them.

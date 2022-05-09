@@ -17,7 +17,7 @@ from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
 from synapse.events.utils import (
     SerializeEventConfig,
-    copy_power_levels_contents,
+    copy_and_fixup_power_levels_contents,
     prune_event,
     serialize_event,
 )
@@ -529,7 +529,7 @@ class CopyPowerLevelsContentTestCase(unittest.TestCase):
         }
 
     def _test(self, input):
-        a = copy_power_levels_contents(input)
+        a = copy_and_fixup_power_levels_contents(input)
 
         self.assertEqual(a["ban"], 50)
         self.assertEqual(a["events"]["m.room.name"], 100)
@@ -547,3 +547,40 @@ class CopyPowerLevelsContentTestCase(unittest.TestCase):
     def test_frozen(self):
         input = freeze(self.test_content)
         self._test(input)
+
+    def test_stringy_integers(self):
+        """String representations of decimal integers are converted to integers."""
+        input = {
+            "a": "100",
+            "b": {
+                "foo": 99,
+                "bar": "-98",
+            },
+            "d": "0999",
+        }
+        output = copy_and_fixup_power_levels_contents(input)
+        expected_output = {
+            "a": 100,
+            "b": {
+                "foo": 99,
+                "bar": -98,
+            },
+            "d": 999,
+        }
+
+        self.assertEqual(output, expected_output)
+
+    def test_strings_that_dont_represent_decimal_integers(self) -> None:
+        """Should raise when given inputs `s` for which `int(s, base=10)` raises."""
+        for invalid_string in ["0x123", "123.0", "123.45", "hello", "0b1", "0o777"]:
+            with self.assertRaises(TypeError):
+                copy_and_fixup_power_levels_contents({"a": invalid_string})
+
+    def test_invalid_types_raise_type_error(self) -> None:
+        with self.assertRaises(TypeError):
+            copy_and_fixup_power_levels_contents({"a": ["hello", "grandma"]})  # type: ignore[arg-type]
+            copy_and_fixup_power_levels_contents({"a": None})  # type: ignore[arg-type]
+
+    def test_invalid_nesting_raises_type_error(self) -> None:
+        with self.assertRaises(TypeError):
+            copy_and_fixup_power_levels_contents({"a": {"b": {"c": 1}}})
