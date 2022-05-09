@@ -164,7 +164,9 @@ class PresenceRouter:
             except CancelledError:
                 raise
             except Exception as e:
-                logger.warning("Failed to run module API callback %s: %s", callback, e)
+                logger.warning(
+                    "Failed to run module API callback %r:", callback, exc_info=e
+                )
                 continue
 
             if not isinstance(result, Dict):
@@ -218,7 +220,9 @@ class PresenceRouter:
             except CancelledError:
                 raise
             except Exception as e:
-                logger.warning("Failed to run module API callback %s: %s", callback, e)
+                logger.warning(
+                    "Failed to run module API callback %s:", callback, exc_info=e
+                )
                 continue
 
             # If one of the callbacks returns ALL_USERS then we can stop calling all

@@ -493,10 +493,9 @@ class RoomSummaryHandler:
             )
         except Exception as e:
             logger.warning(
-                "Unable to get hierarchy of %s via federation: %s",
+                "Unable to get hierarchy of %s via federation:",
                 room_id,
-                e,
-                exc_info=logger.isEnabledFor(logging.DEBUG),
+                exc_info=e,
             )
             return None, {}, set()
 

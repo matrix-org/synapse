@@ -307,16 +307,15 @@ class ThirdPartyEventRules:
         for callback in self._on_create_room_callbacks:
             try:
                 await callback(requester, config, is_requester_admin)
+            except SynapseError as e:
+                raise e
             except Exception as e:
                 # Don't silence the errors raised by this callback since we expect it to
                 # raise an exception to deny the creation of the room; instead make sure
                 # it's a SynapseError we can send to clients.
-                if not isinstance(e, SynapseError):
-                    e = SynapseError(
-                        403, "Room creation forbidden with these parameters"
-                    )
-
-                raise e
+                raise SynapseError(
+                    403, "Room creation forbidden with these parameters"
+                ) from e
 
     async def check_threepid_can_be_invited(
         self, medium: str, address: str, room_id: str
@@ -347,7 +346,9 @@ class ThirdPartyEventRules:
             except CancelledError:
                 raise
             except Exception as e:
-                logger.warning("Failed to run module API callback %s: %s", callback, e)
+                logger.warning(
+                    "Failed to run module API callback %s:", callback, exc_info=e
+                )
 
         return True
 
@@ -380,7 +381,9 @@ class ThirdPartyEventRules:
             except CancelledError:
                 raise
             except Exception as e:
-                logger.warning("Failed to run module API callback %s: %s", callback, e)
+                logger.warning(
+                    "Failed to run module API callback %s:", callback, exc_info=e
+                )
 
         return True
 
@@ -403,7 +406,7 @@ class ThirdPartyEventRules:
                 await callback(event, state_events)
             except Exception as e:
                 logger.exception(
-                    "Failed to run module API callback %s: %s", callback, e
+                    "Failed to run module API callback %s:", callback, exc_info=e
                 )
 
     async def check_can_shutdown_room(self, user_id: str, room_id: str) -> bool:
@@ -423,7 +426,7 @@ class ThirdPartyEventRules:
                 raise
             except Exception as e:
                 logger.exception(
-                    "Failed to run module API callback %s: %s", callback, e
+                    "Failed to run module API callback %s:", callback, exc_info=e
                 )
         return True
 
@@ -450,7 +453,7 @@ class ThirdPartyEventRules:
                 raise
             except Exception as e:
                 logger.exception(
-                    "Failed to run module API callback %s: %s", callback, e
+                    "Failed to run module API callback %s:", callback, exc_info=e
                 )
         return True
 
@@ -489,7 +492,7 @@ class ThirdPartyEventRules:
                 await callback(user_id, new_profile, by_admin, deactivation)
             except Exception as e:
                 logger.exception(
-                    "Failed to run module API callback %s: %s", callback, e
+                    "Failed to run module API callback %s:", callback, exc_info=e
                 )
 
     async def on_user_deactivation_status_changed(
@@ -507,7 +510,7 @@ class ThirdPartyEventRules:
                 await callback(user_id, deactivated, by_admin)
             except Exception as e:
                 logger.exception(
-                    "Failed to run module API callback %s: %s", callback, e
+                    "Failed to run module API callback %s:", callback, exc_info=e
                 )
 
     async def on_threepid_bind(self, user_id: str, medium: str, address: str) -> None:
@@ -527,5 +530,5 @@ class ThirdPartyEventRules:
                 await callback(user_id, medium, address)
             except Exception as e:
                 logger.exception(
-                    "Failed to run module API callback %s: %s", callback, e
+                    "Failed to run module API callback %s:", callback, exc_info=e
                 )

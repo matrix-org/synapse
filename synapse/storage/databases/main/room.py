@@ -132,7 +132,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 desc="store_room",
             )
         except Exception as e:
-            logger.error("store_room with room_id=%s failed: %s", room_id, e)
+            logger.error("store_room with room_id=%s failed:", room_id, exc_info=e)
             raise StoreError(500, "Problem creating room.")
 
     async def get_room(self, room_id: str) -> Optional[Dict[str, Any]]:
@@ -1089,9 +1089,9 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         except self.db_pool.engine.module.DatabaseError as e:
             # TODO(faster_joins): how do we distinguish between FK errors and other errors?
             logger.warning(
-                "Exception while clearing lazy partial-state-room %s, retrying: %s",
+                "Exception while clearing lazy partial-state-room %s, retrying:",
                 room_id,
-                e,
+                exc_info=e,
             )
             return False
 

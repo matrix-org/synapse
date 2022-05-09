@@ -484,6 +484,8 @@ class RequestSendFailed(RuntimeError):
         self.inner_exception = inner_exception
         self.can_retry = can_retry
 
+        self.__cause__ = inner_exception
+
 
 class UnredactedContentDeletedError(SynapseError):
     def __init__(self, content_keep_ms: Optional[int] = None):

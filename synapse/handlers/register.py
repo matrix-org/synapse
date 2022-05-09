@@ -487,7 +487,7 @@ class RegistrationHandler:
                             ratelimit=False,
                         )
             except Exception as e:
-                logger.error("Failed to join new user to %r: %r", r, e)
+                logger.error("Failed to join new user to %r:", r, exc_info=e)
 
     async def _join_rooms(self, user_id: str) -> None:
         """
@@ -573,11 +573,13 @@ class RegistrationHandler:
                 )
 
             except ConsentNotGivenError as e:
-                # Technically not necessary to pull out this error though
-                # moving away from bare excepts is a good thing to do.
-                logger.error("Failed to join new user to %r: %r", r, e)
+                logger.warning(
+                    "Failed to join new user to %r, User did not accept privacy policy: %s",
+                    r,
+                    e,
+                )
             except Exception as e:
-                logger.error("Failed to join new user to %r: %r", r, e)
+                logger.error("Failed to join new user to %r:", r, exc_info=e)
 
     async def _auto_join_rooms(self, user_id: str) -> None:
         """Automatically joins users to auto join rooms - creating the room in the first place

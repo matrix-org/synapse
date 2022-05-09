@@ -439,7 +439,7 @@ class Linearizer:
         try:
             await new_defer
         except Exception as e:
-            logger.info("defer %r got err %r", new_defer, e)
+            logger.info("Got error while awaiting deferred %r", new_defer)
             if isinstance(e, CancelledError):
                 logger.debug(
                     "Cancelling wait for linearizer lock %r for key %r",
@@ -451,6 +451,7 @@ class Linearizer:
                     "Unexpected exception waiting for linearizer lock %r for key %r",
                     self.name,
                     key,
+                    exc_info=e,
                 )
 
             # we just have to take ourselves back out of the queue.

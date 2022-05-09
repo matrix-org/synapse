@@ -86,6 +86,7 @@ class PusherWorkerStore(SQLBaseStore):
                     r["id"],
                     data_json,
                     e.args[0],
+                    exc_info=e,
                 )
                 continue
 

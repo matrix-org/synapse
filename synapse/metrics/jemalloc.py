@@ -144,7 +144,7 @@ def _setup_jemalloc_stats() -> None:
         try:
             _mallctl("epoch", read=False, write=1)
         except Exception as e:
-            logger.warning("Failed to reload jemalloc stats: %s", e)
+            logger.warning("Failed to reload jemalloc stats:", exc_info=e)
 
     class JemallocCollector(Collector):
         """Metrics for internal jemalloc stats."""
@@ -187,7 +187,7 @@ def _setup_jemalloc_stats() -> None:
                     value = _mallctl(f"stats.{t}")
                 except Exception as e:
                     # There was an error fetching the value, skip.
-                    logger.warning("Failed to read jemalloc stats.%s: %s", t, e)
+                    logger.warning("Failed to read jemalloc stats.%s:", t, exc_info=e)
                     continue
 
                 g.add_metric([t], value=value)
@@ -207,4 +207,4 @@ def setup_jemalloc_stats() -> None:
     except Exception as e:
         # This should only happen if we find the loaded jemalloc library, but
         # fail to load it somehow (e.g. we somehow picked the wrong version).
-        logger.info("Failed to setup collector to record jemalloc stats: %s", e)
+        logger.info("Failed to setup collector to record jemalloc stats:", exc_info=e)

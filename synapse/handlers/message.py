@@ -375,7 +375,7 @@ class MessageHandler:
             # date from the database in the same database transaction.
             await self.store.expire_event(event_id)
         except Exception as e:
-            logger.error("Could not expire event %s: %r", event_id, e)
+            logger.error("Could not expire event %s:", event_id, exc_info=e)
 
         # Schedule the expiry of the next event to expire.
         await self._schedule_next_expiry()
@@ -595,7 +595,7 @@ class EventCreationHandler:
                             content["avatar_url"] = avatar_url
                 except Exception as e:
                     logger.info(
-                        "Failed to get profile information for %r: %s", target, e
+                        "Failed to get profile information for %r:", target, exc_info=e
                     )
 
         is_exempt = await self._is_exempt_from_privacy_policy(builder, requester)

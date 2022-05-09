@@ -313,7 +313,7 @@ class GroupsServerWorkerHandler:
                 profile = await self.profile_handler.get_profile_from_cache(user_id)
                 user_profile.update(profile)
             except Exception as e:
-                logger.warning("Error getting profile for %s: %s", user_id, e)
+                logger.warning("Error getting profile for %s: %s", user_id, exc_info=e)
             user_profiles.append(user_profile)
 
         return {"chunk": user_profiles, "total_user_count_estimate": len(invited_users)}

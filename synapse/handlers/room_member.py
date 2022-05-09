@@ -1255,7 +1255,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     require_consent=False,
                 )
             except Exception as e:
-                logger.exception("Error kicking guest user: %s" % (e,))
+                logger.exception("Error kicking guest user:", exc_info=e)
 
     async def lookup_room_alias(
         self, room_alias: RoomAlias
@@ -1663,7 +1663,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             # The 'except' clause is very broad, but we need to
             # capture everything from DNS failures upwards
             #
-            logger.warning("Failed to reject invite: %s", e)
+            logger.warning("Failed to reject invite:", exc_info=e)
 
             return await self._generate_local_out_of_band_leave(
                 invite_event, txn_id, requester, content

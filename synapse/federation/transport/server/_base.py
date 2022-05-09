@@ -198,13 +198,13 @@ def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str, Optional[str
         return origin, key, sig, destination
     except Exception as e:
         logger.warning(
-            "Error parsing auth header '%s': %s",
+            "Error parsing auth header '%s':",
             header_bytes.decode("ascii", "replace"),
-            e,
+            exc_info=e,
         )
         raise AuthenticationError(
             HTTPStatus.BAD_REQUEST, "Malformed Authorization header", Codes.UNAUTHORIZED
-        )
+        ) from e
 
 
 class BaseFederationServlet:
@@ -303,7 +303,7 @@ class BaseFederationServlet:
                     )
                     raise
             except Exception as e:
-                logger.warning("authenticate_request failed: %s", e)
+                logger.warning("authenticate_request failed:", exc_info=e)
                 raise
 
             # update the active opentracing span with the authenticated entity

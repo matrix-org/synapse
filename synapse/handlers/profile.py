@@ -458,7 +458,7 @@ class ProfileHandler:
                 )
             except Exception as e:
                 logger.warning(
-                    "Failed to update join event for room %s - %s", room_id, str(e)
+                    "Failed to update join event for room %s:", room_id, exc_info=e
                 )
 
     async def check_profile_query_allowed(

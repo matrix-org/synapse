@@ -434,7 +434,7 @@ class FederationServer(FederationBase):
             except UnsupportedRoomVersionError as e:
                 # this can happen if support for a given room version is withdrawn,
                 # so that we still get events for said room.
-                logger.info("Ignoring PDU: %s", e)
+                logger.info("Ignoring PDU: %s", e.msg)
                 continue
 
             event = event_from_pdu_json(p, room_version)
@@ -1092,7 +1092,7 @@ class FederationServer(FederationBase):
                     # XXX: Ideally we'd inform the remote we failed to process
                     # the event, but we can't return an error in the transaction
                     # response (as we've already responded).
-                    logger.warning("Error handling PDU %s: %s", event.event_id, e)
+                    logger.warning("Error handling PDU %s:", event.event_id, exc_info=e)
                 except Exception:
                     f = failure.Failure()
                     logger.error(

@@ -249,6 +249,7 @@ async def _handle_response(
             request.destination,
             request.method,
             request.uri.decode("ascii"),
+            exc_info=e,
         )
         raise RequestSendFailed(e, can_retry=False) from e
     except defer.TimeoutError as e:
@@ -271,12 +272,12 @@ async def _handle_response(
         raise RequestSendFailed(e, can_retry=True) from e
     except Exception as e:
         logger.warning(
-            "{%s} [%s] Error reading response %s %s: %s",
+            "{%s} [%s] Error reading response %s %s:",
             request.txn_id,
             request.destination,
             request.method,
             request.uri.decode("ascii"),
-            e,
+            exc_info=e,
         )
         raise
 
@@ -618,6 +619,7 @@ class MatrixFederationHttpClient:
                                 request.method,
                                 url_str,
                                 _flatten_response_never_received(e),
+                                exc_info=e,
                             )
                             body = None
 
@@ -677,6 +679,7 @@ class MatrixFederationHttpClient:
                         request.method,
                         url_str,
                         _flatten_response_never_received(e),
+                        exc_info=e,
                     )
                     raise
         return response
@@ -1220,10 +1223,10 @@ class MatrixFederationHttpClient:
             raise RequestSendFailed(e, can_retry=True) from e
         except Exception as e:
             logger.warning(
-                "{%s} [%s] Error reading response: %s",
+                "{%s} [%s] Error reading response:",
                 request.txn_id,
                 request.destination,
-                e,
+                exc_info=e,
             )
             raise
         logger.info(

@@ -83,7 +83,9 @@ class AccountDataHandler:
             try:
                 await callback(user_id, room_id, account_data_type, content)
             except Exception as e:
-                logger.exception("Failed to run module callback %s: %s", callback, e)
+                logger.exception(
+                    "Failed to run module callback %s:", callback, exc_info=e
+                )
 
     async def add_account_data_to_room(
         self, user_id: str, room_id: str, account_data_type: str, content: JsonDict

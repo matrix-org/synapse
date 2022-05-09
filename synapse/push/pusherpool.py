@@ -331,12 +331,12 @@ class PusherPool:
             p = self.pusher_factory.create_pusher(pusher_config)
         except PusherConfigException as e:
             logger.warning(
-                "Pusher incorrectly configured id=%i, user=%s, appid=%s, pushkey=%s: %s",
+                "Pusher incorrectly configured id=%i, user=%s, appid=%s, pushkey=%s:",
                 pusher_config.id,
                 pusher_config.user_name,
                 pusher_config.app_id,
                 pusher_config.pushkey,
-                e,
+                exc_info=e,
             )
             return None
         except Exception:

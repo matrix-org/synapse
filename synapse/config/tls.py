@@ -118,8 +118,8 @@ class TlsConfig(Config):
                     certs.append(cert_base)
                 except Exception as e:
                     raise ConfigError(
-                        "Error parsing custom CA certificate file %s: %s" % (ca_file, e)
-                    )
+                        "Error parsing custom CA certificate file %s:" % ca_file
+                    ) from e
 
             self.federation_ca_trust_root = trustRootFromCertificates(certs)
 

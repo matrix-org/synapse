@@ -68,9 +68,9 @@ class FederationBase:
             await _check_sigs_on_pdu(self.keyring, room_version, pdu)
         except SynapseError as e:
             logger.warning(
-                "Signature check failed for %s: %s",
+                "Signature check failed for %s:",
                 pdu.event_id,
-                e,
+                exc_info=e,
             )
             raise
 
@@ -155,12 +155,11 @@ async def _check_sigs_on_pdu(
                 pdu.origin_server_ts if room_version.enforce_key_validity else 0,
             )
         except Exception as e:
-            errmsg = "event id %s: unable to verify signature for sender %s: %s" % (
+            errmsg = "event id %s: unable to verify signature for sender %s" % (
                 pdu.event_id,
                 get_domain_from_id(pdu.sender),
-                e,
             )
-            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN) from e
 
     # now let's look for events where the sender's domain is different to the
     # event id's domain (normally only the case for joins/leaves), and add additional
@@ -177,14 +176,13 @@ async def _check_sigs_on_pdu(
             )
         except Exception as e:
             errmsg = (
-                "event id %s: unable to verify signature for event id domain %s: %s"
+                "event id %s: unable to verify signature for event id domain %s"
                 % (
                     pdu.event_id,
                     get_domain_from_id(pdu.event_id),
-                    e,
                 )
             )
-            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN) from e
 
     # If this is a join event for a restricted room it may have been authorised
     # via a different server from the sending server. Check those signatures.
@@ -205,14 +203,13 @@ async def _check_sigs_on_pdu(
             )
         except Exception as e:
             errmsg = (
-                "event id %s: unable to verify signature for authorising server %s: %s"
+                "event id %s: unable to verify signature for authorising server %s:"
                 % (
                     pdu.event_id,
                     authorising_server,
-                    e,
                 )
             )
-            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN) from e
 
 
 def _is_invite_via_3pid(event: EventBase) -> bool:

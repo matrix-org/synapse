@@ -133,7 +133,9 @@ class CacheMetric:
             if self._collect_callback:
                 self._collect_callback()
         except Exception as e:
-            logger.warning("Error calculating metrics for %s: %s", self._cache_name, e)
+            logger.warning(
+                "Error calculating metrics for %s:", self._cache_name, exc_info=e
+            )
             raise
 
 

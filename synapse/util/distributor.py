@@ -125,10 +125,10 @@ class Signal(Generic[P]):
                 return await maybe_awaitable(observer(*args, **kwargs))
             except Exception as e:
                 logger.warning(
-                    "%s signal observer %s failed: %r",
+                    "%s signal observer %s failed:",
                     self.name,
                     observer,
-                    e,
+                    exc_info=e,
                 )
                 return None
 

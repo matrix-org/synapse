@@ -352,18 +352,18 @@ class PerDestinationQueue:
 
                 self._start_catching_up()
         except FederationDeniedError as e:
-            logger.info(e)
+            logger.info(e.msg)
         except HttpResponseException as e:
             logger.warning(
-                "TX [%s] Received %d response to transaction: %s",
+                "TX [%s] Received %d response to transaction:",
                 self._destination,
                 e.code,
-                e,
+                exc_info=e,
             )
 
         except RequestSendFailed as e:
             logger.warning(
-                "TX [%s] Failed to send transaction: %s", self._destination, e
+                "TX [%s] Failed to send transaction:", self._destination, exc_info=e
             )
 
             for p in pending_pdus:

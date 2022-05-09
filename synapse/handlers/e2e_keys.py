@@ -1140,11 +1140,10 @@ class E2eKeysHandler:
             )
         except Exception as e:
             logger.warning(
-                "Unable to query %s for cross-signing keys of user %s: %s %s",
+                "Unable to query %s for cross-signing keys of user %s:",
                 user.domain,
                 user.to_string(),
-                type(e),
-                e,
+                exc_info=e,
             )
             return None, None, None
 
@@ -1183,11 +1182,7 @@ class E2eKeysHandler:
                 key_id, verify_key = get_verify_key_from_cross_signing_key(key_content)
             except ValueError as e:
                 logger.warning(
-                    "Invalid %s key retrieved: %s - %s %s",
-                    key_type,
-                    key_content,
-                    type(e),
-                    e,
+                    "Invalid %s key retrieved (%r): ", key_type, key_content, exc_info=e
                 )
                 continue
 

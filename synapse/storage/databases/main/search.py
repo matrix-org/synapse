@@ -283,7 +283,8 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
                     )
                 except psycopg2.ProgrammingError as e:
                     logger.warning(
-                        "Ignoring error %r when trying to switch from GIST to GIN", e
+                        "Ignoring error when trying to switch from GIST to GIN:",
+                        exc_info=e,
                     )
 
                 # we should now be able to delete the GIST index.

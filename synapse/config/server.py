@@ -253,7 +253,7 @@ class ServerConfig(Config):
         try:
             parse_and_validate_server_name(self.server_name)
         except ValueError as e:
-            raise ConfigError(str(e))
+            raise ConfigError("Failed to parse/validate server name") from e
 
         self.pid_file = self.abspath(config.get("pid_file"))
         self.soft_file_limit = config.get("soft_file_limit", 0)
@@ -292,7 +292,7 @@ class ServerConfig(Config):
         try:
             splits = urllib.parse.urlsplit(self.public_baseurl)
         except Exception as e:
-            raise ConfigError(f"Unable to parse URL: {e}", ("public_baseurl",))
+            raise ConfigError("Unable to parse URL:", ("public_baseurl",)) from e
         if splits.scheme not in ("https", "http"):
             raise ConfigError(
                 f"Invalid scheme '{splits.scheme}': only https and http are supported"

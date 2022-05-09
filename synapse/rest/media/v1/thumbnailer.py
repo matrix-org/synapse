@@ -77,7 +77,7 @@ class Thumbnailer:
                 self.transpose_method = EXIF_TRANSPOSE_MAPPINGS.get(image_orientation)
         except Exception as e:
             # A lot of parsing errors can happen when parsing EXIF
-            logger.info("Error parsing image EXIF information: %s", e)
+            logger.info("Error parsing image EXIF information:", exc_info=e)
 
     def transpose(self) -> Tuple[int, int]:
         """Transpose the image using its EXIF Orientation tag

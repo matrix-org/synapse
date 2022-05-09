@@ -236,8 +236,7 @@ class FederationEventHandler:
                         )
                     except Exception as e:
                         raise Exception(
-                            "Error fetching missing prev_events for %s: %s"
-                            % (event_id, e)
+                            "Error fetching missing prev_events for %s" % event_id
                         ) from e
 
                 # Update the set of things we've seen after trying to
@@ -745,7 +744,7 @@ class FederationEventHandler:
         try:
             self._sanity_check_event(event)
         except SynapseError as err:
-            logger.warning("Event %s failed sanity check: %s", event_id, err)
+            logger.warning("Event %s failed sanity check:", event_id, exc_info=err)
             return
 
         try:
@@ -1301,10 +1300,9 @@ class FederationEventHandler:
 
                 except Exception as e:
                     logger.warning(
-                        "Error fetching missing state/auth event %s: %s %s",
+                        "Error fetching missing state/auth event %s:",
                         event_id,
-                        type(e),
-                        e,
+                        exc_info=e,
                     )
 
         await concurrently_execute(get_event, event_ids, 5)
@@ -1428,7 +1426,7 @@ class FederationEventHandler:
                     validate_event_for_room_version(room_version_obj, event)
                     check_auth_rules_for_event(room_version_obj, event, auth)
                 except AuthError as e:
-                    logger.warning("Rejecting %r because %s", event, e)
+                    logger.warning("Rejecting %r because %s", event, e.msg)
                     context.rejected = RejectedReason.AUTH_ERROR
 
             return event, context
@@ -1475,7 +1473,7 @@ class FederationEventHandler:
         try:
             validate_event_for_room_version(room_version_obj, event)
         except AuthError as e:
-            logger.warning("While validating received event %r: %s", event, e)
+            logger.warning("While validating received event %r: %s", event, e.msg)
             # TODO: use a different rejected reason here?
             context.rejected = RejectedReason.AUTH_ERROR
             return context
@@ -1776,7 +1774,7 @@ class FederationEventHandler:
                 destination, event.room_id, event.event_id
             )
         except Exception as e:
-            logger.warning("Failed to get auth chain for %s: %s", event, e)
+            logger.warning("Failed to get auth chain for %s:", event, exc_info=e)
             # in this case, it's very likely we still won't have all the auth
             # events - but we pick that up below.
 

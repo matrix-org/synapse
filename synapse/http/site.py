@@ -455,7 +455,7 @@ class SynapseRequest(Request):
         try:
             self.request_metrics.stop(self.finish_time, self.code, self.sentLength)
         except Exception as e:
-            logger.warning("Failed to stop metrics: %r", e)
+            logger.warning("Failed to stop metrics:", exc_info=e)
 
     def _should_log_request(self) -> bool:
         """Whether we should log at INFO that we processed the request."""

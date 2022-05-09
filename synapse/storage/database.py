@@ -723,7 +723,7 @@ class DatabasePool:
                     # [2]: https://github.com/python/cpython/blob/v3.8.0/Modules/_sqlite/cursor.c#L236
                     cursor.close()
         except Exception as e:
-            transaction_logger.debug("[TXN FAIL] {%s} %s", name, e)
+            transaction_logger.debug("[TXN FAIL] {%s} %s", name, e, exc_info=e)
             raise
         finally:
             end = monotonic_time()

@@ -855,7 +855,7 @@ class MediaRepository:
                 try:
                     os.remove(full_path)
                 except OSError as e:
-                    logger.warning("Failed to remove file: %r", full_path)
+                    logger.warning("Failed to remove file: %r", full_path, exc_info=e)
                     if e.errno == errno.ENOENT:
                         pass
                     else:
@@ -930,7 +930,7 @@ class MediaRepository:
             try:
                 os.remove(full_path)
             except OSError as e:
-                logger.warning("Failed to remove file: %r: %s", full_path, e)
+                logger.warning("Failed to remove file: %r:", full_path, exc_info=e)
                 if e.errno == errno.ENOENT:
                     pass
                 else:

@@ -114,9 +114,11 @@ class ApplicationServiceApi(SimpleHttpClient):
         except CodeMessageException as e:
             if e.code == 404:
                 return False
-            logger.warning("query_user to %s received %s", uri, e.code)
+            logger.warning(
+                "query_user to %s received code=%d msg=%r", uri, e.code, e.msg
+            )
         except Exception as ex:
-            logger.warning("query_user to %s threw exception %s", uri, ex)
+            logger.warning("query_user to %s threw exception:", uri, exc_info=ex)
         return False
 
     async def query_alias(self, service: "ApplicationService", alias: str) -> bool:
@@ -132,11 +134,13 @@ class ApplicationServiceApi(SimpleHttpClient):
             if response is not None:  # just an empty json object
                 return True
         except CodeMessageException as e:
-            logger.warning("query_alias to %s received %s", uri, e.code)
+            logger.warning(
+                "query_alias to %s received code=%d msg=%r", uri, e.code, e.msg
+            )
             if e.code == 404:
                 return False
         except Exception as ex:
-            logger.warning("query_alias to %s threw exception %s", uri, ex)
+            logger.warning("query_alias to %s threw exception", uri, exc_info=ex)
         return False
 
     async def query_3pe(
@@ -180,7 +184,7 @@ class ApplicationServiceApi(SimpleHttpClient):
 
             return ret
         except Exception as ex:
-            logger.warning("query_3pe to %s threw exception %s", uri, ex)
+            logger.warning("query_3pe to %s threw exception", uri, exc_info=ex)
             return []
 
     async def get_3pe_protocol(
@@ -213,7 +217,9 @@ class ApplicationServiceApi(SimpleHttpClient):
 
                 return info
             except Exception as ex:
-                logger.warning("query_3pe_protocol to %s threw exception %s", uri, ex)
+                logger.warning(
+                    "query_3pe_protocol to %s threw exception", uri, exc_info=ex
+                )
                 return None
 
         key = (service.id, protocol)
@@ -304,7 +310,7 @@ class ApplicationServiceApi(SimpleHttpClient):
             return True
         except CodeMessageException as e:
             logger.warning(
-                "push_bulk to %s received code=%s msg=%s",
+                "push_bulk to %s received code=%d msg=%r",
                 uri,
                 e.code,
                 e.msg,
@@ -312,12 +318,9 @@ class ApplicationServiceApi(SimpleHttpClient):
             )
         except Exception as ex:
             logger.warning(
-                "push_bulk to %s threw exception(%s) %s args=%s",
+                "push_bulk to %s threw exception",
                 uri,
-                type(ex).__name__,
-                ex,
-                ex.args,
-                exc_info=logger.isEnabledFor(logging.DEBUG),
+                exc_info=ex,
             )
         failed_transactions_counter.labels(service.id).inc()
         return False

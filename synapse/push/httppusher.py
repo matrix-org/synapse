@@ -395,11 +395,7 @@ class HttpPusher(Pusher):
             )
         except Exception as e:
             logger.warning(
-                "Failed to push event %s to %s: %s %s",
-                event.event_id,
-                self.name,
-                type(e),
-                e,
+                "Failed to push event %s to %s:", event.event_id, self.name, exc_info=e
             )
             return False
         rejected = []
@@ -435,7 +431,5 @@ class HttpPusher(Pusher):
             await self.http_client.post_json_get_json(self.url, d)
             http_badges_processed_counter.inc()
         except Exception as e:
-            logger.warning(
-                "Failed to send badge count to %s: %s %s", self.name, type(e), e
-            )
+            logger.warning("Failed to send badge count to %s:", self.name, exc_info=e)
             http_badges_failed_counter.inc()

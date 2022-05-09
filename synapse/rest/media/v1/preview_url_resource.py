@@ -688,7 +688,7 @@ class PreviewUrlResource(DirectServeJsonResource):
                     # Failed, skip deleting the rest of the parent dirs
                     if e.errno != errno.ENOTEMPTY:
                         logger.warning(
-                            "Failed to remove media directory: %r: %s", dir, e
+                            "Failed to remove media directory %r:", dir, exc_info=e
                         )
                     break
 
@@ -703,7 +703,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             except FileNotFoundError:
                 pass  # If the path doesn't exist, meh
             except OSError as e:
-                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                logger.warning("Failed to remove media: %r:", media_id, exc_info=e)
                 continue
 
             removed_media.append(media_id)
@@ -733,7 +733,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             except FileNotFoundError:
                 pass  # If the path doesn't exist, meh
             except OSError as e:
-                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                logger.warning("Failed to remove media: %r:", media_id, exc_info=e)
                 continue
 
             dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
@@ -745,7 +745,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             except FileNotFoundError:
                 pass  # If the path doesn't exist, meh
             except OSError as e:
-                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                logger.warning("Failed to remove media: %r:", media_id, exc_info=e)
                 continue
 
             removed_media.append(media_id)

@@ -133,9 +133,9 @@ class CasHandler:
             body = pde.response
         except HttpResponseException as e:
             description = (
-                'Authorization server responded with a "{status}" error '
+                f'Authorization server responded with a "{e.code}" error '
                 "while exchanging the authorization code."
-            ).format(status=e.code)
+            )
             raise CasError("server_error", description) from e
 
         return self._parse_cas_response(body)

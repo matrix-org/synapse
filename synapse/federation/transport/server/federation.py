@@ -122,7 +122,9 @@ class FederationSendServlet(BaseFederationServerServlet):
                     )
 
         except Exception as e:
-            logger.exception(e)
+            logger.error(
+                "Exception when trying to process federation transaction:", exc_info=e
+            )
             return 400, {"error": "Invalid transaction"}
 
         code, response = await self.handler.on_incoming_transaction(

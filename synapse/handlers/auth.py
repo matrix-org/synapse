@@ -1923,7 +1923,7 @@ def load_single_legacy_password_auth_provider(
     try:
         provider = module(config=config, account_handler=api)
     except Exception as e:
-        logger.error("Error while initializing %r: %s", module, e)
+        logger.error("Error while initializing %r:", module, exc_info=e)
         raise
 
     # All methods that the module provides should be async, but this wasn't enforced
@@ -2209,7 +2209,9 @@ class PasswordAuthProvider:
             except CancelledError:
                 raise
             except Exception as e:
-                logger.warning("Failed to run module API callback %s: %s", callback, e)
+                logger.warning(
+                    "Failed to run module API callback %s:", callback, exc_info=e
+                )
                 continue
 
             if result is not None:
@@ -2272,7 +2274,9 @@ class PasswordAuthProvider:
             except CancelledError:
                 raise
             except Exception as e:
-                logger.warning("Failed to run module API callback %s: %s", callback, e)
+                logger.warning(
+                    "Failed to run module API callback %s:", callback, exc_info=e
+                )
                 continue
 
             if result is not None:
@@ -2329,7 +2333,9 @@ class PasswordAuthProvider:
             try:
                 await callback(user_id, device_id, access_token)
             except Exception as e:
-                logger.warning("Failed to run module API callback %s: %s", callback, e)
+                logger.warning(
+                    "Failed to run module API callback %s:", callback, exc_info=e
+                )
                 continue
 
     async def get_username_for_registration(
@@ -2370,8 +2376,8 @@ class PasswordAuthProvider:
                 raise
             except Exception as e:
                 logger.error(
-                    "Module raised an exception in get_username_for_registration: %s",
-                    e,
+                    "Module raised an exception in get_username_for_registration:",
+                    exc_info=e,
                 )
                 raise SynapseError(code=500, msg="Internal Server Error")
 
@@ -2415,8 +2421,8 @@ class PasswordAuthProvider:
                 raise
             except Exception as e:
                 logger.error(
-                    "Module raised an exception in get_displayname_for_registration: %s",
-                    e,
+                    "Module raised an exception in get_displayname_for_registration:",
+                    exc_info=e,
                 )
                 raise SynapseError(code=500, msg="Internal Server Error")
 
@@ -2457,7 +2463,9 @@ class PasswordAuthProvider:
             except CancelledError:
                 raise
             except Exception as e:
-                logger.error("Module raised an exception in is_3pid_allowed: %s", e)
+                logger.error(
+                    "Module raised an exception in is_3pid_allowed:", exc_info=e
+                )
                 raise SynapseError(code=500, msg="Internal Server Error")
 
         return True

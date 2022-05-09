@@ -448,12 +448,11 @@ class SimpleHttpClient:
                 return response
             except Exception as e:
                 incoming_responses_counter.labels(method, "ERR").inc()
-                logger.info(
-                    "Error sending request to  %s %s: %s %s",
+                logger.warning(
+                    "Error sending request to %s %s:",
                     method,
                     redact_uri(uri),
-                    type(e).__name__,
-                    e.args[0],
+                    exc_info=e,
                 )
                 set_tag(tags.ERROR, True)
                 set_tag("error_reason", e.args[0])

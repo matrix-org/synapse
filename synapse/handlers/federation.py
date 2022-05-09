@@ -396,7 +396,7 @@ class FederationHandler:
                     logger.info(e)
                     continue
                 except Exception as e:
-                    logger.exception("Failed to backfill from %s because %s", dom, e)
+                    logger.exception("Failed to backfill from %s:", dom, exc_info=e)
                     continue
 
             return False
@@ -683,7 +683,10 @@ class FederationHandler:
                     await self._federation_event_handler.on_receive_pdu(origin, p)
             except Exception as e:
                 logger.warning(
-                    "Error handling queued PDU %s from %s: %s", p.event_id, origin, e
+                    "Error handling queued PDU %s from %s:",
+                    p.event_id,
+                    origin,
+                    exc_info=e,
                 )
 
     async def on_make_join_request(

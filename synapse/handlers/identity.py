@@ -647,7 +647,7 @@ class IdentityHandler:
                         id_server,
                     )
                 else:
-                    logger.warning("Error when looking up hashing details: %s", e)
+                    logger.warning("Error when looking up hashing details:", exc_info=e)
                     return None
 
         return await self._lookup_3pid_v1(id_server, medium, address)
@@ -680,7 +680,7 @@ class IdentityHandler:
         except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except OSError as e:
-            logger.warning("Error from v1 identity server lookup: %s" % (e,))
+            logger.warning("Error from v1 identity server lookup:", exc_info=e)
 
         return None
 
@@ -780,7 +780,7 @@ class IdentityHandler:
         except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except Exception as e:
-            logger.warning("Error when performing a v2 3pid lookup: %s", e)
+            logger.warning("Error when performing a v2 3pid lookup:", exc_info=e)
             raise SynapseError(
                 500, "Unknown error occurred during identity server lookup"
             )

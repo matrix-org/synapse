@@ -1424,5 +1424,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
                 extras[key] = template.render(user=userinfo).strip()
             except Exception as e:
                 # Log an error and skip this value (don't break login for this).
-                logger.error("Failed to render OIDC extra attribute %s: %s" % (key, e))
+                logger.error(
+                    "Failed to render OIDC extra attribute %s:", key, exc_info=e
+                )
         return extras

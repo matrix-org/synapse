@@ -1382,14 +1382,14 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         except Exception as e:
             logger.error(
                 "store_device with device_id=%s(%r) user_id=%s(%r)"
-                " display_name=%s(%r) failed: %s",
+                " display_name=%s(%r) failed:",
                 type(device_id).__name__,
                 device_id,
                 type(user_id).__name__,
                 user_id,
                 type(initial_device_display_name).__name__,
                 initial_device_display_name,
-                e,
+                exc_info=e,
             )
             raise StoreError(500, "Problem storing device.")
 

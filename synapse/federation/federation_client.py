@@ -373,22 +373,22 @@ class FederationClient(FederationBase):
 
                 pdu_attempts[destination] = now
 
+            except FederationDeniedError as e:
+                logger.info(str(e))
+                continue
             except SynapseError as e:
                 logger.info(
-                    "Failed to get PDU %s from %s because %s", event_id, destination, e
+                    "Failed to get PDU %s from %s:", event_id, destination, exc_info=e
                 )
                 continue
             except NotRetryingDestination as e:
-                logger.info(str(e))
-                continue
-            except FederationDeniedError as e:
                 logger.info(str(e))
                 continue
             except Exception as e:
                 pdu_attempts[destination] = now
 
                 logger.info(
-                    "Failed to get PDU %s from %s because %s", event_id, destination, e
+                    "Failed to get PDU %s from %s:", event_id, destination, exc_info=e
                 )
                 continue
 
@@ -1322,7 +1322,7 @@ class FederationClient(FederationBase):
                 raise
             except Exception as e:
                 logger.exception(
-                    "Failed to send_third_party_invite via %s: %s", destination, str(e)
+                    "Failed to send_third_party_invite via %s:", destination, exc_info=e
                 )
 
         raise RuntimeError("Failed to send to any server.")
@@ -1349,10 +1349,11 @@ class FederationClient(FederationBase):
             # We didn't manage to get it -- probably a 404. We are okay if other
             # servers don't give it to us.
             logger.debug(
-                "Failed to fetch room complexity via %s for %s, got a %d",
+                "Failed to fetch room complexity via %s for %s, got a %d (msg=%r)",
                 destination,
                 room_id,
                 e.code,
+                e.msg,
             )
         except Exception:
             logger.exception(

@@ -306,7 +306,7 @@ class KeyConfig(Config):
         try:
             return read_signing_keys(signing_keys.splitlines(True))
         except Exception as e:
-            raise ConfigError("Error reading %s: %s" % (name, str(e)))
+            raise ConfigError("Error reading %s" % name) from e
 
     def read_old_signing_keys(
         self, old_signing_keys: Optional[JsonDict]
@@ -447,8 +447,8 @@ def _parse_key_servers(
                 except Exception as e:
                     raise ConfigError(
                         "Unable to parse key %s for server %s in "
-                        "trusted_key_servers: %s" % (key_id, server_name, e)
-                    )
+                        "trusted_key_servers:" % (key_id, server_name)
+                    ) from e
 
                 result.verify_keys[key_id] = verify_key
 

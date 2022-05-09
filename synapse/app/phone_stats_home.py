@@ -150,7 +150,7 @@ async def phone_stats_home(
             hs.config.metrics.report_stats_endpoint, stats
         )
     except Exception as e:
-        logger.warning("Error reporting stats: %s", e)
+        logger.warning("Error reporting stats:", exc_info=e)
 
 
 def start_phone_stats_home(hs: "HomeServer") -> None:

@@ -700,9 +700,9 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                     )
                 except Exception as e:
                     logger.warning(
-                        "Unable to load event %s (no labels will be imported): %s",
+                        "Unable to load event %s (no labels will be imported):",
                         event_id,
-                        e,
+                        exc_info=e,
                     )
 
                 nbrows += 1
@@ -1140,9 +1140,9 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                     event_json = db_to_json(event_json_raw)
                 except Exception as e:
                     logger.warning(
-                        "Unable to load event %s (no relations will be updated): %s",
+                        "Unable to load event %s (no relations will be updated):",
                         event_id,
-                        e,
+                        exc_info=e,
                     )
                     continue
 

@@ -332,12 +332,12 @@ class Keyring:
             )
         except SignatureVerifyException as e:
             logger.debug(
-                "Error verifying signature for %s:%s:%s with key %s: %s",
+                "Error verifying signature for %s:%s:%s with key %s:",
                 verify_request.server_name,
                 verify_key.alg,
                 verify_key.version,
                 encode_verify_key_base64(verify_key),
-                str(e),
+                exc_info=e,
             )
             raise SynapseError(
                 401,
@@ -617,14 +617,11 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
                 )
             except KeyLookupError as e:
                 logger.warning(
-                    "Key lookup failed from %r: %s", key_server.server_name, e
+                    "Key lookup failed from %r:", key_server.server_name, exc_info=e
                 )
             except Exception as e:
                 logger.exception(
-                    "Unable to get key from %r: %s %s",
-                    key_server.server_name,
-                    type(e).__name__,
-                    str(e),
+                    "Unable to get key from %r:", key_server.server_name, exc_info=e
                 )
 
             return {}
@@ -691,7 +688,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             # these both have str() representations which we can't really improve upon
             raise KeyLookupError(str(e))
         except HttpResponseException as e:
-            raise KeyLookupError("Remote server returned an error: %s" % (e,))
+            raise KeyLookupError("Remote server returned an error:") from e
 
         logger.debug(
             "Response from notary server %s: %s", perspective_name, query_response
@@ -721,10 +718,10 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             except KeyLookupError as e:
                 logger.warning(
                     "Error processing response from key notary server %s for origin "
-                    "server %s: %s",
+                    "server %s:",
                     perspective_name,
                     server_name,
-                    e,
+                    exc_info=e,
                 )
                 # we continue to process the rest of the response
                 continue
@@ -823,7 +820,10 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
                 results[server_name] = keys
             except KeyLookupError as e:
                 logger.warning(
-                    "Error looking up keys %s from %s: %s", key_ids, server_name, e
+                    "Error looking up keys %s from %s:",
+                    key_ids,
+                    server_name,
+                    exc_info=e,
                 )
             except Exception:
                 logger.exception("Error getting keys %s from %s", key_ids, server_name)
@@ -878,7 +878,7 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
                 # upon
                 raise KeyLookupError(str(e))
             except HttpResponseException as e:
-                raise KeyLookupError("Remote server returned an error: %s" % (e,))
+                raise KeyLookupError("Remote server returned an error") from e
 
             assert isinstance(response, dict)
             if response["server_name"] != server_name:

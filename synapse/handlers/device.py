@@ -928,9 +928,9 @@ class DeviceListUpdater:
                     # server sent a malformed result, just log the error instead of
                     # aborting all the subsequent resyncs.
                     logger.debug(
-                        "Could not resync the device list for %s: %s",
+                        "Could not resync the device list for %s:",
                         user_id,
-                        e,
+                        exc_info=e,
                     )
         finally:
             # Allow future calls to retry resyncinc out of sync device lists.
@@ -985,7 +985,7 @@ class DeviceListUpdater:
         except FederationDeniedError as e:
             set_tag("error", True)
             log_kv({"reason": "FederationDeniedError"})
-            logger.info(e)
+            logger.info(e.msg)
             return None
         except Exception as e:
             set_tag("error", True)

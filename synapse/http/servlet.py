@@ -660,7 +660,7 @@ def parse_json_value_from_request(
     try:
         content = json_decoder.decode(content_bytes.decode("utf-8"))
     except Exception as e:
-        logger.warning("Unable to parse JSON: %s (%s)", e, content_bytes)
+        logger.warning("Unable to parse JSON (%r):", content_bytes, exc_info=e)
         raise SynapseError(
             HTTPStatus.BAD_REQUEST, "Content not JSON.", errcode=Codes.NOT_JSON
         )

@@ -621,7 +621,7 @@ class RoomCreationHandler:
         except SynapseError as e:
             # again I'm not really expecting this to fail, but if it does, I'd rather
             # we returned the new room to the client at this point.
-            logger.error("Unable to send updated alias events in old room: %s", e)
+            logger.error("Unable to send updated alias events in old room:", exc_info=e)
 
         try:
             await self.event_creation_handler.create_and_send_nonmember_event(
@@ -638,7 +638,7 @@ class RoomCreationHandler:
         except SynapseError as e:
             # again I'm not really expecting this to fail, but if it does, I'd rather
             # we returned the new room to the client at this point.
-            logger.error("Unable to send updated alias events in new room: %s", e)
+            logger.error("Unable to send updated alias events in new room:", exc_info=e)
 
     async def create_room(
         self,
@@ -1372,11 +1372,9 @@ class TimestampLookupHandler:
                 except Exception as ex:
                     # But we do want to see some exceptions in our code
                     logger.warning(
-                        "Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",
+                        "Failed to fetch /timestamp_to_event from %s:",
                         domain,
-                        type(ex).__name__,
-                        ex,
-                        ex.args,
+                        exc_info=ex,
                     )
 
         if not local_event_id:

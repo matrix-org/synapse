@@ -554,7 +554,7 @@ def sdnotify(state: bytes) -> None:
     except Exception as e:
         # this is a bit surprising, since we don't expect to have a NOTIFY_SOCKET
         # unless systemd is expecting us to notify it.
-        logger.warning("Unable to send notification to systemd: %s", e)
+        logger.warning("Unable to send notification to systemd:", exc_info=e)
 
 
 def max_request_body_size(config: HomeServerConfig) -> int:
