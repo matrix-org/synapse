@@ -129,6 +129,31 @@ class PushRuleEvaluatorForEvent:
         # Maps strings of e.g. 'content.body' -> event["content"]["body"]
         self._value_cache = _flatten_dict(event)
 
+    def check_conditions(
+        self,
+        conditions: List[dict],
+        uid: str,
+        display_name: Optional[str],
+        cache: Dict[str, bool],
+    ) -> bool:
+        for cond in conditions:
+            _cache_key = cond.get("_cache_key", None)
+            if _cache_key:
+                res = cache.get(_cache_key, None)
+                if res is False:
+                    return False
+                elif res is True:
+                    continue
+
+            res = self.matches(cond, uid, display_name)
+            if _cache_key:
+                cache[_cache_key] = bool(res)
+
+            if not res:
+                return False
+
+        return True
+
     def matches(
         self, condition: Dict[str, Any], user_id: str, display_name: Optional[str]
     ) -> bool:

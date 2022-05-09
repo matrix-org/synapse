@@ -247,8 +247,8 @@ class BulkPushRuleEvaluator:
                 if "enabled" in rule and not rule["enabled"]:
                     continue
 
-                matches = _condition_checker(
-                    evaluator, rule["conditions"], uid, display_name, condition_cache
+                matches = evaluator.check_conditions(
+                    rule["conditions"], uid, display_name, condition_cache
                 )
                 if matches:
                     actions = [x for x in rule["actions"] if x != "dont_notify"]
@@ -265,32 +265,6 @@ class BulkPushRuleEvaluator:
             actions_by_user,
             count_as_unread,
         )
-
-
-def _condition_checker(
-    evaluator: PushRuleEvaluatorForEvent,
-    conditions: List[dict],
-    uid: str,
-    display_name: Optional[str],
-    cache: Dict[str, bool],
-) -> bool:
-    for cond in conditions:
-        _cache_key = cond.get("_cache_key", None)
-        if _cache_key:
-            res = cache.get(_cache_key, None)
-            if res is False:
-                return False
-            elif res is True:
-                continue
-
-        res = evaluator.matches(cond, uid, display_name)
-        if _cache_key:
-            cache[_cache_key] = bool(res)
-
-        if not res:
-            return False
-
-    return True
 
 
 MemberMap = Dict[str, Optional[EventIdMembership]]
