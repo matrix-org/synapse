@@ -27,6 +27,7 @@ from typing import (
     Collection,
     Dict,
     Iterable,
+    Iterator,
     List,
     MutableMapping,
     Optional,
@@ -58,6 +59,38 @@ class ConfigError(Exception):
     def __init__(self, msg: str, path: Optional[Iterable[str]] = None):
         self.msg = msg
         self.path = path
+
+
+def format_config_error(e: ConfigError) -> Iterator[str]:
+    """
+    Formats a config error neatly
+
+    The idea is to format the immediate error, plus the "causes" of those errors,
+    hopefully in a way that makes sense to the user. For example:
+
+        Error in configuration at 'oidc_config.user_mapping_provider.config.display_name_template':
+          Failed to parse config for module 'JinjaOidcMappingProvider':
+            invalid jinja template:
+              unexpected end of template, expected 'end of print statement'.
+
+    Args:
+        e: the error to be formatted
+
+    Returns: An iterator which yields string fragments to be formatted
+    """
+    yield "Error in configuration"
+
+    if e.path:
+        yield " at '%s'" % (".".join(e.path),)
+
+    yield ":\n  %s" % (e.msg,)
+
+    parent_e = e.__cause__
+    indent = 1
+    while parent_e:
+        indent += 1
+        yield ":\n%s%s" % ("  " * indent, str(parent_e))
+        parent_e = parent_e.__cause__
 
 
 # We split these messages out to allow packages to override with package

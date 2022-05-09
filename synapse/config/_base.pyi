@@ -4,6 +4,7 @@ from typing import (
     Collection,
     Dict,
     Iterable,
+    Iterator,
     List,
     MutableMapping,
     Optional,
@@ -64,6 +65,8 @@ class ConfigError(Exception):
     def __init__(self, msg: str, path: Optional[Iterable[str]] = None):
         self.msg = msg
         self.path = path
+
+def format_config_error(e: ConfigError) -> Iterator[str]: ...
 
 MISSING_REPORT_STATS_CONFIG_INSTRUCTIONS: str
 MISSING_REPORT_STATS_SPIEL: str
