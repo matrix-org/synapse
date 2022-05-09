@@ -115,7 +115,7 @@ type and the `notify_appservices` configuration option have been deprecated.
 The `synapse.app.user_dir` worker application type and `update_user_directory`
 configuration option have also been deprecated.
 
-To get the same functionality, it's now recommended that the `synapse.app.generic_worker`
+To get the same functionality as was provided by the deprecated options, it's now recommended that the `synapse.app.generic_worker`
 worker application type is used and that the `notify_appservices_from_worker` and/or
 `update_user_directory_from_worker` options are set to the name of a worker.
 
