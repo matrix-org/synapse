@@ -15911,40 +15911,23 @@ more CPU and RAM, and make use of <a href="usage/administration/../../workers.ht
 to make use of multiple CPU cores / multiple machines for your homeserver.</p>
 <div style="break-before: page; page-break-before: always;"></div><h2 id="some-useful-sql-queries-for-synapse-admins"><a class="header" href="#some-useful-sql-queries-for-synapse-admins">Some useful SQL queries for Synapse Admins</a></h2>
 <h2 id="size-of-full-matrix-db"><a class="header" href="#size-of-full-matrix-db">Size of full matrix db</a></h2>
-<p><code>SELECT pg_size_pretty( pg_database_size( 'matrix' ) );</code></p>
+<pre><code class="language-sql">SELECT pg_size_pretty( pg_database_size( 'matrix' ) );
+</code></pre>
 <h3 id="result-example"><a class="header" href="#result-example">Result example:</a></h3>
 <pre><code>pg_size_pretty 
 ----------------
  6420 MB
 (1 row)
 </code></pre>
-<h2 id="show-top-20-larger-rooms-by-state-events-count"><a class="header" href="#show-top-20-larger-rooms-by-state-events-count">Show top 20 larger rooms by state events count</a></h2>
-<pre><code class="language-sql">SELECT r.name, s.room_id, s.current_state_events
-  FROM room_stats_current s
-  LEFT JOIN room_stats_state r USING (room_id)
-  ORDER BY current_state_events DESC
-  LIMIT 20;
-</code></pre>
-<p>and by state_group_events count:</p>
-<pre><code class="language-sql">SELECT rss.name, s.room_id, count(s.room_id) FROM state_groups_state s
-LEFT JOIN room_stats_state rss USING (room_id)
-GROUP BY s.room_id, rss.name        
-ORDER BY count(s.room_id) DESC
-LIMIT 20;
-</code></pre>
-<p>plus same, but with join removed for performance reasons:</p>
-<pre><code class="language-sql">SELECT s.room_id, count(s.room_id) FROM state_groups_state s
-GROUP BY s.room_id        
-ORDER BY count(s.room_id) DESC
-LIMIT 20;
-</code></pre>
 <h2 id="show-top-20-larger-tables-by-row-count"><a class="header" href="#show-top-20-larger-tables-by-row-count">Show top 20 larger tables by row count</a></h2>
-<pre><code class="language-sql">SELECT relname, n_live_tup as rows
-  FROM pg_stat_user_tables 
+<pre><code class="language-sql">SELECT relname, n_live_tup AS &quot;rows&quot;
+  FROM pg_stat_user_tables
   ORDER BY n_live_tup DESC
   LIMIT 20;
 </code></pre>
-<p>This query is quick, but may be very approximate, for exact number of rows use <code>SELECT COUNT(*) FROM &lt;table_name&gt;</code>.</p>
+<p>This query is quick, but may be very approximate, for exact number of rows use:</p>
+<pre><code class="language-sql">SELECT COUNT(*) FROM &lt;table_name&gt;;
+</code></pre>
 <h3 id="result-example-1"><a class="header" href="#result-example-1">Result example:</a></h3>
 <pre><code>state_groups_state - 161687170
 event_auth - 8584785
@@ -15967,37 +15950,15 @@ users_in_public_rooms - 364059
 device_lists_stream - 326903
 user_directory_search - 316433
 </code></pre>
-<h2 id="show-top-20-rooms-by-new-events-count-in-last-1-day"><a class="header" href="#show-top-20-rooms-by-new-events-count-in-last-1-day">Show top 20 rooms by new events count in last 1 day:</a></h2>
-<pre><code class="language-sql">SELECT e.room_id, r.name, COUNT(e.event_id) cnt FROM events e
-LEFT JOIN room_stats_state r USING (room_id)
-WHERE e.origin_server_ts &gt;= DATE_PART('epoch', NOW() - INTERVAL '1 day') * 1000 GROUP BY e.room_id, r.name ORDER BY cnt DESC LIMIT 20;
-</code></pre>
-<h2 id="show-top-20-users-on-homeserver-by-sent-events-messages-at-last-month"><a class="header" href="#show-top-20-users-on-homeserver-by-sent-events-messages-at-last-month">Show top 20 users on homeserver by sent events (messages) at last month:</a></h2>
-<pre><code class="language-sql">SELECT user_id, SUM(total_events) 
-   FROM user_stats_historical
-   WHERE TO_TIMESTAMP(end_ts/1000) AT TIME ZONE 'UTC' &gt; date_trunc('day', now() - interval '1 month')
-   GROUP BY user_id
-   ORDER BY SUM(total_events) DESC 
-   LIMIT 20;
-</code></pre>
-<h2 id="show-last-100-messages-from-needed-user-with-room-names"><a class="header" href="#show-last-100-messages-from-needed-user-with-room-names">Show last 100 messages from needed user, with room names:</a></h2>
-<pre><code class="language-sql">SELECT e.room_id, r.name, e.event_id, e.type, e.content, j.json FROM events e
-  LEFT JOIN event_json j USING (room_id)
-  LEFT JOIN room_stats_state r USING (room_id)
-  WHERE sender = '@LOGIN:example.com'
-  AND e.type = 'm.room.message'
-  ORDER BY stream_ordering DESC
-  LIMIT 100;
-</code></pre>
 <h2 id="show-top-20-larger-tables-by-storage-size"><a class="header" href="#show-top-20-larger-tables-by-storage-size">Show top 20 larger tables by storage size</a></h2>
 <pre><code class="language-sql">SELECT nspname || '.' || relname AS &quot;relation&quot;,
-    pg_size_pretty(pg_total_relation_size(C.oid)) AS &quot;total_size&quot;
-  FROM pg_class C
-  LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
+    pg_size_pretty(pg_total_relation_size(c.oid)) AS &quot;total_size&quot;
+  FROM pg_class c
+  LEFT JOIN pg_namespace n ON (n.oid = c.relnamespace)
   WHERE nspname NOT IN ('pg_catalog', 'information_schema')
-    AND C.relkind &lt;&gt; 'i'
+    AND c.relkind &lt;&gt; 'i'
     AND nspname !~ '^pg_toast'
-  ORDER BY pg_total_relation_size(C.oid) DESC
+  ORDER BY pg_total_relation_size(c.oid) DESC
   LIMIT 20;
 </code></pre>
 <h3 id="result-example-2"><a class="header" href="#result-example-2">Result example:</a></h3>
@@ -16022,8 +15983,75 @@ public.state_groups - 160 MB
 public.device_lists_remote_cache - 124 MB
 public.state_group_edges - 122 MB
 </code></pre>
+<h2 id="show-top-20-larger-rooms-by-state-events-count"><a class="header" href="#show-top-20-larger-rooms-by-state-events-count">Show top 20 larger rooms by state events count</a></h2>
+<p>You get the same information when you use the
+<a href="usage/administration/../../admin_api/rooms.html#list-room-api">admin API</a>
+and set parameter <code>order_by=state_events</code>.</p>
+<pre><code class="language-sql">SELECT r.name, s.room_id, s.current_state_events
+  FROM room_stats_current s
+  LEFT JOIN room_stats_state r USING (room_id)
+  ORDER BY current_state_events DESC
+  LIMIT 20;
+</code></pre>
+<p>and by state_group_events count:</p>
+<pre><code class="language-sql">SELECT rss.name, s.room_id, COUNT(s.room_id)
+  FROM state_groups_state s
+  LEFT JOIN room_stats_state rss USING (room_id)
+  GROUP BY s.room_id, rss.name
+  ORDER BY COUNT(s.room_id) DESC
+  LIMIT 20;
+</code></pre>
+<p>plus same, but with join removed for performance reasons:</p>
+<pre><code class="language-sql">SELECT s.room_id, COUNT(s.room_id)
+  FROM state_groups_state s
+  GROUP BY s.room_id 
+  ORDER BY COUNT(s.room_id) DESC
+  LIMIT 20;
+</code></pre>
+<h2 id="show-top-20-rooms-by-new-events-count-in-last-1-day"><a class="header" href="#show-top-20-rooms-by-new-events-count-in-last-1-day">Show top 20 rooms by new events count in last 1 day:</a></h2>
+<pre><code class="language-sql">SELECT e.room_id, r.name, COUNT(e.event_id) cnt
+  FROM events e
+  LEFT JOIN room_stats_state r USING (room_id)
+  WHERE e.origin_server_ts &gt;= DATE_PART('epoch', NOW() - INTERVAL '1 day') * 1000
+  GROUP BY e.room_id, r.name 
+  ORDER BY cnt DESC
+  LIMIT 20;
+</code></pre>
+<h2 id="show-top-20-users-on-homeserver-by-sent-events-messages-at-last-month"><a class="header" href="#show-top-20-users-on-homeserver-by-sent-events-messages-at-last-month">Show top 20 users on homeserver by sent events (messages) at last month:</a></h2>
+<p>Caution. This query does not use any indexes, can be slow and create load on the database.</p>
+<pre><code class="language-sql">SELECT COUNT(*), sender
+  FROM events
+  WHERE (type = 'm.room.encrypted' OR type = 'm.room.message')
+    AND origin_server_ts &gt;= DATE_PART('epoch', NOW() - INTERVAL '1 month') * 1000
+  GROUP BY sender
+  ORDER BY COUNT(*) DESC
+  LIMIT 20;
+</code></pre>
+<h2 id="show-last-100-messages-from-needed-user-with-room-names"><a class="header" href="#show-last-100-messages-from-needed-user-with-room-names">Show last 100 messages from needed user, with room names:</a></h2>
+<pre><code class="language-sql">SELECT e.room_id, r.name, e.event_id, e.type, e.content, j.json
+  FROM events e
+  LEFT JOIN event_json j USING (room_id)
+  LEFT JOIN room_stats_state r USING (room_id)
+  WHERE sender = '@LOGIN:example.com'
+    AND e.type = 'm.room.message'
+  ORDER BY stream_ordering DESC
+  LIMIT 100;
+</code></pre>
 <h2 id="show-rooms-with-names-sorted-by-events-in-this-rooms"><a class="header" href="#show-rooms-with-names-sorted-by-events-in-this-rooms">Show rooms with names, sorted by events in this rooms</a></h2>
-<p><code>echo &quot;select event_json.room_id,room_stats_state.name from event_json,room_stats_state where room_stats_state.room_id=event_json.room_id&quot; | psql synapse | sort | uniq -c | sort -n</code></p>
+<p><strong>Sort and order with bash</strong></p>
+<pre><code class="language-bash">echo &quot;SELECT event_json.room_id, room_stats_state.name FROM event_json, room_stats_state \
+WHERE room_stats_state.room_id = event_json.room_id&quot; | psql -d synapse -h localhost -U synapse_user -t \
+| sort | uniq -c | sort -n
+</code></pre>
+<p>Documentation for <code>psql</code> command line parameters: https://www.postgresql.org/docs/current/app-psql.html</p>
+<p><strong>Sort and order with SQL</strong></p>
+<pre><code class="language-sql">SELECT COUNT(*), event_json.room_id, room_stats_state.name
+  FROM event_json, room_stats_state
+  WHERE room_stats_state.room_id = event_json.room_id
+  GROUP BY event_json.room_id, room_stats_state.name
+  ORDER BY COUNT(*) DESC
+  LIMIT 50;
+</code></pre>
 <h3 id="result-example-3"><a class="header" href="#result-example-3">Result example:</a></h3>
 <pre><code>   9459  !FPUfgzXYWTKgIrwKxW:matrix.org              | This Week in Matrix
    9459  !FPUfgzXYWTKgIrwKxW:matrix.org              | This Week in Matrix (TWIM)
@@ -16035,13 +16063,21 @@ public.state_group_edges - 122 MB
   43601  !iNmaIQExDMeqdITdHH:matrix.org              | Riot Web/Desktop
 </code></pre>
 <h2 id="lookup-room-state-info-by-list-of-room_id"><a class="header" href="#lookup-room-state-info-by-list-of-room_id">Lookup room state info by list of room_id</a></h2>
-<pre><code class="language-sql">SELECT rss.room_id, rss.name, rss.canonical_alias, rss.topic, rss.encryption, rsc.joined_members, rsc.local_users_in_room, rss.join_rules
-FROM room_stats_state rss
-LEFT JOIN room_stats_current rsc USING (room_id)
-WHERE room_id IN (WHERE room_id IN (
- '!OGEhHVWSdvArJzumhm:matrix.org',
- '!YTvKGNlinIzlkMTVRl:matrix.org'
-)
+<p>You get the same information when you use the
+<a href="usage/administration/../../admin_api/rooms.html#room-details-api">admin API</a>.</p>
+<pre><code class="language-sql">SELECT rss.room_id, rss.name, rss.canonical_alias, rss.topic, rss.encryption,
+    rsc.joined_members, rsc.local_users_in_room, rss.join_rules
+  FROM room_stats_state rss
+  LEFT JOIN room_stats_current rsc USING (room_id)
+  WHERE room_id IN ( WHERE room_id IN (
+    '!OGEhHVWSdvArJzumhm:matrix.org',
+    '!YTvKGNlinIzlkMTVRl:matrix.org' 
+  );
+</code></pre>
+<h2 id="show-users-and-devices-that-have-not-been-online-for-a-while"><a class="header" href="#show-users-and-devices-that-have-not-been-online-for-a-while">Show users and devices that have not been online for a while</a></h2>
+<pre><code class="language-sql">SELECT user_id, device_id, user_agent, TO_TIMESTAMP(last_seen / 1000) AS &quot;last_seen&quot;
+  FROM devices
+  WHERE last_seen &lt; DATE_PART('epoch', NOW() - INTERVAL '3 month') * 1000;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><p>This blog post by Victor Berger explains how to use many of the tools listed on this page: https://levans.fr/shrink-synapse-database.html</p>
 <h1 id="list-of-useful-tools-and-scripts-for-maintenance-synapse-database"><a class="header" href="#list-of-useful-tools-and-scripts-for-maintenance-synapse-database">List of useful tools and scripts for maintenance Synapse database:</a></h1>
