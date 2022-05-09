@@ -437,7 +437,7 @@ An example for a dedicated background worker instance:
 
 #### Updating the User Directory
 
-You can designate one worker to update the user directory.
+You can designate one generic worker to update the user directory.
 
 Specify its name in the shared configuration as follows:
 
@@ -454,7 +454,7 @@ worker application type.
 
 #### Notifying Application Services
 
-You can designate one worker to send output traffic to Application Services.
+You can designate one generic worker to send output traffic to Application Services.
 
 Specify its name in the shared configuration as follows:
 
