@@ -69,11 +69,11 @@ def _canonicalise_cache_name(cache_name: str) -> str:
 def add_resizable_cache(
     cache_name: str, cache_resize_callback: Callable[[float], None]
 ) -> None:
-    """Register a cache that's size can dynamically change
+    """Register a cache whose size can dynamically change
 
     Args:
         cache_name: A reference to the cache
-        cache_resize_callback: A callback function that will be ran whenever
+        cache_resize_callback: A callback function that will run whenever
             the cache needs to be resized
     """
     # Some caches have '*' in them which we strip out.
