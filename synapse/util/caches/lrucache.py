@@ -113,7 +113,6 @@ async def _expire_old_entries(
     """Walks the global cache list to find cache entries that haven't been
     accessed in the given number of seconds, or if a given memory threshold has been breached.
     """
-
     if autotune_config:
         max_cache_memory_usage = autotune_config.get("max_cache_memory_usage")
         target_cache_memory_usage = autotune_config.get("target_cache_memory_usage")
@@ -130,7 +129,7 @@ async def _expire_old_entries(
     # determine if we're evicting due to memory
     jemalloc_interface = get_jemalloc_stats()
 
-    if jemalloc_interface and cache_config.autotune_config:
+    if jemalloc_interface and autotune_config:
         # todo: add a try/catch as this may throw
         mem_usage = jemalloc_interface.get_stat("allocated")
         if mem_usage > max_cache_memory_usage:
@@ -195,7 +194,7 @@ def setup_expire_lru_cache_entries(hs: "HomeServer") -> None:
     been accessed for the given number of seconds, or if a given memory usage threshold has been
     breached.
     """
-    if not hs.config.caches.expiry_time_msec or hs.config.caches.cache_autotuning:
+    if not hs.config.caches.expiry_time_msec or not hs.config.caches.cache_autotuning:
         return
 
     expiry_time = hs.config.caches.expiry_time_msec / 1000

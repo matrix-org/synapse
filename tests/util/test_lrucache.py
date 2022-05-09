@@ -14,7 +14,7 @@
 
 
 from typing import List
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from synapse.util.caches.lrucache import LruCache, setup_expire_lru_cache_entries
 from synapse.util.caches.treecache import TreeCache
@@ -316,3 +316,26 @@ class TimeEvictionTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(cache.get("key1"), None)
         self.assertEqual(cache.get("key2"), 3)
+
+
+class MemoryEvictionTestCase(unittest.HomeserverTestCase):
+    @override_config({"caches": {
+        "cache_autotuning": {"max_cache_memory_usage": "700M", "target_cache_memory_usage": "500M",
+                             "min_cache_ttl": "5m"}}})
+    @patch("synapse.util.caches.lrucache.get_jemalloc_stats")
+    def test_evict_if_memory_exceeds_max(self, mock_jemalloc_interface) -> None:
+        mock_jemalloc_interface.get_stat.return_value = 60
+
+        setup_expire_lru_cache_entries(self.hs)
+        cache = LruCache(5, clock=self.hs.get_clock())
+
+        # set the return value to higher than max_memory
+        #mock_jemalloc.JemallocStats.get_stat = Mock(return_value=624288000)
+
+        cache["key1"] = 1
+        cache["key2"] = 2
+
+        # advance the reactor past the min_cache_ttl
+        self.reactor.advance(60 * 6)
+
+        self.assertEqual(cache.get("key1"), None)
