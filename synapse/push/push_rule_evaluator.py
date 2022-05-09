@@ -129,17 +129,16 @@ class PushRuleEvaluatorForEvent:
         # Maps strings of e.g. 'content.body' -> event["content"]["body"]
         self._value_cache = _flatten_dict(event)
 
+        # Maps cache keys to final values.
+        self._condition_cache: Dict[str, bool] = {}
+
     def check_conditions(
-        self,
-        conditions: List[dict],
-        uid: str,
-        display_name: Optional[str],
-        cache: Dict[str, bool],
+        self, conditions: List[dict], uid: str, display_name: Optional[str]
     ) -> bool:
         for cond in conditions:
             _cache_key = cond.get("_cache_key", None)
             if _cache_key:
-                res = cache.get(_cache_key, None)
+                res = self._condition_cache.get(_cache_key, None)
                 if res is False:
                     return False
                 elif res is True:
@@ -147,7 +146,7 @@ class PushRuleEvaluatorForEvent:
 
             res = self.matches(cond, uid, display_name)
             if _cache_key:
-                cache[_cache_key] = bool(res)
+                self._condition_cache[_cache_key] = bool(res)
 
             if not res:
                 return False

@@ -208,8 +208,6 @@ class BulkPushRuleEvaluator:
             event, len(room_members), sender_power_level, power_levels
         )
 
-        condition_cache: Dict[str, bool] = {}
-
         # If the event is not a state event check if any users ignore the sender.
         if not event.is_state():
             ignorers = await self.store.ignored_by(event.sender)
@@ -248,7 +246,7 @@ class BulkPushRuleEvaluator:
                     continue
 
                 matches = evaluator.check_conditions(
-                    rule["conditions"], uid, display_name, condition_cache
+                    rule["conditions"], uid, display_name
                 )
                 if matches:
                     actions = [x for x in rule["actions"] if x != "dont_notify"]
