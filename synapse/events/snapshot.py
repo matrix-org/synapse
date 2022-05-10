@@ -270,24 +270,6 @@ class EventContext:
         assert self._prev_state_ids is not None
         return self._prev_state_ids
 
-    def get_cached_current_state_ids(self) -> Optional[StateMap[str]]:
-        """Gets the current state IDs if we have them already cached.
-
-        It is an error to access this for a rejected event, since rejected state should
-        not make it into the room state. This method will raise an exception if
-        ``rejected`` is set.
-
-        Returns:
-            Returns None if we haven't cached the state or if state_group is None
-            (which happens when the associated event is an outlier).
-
-            Otherwise, returns the the current state IDs.
-        """
-        if self.rejected:
-            raise RuntimeError("Attempt to access state_ids of rejected event")
-
-        return self._current_state_ids
-
     async def _ensure_fetched(self) -> None:
         return None
 
