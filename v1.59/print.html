@@ -1638,23 +1638,29 @@ Device IDs are unaffected, as these are necessary to facilitate end-to-end encry
 <p>To re-enable this functionality, set the
 <a href="https://matrix-org.github.io/synapse/v1.59/usage/configuration/config_documentation.html#federation"><code>allow_device_name_lookup_over_federation</code></a>
 homeserver config option to <code>true</code>.</p>
-<h2 id="deprecation-of-the-synapseappappservice-worker-application-type"><a class="header" href="#deprecation-of-the-synapseappappservice-worker-application-type">Deprecation of the <code>synapse.app.appservice</code> worker application type</a></h2>
+<h2 id="deprecation-of-the-synapseappappservice-and-synapseappuser_dir-worker-application-types"><a class="header" href="#deprecation-of-the-synapseappappservice-and-synapseappuser_dir-worker-application-types">Deprecation of the <code>synapse.app.appservice</code> and <code>synapse.app.user_dir</code> worker application types</a></h2>
 <p>The <code>synapse.app.appservice</code> worker application type allowed you to configure a
 single worker to use to notify application services of new events, as long
-as this functionality was disabled on the main process with <code>notify_appservices: False</code>.</p>
+as this functionality was disabled on the main process with <code>notify_appservices: False</code>.
+Further, the <code>synapse.app.user_dir</code> worker application type allowed you to configure
+a single worker to be responsible for updating the user directory, as long as this
+was disabled on the main process with <code>update_user_directory: False</code>.</p>
 <p>To unify Synapse's worker types, the <code>synapse.app.appservice</code> worker application
-type and the <code>notify_appservices</code> configuration option have been deprecated.</p>
-<p>To get the same functionality, it's now recommended that the <code>synapse.app.generic_worker</code>
-worker application type is used and that the <code>notify_appservices_from_worker</code> option
-is set to the name of a worker.</p>
-<p>For the time being, <code>notify_appservices_from_worker</code> can be used alongside
-<code>synapse.app.appservice</code> and <code>notify_appservices</code> to make it easier to transition
-between the two configurations, however please note that:</p>
+type and the <code>notify_appservices</code> configuration option have been deprecated.
+The <code>synapse.app.user_dir</code> worker application type and <code>update_user_directory</code>
+configuration option have also been deprecated.</p>
+<p>To get the same functionality as was provided by the deprecated options, it's now recommended that the <code>synapse.app.generic_worker</code>
+worker application type is used and that the <code>notify_appservices_from_worker</code> and/or
+<code>update_user_directory_from_worker</code> options are set to the name of a worker.</p>
+<p>For the time being, the old options can be used alongside the new options to make
+it easier to transition between the two configurations, however please note that:</p>
 <ul>
 <li>the options must not contradict each other (otherwise Synapse won't start); and</li>
-<li>the <code>notify_appservices</code> option will be removed in a future release of Synapse.</li>
+<li>the <code>notify_appservices</code> and <code>update_user_directory</code> options will be removed in a future release of Synapse.</li>
 </ul>
-<p>Please see <a href="workers.html#notifying-application-services">the relevant section of the worker documentation</a> for more information.</p>
+<p>Please see the <a href="workers.html#notifying-application-services"><em>Notifying Application Services</em></a> and
+<a href="workers.html#updating-the-user-directory"><em>Updating the User Directory</em></a> sections of the worker
+documentation for more information.</p>
 <h1 id="upgrading-to-v1580"><a class="header" href="#upgrading-to-v1580">Upgrading to v1.58.0</a></h1>
 <h2 id="groupscommunities-feature-has-been-disabled-by-default"><a class="header" href="#groupscommunities-feature-has-been-disabled-by-default">Groups/communities feature has been disabled by default</a></h2>
 <p>The non-standard groups/communities feature in Synapse has been disabled by default
@@ -12318,7 +12324,7 @@ background tasks. For example, to move background tasks to a dedicated worker,
 the shared configuration would include:</p>
 <pre><code class="language-yaml">run_background_tasks_on: background_worker
 </code></pre>
-<p>You might also wish to investigate the <code>update_user_directory</code> and
+<p>You might also wish to investigate the <code>update_user_directory_from_worker</code> and
 <code>media_instance_running_background_jobs</code> settings.</p>
 <p>An example for a dedicated background worker instance:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
@@ -12330,8 +12336,17 @@ worker_replication_http_port: 9093
 
 worker_log_config: /etc/matrix-synapse/background-worker-log.yaml
 </code></pre>
+<h4 id="updating-the-user-directory"><a class="header" href="#updating-the-user-directory">Updating the User Directory</a></h4>
+<p>You can designate one generic worker to update the user directory.</p>
+<p>Specify its name in the shared configuration as follows:</p>
+<pre><code class="language-yaml">update_user_directory_from_worker: worker_name
+</code></pre>
+<p>This work cannot be load-balanced; please ensure the main process is restarted
+after setting this option in the shared configuration!</p>
+<p>This style of configuration supersedes the legacy <code>synapse.app.user_dir</code>
+worker application type.</p>
 <h4 id="notifying-application-services"><a class="header" href="#notifying-application-services">Notifying Application Services</a></h4>
-<p>You can designate one worker to send output traffic to Application Services.</p>
+<p>You can designate one generic worker to send output traffic to Application Services.</p>
 <p>Specify its name in the shared configuration as follows:</p>
 <pre><code class="language-yaml">notify_appservices_from_worker: worker_name
 </code></pre>
@@ -12350,7 +12365,7 @@ pusher instances by their worker name, e.g.:</p>
     - pusher_worker2
 </code></pre>
 <h3 id="synapseappappservice"><a class="header" href="#synapseappappservice"><code>synapse.app.appservice</code></a></h3>
-<p><strong>Deprecated as of Synapse v1.58.</strong> <a href="workers.html#notifying-application-services">Use <code>synapse.app.generic_worker</code> with the
+<p><strong>Deprecated as of Synapse v1.59.</strong> <a href="workers.html#notifying-application-services">Use <code>synapse.app.generic_worker</code> with the
 <code>notify_appservices_from_worker</code> option instead.</a></p>
 <p>Handles sending output traffic to Application Services. Doesn't handle any
 REST endpoints itself, but you should set <code>notify_appservices: False</code> in the
@@ -12399,6 +12414,8 @@ and you must configure a single instance to run the background tasks, e.g.:</p>
 </code></pre>
 <p>Note that if a reverse proxy is used , then <code>/_matrix/media/</code> must be routed for both inbound client and federation requests (if they are handled separately).</p>
 <h3 id="synapseappuser_dir"><a class="header" href="#synapseappuser_dir"><code>synapse.app.user_dir</code></a></h3>
+<p><strong>Deprecated as of Synapse v1.59.</strong> <a href="workers.html#updating-the-user-directory">Use <code>synapse.app.generic_worker</code> with the
+<code>update_user_directory_from_worker</code> option instead.</a></p>
 <p>Handles searches in the user directory. It can handle REST endpoints matching
 the following regular expressions:</p>
 <pre><code>^/_matrix/client/(r0|v3|unstable)/user_directory/search$
