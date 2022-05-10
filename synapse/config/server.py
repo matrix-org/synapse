@@ -253,7 +253,7 @@ class ServerConfig(Config):
         try:
             parse_and_validate_server_name(self.server_name)
         except ValueError as e:
-            raise ConfigError("Failed to parse/validate server name") from e
+            raise ConfigError(str(e))
 
         self.pid_file = self.abspath(config.get("pid_file"))
         self.soft_file_limit = config.get("soft_file_limit", 0)
