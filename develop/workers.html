@@ -520,7 +520,7 @@ background tasks. For example, to move background tasks to a dedicated worker,
 the shared configuration would include:</p>
 <pre><code class="language-yaml">run_background_tasks_on: background_worker
 </code></pre>
-<p>You might also wish to investigate the <code>update_user_directory</code> and
+<p>You might also wish to investigate the <code>update_user_directory_from_worker</code> and
 <code>media_instance_running_background_jobs</code> settings.</p>
 <p>An example for a dedicated background worker instance:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
@@ -532,8 +532,17 @@ worker_replication_http_port: 9093
 
 worker_log_config: /etc/matrix-synapse/background-worker-log.yaml
 </code></pre>
+<h4 id="updating-the-user-directory"><a class="header" href="#updating-the-user-directory">Updating the User Directory</a></h4>
+<p>You can designate one generic worker to update the user directory.</p>
+<p>Specify its name in the shared configuration as follows:</p>
+<pre><code class="language-yaml">update_user_directory_from_worker: worker_name
+</code></pre>
+<p>This work cannot be load-balanced; please ensure the main process is restarted
+after setting this option in the shared configuration!</p>
+<p>This style of configuration supersedes the legacy <code>synapse.app.user_dir</code>
+worker application type.</p>
 <h4 id="notifying-application-services"><a class="header" href="#notifying-application-services">Notifying Application Services</a></h4>
-<p>You can designate one worker to send output traffic to Application Services.</p>
+<p>You can designate one generic worker to send output traffic to Application Services.</p>
 <p>Specify its name in the shared configuration as follows:</p>
 <pre><code class="language-yaml">notify_appservices_from_worker: worker_name
 </code></pre>
@@ -552,7 +561,7 @@ pusher instances by their worker name, e.g.:</p>
     - pusher_worker2
 </code></pre>
 <h3 id="synapseappappservice"><a class="header" href="#synapseappappservice"><code>synapse.app.appservice</code></a></h3>
-<p><strong>Deprecated as of Synapse v1.58.</strong> <a href="#notifying-application-services">Use <code>synapse.app.generic_worker</code> with the
+<p><strong>Deprecated as of Synapse v1.59.</strong> <a href="#notifying-application-services">Use <code>synapse.app.generic_worker</code> with the
 <code>notify_appservices_from_worker</code> option instead.</a></p>
 <p>Handles sending output traffic to Application Services. Doesn't handle any
 REST endpoints itself, but you should set <code>notify_appservices: False</code> in the
@@ -601,6 +610,8 @@ and you must configure a single instance to run the background tasks, e.g.:</p>
 </code></pre>
 <p>Note that if a reverse proxy is used , then <code>/_matrix/media/</code> must be routed for both inbound client and federation requests (if they are handled separately).</p>
 <h3 id="synapseappuser_dir"><a class="header" href="#synapseappuser_dir"><code>synapse.app.user_dir</code></a></h3>
+<p><strong>Deprecated as of Synapse v1.59.</strong> <a href="#updating-the-user-directory">Use <code>synapse.app.generic_worker</code> with the
+<code>update_user_directory_from_worker</code> option instead.</a></p>
 <p>Handles searches in the user directory. It can handle REST endpoints matching
 the following regular expressions:</p>
 <pre><code>^/_matrix/client/(r0|v3|unstable)/user_directory/search$
