@@ -338,6 +338,15 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
     @cached()
+    async def get_number_joined_users_in_room(self, room_id: str) -> int:
+        return await self.db_pool.simple_select_one_onecol(
+            table="current_state_events",
+            keyvalues={"room_id": room_id, "membership": Membership.JOIN},
+            retcol="COUNT(*)",
+            desc="get_number_joined_users_in_room",
+        )
+
+    @cached()
     async def get_invited_rooms_for_local_user(
         self, user_id: str
     ) -> List[RoomsForUser]:
