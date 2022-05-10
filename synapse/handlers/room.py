@@ -149,6 +149,10 @@ class RoomCreationHandler:
             )
             preset_config["encrypted"] = encrypted
 
+        self._default_power_level_content_override = (
+            self.config.room.default_power_level_content_override
+        )
+
         self._replication = hs.get_replication_data_handler()
 
         # linearizer to stop two upgrades happening at once
@@ -1046,15 +1050,12 @@ class RoomCreationHandler:
 
             # If the server config contains default_power_level_content_override,
             # and that contains information for this room preset, apply it.
-            default_power_level_content_override = (
-                self.config.room.default_power_level_content_override
-            )
             if (
-                default_power_level_content_override
-                and default_power_level_content_override.get(preset_config)
+                self._default_power_level_content_override
+                and self._default_power_level_content_override.get(preset_config)
             ):
                 power_level_content.update(
-                    default_power_level_content_override.get(preset_config)
+                    self._default_power_level_content_override.get(preset_config)
                 )
 
             # Finally, if the user supplied specific permissions for this room,
