@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse v1.53.0 where bundled aggregations for annotations/edits were incorrectly calculated.

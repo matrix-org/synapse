@@ -319,10 +319,6 @@ class ServerConfig(Config):
                 self.presence_router_config,
             ) = load_module(presence_router_config, ("presence", "presence_router"))
 
-        # Whether to update the user directory or not. This should be set to
-        # false only if we are updating the user directory in a worker
-        self.update_user_directory = config.get("update_user_directory", True)
-
         # whether to enable the media repository endpoints. This should be set
         # to false if the media repository is running as a separate endpoint;
         # doing so ensures that we will not run cache cleanup jobs on the

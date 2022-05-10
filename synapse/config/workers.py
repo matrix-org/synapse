@@ -311,6 +311,13 @@ class WorkerConfig(Config):
             new_option_name="notify_appservices_from_worker",
         )
 
+        self.should_update_user_directory = self._should_this_worker_perform_duty(
+            config,
+            legacy_master_option_name="update_user_directory",
+            legacy_worker_app_name="synapse.app.user_dir",
+            new_option_name="update_user_directory_from_worker",
+        )
+
     def _should_this_worker_perform_duty(
         self,
         config: Dict[str, Any],
