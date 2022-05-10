@@ -1325,8 +1325,8 @@ class RoomPowerLevelOverridesInPracticeTestCase(RoomBase):
         },
     )
     def test_with_config_override_normal_user_can_post_state_event(self) -> None:
-        # Given the server has config allowing normal users to post my event type
-        # And I am a normal member of a room
+        # Given the server has config allowing normal users to post my event type,
+        # and I am a normal member of a room
         room_id = self.helper.create_room_as("@some_other_guy:red")
         self.helper.join(room=room_id, user=self.user_id)
 
@@ -1375,9 +1375,9 @@ class RoomPowerLevelOverridesInPracticeTestCase(RoomBase):
         },
     )
     def test_specific_room_override_defeats_config_override(self) -> None:
-        # Given the server has config allowing normal users to post my event type
-        # And I am a normal member of a room
-        # But the room was created with special permissions for this event type
+        # Given the server has config allowing normal users to post my event type,
+        # and I am a normal member of a room,
+        # but the room was created with special permissions for this event type
         extra_content = {
             "power_level_content_override": {"events": {"custom.event": 1}},
         }
@@ -1410,8 +1410,8 @@ class RoomPowerLevelOverridesInPracticeTestCase(RoomBase):
         },
     )
     def test_config_override_applies_only_to_specific_preset(self) -> None:
-        # Given the server has config for public_chats
-        # And I am a normal member of a private_chat room
+        # Given the server has config for public_chats,
+        # and I am a normal member of a private_chat room
         room_id = self.helper.create_room_as("@some_other_guy:red", is_public=False)
         self.helper.invite(room=room_id, src="@some_other_guy:red", targ=self.user_id)
         self.helper.join(room=room_id, user=self.user_id)
