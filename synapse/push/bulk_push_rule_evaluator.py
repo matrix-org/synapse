@@ -267,6 +267,10 @@ class BulkPushRuleEvaluator:
 
         room_members = await self.store.get_joined_users_from_context(event, context)
 
+        room_member_count = await self.store.get_number_joined_users_in_room(
+            event.room_id
+        )
+
         (
             power_levels,
             sender_power_level,
@@ -278,7 +282,7 @@ class BulkPushRuleEvaluator:
 
         evaluator = PushRuleEvaluatorForEvent(
             event,
-            len(room_members),
+            room_member_count,
             sender_power_level,
             power_levels,
             relations,
