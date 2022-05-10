@@ -1246,7 +1246,7 @@ class RoomPowerLevelOverridesTestCase(RoomBase):
     def test_power_levels_with_server_and_room_overrides(self) -> None:
         """
         With a server configured to modify the room-level defaults,
-        Create a room, providing different overrides.
+        create a room, providing different overrides.
         Confirm that the room's power levels reflect both overrides, and
         choose the room overrides where they clash.
         """
