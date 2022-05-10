@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 import attr
 from frozendict import frozendict
+from typing_extensions import Literal
 
 from twisted.internet.defer import Deferred
 
@@ -106,7 +107,7 @@ class EventContext:
             incomplete state.
     """
 
-    rejected: Union[bool, str] = False
+    rejected: Union[Literal[False], str] = False
     _state_group: Optional[int] = None
     state_group_before_event: Optional[int] = None
     prev_group: Optional[int] = None
