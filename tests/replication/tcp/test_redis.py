@@ -12,7 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.replication.tcp.redis import RedisDirectTcpReplicationClientFactory
+try:
+    # We only import it to see if it's installed, so ignore the 'unused' import
+    import txredisapi  # noqa: F401
+
+    HAVE_TXREDISAPI = True
+except ImportError:
+    HAVE_TXREDISAPI = False
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.unittest import HomeserverTestCase
@@ -38,7 +44,12 @@ ALL_RDATA_CHANNELS = [
 
 
 class RedisTestCase(HomeserverTestCase):
+    if not HAVE_TXREDISAPI:
+        skip = "Redis extras not installed"
+
     def test_subscribed_to_enough_redis_channels(self) -> None:
+        from synapse.replication.tcp.redis import RedisDirectTcpReplicationClientFactory
+
         # The default main process is subscribed to USER_IP and all RDATA channels.
         self.assertCountEqual(
             RedisDirectTcpReplicationClientFactory.channels_to_subscribe_to_for_config(
@@ -52,7 +63,12 @@ class RedisTestCase(HomeserverTestCase):
 
 
 class RedisWorkerTestCase(BaseMultiWorkerStreamTestCase):
+    if not HAVE_TXREDISAPI:
+        skip = "Redis extras not installed"
+
     def test_background_worker_subscribed_to_user_ip(self) -> None:
+        from synapse.replication.tcp.redis import RedisDirectTcpReplicationClientFactory
+
         # The default main process is subscribed to USER_IP and all RDATA channels.
         worker1 = self.make_worker_hs(
             "synapse.app.generic_worker",
@@ -69,6 +85,8 @@ class RedisWorkerTestCase(BaseMultiWorkerStreamTestCase):
         )
 
     def test_non_background_worker_not_subscribed_to_user_ip(self) -> None:
+        from synapse.replication.tcp.redis import RedisDirectTcpReplicationClientFactory
+
         # The default main process is subscribed to USER_IP and all RDATA channels.
         worker2 = self.make_worker_hs(
             "synapse.app.generic_worker",
