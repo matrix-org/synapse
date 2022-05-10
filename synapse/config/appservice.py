@@ -90,7 +90,7 @@ def load_appservices(
                 logger.info("Loaded application service: %s", appservice)
                 appservices.append(appservice)
         except Exception as e:
-            logger.error("Failed to load appservice from '%s'", config_file, exc_info=e)
+            logger.exception("Failed to load appservice from '%s'", config_file)
             raise
     return appservices
 
