@@ -30,11 +30,9 @@ from tests.server import FakeChannel
 from tests.test_utils import make_awaitable
 from tests.unittest import override_config
 
-# (possibly experimental) login flows we expect to appear in the list after the normal
-# ones
+# Login flows we expect to appear in the list after the normal ones.
 ADDITIONAL_LOGIN_FLOWS = [
     {"type": "m.login.application_service"},
-    {"type": "uk.half-shot.msc2778.login.application_service"},
 ]
 
 # a mock instance which the dummy auth providers delegate to, so we can see what's going

@@ -1,1 +1,0 @@
-Use supervisord to supervise Postgres and Caddy in the Complement image to reduce restart time.

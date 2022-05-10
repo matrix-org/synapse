@@ -40,5 +40,9 @@ class ActionGenerator:
     async def handle_push_actions_for_event(
         self, event: EventBase, context: EventContext
     ) -> None:
+        if event.internal_metadata.is_outlier():
+            # This can happen due to out of band memberships
+            return
+
         with Measure(self.clock, "action_for_event_by_user"):
             await self.bulk_evaluator.action_for_event_by_user(event, context)

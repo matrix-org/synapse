@@ -121,10 +121,10 @@ class Thumbnailer:
         #
         # If the image has transparency, use RGBA instead.
         if self.image.mode in ["1", "L", "P"]:
-            mode = "RGB"
             if self.image.info.get("transparency", None) is not None:
-                mode = "RGBA"
-            self.image = self.image.convert(mode)
+                self.image = self.image.convert("RGBA")
+            else:
+                self.image = self.image.convert("RGB")
         return self.image.resize((width, height), Image.ANTIALIAS)
 
     def scale(self, width: int, height: int, output_type: str) -> BytesIO:

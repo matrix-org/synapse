@@ -860,7 +860,7 @@ class FederationEventHandler:
             evs = await self._store.get_events(
                 list(state_map.values()),
                 get_prev_content=False,
-                redact_behaviour=EventRedactBehaviour.AS_IS,
+                redact_behaviour=EventRedactBehaviour.as_is,
             )
             event_map.update(evs)
 
@@ -1423,7 +1423,7 @@ class FederationEventHandler:
                 # we're not bothering about room state, so flag the event as an outlier.
                 event.internal_metadata.outlier = True
 
-                context = EventContext.for_outlier()
+                context = EventContext.for_outlier(self._storage)
                 try:
                     validate_event_for_room_version(room_version_obj, event)
                     check_auth_rules_for_event(room_version_obj, event, auth)
@@ -1874,10 +1874,10 @@ class FederationEventHandler:
         )
 
         return EventContext.with_state(
+            storage=self._storage,
             state_group=state_group,
             state_group_before_event=context.state_group_before_event,
-            current_state_ids=current_state_ids,
-            prev_state_ids=prev_state_ids,
+            state_delta_due_to_event=state_updates,
             prev_group=prev_group,
             delta_ids=state_updates,
             partial_state=context.partial_state,

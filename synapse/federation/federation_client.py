@@ -618,7 +618,7 @@ class FederationClient(FederationBase):
         #
         # Dendrite returns a 404 (with a body of "404 page not found");
         # Conduit returns a 404 (with no body); and Synapse returns a 400
-        # with M_UNRECOGNISED.
+        # with M_UNRECOGNIZED.
         #
         # This needs to be rather specific as some endpoints truly do return 404
         # errors.
@@ -1426,6 +1426,8 @@ class FederationClient(FederationBase):
             room = res.get("room")
             if not isinstance(room, dict):
                 raise InvalidResponseError("'room' must be a dict")
+            if room.get("room_id") != room_id:
+                raise InvalidResponseError("wrong room returned in hierarchy response")
 
             # Validate children_state of the room.
             children_state = room.pop("children_state", [])

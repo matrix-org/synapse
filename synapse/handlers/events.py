@@ -164,7 +164,7 @@ class EventHandler:
             event.
         """
         redact_behaviour = (
-            EventRedactBehaviour.AS_IS if show_redacted else EventRedactBehaviour.REDACT
+            EventRedactBehaviour.as_is if show_redacted else EventRedactBehaviour.redact
         )
         event = await self.store.get_event(
             event_id, check_room_id=room_id, redact_behaviour=redact_behaviour
