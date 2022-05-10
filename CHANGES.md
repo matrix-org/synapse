@@ -93,7 +93,7 @@ Internal Changes
 - Fix scripts-dev to pass typechecking. ([\#12356](https://github.com/matrix-org/synapse/issues/12356))
 - Add some type hints to datastore. ([\#12485](https://github.com/matrix-org/synapse/issues/12485))
 - Remove unused `# type: ignore`s. ([\#12531](https://github.com/matrix-org/synapse/issues/12531))
-- Allow unused `#type: ignore` comments in bleeding edge CI jobs. ([\#12576](https://github.com/matrix-org/synapse/issues/12576))
+- Allow unused `# type: ignore` comments in bleeding edge CI jobs. ([\#12576](https://github.com/matrix-org/synapse/issues/12576))
 - Remove redundant lines of config from `mypy.ini`. ([\#12608](https://github.com/matrix-org/synapse/issues/12608))
 - Update to mypy 0.950. ([\#12650](https://github.com/matrix-org/synapse/issues/12650))
 - Use `Concatenate` to better annotate `_do_execute`. ([\#12666](https://github.com/matrix-org/synapse/issues/12666))
