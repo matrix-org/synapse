@@ -30,7 +30,7 @@ from synapse.server import HomeServer
 from synapse.types import JsonDict
 
 from tests import unittest
-from tests.http.server._base import EndpointCancellationTestCase
+from tests.http.server._base import EndpointCancellationTestHelperMixin
 
 
 def make_request(content):
@@ -107,7 +107,7 @@ class CancellableRestServlet(RestServlet):
 
 
 class TestRestServletCancellation(
-    unittest.HomeserverTestCase, EndpointCancellationTestCase
+    unittest.HomeserverTestCase, EndpointCancellationTestHelperMixin
 ):
     """Tests for `RestServlet` cancellation."""
 
