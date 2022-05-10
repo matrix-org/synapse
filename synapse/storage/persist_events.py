@@ -801,9 +801,7 @@ class EventsPersistenceStorage:
             delta_ids = state_group_deltas.get((old_state_group, new_state_group), None)
             if delta_ids is not None:
                 # We have a delta from the existing to new current state,
-                # so lets just return that. If we happen to already have
-                # the current state in memory then lets also return that,
-                # but it doesn't matter if we don't.
+                # so lets just return that.
                 return None, delta_ids, new_latest_event_ids
 
         # Now that we have calculated new_state_groups we need to get
