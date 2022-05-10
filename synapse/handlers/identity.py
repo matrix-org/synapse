@@ -92,7 +92,7 @@ class IdentityHandler:
         """
 
         await self._3pid_validation_ratelimiter_ip.ratelimit(
-            None, (medium, request.getClientIP())
+            None, (medium, request.getClientAddress().host)
         )
         await self._3pid_validation_ratelimiter_address.ratelimit(
             None, (medium, address)

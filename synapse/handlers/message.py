@@ -1407,7 +1407,7 @@ class EventCreationHandler:
 
                 original_event = await self.store.get_event(
                     event.redacts,
-                    redact_behaviour=EventRedactBehaviour.AS_IS,
+                    redact_behaviour=EventRedactBehaviour.as_is,
                     get_prev_content=False,
                     allow_rejected=False,
                     allow_none=True,
@@ -1427,7 +1427,7 @@ class EventCreationHandler:
             # Validate a newly added alias or newly added alt_aliases.
 
             original_alias = None
-            original_alt_aliases: List[str] = []
+            original_alt_aliases: object = []
 
             original_event_id = event.unsigned.get("replaces_state")
             if original_event_id:
@@ -1455,6 +1455,7 @@ class EventCreationHandler:
             # If the old version of alt_aliases is of an unknown form,
             # completely replace it.
             if not isinstance(original_alt_aliases, (list, tuple)):
+                # TODO: check that the original_alt_aliases' entries are all strings
                 original_alt_aliases = []
 
             # Check that each alias is currently valid.
@@ -1504,7 +1505,7 @@ class EventCreationHandler:
 
             original_event = await self.store.get_event(
                 event.redacts,
-                redact_behaviour=EventRedactBehaviour.AS_IS,
+                redact_behaviour=EventRedactBehaviour.as_is,
                 get_prev_content=False,
                 allow_rejected=False,
                 allow_none=True,
