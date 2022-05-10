@@ -4,7 +4,7 @@ Synapse 1.59.0rc1 (2022-05-10)
 This release makes several changes that server administrators should be aware of:
 
 - Device name lookup over federation is now disabled by default. ([\#12616](https://github.com/matrix-org/synapse/issues/12616))
-- The `synapse.app.appservice` is now deprecated. ([\#12452])(https://github.com/matrix-org/synapse/pull/12452))
+- The `synapse.app.appservice` is now deprecated. ([\#12452](https://github.com/matrix-org/synapse/issues/12452))
 
 See [the upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1590) for more details.
 
