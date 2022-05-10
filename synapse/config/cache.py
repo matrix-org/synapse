@@ -118,6 +118,8 @@ class CacheConfig(Config):
         ## Caching ##
 
         # Caching can be configured through the following options.
+        # This configuration can be reloaded while the application
+        # is running, by sending a SIGHUP signal to the Synapse process.
         #
         # A cache 'factor' is a multiplier that can be applied to each of
         # Synapse's caches in order to increase or decrease the maximum
