@@ -1658,8 +1658,12 @@ class PersistEventsStore:
         txn.call_after(prefill)
 
     def _store_redaction(self, txn: LoggingTransaction, event: EventBase) -> None:
-        # Invalidate the caches for the redacted event, note that these caches
-        # are also cleared as part of event replication in _invalidate_caches_for_event.
+        """Invalidate the caches for the redacted event.
+
+        Note that these caches are also cleared as part of event replication in
+        _invalidate_caches_for_event.
+        """
+        assert event.redacts is not None
         txn.call_after(self.store._invalidate_get_event_cache, event.redacts)
         txn.call_after(self.store.get_relations_for_event.invalidate, (event.redacts,))
         txn.call_after(self.store.get_applicable_edit.invalidate, (event.redacts,))
