@@ -459,7 +459,7 @@ class PaginationHandler:
             )
             # We expect `/messages` to use historic pagination tokens by default but
             # `/messages` should still works with live tokens when manually provided.
-            assert from_token.room_key.topological
+            assert from_token.room_key.topological is not None
 
         if pagin_config.limit is None:
             # This shouldn't happen as we've set a default limit before this
