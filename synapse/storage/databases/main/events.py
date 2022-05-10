@@ -28,7 +28,6 @@ from typing import (
     Sequence,
     Set,
     Tuple,
-    Union,
 )
 
 import attr
@@ -2227,7 +2226,7 @@ class PersistEventsStore:
         )
 
     def _store_rejections_txn(
-        self, txn: LoggingTransaction, event_id: str, reason: Union[bool, str]
+        self, txn: LoggingTransaction, event_id: str, reason: str
     ) -> None:
         self.db_pool.simple_insert_txn(
             txn,
