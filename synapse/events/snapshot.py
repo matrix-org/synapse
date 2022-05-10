@@ -13,10 +13,9 @@
 # limitations under the License.
 from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
-from typing_extensions import Literal
-
 import attr
 from frozendict import frozendict
+from typing_extensions import Literal
 
 from twisted.internet.defer import Deferred
 
