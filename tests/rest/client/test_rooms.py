@@ -925,7 +925,7 @@ class RoomJoinTestCase(RoomBase):
         ) -> bool:
             return return_value
 
-        callback_mock = Mock(side_effect=user_may_join_room)
+        callback_mock = Mock(side_effect=user_may_join_room, spec=lambda *x: None)
         self.hs.get_spam_checker()._user_may_join_room_callbacks.append(callback_mock)
 
         # Join a first room, without being invited to it.
@@ -2598,7 +2598,9 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
 
         # Add a mock to the spamchecker callbacks for user_may_send_3pid_invite. Make it
         # allow everything for now.
-        mock = Mock(return_value=make_awaitable(True))
+        # `spec` argument is needed for this function mock to have `__qualname__`, which
+        # is needed for `Measure` metrics buried in SpamChecker.
+        mock = Mock(return_value=make_awaitable(True), spec=lambda *x: None)
         self.hs.get_spam_checker()._user_may_send_3pid_invite_callbacks.append(mock)
 
         # Send a 3PID invite into the room and check that it succeeded.
