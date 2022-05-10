@@ -59,6 +59,7 @@ from typing import (
     Optional,
     Set,
     Tuple,
+    Union,
 )
 
 from synapse.appservice import (
@@ -68,6 +69,7 @@ from synapse.appservice import (
     TransactionUnusedFallbackKeys,
 )
 from synapse.appservice.api import ApplicationServiceApi
+from synapse.config.appservice import AppServiceConfig
 from synapse.events import EventBase
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -102,7 +104,9 @@ class ApplicationServiceScheduler:
         self.store = hs.get_datastores().main
         self.as_api = hs.get_application_service_api()
 
-        self.txn_ctrl = _TransactionController(self.clock, self.store, self.as_api)
+        self.txn_ctrl = _TransactionController(
+            self.clock, self.store, self.as_api, hs.config.appservice
+        )
         self.queuer = _ServiceQueuer(self.txn_ctrl, self.clock, hs)
 
     async def start(self) -> None:
@@ -347,10 +351,17 @@ class _TransactionController:
     (Note we have only have one of these in the homeserver.)
     """
 
-    def __init__(self, clock: Clock, store: DataStore, as_api: ApplicationServiceApi):
+    def __init__(
+        self,
+        clock: Clock,
+        store: DataStore,
+        as_api: ApplicationServiceApi,
+        as_config: AppServiceConfig,
+    ):
         self.clock = clock
         self.store = store
         self.as_api = as_api
+        self.as_config = as_config
 
         # map from service id to recoverer instance
         self.recoverers: Dict[str, "_Recoverer"] = {}
@@ -430,7 +441,12 @@ class _TransactionController:
         logger.info("Starting recoverer for AS ID %s", service.id)
         assert service.id not in self.recoverers
         recoverer = self.RECOVERER_CLASS(
-            self.clock, self.store, self.as_api, service, self.on_recovered
+            self.clock,
+            self.store,
+            self.as_api,
+            service,
+            self.on_recovered,
+            self.as_config.appservice_max_backoff,
         )
         self.recoverers[service.id] = recoverer
         recoverer.recover()
@@ -452,6 +468,7 @@ class _Recoverer:
         as_api (synapse.appservice.api.ApplicationServiceApi):
         service (synapse.appservice.ApplicationService): the service we are managing
         callback (callable[_Recoverer]): called once the service recovers.
+        max_backoff (int|None): maximum interval between retries
     """
 
     def __init__(
@@ -461,6 +478,7 @@ class _Recoverer:
         as_api: ApplicationServiceApi,
         service: ApplicationService,
         callback: Callable[["_Recoverer"], Awaitable[None]],
+        max_backoff: Union[int, None],
     ):
         self.clock = clock
         self.store = store
@@ -468,6 +486,7 @@ class _Recoverer:
         self.service = service
         self.callback = callback
         self.backoff_counter = 1
+        self.max_backoff = max_backoff
 
     def recover(self) -> None:
         def _retry() -> None:
@@ -476,6 +495,8 @@ class _Recoverer:
             )
 
         delay = 2**self.backoff_counter
+        if self.max_backoff is not None and delay > self.max_backoff:
+            delay = self.max_backoff
         logger.info("Scheduling retries on %s in %fs", self.service.id, delay)
         self.clock.call_later(delay, _retry)
 

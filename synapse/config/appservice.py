@@ -34,6 +34,7 @@ class AppServiceConfig(Config):
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.app_service_config_files = config.get("app_service_config_files", [])
         self.track_appservice_user_ips = config.get("track_appservice_user_ips", False)
+        self.appservice_max_backoff = config.get("appservice_max_backoff", None)
 
     def generate_config_section(cls, **kwargs: Any) -> str:
         return """\
@@ -47,6 +48,12 @@ class AppServiceConfig(Config):
         # enables MAU tracking for application service users.
         #
         #track_appservice_user_ips: true
+
+        # Set to establish maximum backoff (in seconds) between HS -> AS connection attempts.
+        # Upon failing to push appservice events the homeserver will wait
+        # an increasing amount of seconds between retries. This sets an upper limit of that (in seconds)
+        #
+        #appservice_max_backoff: 60
         """
 
 
