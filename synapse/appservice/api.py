@@ -17,6 +17,7 @@ import urllib.parse
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
 
 from prometheus_client import Counter
+from typing_extensions import TypeGuard
 
 from synapse.api.constants import EventTypes, Membership, ThirdPartyEntityKind
 from synapse.api.errors import CodeMessageException
@@ -66,7 +67,7 @@ def _is_valid_3pe_metadata(info: JsonDict) -> bool:
     return True
 
 
-def _is_valid_3pe_result(r: JsonDict, field: str) -> bool:
+def _is_valid_3pe_result(r: object, field: str) -> TypeGuard[JsonDict]:
     if not isinstance(r, dict):
         return False
 

@@ -1,0 +1,1 @@
+Protect module callbacks with read semantics against cancellation.

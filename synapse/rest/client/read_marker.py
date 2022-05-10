@@ -16,7 +16,6 @@ import logging
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.constants import ReceiptTypes
-from synapse.api.errors import SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -50,17 +49,21 @@ class ReadMarkerRestServlet(RestServlet):
 
         body = parse_json_object_from_request(request)
 
-        valid_receipt_types = {ReceiptTypes.READ, ReceiptTypes.FULLY_READ}
-        if self.config.experimental.msc2285_enabled:
-            valid_receipt_types.add(ReceiptTypes.READ_PRIVATE)
+        valid_receipt_types = {
+            ReceiptTypes.READ,
+            ReceiptTypes.FULLY_READ,
+            ReceiptTypes.READ_PRIVATE,
+        }
 
-        if set(body.keys()) > valid_receipt_types:
-            raise SynapseError(
-                400,
-                "Receipt type must be 'm.read', 'org.matrix.msc2285.read.private' or 'm.fully_read'"
-                if self.config.experimental.msc2285_enabled
-                else "Receipt type must be 'm.read' or 'm.fully_read'",
-            )
+        unrecognized_types = set(body.keys()) - valid_receipt_types
+        if unrecognized_types:
+            # It's fine if there are unrecognized receipt types, but let's log
+            # it to help debug clients that have typoed the receipt type.
+            #
+            # We specifically *don't* error here, as a) it stops us processing
+            # the valid receipts, and b) we need to be extensible on receipt
+            # types.
+            logger.info("Ignoring unrecognized receipt types: %s", unrecognized_types)
 
         read_event_id = body.get(ReceiptTypes.READ, None)
         if read_event_id:
