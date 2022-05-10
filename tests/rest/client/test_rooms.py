@@ -1136,33 +1136,6 @@ class RoomPowerLevelOverridesTestCase(RoomBase):
             room_id, "m.room.power_levels", self.admin_access_token
         )
 
-    def test_default_power_levels_without_override(self) -> None:
-        room_id = self.helper.create_room_as(self.user_id)
-        self.assertEqual(
-            {
-                "ban": 50,
-                "events": {
-                    "m.room.avatar": 50,
-                    "m.room.canonical_alias": 50,
-                    "m.room.encryption": 100,
-                    "m.room.history_visibility": 100,
-                    "m.room.name": 50,
-                    "m.room.power_levels": 100,
-                    "m.room.server_acl": 100,
-                    "m.room.tombstone": 100,
-                },
-                "events_default": 0,
-                "historical": 100,
-                "invite": 50,
-                "kick": 50,
-                "redact": 50,
-                "state_default": 50,
-                "users": {"@sid1:red": 100},
-                "users_default": 0,
-            },
-            self.power_levels(room_id),
-        )
-
     def test_default_power_levels_with_room_override(self) -> None:
         """
         Create a room, providing power level overrides.
@@ -1180,21 +1153,8 @@ class RoomPowerLevelOverridesTestCase(RoomBase):
             },
         )
         self.assertEqual(
-            {
-                "ban": 50,
-                "events": {
-                    "custom.event": 0,
-                },
-                "events_default": 0,
-                "historical": 100,
-                "invite": 50,
-                "kick": 50,
-                "redact": 50,
-                "state_default": 50,
-                "users": {"@sid1:red": 100},
-                "users_default": 0,
-            },
-            self.power_levels(room_id),
+            { "custom.event": 0, },
+            self.power_levels(room_id)["events"],
         )
 
     @unittest.override_config(
@@ -1217,20 +1177,9 @@ class RoomPowerLevelOverridesTestCase(RoomBase):
         room_id = self.helper.create_room_as(self.user_id)
         self.assertEqual(
             {
-                "ban": 50,
-                "events": {
-                    "custom.event": 0,
-                },
-                "events_default": 0,
-                "historical": 100,
-                "invite": 50,
-                "kick": 50,
-                "redact": 50,
-                "state_default": 50,
-                "users": {"@sid1:red": 100},
-                "users_default": 0,
+                "custom.event": 0,
             },
-            self.power_levels(room_id),
+            self.power_levels(room_id)["events"],
         )
 
     @unittest.override_config(
@@ -1258,23 +1207,14 @@ class RoomPowerLevelOverridesTestCase(RoomBase):
             },
         )
 
+        # Room override wins over server config
         self.assertEqual(
-            {
-                "ban": 13,  # From server config override
-                "events": {
-                    "room.event": 0,  # From room override
-                },
-                "events_default": 0,
-                "historical": 100,
-                "invite": 50,
-                "kick": 50,
-                "redact": 50,
-                "state_default": 50,
-                "users": {"@sid1:red": 100},
-                "users_default": 0,
-            },
-            self.power_levels(room_id),
+            {"room.event": 0},
+            self.power_levels(room_id)["events"],
         )
+
+        # But where there is no room override, server config wins
+        self.assertEqual(13, self.power_levels(room_id)["ban"])
 
 
 class RoomPowerLevelOverridesInPracticeTestCase(RoomBase):
