@@ -778,6 +778,23 @@ caches:
   #
   #cache_entry_ttl: 30m
 
+  # This flag enables cache autotuning, and is further specified by the sub-options `max_cache_memory_usage`,
+  # `target_cache_memory_usage`, `min_cache_ttl`. These flags work in conjunction with each other to maintain
+  # a balance between cache memory usage and cache entry availability. You must be using jemalloc to utilize
+  # this option, and all three of the options must be specified for this feature to work.
+  #cache_autotuning:
+    # This flag sets a ceiling on much memory the cache can use before caches begin to be continuously evicted.
+    # They will continue to be evicted until the memory usage drops below the `target_memory_usage`, set in
+    # the flag below.
+    #max_cache_memory_usage:
+
+    # This flag sets a rough target for the desired memory usage of the caches.
+    #target_cache_memory_usage:
+
+    # This flag sets a floor for the minimum time that cache entries must exist in the cache, and is only applied
+    # caches are actively being evicted/`max_cache_memory_usage` has been exceeded.
+    #min_cache_ttl:
+
   # Controls how long the results of a /sync request are cached for after
   # a successful response is returned. A higher duration can help clients with
   # intermittent connections, at the cost of higher memory usage.
