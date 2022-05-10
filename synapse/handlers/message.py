@@ -757,6 +757,10 @@ class EventCreationHandler:
             The previous version of the event is returned, if it is found in the
             event context. Otherwise, None is returned.
         """
+        if event.internal_metadata.is_outlier():
+            # This can happen due to out of band memberships
+            return None
+
         prev_state_ids = await context.get_prev_state_ids()
         prev_event_id = prev_state_ids.get((event.type, event.state_key))
         if not prev_event_id:

@@ -57,6 +57,9 @@ class EventContext:
             If ``state_group`` is None (ie, the event is an outlier),
             ``state_group_before_event`` will always also be ``None``.
 
+        delta_before_after: If `state_group` and `state_group_before_event` are not None
+            then this is the delta of the state between the two groups.
+
         prev_group: If it is known, ``state_group``'s prev_group. Note that this being
             None does not necessarily mean that ``state_group`` does not have
             a prev_group!
@@ -75,30 +78,6 @@ class EventContext:
         app_service: If this event is being sent by a (local) application service, that
             app service.
 
-        _current_state_ids: The room state map, including this event - ie, the state
-            in ``state_group``.
-
-            (type, state_key) -> event_id
-
-            For an outlier, this is {}
-
-            Note that this is a private attribute: it should be accessed via
-            ``get_current_state_ids``. _AsyncEventContext impl calculates this
-            on-demand: it will be None until that happens.
-
-        _prev_state_ids: The room state map, excluding this event - ie, the state
-            in ``state_group_before_event``. For a non-state
-            event, this will be the same as _current_state_events.
-
-            Note that it is a completely different thing to prev_group!
-
-            (type, state_key) -> event_id
-
-            For an outlier, this is {}
-
-            As with _current_state_ids, this is a private attribute. It should be
-            accessed via get_prev_state_ids.
-
         partial_state: if True, we may be storing this event with a temporary,
             incomplete state.
     """
@@ -107,12 +86,10 @@ class EventContext:
     rejected: Union[bool, str] = False
     _state_group: Optional[int] = None
     state_group_before_event: Optional[int] = None
+    _delta_before_after: Optional[StateMap[str]] = None
     prev_group: Optional[int] = None
     delta_ids: Optional[StateMap[str]] = None
     app_service: Optional[ApplicationService] = None
-
-    _current_state_ids: Optional[StateMap[str]] = None
-    _prev_state_ids: Optional[StateMap[str]] = None
 
     partial_state: bool = False
 
@@ -121,8 +98,7 @@ class EventContext:
         storage: "Storage",
         state_group: Optional[int],
         state_group_before_event: Optional[int],
-        current_state_ids: Optional[StateMap[str]],
-        prev_state_ids: Optional[StateMap[str]],
+        delta_before_after: Optional[StateMap[str]],
         partial_state: bool,
         prev_group: Optional[int] = None,
         delta_ids: Optional[StateMap[str]] = None,
@@ -131,6 +107,7 @@ class EventContext:
             storage=storage,
             state_group=state_group,
             state_group_before_event=state_group_before_event,
+            delta_before_after=delta_before_after,
             prev_group=prev_group,
             delta_ids=delta_ids,
             partial_state=partial_state,
@@ -141,11 +118,7 @@ class EventContext:
         storage: "Storage",
     ) -> "EventContext":
         """Return an EventContext instance suitable for persisting an outlier event"""
-        return EventContext(
-            storage=storage,
-            current_state_ids={},
-            prev_state_ids={},
-        )
+        return EventContext(storage=storage)
 
     async def serialize(self, event: EventBase, store: "DataStore") -> JsonDict:
         """Converts self to a type that can be serialized as JSON, and then
@@ -163,6 +136,7 @@ class EventContext:
             "state_group_before_event": self.state_group_before_event,
             "rejected": self.rejected,
             "prev_group": self.prev_group,
+            "delta_before_after": _encode_state_dict(self._delta_before_after),
             "delta_ids": _encode_state_dict(self.delta_ids),
             "app_service_id": self.app_service.id if self.app_service else None,
             "partial_state": self.partial_state,
@@ -187,6 +161,7 @@ class EventContext:
             state_group=input["state_group"],
             state_group_before_event=input["state_group_before_event"],
             prev_group=input["prev_group"],
+            delta_before_after=_decode_state_dict(input["delta_before_after"]),
             delta_ids=_decode_state_dict(input["delta_ids"]),
             rejected=input["rejected"],
             partial_state=input.get("partial_state", False),
@@ -234,10 +209,15 @@ class EventContext:
         if self.rejected:
             raise RuntimeError("Attempt to access state_ids of rejected event")
 
-        if self._state_group is None:
-            return None
+        assert self._delta_before_after is not None
 
-        return await self._storage.state.get_state_ids_for_group(self._state_group)
+        prev_state_ids = await self.get_prev_state_ids()
+
+        if self._delta_before_after:
+            prev_state_ids = dict(prev_state_ids)
+            prev_state_ids.update(self._delta_before_after)
+
+        return prev_state_ids
 
     async def get_prev_state_ids(self) -> StateMap[str]:
         """
@@ -252,7 +232,7 @@ class EventContext:
             Maps a (type, state_key) to the event ID of the state event matching
             this tuple.
         """
-        assert self.state_group_before_event
+        assert self.state_group_before_event is not None
         return await self._storage.state.get_state_ids_for_group(
             self.state_group_before_event
         )
