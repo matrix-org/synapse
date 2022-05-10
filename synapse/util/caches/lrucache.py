@@ -143,7 +143,6 @@ async def _expire_old_entries(
             )
 
     while node is not GLOBAL_ROOT:
-
         # Only the root node isn't a `_TimedListNode`.
         assert isinstance(node, _TimedListNode)
 
