@@ -203,19 +203,29 @@ class ApplicationServiceTransactionWorkerStore(
         """Get the application service state.
 
         Args:
-            service: The service whose state to set.
+            service: The service whose state to get.
         Returns:
-            An ApplicationServiceState or none.
+            An ApplicationServiceState, or None if we have yet to attempt any
+            transactions to the AS.
         """
-        result = await self.db_pool.simple_select_one(
+        # if we have created transactions for this AS but not yet attempted to send
+        # them, we will have a row in the table with state=NULL (recording the stream
+        # positions we have processed up to).
+        #
+        # On the other hand, if we have yet to create any transactions for this AS at
+        # all, then there will be no row for the AS.
+        #
+        # In either case, we return None to indicate "we don't yet know the state of
+        # this AS".
+        result = await self.db_pool.simple_select_one_onecol(
             "application_services_state",
             {"as_id": service.id},
-            ["state"],
+            retcol="state",
             allow_none=True,
             desc="get_appservice_state",
         )
         if result:
-            return ApplicationServiceState(result.get("state"))
+            return ApplicationServiceState(result)
         return None
 
     async def set_appservice_state(
