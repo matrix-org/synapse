@@ -63,6 +63,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
         self.other_user = self.register_user("user", "pass")
         self.other_user_token = self.login("user", "pass")
 
+    @unittest.override_config({"experimental_features": {"groups_enabled": True}})
     def test_delete_group(self) -> None:
         # Create a new group
         channel = self.make_request(

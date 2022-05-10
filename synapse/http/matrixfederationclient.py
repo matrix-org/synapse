@@ -704,6 +704,9 @@ class MatrixFederationHttpClient:
         Returns:
             A list of headers to be added as "Authorization:" headers
         """
+        if destination is None and destination_is is None:
+            raise ValueError("destination and destination_is cannot both be None!")
+
         request: JsonDict = {
             "method": method.decode("ascii"),
             "uri": url_bytes.decode("ascii"),
@@ -726,8 +729,13 @@ class MatrixFederationHttpClient:
         for key, sig in request["signatures"][self.server_name].items():
             auth_headers.append(
                 (
-                    'X-Matrix origin=%s,key="%s",sig="%s"'
-                    % (self.server_name, key, sig)
+                    'X-Matrix origin=%s,key="%s",sig="%s",destination="%s"'
+                    % (
+                        self.server_name,
+                        key,
+                        sig,
+                        request.get("destination") or request["destination_is"],
+                    )
                 ).encode("ascii")
             )
         return auth_headers

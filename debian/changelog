@@ -1,3 +1,30 @@
+matrix-synapse-py3 (1.58.1) stable; urgency=medium
+
+  * Include python dependencies from the `systemd` and `cache_memory` extras package groups, which
+    were incorrectly omitted from the 1.58.0 package.
+  * New Synapse release 1.58.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 05 May 2022 14:58:23 +0100
+
+matrix-synapse-py3 (1.58.0) stable; urgency=medium
+
+  * New Synapse release 1.58.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 03 May 2022 10:52:58 +0100
+
+matrix-synapse-py3 (1.58.0~rc2) stable; urgency=medium
+
+  * New Synapse release 1.58.0rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 26 Apr 2022 17:14:56 +0100
+
+matrix-synapse-py3 (1.58.0~rc1) stable; urgency=medium
+
+  * Use poetry to manage the bundled virtualenv included with this package.
+  * New Synapse release 1.58.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 26 Apr 2022 11:15:20 +0100
+
 matrix-synapse-py3 (1.57.1) stable; urgency=medium
 
   * New synapse release 1.57.1.

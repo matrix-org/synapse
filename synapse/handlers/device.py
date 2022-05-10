@@ -291,12 +291,6 @@ class DeviceHandler(DeviceWorkerHandler):
         # On start up check if there are any updates pending.
         hs.get_reactor().callWhenRunning(self._handle_new_device_update_async)
 
-        # Used to decide if we calculate outbound pokes up front or not. By
-        # default we do to allow safely downgrading Synapse.
-        self.use_new_device_lists_changes_in_room = (
-            hs.config.server.use_new_device_lists_changes_in_room
-        )
-
     def _check_device_name_length(self, name: Optional[str]) -> None:
         """
         Checks whether a device name is longer than the maximum allowed length.
@@ -490,23 +484,9 @@ class DeviceHandler(DeviceWorkerHandler):
 
         room_ids = await self.store.get_rooms_for_user(user_id)
 
-        hosts: Optional[Set[str]] = None
-        if not self.use_new_device_lists_changes_in_room:
-            hosts = set()
-
-            if self.hs.is_mine_id(user_id):
-                for room_id in room_ids:
-                    joined_users = await self.store.get_users_in_room(room_id)
-                    hosts.update(get_domain_from_id(u) for u in joined_users)
-
-                set_tag("target_hosts", hosts)
-
-                hosts.discard(self.server_name)
-
         position = await self.store.add_device_change_to_streams(
             user_id,
             device_ids,
-            hosts=hosts,
             room_ids=room_ids,
         )
 
@@ -525,16 +505,9 @@ class DeviceHandler(DeviceWorkerHandler):
             "device_list_key", position, users={user_id}, rooms=room_ids
         )
 
-        # We may need to do some processing asynchronously.
-        self._handle_new_device_update_async()
-
-        if hosts:
-            logger.info(
-                "Sending device list update notif for %r to: %r", user_id, hosts
-            )
-            for host in hosts:
-                self.federation_sender.send_device_messages(host, immediate=False)
-                log_kv({"message": "sent device update to host", "host": host})
+        # We may need to do some processing asynchronously for local user IDs.
+        if self.hs.is_mine_id(user_id):
+            self._handle_new_device_update_async()
 
     async def notify_user_signature_update(
         self, from_user_id: str, user_ids: List[str]
@@ -677,9 +650,13 @@ class DeviceHandler(DeviceWorkerHandler):
                         return
 
                 for user_id, device_id, room_id, stream_id, opentracing_context in rows:
-                    joined_user_ids = await self.store.get_users_in_room(room_id)
-                    hosts = {get_domain_from_id(u) for u in joined_user_ids}
-                    hosts.discard(self.server_name)
+                    hosts = set()
+
+                    # Ignore any users that aren't ours
+                    if self.hs.is_mine_id(user_id):
+                        joined_user_ids = await self.store.get_users_in_room(room_id)
+                        hosts = {get_domain_from_id(u) for u in joined_user_ids}
+                        hosts.discard(self.server_name)
 
                     # Check if we've already sent this update to some hosts
                     if current_stream_id == stream_id:
@@ -707,9 +684,12 @@ class DeviceHandler(DeviceWorkerHandler):
                             self.federation_sender.send_device_messages(
                                 host, immediate=False
                             )
-                            log_kv(
-                                {"message": "sent device update to host", "host": host}
-                            )
+                            # TODO: when called, this isn't in a logging context.
+                            # This leads to log spam, sentry event spam, and massive
+                            # memory usage. See #12552.
+                            # log_kv(
+                            #     {"message": "sent device update to host", "host": host}
+                            # )
 
                     if current_stream_id != stream_id:
                         # Clear the set of hosts we've already sent to as we're

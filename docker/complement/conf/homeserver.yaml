@@ -103,8 +103,10 @@ experimental_features:
   spaces_enabled: true
   # Enable history backfilling support
   msc2716_enabled: true
-  # server-side support for partial state in /send_join
+  # server-side support for partial state in /send_join responses
   msc3706_enabled: true
+  # client-side support for partial state in /send_join responses
+  faster_joins: true
   # Enable jump to date endpoint
   msc3030_enabled: true
 
