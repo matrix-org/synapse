@@ -174,7 +174,7 @@ async def _expire_old_entries(
         cache_entry.drop_from_cache()
 
         # Check mem allocation periodically if we are evicting a bunch of caches
-        if jemalloc_interface and autotune_config and (i + 1) % 100 == 0:
+        if jemalloc_interface and evicting_due_to_memory and (i + 1) % 100 == 0:
             try:
                 mem_usage = jemalloc_interface.get_stat("allocated")
                 assert target_cache_memory_usage is not None
