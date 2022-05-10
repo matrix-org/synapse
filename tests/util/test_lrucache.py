@@ -320,9 +320,17 @@ class TimeEvictionTestCase(unittest.HomeserverTestCase):
 
 
 class MemoryEvictionTestCase(unittest.HomeserverTestCase):
-    @override_config({"caches": {
-        "cache_autotuning": {"max_cache_memory_usage": "700M", "target_cache_memory_usage": "500M",
-                             "min_cache_ttl": "5m"}}})
+    @override_config(
+        {
+            "caches": {
+                "cache_autotuning": {
+                    "max_cache_memory_usage": "700M",
+                    "target_cache_memory_usage": "500M",
+                    "min_cache_ttl": "5m",
+                }
+            }
+        }
+    )
     @patch("synapse.util.caches.lrucache.get_jemalloc_stats")
     def test_evict_memory(self, jemalloc_interface) -> None:
         mock_jemalloc_class = Mock(spec=JemallocStats)

@@ -117,7 +117,9 @@ async def _expire_old_entries(
     if autotune_config:
         max_cache_memory_usage = autotune_config.get("max_cache_memory_usage")
         target_cache_memory_usage = autotune_config.get("target_cache_memory_usage")
-        min_cache_ttl = autotune_config.get("min_cache_ttl")/1000
+        min_cache_ttl = autotune_config.get("min_cache_ttl")
+        assert min_cache_ttl is not None
+        min_cache_ttl = min_cache_ttl / 1000
 
     now = int(clock.time())
     node = GLOBAL_ROOT.prev_node
@@ -134,11 +136,14 @@ async def _expire_old_entries(
     if jemalloc_interface and autotune_config:
         try:
             mem_usage = jemalloc_interface.get_stat("allocated")
+            assert max_cache_memory_usage is not None
             if mem_usage > max_cache_memory_usage:
                 logger.info("Begin memory-based cache eviction.")
                 evicting_due_to_memory = True
-        except:
-            logger.warning("Unable to read allocated memory, skipping memory-based cache eviction.")
+        except Exception:
+            logger.warning(
+                "Unable to read allocated memory, skipping memory-based cache eviction."
+            )
 
     while node is not GLOBAL_ROOT:
 
@@ -154,6 +159,7 @@ async def _expire_old_entries(
             break
 
         # if entry is newer than min_cache_entry_ttl then do not evict and don't evict anything newer
+        assert min_cache_ttl is not None
         if evicting_due_to_memory and now - node.last_access_ts_secs < min_cache_ttl:
             break
 
@@ -171,11 +177,14 @@ async def _expire_old_entries(
         if jemalloc_interface and autotune_config and (i + 1) % 100 == 0:
             try:
                 mem_usage = jemalloc_interface.get_stat("allocated")
+                assert target_cache_memory_usage is not None
                 if mem_usage < target_cache_memory_usage:
                     evicting_due_to_memory = False
                     logger.info("Stop memory-based cache eviction.")
-            except:
-                logger.warning("Unable to read allocated memory, this may affect memory-based cache eviction.")
+            except Exception:
+                logger.warning(
+                    "Unable to read allocated memory, this may affect memory-based cache eviction."
+                )
 
         # If we do lots of work at once we yield to allow other stuff to happen.
         if (i + 1) % 10000 == 0:

@@ -166,10 +166,10 @@ class CacheConfig(Config):
           # This flag enables cache autotuning, and is further specified by the sub-options `max_cache_memory_usage`,
           # `target_cache_memory_usage`, `min_cache_ttl`. These flags work in conjunction with each other to maintain
           # a balance between cache memory usage and cache entry availability. You must be using jemalloc to utilize
-          # this option.
+          # this option, and all three of the options must be specified for this feature to work.
           #cache_autotuning:
             # This flag sets a ceiling on much memory the cache can use before caches begin to be continuously evicted.
-            # They will continue to be evicted until the memory usage drops below the `target_memory_useage`, set in
+            # They will continue to be evicted until the memory usage drops below the `target_memory_usage`, set in
             # the flag below.
             #max_cache_memory_usage:
 
