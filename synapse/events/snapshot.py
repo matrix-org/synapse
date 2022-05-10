@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 import attr
 from frozendict import frozendict
+from typing_extensions import Literal
 
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
@@ -83,7 +84,7 @@ class EventContext:
     """
 
     _storage: "Storage"
-    rejected: Union[bool, str] = False
+    rejected: Union[Literal[False], str] = False
     _state_group: Optional[int] = None
     state_group_before_event: Optional[int] = None
     _delta_before_after: Optional[StateMap[str]] = None
