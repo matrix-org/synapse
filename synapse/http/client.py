@@ -348,7 +348,7 @@ class SimpleHttpClient:
         # XXX: The justification for using the cache factor here is that larger instances
         # will need both more cache and more connections.
         # Still, this should probably be a separate dial
-        pool.maxPersistentPerHost = max((100 * hs.config.caches.global_factor, 5))
+        pool.maxPersistentPerHost = max(int(100 * hs.config.caches.global_factor), 5)
         pool.cachedConnectionTimeout = 2 * 60
 
         self.agent: IAgent = ProxyAgent(

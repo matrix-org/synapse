@@ -96,6 +96,13 @@ class CacheConfig(Config):
     section = "caches"
     _environ = os.environ
 
+    event_cache_size: int
+    cache_factors: Dict[str, float]
+    global_factor: float
+    track_memory_usage: bool
+    expiry_time_msec: Optional[int]
+    sync_response_cache_duration: int
+
     @staticmethod
     def reset() -> None:
         """Resets the caches to their defaults. Used for tests."""
@@ -177,7 +184,7 @@ class CacheConfig(Config):
         self.event_cache_size = self.parse_size(
             config.get("event_cache_size", _DEFAULT_EVENT_CACHE_SIZE)
         )
-        self.cache_factors: Dict[str, float] = {}
+        self.cache_factors = {}
 
         cache_config = config.get("caches") or {}
         self.global_factor = cache_config.get("global_factor", _DEFAULT_FACTOR_SIZE)
@@ -228,7 +235,7 @@ class CacheConfig(Config):
         cache_entry_ttl = cache_config.get("cache_entry_ttl", "30m")
 
         if expire_caches:
-            self.expiry_time_msec: Optional[int] = self.parse_duration(cache_entry_ttl)
+            self.expiry_time_msec = self.parse_duration(cache_entry_ttl)
         else:
             self.expiry_time_msec = None
 
