@@ -92,11 +92,12 @@ class SynapseRequest(Request):
         # we can't yet create the logcontext, as we don't know the method.
         self.logcontext: Optional[LoggingContext] = None
 
-        # The `Deferred` to cancel if the client disconnects early. Expected to be set
-        # by `Resource.render`.
+        # The `Deferred` to cancel if the client disconnects early and
+        # `is_render_cancellable` is set. Expected to be set by `Resource.render`.
         self.render_deferred: Optional["Deferred[None]"] = None
-        # A boolean indicating whether `_render_deferred` should be cancelled if the
-        # client disconnects early. Expected to be set during `Resource.render`.
+        # A boolean indicating whether `render_deferred` should be cancelled if the
+        # client disconnects early. Expected to be set by the coroutine started by
+        # `Resource.render`, if rendering is asynchronous.
         self.is_render_cancellable = False
 
         global _next_request_seq
