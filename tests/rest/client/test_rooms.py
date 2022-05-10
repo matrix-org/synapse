@@ -1153,7 +1153,9 @@ class RoomPowerLevelOverridesTestCase(RoomBase):
             },
         )
         self.assertEqual(
-            { "custom.event": 0, },
+            {
+                "custom.event": 0,
+            },
             self.power_levels(room_id)["events"],
         )
 
