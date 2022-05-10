@@ -766,11 +766,20 @@ class RootConfig:
     ) -> None:
         self.invoke_all("generate_files", config_dict, config_dir_path)
 
-    def reload_config_section(self, section_name: str) -> None:
+    def reload_config_section(self, section_name: str) -> Config:
         """Reconstruct the given config section, leaving all others unchanged.
+
+        This works in three steps:
+
+        1. Create a new instance of the relevant `Config` subclass.
+        2. Call `read_config` on that instance to parse the new config.
+        3. Replace the existing config instance with the new one.
 
         :raises ValueError: if the given `section` does not exist.
         :raises ConfigError: for any other problems reloading config.
+
+        :returns: the previous config object, which no longer has a reference to this
+            RootConfig.
         """
         existing_config: Optional[Config] = getattr(self, section_name, None)
         if existing_config is None:
@@ -778,7 +787,12 @@ class RootConfig:
         logger.info("Reloading config section '%s'", section_name)
 
         new_config_data = read_config_files(self.config_files)
-        existing_config.read_config(new_config_data)
+        new_config = type(existing_config)(self)
+        new_config.read_config(new_config_data)
+        setattr(self, section_name, new_config)
+
+        existing_config.root = None
+        return existing_config
 
 
 def read_config_files(config_files: Iterable[str]) -> Dict[str, Any]:

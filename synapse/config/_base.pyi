@@ -6,12 +6,14 @@ from typing import (
     Iterable,
     Iterator,
     List,
+    Literal,
     MutableMapping,
     Optional,
     Tuple,
     Type,
     TypeVar,
     Union,
+    overload,
 )
 
 import jinja2
@@ -162,7 +164,12 @@ class RootConfig:
     def generate_missing_files(
         self, config_dict: dict, config_dir_path: str
     ) -> None: ...
-    def reload_config_section(self, section_name: str) -> None: ...
+    @overload
+    def reload_config_section(
+        self, section_name: Literal["caches"]
+    ) -> cache.CacheConfig: ...
+    @overload
+    def reload_config_section(self, section_name: str) -> Config: ...
 
 class Config:
     root: RootConfig

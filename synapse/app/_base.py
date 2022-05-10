@@ -485,13 +485,17 @@ async def start(hs: "HomeServer") -> None:
 
 def reload_cache_config(config: HomeServerConfig) -> None:
     try:
-        config.reload_config_section("caches")
+        previous_cache_config = config.reload_config_section("caches")
     except ConfigError as e:
         logger.warning("Failed to reload cache config")
         for f in format_config_error(e):
             logger.warning(f)
     else:
-        logger.debug("New cache config: %s", config.caches.__dict__)
+        logger.debug(
+            "New cache config. Was:\n %s\nNow:\n",
+            previous_cache_config.__dict__,
+            config.caches.__dict__,
+        )
         config.caches.resize_all_caches()
 
 
