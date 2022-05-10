@@ -1,0 +1,1 @@
+Add a unique index to `state_group_edges` to prevent duplicates being accidentally introduced and the consequential impact to performance.
