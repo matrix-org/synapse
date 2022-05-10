@@ -22,6 +22,7 @@ from synapse.appservice.scheduler import (
     _Recoverer,
     _TransactionController,
 )
+from synapse.config.appservice import AppServiceConfig
 from synapse.logging.context import make_deferred_yieldable
 from synapse.server import HomeServer
 from synapse.types import DeviceListUpdates
@@ -43,8 +44,10 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         self.as_api = Mock()
         self.recoverer = Mock()
         self.recoverer_fn = Mock(return_value=self.recoverer)
+        as_config = AppServiceConfig()
+        as_config.read_config({})
         self.txnctrl = _TransactionController(
-            clock=self.clock, store=self.store, as_api=self.as_api
+            clock=self.clock, store=self.store, as_api=self.as_api, as_config=as_config
         )
         self.txnctrl.RECOVERER_CLASS = self.recoverer_fn
 
@@ -151,6 +154,7 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
             store=self.store,
             service=self.service,
             callback=self.callback,
+            max_backoff=None,
         )
 
     def test_recover_single_txn(self):
