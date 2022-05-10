@@ -218,6 +218,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self._membership_stream_cache.entity_has_changed(state_key, stream_ordering)
             self.get_invited_rooms_for_local_user.invalidate((state_key,))
             self.get_local_users_in_room.invalidate((room_id,))
+            self.get_number_joined_users_in_room.invalidate((room_id,))
 
         if relates_to:
             self.get_relations_for_event.invalidate((relates_to,))
