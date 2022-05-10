@@ -286,3 +286,30 @@ class WorkerDutyConfigTestCase(TestCase):
                 "notify_appservices_from_worker",
             )
         )
+
+    def test_worker_duty_configs(self) -> None:
+        """
+        Additional tests for the worker duties
+        """
+
+        worker1_config = self._make_worker_config(
+            worker_app="synapse.app.generic_worker",
+            worker_name="worker1",
+            extras={
+                "notify_appservices_from_worker": "worker2",
+                "update_user_directory_from_worker": "worker1",
+            },
+        )
+        self.assertFalse(worker1_config.should_notify_appservices)
+        self.assertTrue(worker1_config.should_update_user_directory)
+
+        worker2_config = self._make_worker_config(
+            worker_app="synapse.app.generic_worker",
+            worker_name="worker2",
+            extras={
+                "notify_appservices_from_worker": "worker2",
+                "update_user_directory_from_worker": "worker1",
+            },
+        )
+        self.assertTrue(worker2_config.should_notify_appservices)
+        self.assertFalse(worker2_config.should_update_user_directory)
