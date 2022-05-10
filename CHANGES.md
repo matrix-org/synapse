@@ -1,44 +1,52 @@
 Synapse 1.59.0rc1 (2022-05-10)
 ==============================
 
+This release makes several changes that server administrators should be aware of:
+
+- Device name lookup over federation is now disabled by default. ([\#12616](https://github.com/matrix-org/synapse/issues/12616))
+- The `synapse.app.appservice` is now deprecated. ([\#12452])(https://github.com/matrix-org/synapse/pull/12452))
+
+See [the upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1590) for more details.
+
+Additionally, this release removes the non-standard `m.login.jwt` login type from Synapse. It can be replaced with `org.matrix.login.jwt` for identical behaviour. This is only used if `jwt_config.enabled` is set to `true` in the configuration. ([\#12597](https://github.com/matrix-org/synapse/issues/12597))
+
 Features
 --------
 
 - Support [MSC3266](https://github.com/matrix-org/matrix-doc/pull/3266) room summaries over federation. ([\#11507](https://github.com/matrix-org/synapse/issues/11507))
 - Implement [changes](https://github.com/matrix-org/matrix-spec-proposals/pull/2285/commits/4a77139249c2e830aec3c7d6bd5501a514d1cc27) to [MSC2285 (hidden read receipts)](https://github.com/matrix-org/matrix-spec-proposals/pull/2285). Contributed by @SimonBrandner. ([\#12168](https://github.com/matrix-org/synapse/issues/12168), [\#12635](https://github.com/matrix-org/synapse/issues/12635), [\#12636](https://github.com/matrix-org/synapse/issues/12636), [\#12670](https://github.com/matrix-org/synapse/issues/12670))
-- Add a module API to allow modules to change actions for existing push rules of local users. ([\#12406](https://github.com/matrix-org/synapse/issues/12406))
+- Extend the [module API](https://github.com/matrix-org/synapse/blob/release-v1.59/synapse/module_api/__init__.py) to allow modules to change actions for existing push rules of local users. ([\#12406](https://github.com/matrix-org/synapse/issues/12406))
 - Add the `notify_appservices_from_worker` configuration option (superseding `notify_appservices`) to allow a generic worker to be designated as the worker to send traffic to Application Services. ([\#12452](https://github.com/matrix-org/synapse/issues/12452))
 - Add new `enable_registration_token_3pid_bypass` configuration option to allow registrations via token as an alternative to verifying a 3pid. ([\#12526](https://github.com/matrix-org/synapse/issues/12526))
-- Implement MSC3786: Add a default push rule to ignore m.room.server_acl events. ([\#12601](https://github.com/matrix-org/synapse/issues/12601))
+- Implement [MSC3786](https://github.com/matrix-org/matrix-spec-proposals/pull/3786): Add a default push rule to ignore m.room.server_acl events. ([\#12601](https://github.com/matrix-org/synapse/issues/12601))
 - Add new `mau_appservice_trial_days` configuration option to specify a different trial period for users registered via an appservice. ([\#12619](https://github.com/matrix-org/synapse/issues/12619))
 
 
 Bugfixes
 --------
 
-- Fix a bug introduced in Synapse v1.48.0 where latest thread reply provided failed to include the proper bundled aggregations. ([\#12273](https://github.com/matrix-org/synapse/issues/12273))
-- Fix a bug where attempting to send a large amount of read receipts to an application service all at once would result in duplicate content and abnormally high memory usage. Contributed by Brad & Nick @ Beeper. ([\#12544](https://github.com/matrix-org/synapse/issues/12544))
-- Fix a bug introduced in Synapse 1.57 which could cause `Failed to calculate hosts in room` errors to be logged for outbound federation. ([\#12570](https://github.com/matrix-org/synapse/issues/12570))
-- Fix a long standing bug where status codes would almost always get logged as 200!, irrespective of the actual status code, when clients disconnect before a request has finished processing. ([\#12580](https://github.com/matrix-org/synapse/issues/12580))
+- Fix a bug introduced in Synapse v1.48.0 where the latest thread reply provided failed to include the proper bundled aggregations. ([\#12273](https://github.com/matrix-org/synapse/issues/12273))
+- Fix a bug introduced in Synapse v1.22.0 where attempting to send a large amount of read receipts to an application service all at once would result in duplicate content and abnormally high memory usage. Contributed by Brad & Nick @ Beeper. ([\#12544](https://github.com/matrix-org/synapse/issues/12544))
+- Fix a bug introduced in Synapse v1.57.0 which could cause `Failed to calculate hosts in room` errors to be logged for outbound federation. ([\#12570](https://github.com/matrix-org/synapse/issues/12570))
+- Fix a long-standing bug where status codes would almost always get logged as `200!`, irrespective of the actual status code, when clients disconnect before a request has finished processing. ([\#12580](https://github.com/matrix-org/synapse/issues/12580))
 - Fix race when persisting an event and deleting a room that could lead to outbound federation breaking. ([\#12594](https://github.com/matrix-org/synapse/issues/12594))
-- Fix a typo in the announcement text generated by the Synapse release development script. ([\#12612](https://github.com/matrix-org/synapse/issues/12612))
 - Fix a bug introduced in Synapse v1.53.0 where bundled aggregations for annotations/edits were incorrectly calculated. ([\#12633](https://github.com/matrix-org/synapse/issues/12633))
-- Add new `enable_registration_token_3pid_bypass` configuration option to allow registrations via token as an alternative to verifying a 3pid. ([\#12639](https://github.com/matrix-org/synapse/issues/12639))
 - Fix a long-standing bug where rooms containing power levels with string values could not be upgraded. ([\#12657](https://github.com/matrix-org/synapse/issues/12657))
+- Prevent memory leak from reoccurring when presence is disabled. ([\#12656](https://github.com/matrix-org/synapse/issues/12656))
 
 
 Updates to the Docker image
 ---------------------------
 
 - Explicitly opt-in to using [BuildKit-specific features](https://github.com/moby/buildkit/blob/master/frontend/dockerfile/docs/syntax.md) in the Dockerfile. This fixes issues with building images in some GitLab CI environments. ([\#12541](https://github.com/matrix-org/synapse/issues/12541))
-- Update the "Build docker images" GitHub Actions workflow to use `docker/metadata-action` to generate docker image tags, instead of a custom shell script. Contributed by henryclw. ([\#12573](https://github.com/matrix-org/synapse/issues/12573))
+- Update the "Build docker images" GitHub Actions workflow to use `docker/metadata-action` to generate docker image tags, instead of a custom shell script. Contributed by @henryclw. ([\#12573](https://github.com/matrix-org/synapse/issues/12573))
 
 
 Improved Documentation
 ----------------------
 
 - Update SQL statements and replace use of old table `user_stats_historical` in docs for Synapse Admins. ([\#12536](https://github.com/matrix-org/synapse/issues/12536))
-- Add missing linebreak to pipx install instructions. ([\#12579](https://github.com/matrix-org/synapse/issues/12579))
+- Add missing linebreak to `pipx` install instructions. ([\#12579](https://github.com/matrix-org/synapse/issues/12579))
 - Add information about the TCP replication module to docs. ([\#12621](https://github.com/matrix-org/synapse/issues/12621))
 - Fixes to the formatting of README.rst. ([\#12627](https://github.com/matrix-org/synapse/issues/12627))
 - Fix docs on how to run specific Complement tests using the `complement.sh` test runner. ([\#12664](https://github.com/matrix-org/synapse/issues/12664))
@@ -56,16 +64,12 @@ Deprecations and Removals
 Internal Changes
 ----------------
 
-- Fix scripts-dev to pass typechecking. ([\#12356](https://github.com/matrix-org/synapse/issues/12356))
 - Use supervisord to supervise Postgres and Caddy in the Complement image to reduce restart time. ([\#12480](https://github.com/matrix-org/synapse/issues/12480))
-- Add some type hints to datastore. ([\#12485](https://github.com/matrix-org/synapse/issues/12485))
 - Immediately retry any requests that have backed off when a server comes back online. ([\#12500](https://github.com/matrix-org/synapse/issues/12500))
 - Use `make_awaitable` instead of `defer.succeed` for return values of mocks in tests. ([\#12505](https://github.com/matrix-org/synapse/issues/12505))
-- Remove unused `# type: ignore`s. ([\#12531](https://github.com/matrix-org/synapse/issues/12531))
 - Release script: confirm the commit to be tagged before tagging. ([\#12556](https://github.com/matrix-org/synapse/issues/12556))
 - Consistently check if an object is a `frozendict`. ([\#12564](https://github.com/matrix-org/synapse/issues/12564))
 - Protect module callbacks with read semantics against cancellation. ([\#12568](https://github.com/matrix-org/synapse/issues/12568))
-- Allow unused `#type: ignore` comments in bleeding edge CI jobs. ([\#12576](https://github.com/matrix-org/synapse/issues/12576))
 - Improve comments and error messages around access tokens. ([\#12577](https://github.com/matrix-org/synapse/issues/12577))
 - Improve docstrings for the receipts store. ([\#12581](https://github.com/matrix-org/synapse/issues/12581))
 - Use constants for read-receipts in tests. ([\#12582](https://github.com/matrix-org/synapse/issues/12582))
@@ -73,28 +77,28 @@ Internal Changes
 - Remove special-case for `twisted` logger from default log config. ([\#12589](https://github.com/matrix-org/synapse/issues/12589))
 - Use `getClientAddress` instead of the deprecated `getClientIP`. ([\#12599](https://github.com/matrix-org/synapse/issues/12599))
 - Add link to documentation in Grafana Dashboard. ([\#12602](https://github.com/matrix-org/synapse/issues/12602))
-- Remove redundant lines of config from `mypy.ini`. ([\#12608](https://github.com/matrix-org/synapse/issues/12608))
 - Reduce log spam when running multiple event persisters. ([\#12610](https://github.com/matrix-org/synapse/issues/12610))
 - Add extra debug logging to federation sender. ([\#12614](https://github.com/matrix-org/synapse/issues/12614))
 - Prevent remote homeservers from requesting local user device names by default. ([\#12616](https://github.com/matrix-org/synapse/issues/12616))
 - Add a consistency check on events which we read from the database. ([\#12620](https://github.com/matrix-org/synapse/issues/12620))
-- Remove use of constantly library and switch to enums for EventRedactBehaviour. Contributed by @andrewdoh. ([\#12624](https://github.com/matrix-org/synapse/issues/12624))
+- Remove use of `constantly` library and switch to enums for `EventRedactBehaviour`. Contributed by @andrewdoh. ([\#12624](https://github.com/matrix-org/synapse/issues/12624))
 - Remove unused code related to receipts. ([\#12632](https://github.com/matrix-org/synapse/issues/12632))
 - Minor improvements to the scripts for running Synapse in worker mode under Complement. ([\#12637](https://github.com/matrix-org/synapse/issues/12637))
-- Update to mypy 0.950. ([\#12650](https://github.com/matrix-org/synapse/issues/12650))
 - Move `pympler` back in to the `all` extras. ([\#12652](https://github.com/matrix-org/synapse/issues/12652))
-- Prevent memory leak from reoccurring when presence is disabled. ([\#12656](https://github.com/matrix-org/synapse/issues/12656))
 - Fix spelling of `M_UNRECOGNIZED` in comments. ([\#12665](https://github.com/matrix-org/synapse/issues/12665))
+- Fix a typo in the announcement text generated by the Synapse release development script. ([\#12612](https://github.com/matrix-org/synapse/issues/12612))
+
+### Typechecking
+
+- Fix scripts-dev to pass typechecking. ([\#12356](https://github.com/matrix-org/synapse/issues/12356))
+- Add some type hints to datastore. ([\#12485](https://github.com/matrix-org/synapse/issues/12485))
+- Remove unused `# type: ignore`s. ([\#12531](https://github.com/matrix-org/synapse/issues/12531))
+- Allow unused `#type: ignore` comments in bleeding edge CI jobs. ([\#12576](https://github.com/matrix-org/synapse/issues/12576))
+- Remove redundant lines of config from `mypy.ini`. ([\#12608](https://github.com/matrix-org/synapse/issues/12608))
+- Update to mypy 0.950. ([\#12650](https://github.com/matrix-org/synapse/issues/12650))
 - Use `Concatenate` to better annotate `_do_execute`. ([\#12666](https://github.com/matrix-org/synapse/issues/12666))
 - Use `ParamSpec` to refine type hints. ([\#12667](https://github.com/matrix-org/synapse/issues/12667))
 - Fix mypy against latest pillow stubs. ([\#12671](https://github.com/matrix-org/synapse/issues/12671))
-
-
-Synapse 1.59.0
-==============
-
-The non-standard `m.login.jwt` login type has been removed from Synapse. It can be replaced with `org.matrix.login.jwt` for identical behaviour. This is only used if `jwt_config.enabled` is set to `true` in the configuration.
-
 
 Synapse 1.58.1 (2022-05-05)
 ===========================
