@@ -1278,8 +1278,10 @@ class RoomPowerLevelOverridesTestCase(RoomBase):
 
 
 class RoomPowerLevelOverridesInPracticeTestCase(RoomBase):
-    """Tests that we can really do various otherwise-prohibited actions
-    based on overriding the power levels in config."""
+    """
+    Tests that we can really do various otherwise-prohibited actions
+    based on overriding the power levels in config.
+    """
 
     user_id = "@sid1:red"
 
