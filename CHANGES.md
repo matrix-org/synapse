@@ -49,7 +49,7 @@ Improved Documentation
 - Update SQL statements and replace use of old table `user_stats_historical` in docs for Synapse Admins. ([\#12536](https://github.com/matrix-org/synapse/issues/12536))
 - Add missing linebreak to `pipx` install instructions. ([\#12579](https://github.com/matrix-org/synapse/issues/12579))
 - Add information about the TCP replication module to docs. ([\#12621](https://github.com/matrix-org/synapse/issues/12621))
-- Fixes to the formatting of README.rst. ([\#12627](https://github.com/matrix-org/synapse/issues/12627))
+- Fixes to the formatting of `README.rst`. ([\#12627](https://github.com/matrix-org/synapse/issues/12627))
 - Fix docs on how to run specific Complement tests using the `complement.sh` test runner. ([\#12664](https://github.com/matrix-org/synapse/issues/12664))
 
 
@@ -81,7 +81,7 @@ Internal Changes
 - Add extra debug logging to federation sender. ([\#12614](https://github.com/matrix-org/synapse/issues/12614))
 - Prevent remote homeservers from requesting local user device names by default. ([\#12616](https://github.com/matrix-org/synapse/issues/12616))
 - Add a consistency check on events which we read from the database. ([\#12620](https://github.com/matrix-org/synapse/issues/12620))
-- Remove use of `constantly` library and switch to enums for `EventRedactBehaviour`. Contributed by @andrewdoh. ([\#12624](https://github.com/matrix-org/synapse/issues/12624))
+- Remove use of the `constantly` library and switch to enums for `EventRedactBehaviour`. Contributed by @andrewdoh. ([\#12624](https://github.com/matrix-org/synapse/issues/12624))
 - Remove unused code related to receipts. ([\#12632](https://github.com/matrix-org/synapse/issues/12632))
 - Minor improvements to the scripts for running Synapse in worker mode under Complement. ([\#12637](https://github.com/matrix-org/synapse/issues/12637))
 - Move `pympler` back in to the `all` extras. ([\#12652](https://github.com/matrix-org/synapse/issues/12652))
