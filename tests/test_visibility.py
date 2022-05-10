@@ -234,7 +234,9 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         event = self.get_success(builder.build(prev_event_ids=[], auth_event_ids=[]))
         event.internal_metadata.outlier = True
         self.get_success(
-            self.storage.persistence.persist_event(event, EventContext.for_outlier())
+            self.storage.persistence.persist_event(
+                event, EventContext.for_outlier(self.storage)
+            )
         )
         return event
 

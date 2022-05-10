@@ -106,6 +106,7 @@ class EventContext:
             incomplete state.
     """
 
+    _storage: "Storage"
     rejected: Union[bool, str] = False
     _state_group: Optional[int] = None
     state_group_before_event: Optional[int] = None
@@ -120,6 +121,7 @@ class EventContext:
 
     @staticmethod
     def with_state(
+        storage: "Storage",
         state_group: Optional[int],
         state_group_before_event: Optional[int],
         current_state_ids: Optional[StateMap[str]],
@@ -129,6 +131,7 @@ class EventContext:
         delta_ids: Optional[StateMap[str]] = None,
     ) -> "EventContext":
         return EventContext(
+            storage=storage,
             current_state_ids=current_state_ids,
             prev_state_ids=prev_state_ids,
             state_group=state_group,
@@ -139,9 +142,12 @@ class EventContext:
         )
 
     @staticmethod
-    def for_outlier() -> "EventContext":
+    def for_outlier(
+        storage: "Storage",
+    ) -> "EventContext":
         """Return an EventContext instance suitable for persisting an outlier event"""
         return EventContext(
+            storage=storage,
             current_state_ids={},
             prev_state_ids={},
         )
