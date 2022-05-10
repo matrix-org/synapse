@@ -484,9 +484,6 @@ async def start(hs: "HomeServer") -> None:
 
 
 def reload_cache_config(config: HomeServerConfig) -> None:
-    # For mypy's benefit. It can't know that we haven't altered `config` by the time
-    # we call this closure.
-    assert config is not None
     try:
         config.reload_config_section("caches")
     except ConfigError as e:
