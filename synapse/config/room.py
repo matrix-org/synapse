@@ -109,6 +109,14 @@ class RoomConfig(Config):
         # `power_level_content_override` parameter in the /createRoom API, but
         # is applied before that parameter.
         #
+        # Valid keys are some or all of `private_chat`, `trusted_private_chat`
+        # and `public_chat`. Inside each of those should be any of the
+        # properties allowed in `power_level_content_override` in the
+        # /createRoom API. If any property is missing, its default value will
+        # continue to be use. If any property is present, it will overwrite
+        # the existing default completely (so if the `events` property exists,
+        # the default event power levels will be ignored).
+        #
         #default_power_level_content_override:
         #    private_chat: {
         #        "events": {
