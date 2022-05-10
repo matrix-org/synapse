@@ -488,8 +488,6 @@ def reload_cache_config(config: HomeServerConfig) -> None:
     # we call this closure.
     assert config is not None
     try:
-        # This will call CacheConfig.read_config, which will automatically call
-        # CacheConfig.resize_all_caches.
         config.reload_config_section("caches")
     except ConfigError as e:
         logger.warning("Failed to reload cache config")
@@ -497,6 +495,7 @@ def reload_cache_config(config: HomeServerConfig) -> None:
             logger.warning(f)
     else:
         logger.debug("New cache config: %s", config.caches.__dict__)
+        config.caches.resize_all_caches()
 
 
 def setup_sentry(hs: "HomeServer") -> None:

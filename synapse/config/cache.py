@@ -181,6 +181,11 @@ class CacheConfig(Config):
         """
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
+        """Populate this config object with values from `config`.
+
+        This method does NOT resize existing or future caches: use `resize_all_caches`.
+        We use two separate methods so that we can reject bad config before applying it.
+        """
         self.event_cache_size = self.parse_size(
             config.get("event_cache_size", _DEFAULT_EVENT_CACHE_SIZE)
         )
@@ -190,9 +195,6 @@ class CacheConfig(Config):
         self.global_factor = cache_config.get("global_factor", _DEFAULT_FACTOR_SIZE)
         if not isinstance(self.global_factor, (int, float)):
             raise ConfigError("caches.global_factor must be a number.")
-
-        # Set the global one so that it's reflected in new caches
-        properties.default_factor_size = self.global_factor
 
         # Load cache factors from the config
         individual_factors = cache_config.get("per_cache_factors") or {}
@@ -259,19 +261,19 @@ class CacheConfig(Config):
             cache_config.get("sync_response_cache_duration", 0)
         )
 
-        # Resize all caches (if necessary) with the new factors we've loaded
-        self.resize_all_caches()
-
-        # Store this function so that it can be called from other classes without
-        # needing an instance of Config
-        properties.resize_all_caches_func = self.resize_all_caches
-
     def resize_all_caches(self) -> None:
-        """Ensure all cache sizes are up to date
+        """Ensure all cache sizes are up-to-date.
 
         For each cache, run the mapped callback function with either
         a specific cache factor or the default, global one.
         """
+        # Set the global factor size, so that new caches are appropriately sized.
+        properties.default_factor_size = self.global_factor
+
+        # Store this function so that it can be called from other classes without
+        # needing an instance of CacheConfig
+        properties.resize_all_caches_func = self.resize_all_caches
+
         # block other threads from modifying _CACHES while we iterate it.
         with _CACHES_LOCK:
             for cache_name, callback in _CACHES.items():
