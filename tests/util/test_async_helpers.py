@@ -534,3 +534,45 @@ class AwakenableSleeperTests(TestCase):
         self.assertTrue(d.called)
 
         reactor.advance(0.6)
+
+    def test_multiple_sleepers_timeout(self):
+        reactor, _ = get_clock()
+        sleeper = AwakenableSleeper(reactor)
+
+        d1 = defer.ensureDeferred(sleeper.sleep("name", 1000))
+
+        reactor.advance(0.6)
+        self.assertFalse(d1.called)
+
+        # Add another sleeper
+        d2 = defer.ensureDeferred(sleeper.sleep("name", 1000))
+
+        # Only the first sleep should time out now.
+        reactor.advance(0.6)
+        self.assertTrue(d1.called)
+        self.assertFalse(d2.called)
+
+        reactor.advance(0.6)
+        self.assertTrue(d2.called)
+
+    def test_multiple_sleepers_wake(self):
+        reactor, _ = get_clock()
+        sleeper = AwakenableSleeper(reactor)
+
+        d1 = defer.ensureDeferred(sleeper.sleep("name", 1000))
+
+        reactor.advance(0.5)
+        self.assertFalse(d1.called)
+
+        # Add another sleeper
+        d2 = defer.ensureDeferred(sleeper.sleep("name", 1000))
+
+        # Neither should fire yet
+        reactor.advance(0.3)
+        self.assertFalse(d1.called)
+        self.assertFalse(d2.called)
+
+        # Explicitly waking both up works
+        sleeper.wake("name")
+        self.assertTrue(d1.called)
+        self.assertTrue(d2.called)
