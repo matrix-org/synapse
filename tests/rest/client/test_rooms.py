@@ -1313,7 +1313,7 @@ class RoomPowerLevelOverridesInPracticeTestCase(RoomBase):
         self.assertEqual(403, channel.code, msg=channel.result["body"])
         self.assertEqual(
             "You don't have permission to post that to the room. "
-            + "user_level (0) < send_level (50)",
+            "user_level (0) < send_level (50)",
             channel.json_body["error"],
         )
 
