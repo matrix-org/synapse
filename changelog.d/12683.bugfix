@@ -1,0 +1,1 @@
+Fix `/messages` throwing a 500 error when querying for a non-existent room.
