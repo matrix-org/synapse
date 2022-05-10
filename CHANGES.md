@@ -19,7 +19,7 @@ Features
 - Add the `notify_appservices_from_worker` configuration option (superseding `notify_appservices`) to allow a generic worker to be designated as the worker to send traffic to Application Services. ([\#12452](https://github.com/matrix-org/synapse/issues/12452))
 - Add the `update_user_directory_from_worker` configuration option (superseding `update_user_directory`) to allow a generic worker to be designated as the worker to update the user directory. ([\#12654](https://github.com/matrix-org/synapse/issues/12654))
 - Add new `enable_registration_token_3pid_bypass` configuration option to allow registrations via token as an alternative to verifying a 3pid. ([\#12526](https://github.com/matrix-org/synapse/issues/12526))
-- Implement [MSC3786](https://github.com/matrix-org/matrix-spec-proposals/pull/3786): Add a default push rule to ignore m.room.server_acl events. ([\#12601](https://github.com/matrix-org/synapse/issues/12601))
+- Implement [MSC3786](https://github.com/matrix-org/matrix-spec-proposals/pull/3786): Add a default push rule to ignore `m.room.server_acl` events. ([\#12601](https://github.com/matrix-org/synapse/issues/12601))
 - Add new `mau_appservice_trial_days` configuration option to specify a different trial period for users registered via an appservice. ([\#12619](https://github.com/matrix-org/synapse/issues/12619))
 
 
