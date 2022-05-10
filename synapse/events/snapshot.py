@@ -16,11 +16,8 @@ from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 import attr
 from frozendict import frozendict
 
-from twisted.internet.defer import Deferred
-
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
-from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import JsonDict, StateMap
 
 if TYPE_CHECKING:
@@ -132,8 +129,6 @@ class EventContext:
     ) -> "EventContext":
         return EventContext(
             storage=storage,
-            current_state_ids=current_state_ids,
-            prev_state_ids=prev_state_ids,
             state_group=state_group,
             state_group_before_event=state_group_before_event,
             prev_group=prev_group,
@@ -163,20 +158,7 @@ class EventContext:
             The serialized event.
         """
 
-        # We don't serialize the full state dicts, instead they get pulled out
-        # of the DB on the other side. However, the other side can't figure out
-        # the prev_state_ids, so if we're a state event we include the event
-        # id that we replaced in the state.
-        if event.is_state():
-            prev_state_ids = await self.get_prev_state_ids()
-            prev_state_id = prev_state_ids.get((event.type, event.state_key))
-        else:
-            prev_state_id = None
-
         return {
-            "prev_state_id": prev_state_id,
-            "event_type": event.type,
-            "event_state_key": event.get_state_key(),
             "state_group": self._state_group,
             "state_group_before_event": self.state_group_before_event,
             "rejected": self.rejected,
@@ -198,13 +180,10 @@ class EventContext:
         Returns:
             The event context.
         """
-        context = _AsyncEventContextImpl(
+        context = EventContext(
             # We use the state_group and prev_state_id stuff to pull the
             # current_state_ids out of the DB and construct prev_state_ids.
             storage=storage,
-            prev_state_id=input["prev_state_id"],
-            event_type=input["event_type"],
-            event_state_key=input["event_state_key"],
             state_group=input["state_group"],
             state_group_before_event=input["state_group_before_event"],
             prev_group=input["prev_group"],
@@ -255,8 +234,10 @@ class EventContext:
         if self.rejected:
             raise RuntimeError("Attempt to access state_ids of rejected event")
 
-        await self._ensure_fetched()
-        return self._current_state_ids
+        if self._state_group is None:
+            return None
+
+        return await self._storage.state.get_state_ids_for_group(self._state_group)
 
     async def get_prev_state_ids(self) -> StateMap[str]:
         """
@@ -271,76 +252,10 @@ class EventContext:
             Maps a (type, state_key) to the event ID of the state event matching
             this tuple.
         """
-        await self._ensure_fetched()
-        # There *should* be previous state IDs now.
-        assert self._prev_state_ids is not None
-        return self._prev_state_ids
-
-    async def _ensure_fetched(self) -> None:
-        return None
-
-
-@attr.s(slots=True)
-class _AsyncEventContextImpl(EventContext):
-    """
-    An implementation of EventContext which fetches _current_state_ids and
-    _prev_state_ids from the database on demand.
-
-    Attributes:
-
-        _storage
-
-        _fetching_state_deferred: Resolves when *_state_ids have been calculated.
-            None if we haven't started calculating yet
-
-        _event_type: The type of the event the context is associated with.
-
-        _event_state_key: The state_key of the event the context is associated with.
-
-        _prev_state_id: If the event associated with the context is a state event,
-            then `_prev_state_id` is the event_id of the state that was replaced.
-    """
-
-    # This needs to have a default as we're inheriting
-    _storage: "Storage" = attr.ib(default=None)
-    _prev_state_id: Optional[str] = attr.ib(default=None)
-    _event_type: str = attr.ib(default=None)
-    _event_state_key: Optional[str] = attr.ib(default=None)
-    _fetching_state_deferred: Optional["Deferred[None]"] = attr.ib(default=None)
-
-    async def _ensure_fetched(self) -> None:
-        if not self._fetching_state_deferred:
-            self._fetching_state_deferred = run_in_background(self._fill_out_state)
-
-        await make_deferred_yieldable(self._fetching_state_deferred)
-
-    async def _fill_out_state(self) -> None:
-        """Called to populate the _current_state_ids and _prev_state_ids
-        attributes by loading from the database.
-        """
-        if self.state_group is None:
-            # No state group means the event is an outlier. Usually the state_ids dicts are also
-            # pre-set to empty dicts, but they get reset when the context is serialized, so set
-            # them to empty dicts again here.
-            self._current_state_ids = {}
-            self._prev_state_ids = {}
-            return
-
-        current_state_ids = await self._storage.state.get_state_ids_for_group(
-            self.state_group
+        assert self.state_group_before_event
+        return await self._storage.state.get_state_ids_for_group(
+            self.state_group_before_event
         )
-        # Set this separately so mypy knows current_state_ids is not None.
-        self._current_state_ids = current_state_ids
-        if self._event_state_key is not None:
-            self._prev_state_ids = dict(current_state_ids)
-
-            key = (self._event_type, self._event_state_key)
-            if self._prev_state_id:
-                self._prev_state_ids[key] = self._prev_state_id
-            else:
-                self._prev_state_ids.pop(key, None)
-        else:
-            self._prev_state_ids = current_state_ids
 
 
 def _encode_state_dict(
