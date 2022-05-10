@@ -1877,7 +1877,7 @@ class FederationEventHandler:
             storage=self._storage,
             state_group=state_group,
             state_group_before_event=context.state_group_before_event,
-            delta_before_after=state_updates,
+            state_delta_due_to_event=state_updates,
             prev_group=prev_group,
             delta_ids=state_updates,
             partial_state=context.partial_state,

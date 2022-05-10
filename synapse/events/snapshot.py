@@ -58,7 +58,7 @@ class EventContext:
             If ``state_group`` is None (ie, the event is an outlier),
             ``state_group_before_event`` will always also be ``None``.
 
-        delta_before_after: If `state_group` and `state_group_before_event` are not None
+        state_delta_due_to_event: If `state_group` and `state_group_before_event` are not None
             then this is the delta of the state between the two groups.
 
         prev_group: If it is known, ``state_group``'s prev_group. Note that this being
@@ -87,7 +87,7 @@ class EventContext:
     rejected: Union[Literal[False], str] = False
     _state_group: Optional[int] = None
     state_group_before_event: Optional[int] = None
-    _delta_before_after: Optional[StateMap[str]] = None
+    _state_delta_due_to_event: Optional[StateMap[str]] = None
     prev_group: Optional[int] = None
     delta_ids: Optional[StateMap[str]] = None
     app_service: Optional[ApplicationService] = None
@@ -99,7 +99,7 @@ class EventContext:
         storage: "Storage",
         state_group: Optional[int],
         state_group_before_event: Optional[int],
-        delta_before_after: Optional[StateMap[str]],
+        state_delta_due_to_event: Optional[StateMap[str]],
         partial_state: bool,
         prev_group: Optional[int] = None,
         delta_ids: Optional[StateMap[str]] = None,
@@ -108,7 +108,7 @@ class EventContext:
             storage=storage,
             state_group=state_group,
             state_group_before_event=state_group_before_event,
-            delta_before_after=delta_before_after,
+            state_delta_due_to_event=state_delta_due_to_event,
             prev_group=prev_group,
             delta_ids=delta_ids,
             partial_state=partial_state,
@@ -137,7 +137,9 @@ class EventContext:
             "state_group_before_event": self.state_group_before_event,
             "rejected": self.rejected,
             "prev_group": self.prev_group,
-            "delta_before_after": _encode_state_dict(self._delta_before_after),
+            "state_delta_due_to_event": _encode_state_dict(
+                self._state_delta_due_to_event
+            ),
             "delta_ids": _encode_state_dict(self.delta_ids),
             "app_service_id": self.app_service.id if self.app_service else None,
             "partial_state": self.partial_state,
@@ -162,7 +164,9 @@ class EventContext:
             state_group=input["state_group"],
             state_group_before_event=input["state_group_before_event"],
             prev_group=input["prev_group"],
-            delta_before_after=_decode_state_dict(input["delta_before_after"]),
+            state_delta_due_to_event=_decode_state_dict(
+                input["state_delta_due_to_event"]
+            ),
             delta_ids=_decode_state_dict(input["delta_ids"]),
             rejected=input["rejected"],
             partial_state=input.get("partial_state", False),
@@ -210,13 +214,13 @@ class EventContext:
         if self.rejected:
             raise RuntimeError("Attempt to access state_ids of rejected event")
 
-        assert self._delta_before_after is not None
+        assert self._state_delta_due_to_event is not None
 
         prev_state_ids = await self.get_prev_state_ids()
 
-        if self._delta_before_after:
+        if self._state_delta_due_to_event:
             prev_state_ids = dict(prev_state_ids)
-            prev_state_ids.update(self._delta_before_after)
+            prev_state_ids.update(self._state_delta_due_to_event)
 
         return prev_state_ids
 
