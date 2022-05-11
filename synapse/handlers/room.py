@@ -197,29 +197,16 @@ class RoomCreationHandler:
                     400, "An upgrade for this room is currently in progress"
                 )
 
-        # Check whether the user has the power level to carry out the upgrade.
-        # `check_auth_rules_from_context` will check that they are in the room and have
-        # the required power level to send the tombstone event.
-        (
-            tombstone_event,
-            tombstone_context,
-        ) = await self.event_creation_handler.create_event(
+        # Before starting the room upgrade, check whether the user has the power level
+        # to carry out the upgrade, by creating a dummy tombstone event. The auth checks
+        # will check for room membership and the required power level to send the
+        # tombstone. We reuse the prev events and auth events from the dummy event for
+        # the real tombstone. That way if the dummy event passes the auth checks, the
+        # real tombstone should pass auth checks too.
+        tombstone_event, _ = await self._create_tombstone_and_check_auth(
             requester,
-            {
-                "type": EventTypes.Tombstone,
-                "state_key": "",
-                "room_id": old_room_id,
-                "sender": user_id,
-                "content": {
-                    "body": "This room has been replaced",
-                    "replacement_room": None,  # Use a placeholder value for now
-                },
-            },
-        )
-        old_room_version = await self.store.get_room_version(old_room_id)
-        validate_event_for_room_version(old_room_version, tombstone_event)
-        await self._event_auth_handler.check_auth_rules_from_context(
-            old_room_version, tombstone_event, tombstone_context
+            old_room_id,
+            new_room_id=None,
         )
 
         # Upgrade the room
@@ -233,8 +220,7 @@ class RoomCreationHandler:
             requester,
             old_room_id,
             new_version,  # args for _upgrade_room
-            tombstone_event,
-            tombstone_context,
+            tombstone_auth_template=tombstone_event,
         )
 
         return ret
@@ -244,18 +230,16 @@ class RoomCreationHandler:
         requester: Requester,
         old_room_id: str,
         new_version: RoomVersion,
-        tombstone_event: EventBase,
-        tombstone_context: synapse.events.snapshot.EventContext,
+        tombstone_auth_template: EventBase,
     ) -> str:
         """
         Args:
             requester: the user requesting the upgrade
             old_room_id: the id of the room to be replaced
             new_versions: the version to upgrade the room to
-            tombstone_event: a template for the tombstone event to send to the old room.
-                `content["replacement_room"]` will be filled in the the id of the new
-                room.
-            tombstone_context: the context for the tombstone event
+            tombstone_auth_template: a template for the tombstone event to send to the
+                old room. `tombstone_auth_template`'s prev and auth events will be used
+                to create the tombstone event.
 
         Raises:
             ShadowBanError if the requester is shadow-banned.
@@ -274,7 +258,16 @@ class RoomCreationHandler:
         )
 
         logger.info("Creating new room %s to replace %s", new_room_id, old_room_id)
-        tombstone_event.content["replacement_room"] = new_room_id
+
+        (
+            tombstone_event,
+            tombstone_context,
+        ) = await self._create_tombstone_and_check_auth(
+            requester,
+            old_room_id,
+            new_room_id,
+            copy_auth_from_event=tombstone_auth_template,
+        )
 
         await self.clone_existing_room(
             requester,
@@ -316,6 +309,61 @@ class RoomCreationHandler:
         )
 
         return new_room_id
+
+    async def _create_tombstone_and_check_auth(
+        self,
+        requester: Requester,
+        old_room_id: str,
+        new_room_id: Optional[str],
+        copy_auth_from_event: Optional[EventBase] = None,
+    ) -> Tuple[EventBase, synapse.events.snapshot.EventContext]:
+        """Creates a tombstone event for a room upgrade and checks that it can be sent.
+
+        Args:
+            requester: the user requesting the upgrade
+            old_room_id: the id of the room to be replaced
+            new_room_id: the id of the replacement room, or `None` if not known yet
+            copy_auth_from_event: an event whose prev and auth events are to be used for
+                the tombstone event, if provided
+
+        Returns:
+            A tuple containing the tombstone event and its context.
+
+        Raises:
+            AuthError if the requester cannot send the tombstone event, eg. if they are
+                not in the room or do not have the required power level.
+        """
+        user_id = requester.user.to_string()
+
+        (
+            tombstone_event,
+            tombstone_context,
+        ) = await self.event_creation_handler.create_event(
+            requester,
+            {
+                "type": EventTypes.Tombstone,
+                "state_key": "",
+                "room_id": old_room_id,
+                "sender": user_id,
+                "content": {
+                    "body": "This room has been replaced",
+                    "replacement_room": new_room_id,
+                },
+            },
+            prev_event_ids=(
+                copy_auth_from_event.prev_event_ids() if copy_auth_from_event else None
+            ),
+            auth_event_ids=(
+                copy_auth_from_event.auth_event_ids() if copy_auth_from_event else None
+            ),
+        )
+        old_room_version = await self.store.get_room_version(old_room_id)
+        validate_event_for_room_version(old_room_version, tombstone_event)
+        await self._event_auth_handler.check_auth_rules_from_context(
+            old_room_version, tombstone_event, tombstone_context
+        )
+
+        return tombstone_event, tombstone_context
 
     async def _update_upgraded_room_pls(
         self,
