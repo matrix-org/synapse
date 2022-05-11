@@ -173,6 +173,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         current user.
         """
 
+        events = events.copy()
         # filter out private receipts the user shouldn't see
         for index, event in enumerate(events):
             content = event.get("content", {})
