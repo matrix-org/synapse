@@ -140,7 +140,7 @@ def cancellable(method: F) -> F:
                 ...
     """
     if method.__name__ not in _cancellable_method_names and not any(
-        method.__name__.startswith(name) for name in _cancellable_method_names
+        method.__name__.startswith(prefix) for prefix in _cancellable_method_names
     ):
         raise ValueError(
             "@cancellable decorator can only be applied to servlet methods."
