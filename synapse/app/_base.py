@@ -430,6 +430,9 @@ async def start(hs: "HomeServer") -> None:
         register_sighup(refresh_certificate, hs)
         register_sighup(reload_cache_config, hs.config)
 
+    # Apply the cache config.
+    hs.config.caches.resize_all_caches()
+
     # Load the certificate from disk.
     refresh_certificate(hs)
 
