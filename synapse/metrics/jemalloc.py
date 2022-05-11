@@ -182,7 +182,7 @@ def _setup_jemalloc_stats() -> None:
         """Metrics for internal jemalloc stats."""
 
         def collect(self) -> Iterable[Metric]:
-            stats.refresh_stats
+            stats.refresh_stats()
 
             g = GaugeMetricFamily(
                 "jemalloc_stats_app_memory_bytes",
