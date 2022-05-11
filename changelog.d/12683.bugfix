@@ -1,1 +1,1 @@
-Fix `/messages` throwing a 500 error when querying for a non-existent room.
+Fix a bug introduced in Synapse 1.57.0 where `/messages` would throw a 500 error when querying for a non-existent room.
