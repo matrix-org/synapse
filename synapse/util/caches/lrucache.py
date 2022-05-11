@@ -181,6 +181,9 @@ async def _expire_old_entries(
                 logger.warning(
                     "Unable to read allocated memory, this may affect memory-based cache eviction."
                 )
+                # If we've failed to read the current memory usage then we
+                # should stop trying to evict based on memory usage
+                evicting_due_to_memory = False
 
         # If we do lots of work at once we yield to allow other stuff to happen.
         if (i + 1) % 10000 == 0:
