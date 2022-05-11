@@ -426,7 +426,7 @@ class EventCreationHandler:
         # This is to stop us from diverging history *too* much.
         self.limiter = Linearizer(max_count=5, name="room_event_creation_limit")
 
-        self.action_generator = hs.get_action_generator()
+        self._bulk_push_rule_evaluator = hs.get_bulk_push_rule_evaluator()
 
         self.spam_checker = hs.get_spam_checker()
         self.third_party_event_rules: "ThirdPartyEventRules" = (
@@ -1249,7 +1249,9 @@ class EventCreationHandler:
         # and `state_groups` because they have `prev_events` that aren't persisted yet
         # (historical messages persisted in reverse-chronological order).
         if not event.internal_metadata.is_historical():
-            await self.action_generator.handle_push_actions_for_event(event, context)
+            await self._bulk_push_rule_evaluator.action_for_event_by_user(
+                event, context
+            )
 
         try:
             # If we're a worker we need to hit out to the master.
