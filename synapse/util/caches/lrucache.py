@@ -139,7 +139,7 @@ async def _expire_old_entries(
             logger.warning(
                 "Unable to read allocated memory, skipping memory-based cache eviction."
             )
-            
+
         if mem_usage > max_cache_memory_usage:
             logger.info("Begin memory-based cache eviction.")
             evicting_due_to_memory = True

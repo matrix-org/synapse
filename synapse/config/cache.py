@@ -178,7 +178,7 @@ class CacheConfig(Config):
 
             # 'min_cache_ttl` sets a limit under which newer cache entries are not evicted and is only applied when
             # caches are actively being evicted/`max_cache_memory_usage` has been exceeded. This is to protect hot caches
-            # from being emptied while Synapse is evicting due to memory. 
+            # from being emptied while Synapse is evicting due to memory.
             #min_cache_ttl: 5m
 
           # Controls how long the results of a /sync request are cached for after
