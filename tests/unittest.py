@@ -831,7 +831,7 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
             self.site,
             method=method,
             path=path,
-            content=content or "",
+            content=content if content is not None else "",
             shorthand=False,
             await_result=await_result,
             custom_headers=custom_headers,
