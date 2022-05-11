@@ -135,14 +135,14 @@ async def _expire_old_entries(
         try:
             jemalloc_interface.refresh_stats()
             mem_usage = jemalloc_interface.get_stat("allocated")
-            if mem_usage > max_cache_memory_usage:
-                logger.info("Begin memory-based cache eviction.")
-                evicting_due_to_memory = True
         except Exception:
             logger.warning(
                 "Unable to read allocated memory, skipping memory-based cache eviction."
             )
-
+            
+        if mem_usage > max_cache_memory_usage:
+            logger.info("Begin memory-based cache eviction.")
+            evicting_due_to_memory = True
     while node is not GLOBAL_ROOT:
         # Only the root node isn't a `_TimedListNode`.
         assert isinstance(node, _TimedListNode)
