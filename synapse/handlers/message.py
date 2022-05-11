@@ -426,7 +426,7 @@ class EventCreationHandler:
         # This is to stop us from diverging history *too* much.
         self.limiter = Linearizer(max_count=5, name="room_event_creation_limit")
 
-        self.action_generator = hs.get_action_generator()
+        self._bulk_push_rule_evaluator = hs.get_bulk_push_rule_evaluator()
 
         self.spam_checker = hs.get_spam_checker()
         self.third_party_event_rules: "ThirdPartyEventRules" = (
@@ -757,6 +757,10 @@ class EventCreationHandler:
             The previous version of the event is returned, if it is found in the
             event context. Otherwise, None is returned.
         """
+        if event.internal_metadata.is_outlier():
+            # This can happen due to out of band memberships
+            return None
+
         prev_state_ids = await context.get_prev_state_ids()
         prev_event_id = prev_state_ids.get((event.type, event.state_key))
         if not prev_event_id:
@@ -1001,7 +1005,7 @@ class EventCreationHandler:
         # after it is created
         if builder.internal_metadata.outlier:
             event.internal_metadata.outlier = True
-            context = EventContext.for_outlier()
+            context = EventContext.for_outlier(self.storage)
         elif (
             event.type == EventTypes.MSC2716_INSERTION
             and state_event_ids
@@ -1239,7 +1243,9 @@ class EventCreationHandler:
         # and `state_groups` because they have `prev_events` that aren't persisted yet
         # (historical messages persisted in reverse-chronological order).
         if not event.internal_metadata.is_historical():
-            await self.action_generator.handle_push_actions_for_event(event, context)
+            await self._bulk_push_rule_evaluator.action_for_event_by_user(
+                event, context
+            )
 
         try:
             # If we're a worker we need to hit out to the master.
