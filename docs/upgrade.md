@@ -101,29 +101,36 @@ To re-enable this functionality, set the
 homeserver config option to `true`.
 
 
-## Deprecation of the `synapse.app.appservice` worker application type
+## Deprecation of the `synapse.app.appservice` and `synapse.app.user_dir` worker application types
 
 The `synapse.app.appservice` worker application type allowed you to configure a
 single worker to use to notify application services of new events, as long
 as this functionality was disabled on the main process with `notify_appservices: False`.
+Further, the `synapse.app.user_dir` worker application type allowed you to configure
+a single worker to be responsible for updating the user directory, as long as this
+was disabled on the main process with `update_user_directory: False`.
 
 To unify Synapse's worker types, the `synapse.app.appservice` worker application
 type and the `notify_appservices` configuration option have been deprecated.
+The `synapse.app.user_dir` worker application type and `update_user_directory`
+configuration option have also been deprecated.
 
-To get the same functionality, it's now recommended that the `synapse.app.generic_worker`
-worker application type is used and that the `notify_appservices_from_worker` option
-is set to the name of a worker.
+To get the same functionality as was provided by the deprecated options, it's now recommended that the `synapse.app.generic_worker`
+worker application type is used and that the `notify_appservices_from_worker` and/or
+`update_user_directory_from_worker` options are set to the name of a worker.
 
-For the time being, `notify_appservices_from_worker` can be used alongside
-`synapse.app.appservice` and `notify_appservices` to make it easier to transition
-between the two configurations, however please note that:
+For the time being, the old options can be used alongside the new options to make
+it easier to transition between the two configurations, however please note that:
 
 - the options must not contradict each other (otherwise Synapse won't start); and
-- the `notify_appservices` option will be removed in a future release of Synapse.
+- the `notify_appservices` and `update_user_directory` options will be removed in a future release of Synapse.
 
-Please see [the relevant section of the worker documentation][v1_59_notify_ases_from] for more information.
+Please see the [*Notifying Application Services*][v1_59_notify_ases_from] and
+[*Updating the User Directory*][v1_59_update_user_dir] sections of the worker
+documentation for more information.
 
 [v1_59_notify_ases_from]: workers.md#notifying-application-services
+[v1_59_update_user_dir]: workers.md#updating-the-user-directory
 
 
 # Upgrading to v1.58.0

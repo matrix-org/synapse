@@ -1,1 +1,0 @@
-Fix a long-standing bug where rooms containing power levels with string values could not be upgraded.

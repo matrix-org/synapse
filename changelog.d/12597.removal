@@ -1,2 +1,0 @@
-Remove the unspecified `m.login.jwt` login type and the unstable `uk.half-shot.msc2778.login.application_service` from 
-[MSC2778](https://github.com/matrix-org/matrix-doc/pull/2778).

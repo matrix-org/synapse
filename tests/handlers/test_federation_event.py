@@ -148,7 +148,9 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             prev_event.internal_metadata.outlier = True
             persistence = self.hs.get_storage().persistence
             self.get_success(
-                persistence.persist_event(prev_event, EventContext.for_outlier())
+                persistence.persist_event(
+                    prev_event, EventContext.for_outlier(self.hs.get_storage())
+                )
             )
         else:
 
