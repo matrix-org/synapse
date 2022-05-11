@@ -12,13 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from enum import Enum
+from typing import NewType, Union
+
+from synapse.api.errors import Codes
 
 
 class RegistrationBehaviour(Enum):
     """
-    Enum to define whether a registration request should allowed, denied, or shadow-banned.
+    Enum to define whether a registration request should be allowed, denied, or shadow-banned.
     """
 
     ALLOW = "allow"
     SHADOW_BAN = "shadow_ban"
     DENY = "deny"
+
+
+Allow = NewType("Allow", str)
+
+ALLOW = Allow("Allow")
+"""
+Return this constant to allow a message to pass.
+"""
+
+Decision = Union[ALLOW, Codes]
+"""
+Union to define whether a request should be allowed or rejected.
+
+To reject a request without any specific information, use `Codes.FORBIDDEN`.
+"""

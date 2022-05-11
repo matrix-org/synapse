@@ -18,6 +18,17 @@ async def check_event_for_spam(event: "synapse.events.EventBase") -> Union[bool,
 
 Called when receiving an event from a client or via federation. The callback must return
 either:
+  - on `Decision.ALLOW`, the action is permitted.
+  - on `Decision.DENY`, the action is rejected with a default error message/code.
+  - on `Codes`, the action is rejected with a specific error message/code. In case
+      of doubt, use `Codes.FORBIDDEN`.
+  - (deprecated) on `False`, behave as `Decision.ALLOW`. Deprecated as methods in
+      this API are inconsistent, some expect `True` for `ALLOW` and others `True`
+      for `DENY`.
+  - (deprecated) on `True`, behave as `Decision.DENY`. Deprecated as methods in
+      this API are inconsistent, some expect `True` for `ALLOW` and others `True`
+      for `DENY`.
+
 - an error message string, to indicate the event must be rejected because of spam and 
   give a rejection reason to forward to clients;
 - the boolean `True`, to indicate that the event is spammy, but not provide further details; or

@@ -18,6 +18,7 @@ import random
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Iterable, List, Optional, Set, Tuple
 
+import synapse
 from synapse import types
 from synapse.api.constants import (
     AccountDataTypes,
@@ -679,8 +680,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             if target_id == self._server_notices_mxid:
                 raise SynapseError(HTTPStatus.FORBIDDEN, "Cannot invite this user")
 
-            block_invite = False
-
             if (
                 self._server_notices_mxid is not None
                 and requester.user.to_string() == self._server_notices_mxid
@@ -697,16 +696,18 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                         "Blocking invite: user is not admin and non-admin "
                         "invites disabled"
                     )
-                    block_invite = True
+                    raise SynapseError(403, "Invites have been disabled on this server")
 
-                if not await self.spam_checker.user_may_invite(
+                spam_check = await self.spam_checker.user_may_invite(
                     requester.user.to_string(), target_id, room_id
-                ):
+                )
+                if spam_check is not synapse.spam_checker_api.ALLOW:
                     logger.info("Blocking invite due to spam checker")
-                    block_invite = True
-
-            if block_invite:
-                raise SynapseError(403, "Invites have been disabled on this server")
+                    raise SynapseError(
+                        403,
+                        "This invite has been rejected as probable spam",
+                        spam_check,
+                    )
 
         # An empty prev_events list is allowed as long as the auth_event_ids are present
         if prev_event_ids is not None:
@@ -814,11 +815,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 # We assume that if the spam checker allowed the user to create
                 # a room then they're allowed to join it.
                 and not new_room
-                and not await self.spam_checker.user_may_join_room(
+            ):
+                spam_check = await self.spam_checker.user_may_join_room(
                     target.to_string(), room_id, is_invited=inviter is not None
                 )
-            ):
-                raise SynapseError(403, "Not allowed to join this room")
+                if spam_check is not synapse.spam_checker_api.ALLOW:
+                    raise SynapseError(
+                        403, "This request to join room has been rejected", spam_check
+                    )
 
             # Check if a remote join should be performed.
             remote_join, remote_room_hosts = await self._should_perform_remote_join(
@@ -1372,13 +1376,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             )
         else:
             # Check if the spamchecker(s) allow this invite to go through.
-            if not await self.spam_checker.user_may_send_3pid_invite(
+            spam_check = await self.spam_checker.user_may_send_3pid_invite(
                 inviter_userid=requester.user.to_string(),
                 medium=medium,
                 address=address,
                 room_id=room_id,
-            ):
-                raise SynapseError(403, "Cannot send threepid invite")
+            )
+            if spam_check is not synapse.spam_checker_api.ALLOW:
+                raise SynapseError(403, "Cannot send threepid invite", spam_check)
 
             stream_id = await self._make_and_store_3pid_invite(
                 requester,

@@ -27,6 +27,7 @@ from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
 from unpaddedbase64 import decode_base64
 
+import synapse
 from synapse import event_auth
 from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
@@ -799,11 +800,14 @@ class FederationHandler:
         if self.hs.config.server.block_non_admin_invites:
             raise SynapseError(403, "This server does not accept room invites")
 
-        if not await self.spam_checker.user_may_invite(
+        spam_check = await self.spam_checker.user_may_invite(
             event.sender, event.state_key, event.room_id
-        ):
+        )
+        if spam_check is not synapse.spam_checker_api.ALLOW:
             raise SynapseError(
-                403, "This user is not permitted to send invites to this server/user"
+                403,
+                "This user is not permitted to send invites to this server/user",
+                spam_check,
             )
 
         membership = event.content.get("membership")

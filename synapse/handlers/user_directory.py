@@ -100,7 +100,8 @@ class UserDirectoryHandler(StateDeltasHandler):
         # Remove any spammy users from the results.
         non_spammy_users = []
         for user in results["results"]:
-            if not await self.spam_checker.check_username_for_spam(user):
+            spam_check = await self.spam_checker.check_username_for_spam(user)
+            if spam_check is synapse.spam_checker_api.ALLOW:
                 non_spammy_users.append(user)
         results["results"] = non_spammy_users
 

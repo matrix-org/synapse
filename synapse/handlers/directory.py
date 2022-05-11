@@ -16,6 +16,7 @@ import logging
 import string
 from typing import TYPE_CHECKING, Iterable, List, Optional
 
+import synapse
 from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes
 from synapse.api.errors import (
     AuthError,
@@ -137,10 +138,13 @@ class DirectoryHandler:
                         403, "You must be in the room to create an alias for it"
                     )
 
-            if not await self.spam_checker.user_may_create_room_alias(
+            spam_check = await self.spam_checker.user_may_create_room_alias(
                 user_id, room_alias
-            ):
-                raise AuthError(403, "This user is not permitted to create this alias")
+            )
+            if spam_check is not synapse.spam_checker_api.ALLOW:
+                raise AuthError(
+                    403, "This alias creation request has been rejected", spam_check
+                )
 
             if not self.config.roomdirectory.is_alias_creation_allowed(
                 user_id, room_id, room_alias_str
@@ -426,9 +430,12 @@ class DirectoryHandler:
         """
         user_id = requester.user.to_string()
 
-        if not await self.spam_checker.user_may_publish_room(user_id, room_id):
+        spam_check = await self.spam_checker.user_may_publish_room(user_id, room_id)
+        if spam_check is not synapse.spam_checker_api.ALLOW:
             raise AuthError(
-                403, "This user is not permitted to publish rooms to the room list"
+                403,
+                "This request to publish a room to the room list has been rejected",
+                spam_check,
             )
 
         if requester.is_guest:

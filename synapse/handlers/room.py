@@ -33,6 +33,7 @@ from typing import (
 import attr
 from typing_extensions import TypedDict
 
+import synapse
 from synapse.api.constants import (
     EventContentFields,
     EventTypes,
@@ -407,9 +408,10 @@ class RoomCreationHandler:
         """
         user_id = requester.user.to_string()
 
-        if not await self.spam_checker.user_may_create_room(user_id):
+        spam_check = await self.spam_checker.user_may_create_room(user_id)
+        if spam_check is not synapse.spam_checker_api.ALLOW:
             raise SynapseError(
-                403, "You are not permitted to create rooms", Codes.FORBIDDEN
+                403, "This room creation request has been rejected", spam_check
             )
 
         creation_content: JsonDict = {
