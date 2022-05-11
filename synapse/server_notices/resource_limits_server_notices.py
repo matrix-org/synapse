@@ -21,7 +21,6 @@ from synapse.api.constants import (
     ServerNoticeMsgType,
 )
 from synapse.api.errors import AuthError, ResourceLimitError, SynapseError
-from synapse.server_notices.server_notices_manager import SERVER_NOTICE_ROOM_TAG
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -77,11 +76,6 @@ class ResourceLimitsServerNotices:
         )
 
         if room_id is not None:
-            # If the room exists, make sure it has the correct tags. We don't need to do
-            # anything if the room doesn't exist because it will be created with the
-            # correct tags anyway.
-            await self._check_and_set_tags(user_id, room_id)
-
             # Determine current state of room
             currently_blocked, ref_events = await self._is_room_currently_blocked(
                 room_id
@@ -166,26 +160,6 @@ class ResourceLimitsServerNotices:
         await self._server_notices_manager.send_notice(
             user_id, content, EventTypes.Pinned, ""
         )
-
-    async def _check_and_set_tags(self, user_id: str, room_id: str) -> None:
-        """
-        Since server notices rooms were originally not with tags,
-        important to check that tags have been set correctly
-        Args:
-            user_id(str): the user in question
-            room_id(str): the server notices room for that user
-        """
-        tags = await self._store.get_tags_for_room(user_id, room_id)
-        need_to_set_tag = True
-        if tags:
-            if SERVER_NOTICE_ROOM_TAG in tags:
-                # tag already present, nothing to do here
-                need_to_set_tag = False
-        if need_to_set_tag:
-            max_id = await self._account_data_handler.add_tag_to_room(
-                user_id, room_id, SERVER_NOTICE_ROOM_TAG, {}
-            )
-            self._notifier.on_new_event("account_data_key", max_id, users=[user_id])
 
     async def _is_room_currently_blocked(self, room_id: str) -> Tuple[bool, List[str]]:
         """
