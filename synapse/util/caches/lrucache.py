@@ -133,6 +133,7 @@ async def _expire_old_entries(
     jemalloc_interface = get_jemalloc_stats()
     if jemalloc_interface and autotune_config:
         try:
+            jemalloc_interface.refresh_stats()
             mem_usage = jemalloc_interface.get_stat("allocated")
             if mem_usage > max_cache_memory_usage:
                 logger.info("Begin memory-based cache eviction.")
@@ -171,6 +172,7 @@ async def _expire_old_entries(
         # Check mem allocation periodically if we are evicting a bunch of caches
         if jemalloc_interface and evicting_due_to_memory and (i + 1) % 100 == 0:
             try:
+                jemalloc_interface.refresh_stats()
                 mem_usage = jemalloc_interface.get_stat("allocated")
                 if mem_usage < target_cache_memory_usage:
                     evicting_due_to_memory = False
