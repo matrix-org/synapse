@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Collection, Dict, List, Optional, Tuple, Union
 
 import attr
 from signedjson.types import SigningKey
@@ -101,8 +101,8 @@ class EventBuilder:
 
     async def build(
         self,
-        prev_event_ids: List[str],
-        auth_event_ids: Optional[List[str]],
+        prev_event_ids: Collection[str],
+        auth_event_ids: Optional[Collection[str]],
         depth: Optional[int] = None,
     ) -> EventBase:
         """Transform into a fully signed and hashed event
@@ -135,8 +135,8 @@ class EventBuilder:
             auth_events = await self._store.add_event_hashes(auth_event_ids)
             prev_events = await self._store.add_event_hashes(prev_event_ids)
         else:
-            auth_events = auth_event_ids
-            prev_events = prev_event_ids
+            auth_events = list(auth_event_ids)
+            prev_events = list(prev_event_ids)
 
         # Otherwise, progress the depth as normal
         if depth is None:

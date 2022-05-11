@@ -17,7 +17,7 @@
 import logging
 import random
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Collection, Dict, List, Mapping, Optional, Tuple
 
 from canonicaljson import encode_canonical_json
 
@@ -487,9 +487,9 @@ class EventCreationHandler:
         event_dict: dict,
         txn_id: Optional[str] = None,
         allow_no_prev_events: bool = False,
-        prev_event_ids: Optional[List[str]] = None,
-        auth_event_ids: Optional[List[str]] = None,
-        state_event_ids: Optional[List[str]] = None,
+        prev_event_ids: Optional[Collection[str]] = None,
+        auth_event_ids: Optional[Collection[str]] = None,
+        state_event_ids: Optional[Collection[str]] = None,
         require_consent: bool = True,
         outlier: bool = False,
         historical: bool = False,
@@ -901,9 +901,9 @@ class EventCreationHandler:
         builder: EventBuilder,
         requester: Optional[Requester] = None,
         allow_no_prev_events: bool = False,
-        prev_event_ids: Optional[List[str]] = None,
-        auth_event_ids: Optional[List[str]] = None,
-        state_event_ids: Optional[List[str]] = None,
+        prev_event_ids: Optional[Collection[str]] = None,
+        auth_event_ids: Optional[Collection[str]] = None,
+        state_event_ids: Optional[Collection[str]] = None,
         depth: Optional[int] = None,
     ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client
