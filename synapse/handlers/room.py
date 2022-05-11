@@ -245,7 +245,7 @@ class RoomCreationHandler:
             requester: the user requesting the upgrade
             old_room_id: the id of the room to be replaced
             new_versions: the version to upgrade the room to
-            old_room: a dict containing room information for the room the be replaced,
+            old_room: a dict containing room information for the room to be replaced,
                 as returned by `RoomWorkerStore.get_room`.
             tombstone_auth_template: a template for the tombstone event to send to the
                 old room. `tombstone_auth_template`'s prev and auth events will be used
