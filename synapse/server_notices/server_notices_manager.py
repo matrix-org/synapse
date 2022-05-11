@@ -90,7 +90,7 @@ class ServerNoticesManager:
         )
         return event
 
-    @cached()
+    @cached(prune_unread_entries=False)
     async def get_or_create_notice_room_for_user(self, user_id: str) -> str:
         """Get the room for notices for a given user
 
