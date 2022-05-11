@@ -76,7 +76,7 @@ _had_valid_well_known_cache: TTLCache[bytes, bool] = TTLCache("had-valid-well-kn
 
 @attr.s(slots=True, frozen=True)
 class WellKnownLookupResult:
-    delegated_server = attr.ib()
+    delegated_server: Optional[bytes] = attr.ib()
 
 
 class WellKnownResolver:
@@ -336,4 +336,4 @@ def _parse_cache_control(headers: Headers) -> Dict[bytes, Optional[bytes]]:
 class _FetchWellKnownFailure(Exception):
     # True if we didn't get a non-5xx HTTP response, i.e. this may or may not be
     # a temporary failure.
-    temporary = attr.ib()
+    temporary: bool = attr.ib()
