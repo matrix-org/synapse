@@ -1,1 +1,1 @@
-Fix a bug introduced in Synapse 1.30.0 which caused invites new server notice rooms to not be sent out if the notice was triggered by the homeserver's monthly active users limit being reached.
+Fix a bug introduced in Synapse 1.30.0 where invites to new server notice rooms would not be sent out if the notice was triggered by the homeserver's monthly active users limit being reached.
