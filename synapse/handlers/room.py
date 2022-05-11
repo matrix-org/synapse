@@ -197,6 +197,12 @@ class RoomCreationHandler:
                     400, "An upgrade for this room is currently in progress"
                 )
 
+        # Check whether the room exists and 404 if it doesn't.
+        # We could go straight for the auth check, but that will raise a 403 instead.
+        old_room = await self.store.get_room(old_room_id)
+        if old_room is None:
+            raise NotFoundError("Unknown room id %s" % (old_room_id,))
+
         # Before starting the room upgrade, check whether the user has the power level
         # to carry out the upgrade, by creating a dummy tombstone event. The auth checks
         # will check for room membership and the required power level to send the
@@ -220,6 +226,7 @@ class RoomCreationHandler:
             requester,
             old_room_id,
             new_version,  # args for _upgrade_room
+            old_room,
             tombstone_auth_template=tombstone_event,
         )
 
@@ -230,6 +237,7 @@ class RoomCreationHandler:
         requester: Requester,
         old_room_id: str,
         new_version: RoomVersion,
+        old_room: Dict[str, Any],
         tombstone_auth_template: EventBase,
     ) -> str:
         """
@@ -237,6 +245,8 @@ class RoomCreationHandler:
             requester: the user requesting the upgrade
             old_room_id: the id of the room to be replaced
             new_versions: the version to upgrade the room to
+            old_room: a dict containing room information for the room the be replaced,
+                as returned by `RoomWorkerStore.get_room`.
             tombstone_auth_template: a template for the tombstone event to send to the
                 old room. `tombstone_auth_template`'s prev and auth events will be used
                 to create the tombstone event.
@@ -248,12 +258,9 @@ class RoomCreationHandler:
         assert self.hs.is_mine_id(user_id), "User must be our own: %s" % (user_id,)
 
         # start by allocating a new room id
-        r = await self.store.get_room(old_room_id)
-        if r is None:
-            raise NotFoundError("Unknown room id %s" % (old_room_id,))
         new_room_id = await self._generate_room_id(
             creator_id=user_id,
-            is_public=r["is_public"],
+            is_public=old_room["is_public"],
             room_version=new_version,
         )
 
