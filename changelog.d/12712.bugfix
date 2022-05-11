@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.38.0 where empty rooms would be created automatically if an MAU limit was set and time-based cache expiry was turned on.
