@@ -170,15 +170,16 @@ class CacheConfig(Config):
           #cache_autotuning:
             # This flag sets a ceiling on much memory the cache can use before caches begin to be continuously evicted.
             # They will continue to be evicted until the memory usage drops below the `target_memory_usage`, set in
-            # the flag below.
-            #max_cache_memory_usage:
+            # the flag below, or until the `min_cache_ttl` is hit.
+            #max_cache_memory_usage: 1024M
 
             # This flag sets a rough target for the desired memory usage of the caches.
-            #target_cache_memory_usage:
+            #target_cache_memory_usage: 758M
 
-            # This flag sets a floor for the minimum time that cache entries must exist in the cache, and is only applied
-            # caches are actively being evicted/`max_cache_memory_usage` has been exceeded.
-            #min_cache_ttl:
+            # 'min_cache_ttl` sets a limit under which newer cache entries are not evicted and is only applied when
+            # caches are actively being evicted/`max_cache_memory_usage` has been exceeded. This is to protect hot caches
+            # from being emptied while Synapse is evicting due to memory. 
+            #min_cache_ttl: 5m
 
           # Controls how long the results of a /sync request are cached for after
           # a successful response is returned. A higher duration can help clients with
