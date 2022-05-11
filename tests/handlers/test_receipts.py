@@ -331,6 +331,27 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
+    def test_we_do_not_mutate(self):
+        events = [
+            {
+                "content": {
+                    "$1435641916114394fHBLK:matrix.org": {
+                        ReceiptTypes.READ_PRIVATE: {
+                            "@rikj:jki.re": {
+                                "ts": 1436451550453,
+                            }
+                        }
+                    }
+                },
+                "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
+                "type": "m.receipt",
+            }
+        ]
+        events_copy = events.copy()
+
+        self.event_source.filter_out_private(events, "@me:server.org")
+        self.assertEqual(events, events_copy)
+
     def _test_filters_private(
         self, events: List[JsonDict], expected_output: List[JsonDict]
     ):
