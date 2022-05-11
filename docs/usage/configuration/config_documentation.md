@@ -1131,18 +1131,17 @@ caches:
   sync_response_cache_duration: 2m
 ```
 
-### Reloading cache config
+### Reloading cache factors
 
-The cache config may be reloaded at any time by sending a
+The cache factors (i.e. `caches.global_factor` and `caches.per_cache_factors`)  may be reloaded at any time by sending a
 [`SIGHUP`](https://en.wikipedia.org/wiki/SIGHUP) signal to Synapse using e.g.
 
 ```commandline
 kill -HUP [PID_OF_SYNAPSE_PROCESS]
 ```
 
-If you are running multiple workers, you must send this signal to each worker
-process individually; otherwise different workers will have different caching
-config.
+If you are running multiple workers, you must individually update the worker 
+config file and send this signal to each worker process.
 
 If you're using the [example systemd service](https://github.com/matrix-org/synapse/blob/develop/contrib/systemd/matrix-synapse.service)
 file in Synapse's `contrib` directory, you can send a `SIGHUP` signal by using

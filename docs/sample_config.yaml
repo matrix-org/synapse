@@ -726,12 +726,16 @@ retention:
 ## Caching ##
 
 # Caching can be configured through the following options.
-# This configuration can be reloaded while the application
-# is running, by sending a SIGHUP signal to the Synapse process.
 #
 # A cache 'factor' is a multiplier that can be applied to each of
 # Synapse's caches in order to increase or decrease the maximum
 # number of entries that can be stored.
+#
+# The configuration for cache factors (caches.global_factor and
+# caches.per_cache_factors) can be reloaded while the application is running,
+# by sending a SIGHUP signal to the Synapse process. Changes to other parts of
+# the caching config will NOT be applied after a SIGHUP is received; a restart
+# is necessary.
 
 # The number of events to cache in memory. Not affected by
 # caches.global_factor.

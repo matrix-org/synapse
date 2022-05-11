@@ -495,7 +495,6 @@ def reload_cache_config(config: HomeServerConfig) -> None:
     Otherwise, this:
         - replaces the `caches` section on the given `config` object,
         - resizes all caches according to the new cache factors, and
-        - updates synapse.util.caches.TRACK_MEMORY_USAGE.
 
     Note that the following cache config keys are read, but not applied:
         - event_cache_size: used to set a max_size and _original_max_size on
@@ -503,6 +502,8 @@ def reload_cache_config(config: HomeServerConfig) -> None:
               the _original_max_size (and maybe
         - sync_response_cache_duration: would have to update the timeout_sec attribute on
               HomeServer ->  SyncHandler -> ResponseCache.
+        - track_memory_usage. This affects synapse.util.caches.TRACK_MEMORY_USAGE which
+              influences Synapse's self-reported metrics.
 
     Also, the HTTPConnectionPool in SimpleHTTPClient sets its maxPersistentPerHost
     parameter based on the global_factor. This won't be applied on a config reload.
