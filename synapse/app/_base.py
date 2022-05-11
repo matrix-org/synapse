@@ -48,6 +48,7 @@ from twisted.logger import LoggingFile, LogLevel
 from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.python.threadpool import ThreadPool
 
+import synapse.util.caches
 from synapse.api.constants import MAX_PDU_SIZE
 from synapse.app import check_bind_error
 from synapse.app.phone_stats_home import start_phone_stats_home
@@ -499,6 +500,7 @@ def reload_cache_config(config: HomeServerConfig) -> None:
             previous_cache_config.__dict__,
             config.caches.__dict__,
         )
+        synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage
         config.caches.resize_all_caches()
 
 
