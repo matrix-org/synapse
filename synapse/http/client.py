@@ -779,7 +779,7 @@ class SimpleHttpClient:
         )
 
 
-def _timeout_to_request_timed_out_error(f: Failure):
+def _timeout_to_request_timed_out_error(f: Failure) -> Failure:
     if f.check(twisted_error.TimeoutError, twisted_error.ConnectingCancelledError):
         # The TCP connection has its own timeout (set by the 'connectTimeout' param
         # on the Agent), which raises twisted_error.TimeoutError exception.
@@ -813,7 +813,7 @@ class _DiscardBodyWithMaxSizeProtocol(protocol.Protocol):
     def __init__(self, deferred: defer.Deferred):
         self.deferred = deferred
 
-    def _maybe_fail(self):
+    def _maybe_fail(self) -> None:
         """
         Report a max size exceed error and disconnect the first time this is called.
         """
@@ -937,12 +937,12 @@ class InsecureInterceptableContextFactory(ssl.ContextFactory):
     Do not use this since it allows an attacker to intercept your communications.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._context = SSL.Context(SSL.SSLv23_METHOD)
         self._context.set_verify(VERIFY_NONE, lambda *_: False)
 
     def getContext(self, hostname=None, port=None):
         return self._context
 
-    def creatorForNetloc(self, hostname, port):
+    def creatorForNetloc(self, hostname: bytes, port: int):
         return self
