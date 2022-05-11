@@ -66,7 +66,6 @@ class ServerNoticesManager:
             txn_id: The transaction ID.
         """
         room_id = await self.get_or_create_notice_room_for_user(user_id)
-        await self.maybe_invite_user_to_room(user_id, room_id)
 
         assert self.server_notices_mxid is not None
         requester = create_requester(
@@ -90,8 +89,28 @@ class ServerNoticesManager:
         )
         return event
 
-    @cached()
     async def get_or_create_notice_room_for_user(self, user_id: str) -> str:
+        """Get the room for notices for a given user
+
+        If we have not yet created a notice room for this user, create it, but don't
+        invite the user to it.
+
+        Also checks if the user needs to be invited into the room, and invites them if
+        necessary.
+
+        Args:
+            user_id: complete user id for the user we want a room for
+
+        Returns:
+            room id of notice room.
+        """
+
+        room_id = await self._get_or_create_notice_room_for_user(user_id)
+        await self.maybe_invite_user_to_room(user_id, room_id)
+        return room_id
+
+    @cached()
+    async def _get_or_create_notice_room_for_user(self, user_id: str) -> str:
         """Get the room for notices for a given user
 
         If we have not yet created a notice room for this user, create it, but don't

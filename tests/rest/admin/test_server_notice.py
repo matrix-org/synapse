@@ -214,7 +214,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(messages[0]["sender"], "@notices:test")
 
         # invalidate cache of server notices room_ids
-        self.server_notices_manager.get_or_create_notice_room_for_user.invalidate_all()
+        self.server_notices_manager._get_or_create_notice_room_for_user.invalidate_all()
 
         # send second message
         channel = self.make_request(
@@ -289,7 +289,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         # invalidate cache of server notices room_ids
         # if server tries to send to a cached room_id the user gets the message
         # in old room
-        self.server_notices_manager.get_or_create_notice_room_for_user.invalidate_all()
+        self.server_notices_manager._get_or_create_notice_room_for_user.invalidate_all()
 
         # send second message
         channel = self.make_request(
@@ -376,7 +376,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
 
         # invalidate cache of server notices room_ids
         # if server tries to send to a cached room_id it gives an error
-        self.server_notices_manager.get_or_create_notice_room_for_user.invalidate_all()
+        self.server_notices_manager._get_or_create_notice_room_for_user.invalidate_all()
 
         # send second message
         channel = self.make_request(
@@ -432,7 +432,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         self.server_notices_manager._config.servernotices.server_notices_mxid_display_name = (
             new_display_name
         )
-        self.server_notices_manager.get_or_create_notice_room_for_user.cache.invalidate_all()
+        self.server_notices_manager._get_or_create_notice_room_for_user.invalidate_all()
 
         self.make_request(
             "POST",
@@ -478,7 +478,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         self.server_notices_manager._config.servernotices.server_notices_mxid_avatar_url = (
             new_avatar_url
         )
-        self.server_notices_manager.get_or_create_notice_room_for_user.cache.invalidate_all()
+        self.server_notices_manager._get_or_create_notice_room_for_user.invalidate_all()
 
         self.make_request(
             "POST",
@@ -500,6 +500,27 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             state_key="@notices:test",
         )
         self.assertEqual(notice_user_state["avatar_url"], new_avatar_url)
+
+    @override_config({"server_notices": {"system_mxid_localpart": "notices"}})
+    def test_always_invite(self) -> None:
+        """Tests that calling get_or_create_notice_room_for_user always end up inviting
+        the user if necessary.
+        """
+        room_id = self.get_success(
+            self.server_notices_manager.get_or_create_notice_room_for_user(
+                self.other_user,
+            )
+        )
+
+        invited_rooms = self._check_invite_and_join_status(self.other_user, 1, 0)
+
+        invited = False
+        for invited_room in invited_rooms:
+            if invited_room.room_id == room_id:
+                invited = True
+                break
+
+        self.assertTrue(invited)
 
     def _check_invite_and_join_status(
         self, user_id: str, expected_invites: int, expected_memberships: int
