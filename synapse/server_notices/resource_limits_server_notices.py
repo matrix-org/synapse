@@ -71,18 +71,22 @@ class ResourceLimitsServerNotices:
             # In practice, not sure we can ever get here
             return
 
-        room_id = await self._server_notices_manager.get_or_create_notice_room_for_user(
+        # Check if there's a server notice room for this user.
+        room_id = await self._server_notices_manager.maybe_get_notice_room_for_user(
             user_id
         )
 
-        if not room_id:
-            logger.warning("Failed to get server notices room")
-            return
+        if room_id is not None:
+            # If the room exists, make sure it has the correct tags.
+            await self._check_and_set_tags(user_id, room_id)
 
-        await self._check_and_set_tags(user_id, room_id)
-
-        # Determine current state of room
-        currently_blocked, ref_events = await self._is_room_currently_blocked(room_id)
+            # Determine current state of room
+            currently_blocked, ref_events = await self._is_room_currently_blocked(
+                room_id
+            )
+        else:
+            currently_blocked = False
+            ref_events = []
 
         limit_msg = None
         limit_type = None
