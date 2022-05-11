@@ -165,7 +165,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         self.config = hs.config
 
     @staticmethod
-    def filter_out_private(events: List[JsonDict], user_id: str) -> List[JsonDict]:
+    def filter_out_private(events: List[JsonDict], our_user_id: str) -> List[JsonDict]:
         """
         This method takes in what is returned by
         get_linearized_receipts_for_rooms() and goes through read receipts
@@ -173,35 +173,23 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         current user.
         """
 
-        visible_events = []
-
         # filter out private receipts the user shouldn't see
-        for event in events:
+        for index, event in enumerate(events):
             content = event.get("content", {})
-            new_event = event.copy()
-            new_event["content"] = {}
-
-            for event_id, event_content in content.items():
-                receipt_event = {}
-                for receipt_type, receipt_content in event_content.items():
+            for event_id, event_content in list(content.items()):
+                for receipt_type, receipt_content in list(event_content.items()):
                     if receipt_type == ReceiptTypes.READ_PRIVATE:
-                        user_rr = receipt_content.get(user_id, None)
-                        if user_rr:
-                            receipt_event[ReceiptTypes.READ_PRIVATE] = {
-                                user_id: user_rr.copy()
-                            }
-                    else:
-                        receipt_event[receipt_type] = receipt_content.copy()
+                        for user_id in list(receipt_content.keys()):
+                            if user_id != our_user_id:
+                                del receipt_content[user_id]
 
-                # Only include the receipt event if it is non-empty.
-                if receipt_event:
-                    new_event["content"][event_id] = receipt_event
-
-            # Append new_event to visible_events unless empty
-            if len(new_event["content"].keys()) > 0:
-                visible_events.append(new_event)
-
-        return visible_events
+                    if len(receipt_content) == 0:
+                        del event_content[receipt_type]
+                if len(event_content) == 0:
+                    del content[event_id]
+            if len(content) == 0:
+                del events[index]
+        return events
 
     async def get_new_events(
         self,
