@@ -77,7 +77,9 @@ class ResourceLimitsServerNotices:
         )
 
         if room_id is not None:
-            # If the room exists, make sure it has the correct tags.
+            # If the room exists, make sure it has the correct tags. We don't need to do
+            # anything if the room doesn't exist because it will be created with the
+            # correct tags anyway.
             await self._check_and_set_tags(user_id, room_id)
 
             # Determine current state of room
