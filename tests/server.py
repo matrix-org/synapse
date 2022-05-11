@@ -749,6 +749,7 @@ def setup_test_homeserver(
     if config is None:
         config = default_config(name, parse=True)
 
+    config.caches.resize_all_caches()
     config.ldap_enabled = False
 
     if "clock" not in kwargs:

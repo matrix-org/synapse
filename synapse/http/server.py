@@ -314,6 +314,9 @@ class HttpServer(Protocol):
         If the regex contains groups these gets passed to the callback via
         an unpacked tuple.
 
+        The callback may be marked with the `@cancellable` decorator, which will
+        cause request processing to be cancelled when clients disconnect early.
+
         Args:
             method: The HTTP method to listen to.
             path_patterns: The regex used to match requests.
@@ -382,6 +385,8 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
 
         method_handler = getattr(self, "_async_render_%s" % (request_method,), None)
         if method_handler:
+            request.is_render_cancellable = is_method_cancellable(method_handler)
+
             raw_callback_return = method_handler(request)
 
             # Is it synchronous? We'll allow this for now.
@@ -541,6 +546,8 @@ class JsonResource(DirectServeJsonResource):
 
     async def _async_render(self, request: SynapseRequest) -> Tuple[int, Any]:
         callback, servlet_classname, group_dict = self._get_handler_for_request(request)
+
+        request.is_render_cancellable = is_method_cancellable(callback)
 
         # Make sure we have an appropriate name for this handler in prometheus
         # (rather than the default of JsonResource).

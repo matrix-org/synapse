@@ -69,11 +69,11 @@ def _canonicalise_cache_name(cache_name: str) -> str:
 def add_resizable_cache(
     cache_name: str, cache_resize_callback: Callable[[float], None]
 ) -> None:
-    """Register a cache that's size can dynamically change
+    """Register a cache whose size can dynamically change
 
     Args:
         cache_name: A reference to the cache
-        cache_resize_callback: A callback function that will be ran whenever
+        cache_resize_callback: A callback function that will run whenever
             the cache needs to be resized
     """
     # Some caches have '*' in them which we strip out.
@@ -96,6 +96,13 @@ class CacheConfig(Config):
     section = "caches"
     _environ = os.environ
 
+    event_cache_size: int
+    cache_factors: Dict[str, float]
+    global_factor: float
+    track_memory_usage: bool
+    expiry_time_msec: Optional[int]
+    sync_response_cache_duration: int
+
     @staticmethod
     def reset() -> None:
         """Resets the caches to their defaults. Used for tests."""
@@ -115,6 +122,12 @@ class CacheConfig(Config):
         # A cache 'factor' is a multiplier that can be applied to each of
         # Synapse's caches in order to increase or decrease the maximum
         # number of entries that can be stored.
+        #
+        # The configuration for cache factors (caches.global_factor and
+        # caches.per_cache_factors) can be reloaded while the application is running,
+        # by sending a SIGHUP signal to the Synapse process. Changes to other parts of
+        # the caching config will NOT be applied after a SIGHUP is received; a restart
+        # is necessary.
 
         # The number of events to cache in memory. Not affected by
         # caches.global_factor.
@@ -192,20 +205,20 @@ class CacheConfig(Config):
         """
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
+        """Populate this config object with values from `config`.
+
+        This method does NOT resize existing or future caches: use `resize_all_caches`.
+        We use two separate methods so that we can reject bad config before applying it.
+        """
         self.event_cache_size = self.parse_size(
             config.get("event_cache_size", _DEFAULT_EVENT_CACHE_SIZE)
         )
-        self.cache_factors: Dict[str, float] = {}
+        self.cache_factors = {}
 
         cache_config = config.get("caches") or {}
-        self.global_factor = cache_config.get(
-            "global_factor", properties.default_factor_size
-        )
+        self.global_factor = cache_config.get("global_factor", _DEFAULT_FACTOR_SIZE)
         if not isinstance(self.global_factor, (int, float)):
             raise ConfigError("caches.global_factor must be a number.")
-
-        # Set the global one so that it's reflected in new caches
-        properties.default_factor_size = self.global_factor
 
         # Load cache factors from the config
         individual_factors = cache_config.get("per_cache_factors") or {}
@@ -248,7 +261,7 @@ class CacheConfig(Config):
         cache_entry_ttl = cache_config.get("cache_entry_ttl", "30m")
 
         if expire_caches:
-            self.expiry_time_msec: Optional[int] = self.parse_duration(cache_entry_ttl)
+            self.expiry_time_msec = self.parse_duration(cache_entry_ttl)
         else:
             self.expiry_time_msec = None
 
@@ -287,19 +300,19 @@ class CacheConfig(Config):
             cache_config.get("sync_response_cache_duration", 0)
         )
 
-        # Resize all caches (if necessary) with the new factors we've loaded
-        self.resize_all_caches()
-
-        # Store this function so that it can be called from other classes without
-        # needing an instance of Config
-        properties.resize_all_caches_func = self.resize_all_caches
-
     def resize_all_caches(self) -> None:
-        """Ensure all cache sizes are up to date
+        """Ensure all cache sizes are up-to-date.
 
         For each cache, run the mapped callback function with either
         a specific cache factor or the default, global one.
         """
+        # Set the global factor size, so that new caches are appropriately sized.
+        properties.default_factor_size = self.global_factor
+
+        # Store this function so that it can be called from other classes without
+        # needing an instance of CacheConfig
+        properties.resize_all_caches_func = self.resize_all_caches
+
         # block other threads from modifying _CACHES while we iterate it.
         with _CACHES_LOCK:
             for cache_name, callback in _CACHES.items():

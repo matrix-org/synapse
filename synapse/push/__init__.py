@@ -43,11 +43,6 @@ The general interaction of the classes are:
         +---------------------------------------------+
                 |
                 v
-        +-----------------+
-        | ActionGenerator |
-        +-----------------+
-                |
-                v
         +-----------------------+     +---------------------------+
         | BulkPushRuleEvaluator |---->| PushRuleEvaluatorForEvent |
         +-----------------------+     +---------------------------+
