@@ -3929,6 +3929,16 @@ at all.</p>
   expire_caches: false
   sync_response_cache_duration: 2m
 </code></pre>
+<h3 id="reloading-cache-factors"><a class="header" href="#reloading-cache-factors">Reloading cache factors</a></h3>
+<p>The cache factors (i.e. <code>caches.global_factor</code> and <code>caches.per_cache_factors</code>)  may be reloaded at any time by sending a
+<a href="https://en.wikipedia.org/wiki/SIGHUP"><code>SIGHUP</code></a> signal to Synapse using e.g.</p>
+<pre><code class="language-commandline">kill -HUP [PID_OF_SYNAPSE_PROCESS]
+</code></pre>
+<p>If you are running multiple workers, you must individually update the worker 
+config file and send this signal to each worker process.</p>
+<p>If you're using the <a href="https://github.com/matrix-org/synapse/blob/develop/contrib/systemd/matrix-synapse.service">example systemd service</a>
+file in Synapse's <code>contrib</code> directory, you can send a <code>SIGHUP</code> signal by using
+<code>systemctl reload matrix-synapse</code>.</p>
 <hr />
 <h2 id="database"><a class="header" href="#database">Database</a></h2>
 <p>Config options related to database settings.</p>
@@ -6709,6 +6719,12 @@ retention:
 # A cache 'factor' is a multiplier that can be applied to each of
 # Synapse's caches in order to increase or decrease the maximum
 # number of entries that can be stored.
+#
+# The configuration for cache factors (caches.global_factor and
+# caches.per_cache_factors) can be reloaded while the application is running,
+# by sending a SIGHUP signal to the Synapse process. Changes to other parts of
+# the caching config will NOT be applied after a SIGHUP is received; a restart
+# is necessary.
 
 # The number of events to cache in memory. Not affected by
 # caches.global_factor.
