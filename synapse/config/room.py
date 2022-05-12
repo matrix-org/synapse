@@ -132,6 +132,4 @@ class RoomConfig(Config):
         #        },
         #        "events_default": 1
         #    }
-        #    trusted_private_chat: null
-        #    public_chat: null
         """

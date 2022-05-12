@@ -2490,8 +2490,6 @@ push:
 #        },
 #        "events_default": 1
 #    }
-#    trusted_private_chat: null
-#    public_chat: null
 
 
 # Uncomment to allow non-server-admin users to create groups on this server
