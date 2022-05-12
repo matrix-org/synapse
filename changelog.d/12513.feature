@@ -1,1 +1,1 @@
-Insert Measure blocks throughout SpamChecker to collect metrics.
+Measure the time taken in spam-checking callbacks and expose those measurements as metrics.
