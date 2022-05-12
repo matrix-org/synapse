@@ -118,7 +118,7 @@ class RoomConfig(Config):
         # the default event power levels will be ignored).
         #
         #default_power_level_content_override:
-        #    private_chat: {
+        #    "private_chat": {
         #        "events": {
         #            "com.example.myeventtype" : 0,
         #            "m.room.avatar": 50,
