@@ -507,6 +507,7 @@ class OidcProvider:
         if not uri:
             # this should be unreachable: load_metadata validates that
             # there is a jwks_uri in the metadata if _uses_userinfo is unset
+            logger.error("Missing 'jwks_uri' in metadata")
             raise RuntimeError('Missing "jwks_uri" in metadata')
 
         jwk_set = await self._http_client.get_json(uri)
@@ -719,6 +720,54 @@ class OidcProvider:
 
         return claims
 
+    async def _parse_standalone_id_token(self, id_token: Optional[str]) -> CodeIDToken:
+        """Return an instance of UserInfo from to given ``id_token``.
+
+        Args:
+            id_token: a JWT token which was _not_ acquire via our login process
+                    but from some other application
+
+        Returns:
+            The decoded claims in the id_token.
+        """
+        metadata = await self.load_metadata()
+        claims_params = {}
+
+        alg_values = metadata.get("id_token_signing_alg_values_supported", ["RS256"])
+        jwt = JsonWebToken(alg_values)
+
+        claim_options = {"iss": {"values": [metadata["issuer"]]}}
+
+        logger.debug("Attempting to decode JWT id_token %r", id_token)
+
+        # Try to decode the keys in cache first, then retry by forcing the keys
+        # to be reloaded
+        jwk_set = await self.load_jwks()
+        try:
+            claims = jwt.decode(
+                id_token,
+                key=jwk_set,
+                claims_cls=CodeIDToken,
+                claims_options=claim_options,
+                claims_params=claims_params,
+            )
+        except ValueError:
+            logger.info("Reloading JWKS after decode error")
+            jwk_set = await self.load_jwks(force=True)  # try reloading the jwks
+            claims = jwt.decode(
+                id_token,
+                key=jwk_set,
+                claims_cls=CodeIDToken,
+                claims_options=claim_options,
+                claims_params=claims_params,
+            )
+
+        logger.debug("Decoded id_token JWT %r; validating", claims)
+
+        claims.validate(leeway=120)  # allows 2 min of clock skew
+
+        return claims
+
     async def handle_redirect_request(
         self,
         request: SynapseRequest,
@@ -901,6 +950,11 @@ class OidcProvider:
             logger.exception("Could not map user")
             self._sso_handler.render_error(request, "mapping_error", str(e))
 
+    async def verified_claims_of_standalone_token(
+        self, token
+    ) -> CodeIDToken:
+        return await self._parse_standalone_id_token(token)
+
     async def _complete_oidc_login(
         self,
         userinfo: UserInfo,
@@ -1035,6 +1089,9 @@ class OidcProvider:
         # Some OIDC providers use integer IDs, but Synapse expects external IDs
         # to be strings.
         return str(remote_user_id)
+
+    def get_issuer(self) -> Optional[str]:
+        return self._config.issuer
 
 
 # number of seconds a newly-generated client secret should be valid for

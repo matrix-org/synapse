@@ -17,11 +17,13 @@ import re
 from typing import (
     TYPE_CHECKING,
     Any,
+    AnyStr,
     Awaitable,
     Callable,
     Dict,
     List,
     Optional,
+    Sequence,
     Tuple,
     Union,
 )
@@ -32,6 +34,7 @@ from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.appservice import ApplicationService
+from synapse.handlers.oidc import OidcProvider
 from synapse.handlers.sso import SsoIdentityProvider
 from synapse.http import get_request_uri
 from synapse.http.server import HttpServer, finish_request
@@ -48,6 +51,10 @@ from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
+    from authlib.oidc.core import CodeIDToken
+
+    from twisted.web.http_headers import Headers
+
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -63,12 +70,25 @@ class LoginResponse(TypedDict, total=False):
     well_known: Optional[Dict[str, Any]]
 
 
+def extract_jwt_from_headers(request_headers: "Headers") -> Optional[str]:
+    if request_headers is None:
+        return None
+    if request_headers.hasHeader('Authorization'):
+        values: Sequence[AnyStr] = request_headers.getRawHeaders('Authorization')
+        for val in values:
+            # we simply take the first 'Authorization' header containing a Bearer token
+            if val.startswith('Bearer '):
+                return val[7:]
+    return None
+
+
 class LoginRestServlet(RestServlet):
     PATTERNS = client_patterns("/login$", v1=True)
     CAS_TYPE = "m.login.cas"
     SSO_TYPE = "m.login.sso"
     TOKEN_TYPE = "m.login.token"
     JWT_TYPE = "org.matrix.login.jwt"
+    SSO_JWT_TYPE = "org.matrix.login.sso_jwt"
     APPSERVICE_TYPE = "m.login.application_service"
     REFRESH_TOKEN_PARAM = "refresh_token"
 
@@ -124,6 +144,8 @@ class LoginRestServlet(RestServlet):
         flows: List[JsonDict] = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
+        if self.oidc_enabled:
+            flows.append({"type": LoginRestServlet.SSO_JWT_TYPE})
 
         if self.cas_enabled:
             # we advertise CAS for backwards compat, though MSC1721 renamed it
@@ -183,6 +205,17 @@ class LoginRestServlet(RestServlet):
                     login_submission,
                     appservice,
                     should_issue_refresh_token=should_issue_refresh_token,
+                )
+            elif (
+                self.oidc_enabled
+                and login_submission["type"] == LoginRestServlet.SSO_JWT_TYPE
+            ):
+                await self._address_ratelimiter.ratelimit(
+                    None, request.getClientAddress().host
+                )
+                result = await self._do_sso_jwt_login(
+                    login_submission,
+                    request.requestHeaders
                 )
             elif (
                 self.jwt_enabled
@@ -411,6 +444,50 @@ class LoginRestServlet(RestServlet):
             auth_provider_session_id=res.auth_provider_session_id,
         )
 
+    async def _do_sso_jwt_login(
+        self, login_submission: JsonDict, request_headers: "Headers"
+    ) -> LoginResponse:
+        token = login_submission.get("token", None)
+        if token is None:
+            token = extract_jwt_from_headers(request_headers)
+        if token is None:
+            raise LoginError(
+                403, "Token field for JWT is missing", errcode=Codes.FORBIDDEN
+            )
+
+        oidc: OidcProvider = self.find_token_issuer(token)
+        from authlib.jose import JoseError
+        try:
+            # Now that we know the issuer of the token (and loaded its config)
+            # we can go and validate it
+            claims: "CodeIDToken" = await oidc.verified_claims_of_standalone_token(token)
+            if claims is None:
+                raise LoginError(403, "Invalid JWT", errcode=Codes.FORBIDDEN)
+
+            iss = claims.get("iss")
+            if iss is None:
+                raise LoginError(403, "Missing claim 'iss'", errcode=Codes.FORBIDDEN)
+
+            sub = claims.get("sub")
+            if sub is None:
+                raise LoginError(403, "Missing claim 'sub'", errcode=Codes.FORBIDDEN)
+
+            canonical_user_id: Optional[str] = await self.hs.get_datastores().main.get_user_by_external_id(iss, sub)
+            if canonical_user_id is None:
+                raise LoginError(403, "No account assigned to this JWT subject", errcode=Codes.FORBIDDEN)
+
+            result = await self._complete_login(
+                canonical_user_id,
+                login_submission,
+                None,
+                should_issue_refresh_token=False,
+            )
+            return result
+        except JoseError as e:
+            raise LoginError(
+                401, e.description, errcode=Codes.UNAUTHORIZED
+            )
+
     async def _do_jwt_login(
         self, login_submission: JsonDict, should_issue_refresh_token: bool = False
     ) -> LoginResponse:
@@ -450,6 +527,34 @@ class LoginRestServlet(RestServlet):
             should_issue_refresh_token=should_issue_refresh_token,
         )
         return result
+
+    def find_token_issuer(self, token: str) -> OidcProvider:
+        import jwt
+
+        try:
+            # don't try to validate the token; just unwrap and split it
+            # we need to find out the issuer before we can check it
+            jwt_content: Dict[str, Any] = jwt.api_jwt.decode_complete(
+                token, "", None, options={"verify_signature": False})
+            issuer: str = jwt_content['payload']['iss']
+        except KeyError:
+            raise LoginError(403, "Invalid JWT", errcode=Codes.FORBIDDEN)
+
+        all_idps = self._sso_handler.get_identity_providers().values()
+        for idp in all_idps:
+            if type(idp) == OidcProvider:
+                # noinspection PyTypeChecker
+                provider:OidcProvider = idp
+                idp_issuer:Optional[str] = provider.get_issuer()
+                if idp_issuer is None:
+                    # The config for this provider doesn't contain an issuer so we skip it
+                    continue
+                if idp_issuer == issuer:
+                    # Found the config data for the issuer of this JWT
+                    return provider
+        # The issuer of this JWT is not contained in our configuration
+        # So we don't accept this token
+        raise LoginError(403, "Issuer of JWT not accepted", errcode=Codes.FORBIDDEN)
 
 
 def _get_auth_flow_dict_for_idp(idp: SsoIdentityProvider) -> JsonDict:
