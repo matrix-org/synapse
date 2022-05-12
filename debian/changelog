@@ -1,3 +1,12 @@
+matrix-synapse-py3 (1.59.0~rc1) stable; urgency=medium
+
+  * Adjust how the `exported-requirements.txt` file is generated as part of
+    the process of building these packages. This affects the package
+    maintainers only; end-users are unaffected.
+  * New Synapse release 1.59.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 10 May 2022 10:45:08 +0100
+
 matrix-synapse-py3 (1.58.1) stable; urgency=medium
 
   * Include python dependencies from the `systemd` and `cache_memory` extras package groups, which

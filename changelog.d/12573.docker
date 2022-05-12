@@ -1,1 +1,0 @@
-Update the "Build docker images" GitHub Actions workflow to use `docker/metadata-action` to generate docker image tags, instead of a custom shell script. Contributed by henryclw.

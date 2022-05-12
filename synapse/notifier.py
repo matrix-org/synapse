@@ -228,9 +228,7 @@ class Notifier:
         # Called when there are new things to stream over replication
         self.replication_callbacks: List[Callable[[], None]] = []
 
-        # Called when remote servers have come back online after having been
-        # down.
-        self.remote_server_up_callbacks: List[Callable[[str], None]] = []
+        self._federation_client = hs.get_federation_http_client()
 
         self._third_party_rules = hs.get_third_party_event_rules()
 
@@ -731,3 +729,7 @@ class Notifier:
         # circular dependencies.
         if self.federation_sender:
             self.federation_sender.wake_destination(server)
+
+        # Tell the federation client about the fact the server is back up, so
+        # that any in flight requests can be immediately retried.
+        self._federation_client.wake_destination(server)

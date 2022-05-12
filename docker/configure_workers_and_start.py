@@ -69,10 +69,10 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "worker_extra_conf": "enable_media_repo: true",
     },
     "appservice": {
-        "app": "synapse.app.appservice",
+        "app": "synapse.app.generic_worker",
         "listener_resources": [],
         "endpoint_patterns": [],
-        "shared_extra_conf": {"notify_appservices": False},
+        "shared_extra_conf": {"notify_appservices_from_worker": "appservice"},
         "worker_extra_conf": "",
     },
     "federation_sender": {

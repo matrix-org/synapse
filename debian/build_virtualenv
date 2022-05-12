@@ -41,7 +41,6 @@ poetry export \
     --extras all \
     --extras test \
     --extras systemd \
-    --extras cache_memory \
     -o exported_requirements.txt
 deactivate
 rm -rf "$TEMP_VENV"

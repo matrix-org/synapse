@@ -29,6 +29,7 @@ from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import CacheMetric, register_cache
 from synapse.util.caches.descriptors import lru_cache
 from synapse.util.caches.lrucache import LruCache
+from synapse.util.metrics import measure_func
 
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
@@ -105,6 +106,7 @@ class BulkPushRuleEvaluator:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastores().main
+        self.clock = hs.get_clock()
         self._event_auth_handler = hs.get_event_auth_handler()
 
         # Used by `RulesForRoom` to ensure only one thing mutates the cache at a
@@ -185,6 +187,7 @@ class BulkPushRuleEvaluator:
 
         return pl_event.content if pl_event else {}, sender_level
 
+    @measure_func("action_for_event_by_user")
     async def action_for_event_by_user(
         self, event: EventBase, context: EventContext
     ) -> None:
@@ -192,6 +195,10 @@ class BulkPushRuleEvaluator:
         should increment the unread count, and insert the results into the
         event_push_actions_staging table.
         """
+        if event.internal_metadata.is_outlier():
+            # This can happen due to out of band memberships
+            return
+
         count_as_unread = _should_count_as_unread(event, context)
 
         rules_by_user = await self._get_rules_for_event(event, context)
@@ -207,8 +214,6 @@ class BulkPushRuleEvaluator:
         evaluator = PushRuleEvaluatorForEvent(
             event, len(room_members), sender_power_level, power_levels
         )
-
-        condition_cache: Dict[str, bool] = {}
 
         # If the event is not a state event check if any users ignore the sender.
         if not event.is_state():
@@ -247,8 +252,8 @@ class BulkPushRuleEvaluator:
                 if "enabled" in rule and not rule["enabled"]:
                     continue
 
-                matches = _condition_checker(
-                    evaluator, rule["conditions"], uid, display_name, condition_cache
+                matches = evaluator.check_conditions(
+                    rule["conditions"], uid, display_name
                 )
                 if matches:
                     actions = [x for x in rule["actions"] if x != "dont_notify"]
@@ -265,32 +270,6 @@ class BulkPushRuleEvaluator:
             actions_by_user,
             count_as_unread,
         )
-
-
-def _condition_checker(
-    evaluator: PushRuleEvaluatorForEvent,
-    conditions: List[dict],
-    uid: str,
-    display_name: Optional[str],
-    cache: Dict[str, bool],
-) -> bool:
-    for cond in conditions:
-        _cache_key = cond.get("_cache_key", None)
-        if _cache_key:
-            res = cache.get(_cache_key, None)
-            if res is False:
-                return False
-            elif res is True:
-                continue
-
-        res = evaluator.matches(cond, uid, display_name)
-        if _cache_key:
-            cache[_cache_key] = bool(res)
-
-        if not res:
-            return False
-
-    return True
 
 
 MemberMap = Dict[str, Optional[EventIdMembership]]

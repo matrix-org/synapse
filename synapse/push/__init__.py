@@ -12,6 +12,80 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+This module implements the push rules & notifications portion of the Matrix
+specification.
+
+There's a few related features:
+
+* Push notifications (i.e. email or outgoing requests to a Push Gateway).
+* Calculation of unread notifications (for /sync and /notifications).
+
+When Synapse receives a new event (locally, via the Client-Server API, or via
+federation), the following occurs:
+
+1. The push rules get evaluated to generate a set of per-user actions.
+2. The event is persisted into the database.
+3. (In the background) The notifier is notified about the new event.
+
+The per-user actions are initially stored in the event_push_actions_staging table,
+before getting moved into the event_push_actions table when the event is persisted.
+The event_push_actions table is periodically summarised into the event_push_summary
+and event_push_summary_stream_ordering tables.
+
+Since push actions block an event from being persisted the generation of push
+actions is performance sensitive.
+
+The general interaction of the classes are:
+
+        +---------------------------------------------+
+        | FederationEventHandler/EventCreationHandler |
+        +---------------------------------------------+
+                |
+                v
+        +-----------------------+     +---------------------------+
+        | BulkPushRuleEvaluator |---->| PushRuleEvaluatorForEvent |
+        +-----------------------+     +---------------------------+
+                |
+                v
+        +-----------------------------+
+        | EventPushActionsWorkerStore |
+        +-----------------------------+
+
+The notifier notifies the pusher pool of the new event, which checks for affected
+users. Each user-configured pusher of the affected users then performs the
+previously calculated action.
+
+The general interaction of the classes are:
+
+        +----------+
+        | Notifier |
+        +----------+
+                |
+                v
+        +------------+     +--------------+
+        | PusherPool |---->| PusherConfig |
+        +------------+     +--------------+
+                |
+                |     +---------------+
+                +<--->| PusherFactory |
+                |     +---------------+
+                v
+        +------------------------+     +-----------------------------------------------+
+        | EmailPusher/HttpPusher |---->| EventPushActionsWorkerStore/PusherWorkerStore |
+        +------------------------+     +-----------------------------------------------+
+                |
+                v
+        +-------------------------+
+        | Mailer/SimpleHttpClient |
+        +-------------------------+
+
+The Pusher instance also calls out to various utilities for generating payloads
+(or email templates), but those interactions are not detailed in this diagram
+(and are specific to the type of pusher).
+
+"""
+
 import abc
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
