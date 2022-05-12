@@ -461,8 +461,6 @@ class FederationHandler:
         # room stuff after join currently doesn't work on workers.
         assert self.config.worker.worker_app is None
 
-        logger.info("traceFrom(do_invite_join) for _update_current_state_txn")
-
         logger.debug("Joining %s to %s", joinee, room_id)
 
         origin, event, room_version_obj = await self._make_and_verify_event(

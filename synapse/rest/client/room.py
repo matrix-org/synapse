@@ -330,14 +330,6 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, TransactionRestServlet):
             remote_room_hosts,
         )
 
-        logger.info("/join/:aliasOrId target_user=%s", requester.user)
-        logger.info(
-            "++++---------------------------------------------------------------++++"
-        )
-        logger.info(
-            "++++---------------------------------------------------------------++++"
-        )
-
         await self.room_member_handler.update_membership(
             requester=requester,
             target=requester.user,
@@ -847,14 +839,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         txn_id: Optional[str] = None,
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
-
-        logger.info("/%s target_user=%s", membership_action, requester.user)
-        logger.info(
-            "-----------------------------------------------------------------------"
-        )
-        logger.info(
-            "-----------------------------------------------------------------------"
-        )
 
         if requester.is_guest and membership_action not in {
             Membership.JOIN,

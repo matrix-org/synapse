@@ -179,10 +179,6 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         """
         state_ids = await self.get_current_state_ids(room_id)
 
-        logger.info(
-            "get_create_event_for_room room_id=%s state_ids=%s", room_id, state_ids
-        )
-
         if not state_ids:
             raise NotFoundError(f"Current state for room {room_id} is empty")
 
