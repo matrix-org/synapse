@@ -668,7 +668,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         logger.debug("Running url preview cache expiry")
 
         if not (await self.store.db_pool.updates.has_completed_background_updates()):
-            logger.info("Still running DB updates; skipping expiry")
+            logger.debug("Still running DB updates; skipping url preview cache expiry")
             return
 
         def try_remove_parent_dirs(dirs: Iterable[str]) -> None:
@@ -688,7 +688,9 @@ class PreviewUrlResource(DirectServeJsonResource):
                     # Failed, skip deleting the rest of the parent dirs
                     if e.errno != errno.ENOTEMPTY:
                         logger.warning(
-                            "Failed to remove media directory: %r: %s", dir, e
+                            "Failed to remove media directory while clearing url preview cache: %r: %s",
+                            dir,
+                            e,
                         )
                     break
 
@@ -703,7 +705,11 @@ class PreviewUrlResource(DirectServeJsonResource):
             except FileNotFoundError:
                 pass  # If the path doesn't exist, meh
             except OSError as e:
-                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                logger.warning(
+                    "Failed to remove media while clearing url preview cache: %r: %s",
+                    media_id,
+                    e,
+                )
                 continue
 
             removed_media.append(media_id)
@@ -714,9 +720,11 @@ class PreviewUrlResource(DirectServeJsonResource):
         await self.store.delete_url_cache(removed_media)
 
         if removed_media:
-            logger.info("Deleted %d entries from url cache", len(removed_media))
+            logger.debug(
+                "Deleted %d entries from url preview cache", len(removed_media)
+            )
         else:
-            logger.debug("No entries removed from url cache")
+            logger.debug("No entries removed from url preview cache")
 
         # Now we delete old images associated with the url cache.
         # These may be cached for a bit on the client (i.e., they
@@ -733,7 +741,9 @@ class PreviewUrlResource(DirectServeJsonResource):
             except FileNotFoundError:
                 pass  # If the path doesn't exist, meh
             except OSError as e:
-                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                logger.warning(
+                    "Failed to remove media from url preview cache: %r: %s", media_id, e
+                )
                 continue
 
             dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
@@ -745,7 +755,9 @@ class PreviewUrlResource(DirectServeJsonResource):
             except FileNotFoundError:
                 pass  # If the path doesn't exist, meh
             except OSError as e:
-                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                logger.warning(
+                    "Failed to remove media from url preview cache: %r: %s", media_id, e
+                )
                 continue
 
             removed_media.append(media_id)
@@ -758,9 +770,9 @@ class PreviewUrlResource(DirectServeJsonResource):
         await self.store.delete_url_cache_media(removed_media)
 
         if removed_media:
-            logger.info("Deleted %d media from url cache", len(removed_media))
+            logger.debug("Deleted %d media from url preview cache", len(removed_media))
         else:
-            logger.debug("No media removed from url cache")
+            logger.debug("No media removed from url preview cache")
 
 
 def _is_media(content_type: str) -> bool:
