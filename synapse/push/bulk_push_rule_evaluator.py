@@ -211,8 +211,10 @@ class BulkPushRuleEvaluator:
             sender_power_level,
         ) = await self._get_power_levels_and_sender_level(event, context)
 
+        relations = await self.store.get_mutual_event_relations(event)
+
         evaluator = PushRuleEvaluatorForEvent(
-            event, len(room_members), sender_power_level, power_levels
+            event, len(room_members), sender_power_level, power_levels, relations
         )
 
         # If the event is not a state event check if any users ignore the sender.

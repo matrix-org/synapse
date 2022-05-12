@@ -42,7 +42,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         sender_power_level = 0
         power_levels: Dict[str, Union[int, Dict[str, int]]] = {}
         return PushRuleEvaluatorForEvent(
-            event, room_member_count, sender_power_level, power_levels
+            event, room_member_count, sender_power_level, power_levels, set()
         )
 
     def test_display_name(self) -> None:

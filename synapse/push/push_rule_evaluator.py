@@ -15,7 +15,7 @@
 
 import logging
 import re
-from typing import Any, Dict, List, Mapping, Optional, Pattern, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Pattern, Set, Tuple, Union
 
 from matrix_common.regex import glob_to_regex, to_word_pattern
 
@@ -120,11 +120,13 @@ class PushRuleEvaluatorForEvent:
         room_member_count: int,
         sender_power_level: int,
         power_levels: Dict[str, Union[int, Dict[str, int]]],
+        relations: Set[Tuple[str, str, str]],
     ):
         self._event = event
         self._room_member_count = room_member_count
         self._sender_power_level = sender_power_level
         self._power_levels = power_levels
+        self._relations = relations
 
         # Maps strings of e.g. 'content.body' -> event["content"]["body"]
         self._value_cache = _flatten_dict(event)
