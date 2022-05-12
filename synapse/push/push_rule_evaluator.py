@@ -190,6 +190,8 @@ class PushRuleEvaluatorForEvent:
             return _sender_notification_permission(
                 self._event, condition, self._sender_power_level, self._power_levels
             )
+        elif condition["kind"] == "org.matrix.msc3772.relation_match":
+            return self._relation_match(condition, user_id)
         else:
             return True
 
@@ -257,6 +259,43 @@ class PushRuleEvaluatorForEvent:
             regex_cache[(display_name, False, True)] = r
 
         return bool(r.search(body))
+
+    def _relation_match(self, condition: dict, user_id: str) -> bool:
+        """
+        Check an "relation_match" push rule condition.
+
+        Args:
+            condition: The "event_match" push rule condition to match.
+            user_id: The user's MXID.
+
+        Returns:
+             True if the condition matches the event, False otherwise.
+        """
+        rel_type_pattern = condition.get("rel_type")
+        sender_pattern = condition.get("sender")
+        if sender_pattern is None:
+            sender_type = condition.get("sender_type")
+            if sender_type == "user_id":
+                sender_pattern = user_id
+        type_pattern = condition.get("type")
+
+        if not rel_type_pattern and not sender_pattern and not type_pattern:
+            logger.warning("relation_match condition with nothing to match")
+            return False
+
+        # If any other relations matches, return True.
+        for relation in self._relations:
+            if rel_type_pattern and not _glob_matches(rel_type_pattern, relation[0]):
+                continue
+            if sender_pattern and not _glob_matches(sender_pattern, relation[1]):
+                continue
+            if type_pattern and not _glob_matches(type_pattern, relation[2]):
+                continue
+            # All values must have matched.
+            return True
+
+        # No relations matched.
+        return False
 
 
 # Caches (string, is_glob, word_boundary) -> regex for push. See _glob_matches

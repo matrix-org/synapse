@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Set, Tuple, Union
 
 import frozendict
 
@@ -26,7 +26,9 @@ from tests import unittest
 
 
 class PushRuleEvaluatorTestCase(unittest.TestCase):
-    def _get_evaluator(self, content: JsonDict) -> PushRuleEvaluatorForEvent:
+    def _get_evaluator(
+        self, content: JsonDict, relations: Optional[Set[Tuple[str, str, str]]] = None
+    ) -> PushRuleEvaluatorForEvent:
         event = FrozenEvent(
             {
                 "event_id": "$event_id",
@@ -42,7 +44,11 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         sender_power_level = 0
         power_levels: Dict[str, Union[int, Dict[str, int]]] = {}
         return PushRuleEvaluatorForEvent(
-            event, room_member_count, sender_power_level, power_levels, set()
+            event,
+            room_member_count,
+            sender_power_level,
+            power_levels,
+            relations or set(),
         )
 
     def test_display_name(self) -> None:
@@ -276,3 +282,54 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             push_rule_evaluator.tweaks_for_actions(actions),
             {"sound": "default", "highlight": True},
         )
+
+    def test_relation_match(self) -> None:
+        """Test the relation_match push rule kind."""
+        evaluator = self._get_evaluator(
+            {}, {("m.annotation", "@user:test", "m.reaction")}
+        )
+
+        # Check just relation type.
+        condition = {
+            "kind": "org.matrix.msc3772.relation_match",
+            "rel_type": "m.annotation",
+        }
+        self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))
+
+        # Check relation type and sender.
+        condition = {
+            "kind": "org.matrix.msc3772.relation_match",
+            "rel_type": "m.annotation",
+            "sender": "@user:test",
+        }
+        self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))
+        condition = {
+            "kind": "org.matrix.msc3772.relation_match",
+            "rel_type": "m.annotation",
+            "sender": "@other:test",
+        }
+        self.assertFalse(evaluator.matches(condition, "@user:test", "foo"))
+
+        # Check relation type and event type.
+        condition = {
+            "kind": "org.matrix.msc3772.relation_match",
+            "rel_type": "m.annotation",
+            "type": "m.reaction",
+        }
+        self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))
+
+        # Check just sender.
+        condition = {
+            "kind": "org.matrix.msc3772.relation_match",
+            "sender": "@user:test",
+        }
+        self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))
+        condition = {
+            "kind": "org.matrix.msc3772.relation_match",
+            "sender": "@other:test",
+        }
+        self.assertFalse(evaluator.matches(condition, "@user:test", "foo"))
+
+        # Check glob.
+        condition = {"kind": "org.matrix.msc3772.relation_match", "sender": "@*:test"}
+        self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))
