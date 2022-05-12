@@ -220,11 +220,11 @@ class OidcHandler:
                 session, state
             )
         except (MacaroonInitException, MacaroonDeserializationException, KeyError) as e:
-            logger.exception("Invalid session for OIDC callback")
+            logger.warning("Invalid session for OIDC callback: %s", e)
             self._sso_handler.render_error(request, "invalid_session", str(e))
             return
         except MacaroonInvalidSignatureException as e:
-            logger.exception("Could not verify session for OIDC callback")
+            logger.warning("Could not verify session for OIDC callback: %s", e)
             self._sso_handler.render_error(request, "mismatching_session", str(e))
             return
 
@@ -827,7 +827,7 @@ class OidcProvider:
             logger.debug("Exchanging OAuth2 code for a token")
             token = await self._exchange_code(code)
         except OidcError as e:
-            logger.exception("Could not exchange OAuth2 code")
+            logger.warning("Could not exchange OAuth2 code: %s", e)
             self._sso_handler.render_error(request, e.error, e.error_description)
             return
 
