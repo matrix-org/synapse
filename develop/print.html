@@ -5839,6 +5839,25 @@ can publish rooms.</p>
     action: allow
 </code></pre>
 <hr />
+<p>Config option: <code>default_power_level_content_override</code></p>
+<p>The <code>default_power_level_content_override</code> option controls the default power
+levels for rooms.</p>
+<p>Useful if you know that your users need special permissions in rooms
+that they create (e.g. to send particular types of state events without
+needing an elevated power level).  This takes the same shape as the
+<code>power_level_content_override</code> parameter in the /createRoom API, but
+is applied before that parameter.</p>
+<p>Note that each key provided inside a preset (for example <code>events</code> in the example
+below) will overwrite all existing defaults inside that key. So in the example
+below, newly-created private_chat rooms will have no rules for any event types
+except <code>com.example.foo</code>.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">default_power_level_content_override:
+   private_chat: { &quot;events&quot;: { &quot;com.example.foo&quot; : 0 } }
+   trusted_private_chat: null
+   public_chat: null
+</code></pre>
+<hr />
 <h2 id="opentracing"><a class="header" href="#opentracing">Opentracing</a></h2>
 <p>Configuration options related to Opentracing support.</p>
 <hr />
@@ -8456,6 +8475,40 @@ push:
 # will also not affect rooms created by other servers.
 #
 #encryption_enabled_by_default_for_room_type: invite
+
+# Override the default power levels for rooms created on this server, per
+# room creation preset.
+#
+# The appropriate dictionary for the room preset will be applied on top
+# of the existing power levels content.
+#
+# Useful if you know that your users need special permissions in rooms
+# that they create (e.g. to send particular types of state events without
+# needing an elevated power level).  This takes the same shape as the
+# `power_level_content_override` parameter in the /createRoom API, but
+# is applied before that parameter.
+#
+# Valid keys are some or all of `private_chat`, `trusted_private_chat`
+# and `public_chat`. Inside each of those should be any of the
+# properties allowed in `power_level_content_override` in the
+# /createRoom API. If any property is missing, its default value will
+# continue to be used. If any property is present, it will overwrite
+# the existing default completely (so if the `events` property exists,
+# the default event power levels will be ignored).
+#
+#default_power_level_content_override:
+#    private_chat:
+#        &quot;events&quot;:
+#            &quot;com.example.myeventtype&quot; : 0
+#            &quot;m.room.avatar&quot;: 50
+#            &quot;m.room.canonical_alias&quot;: 50
+#            &quot;m.room.encryption&quot;: 100
+#            &quot;m.room.history_visibility&quot;: 100
+#            &quot;m.room.name&quot;: 50
+#            &quot;m.room.power_levels&quot;: 100
+#            &quot;m.room.server_acl&quot;: 100
+#            &quot;m.room.tombstone&quot;: 100
+#        &quot;events_default&quot;: 1
 
 
 # Uncomment to allow non-server-admin users to create groups on this server
