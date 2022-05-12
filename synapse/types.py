@@ -860,7 +860,7 @@ class DeviceListUpdates:
 
 
 def get_verify_key_from_cross_signing_key(
-    key_info: Dict[str, Any]
+    key_info: Mapping[str, Any]
 ) -> Tuple[str, VerifyKey]:
     """Get the key ID and signedjson verify key from a cross-signing key dict
 
@@ -877,7 +877,7 @@ def get_verify_key_from_cross_signing_key(
     keys = key_info["keys"]
     # and that it contains exactly one key
     if len(keys) == 1:
-        key_id, key_data = keys.popitem()
+        key_id, key_data = next(iter(keys.items()))
         return key_id, decode_verify_key_bytes(key_id, decode_base64(key_data))
     else:
         raise ValueError("Invalid key")
