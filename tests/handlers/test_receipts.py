@@ -131,7 +131,6 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             [
                 {
                     "content": {
-                        "$14356419ggffg114394fHBLK:matrix.org": {ReceiptTypes.READ: {}},
                         "$1435641916114394fHBLK:matrix.org": {
                             ReceiptTypes.READ: {
                                 "@user:jki.re": {
