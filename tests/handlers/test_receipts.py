@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+from copy import deepcopy
 from typing import List
 
 from synapse.api.constants import ReceiptTypes
@@ -26,24 +26,25 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         self.event_source = hs.get_event_sources().sources.receipt
 
     def test_filters_out_private_receipt(self):
-        self._test_filters_private(
-            [
-                {
-                    "content": {
-                        "$1435641916114394fHBLK:matrix.org": {
-                            ReceiptTypes.READ_PRIVATE: {
-                                "@rikj:jki.re": {
-                                    "ts": 1436451550453,
-                                }
+        events = [
+            {
+                "content": {
+                    "$1435641916114394fHBLK:matrix.org": {
+                        ReceiptTypes.READ_PRIVATE: {
+                            "@rikj:jki.re": {
+                                "ts": 1436451550453,
                             }
                         }
-                    },
-                    "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
-                }
-            ],
-            [],
-        )
+                    }
+                },
+                "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
+                "type": "m.receipt",
+            }
+        ]
+        original_events = deepcopy(events)
+        self._test_filters_private(events, [])
+        # Since the events are fed in from a cache they should not be modified.
+        self.assertEqual(events, original_events)
 
     def test_filters_out_private_receipt_and_ignores_rest(self):
         self._test_filters_private(
@@ -330,26 +331,6 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                 }
             ],
         )
-
-    def test_we_do_not_mutate(self):
-        events = [
-            {
-                "content": {
-                    "$1435641916114394fHBLK:matrix.org": {
-                        ReceiptTypes.READ_PRIVATE: {
-                            "@rikj:jki.re": {
-                                "ts": 1436451550453,
-                            }
-                        }
-                    }
-                },
-                "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                "type": "m.receipt",
-            }
-        ]
-        events_copy = events.copy()
-
-        self._test_filters_private(events, events_copy)
 
     def _test_filters_private(
         self, events: List[JsonDict], expected_output: List[JsonDict]
