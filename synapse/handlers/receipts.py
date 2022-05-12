@@ -166,7 +166,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
     @staticmethod
     def filter_out_private_receipts(
-        events: List[JsonDict], user_id: str
+        rooms: List[JsonDict], user_id: str
     ) -> List[JsonDict]:
         """
         Filters a list of serialized receipts (as returned by /sync and /initialSync)
@@ -174,51 +174,58 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
         This operates on the return value of get_linearized_receipts_for_rooms():
 
-        A list of mappings, each mapping has a `content` field, which is a map
-        of event ID -> receipt type -> user ID -> receipt information.
+        Args:
+            rooms: A list of mappings, each mapping has a `content` field, which
+                is a map of event ID -> receipt type -> user ID -> receipt information.
+
+        Returns:
+            The same as rooms, but filtered.
         """
 
-        visible_events = []
+        result = []
 
-        # filter out private receipts the user shouldn't see
-        for event in events:
-            # The event content with other user's private read receipts removed.
+        # Iterate through each room's receipt content.
+        for room in rooms:
+            # The receipt content with other user's private read receipts removed.
             content = {}
-            for event_id, event_content in event.get("content", {}).items():
-                receipt_event = event_content
-                # If there are no private read receipts, no additional logic is
-                # needed.
-                if ReceiptTypes.READ_PRIVATE in receipt_event:
-                    # Make a copy without private read receipts.
-                    receipt_event = {
-                        k: v
-                        for k, v in receipt_event.items()
-                        if k != ReceiptTypes.READ_PRIVATE
+
+            # Iterate over each event ID / receipts for that event.
+            for event_id, orig_event_content in room.get("content", {}).items():
+                event_content = orig_event_content
+                # If there are private read receipts, additional logic is necessary.
+                if ReceiptTypes.READ_PRIVATE in event_content:
+                    # Make a copy without private read receipts to avoid leaking
+                    # other user's private read receipts..
+                    event_content = {
+                        receipt_type: receipt_value
+                        for receipt_type, receipt_value in event_content.items()
+                        if receipt_type != ReceiptTypes.READ_PRIVATE
                     }
 
-                    # Check the original content for the current user's private
-                    # read receipt. If it exists, add it to the new content.
-                    user_private_read_receipt = event_content[
+                    # Copy the current user's private read receipt from the
+                    # original content, if it exists.
+                    user_private_read_receipt = orig_event_content[
                         ReceiptTypes.READ_PRIVATE
                     ].get(user_id, None)
                     if user_private_read_receipt:
-                        receipt_event[ReceiptTypes.READ_PRIVATE] = {
+                        event_content[ReceiptTypes.READ_PRIVATE] = {
                             user_id: user_private_read_receipt
                         }
 
-                # Only include the receipt event if it is non-empty.
-                if receipt_event:
-                    content[event_id] = receipt_event
+                # Include the event if there is at least one non-private read
+                # receipt or the current user has a private read receipt.
+                if event_content:
+                    content[event_id] = event_content
 
             # Include the event if there is at least one non-private read receipt
             # or the current user has a private read receipt.
             if content:
                 # Build a new event to avoid mutating the cache.
-                new_event = {k: v for k, v in event.items() if k != "content"}
-                new_event["content"] = content
-                visible_events.append(new_event)
+                new_room = {k: v for k, v in room.items() if k != "content"}
+                new_room["content"] = content
+                result.append(new_room)
 
-        return visible_events
+        return result
 
     async def get_new_events(
         self,
