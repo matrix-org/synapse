@@ -165,12 +165,17 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         self.config = hs.config
 
     @staticmethod
-    def filter_out_private(events: List[JsonDict], our_user_id: str) -> List[JsonDict]:
+    def filter_out_private_receipts(
+        events: List[JsonDict], our_user_id: str
+    ) -> List[JsonDict]:
         """
-        This method takes in what is returned by
-        get_linearized_receipts_for_rooms() and goes through read receipts
-        filtering out m.read.private receipts if they were not sent by the
-        current user.
+        Filters a list of serialized receipts (as returned by /sync and /initialSync)
+        and removes private read receipts of other users.
+
+        This operates on the return value of get_linearized_receipts_for_rooms():
+
+        A list of mappings, each mapping has a `content` field, which is a map
+        of event ID -> receipt type -> user ID -> receipt information.
         """
 
         events = events.copy()
@@ -212,7 +217,9 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         )
 
         if self.config.experimental.msc2285_enabled:
-            events = ReceiptEventSource.filter_out_private(events, user.to_string())
+            events = ReceiptEventSource.filter_out_private_receipts(
+                events, user.to_string()
+            )
 
         return events, to_key
 

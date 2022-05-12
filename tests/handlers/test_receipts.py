@@ -349,12 +349,13 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         ]
         events_copy = events.copy()
 
-        self.event_source.filter_out_private(events, "@me:server.org")
-        self.assertEqual(events, events_copy)
+        self._test_filters_private(events, events_copy)
 
     def _test_filters_private(
         self, events: List[JsonDict], expected_output: List[JsonDict]
     ):
         """Tests that the _filter_out_private returns the expected output"""
-        filtered_events = self.event_source.filter_out_private(events, "@me:server.org")
+        filtered_events = self.event_source.filter_out_private_receipts(
+            events, "@me:server.org"
+        )
         self.assertEqual(filtered_events, expected_output)
