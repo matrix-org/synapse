@@ -454,6 +454,10 @@ class FederationEventHandler:
             room_id, itertools.chain(auth_events, state)
         )
 
+        logger.info(
+            "process_remote_join state=%s partial_state=%s", state, partial_state
+        )
+
         # and now persist the join event itself.
         logger.info(
             "Peristing join-via-remote %s (partial_state: %s)", event, partial_state
@@ -475,7 +479,19 @@ class FederationEventHandler:
             # and discover that we do not have it.
             event.internal_metadata.proactively_send = False
 
-            return await self.persist_events_and_notify(room_id, [(event, context)])
+            stream_id_after_persist = await self.persist_events_and_notify(
+                room_id, [(event, context)]
+            )
+
+            # Do this after the state from the remote join was persisted (via
+            # `persist_events_and_notify`). Otherwise we can run into a
+            # situation where the create event doesn't exist yet in the
+            # `current_state_events`
+            for e in state:
+                await self._handle_marker_event(origin, e)
+                # TODO: Loop through previous state to find other markers
+
+            return stream_id_after_persist
 
     async def update_state_for_partial_state_event(
         self, destination: str, event: EventBase
@@ -1200,25 +1216,40 @@ class FederationEventHandler:
         """
 
         if marker_event.type != EventTypes.MSC2716_MARKER:
+            # logger.info(
+            #     "_handle_marker_event not a marker event marker_event.type=%s",
+            #     marker_event.type,
+            # )
             # Not a marker event
             return
 
+        logger.info("_handle_marker_event next 0000000000000000000000000000000000")
+
         if marker_event.rejected_reason is not None:
+            logger.info(
+                "_handle_marker_event rejected %s", marker_event.rejected_reason
+            )
             # Rejected event
             return
+
+        logger.info("_handle_marker_event next 1111111111111111111111111111111111")
 
         # Skip processing a marker event if the room version doesn't
         # support it or the event is not from the room creator.
         room_version = await self._store.get_room_version(marker_event.room_id)
+        logger.info("_handle_marker_event next 2222222222222222222222222222222222")
         create_event = await self._store.get_create_event_for_room(marker_event.room_id)
+        logger.info("_handle_marker_event next 3333333333333333333333333333333333")
         room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+        logger.info("_handle_marker_event next 4444444444444444444444444444444444")
         if not room_version.msc2716_historical and (
             not self._config.experimental.msc2716_enabled
             or marker_event.sender != room_creator
         ):
+            logger.info("_handle_marker_event skipping room_version=%s", room_version)
             return
 
-        logger.debug("_handle_marker_event: received %s", marker_event)
+        logger.info("_handle_marker_event: received %s", marker_event)
 
         insertion_event_id = marker_event.content.get(
             EventContentFields.MSC2716_MARKER_INSERTION
@@ -1228,7 +1259,7 @@ class FederationEventHandler:
             # Nothing to retrieve then (invalid marker)
             return
 
-        logger.debug(
+        logger.info(
             "_handle_marker_event: backfilling insertion event %s", insertion_event_id
         )
 
@@ -1260,7 +1291,7 @@ class FederationEventHandler:
             insertion_event_id, marker_event.room_id
         )
 
-        logger.debug(
+        logger.info(
             "_handle_marker_event: insertion extremity added for %s from marker event %s",
             insertion_event,
             marker_event,
@@ -1947,6 +1978,8 @@ class FederationEventHandler:
         Returns:
             The stream ID after which all events have been persisted.
         """
+        # logger.info("persist_events_and_notify event_and_contexts(%d)=%s", len(event_and_contexts), event_and_contexts)
+
         if not event_and_contexts:
             return self._store.get_room_max_stream_ordering()
 

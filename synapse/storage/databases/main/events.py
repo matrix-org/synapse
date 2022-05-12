@@ -159,6 +159,13 @@ class PersistEventsStore:
             Resolves when the events have been persisted
         """
 
+        logger.info(
+            "_persist_events_and_state_updates events_and_contexts(%d) current_state_for_room(%d) state_delta_for_room(%d)",
+            len(events_and_contexts),
+            len(current_state_for_room),
+            len(state_delta_for_room),
+        )
+
         # We want to calculate the stream orderings as late as possible, as
         # we only notify after all events with a lesser stream ordering have
         # been persisted. I.e. if we spend 10s inside the with block then
@@ -999,7 +1006,17 @@ class PersistEventsStore:
         state_delta_by_room: Dict[str, DeltaState],
         stream_id: int,
     ):
+        logger.info(
+            "_update_current_state_txn state_delta_by_room=%s", state_delta_by_room
+        )
         for room_id, delta_state in state_delta_by_room.items():
+            logger.info(
+                "_update_current_state_txn room_id=%s delta_state=%s",
+                room_id,
+                delta_state,
+                exc_info=True,
+            )
+
             to_delete = delta_state.to_delete
             to_insert = delta_state.to_insert
 
@@ -1037,10 +1054,20 @@ class PersistEventsStore:
                 users_in_room = self.store.get_users_in_room_txn(txn, room_id)
                 members_changed.update(users_in_room)
 
+                logger.info(
+                    "_update_current_state_txn no_longer_in_room deleting all state for room_id=%s (before)",
+                    room_id,
+                )
+
                 self.db_pool.simple_delete_txn(
                     txn,
                     table="current_state_events",
                     keyvalues={"room_id": room_id},
+                )
+
+                logger.info(
+                    "_update_current_state_txn no_longer_in_room deleting all state for room_id=%s (after)",
+                    room_id,
                 )
             else:
                 # We're still in the room, so we update the current state as normal.
@@ -1090,6 +1117,12 @@ class PersistEventsStore:
                         (room_id, etype, state_key)
                         for etype, state_key in itertools.chain(to_delete, to_insert)
                     ),
+                )
+
+                logger.info(
+                    "_update_current_state_txn inserting current_state_events to_insert=%s to_delete=%s",
+                    to_insert,
+                    to_delete,
                 )
 
                 # We include the membership in the current state table, hence we do

@@ -313,11 +313,15 @@ class EventsPersistenceStorage:
             matched the transcation ID; the existing event is returned in such
             a case.
         """
+
+        # logger.info("persist_events events_and_contexts(%d)", len(events_and_contexts))
+
         partitioned: Dict[str, List[Tuple[EventBase, EventContext]]] = {}
         for event, ctx in events_and_contexts:
             partitioned.setdefault(event.room_id, []).append((event, ctx))
 
         async def enqueue(item):
+            # logger.info("persist_events enqueue=%s", item)
             room_id, evs_ctxs = item
             return await self._event_persist_queue.add_to_queue(
                 room_id, evs_ctxs, backfilled=backfilled
@@ -450,6 +454,12 @@ class EventsPersistenceStorage:
         if not events_and_contexts:
             return replaced_events
 
+        logger.info(
+            "traceFrom(_persist_event_batch) for _update_current_state_txn events_and_contexts(%d) backfilled=%s",
+            len(events_and_contexts),
+            backfilled,
+        )
+
         # Check if any of the events have a transaction ID that has already been
         # persisted, and if so we don't persist it again.
         #
@@ -515,13 +525,17 @@ class EventsPersistenceStorage:
                             (event, context)
                         )
 
-                    for room_id, ev_ctx_rm in events_by_room.items():
+                    events_by_room_items = events_by_room.items()
+
+                    for room_id, ev_ctx_rm in events_by_room_items:
                         latest_event_ids = set(
                             await self.main_store.get_latest_event_ids_in_room(room_id)
                         )
                         new_latest_event_ids = await self._calculate_new_extremities(
                             room_id, ev_ctx_rm, latest_event_ids
                         )
+
+                        logger.info("persist_event_batch new_latest_event_ids=%s latest_event_ids=%s", new_latest_event_ids, latest_event_ids)
 
                         if new_latest_event_ids == latest_event_ids:
                             # No change in extremities, so no change in state
@@ -589,6 +603,12 @@ class EventsPersistenceStorage:
                             assert new_latest_event_ids, "No forward extremities left!"
 
                             new_forward_extremities[room_id] = new_latest_event_ids
+
+                        # TODO: Left off here. need to see why
+                        # `state_delta_for_room` is empty in the case where it's
+                        # not working. Need to check how the delta is being
+                        # calculated
+                        logger.info("persist_event_batch delta_ids=%s", delta_ids)
 
                         # If either are not None then there has been a change,
                         # and we need to work out the delta (or use that
