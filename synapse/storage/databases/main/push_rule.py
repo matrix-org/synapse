@@ -199,7 +199,7 @@ class PushRulesWorkerStore(
                     " WHERE user_id = ? AND ? < stream_id"
                 )
                 txn.execute(sql, (user_id, last_id))
-                (count,) = txn.fetchone()
+                (count,) = cast(Tuple[int], txn.fetchone())
                 return bool(count)
 
             return await self.db_pool.runInteraction(
@@ -345,7 +345,7 @@ class PushRulesWorkerStore(
             return [], current_id, False
 
         def get_all_push_rule_updates_txn(
-            txn: LoggingTransaction
+            txn: LoggingTransaction,
         ) -> Tuple[List[Tuple[int, tuple]], int, bool]:
             sql = """
                 SELECT stream_id, user_id
