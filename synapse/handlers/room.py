@@ -149,6 +149,10 @@ class RoomCreationHandler:
             )
             preset_config["encrypted"] = encrypted
 
+        self._default_power_level_content_override = (
+            self.config.room.default_power_level_content_override
+        )
+
         self._replication = hs.get_replication_data_handler()
 
         # linearizer to stop two upgrades happening at once
@@ -1042,9 +1046,19 @@ class RoomCreationHandler:
                 for invitee in invite_list:
                     power_level_content["users"][invitee] = 100
 
-            # Power levels overrides are defined per chat preset
+            # If the user supplied a preset name e.g. "private_chat",
+            # we apply that preset
             power_level_content.update(config["power_level_content_override"])
 
+            # If the server config contains default_power_level_content_override,
+            # and that contains information for this room preset, apply it.
+            if self._default_power_level_content_override:
+                override = self._default_power_level_content_override.get(preset_config)
+                if override is not None:
+                    power_level_content.update(override)
+
+            # Finally, if the user supplied specific permissions for this room,
+            # apply those.
             if power_level_content_override:
                 power_level_content.update(power_level_content_override)
 

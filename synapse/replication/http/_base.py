@@ -26,7 +26,8 @@ from twisted.web.server import Request
 
 from synapse.api.errors import HttpResponseException, SynapseError
 from synapse.http import RequestTimedOutError
-from synapse.http.server import HttpServer
+from synapse.http.server import HttpServer, is_method_cancellable
+from synapse.http.site import SynapseRequest
 from synapse.logging import opentracing
 from synapse.logging.opentracing import trace
 from synapse.types import JsonDict
@@ -310,6 +311,12 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         url_args = list(self.PATH_ARGS)
         method = self.METHOD
 
+        if self.CACHE and is_method_cancellable(self._handle_request):
+            raise Exception(
+                f"{self.__class__.__name__} has been marked as cancellable, but CACHE "
+                "is set. The cancellable flag would have no effect."
+            )
+
         if self.CACHE:
             url_args.append("txn_id")
 
@@ -324,7 +331,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         )
 
     async def _check_auth_and_handle(
-        self, request: Request, **kwargs: Any
+        self, request: SynapseRequest, **kwargs: Any
     ) -> Tuple[int, JsonDict]:
         """Called on new incoming requests when caching is enabled. Checks
         if there is a cached response for the request and returns that,
@@ -340,8 +347,18 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         if self.CACHE:
             txn_id = kwargs.pop("txn_id")
 
+            # We ignore the `@cancellable` flag, since cancellation wouldn't interupt
+            # `_handle_request` and `ResponseCache` does not handle cancellation
+            # correctly yet. In particular, there may be issues to do with logging
+            # context lifetimes.
+
             return await self.response_cache.wrap(
                 txn_id, self._handle_request, request, **kwargs
             )
+
+        # The `@cancellable` decorator may be applied to `_handle_request`. But we
+        # told `HttpServer.register_paths` that our handler is `_check_auth_and_handle`,
+        # so we have to set up the cancellable flag ourselves.
+        request.is_render_cancellable = is_method_cancellable(self._handle_request)
 
         return await self._handle_request(request, **kwargs)
