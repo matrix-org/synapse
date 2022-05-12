@@ -118,18 +118,16 @@ class RoomConfig(Config):
         # the default event power levels will be ignored).
         #
         #default_power_level_content_override:
-        #    "private_chat": {
-        #        "events": {
-        #            "com.example.myeventtype" : 0,
-        #            "m.room.avatar": 50,
-        #            "m.room.canonical_alias": 50,
-        #            "m.room.encryption": 100,
-        #            "m.room.history_visibility": 100,
-        #            "m.room.name": 50,
-        #            "m.room.power_levels": 100,
-        #            "m.room.server_acl": 100,
+        #    private_chat:
+        #        "events":
+        #            "com.example.myeventtype" : 0
+        #            "m.room.avatar": 50
+        #            "m.room.canonical_alias": 50
+        #            "m.room.encryption": 100
+        #            "m.room.history_visibility": 100
+        #            "m.room.name": 50
+        #            "m.room.power_levels": 100
+        #            "m.room.server_acl": 100
         #            "m.room.tombstone": 100
-        #        },
         #        "events_default": 1
-        #    }
         """
