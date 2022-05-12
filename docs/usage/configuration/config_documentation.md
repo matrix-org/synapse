@@ -3315,6 +3315,32 @@ room_list_publication_rules:
     room_id: "*"
     action: allow
 ```
+
+---
+Config option: `default_power_level_content_override`
+
+The `default_power_level_content_override` option controls the default power
+levels for rooms.
+
+Useful if you know that your users need special permissions in rooms
+that they create (e.g. to send particular types of state events without
+needing an elevated power level).  This takes the same shape as the
+`power_level_content_override` parameter in the /createRoom API, but
+is applied before that parameter.
+
+Note that each key provided inside a preset (for example `events` in the example
+below) will overwrite all existing defaults inside that key. So in the example
+below, newly-created private_chat rooms will have no rules for any event types
+except `com.example.foo`.
+
+Example configuration:
+```yaml
+default_power_level_content_override:
+   private_chat: { "events": { "com.example.foo" : 0 } }
+   trusted_private_chat: null
+   public_chat: null
+```
+
 ---
 ## Opentracing ##
 Configuration options related to Opentracing support.
