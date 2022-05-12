@@ -1050,13 +1050,10 @@ class RoomCreationHandler:
 
             # If the server config contains default_power_level_content_override,
             # and that contains information for this room preset, apply it.
-            if (
-                self._default_power_level_content_override
-                and self._default_power_level_content_override.get(preset_config)
-            ):
-                power_level_content.update(
-                    self._default_power_level_content_override.get(preset_config)
-                )
+            if self._default_power_level_content_override:
+                override = self._default_power_level_content_override.get(preset_config)
+                if override is not None:
+                    power_level_content.update(override)
 
             # Finally, if the user supplied specific permissions for this room,
             # apply those.
