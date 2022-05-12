@@ -239,13 +239,13 @@ class StateHandler:
         entry = await self.resolve_state_groups_for_events(room_id, latest_event_ids)
         return await self.store.get_joined_users_from_state(room_id, entry)
 
-    async def get_current_hosts_in_room(self, room_id: str) -> FrozenSet[str]:
+    async def get_current_hosts_in_room(self, room_id: str) -> Set[str]:
         event_ids = await self.store.get_latest_event_ids_in_room(room_id)
         return await self.get_hosts_in_room_at_events(room_id, event_ids)
 
     async def get_hosts_in_room_at_events(
         self, room_id: str, event_ids: Collection[str]
-    ) -> FrozenSet[str]:
+    ) -> Set[str]:
         """Get the hosts that were in a room at the given event ids
 
         Args:
