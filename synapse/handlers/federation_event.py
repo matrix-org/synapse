@@ -489,7 +489,6 @@ class FederationEventHandler:
             # `current_state_events`
             for e in state:
                 await self._handle_marker_event(origin, e)
-                # TODO: Loop through previous state to find other markers
 
             return stream_id_after_persist
 
@@ -1031,7 +1030,7 @@ class FederationEventHandler:
 
     async def _get_state_and_persist(
         self, destination: str, room_id: str, event_id: str
-    ) -> None:
+    ) -> List[EventBase]:
         """Get the complete room state at a given event, and persist any new events
         as outliers"""
         room_version = await self._store.get_room_version(room_id)
@@ -1039,6 +1038,14 @@ class FederationEventHandler:
             destination, room_id, event_id=event_id, room_version=room_version
         )
         logger.info("/state returned %i events", len(auth_events) + len(state_events))
+
+        logger.info(
+            "_get_state_and_persist auth_events(%d)=%s state_events(%d)=%s",
+            len(auth_events),
+            auth_events,
+            len(state_events),
+            state_events,
+        )
 
         await self._auth_and_persist_outliers(
             room_id, itertools.chain(auth_events, state_events)
@@ -1049,6 +1056,8 @@ class FederationEventHandler:
             await self._get_events_and_persist(
                 destination=destination, room_id=room_id, event_ids=(event_id,)
             )
+
+        return auth_events + state_events
 
     async def _process_received_pdu(
         self,
@@ -1235,6 +1244,26 @@ class FederationEventHandler:
             return
 
         logger.debug("_handle_marker_event: received %s", marker_event)
+
+        # TODO: Move this to a background queue
+        async def handle_marker_queue(marker_event: EventBase) -> None:
+            # Get the state before the marker event
+            state_events = await self._get_state_and_persist(
+                origin, marker_event.room_id, marker_event.event_id
+            )
+            logger.info(
+                "handle_marker_queue marker_event=%s state_events=%s",
+                marker_event.event_id,
+                state_events,
+            )
+
+            # TODO: No need to keep going if the marker is already `have_seen_event`
+
+            for e in state_events:
+                await self._handle_marker_event(origin, e)
+
+        # TODO: add_to_queue
+        await handle_marker_queue(marker_event)
 
         insertion_event_id = marker_event.content.get(
             EventContentFields.MSC2716_MARKER_INSERTION
