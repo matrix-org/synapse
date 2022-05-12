@@ -17,7 +17,7 @@ import logging
 import traceback
 from io import StringIO
 from types import TracebackType
-from typing import Tuple, Optional, Type
+from typing import Optional, Tuple, Type
 
 
 class LogFormatter(logging.Formatter):
