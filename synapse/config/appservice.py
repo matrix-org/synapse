@@ -49,9 +49,10 @@ class AppServiceConfig(Config):
         #
         #track_appservice_user_ips: true
 
-        # Set to establish maximum backoff (in seconds) between HS -> AS connection attempts.
-        # Upon failing to push appservice events the homeserver will wait
-        # an increasing amount of seconds between retries. This sets an upper limit of that (in seconds)
+        # Set to establish a maximum backoff (in seconds) between HS -> AS connection attempts.
+        # Upon failing to push appservice events, the homeserver will reattempt connection to the
+        # application service after a delay. The delay increases with subsequent retries.
+        # This value sets an upper limit on that delay.
         #
         #appservice_max_backoff: 60
         """
