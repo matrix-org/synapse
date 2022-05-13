@@ -301,6 +301,7 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
 
     @unittest.override_config({"retention": {"enabled": False}})
     def test_visibility_when_disabled(self) -> None:
+        """Retention policies should be ignored when the retention feature is disabled."""
         room_id = self.helper.create_room_as(self.user_id, tok=self.token)
 
         self.helper.send_state(
