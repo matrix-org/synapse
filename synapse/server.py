@@ -681,7 +681,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_spam_checker(self) -> SpamChecker:
-        return SpamChecker()
+        return SpamChecker(self)
 
     @cache_in_self
     def get_third_party_event_rules(self) -> ThirdPartyEventRules:
