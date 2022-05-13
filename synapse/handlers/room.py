@@ -258,7 +258,7 @@ class RoomCreationHandler:
         assert self.hs.is_mine_id(user_id), "User must be our own: %s" % (user_id,)
 
         # start by allocating a new room id
-        new_room_id = await self._generate_room_id(
+        new_room_id = await self._generate_and_create_room_id(
             creator_id=user_id,
             is_public=old_room["is_public"],
             room_version=new_version,
@@ -847,7 +847,7 @@ class RoomCreationHandler:
         visibility = config.get("visibility", "private")
         is_public = visibility == "public"
 
-        room_id = await self._generate_room_id(
+        room_id = await self._generate_and_create_room_id(
             creator_id=user_id,
             is_public=is_public,
             room_version=room_version,
@@ -1159,7 +1159,26 @@ class RoomCreationHandler:
 
         return last_sent_stream_id
 
-    async def _generate_room_id(
+    def _generate_room_id(self) -> str:
+        """Generates a random room ID.
+
+        Room IDs look like "!opaque_id:domain" and are case-sensitive as per the spec
+        at https://spec.matrix.org/v1.2/appendices/#room-ids-and-event-ids.
+
+        Does not check for collisions with existing rooms or prevent future calls from
+        returning the same room ID. To ensure the uniqueness of a new room ID, use
+        `_generate_and_create_room_id` instead.
+
+        Synapse's room IDs are 18 [a-zA-Z] characters long, which comes out to around
+        102 bits.
+
+        Returns:
+            A random room ID of the form "!opaque_id:domain".
+        """
+        random_string = stringutils.random_string(18)
+        return RoomID(random_string, self.hs.hostname).to_string()
+
+    async def _generate_and_create_room_id(
         self,
         creator_id: str,
         is_public: bool,
@@ -1170,8 +1189,7 @@ class RoomCreationHandler:
         attempts = 0
         while attempts < 5:
             try:
-                random_string = stringutils.random_string(18)
-                gen_room_id = RoomID(random_string, self.hs.hostname).to_string()
+                gen_room_id = self._generate_room_id()
                 await self.store.store_room(
                     room_id=gen_room_id,
                     room_creator_user_id=creator_id,
