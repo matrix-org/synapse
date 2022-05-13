@@ -65,7 +65,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-UPDATE_RECENTLY_ACCESSED_TS = 60 * 1000
+# How often to run the background job to update the "recently accessed"
+# attribute of local and remote media.
+UPDATE_RECENTLY_ACCESSED_TS = 60 * 1000  # 1 minute
+# How often to run the background job that purges local and remote media
+# according to the configured media retention rules.
+APPLY_MEDIA_RETENTION_RULES_PERIOD_MS = 60 * 60 * 1000  # 1 hour
 
 
 class MediaRepository:
@@ -122,9 +127,30 @@ class MediaRepository:
             self._start_update_recently_accessed, UPDATE_RECENTLY_ACCESSED_TS
         )
 
+        # Media retention configuration options
+        self._media_retention_local_media_lifetime_ms = (
+            hs.config.media.media_retention_local_media_lifetime_ms
+        )
+        self._media_retention_remote_media_lifetime_ms = (
+            hs.config.media.media_retention_remote_media_lifetime_ms
+        )
+
+        if hs.config.media.media_retention_enabled:
+            # Run the background job to apply media retention rules every
+            # $APPLY_MEDIA_RETENTION_RULES_PERIOD_MS milliseconds.
+            self.clock.looping_call(
+                self._start_apply_media_retention_rules,
+                APPLY_MEDIA_RETENTION_RULES_PERIOD_MS,
+            )
+
     def _start_update_recently_accessed(self) -> Deferred:
         return run_as_background_process(
             "update_recently_accessed_media", self._update_recently_accessed
+        )
+
+    def _start_apply_media_retention_rules(self) -> Deferred:
+        return run_as_background_process(
+            "apply_media_retention_rules", self._apply_media_retention_rules
         )
 
     async def _update_recently_accessed(self) -> None:
@@ -834,6 +860,48 @@ class MediaRepository:
                     )
 
         return {"width": m_width, "height": m_height}
+
+    async def _apply_media_retention_rules(self) -> None:
+        """
+        Purge old local and remote media according to the media retention rules
+        defined in the homeserver config.
+
+        Raises:
+            ...
+        """
+        # Purge remote media
+        if self._media_retention_remote_media_lifetime_ms is not None:
+            # Calculate a threshold timestamp derived from the configured lifetime. Any
+            # media that has not been accessed since this timestamp will be removed.
+            remote_media_threshold_timestamp_ms = (
+                self.clock.time_msec() - self._media_retention_remote_media_lifetime_ms
+            )
+
+            logger.info(
+                "Purging remote media last accessed before"
+                f" {remote_media_threshold_timestamp_ms}"
+            )
+
+            await self.delete_old_remote_media(
+                before_ts=remote_media_threshold_timestamp_ms
+            )
+
+        # And now do the same for local media
+        if self._media_retention_local_media_lifetime_ms is not None:
+            # This works the same as the remote media threshold
+            local_media_threshold_timestamp_ms = (
+                self.clock.time_msec() - self._media_retention_local_media_lifetime_ms
+            )
+
+            logger.info(
+                "Purging local media last accessed before"
+                f" {local_media_threshold_timestamp_ms}"
+            )
+
+            await self.delete_old_local_media(
+                before_ts=local_media_threshold_timestamp_ms,
+                keep_profiles=True,
+            )
 
     async def delete_old_remote_media(self, before_ts: int) -> Dict[str, int]:
         old_media = await self.store.get_remote_media_before(before_ts)
