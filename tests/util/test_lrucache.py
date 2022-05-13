@@ -14,8 +14,9 @@
 
 
 from typing import List
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
+from synapse.metrics.jemalloc import JemallocStats
 from synapse.util.caches.lrucache import LruCache, setup_expire_lru_cache_entries
 from synapse.util.caches.treecache import TreeCache
 
@@ -316,3 +317,58 @@ class TimeEvictionTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(cache.get("key1"), None)
         self.assertEqual(cache.get("key2"), 3)
+
+
+class MemoryEvictionTestCase(unittest.HomeserverTestCase):
+    @override_config(
+        {
+            "caches": {
+                "cache_autotuning": {
+                    "max_cache_memory_usage": "700M",
+                    "target_cache_memory_usage": "500M",
+                    "min_cache_ttl": "5m",
+                }
+            }
+        }
+    )
+    @patch("synapse.util.caches.lrucache.get_jemalloc_stats")
+    def test_evict_memory(self, jemalloc_interface) -> None:
+        mock_jemalloc_class = Mock(spec=JemallocStats)
+        jemalloc_interface.return_value = mock_jemalloc_class
+
+        # set the return value of get_stat() to be greater than max_cache_memory_usage
+        mock_jemalloc_class.get_stat.return_value = 924288000
+
+        setup_expire_lru_cache_entries(self.hs)
+        cache = LruCache(4, clock=self.hs.get_clock())
+
+        cache["key1"] = 1
+        cache["key2"] = 2
+
+        # advance the reactor less than the min_cache_ttl
+        self.reactor.advance(60 * 2)
+
+        # our items should still be in the cache
+        self.assertEqual(cache.get("key1"), 1)
+        self.assertEqual(cache.get("key2"), 2)
+
+        # advance the reactor past the min_cache_ttl
+        self.reactor.advance(60 * 6)
+
+        # the items should be cleared from cache
+        self.assertEqual(cache.get("key1"), None)
+        self.assertEqual(cache.get("key2"), None)
+
+        # add more stuff to caches
+        cache["key1"] = 1
+        cache["key2"] = 2
+
+        # set the return value of get_stat() to be lower than target_cache_memory_usage
+        mock_jemalloc_class.get_stat.return_value = 10000
+
+        # advance the reactor past the min_cache_ttl
+        self.reactor.advance(60 * 6)
+
+        # the items should still be in the cache
+        self.assertEqual(cache.get("key1"), 1)
+        self.assertEqual(cache.get("key2"), 2)
