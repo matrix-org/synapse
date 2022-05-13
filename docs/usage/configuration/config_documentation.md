@@ -627,6 +627,20 @@ Example configuration:
 mau_trial_days: 5
 ```
 ---
+Config option: `mau_appservice_trial_days`
+
+The option `mau_appservice_trial_days` is similar to `mau_trial_days`, but applies a different
+trial number if the user was registered by an appservice. A value
+of 0 means no trial days are applied. Appservices not listed in this dictionary
+use the value of `mau_trial_days` instead.
+
+Example configuration:
+```yaml
+mau_appservice_trial_days: 
+  my_appservice_id: 3
+  another_appservice_id: 6
+```
+---
 Config option: `mau_limit_alerting`
 
 The option `mau_limit_alerting` is a means of limiting client-side alerting
@@ -1035,13 +1049,13 @@ allow_profile_lookup_over_federation: false
 ---
 Config option: `allow_device_name_lookup_over_federation`
 
-Set this option to false to disable device display name lookup over federation. By default, the
-Federation API allows other homeservers to obtain device display names of any user
+Set this option to true to allow device display name lookup over federation. By default, the
+Federation API prevents other homeservers from obtaining the display names of any user devices
 on this homeserver.
 
 Example configuration:
 ```yaml
-allow_device_name_lookup_over_federation: false
+allow_device_name_lookup_over_federation: true
 ```
 ---
 ## Caching ##
@@ -1116,6 +1130,23 @@ caches:
   expire_caches: false
   sync_response_cache_duration: 2m
 ```
+
+### Reloading cache factors
+
+The cache factors (i.e. `caches.global_factor` and `caches.per_cache_factors`)  may be reloaded at any time by sending a
+[`SIGHUP`](https://en.wikipedia.org/wiki/SIGHUP) signal to Synapse using e.g.
+
+```commandline
+kill -HUP [PID_OF_SYNAPSE_PROCESS]
+```
+
+If you are running multiple workers, you must individually update the worker 
+config file and send this signal to each worker process.
+
+If you're using the [example systemd service](https://github.com/matrix-org/synapse/blob/develop/contrib/systemd/matrix-synapse.service)
+file in Synapse's `contrib` directory, you can send a `SIGHUP` signal by using
+`systemctl reload matrix-synapse`.
+
 ---
 ## Database ##
 Config options related to database settings.
@@ -3284,6 +3315,32 @@ room_list_publication_rules:
     room_id: "*"
     action: allow
 ```
+
+---
+Config option: `default_power_level_content_override`
+
+The `default_power_level_content_override` option controls the default power
+levels for rooms.
+
+Useful if you know that your users need special permissions in rooms
+that they create (e.g. to send particular types of state events without
+needing an elevated power level).  This takes the same shape as the
+`power_level_content_override` parameter in the /createRoom API, but
+is applied before that parameter.
+
+Note that each key provided inside a preset (for example `events` in the example
+below) will overwrite all existing defaults inside that key. So in the example
+below, newly-created private_chat rooms will have no rules for any event types
+except `com.example.foo`.
+
+Example configuration:
+```yaml
+default_power_level_content_override:
+   private_chat: { "events": { "com.example.foo" : 0 } }
+   trusted_private_chat: null
+   public_chat: null
+```
+
 ---
 ## Opentracing ##
 Configuration options related to Opentracing support.

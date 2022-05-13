@@ -55,7 +55,7 @@ solutions. The hope is for Matrix to act as the building blocks for a new
 generation of fully open and interoperable messaging and VoIP apps for the
 internet.
 
-Synapse is a Matrix "homeserver" implementation developed by the matrix.org core 
+Synapse is a Matrix "homeserver" implementation developed by the matrix.org core
 team, written in Python 3/Twisted.
 
 In Matrix, every user runs one or more Matrix clients, which connect through to
@@ -294,13 +294,13 @@ directory of your choice::
     cd synapse
 
 Synapse has a number of external dependencies. We maintain a fixed development
-environment using [poetry](https://python-poetry.org/). First, install poetry. We recommend
+environment using `Poetry <https://python-poetry.org/>`_. First, install poetry. We recommend::
 
     pip install --user pipx
     pipx install poetry
 
 as described `here <https://python-poetry.org/docs/#installing-with-pipx>`_.
-(See `poetry's installation docs <https://python-poetry.org/docs/#installation>`
+(See `poetry's installation docs <https://python-poetry.org/docs/#installation>`_
 for other installation methods.) Then ask poetry to create a virtual environment
 from the project and install Synapse's dependencies::
 
@@ -309,11 +309,11 @@ from the project and install Synapse's dependencies::
 This will run a process of downloading and installing all the needed
 dependencies into a virtual env.
 
-We recommend using the demo which starts 3 federated instances running on ports `8080` - `8082`
+We recommend using the demo which starts 3 federated instances running on ports `8080` - `8082`::
 
     poetry run ./demo/start.sh
 
-(to stop, you can use `poetry run ./demo/stop.sh`)
+(to stop, you can use ``poetry run ./demo/stop.sh``)
 
 See the `demo documentation <https://matrix-org.github.io/synapse/develop/development/demo.html>`_
 for more information.

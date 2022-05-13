@@ -159,7 +159,7 @@ Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to 
 oidc_providers:
   - idp_id: keycloak
     idp_name: "My KeyCloak server"
-    issuer: "https://127.0.0.1:8443/auth/realms/{realm_name}"
+    issuer: "https://127.0.0.1:8443/realms/{realm_name}"
     client_id: "synapse"
     client_secret: "copy secret generated from above"
     scopes: ["openid", "profile"]

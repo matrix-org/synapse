@@ -57,7 +57,7 @@ from synapse.api.filtering import Filter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase
-from synapse.events.utils import copy_power_levels_contents
+from synapse.events.utils import copy_and_fixup_power_levels_contents
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.handlers.federation import get_domains_from_state
 from synapse.handlers.relations import BundledAggregations
@@ -148,6 +148,10 @@ class RoomCreationHandler:
                 in self.config.room.encryption_enabled_by_default_for_room_presets
             )
             preset_config["encrypted"] = encrypted
+
+        self._default_power_level_content_override = (
+            self.config.room.default_power_level_content_override
+        )
 
         self._replication = hs.get_replication_data_handler()
 
@@ -337,13 +341,13 @@ class RoomCreationHandler:
         # 50, but if the default PL in a room is 50 or more, then we set the
         # required PL above that.
 
-        pl_content = dict(old_room_pl_state.content)
-        users_default = int(pl_content.get("users_default", 0))
+        pl_content = copy_and_fixup_power_levels_contents(old_room_pl_state.content)
+        users_default: int = pl_content.get("users_default", 0)  # type: ignore[assignment]
         restricted_level = max(users_default + 1, 50)
 
         updated = False
         for v in ("invite", "events_default"):
-            current = int(pl_content.get(v, 0))
+            current: int = pl_content.get(v, 0)  # type: ignore[assignment]
             if current < restricted_level:
                 logger.debug(
                     "Setting level for %s in %s to %i (was %i)",
@@ -380,7 +384,9 @@ class RoomCreationHandler:
                 "state_key": "",
                 "room_id": new_room_id,
                 "sender": requester.user.to_string(),
-                "content": old_room_pl_state.content,
+                "content": copy_and_fixup_power_levels_contents(
+                    old_room_pl_state.content
+                ),
             },
             ratelimit=False,
         )
@@ -471,7 +477,7 @@ class RoomCreationHandler:
         # dict so we can't just copy.deepcopy it.
         initial_state[
             (EventTypes.PowerLevels, "")
-        ] = power_levels = copy_power_levels_contents(
+        ] = power_levels = copy_and_fixup_power_levels_contents(
             initial_state[(EventTypes.PowerLevels, "")]
         )
 
@@ -1040,9 +1046,19 @@ class RoomCreationHandler:
                 for invitee in invite_list:
                     power_level_content["users"][invitee] = 100
 
-            # Power levels overrides are defined per chat preset
+            # If the user supplied a preset name e.g. "private_chat",
+            # we apply that preset
             power_level_content.update(config["power_level_content_override"])
 
+            # If the server config contains default_power_level_content_override,
+            # and that contains information for this room preset, apply it.
+            if self._default_power_level_content_override:
+                override = self._default_power_level_content_override.get(preset_config)
+                if override is not None:
+                    power_level_content.update(override)
+
+            # Finally, if the user supplied specific permissions for this room,
+            # apply those.
             if power_level_content_override:
                 power_level_content.update(power_level_content_override)
 
