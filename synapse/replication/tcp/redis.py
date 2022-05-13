@@ -94,7 +94,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
 
     synapse_handler: "ReplicationCommandHandler"
     synapse_stream_prefix: str
-    synapse_subscribed_channels: List[str]
+    synapse_channel_names: List[str]
     synapse_outbound_redis_connection: txredisapi.ConnectionHandler
 
     def __init__(self, *args: Any, **kwargs: Any):
@@ -121,7 +121,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
         # POSITION response sent back by the other end.
         fully_qualified_stream_names = [
             f"{self.synapse_stream_prefix}/{stream_suffix}"
-            for stream_suffix in self.synapse_subscribed_channels
+            for stream_suffix in self.synapse_channel_names
         ] + [self.synapse_stream_prefix]
         logger.info("Sending redis SUBSCRIBE for %r", fully_qualified_stream_names)
         await make_deferred_yieldable(self.subscribe(fully_qualified_stream_names))
@@ -314,13 +314,20 @@ class RedisDirectTcpReplicationClientFactory(SynapseRedisFactory):
         outbound_redis_connection: A connection to redis that will be used to
             send outbound commands (this is separate to the redis connection
             used to subscribe).
+        channel_names: A list of channel names to append to the base channel name
+            to additionally subscribe to.
+            e.g. if ['ABC', 'DEF'] is specified then we'll listen to:
+            example.com; example.com/ABC; and example.com/DEF.
     """
 
     maxDelay = 5
     protocol = RedisSubscriber
 
     def __init__(
-        self, hs: "HomeServer", outbound_redis_connection: txredisapi.ConnectionHandler
+        self,
+        hs: "HomeServer",
+        outbound_redis_connection: txredisapi.ConnectionHandler,
+        channel_names: List[str],
     ):
 
         super().__init__(
@@ -334,11 +341,7 @@ class RedisDirectTcpReplicationClientFactory(SynapseRedisFactory):
 
         self.synapse_handler = hs.get_replication_command_handler()
         self.synapse_stream_prefix = hs.hostname
-        self.synapse_subscribed_channels = (
-            RedisDirectTcpReplicationClientFactory.channels_to_subscribe_to_for_config(
-                hs.config
-            )
-        )
+        self.synapse_channel_names = channel_names
 
         self.synapse_outbound_redis_connection = outbound_redis_connection
 
@@ -350,27 +353,6 @@ class RedisDirectTcpReplicationClientFactory(SynapseRedisFactory):
             # If we're the main process or the background worker, we want to process
             # User IP addresses
             subscribe_to.append("USER_IP")
-
-        # Subscribe to the following RDATA channels.
-        # We may be able to reduce this in the future.
-        subscribe_to += [
-            "RDATA/account_data",
-            "RDATA/backfill",
-            "RDATA/caches",
-            "RDATA/device_lists",
-            "RDATA/events",
-            "RDATA/federation",
-            "RDATA/groups",
-            "RDATA/presence",
-            "RDATA/presence_federation",
-            "RDATA/push_rules",
-            "RDATA/pushers",
-            "RDATA/receipts",
-            "RDATA/tag_account_data",
-            "RDATA/to_device",
-            "RDATA/typing",
-            "RDATA/user_signature",
-        ]
 
         return subscribe_to
 
@@ -385,7 +367,7 @@ class RedisDirectTcpReplicationClientFactory(SynapseRedisFactory):
         p.synapse_handler = self.synapse_handler
         p.synapse_outbound_redis_connection = self.synapse_outbound_redis_connection
         p.synapse_stream_prefix = self.synapse_stream_prefix
-        p.synapse_subscribed_channels = self.synapse_subscribed_channels
+        p.synapse_channel_names = self.synapse_channel_names
 
         return p
 

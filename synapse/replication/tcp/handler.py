@@ -321,7 +321,11 @@ class ReplicationCommandHandler:
 
             # Now create the factory/connection for the subscription stream.
             self._factory = RedisDirectTcpReplicationClientFactory(
-                hs, outbound_redis_connection
+                hs,
+                outbound_redis_connection,
+                channel_names=RedisDirectTcpReplicationClientFactory.channels_to_subscribe_to_for_config(
+                    hs.config
+                ),
             )
             hs.get_reactor().connectTCP(
                 hs.config.redis.redis_host,
