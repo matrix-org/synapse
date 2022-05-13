@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import Mapping, Optional
+from typing import TYPE_CHECKING, Any, Mapping, Optional, cast
 
 from synapse.storage.engines._base import (
     BaseDatabaseEngine,
@@ -22,30 +22,35 @@ from synapse.storage.engines._base import (
 )
 from synapse.storage.types import Connection
 
+if TYPE_CHECKING:
+    import psycopg2  # noqa: F401
+
 logger = logging.getLogger(__name__)
 
 
-class PostgresEngine(BaseDatabaseEngine):
-    def __init__(self, database_module, database_config):
-        super().__init__(database_module, database_config)
-        self.module.extensions.register_type(self.module.extensions.UNICODE)
+class PostgresEngine(BaseDatabaseEngine["psycopg2.connection"]):
+    def __init__(self, database_config: Mapping[str, Any]):
+        import psycopg2.extensions
+
+        super().__init__(psycopg2, database_config)
+        psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 
         # Disables passing `bytes` to txn.execute, c.f. #6186. If you do
         # actually want to use bytes than wrap it in `bytearray`.
         def _disable_bytes_adapter(_):
             raise Exception("Passing bytes to DB is disabled.")
 
-        self.module.extensions.register_adapter(bytes, _disable_bytes_adapter)
+        psycopg2.extensions.register_adapter(bytes, _disable_bytes_adapter)
         self.synchronous_commit = database_config.get("synchronous_commit", True)
-        self._version = None  # unknown as yet
+        self._version: Optional[int] = None  # unknown as yet
 
         self.isolation_level_map: Mapping[int, int] = {
-            IsolationLevel.READ_COMMITTED: self.module.extensions.ISOLATION_LEVEL_READ_COMMITTED,
-            IsolationLevel.REPEATABLE_READ: self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ,
-            IsolationLevel.SERIALIZABLE: self.module.extensions.ISOLATION_LEVEL_SERIALIZABLE,
+            IsolationLevel.READ_COMMITTED: psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED,
+            IsolationLevel.REPEATABLE_READ: psycopg2.extensions.ISOLATION_LEVEL_REPEATABLE_READ,
+            IsolationLevel.SERIALIZABLE: psycopg2.extensions.ISOLATION_LEVEL_SERIALIZABLE,
         }
         self.default_isolation_level = (
-            self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
+            psycopg2.extensions.ISOLATION_LEVEL_REPEATABLE_READ
         )
         self.config = database_config
 
@@ -65,7 +70,7 @@ class PostgresEngine(BaseDatabaseEngine):
         # docs: The number is formed by converting the major, minor, and
         # revision numbers into two-decimal-digit numbers and appending them
         # together. For example, version 8.1.5 will be returned as 80105
-        self._version = db_conn.server_version
+        self._version = cast(int, db_conn.server_version)
         allow_unsafe_locale = self.config.get("allow_unsafe_locale", False)
 
         # Are we on a supported PostgreSQL version?
@@ -166,7 +171,9 @@ class PostgresEngine(BaseDatabaseEngine):
         return True
 
     def is_deadlock(self, error):
-        if isinstance(error, self.module.DatabaseError):
+        import psycopg2.extensions
+
+        if isinstance(error, psycopg2.DatabaseError):
             # https://www.postgresql.org/docs/current/static/errcodes-appendix.html
             # "40001" serialization_failure
             # "40P01" deadlock_detected
@@ -198,7 +205,9 @@ class PostgresEngine(BaseDatabaseEngine):
             return "%i.%i.%i" % (numver / 10000, (numver % 10000) / 100, numver % 100)
 
     def in_transaction(self, conn: Connection) -> bool:
-        return conn.status != self.module.extensions.STATUS_READY  # type: ignore
+        import psycopg2.extensions
+
+        return conn.status != psycopg2.extensions.STATUS_READY  # type: ignore
 
     def attempt_to_set_autocommit(self, conn: Connection, autocommit: bool):
         return conn.set_session(autocommit=autocommit)  # type: ignore

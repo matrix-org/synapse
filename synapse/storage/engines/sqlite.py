@@ -12,21 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import platform
+import sqlite3
 import struct
 import threading
-import typing
-from typing import Optional
+from typing import Any, Mapping, Optional
 
 from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.types import Connection
 
-if typing.TYPE_CHECKING:
-    import sqlite3  # noqa: F401
 
-
-class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
-    def __init__(self, database_module, database_config):
-        super().__init__(database_module, database_config)
+class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
+    def __init__(self, database_config: Mapping[str, Any]):
+        super().__init__(sqlite3, database_config)
 
         database = database_config.get("args", {}).get("database")
         self._is_in_memory = database in (
@@ -37,7 +34,7 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
         if platform.python_implementation() == "PyPy":
             # pypy's sqlite3 module doesn't handle bytearrays, convert them
             # back to bytes.
-            database_module.register_adapter(bytearray, lambda array: bytes(array))
+            sqlite3.register_adapter(bytearray, lambda array: bytes(array))
 
         # The current max state_group, or None if we haven't looked
         # in the DB yet.
@@ -54,7 +51,7 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
         Do we support native UPSERTs? This requires SQLite3 3.24+, plus some
         more work we haven't done yet to tell what was inserted vs updated.
         """
-        return self.module.sqlite_version_info >= (3, 24, 0)
+        return sqlite3.sqlite_version_info >= (3, 24, 0)
 
     @property
     def supports_using_any_list(self):
@@ -64,11 +61,11 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
     @property
     def supports_returning(self) -> bool:
         """Do we support the `RETURNING` clause in insert/update/delete?"""
-        return self.module.sqlite_version_info >= (3, 35, 0)
+        return sqlite3.sqlite_version_info >= (3, 35, 0)
 
     def check_database(self, db_conn, allow_outdated_version: bool = False):
         if not allow_outdated_version:
-            version = self.module.sqlite_version_info
+            version = sqlite3.sqlite_version_info
             # Synapse is untested against older SQLite versions, and we don't want
             # to let users upgrade to a version of Synapse with broken support for their
             # sqlite version, because it risks leaving them with a half-upgraded db.
@@ -113,7 +110,7 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
         Returns:
             string
         """
-        return "%i.%i.%i" % self.module.sqlite_version_info
+        return "%i.%i.%i" % sqlite3.sqlite_version_info
 
     def in_transaction(self, conn: Connection) -> bool:
         return conn.in_transaction  # type: ignore
