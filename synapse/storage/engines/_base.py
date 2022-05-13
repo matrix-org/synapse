@@ -15,7 +15,7 @@ import abc
 from enum import IntEnum
 from typing import Generic, Optional, TypeVar
 
-from synapse.storage.types import Connection
+from synapse.storage.types import Connection, DBAPI2Module
 
 
 class IsolationLevel(IntEnum):
@@ -32,7 +32,7 @@ ConnectionType = TypeVar("ConnectionType", bound=Connection)
 
 
 class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
-    def __init__(self, module):
+    def __init__(self, module: DBAPI2Module):
         self.module = module
 
     @property

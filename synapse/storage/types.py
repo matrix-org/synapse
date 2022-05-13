@@ -94,3 +94,23 @@ class Connection(Protocol):
         traceback: Optional[TracebackType],
     ) -> Optional[bool]:
         ...
+
+
+class DBAPI2Module(Protocol):
+    """The module-level attributes that we use from PEP 249.
+
+    This is NOT a comprehensive stub for the entire DBAPI2."""
+
+    __name__: str
+
+    Warning: Type[Exception]
+    Error: Type[Exception]
+    DatabaseError: Type[Exception]
+    OperationalError: Type[Exception]
+    IntegrityError: Type[Exception]
+
+    def connect(self, **parameters: object) -> Connection:
+        ...
+
+
+__all__ = ["Cursor", "Connection", "DBAPI2Module"]
