@@ -716,7 +716,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             A dict containing "min_lifetime" and "max_lifetime" for this room.
         """
         # If the room retention feature is disabled, return a policy with no minimum nor
-        # maximum, in order not to filter out events we should filter out when sending to
+        # maximum. This prevents incorrectly filtering out events when sending to
         # the client.
         if not self.config.retention.retention_enabled:
             return {"min_lifetime": None, "max_lifetime": None}
