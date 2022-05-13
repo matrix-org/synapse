@@ -175,7 +175,7 @@ class DefaultDictProperty(DictProperty, Generic[T]):
 
 
 class _EventInternalMetadata:
-    __slots__ = ["_dict", "stream_ordering", "outlier", "redacted_by"]
+    __slots__ = ["_dict", "stream_ordering", "outlier"]
 
     def __init__(self, internal_metadata_dict: JsonDict):
         # we have to copy the dict, because it turns out that the same dict is
@@ -188,10 +188,6 @@ class _EventInternalMetadata:
         # whether this event is an outlier (ie, whether we have the state at that point
         # in the DAG)
         self.outlier = False
-
-        # Whether this event has a valid redaction event pointing at it (i.e.
-        # whether it should be redacted before giving to clients).
-        self.redacted_by: Optional[str] = None
 
     out_of_band_membership: DictProperty[bool] = DictProperty("out_of_band_membership")
     send_on_behalf_of: DictProperty[str] = DictProperty("send_on_behalf_of")

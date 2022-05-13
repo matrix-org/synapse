@@ -251,7 +251,9 @@ class EventsWorkerStore(SQLBaseStore):
         ] = {}
 
         # We keep track of the events we have currently loaded in memory so that
-        # we can reuse them even if they've been evicted from the cache.
+        # we can reuse them even if they've been evicted from the cache. We only
+        # track events that don't need redacting in here (as then we don't need
+        # to track redaction status).
         self._event_ref: MutableMapping[str, EventBase] = weakref.WeakValueDictionary()
 
         self._event_fetch_lock = threading.Condition()
@@ -758,18 +760,11 @@ class EventsWorkerStore(SQLBaseStore):
             if event:
                 # Reconstruct an event cache entry
 
-                redacted_event = None
-                if event.internal_metadata.redacted_by is not None:
-                    # The event has been redacted, so we generate a redacted
-                    # version.
-                    redacted_event = prune_event(event)
-                    redacted_event.unsigned[
-                        "redacted_by"
-                    ] = event.internal_metadata.redacted_by
-
                 cache_entry = EventCacheEntry(
                     event=event,
-                    redacted_event=redacted_event,
+                    # We don't cache weakrefs to redacted events, so we know
+                    # this is None.
+                    redacted_event=None,
                 )
                 event_map[event_id] = cache_entry
 
@@ -1148,11 +1143,6 @@ class EventsWorkerStore(SQLBaseStore):
                 original_ev, redactions, event_map
             )
 
-            if redacted_event:
-                original_ev.internal_metadata.redacted_by = redacted_event.unsigned[
-                    "redacted_by"
-                ]
-
             cache_entry = EventCacheEntry(
                 event=original_ev, redacted_event=redacted_event
             )
@@ -1160,7 +1150,9 @@ class EventsWorkerStore(SQLBaseStore):
             self._get_event_cache.set((event_id,), cache_entry)
             result_map[event_id] = cache_entry
 
-            self._event_ref[event_id] = original_ev
+            if not redacted_event:
+                # We only cache references to unredacted events.
+                self._event_ref[event_id] = original_ev
 
         return result_map
 
