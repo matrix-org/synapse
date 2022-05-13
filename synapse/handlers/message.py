@@ -44,7 +44,7 @@ from synapse.api.errors import (
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.api.urls import ConsentURIBuilder
 from synapse.event_auth import validate_event_for_room_version
-from synapse.events import EventBase
+from synapse.events import EventBase, relation_from_event
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
@@ -1060,7 +1060,7 @@ class EventCreationHandler:
             SynapseError if the event is invalid.
         """
 
-        relation = event.relation()
+        relation = relation_from_event(event)
         if not relation:
             return
 

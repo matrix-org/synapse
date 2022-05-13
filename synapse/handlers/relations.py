@@ -27,7 +27,7 @@ import attr
 
 from synapse.api.constants import RelationTypes
 from synapse.api.errors import SynapseError
-from synapse.events import EventBase
+from synapse.events import EventBase, relation_from_event
 from synapse.storage.databases.main.relations import _RelatedEvent
 from synapse.types import JsonDict, Requester, StreamToken, UserID
 from synapse.visibility import filter_events_for_client
@@ -372,7 +372,7 @@ class RelationsHandler:
             if event.is_state():
                 continue
 
-            relates_to = event.relation()
+            relates_to = relation_from_event(event)
             if relates_to:
                 # An event which is a replacement (ie edit) or annotation (ie,
                 # reaction) may not have any other event related to it.

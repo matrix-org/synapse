@@ -290,17 +290,6 @@ class _EventInternalMetadata:
         return self._dict.get("historical", False)
 
 
-@attr.s(slots=True, frozen=True, auto_attribs=True)
-class _EventRelation:
-    # The target event of the relation.
-    parent_id: str
-    # The relation type.
-    rel_type: str
-    # The aggregation key. Will be None if the rel_type is not m.annotation or is
-    # not a string.
-    aggregation_key: Optional[str]
-
-
 class EventBase(metaclass=abc.ABCMeta):
     @property
     @abc.abstractmethod
@@ -428,36 +417,6 @@ class EventBase(metaclass=abc.ABCMeta):
             The list of event IDs of this event's auth_events
         """
         return [e for e, _ in self._dict["auth_events"]]
-
-    def relation(self) -> Optional[_EventRelation]:
-        """
-        Parse the event's relation information.
-
-        Returns:
-            The event relation information, if it is valid. None, otherwise.
-        """
-        relation = self.content.get("m.relates_to")
-        if not relation or not isinstance(relation, collections.abc.Mapping):
-            # No relation information.
-            return None
-
-        # Relations must have a type and parent event ID.
-        rel_type = relation.get("rel_type")
-        if not isinstance(rel_type, str):
-            return None
-
-        parent_id = relation.get("event_id")
-        if not isinstance(parent_id, str):
-            return None
-
-        # Annotations have a key field.
-        aggregation_key = None
-        if rel_type == RelationTypes.ANNOTATION:
-            aggregation_key = relation.get("key")
-            if not isinstance(aggregation_key, str):
-                aggregation_key = None
-
-        return _EventRelation(parent_id, rel_type, aggregation_key)
 
     def freeze(self) -> None:
         """'Freeze' the event dict, so it cannot be modified by accident"""
@@ -659,3 +618,45 @@ def make_event_from_dict(
     return event_type(
         event_dict, room_version, internal_metadata_dict or {}, rejected_reason
     )
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class _EventRelation:
+    # The target event of the relation.
+    parent_id: str
+    # The relation type.
+    rel_type: str
+    # The aggregation key. Will be None if the rel_type is not m.annotation or is
+    # not a string.
+    aggregation_key: Optional[str]
+
+
+def relation_from_event(event: EventBase) -> Optional[_EventRelation]:
+    """
+    Attempt to parse relation information an event.
+
+    Returns:
+        The event relation information, if it is valid. None, otherwise.
+    """
+    relation = event.content.get("m.relates_to")
+    if not relation or not isinstance(relation, collections.abc.Mapping):
+        # No relation information.
+        return None
+
+    # Relations must have a type and parent event ID.
+    rel_type = relation.get("rel_type")
+    if not isinstance(rel_type, str):
+        return None
+
+    parent_id = relation.get("event_id")
+    if not isinstance(parent_id, str):
+        return None
+
+    # Annotations have a key field.
+    aggregation_key = None
+    if rel_type == RelationTypes.ANNOTATION:
+        aggregation_key = relation.get("key")
+        if not isinstance(aggregation_key, str):
+            aggregation_key = None
+
+    return _EventRelation(parent_id, rel_type, aggregation_key)
