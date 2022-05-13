@@ -14,7 +14,6 @@
 import logging
 from unittest.mock import patch
 
-from synapse.api.room_versions import RoomVersion
 from synapse.rest import admin
 from synapse.rest.client import login, room, sync
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
