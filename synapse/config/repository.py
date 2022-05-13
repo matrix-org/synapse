@@ -223,6 +223,23 @@ class ContentRepositoryConfig(Config):
                 "url_preview_accept_language"
             ) or ["en"]
 
+        media_retention = config.get("media_retention") or {}
+        self.media_retention_enabled = media_retention.get("enabled", False)
+
+        self.media_retention_local_media_lifetime_ms = None
+        local_media_lifetime = media_retention.get("local_media_lifetime")
+        if local_media_lifetime is not None:
+            self.media_retention_local_media_lifetime_ms = self.parse_duration(
+                local_media_lifetime
+            )
+
+        self.media_retention_remote_media_lifetime_ms = None
+        remote_media_lifetime = media_retention.get("remote_media_lifetime")
+        if remote_media_lifetime is not None:
+            self.media_retention_remote_media_lifetime_ms = self.parse_duration(
+                remote_media_lifetime
+            )
+
     def generate_config_section(self, data_dir_path: str, **kwargs: Any) -> str:
         assert data_dir_path is not None
         media_store = os.path.join(data_dir_path, "media_store")
@@ -288,6 +305,39 @@ class ContentRepositoryConfig(Config):
         #
         #thumbnail_sizes:
 %(formatted_thumbnail_sizes)s
+
+        # Configure media retention settings. Media will be purged if it
+        # has not been accessed in at least this amount of time. If the
+        # media has never been access, the media's creation time is used
+        # instead. Both thumbnails and the original media will be removed.
+        #
+        # Media is 'accessed' when loaded in a room in a client, or
+        # otherwise downloaded by a local or remote user.
+        #
+        media_retention:
+            # Whether media retention settings should apply. Defaults to
+            # false.
+            #
+            # Uncomment to enable media retention on this homeserver.
+            #
+            #enabled: true
+
+            # How long to keep local media since its last access. Local
+            # media that is removed will be permanently deleted.
+            #
+            # If this option is not set, local media will not have a
+            # retention policy applied.
+            #
+            #local_media_lifetime: 30d
+
+            # How long to keep downloaded remote media since its last
+            # access. Remote media will be downloaded again from the
+            # originating server on demand.
+            #
+            # If this option is not set, remote media will not have a
+            # retention policy applied.
+            #
+            remote_media_lifetime: 7d
 
         # Is the preview URL API enabled?
         #
