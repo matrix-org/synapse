@@ -54,6 +54,8 @@ class AppServiceConfig(Config):
         # application service after a delay. The delay increases with subsequent retries.
         # This value sets an upper limit on that delay.
         #
+        # Regardless of this setting, the delay will never be longer than 512 seconds (about 8.5 minutes).
+        #
         #appservice_max_backoff: 60
         """
 
