@@ -1,0 +1,1 @@
+Fix uncommon bug where `/sync` would break for a user. Broke in v1.58.0.
