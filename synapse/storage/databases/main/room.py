@@ -709,6 +709,9 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         the 'max_lifetime' if no default policy has been defined in the server's
         configuration).
 
+        If support for retention policies is disabled, a policy without any bound is
+        returned.
+
         Args:
             room_id: The ID of the room to get the retention policy of.
 

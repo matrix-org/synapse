@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Dict, Any
 from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -252,20 +253,24 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-        config = self.default_config()
+    def default_config(self) -> Dict[str, Any]:
+        config = super().default_config()
 
         retention_config = {
             "enabled": True,
         }
 
+        # Update this config with what's in the default config so that
+        # override_config works as expected.
         retention_config.update(config.get("retention", {}))
         config["retention"] = retention_config
 
+        return config
+
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         mock_federation_client = Mock(spec=["backfill"])
 
         self.hs = self.setup_test_homeserver(
-            config=config,
             federation_client=mock_federation_client,
         )
         return self.hs
