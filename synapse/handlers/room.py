@@ -78,7 +78,6 @@ from synapse.types import (
     create_requester,
 )
 from synapse.util import stringutils
-from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_and_validate_server_name
 from synapse.visibility import filter_events_for_client
@@ -151,9 +150,6 @@ class RoomCreationHandler:
             preset_config["encrypted"] = encrypted
 
         self._replication = hs.get_replication_data_handler()
-
-        # linearizer to stop two upgrades happening at once
-        self._upgrade_linearizer = Linearizer("room_upgrade_linearizer")
 
         # If a user tries to update the same room multiple times in quick
         # succession, only process the first attempt and return its result to
