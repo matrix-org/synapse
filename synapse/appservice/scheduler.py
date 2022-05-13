@@ -478,7 +478,7 @@ class _Recoverer:
         as_api: ApplicationServiceApi,
         service: ApplicationService,
         callback: Callable[["_Recoverer"], Awaitable[None]],
-        max_backoff: Union[int, None],
+        max_backoff: Optional[int]
     ):
         self.clock = clock
         self.store = store
