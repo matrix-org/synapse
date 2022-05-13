@@ -15,10 +15,13 @@ import platform
 import sqlite3
 import struct
 import threading
-from typing import Any, Mapping, Optional
+from typing import TYPE_CHECKING, Any, List, Mapping, Optional
 
 from synapse.storage.engines import BaseDatabaseEngine
-from synapse.storage.types import Connection
+from synapse.storage.types import Cursor
+
+if TYPE_CHECKING:
+    from synapse.storage.database import LoggingDatabaseConnection
 
 
 class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
@@ -46,7 +49,7 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
         return True
 
     @property
-    def can_native_upsert(self):
+    def can_native_upsert(self) -> bool:
         """
         Do we support native UPSERTs? This requires SQLite3 3.24+, plus some
         more work we haven't done yet to tell what was inserted vs updated.
@@ -54,7 +57,7 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
         return sqlite3.sqlite_version_info >= (3, 24, 0)
 
     @property
-    def supports_using_any_list(self):
+    def supports_using_any_list(self) -> bool:
         """Do we support using `a = ANY(?)` and passing a list"""
         return False
 
@@ -63,7 +66,9 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
         """Do we support the `RETURNING` clause in insert/update/delete?"""
         return sqlite3.sqlite_version_info >= (3, 35, 0)
 
-    def check_database(self, db_conn, allow_outdated_version: bool = False):
+    def check_database(
+        self, db_conn: sqlite3.Connection, allow_outdated_version: bool = False
+    ) -> None:
         if not allow_outdated_version:
             version = sqlite3.sqlite_version_info
             # Synapse is untested against older SQLite versions, and we don't want
@@ -72,15 +77,15 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
             if version < (3, 22, 0):
                 raise RuntimeError("Synapse requires sqlite 3.22 or above.")
 
-    def check_new_database(self, txn):
+    def check_new_database(self, txn: Cursor) -> None:
         """Gets called when setting up a brand new database. This allows us to
         apply stricter checks on new databases versus existing database.
         """
 
-    def convert_param_style(self, sql):
+    def convert_param_style(self, sql: str) -> str:
         return sql
 
-    def on_new_connection(self, db_conn):
+    def on_new_connection(self, db_conn: "LoggingDatabaseConnection") -> None:
         # We need to import here to avoid an import loop.
         from synapse.storage.prepare_database import prepare_database
 
@@ -94,48 +99,46 @@ class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
         db_conn.execute("PRAGMA foreign_keys = ON;")
         db_conn.commit()
 
-    def is_deadlock(self, error):
+    def is_deadlock(self, error: Exception) -> bool:
         return False
 
-    def is_connection_closed(self, conn):
+    def is_connection_closed(self, conn: sqlite3.Connection) -> bool:
         return False
 
-    def lock_table(self, txn, table):
+    def lock_table(self, txn: Cursor, table: str) -> None:
         return
 
     @property
-    def server_version(self):
-        """Gets a string giving the server version. For example: '3.22.0'
-
-        Returns:
-            string
-        """
+    def server_version(self) -> str:
+        """Gets a string giving the server version. For example: '3.22.0'."""
         return "%i.%i.%i" % sqlite3.sqlite_version_info
 
-    def in_transaction(self, conn: Connection) -> bool:
-        return conn.in_transaction  # type: ignore
+    def in_transaction(self, conn: sqlite3.Connection) -> bool:
+        return conn.in_transaction
 
-    def attempt_to_set_autocommit(self, conn: Connection, autocommit: bool):
+    def attempt_to_set_autocommit(
+        self, conn: sqlite3.Connection, autocommit: bool
+    ) -> None:
         # Twisted doesn't let us set attributes on the connections, so we can't
         # set the connection to autocommit mode.
         pass
 
     def attempt_to_set_isolation_level(
-        self, conn: Connection, isolation_level: Optional[int]
-    ):
-        # All transactions are SERIALIZABLE by default in sqllite
+        self, conn: sqlite3.Connection, isolation_level: Optional[int]
+    ) -> None:
+        # All transactions are SERIALIZABLE by default in sqlite
         pass
 
 
 # Following functions taken from: https://github.com/coleifer/peewee
 
 
-def _parse_match_info(buf):
+def _parse_match_info(buf: bytes) -> List[int]:
     bufsize = len(buf)
     return [struct.unpack("@I", buf[i : i + 4])[0] for i in range(0, bufsize, 4)]
 
 
-def _rank(raw_match_info):
+def _rank(raw_match_info: bytes) -> float:
     """Handle match_info called w/default args 'pcx' - based on the example rank
     function http://sqlite.org/fts3.html#appendix_a
     """
