@@ -16,7 +16,7 @@
 import logging
 import os
 import sys
-from typing import Dict, Iterable, Iterator, List
+from typing import Dict, Iterable, List
 
 from matrix_common.versionstring import get_distribution_version_string
 
@@ -45,7 +45,7 @@ from synapse.app._base import (
     redirect_stdio_to_logs,
     register_start,
 )
-from synapse.config._base import ConfigError
+from synapse.config._base import ConfigError, format_config_error
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import ListenerConfig
@@ -397,38 +397,6 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
     register_start(start)
 
     return hs
-
-
-def format_config_error(e: ConfigError) -> Iterator[str]:
-    """
-    Formats a config error neatly
-
-    The idea is to format the immediate error, plus the "causes" of those errors,
-    hopefully in a way that makes sense to the user. For example:
-
-        Error in configuration at 'oidc_config.user_mapping_provider.config.display_name_template':
-          Failed to parse config for module 'JinjaOidcMappingProvider':
-            invalid jinja template:
-              unexpected end of template, expected 'end of print statement'.
-
-    Args:
-        e: the error to be formatted
-
-    Returns: An iterator which yields string fragments to be formatted
-    """
-    yield "Error in configuration"
-
-    if e.path:
-        yield " at '%s'" % (".".join(e.path),)
-
-    yield ":\n  %s" % (e.msg,)
-
-    parent_e = e.__cause__
-    indent = 1
-    while parent_e:
-        indent += 1
-        yield ":\n%s%s" % ("  " * indent, str(parent_e))
-        parent_e = parent_e.__cause__
 
 
 def run(hs: HomeServer) -> None:

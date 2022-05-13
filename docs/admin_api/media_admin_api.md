@@ -289,7 +289,7 @@ POST /_synapse/admin/v1/purge_media_cache?before_ts=<unix_timestamp_in_ms>
 
 URL Parameters
 
-* `unix_timestamp_in_ms`: string representing a positive integer - Unix timestamp in milliseconds.
+* `before_ts`: string representing a positive integer - Unix timestamp in milliseconds.
 All cached media that was last accessed before this timestamp will be removed.
 
 Response:
