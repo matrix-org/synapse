@@ -102,12 +102,12 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
-    def in_transaction(self, conn: Connection) -> bool:
+    def in_transaction(self, conn: ConnectionType) -> bool:
         """Whether the connection is currently in a transaction."""
         ...
 
     @abc.abstractmethod
-    def attempt_to_set_autocommit(self, conn: Connection, autocommit: bool):
+    def attempt_to_set_autocommit(self, conn: ConnectionType, autocommit: bool):
         """Attempt to set the connections autocommit mode.
 
         When True queries are run outside of transactions.
@@ -119,7 +119,7 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def attempt_to_set_isolation_level(
-        self, conn: Connection, isolation_level: Optional[int]
+        self, conn: ConnectionType, isolation_level: Optional[int]
     ):
         """Attempt to set the connections isolation level.
 
