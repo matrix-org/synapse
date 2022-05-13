@@ -23,7 +23,7 @@ from synapse.storage.types import Connection
 
 class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
     def __init__(self, database_config: Mapping[str, Any]):
-        super().__init__(sqlite3, database_config)
+        super().__init__(sqlite3)
 
         database = database_config.get("args", {}).get("database")
         self._is_in_memory = database in (

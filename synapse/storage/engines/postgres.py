@@ -32,7 +32,7 @@ class PostgresEngine(BaseDatabaseEngine["psycopg2.connection"]):
     def __init__(self, database_config: Mapping[str, Any]):
         import psycopg2.extensions
 
-        super().__init__(psycopg2, database_config)
+        super().__init__(psycopg2)
         psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 
         # Disables passing `bytes` to txn.execute, c.f. #6186. If you do
