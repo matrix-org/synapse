@@ -9443,7 +9443,7 @@ to install Dex.</p>
 <pre><code class="language-yaml">oidc_providers:
   - idp_id: keycloak
     idp_name: &quot;My KeyCloak server&quot;
-    issuer: &quot;https://127.0.0.1:8443/auth/realms/{realm_name}&quot;
+    issuer: &quot;https://127.0.0.1:8443/realms/{realm_name}&quot;
     client_id: &quot;synapse&quot;
     client_secret: &quot;copy secret generated from above&quot;
     scopes: [&quot;openid&quot;, &quot;profile&quot;]
