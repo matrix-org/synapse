@@ -16,7 +16,7 @@
 
 import time
 import urllib.parse
-from typing import TYPE_CHECKING, Callable, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Callable, Optional, Sequence, Union
 
 import jinja2
 
@@ -25,9 +25,9 @@ if TYPE_CHECKING:
 
 
 def build_jinja_env(
-    template_search_directories: Iterable[str],
+    template_search_directories: Sequence[str],
     config: "HomeServerConfig",
-    autoescape: Union[bool, Callable[[str], bool], None] = None,
+    autoescape: Union[bool, Callable[[Optional[str]], bool], None] = None,
 ) -> jinja2.Environment:
     """Set up a Jinja2 environment to load templates from the given search path
 
@@ -63,12 +63,13 @@ def build_jinja_env(
     env.filters.update(
         {
             "format_ts": _format_ts_filter,
-            "mxc_to_http": _create_mxc_to_http_filter(config.public_baseurl),
+            "mxc_to_http": _create_mxc_to_http_filter(config.server.public_baseurl),
+            "localpart_from_email": _localpart_from_email_filter,
         }
     )
 
     # common variables for all templates
-    env.globals.update({"server_name": config.server_name})
+    env.globals.update({"server_name": config.server.server_name})
 
     return env
 
@@ -110,5 +111,9 @@ def _create_mxc_to_http_filter(
     return mxc_to_http_filter
 
 
-def _format_ts_filter(value: int, format: str):
+def _format_ts_filter(value: int, format: str) -> str:
     return time.strftime(format, time.localtime(value / 1000))
+
+
+def _localpart_from_email_filter(address: str) -> str:
+    return address.rsplit("@", 1)[0]

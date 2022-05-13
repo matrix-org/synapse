@@ -23,6 +23,7 @@ from synapse.api.constants import (
     AccountDataTypes,
     EventContentFields,
     EventTypes,
+    GuestAccess,
     Membership,
 )
 from synapse.api.errors import (
@@ -36,6 +37,7 @@ from synapse.api.ratelimiting import Ratelimiter
 from synapse.event_auth import get_named_level, get_power_level_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
+from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
 from synapse.types import (
     JsonDict,
     Requester,
@@ -43,12 +45,11 @@ from synapse.types import (
     RoomID,
     StateMap,
     UserID,
+    create_requester,
     get_domain_from_id,
 )
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_left_room
-
-from ._base import BaseHandler
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -65,10 +66,11 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.state_handler = hs.get_state_handler()
         self.config = hs.config
+        self._server_name = hs.hostname
 
         self.federation_handler = hs.get_federation_handler()
         self.directory_handler = hs.get_directory_handler()
@@ -79,14 +81,15 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.account_data_handler = hs.get_account_data_handler()
         self.event_auth_handler = hs.get_event_auth_handler()
 
-        self.member_linearizer = Linearizer(name="member")
+        self.member_linearizer: Linearizer = Linearizer(name="member")
+        self.member_as_limiter = Linearizer(max_count=10, name="member_as_limiter")
 
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
         self.third_party_event_rules = hs.get_third_party_event_rules()
-        self._server_notices_mxid = self.config.server_notices_mxid
-        self._enable_lookup = hs.config.enable_3pid_lookup
-        self.allow_per_room_profiles = self.config.allow_per_room_profiles
+        self._server_notices_mxid = self.config.servernotices.server_notices_mxid
+        self._enable_lookup = hs.config.registration.enable_3pid_lookup
+        self.allow_per_room_profiles = self.config.server.allow_per_room_profiles
 
         self._join_rate_limiter_local = Ratelimiter(
             store=self.store,
@@ -114,10 +117,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             burst_count=hs.config.ratelimiting.rc_invites_per_user.burst_count,
         )
 
-        # This is only used to get at ratelimit function, and
-        # maybe_kick_guest_users. It's fine there are multiple of these as
-        # it doesn't store state.
-        self.base_handler = BaseHandler(hs)
+        self._third_party_invite_limiter = Ratelimiter(
+            store=self.store,
+            clock=self.clock,
+            rate_hz=hs.config.ratelimiting.rc_third_party_invite.per_second,
+            burst_count=hs.config.ratelimiting.rc_third_party_invite.burst_count,
+        )
+
+        self.request_ratelimiter = hs.get_request_ratelimiter()
 
     @abc.abstractmethod
     async def _remote_join(
@@ -222,7 +229,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         room_id: Optional[str],
         n_invites: int,
         update: bool = True,
-    ):
+    ) -> None:
         """Ratelimit more than one invite sent by the given requester in the given room.
 
         Args:
@@ -246,7 +253,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         requester: Optional[Requester],
         room_id: Optional[str],
         invitee_user_id: str,
-    ):
+    ) -> None:
         """Ratelimit invites by room and by target user.
 
         If room ID is missing then we just rate limit by target user.
@@ -262,13 +269,15 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         target: UserID,
         room_id: str,
         membership: str,
-        prev_event_ids: List[str],
-        auth_event_ids: Optional[List[str]] = None,
+        allow_no_prev_events: bool = False,
+        prev_event_ids: Optional[List[str]] = None,
+        state_event_ids: Optional[List[str]] = None,
         txn_id: Optional[str] = None,
         ratelimit: bool = True,
         content: Optional[dict] = None,
         require_consent: bool = True,
         outlier: bool = False,
+        historical: bool = False,
     ) -> Tuple[str, int]:
         """
         Internal membership update function to get an existing event or create
@@ -279,12 +288,20 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             target:
             room_id:
             membership:
-            prev_event_ids: The event IDs to use as the prev events
 
-            auth_event_ids:
-                The event ids to use as the auth_events for the new event.
-                Should normally be left as None, which will cause them to be calculated
-                based on the room state at the prev_events.
+            allow_no_prev_events: Whether to allow this event to be created an empty
+                list of prev_events. Normally this is prohibited just because most
+                events should have a prev_event and we should only use this in special
+                cases like MSC2716.
+            prev_event_ids: The event IDs to use as the prev events
+            state_event_ids:
+                The full state at a given event. This is used particularly by the MSC2716
+                /batch_send endpoint. One use case is the historical `state_events_at_start`;
+                since each is marked as an `outlier`, the `EventContext.for_outlier()` won't
+                have any `state_ids` set and therefore can't derive any state even though the
+                prev_events are set so we need to set them ourself via this argument.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
 
             txn_id:
             ratelimit:
@@ -294,6 +311,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
+            historical: Indicates whether the message is being inserted
+                back in time around some existing events. This is used to skip
+                a few checks and mark the event as backfilled.
 
         Returns:
             Tuple of event ID and stream ordering position
@@ -334,10 +354,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 "membership": membership,
             },
             txn_id=txn_id,
+            allow_no_prev_events=allow_no_prev_events,
             prev_event_ids=prev_event_ids,
-            auth_event_ids=auth_event_ids,
+            state_event_ids=state_event_ids,
             require_consent=require_consent,
             outlier=outlier,
+            historical=historical,
         )
 
         prev_state_ids = await context.get_prev_state_ids()
@@ -383,7 +405,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         return result_event.event_id, result_event.internal_metadata.stream_ordering
 
     async def copy_room_tags_and_direct_to_room(
-        self, old_room_id, new_room_id, user_id
+        self, old_room_id: str, new_room_id: str, user_id: str
     ) -> None:
         """Copies the tags and direct room state from one room to another.
 
@@ -431,10 +453,13 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         third_party_signed: Optional[dict] = None,
         ratelimit: bool = True,
         content: Optional[dict] = None,
+        new_room: bool = False,
         require_consent: bool = True,
         outlier: bool = False,
+        historical: bool = False,
+        allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
-        auth_event_ids: Optional[List[str]] = None,
+        state_event_ids: Optional[List[str]] = None,
     ) -> Tuple[str, int]:
         """Update a user's membership in a room.
 
@@ -448,15 +473,28 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             third_party_signed: Information from a 3PID invite.
             ratelimit: Whether to rate limit the request.
             content: The content of the created event.
+            new_room: Whether the membership update is happening in the context of a room
+                creation.
             require_consent: Whether consent is required.
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
+            historical: Indicates whether the message is being inserted
+                back in time around some existing events. This is used to skip
+                a few checks and mark the event as backfilled.
+            allow_no_prev_events: Whether to allow this event to be created an empty
+                list of prev_events. Normally this is prohibited just because most
+                events should have a prev_event and we should only use this in special
+                cases like MSC2716.
             prev_event_ids: The event IDs to use as the prev events
-            auth_event_ids:
-                The event ids to use as the auth_events for the new event.
-                Should normally be left as None, which will cause them to be calculated
-                based on the room state at the prev_events.
+            state_event_ids:
+                The full state at a given event. This is used particularly by the MSC2716
+                /batch_send endpoint. One use case is the historical `state_events_at_start`;
+                since each is marked as an `outlier`, the `EventContext.for_outlier()` won't
+                have any `state_ids` set and therefore can't derive any state even though the
+                prev_events are set so we need to set them ourself via this argument.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -471,22 +509,32 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         key = (room_id,)
 
-        with (await self.member_linearizer.queue(key)):
-            result = await self.update_membership_locked(
-                requester,
-                target,
-                room_id,
-                action,
-                txn_id=txn_id,
-                remote_room_hosts=remote_room_hosts,
-                third_party_signed=third_party_signed,
-                ratelimit=ratelimit,
-                content=content,
-                require_consent=require_consent,
-                outlier=outlier,
-                prev_event_ids=prev_event_ids,
-                auth_event_ids=auth_event_ids,
-            )
+        as_id = object()
+        if requester.app_service:
+            as_id = requester.app_service.id
+
+        # We first linearise by the application service (to try to limit concurrent joins
+        # by application services), and then by room ID.
+        async with self.member_as_limiter.queue(as_id):
+            async with self.member_linearizer.queue(key):
+                result = await self.update_membership_locked(
+                    requester,
+                    target,
+                    room_id,
+                    action,
+                    txn_id=txn_id,
+                    remote_room_hosts=remote_room_hosts,
+                    third_party_signed=third_party_signed,
+                    ratelimit=ratelimit,
+                    content=content,
+                    new_room=new_room,
+                    require_consent=require_consent,
+                    outlier=outlier,
+                    historical=historical,
+                    allow_no_prev_events=allow_no_prev_events,
+                    prev_event_ids=prev_event_ids,
+                    state_event_ids=state_event_ids,
+                )
 
         return result
 
@@ -501,10 +549,13 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         third_party_signed: Optional[dict] = None,
         ratelimit: bool = True,
         content: Optional[dict] = None,
+        new_room: bool = False,
         require_consent: bool = True,
         outlier: bool = False,
+        historical: bool = False,
+        allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
-        auth_event_ids: Optional[List[str]] = None,
+        state_event_ids: Optional[List[str]] = None,
     ) -> Tuple[str, int]:
         """Helper for update_membership.
 
@@ -520,15 +571,28 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             third_party_signed:
             ratelimit:
             content:
+            new_room: Whether the membership update is happening in the context of a room
+                creation.
             require_consent:
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
+            historical: Indicates whether the message is being inserted
+                back in time around some existing events. This is used to skip
+                a few checks and mark the event as backfilled.
+            allow_no_prev_events: Whether to allow this event to be created an empty
+                list of prev_events. Normally this is prohibited just because most
+                events should have a prev_event and we should only use this in special
+                cases like MSC2716.
             prev_event_ids: The event IDs to use as the prev events
-            auth_event_ids:
-                The event ids to use as the auth_events for the new event.
-                Should normally be left as None, which will cause them to be calculated
-                based on the room state at the prev_events.
+            state_event_ids:
+                The full state at a given event. This is used particularly by the MSC2716
+                /batch_send endpoint. One use case is the historical `state_events_at_start`;
+                since each is marked as an `outlier`, the `EventContext.for_outlier()` won't
+                have any `state_ids` set and therefore can't derive any state even though the
+                prev_events are set so we need to set them ourself via this argument.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -555,6 +619,34 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             # global profile.
             content.pop("displayname", None)
             content.pop("avatar_url", None)
+
+        if len(content.get("displayname") or "") > MAX_DISPLAYNAME_LEN:
+            raise SynapseError(
+                400,
+                f"Displayname is too long (max {MAX_DISPLAYNAME_LEN})",
+                errcode=Codes.BAD_JSON,
+            )
+
+        if len(content.get("avatar_url") or "") > MAX_AVATAR_URL_LEN:
+            raise SynapseError(
+                400,
+                f"Avatar URL is too long (max {MAX_AVATAR_URL_LEN})",
+                errcode=Codes.BAD_JSON,
+            )
+
+        if "avatar_url" in content:
+            if not await self.profile_handler.check_avatar_size_and_mime_type(
+                content["avatar_url"],
+            ):
+                raise SynapseError(403, "This avatar is not allowed", Codes.FORBIDDEN)
+
+        # The event content should *not* include the authorising user as
+        # it won't be properly signed. Strip it out since it might come
+        # back from a client updating a display name / avatar.
+        #
+        # This only applies to restricted rooms, but there should be no reason
+        # for a client to include it. Unconditionally remove it.
+        content.pop(EventContentFields.AUTHORISING_USER, None)
 
         effective_membership_state = action
         if action in ["kick", "unban"]:
@@ -600,7 +692,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 is_requester_admin = await self.auth.is_server_admin(requester.user)
 
             if not is_requester_admin:
-                if self.config.block_non_admin_invites:
+                if self.config.server.block_non_admin_invites:
                     logger.info(
                         "Blocking invite: user is not admin and non-admin "
                         "invites disabled"
@@ -616,7 +708,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             if block_invite:
                 raise SynapseError(403, "Invites have been disabled on this server")
 
-        if prev_event_ids:
+        # An empty prev_events list is allowed as long as the auth_event_ids are present
+        if prev_event_ids is not None:
             return await self._local_membership_update(
                 requester=requester,
                 target=target,
@@ -624,11 +717,13 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 membership=effective_membership_state,
                 txn_id=txn_id,
                 ratelimit=ratelimit,
+                allow_no_prev_events=allow_no_prev_events,
                 prev_event_ids=prev_event_ids,
-                auth_event_ids=auth_event_ids,
+                state_event_ids=state_event_ids,
                 content=content,
                 require_consent=require_consent,
                 outlier=outlier,
+                historical=historical,
             )
 
         latest_event_ids = await self.store.get_prev_events_for_room(room_id)
@@ -651,7 +746,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     " (membership=%s)" % old_membership,
                     errcode=Codes.BAD_STATE,
                 )
-            if old_membership == "ban" and action != "unban":
+            if old_membership == "ban" and action not in ["ban", "unban", "leave"]:
                 raise SynapseError(
                     403,
                     "Cannot %s user who was banned" % (action,),
@@ -700,6 +795,30 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     # This should be an auth check, but guests are a local concept,
                     # so don't really fit into the general auth process.
                     raise AuthError(403, "Guest access not allowed")
+
+            # Figure out whether the user is a server admin to determine whether they
+            # should be able to bypass the spam checker.
+            if (
+                self._server_notices_mxid is not None
+                and requester.user.to_string() == self._server_notices_mxid
+            ):
+                # allow the server notices mxid to join rooms
+                bypass_spam_checker = True
+
+            else:
+                bypass_spam_checker = await self.auth.is_server_admin(requester.user)
+
+            inviter = await self._get_inviter(target.to_string(), room_id)
+            if (
+                not bypass_spam_checker
+                # We assume that if the spam checker allowed the user to create
+                # a room then they're allowed to join it.
+                and not new_room
+                and not await self.spam_checker.user_may_join_room(
+                    target.to_string(), room_id, is_invited=inviter is not None
+                )
+            ):
+                raise SynapseError(403, "Not allowed to join this room")
 
             # Check if a remote join should be performed.
             remote_join, remote_room_hosts = await self._should_perform_remote_join(
@@ -824,7 +943,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             txn_id=txn_id,
             ratelimit=ratelimit,
             prev_event_ids=latest_event_ids,
-            auth_event_ids=auth_event_ids,
+            state_event_ids=state_event_ids,
             content=content,
             require_consent=require_consent,
             outlier=outlier,
@@ -922,7 +1041,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # be included in the event content in order to efficiently validate
         # the event.
         content[
-            "join_authorised_via_users_server"
+            EventContentFields.AUTHORISING_USER
         ] = await self.event_auth_handler.get_user_which_could_invite(
             room_id,
             current_state_ids,
@@ -952,7 +1071,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # Add new room to the room directory if the old room was there
         # Remove old room from the room directory
         old_room = await self.store.get_room(old_room_id)
-        if old_room and old_room["is_public"]:
+        if old_room is not None and old_room["is_public"]:
             await self.store.set_room_is_public(old_room_id, False)
             await self.store.set_room_is_public(room_id, True)
 
@@ -963,7 +1082,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         local_group_ids = await self.store.get_local_groups_for_room(old_room_id)
         for group_id in local_group_ids:
             # Add new the new room to those groups
-            await self.store.add_room_to_group(group_id, room_id, old_room["is_public"])
+            await self.store.add_room_to_group(
+                group_id, room_id, old_room is not None and old_room["is_public"]
+            )
 
             # Remove the old room from those groups
             await self.store.remove_room_from_group(group_id, old_room_id)
@@ -1013,7 +1134,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         event: EventBase,
         context: EventContext,
         ratelimit: bool = True,
-    ):
+    ) -> None:
         """
         Change the membership status of a user in a room.
 
@@ -1080,9 +1201,61 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         return bool(
             guest_access
             and guest_access.content
-            and "guest_access" in guest_access.content
-            and guest_access.content["guest_access"] == "can_join"
+            and guest_access.content.get(EventContentFields.GUEST_ACCESS)
+            == GuestAccess.CAN_JOIN
         )
+
+    async def kick_guest_users(self, current_state: Iterable[EventBase]) -> None:
+        """Kick any local guest users from the room.
+
+        This is called when the room state changes from guests allowed to not-allowed.
+
+        Params:
+            current_state: the current state of the room. We will iterate this to look
+               for guest users to kick.
+        """
+        for member_event in current_state:
+            try:
+                if member_event.type != EventTypes.Member:
+                    continue
+
+                if not self.hs.is_mine_id(member_event.state_key):
+                    continue
+
+                if member_event.content["membership"] not in {
+                    Membership.JOIN,
+                    Membership.INVITE,
+                }:
+                    continue
+
+                if (
+                    "kind" not in member_event.content
+                    or member_event.content["kind"] != "guest"
+                ):
+                    continue
+
+                # We make the user choose to leave, rather than have the
+                # event-sender kick them. This is partially because we don't
+                # need to worry about power levels, and partially because guest
+                # users are a concept which doesn't hugely work over federation,
+                # and having homeservers have their own users leave keeps more
+                # of that decision-making and control local to the guest-having
+                # homeserver.
+                target_user = UserID.from_string(member_event.state_key)
+                requester = create_requester(
+                    target_user, is_guest=True, authenticated_entity=self._server_name
+                )
+                handler = self.hs.get_room_member_handler()
+                await handler.update_membership(
+                    requester,
+                    target_user,
+                    member_event.room_id,
+                    "leave",
+                    ratelimit=False,
+                    require_consent=False,
+                )
+            except Exception as e:
+                logger.exception("Error kicking guest user: %s" % (e,))
 
     async def lookup_room_alias(
         self, room_alias: RoomAlias
@@ -1153,7 +1326,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         Raises:
             ShadowBanError if the requester has been shadow-banned.
         """
-        if self.config.block_non_admin_invites:
+        if self.config.server.block_non_admin_invites:
             is_requester_admin = await self.auth.is_server_admin(requester.user)
             if not is_requester_admin:
                 raise SynapseError(
@@ -1167,7 +1340,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         # We need to rate limit *before* we send out any 3PID invites, so we
         # can't just rely on the standard ratelimiting of events.
-        await self.base_handler.ratelimit(requester)
+        await self._third_party_invite_limiter.ratelimit(requester)
 
         can_invite = await self.third_party_event_rules.check_threepid_can_be_invited(
             medium, address, room_id
@@ -1191,10 +1364,22 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if invitee:
             # Note that update_membership with an action of "invite" can raise
             # a ShadowBanError, but this was done above already.
+            # We don't check the invite against the spamchecker(s) here (through
+            # user_may_invite) because we'll do it further down the line anyway (in
+            # update_membership_locked).
             _, stream_id = await self.update_membership(
                 requester, UserID.from_string(invitee), room_id, "invite", txn_id=txn_id
             )
         else:
+            # Check if the spamchecker(s) allow this invite to go through.
+            if not await self.spam_checker.user_may_send_3pid_invite(
+                inviter_userid=requester.user.to_string(),
+                medium=medium,
+                address=address,
+                room_id=room_id,
+            ):
+                raise SynapseError(403, "Cannot send threepid invite")
+
             stream_id = await self._make_and_store_3pid_invite(
                 requester,
                 id_server,
@@ -1337,7 +1522,6 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         self.distributor = hs.get_distributor()
         self.distributor.declare("user_left_room")
-        self._server_name = hs.hostname
 
     async def _is_remote_room_too_complex(
         self, room_id: str, remote_room_hosts: List[str]
@@ -1352,7 +1536,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         Returns: bool of whether the complexity is too great, or None
             if unable to be fetched
         """
-        max_complexity = self.hs.config.limit_remote_rooms.complexity
+        max_complexity = self.hs.config.server.limit_remote_rooms.complexity
         complexity = await self.federation_handler.get_room_complexity(
             remote_room_hosts, room_id
         )
@@ -1368,7 +1552,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         Args:
             room_id: The room ID to check for complexity.
         """
-        max_complexity = self.hs.config.limit_remote_rooms.complexity
+        max_complexity = self.hs.config.server.limit_remote_rooms.complexity
         complexity = await self.store.get_room_complexity(room_id)
 
         return complexity["v1"] > max_complexity
@@ -1392,8 +1576,11 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         if len(remote_room_hosts) == 0:
             raise SynapseError(404, "No known servers")
 
-        check_complexity = self.hs.config.limit_remote_rooms.enabled
-        if check_complexity and self.hs.config.limit_remote_rooms.admins_can_join:
+        check_complexity = self.hs.config.server.limit_remote_rooms.enabled
+        if (
+            check_complexity
+            and self.hs.config.server.limit_remote_rooms.admins_can_join
+        ):
             check_complexity = not await self.auth.is_server_admin(user)
 
         if check_complexity:
@@ -1404,7 +1591,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             if too_complex is True:
                 raise SynapseError(
                     code=400,
-                    msg=self.hs.config.limit_remote_rooms.complexity_error,
+                    msg=self.hs.config.server.limit_remote_rooms.complexity_error,
                     errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
                 )
 
@@ -1439,7 +1626,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             )
             raise SynapseError(
                 code=400,
-                msg=self.hs.config.limit_remote_rooms.complexity_error,
+                msg=self.hs.config.server.limit_remote_rooms.complexity_error,
                 errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
             )
 
@@ -1551,7 +1738,9 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         #
         # the prev_events consist solely of the previous membership event.
         prev_event_ids = [previous_membership_event.event_id]
-        auth_event_ids = previous_membership_event.auth_event_ids() + prev_event_ids
+        auth_event_ids = (
+            list(previous_membership_event.auth_event_ids()) + prev_event_ids
+        )
 
         event, context = await self.event_creation_handler.create_event(
             requester,
@@ -1559,8 +1748,8 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             txn_id=txn_id,
             prev_event_ids=prev_event_ids,
             auth_event_ids=auth_event_ids,
+            outlier=True,
         )
-        event.internal_metadata.outlier = True
         event.internal_metadata.out_of_band_membership = True
 
         result_event = await self.event_creation_handler.handle_new_client_event(

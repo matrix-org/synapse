@@ -22,6 +22,7 @@ from prometheus_client import Counter
 from typing_extensions import Literal
 
 from twisted.internet import defer
+from twisted.internet.interfaces import IDelayedCall
 
 import synapse.metrics
 from synapse.api.presence import UserPresenceState
@@ -117,7 +118,12 @@ class AbstractFederationSender(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def send_device_messages(self, destination: str) -> None:
+    def send_device_messages(self, destination: str, immediate: bool = True) -> None:
+        """Tells the sender that a new device message is ready to be sent to the
+        destination. The `immediate` flag specifies whether the messages should
+        be tried to be sent immediately, or whether it can be delayed for a
+        short while (to aid performance).
+        """
         raise NotImplementedError()
 
     @abc.abstractmethod
@@ -145,9 +151,8 @@ class AbstractFederationSender(metaclass=abc.ABCMeta):
 
 
 @attr.s
-class _PresenceQueue:
-    """A queue of destinations that need to be woken up due to new presence
-    updates.
+class _DestinationWakeupQueue:
+    """A queue of destinations that need to be woken up due to new updates.
 
     Staggers waking up of per destination queues to ensure that we don't attempt
     to start TLS connections with many hosts all at once, leading to pinned CPU.
@@ -174,7 +179,7 @@ class _PresenceQueue:
         if not self.processing:
             self._handle()
 
-    @wrap_as_background_process("_PresenceQueue.handle")
+    @wrap_as_background_process("_DestinationWakeupQueue.handle")
     async def _handle(self) -> None:
         """Background process to drain the queue."""
 
@@ -227,7 +232,7 @@ class FederationSender(AbstractFederationSender):
         self.hs = hs
         self.server_name = hs.hostname
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state = hs.get_state_handler()
 
         self.clock = hs.get_clock()
@@ -280,11 +285,14 @@ class FederationSender(AbstractFederationSender):
         self._queues_awaiting_rr_flush_by_room: Dict[str, Set[PerDestinationQueue]] = {}
 
         self._rr_txn_interval_per_room_ms = (
-            1000.0 / hs.config.federation_rr_transactions_per_room_per_second
+            1000.0
+            / hs.config.ratelimiting.federation_rr_transactions_per_room_per_second
         )
 
         # wake up destinations that have outstanding PDUs to be caught up
-        self._catchup_after_startup_timer = self.clock.call_later(
+        self._catchup_after_startup_timer: Optional[
+            IDelayedCall
+        ] = self.clock.call_later(
             CATCH_UP_STARTUP_DELAY_SEC,
             run_as_background_process,
             "wake_destinations_needing_catchup",
@@ -293,7 +301,7 @@ class FederationSender(AbstractFederationSender):
 
         self._external_cache = hs.get_external_cache()
 
-        self._presence_queue = _PresenceQueue(self, self.clock)
+        self._destination_wakeup_queue = _DestinationWakeupQueue(self, self.clock)
 
     def _get_per_destination_queue(self, destination: str) -> PerDestinationQueue:
         """Get or create a PerDestinationQueue for the given destination
@@ -335,9 +343,16 @@ class FederationSender(AbstractFederationSender):
                     last_token, self._last_poked_id, limit=100
                 )
 
-                logger.debug("Handling %s -> %s", last_token, next_token)
+                logger.debug(
+                    "Handling %i -> %i: %i events to send (current id %i)",
+                    last_token,
+                    next_token,
+                    len(events),
+                    self._last_poked_id,
+                )
 
                 if not events and next_token >= self._last_poked_id:
+                    logger.debug("All events processed")
                     break
 
                 async def handle_event(event: EventBase) -> None:
@@ -345,9 +360,53 @@ class FederationSender(AbstractFederationSender):
                     send_on_behalf_of = event.internal_metadata.get_send_on_behalf_of()
                     is_mine = self.is_mine_id(event.sender)
                     if not is_mine and send_on_behalf_of is None:
+                        logger.debug("Not sending remote-origin event %s", event)
                         return
 
+                    # We also want to not send out-of-band membership events.
+                    #
+                    # OOB memberships are used in three (and a half) situations:
+                    #
+                    # (1) invite events which we have received over federation. Those
+                    #     will have a `sender` on a different server, so will be
+                    #     skipped by the "is_mine" test above anyway.
+                    #
+                    # (2) rejections of invites to federated rooms - either remotely
+                    #     or locally generated. (Such rejections are normally
+                    #     created via federation, in which case the remote server is
+                    #     responsible for sending out the rejection. If that fails,
+                    #     we'll create a leave event locally, but that's only really
+                    #     for the benefit of the invited user - we don't have enough
+                    #     information to send it out over federation).
+                    #
+                    # (2a) rescinded knocks. These are identical to rejected invites.
+                    #
+                    # (3) knock events which we have sent over federation. As with
+                    #     invite rejections, the remote server should send them out to
+                    #     the federation.
+                    #
+                    # So, in all the above cases, we want to ignore such events.
+                    #
+                    # OOB memberships are always(?) outliers anyway, so if we *don't*
+                    # ignore them, we'll get an exception further down when we try to
+                    # fetch the membership list for the room.
+                    #
+                    # Arguably, we could equivalently ignore all outliers here, since
+                    # in theory the only way for an outlier with a local `sender` to
+                    # exist is by being an OOB membership (via one of (2), (2a) or (3)
+                    # above).
+                    #
+                    if event.internal_metadata.is_out_of_band_membership():
+                        logger.debug("Not sending OOB membership event %s", event)
+                        return
+
+                    # Finally, there are some other events that we should not send out
+                    # until someone asks for them. They are explicitly flagged as such
+                    # with `proactively_send: False`.
                     if not event.internal_metadata.should_proactively_send():
+                        logger.debug(
+                            "Not sending event with proactively_send=false: %s", event
+                        )
                         return
 
                     destinations: Optional[Set[str]] = None
@@ -406,12 +465,15 @@ class FederationSender(AbstractFederationSender):
 
                         now = self.clock.time_msec()
                         ts = await self.store.get_received_ts(event.event_id)
-
+                        assert ts is not None
                         synapse.metrics.event_processing_lag_by_event.labels(
                             "federation_sender"
                         ).observe((now - ts) / 1000)
 
-                async def handle_room_events(events: Iterable[EventBase]) -> None:
+                async def handle_room_events(events: List[EventBase]) -> None:
+                    logger.debug(
+                        "Handling %i events in room %s", len(events), events[0].room_id
+                    )
                     with Measure(self.clock, "handle_room_events"):
                         for event in events:
                             await handle_event(event)
@@ -430,11 +492,13 @@ class FederationSender(AbstractFederationSender):
                     )
                 )
 
+                logger.debug("Successfully handled up to %i", next_token)
                 await self.store.update_federation_out_pos("events", next_token)
 
                 if events:
                     now = self.clock.time_msec()
                     ts = await self.store.get_received_ts(events[-1].event_id)
+                    assert ts is not None
 
                     synapse.metrics.event_processing_lag.labels(
                         "federation_sender"
@@ -589,7 +653,7 @@ class FederationSender(AbstractFederationSender):
         destinations (list[str])
         """
 
-        if not states or not self.hs.config.use_presence:
+        if not states or not self.hs.config.server.use_presence:
             # No-op if presence is disabled.
             return
 
@@ -609,7 +673,7 @@ class FederationSender(AbstractFederationSender):
                 states, start_loop=False
             )
 
-            self._presence_queue.add_to_queue(destination)
+            self._destination_wakeup_queue.add_to_queue(destination)
 
     def build_and_send_edu(
         self,
@@ -662,7 +726,7 @@ class FederationSender(AbstractFederationSender):
         else:
             queue.send_edu(edu)
 
-    def send_device_messages(self, destination: str) -> None:
+    def send_device_messages(self, destination: str, immediate: bool = False) -> None:
         if destination == self.server_name:
             logger.warning("Not sending device update to ourselves")
             return
@@ -672,7 +736,11 @@ class FederationSender(AbstractFederationSender):
         ):
             return
 
-        self._get_per_destination_queue(destination).attempt_new_transaction()
+        if immediate:
+            self._get_per_destination_queue(destination).attempt_new_transaction()
+        else:
+            self._get_per_destination_queue(destination).mark_new_data()
+            self._destination_wakeup_queue.add_to_queue(destination)
 
     def wake_destination(self, destination: str) -> None:
         """Called when we want to retry sending transactions to a remote.

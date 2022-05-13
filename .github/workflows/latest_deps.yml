@@ -1,0 +1,159 @@
+# People who are freshly `pip install`ing from PyPI will pull in the latest versions of
+# dependencies which match the broad requirements. Since most CI runs are against
+# the locked poetry environment, run specifically against the latest dependencies to
+# know if there's an upcoming breaking change.
+#
+# As an overview this workflow:
+# - checks out develop,
+# - installs from source, pulling in the dependencies like a fresh `pip install` would, and 
+# - runs mypy and test suites in that checkout.
+#
+# Based on the twisted trunk CI job.
+
+name: Latest dependencies
+
+on:
+  schedule:
+    - cron: 0 7 * * *
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mypy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      # The dev dependencies aren't exposed in the wheel metadata (at least with current
+      # poetry-core versions), so we install with poetry.
+      - uses: matrix-org/setup-python-poetry@v1
+        with:
+          python-version: "3.x"
+          poetry-version: "1.2.0b1"
+          extras: "all"
+      # Dump installed versions for debugging.
+      - run: poetry run pip list > before.txt
+      # Upgrade all runtime dependencies only. This is intended to mimic a fresh
+      # `pip install matrix-synapse[all]` as closely as possible.
+      - run: poetry update --no-dev
+      - run: poetry run pip list > after.txt && (diff -u before.txt after.txt || true)
+      - name: Remove warn_unused_ignores from mypy config
+        run: sed '/warn_unused_ignores = True/d' -i mypy.ini
+      - run: poetry run mypy
+  trial:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - database: "sqlite"
+          - database: "postgres"
+            postgres-version: "14"
+
+    steps:
+      - uses: actions/checkout@v2
+      - run: sudo apt-get -qq install xmlsec1
+      - name: Set up PostgreSQL ${{ matrix.postgres-version }}
+        if: ${{ matrix.postgres-version }}
+        run: |
+          docker run -d -p 5432:5432 \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_INITDB_ARGS="--lc-collate C --lc-ctype C --encoding UTF8" \
+            postgres:${{ matrix.postgres-version }}
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "3.x"
+      - run: pip install .[all,test]
+      - name: Await PostgreSQL
+        if: ${{ matrix.postgres-version }}
+        timeout-minutes: 2
+        run: until pg_isready -h localhost; do sleep 1; done
+      - run: python -m twisted.trial --jobs=2 tests
+        env:
+          SYNAPSE_POSTGRES: ${{ matrix.database == 'postgres' || '' }}
+          SYNAPSE_POSTGRES_HOST: localhost
+          SYNAPSE_POSTGRES_USER: postgres
+          SYNAPSE_POSTGRES_PASSWORD: postgres
+      - name: Dump logs
+        # Logs are most useful when the command fails, always include them.
+        if: ${{ always() }}
+        # Note: Dumps to workflow logs instead of using actions/upload-artifact
+        #       This keeps logs colocated with failing jobs
+        #       It also ignores find's exit code; this is a best effort affair
+        run: >-
+          find _trial_temp -name '*.log'
+          -exec echo "::group::{}" \;
+          -exec cat {} \;
+          -exec echo "::endgroup::" \;
+          || true
+
+
+  sytest:
+    runs-on: ubuntu-latest
+    container:
+      image: matrixdotorg/sytest-synapse:testing
+      volumes:
+        - ${{ github.workspace }}:/src
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sytest-tag: focal
+
+          - sytest-tag: focal
+            postgres: postgres
+            workers: workers
+            redis: redis
+    env:
+      POSTGRES: ${{ matrix.postgres && 1}}
+      WORKERS: ${{ matrix.workers && 1 }}
+      REDIS: ${{ matrix.redis && 1 }}
+      BLACKLIST: ${{ matrix.workers && 'synapse-blacklist-with-workers' }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Ensure sytest runs `pip install`
+        # Delete the lockfile so sytest will `pip install` rather than `poetry install`
+        run: rm /src/poetry.lock
+        working-directory: /src
+      - name: Prepare test blacklist
+        run: cat sytest-blacklist .ci/worker-blacklist > synapse-blacklist-with-workers
+      - name: Run SyTest
+        run: /bootstrap.sh synapse
+        working-directory: /src
+      - name: Summarise results.tap
+        if: ${{ always() }}
+        run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
+      - name: Upload SyTest logs
+        uses: actions/upload-artifact@v2
+        if: ${{ always() }}
+        with:
+          name: Sytest Logs - ${{ job.status }} - (${{ join(matrix.*, ', ') }})
+          path: |
+            /logs/results.tap
+            /logs/**/*.log*
+
+
+  # TODO: run complement (as with twisted trunk, see #12473).
+
+  # open an issue if the build fails, so we know about it.
+  open-issue:
+    if: failure()
+    needs:
+      # TODO: should mypy be included here? It feels more brittle than the other two.
+      - mypy
+      - trial
+      - sytest
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: JasonEtco/create-an-issue@5d9504915f79f9cc6d791934b8ef34f2353dd74d # v2.5.0, 2020-12-06
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          update_existing: true
+          filename: .ci/latest_deps_build_failed_issue_template.md
+

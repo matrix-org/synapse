@@ -17,11 +17,9 @@ import logging
 from abc import ABCMeta
 from typing import TYPE_CHECKING, Any, Collection, Iterable, Optional, Union
 
-from synapse.storage.database import LoggingTransaction  # noqa: F401
-from synapse.storage.database import make_in_list_sql_clause  # noqa: F401
-from synapse.storage.database import DatabasePool
-from synapse.storage.types import Connection
-from synapse.types import StreamToken, get_domain_from_id
+from synapse.storage.database import make_in_list_sql_clause  # noqa: F401; noqa: F401
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
+from synapse.types import get_domain_from_id
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
@@ -38,7 +36,12 @@ class SQLBaseStore(metaclass=ABCMeta):
     per data store (and not one per physical database).
     """
 
-    def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         self.hs = hs
         self._clock = hs.get_clock()
         self.database_engine = database.engine
@@ -48,13 +51,13 @@ class SQLBaseStore(metaclass=ABCMeta):
         self,
         stream_name: str,
         instance_name: str,
-        token: StreamToken,
+        token: int,
         rows: Iterable[Any],
     ) -> None:
         pass
 
     def _invalidate_state_caches(
-        self, room_id: str, members_changed: Iterable[str]
+        self, room_id: str, members_changed: Collection[str]
     ) -> None:
         """Invalidates caches that are based on the current state, but does
         not stream invalidations down replication.
@@ -63,11 +66,16 @@ class SQLBaseStore(metaclass=ABCMeta):
             room_id: Room where state changed
             members_changed: The user_ids of members that have changed
         """
+        # If there were any membership changes, purge the appropriate caches.
         for host in {get_domain_from_id(u) for u in members_changed}:
             self._attempt_to_invalidate_cache("is_host_joined", (room_id, host))
+        if members_changed:
+            self._attempt_to_invalidate_cache("get_users_in_room", (room_id,))
+            self._attempt_to_invalidate_cache(
+                "get_users_in_room_with_profiles", (room_id,)
+            )
 
-        self._attempt_to_invalidate_cache("get_users_in_room", (room_id,))
-        self._attempt_to_invalidate_cache("get_users_in_room_with_profiles", (room_id,))
+        # Purge other caches based on room state.
         self._attempt_to_invalidate_cache("get_room_summary", (room_id,))
         self._attempt_to_invalidate_cache("get_current_state_ids", (room_id,))
 

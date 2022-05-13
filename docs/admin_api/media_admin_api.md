@@ -1,22 +1,12 @@
-# Contents
-- [Querying media](#querying-media)
-  * [List all media in a room](#list-all-media-in-a-room)
-  * [List all media uploaded by a user](#list-all-media-uploaded-by-a-user)
-- [Quarantine media](#quarantine-media)
-  * [Quarantining media by ID](#quarantining-media-by-id)
-  * [Remove media from quarantine by ID](#remove-media-from-quarantine-by-id)
-  * [Quarantining media in a room](#quarantining-media-in-a-room)
-  * [Quarantining all media of a user](#quarantining-all-media-of-a-user)
-  * [Protecting media from being quarantined](#protecting-media-from-being-quarantined)
-  * [Unprotecting media from being quarantined](#unprotecting-media-from-being-quarantined)
-- [Delete local media](#delete-local-media)
-  * [Delete a specific local media](#delete-a-specific-local-media)
-  * [Delete local media by date or size](#delete-local-media-by-date-or-size)
-- [Purge Remote Media API](#purge-remote-media-api)
-
 # Querying media
 
 These APIs allow extracting media information from the homeserver.
+
+Details about the format of the `media_id` and storage of the media in the file system
+are documented under [media repository](../media_repository.md).
+
+To use it, you will need to authenticate by providing an `access_token`
+for a server admin: see [Admin API](../usage/administration/admin_api).
 
 ## List all media in a room
 
@@ -27,8 +17,6 @@ The API is:
 ```
 GET /_synapse/admin/v1/room/<room_id>/media
 ```
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: see [Admin API](../usage/administration/admin_api).
 
 The API returns a JSON body like the following:
 ```json
@@ -47,7 +35,8 @@ The API returns a JSON body like the following:
 ## List all media uploaded by a user
 
 Listing all media that has been uploaded by a local user can be achieved through
-the use of the [List media of a user](user_admin_api.md#list-media-of-a-user)
+the use of the
+[List media uploaded by a user](user_admin_api.md#list-media-uploaded-by-a-user)
 Admin API.
 
 # Quarantine media
@@ -255,9 +244,9 @@ POST /_synapse/admin/v1/media/<server_name>/delete?before_ts=<before_ts>
 URL Parameters
 
 * `server_name`: string - The name of your local server (e.g `matrix.org`).
-* `before_ts`: string representing a positive integer - Unix timestamp in ms.
+* `before_ts`: string representing a positive integer - Unix timestamp in milliseconds.
 Files that were last used before this timestamp will be deleted. It is the timestamp of
-last access and not the timestamp creation.
+last access, not the timestamp when the file was created.
 * `size_gt`: Optional - string representing a positive integer - Size of the media in bytes.
 Files that are larger will be deleted. Defaults to `0`.
 * `keep_profiles`: Optional - string representing a boolean - Switch to also delete files
@@ -281,6 +270,11 @@ The following fields are returned in the JSON response body:
 * `deleted_media`: an array of strings - List of deleted `media_id`
 * `total`: integer - Total number of deleted `media_id`
 
+## Delete media uploaded by a user
+
+You can find details of how to delete multiple media uploaded by a user in
+[User Admin API](user_admin_api.md#delete-media-uploaded-by-a-user).
+
 # Purge Remote Media API
 
 The purge remote media API allows server admins to purge old cached remote media.
@@ -295,7 +289,7 @@ POST /_synapse/admin/v1/purge_media_cache?before_ts=<unix_timestamp_in_ms>
 
 URL Parameters
 
-* `unix_timestamp_in_ms`: string representing a positive integer - Unix timestamp in ms.
+* `before_ts`: string representing a positive integer - Unix timestamp in milliseconds.
 All cached media that was last accessed before this timestamp will be removed.
 
 Response:
@@ -309,9 +303,6 @@ Response:
 The following fields are returned in the JSON response body:
 
 * `deleted`: integer - The number of media items successfully deleted
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: see [Admin API](../usage/administration/admin_api).
 
 If the user re-requests purged remote media, synapse will re-request the media
 from the originating server.

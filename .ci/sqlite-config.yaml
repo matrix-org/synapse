@@ -1,0 +1,16 @@
+# Configuration file used for testing the 'synapse_port_db' script.
+# Tells the 'update_database' script to connect to the test SQLite database to upgrade its
+# schema and run background updates on it.
+server_name: "localhost:8800"
+
+signing_key_path: ".ci/test.signing.key"
+
+report_stats: false
+
+database:
+  name: "sqlite3"
+  args:
+    database: ".ci/test_db.db"
+
+# Suppress the key server warning.
+trusted_key_servers: []

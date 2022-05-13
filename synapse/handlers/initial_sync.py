@@ -13,25 +13,30 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Optional, Tuple
-
-from twisted.internet import defer
+from typing import TYPE_CHECKING, List, Optional, Tuple, cast
 
 from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import SynapseError
+from synapse.events import EventBase
+from synapse.events.utils import SerializeEventConfig
 from synapse.events.validator import EventValidator
 from synapse.handlers.presence import format_user_presence_state
 from synapse.handlers.receipts import ReceiptEventSource
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.storage.roommember import RoomsForUser
 from synapse.streams.config import PaginationConfig
-from synapse.types import JsonDict, Requester, RoomStreamToken, StreamToken, UserID
+from synapse.types import (
+    JsonDict,
+    Requester,
+    RoomStreamToken,
+    StateMap,
+    StreamToken,
+    UserID,
+)
 from synapse.util import unwrapFirstError
-from synapse.util.async_helpers import concurrently_execute
+from synapse.util.async_helpers import concurrently_execute, gather_results
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.visibility import filter_events_for_client
-
-from ._base import BaseHandler
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -40,9 +45,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class InitialSyncHandler(BaseHandler):
+class InitialSyncHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastores().main
+        self.auth = hs.get_auth()
+        self.state_handler = hs.get_state_handler()
         self.hs = hs
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()
@@ -125,7 +132,7 @@ class InitialSyncHandler(BaseHandler):
 
         now_token = self.hs.get_event_sources().get_current_token()
 
-        presence_stream = self.hs.get_event_sources().sources["presence"]
+        presence_stream = self.hs.get_event_sources().sources.presence
         presence, _ = await presence_stream.get_new_events(
             user, from_key=None, include_offline=False
         )
@@ -136,7 +143,7 @@ class InitialSyncHandler(BaseHandler):
             to_key=int(now_token.receipt_key),
         )
         if self.hs.config.experimental.msc2285_enabled:
-            receipt = ReceiptEventSource.filter_out_hidden(receipt, user_id)
+            receipt = ReceiptEventSource.filter_out_private(receipt, user_id)
 
         tags_by_room = await self.store.get_tags_for_user(user_id)
 
@@ -146,12 +153,15 @@ class InitialSyncHandler(BaseHandler):
 
         public_room_ids = await self.store.get_public_room_ids()
 
-        limit = pagin_config.limit
-        if limit is None:
+        if pagin_config.limit is not None:
+            limit = pagin_config.limit
+        else:
             limit = 10
 
-        async def handle_room(event: RoomsForUser):
-            d = {
+        serializer_options = SerializeEventConfig(as_client_event=as_client_event)
+
+        async def handle_room(event: RoomsForUser) -> None:
+            d: JsonDict = {
                 "room_id": event.room_id,
                 "membership": event.membership,
                 "visibility": (
@@ -164,8 +174,10 @@ class InitialSyncHandler(BaseHandler):
                 d["inviter"] = event.sender
 
                 invite_event = await self.store.get_event(event.event_id)
-                d["invite"] = await self._event_serializer.serialize_event(
-                    invite_event, time_now, as_client_event
+                d["invite"] = self._event_serializer.serialize_event(
+                    invite_event,
+                    time_now,
+                    config=serializer_options,
                 )
 
             rooms_ret.append(d)
@@ -186,14 +198,13 @@ class InitialSyncHandler(BaseHandler):
                     )
                     deferred_room_state = run_in_background(
                         self.state_store.get_state_for_events, [event.event_id]
-                    )
-                    deferred_room_state.addCallback(
-                        lambda states: states[event.event_id]
+                    ).addCallback(
+                        lambda states: cast(StateMap[EventBase], states[event.event_id])
                     )
 
                 (messages, token), current_state = await make_deferred_yieldable(
-                    defer.gatherResults(
-                        [
+                    gather_results(
+                        (
                             run_in_background(
                                 self.store.get_recent_events_for_room,
                                 event.room_id,
@@ -201,7 +212,7 @@ class InitialSyncHandler(BaseHandler):
                                 end_token=room_end_token,
                             ),
                             deferred_room_state,
-                        ]
+                        )
                     )
                 ).addErrback(unwrapFirstError)
 
@@ -215,18 +226,20 @@ class InitialSyncHandler(BaseHandler):
 
                 d["messages"] = {
                     "chunk": (
-                        await self._event_serializer.serialize_events(
-                            messages, time_now=time_now, as_client_event=as_client_event
+                        self._event_serializer.serialize_events(
+                            messages,
+                            time_now=time_now,
+                            config=serializer_options,
                         )
                     ),
                     "start": await start_token.to_string(self.store),
                     "end": await end_token.to_string(self.store),
                 }
 
-                d["state"] = await self._event_serializer.serialize_events(
+                d["state"] = self._event_serializer.serialize_events(
                     current_state.values(),
                     time_now=time_now,
-                    as_client_event=as_client_event,
+                    config=serializer_options,
                 )
 
                 account_data_events = []
@@ -366,15 +379,15 @@ class InitialSyncHandler(BaseHandler):
             "room_id": room_id,
             "messages": {
                 "chunk": (
-                    await self._event_serializer.serialize_events(messages, time_now)
+                    # Don't bundle aggregations as this is a deprecated API.
+                    self._event_serializer.serialize_events(messages, time_now)
                 ),
                 "start": await start_token.to_string(self.store),
                 "end": await end_token.to_string(self.store),
             },
             "state": (
-                await self._event_serializer.serialize_events(
-                    room_state.values(), time_now
-                )
+                # Don't bundle aggregations as this is a deprecated API.
+                self._event_serializer.serialize_events(room_state.values(), time_now)
             ),
             "presence": [],
             "receipts": [],
@@ -392,7 +405,8 @@ class InitialSyncHandler(BaseHandler):
 
         # TODO: These concurrently
         time_now = self.clock.time_msec()
-        state = await self._event_serializer.serialize_events(
+        # Don't bundle aggregations as this is a deprecated API.
+        state = self._event_serializer.serialize_events(
             current_state.values(), time_now
         )
 
@@ -411,9 +425,9 @@ class InitialSyncHandler(BaseHandler):
 
         presence_handler = self.hs.get_presence_handler()
 
-        async def get_presence():
+        async def get_presence() -> List[JsonDict]:
             # If presence is disabled, return an empty list
-            if not self.hs.config.use_presence:
+            if not self.hs.config.server.use_presence:
                 return []
 
             states = await presence_handler.get_states(
@@ -428,19 +442,19 @@ class InitialSyncHandler(BaseHandler):
                 for s in states
             ]
 
-        async def get_receipts():
+        async def get_receipts() -> List[JsonDict]:
             receipts = await self.store.get_linearized_receipts_for_room(
                 room_id, to_key=now_token.receipt_key
             )
             if not receipts:
                 return []
             if self.hs.config.experimental.msc2285_enabled:
-                receipts = ReceiptEventSource.filter_out_hidden(receipts, user_id)
+                receipts = ReceiptEventSource.filter_out_private(receipts, user_id)
             return receipts
 
         presence, receipts, (messages, token) = await make_deferred_yieldable(
-            defer.gatherResults(
-                [
+            gather_results(
+                (
                     run_in_background(get_presence),
                     run_in_background(get_receipts),
                     run_in_background(
@@ -449,7 +463,7 @@ class InitialSyncHandler(BaseHandler):
                         limit=limit,
                         end_token=now_token.room_key,
                     ),
-                ],
+                ),
                 consumeErrors=True,
             ).addErrback(unwrapFirstError)
         )
@@ -467,7 +481,8 @@ class InitialSyncHandler(BaseHandler):
             "room_id": room_id,
             "messages": {
                 "chunk": (
-                    await self._event_serializer.serialize_events(messages, time_now)
+                    # Don't bundle aggregations as this is a deprecated API.
+                    self._event_serializer.serialize_events(messages, time_now)
                 ),
                 "start": await start_token.to_string(self.store),
                 "end": await end_token.to_string(self.store),

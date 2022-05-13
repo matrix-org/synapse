@@ -14,14 +14,15 @@
 
 import logging
 import os
-from datetime import datetime
-from typing import List, Optional, Pattern
+from typing import Any, List, Optional, Pattern
+
+from matrix_common.regex import glob_to_regex
 
 from OpenSSL import SSL, crypto
 from twisted.internet._sslverify import Certificate, trustRootFromCertificates
 
 from synapse.config._base import Config, ConfigError
-from synapse.util import glob_to_regex
+from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 class TlsConfig(Config):
     section = "tls"
 
-    def read_config(self, config: dict, config_dir_path: str, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
 
         self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
         self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
@@ -133,53 +134,7 @@ class TlsConfig(Config):
         self.tls_certificate: Optional[crypto.X509] = None
         self.tls_private_key: Optional[crypto.PKey] = None
 
-    def is_disk_cert_valid(self, allow_self_signed=True):
-        """
-        Is the certificate we have on disk valid, and if so, for how long?
-
-        Args:
-            allow_self_signed (bool): Should we allow the certificate we
-                read to be self signed?
-
-        Returns:
-            int: Days remaining of certificate validity.
-            None: No certificate exists.
-        """
-        if not os.path.exists(self.tls_certificate_file):
-            return None
-
-        try:
-            with open(self.tls_certificate_file, "rb") as f:
-                cert_pem = f.read()
-        except Exception as e:
-            raise ConfigError(
-                "Failed to read existing certificate file %s: %s"
-                % (self.tls_certificate_file, e)
-            )
-
-        try:
-            tls_certificate = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
-        except Exception as e:
-            raise ConfigError(
-                "Failed to parse existing certificate file %s: %s"
-                % (self.tls_certificate_file, e)
-            )
-
-        if not allow_self_signed:
-            if tls_certificate.get_subject() == tls_certificate.get_issuer():
-                raise ValueError(
-                    "TLS Certificate is self signed, and this is not permitted"
-                )
-
-        # YYYYMMDDhhmmssZ -- in UTC
-        expires_on = datetime.strptime(
-            tls_certificate.get_notAfter().decode("ascii"), "%Y%m%d%H%M%SZ"
-        )
-        now = datetime.utcnow()
-        days_remaining = (expires_on - now).days
-        return days_remaining
-
-    def read_certificate_from_disk(self):
+    def read_certificate_from_disk(self) -> None:
         """
         Read the certificates and private key from disk.
         """
@@ -188,13 +143,13 @@ class TlsConfig(Config):
 
     def generate_config_section(
         self,
-        config_dir_path,
-        server_name,
-        data_dir_path,
-        tls_certificate_path,
-        tls_private_key_path,
-        **kwargs,
-    ):
+        config_dir_path: str,
+        data_dir_path: str,
+        server_name: str,
+        tls_certificate_path: Optional[str],
+        tls_private_key_path: Optional[str],
+        **kwargs: Any,
+    ) -> str:
         """If the TLS paths are not specified the default will be certs in the
         config directory"""
 
@@ -260,8 +215,8 @@ class TlsConfig(Config):
         #
         #federation_certificate_verification_whitelist:
         #  - lon.example.com
-        #  - *.domain.com
-        #  - *.onion
+        #  - "*.domain.com"
+        #  - "*.onion"
 
         # List of custom certificate authorities for federation traffic.
         #
@@ -292,7 +247,7 @@ class TlsConfig(Config):
         cert_path = self.tls_certificate_file
         logger.info("Loading TLS certificate from %s", cert_path)
         cert_pem = self.read_file(cert_path, "tls_certificate_path")
-        cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
+        cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem.encode())
 
         return cert
 

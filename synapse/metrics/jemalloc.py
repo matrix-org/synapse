@@ -16,14 +16,18 @@ import ctypes
 import logging
 import os
 import re
-from typing import Optional
+from typing import Iterable, Optional, overload
 
-from synapse.metrics import REGISTRY, GaugeMetricFamily
+from prometheus_client import REGISTRY, Metric
+from typing_extensions import Literal
+
+from synapse.metrics import GaugeMetricFamily
+from synapse.metrics._types import Collector
 
 logger = logging.getLogger(__name__)
 
 
-def _setup_jemalloc_stats():
+def _setup_jemalloc_stats() -> None:
     """Checks to see if jemalloc is loaded, and hooks up a collector to record
     statistics exposed by jemalloc.
     """
@@ -56,6 +60,16 @@ def _setup_jemalloc_stats():
     logger.debug("Found jemalloc at %s", jemalloc_path)
 
     jemalloc = ctypes.CDLL(jemalloc_path)
+
+    @overload
+    def _mallctl(
+        name: str, read: Literal[True] = True, write: Optional[int] = None
+    ) -> int:
+        ...
+
+    @overload
+    def _mallctl(name: str, read: Literal[False], write: Optional[int] = None) -> None:
+        ...
 
     def _mallctl(
         name: str, read: bool = True, write: Optional[int] = None
@@ -132,10 +146,10 @@ def _setup_jemalloc_stats():
         except Exception as e:
             logger.warning("Failed to reload jemalloc stats: %s", e)
 
-    class JemallocCollector:
+    class JemallocCollector(Collector):
         """Metrics for internal jemalloc stats."""
 
-        def collect(self):
+        def collect(self) -> Iterable[Metric]:
             _jemalloc_refresh_stats()
 
             g = GaugeMetricFamily(
@@ -185,7 +199,7 @@ def _setup_jemalloc_stats():
     logger.debug("Added jemalloc stats")
 
 
-def setup_jemalloc_stats():
+def setup_jemalloc_stats() -> None:
     """Try to setup jemalloc stats, if jemalloc is loaded."""
 
     try:

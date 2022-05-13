@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from collections import namedtuple
+from typing import TYPE_CHECKING
 
-from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
+from synapse.api.constants import MAX_DEPTH, EventContentFields, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import EventFormatVersions, RoomVersion
 from synapse.crypto.event_signing import check_event_content_hash
@@ -25,23 +25,32 @@ from synapse.events.utils import prune_event, validate_canonicaljson
 from synapse.http.servlet import assert_params_in_dict
 from synapse.types import JsonDict, get_domain_from_id
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
+
 logger = logging.getLogger(__name__)
 
 
 class FederationBase:
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
 
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
         self.spam_checker = hs.get_spam_checker()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self._clock = hs.get_clock()
 
     async def _check_sigs_and_hash(
         self, room_version: RoomVersion, pdu: EventBase
     ) -> EventBase:
         """Checks that event is correctly signed by the sending server.
+
+        Also checks the content hash, and redacts the event if there is a mismatch.
+
+        Also runs the event through the spam checker; if it fails, redacts the event
+        and flags it as soft-failed.
 
         Args:
             room_version: The room version of the PDU
@@ -51,7 +60,10 @@ class FederationBase:
               * the original event if the checks pass
               * a redacted version of the event (if the signature
                 matched but the hash did not)
-              * throws a SynapseError if the signature check failed."""
+
+        Raises:
+              SynapseError if the signature check failed.
+        """
         try:
             await _check_sigs_on_pdu(self.keyring, room_version, pdu)
         except SynapseError as e:
@@ -97,10 +109,6 @@ class FederationBase:
             return redacted_event
 
         return pdu
-
-
-class PduToCheckSig(namedtuple("PduToCheckSig", ["pdu", "sender_domain", "deferreds"])):
-    pass
 
 
 async def _check_sigs_on_pdu(
@@ -184,10 +192,10 @@ async def _check_sigs_on_pdu(
         room_version.msc3083_join_rules
         and pdu.type == EventTypes.Member
         and pdu.membership == Membership.JOIN
-        and "join_authorised_via_users_server" in pdu.content
+        and EventContentFields.AUTHORISING_USER in pdu.content
     ):
         authorising_server = get_domain_from_id(
-            pdu.content["join_authorised_via_users_server"]
+            pdu.content[EventContentFields.AUTHORISING_USER]
         )
         try:
             await keyring.verify_event_for_server(
@@ -215,15 +223,12 @@ def _is_invite_via_3pid(event: EventBase) -> bool:
     )
 
 
-def event_from_pdu_json(
-    pdu_json: JsonDict, room_version: RoomVersion, outlier: bool = False
-) -> EventBase:
+def event_from_pdu_json(pdu_json: JsonDict, room_version: RoomVersion) -> EventBase:
     """Construct an EventBase from an event json received over federation
 
     Args:
         pdu_json: pdu as received over federation
         room_version: The version of the room this event belongs to
-        outlier: True to mark this event as an outlier
 
     Raises:
         SynapseError: if the pdu is missing required fields or is otherwise
@@ -232,6 +237,10 @@ def event_from_pdu_json(
     # we could probably enforce a bunch of other fields here (room_id, sender,
     # origin, etc etc)
     assert_params_in_dict(pdu_json, ("type", "depth"))
+
+    # Strip any unauthorized values from "unsigned" if they exist
+    if "unsigned" in pdu_json:
+        _strip_unsigned_values(pdu_json)
 
     depth = pdu_json["depth"]
     if not isinstance(depth, int):
@@ -247,6 +256,25 @@ def event_from_pdu_json(
         validate_canonicaljson(pdu_json)
 
     event = make_event_from_dict(pdu_json, room_version)
-    event.internal_metadata.outlier = outlier
-
     return event
+
+
+def _strip_unsigned_values(pdu_dict: JsonDict) -> None:
+    """
+    Strip any unsigned values unless specifically allowed, as defined by the whitelist.
+
+    pdu: the json dict to strip values from. Note that the dict is mutated by this
+    function
+    """
+    unsigned = pdu_dict["unsigned"]
+
+    if not isinstance(unsigned, dict):
+        pdu_dict["unsigned"] = {}
+
+    if pdu_dict["type"] == "m.room.member":
+        whitelist = ["knock_room_state", "invite_room_state", "age"]
+    else:
+        whitelist = ["age"]
+
+    filtered_unsigned = {k: v for k, v in unsigned.items() if k in whitelist}
+    pdu_dict["unsigned"] = filtered_unsigned

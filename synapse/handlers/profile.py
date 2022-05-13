@@ -31,8 +31,8 @@ from synapse.types import (
     create_requester,
     get_domain_from_id,
 )
-
-from ._base import BaseHandler
+from synapse.util.caches.descriptors import cached
+from synapse.util.stringutils import parse_and_validate_mxc_uri
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -43,7 +43,7 @@ MAX_DISPLAYNAME_LEN = 256
 MAX_AVATAR_URL_LEN = 1000
 
 
-class ProfileHandler(BaseHandler):
+class ProfileHandler:
     """Handles fetching and updating user profile information.
 
     ProfileHandler can be instantiated directly on workers and will
@@ -54,7 +54,9 @@ class ProfileHandler(BaseHandler):
     PROFILE_UPDATE_EVERY_MS = 24 * 60 * 60 * 1000
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastores().main
+        self.clock = hs.get_clock()
+        self.hs = hs
 
         self.federation = hs.get_federation_client()
         hs.get_federation_registry().register_query_handler(
@@ -62,8 +64,16 @@ class ProfileHandler(BaseHandler):
         )
 
         self.user_directory_handler = hs.get_user_directory_handler()
+        self.request_ratelimiter = hs.get_request_ratelimiter()
 
-        if hs.config.run_background_tasks:
+        self.max_avatar_size = hs.config.server.max_avatar_size
+        self.allowed_avatar_mimetypes = hs.config.server.allowed_avatar_mimetypes
+
+        self.server_name = hs.config.server.server_name
+
+        self._third_party_rules = hs.get_third_party_event_rules()
+
+        if hs.config.worker.run_background_tasks:
             self.clock.looping_call(
                 self._update_remote_profile_cache, self.PROFILE_UPDATE_MS
             )
@@ -163,6 +173,7 @@ class ProfileHandler(BaseHandler):
         requester: Requester,
         new_displayname: str,
         by_admin: bool = False,
+        deactivation: bool = False,
     ) -> None:
         """Set the displayname of a user
 
@@ -171,6 +182,7 @@ class ProfileHandler(BaseHandler):
             requester: The user attempting to make this change.
             new_displayname: The displayname to give this user.
             by_admin: Whether this change was made by an administrator.
+            deactivation: Whether this change was made while deactivating the user.
         """
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this homeserver")
@@ -178,7 +190,7 @@ class ProfileHandler(BaseHandler):
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's displayname")
 
-        if not by_admin and not self.hs.config.enable_set_displayname:
+        if not by_admin and not self.hs.config.registration.enable_set_displayname:
             profile = await self.store.get_profileinfo(target_user.localpart)
             if profile.display_name:
                 raise SynapseError(
@@ -214,11 +226,14 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, displayname_to_set
         )
 
-        if self.hs.config.user_directory_search_all_users:
-            profile = await self.store.get_profileinfo(target_user.localpart)
-            await self.user_directory_handler.handle_local_profile_change(
-                target_user.to_string(), profile
-            )
+        profile = await self.store.get_profileinfo(target_user.localpart)
+        await self.user_directory_handler.handle_local_profile_change(
+            target_user.to_string(), profile
+        )
+
+        await self._third_party_rules.on_profile_update(
+            target_user.to_string(), profile, by_admin, deactivation
+        )
 
         await self._update_join_states(requester, target_user)
 
@@ -254,7 +269,8 @@ class ProfileHandler(BaseHandler):
         requester: Requester,
         new_avatar_url: str,
         by_admin: bool = False,
-    ):
+        deactivation: bool = False,
+    ) -> None:
         """Set a new avatar URL for a user.
 
         Args:
@@ -262,6 +278,7 @@ class ProfileHandler(BaseHandler):
             requester: The user attempting to make this change.
             new_avatar_url: The avatar URL to give this user.
             by_admin: Whether this change was made by an administrator.
+            deactivation: Whether this change was made while deactivating the user.
         """
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this homeserver")
@@ -269,7 +286,7 @@ class ProfileHandler(BaseHandler):
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's avatar_url")
 
-        if not by_admin and not self.hs.config.enable_set_avatar_url:
+        if not by_admin and not self.hs.config.registration.enable_set_avatar_url:
             profile = await self.store.get_profileinfo(target_user.localpart)
             if profile.avatar_url:
                 raise SynapseError(
@@ -286,6 +303,9 @@ class ProfileHandler(BaseHandler):
                 400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN,)
             )
 
+        if not await self.check_avatar_size_and_mime_type(new_avatar_url):
+            raise SynapseError(403, "This avatar is not allowed", Codes.FORBIDDEN)
+
         avatar_url_to_set: Optional[str] = new_avatar_url
         if new_avatar_url == "":
             avatar_url_to_set = None
@@ -300,18 +320,84 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, avatar_url_to_set
         )
 
-        if self.hs.config.user_directory_search_all_users:
-            profile = await self.store.get_profileinfo(target_user.localpart)
-            await self.user_directory_handler.handle_local_profile_change(
-                target_user.to_string(), profile
-            )
+        profile = await self.store.get_profileinfo(target_user.localpart)
+        await self.user_directory_handler.handle_local_profile_change(
+            target_user.to_string(), profile
+        )
+
+        await self._third_party_rules.on_profile_update(
+            target_user.to_string(), profile, by_admin, deactivation
+        )
 
         await self._update_join_states(requester, target_user)
+
+    @cached()
+    async def check_avatar_size_and_mime_type(self, mxc: str) -> bool:
+        """Check that the size and content type of the avatar at the given MXC URI are
+        within the configured limits.
+
+        If the given `mxc` is empty, no checks are performed. (Users are always able to
+        unset their avatar.)
+
+        Args:
+            mxc: The MXC URI at which the avatar can be found.
+
+        Returns:
+             A boolean indicating whether the file can be allowed to be set as an avatar.
+        """
+        if mxc == "":
+            return True
+
+        if not self.max_avatar_size and not self.allowed_avatar_mimetypes:
+            return True
+
+        server_name, _, media_id = parse_and_validate_mxc_uri(mxc)
+
+        if server_name == self.server_name:
+            media_info = await self.store.get_local_media(media_id)
+        else:
+            media_info = await self.store.get_cached_remote_media(server_name, media_id)
+
+        if media_info is None:
+            # Both configuration options need to access the file's metadata, and
+            # retrieving remote avatars just for this becomes a bit of a faff, especially
+            # if e.g. the file is too big. It's also generally safe to assume most files
+            # used as avatar are uploaded locally, or if the upload didn't happen as part
+            # of a PUT request on /avatar_url that the file was at least previewed by the
+            # user locally (and therefore downloaded to the remote media cache).
+            logger.warning("Forbidding avatar change to %s: avatar not on server", mxc)
+            return False
+
+        if self.max_avatar_size:
+            # Ensure avatar does not exceed max allowed avatar size
+            if media_info["media_length"] > self.max_avatar_size:
+                logger.warning(
+                    "Forbidding avatar change to %s: %d bytes is above the allowed size "
+                    "limit",
+                    mxc,
+                    media_info["media_length"],
+                )
+                return False
+
+        if self.allowed_avatar_mimetypes:
+            # Ensure the avatar's file type is allowed
+            if (
+                self.allowed_avatar_mimetypes
+                and media_info["media_type"] not in self.allowed_avatar_mimetypes
+            ):
+                logger.warning(
+                    "Forbidding avatar change to %s: mimetype %s not allowed",
+                    mxc,
+                    media_info["media_type"],
+                )
+                return False
+
+        return True
 
     async def on_profile_query(self, args: JsonDict) -> JsonDict:
         """Handles federation profile query requests."""
 
-        if not self.hs.config.allow_profile_lookup_over_federation:
+        if not self.hs.config.federation.allow_profile_lookup_over_federation:
             raise SynapseError(
                 403,
                 "Profile lookup over federation is disabled on this homeserver",
@@ -348,7 +434,7 @@ class ProfileHandler(BaseHandler):
         if not self.hs.is_mine(target_user):
             return
 
-        await self.ratelimit(requester)
+        await self.request_ratelimiter.ratelimit(requester)
 
         # Do not actually update the room state for shadow-banned users.
         if requester.shadow_banned:
@@ -399,7 +485,7 @@ class ProfileHandler(BaseHandler):
         # when building a membership event. In this case, we must allow the
         # lookup.
         if (
-            not self.hs.config.limit_profile_requests_to_users_who_share_rooms
+            not self.hs.config.server.limit_profile_requests_to_users_who_share_rooms
             or not requester
         ):
             return
@@ -425,7 +511,7 @@ class ProfileHandler(BaseHandler):
             raise
 
     @wrap_as_background_process("Update remote profile")
-    async def _update_remote_profile_cache(self):
+    async def _update_remote_profile_cache(self) -> None:
         """Called periodically to check profiles of remote users we haven't
         checked in a while.
         """
@@ -457,7 +543,11 @@ class ProfileHandler(BaseHandler):
                 continue
 
             new_name = profile.get("displayname")
+            if not isinstance(new_name, str):
+                new_name = None
             new_avatar = profile.get("avatar_url")
+            if not isinstance(new_avatar, str):
+                new_avatar = None
 
             # We always hit update to update the last_check timestamp
             await self.store.update_remote_profile_cache(user_id, new_name, new_avatar)

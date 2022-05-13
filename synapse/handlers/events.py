@@ -16,16 +16,15 @@ import logging
 import random
 from typing import TYPE_CHECKING, Iterable, List, Optional
 
-from synapse.api.constants import EduTypes, EventTypes, Membership
+from synapse.api.constants import EduTypes, EventTypes, Membership, PresenceState
 from synapse.api.errors import AuthError, SynapseError
 from synapse.events import EventBase
+from synapse.events.utils import SerializeEventConfig
 from synapse.handlers.presence import format_user_presence_state
-from synapse.logging.utils import log_function
+from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.streams.config import PaginationConfig
 from synapse.types import JsonDict, UserID
 from synapse.visibility import filter_events_for_client
-
-from ._base import BaseHandler
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -34,18 +33,17 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class EventStreamHandler(BaseHandler):
+class EventStreamHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
+        self.hs = hs
 
         self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
         self._server_notices_sender = hs.get_server_notices_sender()
         self._event_serializer = hs.get_event_client_serializer()
 
-    @log_function
     async def get_stream(
         self,
         auth_user_id: str,
@@ -70,7 +68,9 @@ class EventStreamHandler(BaseHandler):
         presence_handler = self.hs.get_presence_handler()
 
         context = await presence_handler.user_syncing(
-            auth_user_id, affect_presence=affect_presence
+            auth_user_id,
+            affect_presence=affect_presence,
+            presence_state=PresenceState.ONLINE,
         )
         with context:
             if timeout:
@@ -81,13 +81,14 @@ class EventStreamHandler(BaseHandler):
                 # thundering herds on restart.
                 timeout = random.randint(int(timeout * 0.9), int(timeout * 1.1))
 
-            events, tokens = await self.notifier.get_events_for(
+            stream_result = await self.notifier.get_events_for(
                 auth_user,
                 pagin_config,
                 timeout,
                 is_guest=is_guest,
                 explicit_room_id=room_id,
             )
+            events = stream_result.events
 
             time_now = self.clock.time_msec()
 
@@ -120,31 +121,32 @@ class EventStreamHandler(BaseHandler):
 
             events.extend(to_add)
 
-            chunks = await self._event_serializer.serialize_events(
+            chunks = self._event_serializer.serialize_events(
                 events,
                 time_now,
-                as_client_event=as_client_event,
-                # We don't bundle "live" events, as otherwise clients
-                # will end up double counting annotations.
-                bundle_aggregations=False,
+                config=SerializeEventConfig(as_client_event=as_client_event),
             )
 
             chunk = {
                 "chunk": chunks,
-                "start": await tokens[0].to_string(self.store),
-                "end": await tokens[1].to_string(self.store),
+                "start": await stream_result.start_token.to_string(self.store),
+                "end": await stream_result.end_token.to_string(self.store),
             }
 
             return chunk
 
 
-class EventHandler(BaseHandler):
+class EventHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
 
     async def get_event(
-        self, user: UserID, room_id: Optional[str], event_id: str
+        self,
+        user: UserID,
+        room_id: Optional[str],
+        event_id: str,
+        show_redacted: bool = False,
     ) -> Optional[EventBase]:
         """Retrieve a single specified event.
 
@@ -153,6 +155,7 @@ class EventHandler(BaseHandler):
             room_id: The expected room id. We'll return None if the
                 event's room does not match.
             event_id: The event ID to obtain.
+            show_redacted: Should the full content of redacted events be returned?
         Returns:
             An event, or None if there is no event matching this ID.
         Raises:
@@ -160,7 +163,12 @@ class EventHandler(BaseHandler):
             AuthError if the user does not have the rights to inspect this
             event.
         """
-        event = await self.store.get_event(event_id, check_room_id=room_id)
+        redact_behaviour = (
+            EventRedactBehaviour.as_is if show_redacted else EventRedactBehaviour.redact
+        )
+        event = await self.store.get_event(
+            event_id, check_room_id=room_id, redact_behaviour=redact_behaviour
+        )
 
         if not event:
             return None

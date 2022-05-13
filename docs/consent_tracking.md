@@ -99,7 +99,7 @@ construct URIs where users can give their consent.
    see if an unauthenticated user is viewing the page. This is typically
    wrapped around the form that would be used to actually agree to the document:
 
-   ```
+   ```html
    {% if not public_version %}
      <!-- The variables used here are only provided when the 'u' param is given to the homeserver -->
      <form method="post" action="consent">

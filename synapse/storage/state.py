@@ -15,9 +15,11 @@ import logging
 from typing import (
     TYPE_CHECKING,
     Awaitable,
+    Collection,
     Dict,
     Iterable,
     List,
+    Mapping,
     Optional,
     Set,
     Tuple,
@@ -25,12 +27,16 @@ from typing import (
 )
 
 import attr
+from frozendict import frozendict
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.types import MutableStateMap, StateMap
+from synapse.storage.util.partial_state_events_tracker import PartialStateEventsTracker
+from synapse.types import MutableStateMap, StateKey, StateMap
 
 if TYPE_CHECKING:
+    from typing import FrozenSet  # noqa: used within quoted type hint; flake8 sad
+
     from synapse.server import HomeServer
     from synapse.storage.databases import Databases
 
@@ -40,7 +46,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class StateFilter:
     """A filter used when querying for state.
 
@@ -53,32 +59,37 @@ class StateFilter:
             appear in `types`.
     """
 
-    types = attr.ib(type=Dict[str, Optional[Set[str]]])
-    include_others = attr.ib(default=False, type=bool)
+    types: "frozendict[str, Optional[FrozenSet[str]]]"
+    include_others: bool = False
 
-    def __attrs_post_init__(self):
+    def __attrs_post_init__(self) -> None:
         # If `include_others` is set we canonicalise the filter by removing
         # wildcards from the types dictionary
         if self.include_others:
-            self.types = {k: v for k, v in self.types.items() if v is not None}
+            # this is needed to work around the fact that StateFilter is frozen
+            object.__setattr__(
+                self,
+                "types",
+                frozendict({k: v for k, v in self.types.items() if v is not None}),
+            )
 
     @staticmethod
     def all() -> "StateFilter":
-        """Creates a filter that fetches everything.
+        """Returns a filter that fetches everything.
 
         Returns:
-            The new state filter.
+            The state filter.
         """
-        return StateFilter(types={}, include_others=True)
+        return _ALL_STATE_FILTER
 
     @staticmethod
     def none() -> "StateFilter":
-        """Creates a filter that fetches nothing.
+        """Returns a filter that fetches nothing.
 
         Returns:
             The new state filter.
         """
-        return StateFilter(types={}, include_others=False)
+        return _NONE_STATE_FILTER
 
     @staticmethod
     def from_types(types: Iterable[Tuple[str, Optional[str]]]) -> "StateFilter":
@@ -103,7 +114,12 @@ class StateFilter:
 
             type_dict.setdefault(typ, set()).add(s)  # type: ignore
 
-        return StateFilter(types=type_dict)
+        return StateFilter(
+            types=frozendict(
+                (k, frozenset(v) if v is not None else None)
+                for k, v in type_dict.items()
+            )
+        )
 
     @staticmethod
     def from_lazy_load_member_list(members: Iterable[str]) -> "StateFilter":
@@ -116,7 +132,29 @@ class StateFilter:
         Returns:
             The new state filter
         """
-        return StateFilter(types={EventTypes.Member: set(members)}, include_others=True)
+        return StateFilter(
+            types=frozendict({EventTypes.Member: frozenset(members)}),
+            include_others=True,
+        )
+
+    @staticmethod
+    def freeze(
+        types: Mapping[str, Optional[Collection[str]]], include_others: bool
+    ) -> "StateFilter":
+        """
+        Returns a (frozen) StateFilter with the same contents as the parameters
+        specified here, which can be made of mutable types.
+        """
+        types_with_frozen_values: Dict[str, Optional[FrozenSet[str]]] = {}
+        for state_types, state_keys in types.items():
+            if state_keys is not None:
+                types_with_frozen_values[state_types] = frozenset(state_keys)
+            else:
+                types_with_frozen_values[state_types] = None
+
+        return StateFilter(
+            frozendict(types_with_frozen_values), include_others=include_others
+        )
 
     def return_expanded(self) -> "StateFilter":
         """Creates a new StateFilter where type wild cards have been removed
@@ -169,13 +207,16 @@ class StateFilter:
         if get_all_members:
             # We want to return everything.
             return StateFilter.all()
-        else:
+        elif EventTypes.Member in self.types:
             # We want to return all non-members, but only particular
             # memberships
             return StateFilter(
-                types={EventTypes.Member: self.types[EventTypes.Member]},
+                types=frozendict({EventTypes.Member: self.types[EventTypes.Member]}),
                 include_others=True,
             )
+        else:
+            # We want to return all non-members
+            return _ALL_NON_MEMBER_STATE_FILTER
 
     def make_sql_filter_clause(self) -> Tuple[str, List[str]]:
         """Converts the filter to an SQL clause.
@@ -245,14 +286,15 @@ class StateFilter:
 
         return len(self.concrete_types())
 
-    def filter_state(self, state_dict: StateMap[T]) -> StateMap[T]:
-        """Returns the state filtered with by this StateFilter
+    def filter_state(self, state_dict: StateMap[T]) -> MutableStateMap[T]:
+        """Returns the state filtered with by this StateFilter.
 
         Args:
             state: The state map to filter
 
         Returns:
-            The filtered state map
+            The filtered state map.
+            This is a copy, so it's safe to mutate.
         """
         if self.is_full():
             return dict(state_dict)
@@ -324,18 +366,178 @@ class StateFilter:
             if state_keys is None:
                 member_filter = StateFilter.all()
             else:
-                member_filter = StateFilter({EventTypes.Member: state_keys})
+                member_filter = StateFilter(frozendict({EventTypes.Member: state_keys}))
         elif self.include_others:
             member_filter = StateFilter.all()
         else:
             member_filter = StateFilter.none()
 
         non_member_filter = StateFilter(
-            types={k: v for k, v in self.types.items() if k != EventTypes.Member},
+            types=frozendict(
+                {k: v for k, v in self.types.items() if k != EventTypes.Member}
+            ),
             include_others=self.include_others,
         )
 
         return member_filter, non_member_filter
+
+    def _decompose_into_four_parts(
+        self,
+    ) -> Tuple[Tuple[bool, Set[str]], Tuple[Set[str], Set[StateKey]]]:
+        """
+        Decomposes this state filter into 4 constituent parts, which can be
+        thought of as this:
+            all? - minus_wildcards + plus_wildcards + plus_state_keys
+
+        where
+        * all represents ALL state
+        * minus_wildcards represents entire state types to remove
+        * plus_wildcards represents entire state types to add
+        * plus_state_keys represents individual state keys to add
+
+        See `recompose_from_four_parts` for the other direction of this
+        correspondence.
+        """
+        is_all = self.include_others
+        excluded_types: Set[str] = {t for t in self.types if is_all}
+        wildcard_types: Set[str] = {t for t, s in self.types.items() if s is None}
+        concrete_keys: Set[StateKey] = set(self.concrete_types())
+
+        return (is_all, excluded_types), (wildcard_types, concrete_keys)
+
+    @staticmethod
+    def _recompose_from_four_parts(
+        all_part: bool,
+        minus_wildcards: Set[str],
+        plus_wildcards: Set[str],
+        plus_state_keys: Set[StateKey],
+    ) -> "StateFilter":
+        """
+        Recomposes a state filter from 4 parts.
+
+        See `decompose_into_four_parts` (the other direction of this
+        correspondence) for descriptions on each of the parts.
+        """
+
+        # {state type -> set of state keys OR None for wildcard}
+        # (The same structure as that of a StateFilter.)
+        new_types: Dict[str, Optional[Set[str]]] = {}
+
+        # if we start with all, insert the excluded statetypes as empty sets
+        # to prevent them from being included
+        if all_part:
+            new_types.update({state_type: set() for state_type in minus_wildcards})
+
+        # insert the plus wildcards
+        new_types.update({state_type: None for state_type in plus_wildcards})
+
+        # insert the specific state keys
+        for state_type, state_key in plus_state_keys:
+            if state_type in new_types:
+                entry = new_types[state_type]
+                if entry is not None:
+                    entry.add(state_key)
+            elif not all_part:
+                # don't insert if the entire type is already included by
+                # include_others as this would actually shrink the state allowed
+                # by this filter.
+                new_types[state_type] = {state_key}
+
+        return StateFilter.freeze(new_types, include_others=all_part)
+
+    def approx_difference(self, other: "StateFilter") -> "StateFilter":
+        """
+        Returns a state filter which represents `self - other`.
+
+        This is useful for determining what state remains to be pulled out of the
+        database if we want the state included by `self` but already have the state
+        included by `other`.
+
+        The returned state filter
+        - MUST include all state events that are included by this filter (`self`)
+          unless they are included by `other`;
+        - MUST NOT include state events not included by this filter (`self`); and
+        - MAY be an over-approximation: the returned state filter
+          MAY additionally include some state events from `other`.
+
+        This implementation attempts to return the narrowest such state filter.
+        In the case that `self` contains wildcards for state types where
+        `other` contains specific state keys, an approximation must be made:
+        the returned state filter keeps the wildcard, as state filters are not
+        able to express 'all state keys except some given examples'.
+        e.g.
+            StateFilter(m.room.member -> None (wildcard))
+                minus
+            StateFilter(m.room.member -> {'@wombat:example.org'})
+                is approximated as
+            StateFilter(m.room.member -> None (wildcard))
+        """
+
+        # We first transform self and other into an alternative representation:
+        #   - whether or not they include all events to begin with ('all')
+        #   - if so, which event types are excluded? ('excludes')
+        #   - which entire event types to include ('wildcards')
+        #   - which concrete state keys to include ('concrete state keys')
+        (self_all, self_excludes), (
+            self_wildcards,
+            self_concrete_keys,
+        ) = self._decompose_into_four_parts()
+        (other_all, other_excludes), (
+            other_wildcards,
+            other_concrete_keys,
+        ) = other._decompose_into_four_parts()
+
+        # Start with an estimate of the difference based on self
+        new_all = self_all
+        # Wildcards from the other can be added to the exclusion filter
+        new_excludes = self_excludes | other_wildcards
+        # We remove wildcards that appeared as wildcards in the other
+        new_wildcards = self_wildcards - other_wildcards
+        # We filter out the concrete state keys that appear in the other
+        # as wildcards or concrete state keys.
+        new_concrete_keys = {
+            (state_type, state_key)
+            for (state_type, state_key) in self_concrete_keys
+            if state_type not in other_wildcards
+        } - other_concrete_keys
+
+        if other_all:
+            if self_all:
+                # If self starts with all, then we add as wildcards any
+                # types which appear in the other's exclusion filter (but
+                # aren't in the self exclusion filter). This is as the other
+                # filter will return everything BUT the types in its exclusion, so
+                # we need to add those excluded types that also match the self
+                # filter as wildcard types in the new filter.
+                new_wildcards |= other_excludes.difference(self_excludes)
+
+            # If other is an `include_others` then the difference isn't.
+            new_all = False
+            # (We have no need for excludes when we don't start with all, as there
+            #  is nothing to exclude.)
+            new_excludes = set()
+
+            # We also filter out all state types that aren't in the exclusion
+            # list of the other.
+            new_wildcards &= other_excludes
+            new_concrete_keys = {
+                (state_type, state_key)
+                for (state_type, state_key) in new_concrete_keys
+                if state_type in other_excludes
+            }
+
+        # Transform our newly-constructed state filter from the alternative
+        # representation back into the normal StateFilter representation.
+        return StateFilter._recompose_from_four_parts(
+            new_all, new_excludes, new_wildcards, new_concrete_keys
+        )
+
+
+_ALL_STATE_FILTER = StateFilter(types=frozendict(), include_others=True)
+_ALL_NON_MEMBER_STATE_FILTER = StateFilter(
+    types=frozendict({EventTypes.Member: frozenset()}), include_others=True
+)
+_NONE_STATE_FILTER = StateFilter(types=frozendict(), include_others=False)
 
 
 class StateGroupStorage:
@@ -343,6 +545,10 @@ class StateGroupStorage:
 
     def __init__(self, hs: "HomeServer", stores: "Databases"):
         self.stores = stores
+        self._partial_state_events_tracker = PartialStateEventsTracker(stores.main)
+
+    def notify_event_un_partial_stated(self, event_id: str) -> None:
+        self._partial_state_events_tracker.notify_un_partial_stated(event_id)
 
     async def get_state_group_delta(
         self, state_group: int
@@ -358,10 +564,11 @@ class StateGroupStorage:
             make up the delta between the old and new state groups.
         """
 
-        return await self.stores.state.get_state_group_delta(state_group)
+        state_group_delta = await self.stores.state.get_state_group_delta(state_group)
+        return state_group_delta.prev_group, state_group_delta.delta_ids
 
     async def get_state_groups_ids(
-        self, _room_id: str, event_ids: Iterable[str]
+        self, _room_id: str, event_ids: Collection[str]
     ) -> Dict[int, MutableStateMap[str]]:
         """Get the event IDs of all the state for the state groups for the given events
 
@@ -371,11 +578,15 @@ class StateGroupStorage:
 
         Returns:
             dict of state_group_id -> (dict of (type, state_key) -> event id)
+
+        Raises:
+            RuntimeError if we don't have a state group for one or more of the events
+               (ie they are outliers or unknown)
         """
         if not event_ids:
             return {}
 
-        event_to_groups = await self.stores.main._get_state_group_for_events(event_ids)
+        event_to_groups = await self._get_state_group_for_events(event_ids)
 
         groups = set(event_to_groups.values())
         group_to_state = await self.stores.state._get_state_for_groups(groups)
@@ -396,7 +607,7 @@ class StateGroupStorage:
         return group_to_state[state_group]
 
     async def get_state_groups(
-        self, room_id: str, event_ids: Iterable[str]
+        self, room_id: str, event_ids: Collection[str]
     ) -> Dict[int, List[EventBase]]:
         """Get the state groups for the given list of event_ids
 
@@ -448,7 +659,7 @@ class StateGroupStorage:
         return self.stores.state._get_state_groups_from_groups(groups, state_filter)
 
     async def get_state_for_events(
-        self, event_ids: Iterable[str], state_filter: Optional[StateFilter] = None
+        self, event_ids: Collection[str], state_filter: Optional[StateFilter] = None
     ) -> Dict[str, StateMap[EventBase]]:
         """Given a list of event_ids and type tuples, return a list of state
         dicts for each event.
@@ -459,8 +670,12 @@ class StateGroupStorage:
 
         Returns:
             A dict of (event_id) -> (type, state_key) -> [state_events]
+
+        Raises:
+            RuntimeError if we don't have a state group for one or more of the events
+               (ie they are outliers or unknown)
         """
-        event_to_groups = await self.stores.main._get_state_group_for_events(event_ids)
+        event_to_groups = await self._get_state_group_for_events(event_ids)
 
         groups = set(event_to_groups.values())
         group_to_state = await self.stores.state._get_state_for_groups(
@@ -484,7 +699,7 @@ class StateGroupStorage:
         return {event: event_to_state[event] for event in event_ids}
 
     async def get_state_ids_for_events(
-        self, event_ids: Iterable[str], state_filter: Optional[StateFilter] = None
+        self, event_ids: Collection[str], state_filter: Optional[StateFilter] = None
     ) -> Dict[str, StateMap[str]]:
         """
         Get the state dicts corresponding to a list of events, containing the event_ids
@@ -496,8 +711,12 @@ class StateGroupStorage:
 
         Returns:
             A dict from event_id -> (type, state_key) -> event_id
+
+        Raises:
+            RuntimeError if we don't have a state group for one or more of the events
+                (ie they are outliers or unknown)
         """
-        event_to_groups = await self.stores.main._get_state_group_for_events(event_ids)
+        event_to_groups = await self._get_state_group_for_events(event_ids)
 
         groups = set(event_to_groups.values())
         group_to_state = await self.stores.state._get_state_for_groups(
@@ -523,6 +742,10 @@ class StateGroupStorage:
 
         Returns:
             A dict from (type, state_key) -> state_event
+
+        Raises:
+            RuntimeError if we don't have a state group for the event (ie it is an
+                outlier or is unknown)
         """
         state_map = await self.get_state_for_events(
             [event_id], state_filter or StateFilter.all()
@@ -541,6 +764,10 @@ class StateGroupStorage:
 
         Returns:
             A dict from (type, state_key) -> state_event_id
+
+        Raises:
+            RuntimeError if we don't have a state group for the event (ie it is an
+                outlier or is unknown)
         """
         state_map = await self.get_state_ids_for_events(
             [event_id], state_filter or StateFilter.all()
@@ -564,6 +791,23 @@ class StateGroupStorage:
         return self.stores.state._get_state_for_groups(
             groups, state_filter or StateFilter.all()
         )
+
+    async def _get_state_group_for_events(
+        self,
+        event_ids: Collection[str],
+        await_full_state: bool = True,
+    ) -> Mapping[str, int]:
+        """Returns mapping event_id -> state_group
+
+        Args:
+            event_ids: events to get state groups for
+            await_full_state: if true, will block if we do not yet have complete
+               state at this event.
+        """
+        if await_full_state:
+            await self._partial_state_events_tracker.await_full_state(event_ids)
+
+        return await self.stores.main._get_state_group_for_events(event_ids)
 
     async def store_state_group(
         self,

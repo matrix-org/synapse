@@ -12,13 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, List, Optional, Tuple
 
-from synapse.api.errors import SynapseError
+from twisted.internet.defer import CancelledError
+
+from synapse.api.errors import ModuleFailedException, SynapseError
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
+from synapse.storage.roommember import ProfileInfo
 from synapse.types import Requester, StateMap
-from synapse.util.async_helpers import maybe_awaitable
+from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -36,16 +39,22 @@ CHECK_THREEPID_CAN_BE_INVITED_CALLBACK = Callable[
 CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK = Callable[
     [str, StateMap[EventBase], str], Awaitable[bool]
 ]
+ON_NEW_EVENT_CALLBACK = Callable[[EventBase, StateMap[EventBase]], Awaitable]
+CHECK_CAN_SHUTDOWN_ROOM_CALLBACK = Callable[[str, str], Awaitable[bool]]
+CHECK_CAN_DEACTIVATE_USER_CALLBACK = Callable[[str, bool], Awaitable[bool]]
+ON_PROFILE_UPDATE_CALLBACK = Callable[[str, ProfileInfo, bool, bool], Awaitable]
+ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK = Callable[[str, bool, bool], Awaitable]
+ON_THREEPID_BIND_CALLBACK = Callable[[str, str, str], Awaitable]
 
 
-def load_legacy_third_party_event_rules(hs: "HomeServer"):
+def load_legacy_third_party_event_rules(hs: "HomeServer") -> None:
     """Wrapper that loads a third party event rules module configured using the old
     configuration, and registers the hooks they implement.
     """
-    if hs.config.third_party_event_rules is None:
+    if hs.config.thirdpartyrules.third_party_event_rules is None:
         return
 
-    module, config = hs.config.third_party_event_rules
+    module, config = hs.config.thirdpartyrules.third_party_event_rules
 
     api = hs.get_module_api()
     third_party_rules = module(config=config, module_api=api)
@@ -77,9 +86,9 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
                 event: EventBase,
                 state_events: StateMap[EventBase],
             ) -> Tuple[bool, Optional[dict]]:
-                # We've already made sure f is not None above, but mypy doesn't do well
-                # across function boundaries so we need to tell it f is definitely not
-                # None.
+                # Assertion required because mypy can't prove we won't change
+                # `f` back to `None`. See
+                # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
                 assert f is not None
 
                 res = await f(event, state_events)
@@ -98,9 +107,9 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
             async def wrap_on_create_room(
                 requester: Requester, config: dict, is_requester_admin: bool
             ) -> None:
-                # We've already made sure f is not None above, but mypy doesn't do well
-                # across function boundaries so we need to tell it f is definitely not
-                # None.
+                # Assertion required because mypy can't prove we won't change
+                # `f` back to `None`. See
+                # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
                 assert f is not None
 
                 res = await f(requester, config, is_requester_admin)
@@ -112,9 +121,10 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
 
             return wrap_on_create_room
 
-        def run(*args, **kwargs):
-            # mypy doesn't do well across function boundaries so we need to tell it
-            # f is definitely not None.
+        def run(*args: Any, **kwargs: Any) -> Awaitable:
+            # Assertion required because mypy can't prove we won't change  `f`
+            # back to `None`. See
+            # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
             assert f is not None
 
             return maybe_awaitable(f(*args, **kwargs))
@@ -141,7 +151,7 @@ class ThirdPartyEventRules:
     def __init__(self, hs: "HomeServer"):
         self.third_party_rules = None
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self._check_event_allowed_callbacks: List[CHECK_EVENT_ALLOWED_CALLBACK] = []
         self._on_create_room_callbacks: List[ON_CREATE_ROOM_CALLBACK] = []
@@ -151,6 +161,18 @@ class ThirdPartyEventRules:
         self._check_visibility_can_be_modified_callbacks: List[
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = []
+        self._on_new_event_callbacks: List[ON_NEW_EVENT_CALLBACK] = []
+        self._check_can_shutdown_room_callbacks: List[
+            CHECK_CAN_SHUTDOWN_ROOM_CALLBACK
+        ] = []
+        self._check_can_deactivate_user_callbacks: List[
+            CHECK_CAN_DEACTIVATE_USER_CALLBACK
+        ] = []
+        self._on_profile_update_callbacks: List[ON_PROFILE_UPDATE_CALLBACK] = []
+        self._on_user_deactivation_status_changed_callbacks: List[
+            ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
+        ] = []
+        self._on_threepid_bind_callbacks: List[ON_THREEPID_BIND_CALLBACK] = []
 
     def register_third_party_rules_callbacks(
         self,
@@ -162,7 +184,15 @@ class ThirdPartyEventRules:
         check_visibility_can_be_modified: Optional[
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = None,
-    ):
+        on_new_event: Optional[ON_NEW_EVENT_CALLBACK] = None,
+        check_can_shutdown_room: Optional[CHECK_CAN_SHUTDOWN_ROOM_CALLBACK] = None,
+        check_can_deactivate_user: Optional[CHECK_CAN_DEACTIVATE_USER_CALLBACK] = None,
+        on_profile_update: Optional[ON_PROFILE_UPDATE_CALLBACK] = None,
+        on_user_deactivation_status_changed: Optional[
+            ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
+        ] = None,
+        on_threepid_bind: Optional[ON_THREEPID_BIND_CALLBACK] = None,
+    ) -> None:
         """Register callbacks from modules for each hook."""
         if check_event_allowed is not None:
             self._check_event_allowed_callbacks.append(check_event_allowed)
@@ -179,6 +209,25 @@ class ThirdPartyEventRules:
             self._check_visibility_can_be_modified_callbacks.append(
                 check_visibility_can_be_modified,
             )
+
+        if on_new_event is not None:
+            self._on_new_event_callbacks.append(on_new_event)
+
+        if check_can_shutdown_room is not None:
+            self._check_can_shutdown_room_callbacks.append(check_can_shutdown_room)
+
+        if check_can_deactivate_user is not None:
+            self._check_can_deactivate_user_callbacks.append(check_can_deactivate_user)
+        if on_profile_update is not None:
+            self._on_profile_update_callbacks.append(on_profile_update)
+
+        if on_user_deactivation_status_changed is not None:
+            self._on_user_deactivation_status_changed_callbacks.append(
+                on_user_deactivation_status_changed,
+            )
+
+        if on_threepid_bind is not None:
+            self._on_threepid_bind_callbacks.append(on_threepid_bind)
 
     async def check_event_allowed(
         self, event: EventBase, context: EventContext
@@ -216,10 +265,24 @@ class ThirdPartyEventRules:
 
         for callback in self._check_event_allowed_callbacks:
             try:
-                res, replacement_data = await callback(event, state_events)
-            except Exception as e:
-                logger.warning("Failed to run module API callback %s: %s", callback, e)
-                continue
+                res, replacement_data = await delay_cancellation(
+                    callback(event, state_events)
+                )
+            except CancelledError:
+                raise
+            except SynapseError as e:
+                # FIXME: Being able to throw SynapseErrors is relied upon by
+                # some modules. PR #10386 accidentally broke this ability.
+                # That said, we aren't keen on exposing this implementation detail
+                # to modules and we should one day have a proper way to do what
+                # is wanted.
+                # This module callback needs a rework so that hacks such as
+                # this one are not necessary.
+                raise e
+            except Exception:
+                raise ModuleFailedException(
+                    "Failed to run `check_event_allowed` module API callback"
+                )
 
             # Return if the event shouldn't be allowed or if the module came up with a
             # replacement dict for the event.
@@ -276,8 +339,13 @@ class ThirdPartyEventRules:
 
         for callback in self._check_threepid_can_be_invited_callbacks:
             try:
-                if await callback(medium, address, state_events) is False:
+                threepid_can_be_invited = await delay_cancellation(
+                    callback(medium, address, state_events)
+                )
+                if threepid_can_be_invited is False:
                     return False
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
 
@@ -304,11 +372,86 @@ class ThirdPartyEventRules:
 
         for callback in self._check_visibility_can_be_modified_callbacks:
             try:
-                if await callback(room_id, state_events, new_visibility) is False:
+                visibility_can_be_modified = await delay_cancellation(
+                    callback(room_id, state_events, new_visibility)
+                )
+                if visibility_can_be_modified is False:
                     return False
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
 
+        return True
+
+    async def on_new_event(self, event_id: str) -> None:
+        """Let modules act on events after they've been sent (e.g. auto-accepting
+        invites, etc.)
+
+        Args:
+            event_id: The ID of the event.
+        """
+        # Bail out early without hitting the store if we don't have any callbacks
+        if len(self._on_new_event_callbacks) == 0:
+            return
+
+        event = await self.store.get_event(event_id)
+        state_events = await self._get_state_map_for_room(event.room_id)
+
+        for callback in self._on_new_event_callbacks:
+            try:
+                await callback(event, state_events)
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )
+
+    async def check_can_shutdown_room(self, user_id: str, room_id: str) -> bool:
+        """Intercept requests to shutdown a room. If `False` is returned, the
+         room must not be shut down.
+
+        Args:
+            requester: The ID of the user requesting the shutdown.
+            room_id: The ID of the room.
+        """
+        for callback in self._check_can_shutdown_room_callbacks:
+            try:
+                can_shutdown_room = await delay_cancellation(callback(user_id, room_id))
+                if can_shutdown_room is False:
+                    return False
+            except CancelledError:
+                raise
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )
+        return True
+
+    async def check_can_deactivate_user(
+        self,
+        user_id: str,
+        by_admin: bool,
+    ) -> bool:
+        """Intercept requests to deactivate a user. If `False` is returned, the
+        user should not be deactivated.
+
+        Args:
+            requester
+            user_id: The ID of the room.
+        """
+        for callback in self._check_can_deactivate_user_callbacks:
+            try:
+                can_deactivate_user = await delay_cancellation(
+                    callback(user_id, by_admin)
+                )
+                if can_deactivate_user is False:
+                    return False
+            except CancelledError:
+                raise
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )
         return True
 
     async def _get_state_map_for_room(self, room_id: str) -> StateMap[EventBase]:
@@ -328,3 +471,61 @@ class ThirdPartyEventRules:
             state_events[key] = room_state_events[event_id]
 
         return state_events
+
+    async def on_profile_update(
+        self, user_id: str, new_profile: ProfileInfo, by_admin: bool, deactivation: bool
+    ) -> None:
+        """Called after the global profile of a user has been updated. Does not include
+        per-room profile changes.
+
+        Args:
+            user_id: The user whose profile was changed.
+            new_profile: The updated profile for the user.
+            by_admin: Whether the profile update was performed by a server admin.
+            deactivation: Whether this change was made while deactivating the user.
+        """
+        for callback in self._on_profile_update_callbacks:
+            try:
+                await callback(user_id, new_profile, by_admin, deactivation)
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )
+
+    async def on_user_deactivation_status_changed(
+        self, user_id: str, deactivated: bool, by_admin: bool
+    ) -> None:
+        """Called after a user has been deactivated or reactivated.
+
+        Args:
+            user_id: The deactivated user.
+            deactivated: Whether the user is now deactivated.
+            by_admin: Whether the deactivation was performed by a server admin.
+        """
+        for callback in self._on_user_deactivation_status_changed_callbacks:
+            try:
+                await callback(user_id, deactivated, by_admin)
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )
+
+    async def on_threepid_bind(self, user_id: str, medium: str, address: str) -> None:
+        """Called after a threepid association has been verified and stored.
+
+        Note that this callback is called when an association is created on the
+        local homeserver, not when it's created on an identity server (and then kept track
+        of so that it can be unbound on the same IS later on).
+
+        Args:
+            user_id: the user being associated with the threepid.
+            medium: the threepid's medium.
+            address: the threepid's address.
+        """
+        for callback in self._on_threepid_bind_callbacks:
+            try:
+                await callback(user_id, medium, address)
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )

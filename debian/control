@@ -19,7 +19,7 @@ Standards-Version: 3.9.8
 Homepage: https://github.com/matrix-org/synapse
 
 Package: matrix-synapse-py3
-Architecture: amd64
+Architecture: any
 Provides: matrix-synapse
 Conflicts:
  matrix-synapse (<< 0.34.0.1-0matrix2),

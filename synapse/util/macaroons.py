@@ -77,7 +77,7 @@ def satisfy_expiry(v: pymacaroons.Verifier, get_time_ms: Callable[[], int]) -> N
             should be considered expired. Normally the current time.
     """
 
-    def verify_expiry_caveat(caveat: str):
+    def verify_expiry_caveat(caveat: str) -> bool:
         time_msec = get_time_ms()
         prefix = "time < "
         if not caveat.startswith(prefix):

@@ -37,15 +37,15 @@
 
 # Server admins can expand Synapse's functionality with external modules.
 #
-# See https://matrix-org.github.io/synapse/latest/modules.html for more
+# See https://matrix-org.github.io/synapse/latest/modules/index.html for more
 # documentation on how to configure or create custom modules for Synapse.
 #
 modules:
-    # - module: my_super_module.MySuperClass
-    #   config:
-    #       do_thing: true
-    # - module: my_other_super_module.SomeClass
-    #   config: {}
+  #- module: my_super_module.MySuperClass
+  #  config:
+  #    do_thing: true
+  #- module: my_other_super_module.SomeClass
+  #  config: {}
 
 
 ## Server ##
@@ -74,13 +74,7 @@ server_name: "SERVERNAME"
 #
 pid_file: DATADIR/homeserver.pid
 
-# The absolute URL to the web client which /_matrix/client will redirect
-# to if 'webclient' is configured under the 'listeners' configuration.
-#
-# This option can be also set to the filesystem path to the web client
-# which will be served at /_matrix/client/ if 'webclient' is configured
-# under the 'listeners' configuration, however this is a security risk:
-# https://github.com/matrix-org/synapse#security-note
+# The absolute URL to the web client which / will redirect to.
 #
 #web_client_location: https://riot.example.com/
 
@@ -91,7 +85,27 @@ pid_file: DATADIR/homeserver.pid
 # Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
 # 'listeners' below).
 #
+# Defaults to 'https://<server_name>/'.
+#
 #public_baseurl: https://example.com/
+
+# Uncomment the following to tell other servers to send federation traffic on
+# port 443.
+#
+# By default, other servers will try to reach our server on port 8448, which can
+# be inconvenient in some environments.
+#
+# Provided 'https://<server_name>/' on port 443 is routed to Synapse, this
+# option configures Synapse to serve a file at
+# 'https://<server_name>/.well-known/matrix/server'. This will tell other
+# servers to send traffic to port 443 instead.
+#
+# See https://matrix-org.github.io/synapse/latest/delegate.html for more
+# information.
+#
+# Defaults to 'false'.
+#
+#serve_server_wellknown: true
 
 # Set the soft limit on the number of file descriptors synapse can use
 # Zero is used to indicate synapse should set the soft limit to the
@@ -107,20 +121,6 @@ presence:
   # replaces the previous top-level 'use_presence' option.
   #
   #enabled: false
-
-  # Presence routers are third-party modules that can specify additional logic
-  # to where presence updates from users are routed.
-  #
-  presence_router:
-    # The custom module's class. Uncomment to use a custom presence router module.
-    #
-    #module: "my_custom_router.PresenceRouter"
-
-    # Configuration options of the custom module. Refer to your module's
-    # documentation for available options.
-    #
-    #config:
-    #  example_option: 'something'
 
 # Whether to require authentication to retrieve profile data (avatars,
 # display names) of other users through the client API. Defaults to
@@ -158,12 +158,12 @@ presence:
 # The default room version for newly created rooms.
 #
 # Known room versions are listed here:
-# https://matrix.org/docs/spec/#complete-list-of-room-versions
+# https://spec.matrix.org/latest/rooms/#complete-list-of-room-versions
 #
 # For example, for room version 1, default_room_version should be set
 # to "1".
 #
-#default_room_version: "6"
+#default_room_version: "9"
 
 # The GC threshold parameters to pass to `gc.set_threshold`, if defined
 #
@@ -304,8 +304,6 @@ presence:
 #   static: static resources under synapse/static (/_matrix/static). (Mostly
 #       useful for 'fallback authentication'.)
 #
-#   webclient: A web client. Requires web_client_location to be set.
-#
 listeners:
   # TLS-enabled listener: for when matrix traffic is sent directly to synapse.
   #
@@ -349,6 +347,24 @@ listeners:
   #  bind_addresses: ['::1', '127.0.0.1']
   #  type: manhole
 
+# Connection settings for the manhole
+#
+manhole_settings:
+  # The username for the manhole. This defaults to 'matrix'.
+  #
+  #username: manhole
+
+  # The password for the manhole. This defaults to 'rabbithole'.
+  #
+  #password: mypassword
+
+  # The private and public SSH key pair used to encrypt the manhole traffic.
+  # If these are left unset, then hardcoded and non-secret keys are used,
+  # which could allow traffic to be intercepted if sent over a public network.
+  #
+  #ssh_priv_key_path: CONFDIR/id_rsa
+  #ssh_pub_key_path: CONFDIR/id_rsa.pub
+
 # Forward extremities can build up in a room due to networking delays between
 # homeservers. Once this happens in a large room, calculation of the state of
 # that room can become quite expensive. To mitigate this, once the number of
@@ -391,6 +407,11 @@ listeners:
 # sign up in a short space of time never to return after their initial
 # session.
 #
+# The option `mau_appservice_trial_days` is similar to `mau_trial_days`, but
+# applies a different trial number if the user was registered by an appservice.
+# A value of 0 means no trial days are applied. Appservices not listed in this
+# dictionary use the value of `mau_trial_days` instead.
+#
 # 'mau_limit_alerting' is a means of limiting client side alerting
 # should the mau limit be reached. This is useful for small instances
 # where the admin has 5 mau seats (say) for 5 specific people and no
@@ -401,6 +422,8 @@ listeners:
 #max_mau_value: 50
 #mau_trial_days: 2
 #mau_limit_alerting: false
+#mau_appservice_trial_days:
+#  "appservice-id": 1
 
 # If enabled, the metrics for the number of monthly active users will
 # be populated, however no one will be limited. If limit_usage_by_mau
@@ -455,6 +478,20 @@ limit_remote_rooms:
 #
 #allow_per_room_profiles: false
 
+# The largest allowed file size for a user avatar. Defaults to no restriction.
+#
+# Note that user avatar changes will not work if this is set without
+# using Synapse's media repository.
+#
+#max_avatar_size: 10M
+
+# The MIME types allowed for user avatars. Defaults to no restriction.
+#
+# Note that user avatar changes will not work if this is set without
+# using Synapse's media repository.
+#
+#allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
+
 # How long to keep redacted events in unredacted form in the database. After
 # this period redacted events get replaced with their redacted form in the DB.
 #
@@ -467,6 +504,57 @@ limit_remote_rooms:
 # Defaults to `28d`. Set to `null` to disable clearing out of old rows.
 #
 #user_ips_max_age: 14d
+
+# Inhibits the /requestToken endpoints from returning an error that might leak
+# information about whether an e-mail address is in use or not on this
+# homeserver.
+# Note that for some endpoints the error situation is the e-mail already being
+# used, and for others the error is entering the e-mail being unused.
+# If this option is enabled, instead of returning an error, these endpoints will
+# act as if no error happened and return a fake session ID ('sid') to clients.
+#
+#request_token_inhibit_3pid_errors: true
+
+# A list of domains that the domain portion of 'next_link' parameters
+# must match.
+#
+# This parameter is optionally provided by clients while requesting
+# validation of an email or phone number, and maps to a link that
+# users will be automatically redirected to after validation
+# succeeds. Clients can make use this parameter to aid the validation
+# process.
+#
+# The whitelist is applied whether the homeserver or an
+# identity server is handling validation.
+#
+# The default value is no whitelist functionality; all domains are
+# allowed. Setting this value to an empty list will instead disallow
+# all domains.
+#
+#next_link_domain_whitelist: ["matrix.org"]
+
+# Templates to use when generating email or HTML page contents.
+#
+templates:
+  # Directory in which Synapse will try to find template files to use to generate
+  # email or HTML page contents.
+  # If not set, or a file is not found within the template directory, a default
+  # template from within the Synapse package will be used.
+  #
+  # See https://matrix-org.github.io/synapse/latest/templates.html for more
+  # information about using custom templates.
+  #
+  #custom_template_directory: /path/to/custom/templates/
+
+# List of rooms to exclude from sync responses. This is useful for server
+# administrators wishing to group users into a room without these users being able
+# to see it from their client.
+#
+# By default, no room is excluded.
+#
+#exclude_rooms_from_sync:
+#    - !foo:example.com
+
 
 # Message retention policy at the server level.
 #
@@ -537,34 +625,6 @@ retention:
   #  - shortest_max_lifetime: 3d
   #    interval: 1d
 
-# Inhibits the /requestToken endpoints from returning an error that might leak
-# information about whether an e-mail address is in use or not on this
-# homeserver.
-# Note that for some endpoints the error situation is the e-mail already being
-# used, and for others the error is entering the e-mail being unused.
-# If this option is enabled, instead of returning an error, these endpoints will
-# act as if no error happened and return a fake session ID ('sid') to clients.
-#
-#request_token_inhibit_3pid_errors: true
-
-# A list of domains that the domain portion of 'next_link' parameters
-# must match.
-#
-# This parameter is optionally provided by clients while requesting
-# validation of an email or phone number, and maps to a link that
-# users will be automatically redirected to after validation
-# succeeds. Clients can make use this parameter to aid the validation
-# process.
-#
-# The whitelist is applied whether the homeserver or an
-# identity server is handling validation.
-#
-# The default value is no whitelist functionality; all domains are
-# allowed. Setting this value to an empty list will instead disallow
-# all domains.
-#
-#next_link_domain_whitelist: ["matrix.org"]
-
 
 ## TLS ##
 
@@ -609,8 +669,8 @@ retention:
 #
 #federation_certificate_verification_whitelist:
 #  - lon.example.com
-#  - *.domain.com
-#  - *.onion
+#  - "*.domain.com"
+#  - "*.onion"
 
 # List of custom certificate authorities for federation traffic.
 #
@@ -656,11 +716,11 @@ retention:
 #
 #allow_profile_lookup_over_federation: false
 
-# Uncomment to disable device display name lookup over federation. By default, the
-# Federation API allows other homeservers to obtain device display names of any user
-# on this homeserver. Defaults to 'true'.
+# Uncomment to allow device display name lookup over federation. By default, the
+# Federation API prevents other homeservers from obtaining the display names of
+# user devices on this homeserver. Defaults to 'false'.
 #
-#allow_device_name_lookup_over_federation: false
+#allow_device_name_lookup_over_federation: true
 
 
 ## Caching ##
@@ -670,6 +730,12 @@ retention:
 # A cache 'factor' is a multiplier that can be applied to each of
 # Synapse's caches in order to increase or decrease the maximum
 # number of entries that can be stored.
+#
+# The configuration for cache factors (caches.global_factor and
+# caches.per_cache_factors) can be reloaded while the application is running,
+# by sending a SIGHUP signal to the Synapse process. Changes to other parts of
+# the caching config will NOT be applied after a SIGHUP is received; a restart
+# is necessary.
 
 # The number of events to cache in memory. Not affected by
 # caches.global_factor.
@@ -707,11 +773,16 @@ caches:
   per_cache_factors:
     #get_users_who_share_room_with_user: 2.0
 
-  # Controls how long an entry can be in a cache without having been
-  # accessed before being evicted. Defaults to None, which means
-  # entries are never evicted based on time.
+  # Controls whether cache entries are evicted after a specified time
+  # period. Defaults to true. Uncomment to disable this feature.
   #
-  #expiry_time: 30m
+  #expire_caches: false
+
+  # If expire_caches is enabled, this flag controls how long an entry can
+  # be in a cache without having been accessed before being evicted.
+  # Defaults to 30m. Uncomment to set a different time to live for cache entries.
+  #
+  #cache_entry_ttl: 30m
 
   # Controls how long the results of a /sync request are cached for after
   # a successful response is returned. A higher duration can help clients with
@@ -733,6 +804,12 @@ caches:
 #
 # 'txn_limit' gives the maximum number of transactions to run per connection
 # before reconnecting. Defaults to 0, which means no limit.
+#
+# 'allow_unsafe_locale' is an option specific to Postgres. Under the default behavior, Synapse will refuse to
+# start if the postgres db is set to a non-C locale. You can override this behavior (which is *not* recommended)
+# by setting 'allow_unsafe_locale' to true. Note that doing so may corrupt your database. You can find more information
+# here: https://matrix-org.github.io/synapse/latest/postgres.html#fixing-incorrect-collate-or-ctype and here:
+# https://wiki.postgresql.org/wiki/Locale_data_changes
 #
 # 'args' gives options which are passed through to the database engine,
 # except for options starting 'cp_', which are used to configure the Twisted
@@ -794,6 +871,8 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #     is using
 #   - one for registration that ratelimits registration requests based on the
 #     client's IP address.
+#   - one for checking the validity of registration tokens that ratelimits
+#     requests based on the client's IP address.
 #   - one for login that ratelimits login requests based on the client's IP
 #     address.
 #   - one for login that ratelimits login requests based on the account the
@@ -811,6 +890,9 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #   - one for ratelimiting how often a user or IP can attempt to validate a 3PID.
 #   - two for ratelimiting how often invites can be sent in a room or to a
 #     specific user.
+#   - one for ratelimiting 3PID invites (i.e. invites sent to a third-party ID
+#     such as an email address or a phone number) based on the account that's
+#     sending the invite.
 #
 # The defaults are as shown below.
 #
@@ -821,6 +903,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #rc_registration:
 #  per_second: 0.17
 #  burst_count: 3
+#
+#rc_registration_token_validity:
+#  per_second: 0.1
+#  burst_count: 5
 #
 #rc_login:
 #  address:
@@ -856,6 +942,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #  per_user:
 #    per_second: 0.003
 #    burst_count: 5
+#
+#rc_third_party_invite:
+#  per_second: 0.2
+#  burst_count: 10
 
 # Ratelimiting settings for incoming federation
 #
@@ -1070,6 +1160,27 @@ url_preview_accept_language:
 #   - en
 
 
+# oEmbed allows for easier embedding content from a website. It can be
+# used for generating URLs previews of services which support it.
+#
+oembed:
+  # A default list of oEmbed providers is included with Synapse.
+  #
+  # Uncomment the following to disable using these default oEmbed URLs.
+  # Defaults to 'false'.
+  #
+  #disable_default_providers: true
+
+  # Additional files with oEmbed configuration (each should be in the
+  # form of providers.json).
+  #
+  # By default, this list is empty (so only the default providers.json
+  # is used).
+  #
+  #additional_providers:
+  #  - oembed/my_providers.json
+
+
 ## Captcha ##
 # See docs/CAPTCHA_SETUP.md for full details of configuring this.
 
@@ -1129,9 +1240,17 @@ url_preview_accept_language:
 # Registration can be rate-limited using the parameters in the "Ratelimiting"
 # section of this file.
 
-# Enable registration for new users.
+# Enable registration for new users. Defaults to 'false'. It is highly recommended that if you enable registration,
+# you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration
+# without any verification, you must also set `enable_registration_without_verification`, found below.
 #
 #enable_registration: false
+
+# Enable registration without email or captcha verification. Note: this option is *not* recommended,
+# as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
+# unless `enable_registration` is also enabled.
+#
+#enable_registration_without_verification: true
 
 # Time that a user's session remains valid for, after they log in.
 #
@@ -1143,6 +1262,44 @@ url_preview_accept_language:
 # By default, this is infinite.
 #
 #session_lifetime: 24h
+
+# Time that an access token remains valid for, if the session is
+# using refresh tokens.
+# For more information about refresh tokens, please see the manual.
+# Note that this only applies to clients which advertise support for
+# refresh tokens.
+#
+# Note also that this is calculated at login time and refresh time:
+# changes are not applied to existing sessions until they are refreshed.
+#
+# By default, this is 5 minutes.
+#
+#refreshable_access_token_lifetime: 5m
+
+# Time that a refresh token remains valid for (provided that it is not
+# exchanged for another one first).
+# This option can be used to automatically log-out inactive sessions.
+# Please see the manual for more information.
+#
+# Note also that this is calculated at login time and refresh time:
+# changes are not applied to existing sessions until they are refreshed.
+#
+# By default, this is infinite.
+#
+#refresh_token_lifetime: 24h
+
+# Time that an access token remains valid for, if the session is NOT
+# using refresh tokens.
+# Please note that not all clients support refresh tokens, so setting
+# this to a short value may be inconvenient for some users who will
+# then be logged out frequently.
+#
+# Note also that this is calculated at login time: changes are not applied
+# retrospectively to existing sessions for users that have already logged in.
+#
+# By default, this is infinite.
+#
+#nonrefreshable_access_token_lifetime: 24h
 
 # The user must provide all of the below types of 3PID when registering.
 #
@@ -1170,6 +1327,21 @@ url_preview_accept_language:
 #
 #enable_3pid_lookup: true
 
+# Require users to submit a token during registration.
+# Tokens can be managed using the admin API:
+# https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/registration_tokens.html
+# Note that `enable_registration` must be set to `true`.
+# Disabling this option will not delete any tokens previously generated.
+# Defaults to false. Uncomment the following to require tokens:
+#
+#registration_requires_token: true
+
+# Allow users to submit a token during registration to bypass any required 3pid
+# steps configured in `registrations_require_3pid`.
+# Defaults to false, requiring that registration tokens (if enabled) complete a 3pid flow.
+#
+#enable_registration_token_3pid_bypass: false
+
 # If set, allows registration of standard or admin accounts by anyone who
 # has the shared secret, even if registration is otherwise disabled.
 #
@@ -1193,7 +1365,7 @@ url_preview_accept_language:
 # in on this server.
 #
 # (By default, no suggestion is made, so it is left up to the client.
-# This setting is ignored unless public_baseurl is also set.)
+# This setting is ignored unless public_baseurl is also explicitly set.)
 #
 #default_identity_server: https://matrix.org
 
@@ -1217,8 +1389,6 @@ url_preview_accept_language:
 # Servers handling the these requests must answer the `/requestToken` endpoints defined
 # by the Matrix Identity Service API specification:
 # https://matrix.org/docs/spec/identity_service/latest
-#
-# If a delegate is specified, the config option public_baseurl must also be filled out.
 #
 account_threepid_delegates:
     #email: https://example.com     # Delegate email sending to example.com
@@ -1326,6 +1496,16 @@ account_threepid_delegates:
 #
 #auto_join_rooms_for_guests: false
 
+# Whether to inhibit errors raised when registering a new account if the user ID
+# already exists. If turned on, that requests to /register/available will always
+# show a user ID as available, and Synapse won't raise an error when starting
+# a registration with a user ID that already exists. However, Synapse will still
+# raise an error if the registration completes and the username conflicts.
+#
+# Defaults to false.
+#
+#inhibit_user_in_use_error: true
+
 
 ## Metrics ###
 
@@ -1378,6 +1558,7 @@ room_prejoin_state:
    # - m.room.encryption
    # - m.room.name
    # - m.room.create
+   # - m.room.topic
    #
    # Uncomment the following to disable these defaults (so that only the event
    # types listed in 'additional_event_types' are shared). Defaults to 'false'.
@@ -1391,6 +1572,21 @@ room_prejoin_state:
    #
    #additional_event_types:
    #  - org.example.custom.event.type
+
+# We record the IP address of clients used to access the API for various
+# reasons, including displaying it to the user in the "Where you're signed in"
+# dialog.
+#
+# By default, when puppeting another user via the admin API, the client IP
+# address is recorded against the user who created the access token (ie, the
+# admin user), and *not* the puppeted user.
+#
+# Uncomment the following to also record the IP address against the puppeted
+# user. (This also means that the puppeted user will count as an "active" user
+# for the purpose of monthly active user tracking - see 'limit_usage_by_mau' etc
+# above.)
+#
+#track_puppeted_user_ips: true
 
 
 # A list of application service config files to use
@@ -1759,10 +1955,13 @@ saml2_config:
 #       Defaults to false. Avoid this in production.
 #
 #   user_profile_method: Whether to fetch the user profile from the userinfo
-#       endpoint. Valid values are: 'auto' or 'userinfo_endpoint'.
+#       endpoint, or to rely on the data returned in the id_token from the
+#       token_endpoint.
 #
-#       Defaults to 'auto', which fetches the userinfo endpoint if 'openid' is
-#       included in 'scopes'. Set to 'userinfo_endpoint' to always fetch the
+#       Valid values are: 'auto' or 'userinfo_endpoint'.
+#
+#       Defaults to 'auto', which uses the userinfo endpoint if 'openid' is
+#       not included in 'scopes'. Set to 'userinfo_endpoint' to always use the
 #       userinfo endpoint.
 #
 #   allow_existing_users: set to 'true' to allow a user logging in via OIDC to
@@ -1790,8 +1989,14 @@ saml2_config:
 #
 #             localpart_template: Jinja2 template for the localpart of the MXID.
 #                 If this is not set, the user will be prompted to choose their
-#                 own username (see 'sso_auth_account_details.html' in the 'sso'
-#                 section of this file).
+#                 own username (see the documentation for the
+#                 'sso_auth_account_details.html' template). This template can
+#                 use the 'localpart_from_email' filter.
+#
+#             confirm_localpart: Whether to prompt the user to validate (or
+#                 change) the generated localpart (see the documentation for the
+#                 'sso_auth_account_details.html' template), instead of
+#                 registering the account right away.
 #
 #             display_name_template: Jinja2 template for the display name to set
 #                 on first login. If unset, no displayname will be set.
@@ -1895,6 +2100,9 @@ cas_config:
 # Additional settings to use with single-sign on systems such as OpenID Connect,
 # SAML2 and CAS.
 #
+# Server admins can configure custom templates for pages related to SSO. See
+# https://matrix-org.github.io/synapse/latest/templates.html for more information.
+#
 sso:
     # A list of client URLs which are whitelisted so that the user does not
     # have to confirm giving access to their account to the URL. Any client
@@ -1906,11 +2114,10 @@ sso:
     # phishing attacks from evil.site. To avoid this, include a slash after the
     # hostname: "https://my.client/".
     #
-    # If public_baseurl is set, then the login fallback page (used by clients
-    # that don't natively support the required login flows) is whitelisted in
-    # addition to any URLs in this list.
+    # The login fallback page (used by clients that don't natively support the
+    # required login flows) is whitelisted in addition to any URLs in this list.
     #
-    # By default, this list is empty.
+    # By default, this list contains only the login fallback page.
     #
     #client_whitelist:
     #  - https://riot.im/develop
@@ -1926,169 +2133,6 @@ sso:
     # information when first signing in. Defaults to false.
     #
     #update_profile_information: true
-
-    # Directory in which Synapse will try to find the template files below.
-    # If not set, or the files named below are not found within the template
-    # directory, default templates from within the Synapse package will be used.
-    #
-    # Synapse will look for the following templates in this directory:
-    #
-    # * HTML page to prompt the user to choose an Identity Provider during
-    #   login: 'sso_login_idp_picker.html'.
-    #
-    #   This is only used if multiple SSO Identity Providers are configured.
-    #
-    #   When rendering, this template is given the following variables:
-    #     * redirect_url: the URL that the user will be redirected to after
-    #       login.
-    #
-    #     * server_name: the homeserver's name.
-    #
-    #     * providers: a list of available Identity Providers. Each element is
-    #       an object with the following attributes:
-    #
-    #         * idp_id: unique identifier for the IdP
-    #         * idp_name: user-facing name for the IdP
-    #         * idp_icon: if specified in the IdP config, an MXC URI for an icon
-    #              for the IdP
-    #         * idp_brand: if specified in the IdP config, a textual identifier
-    #              for the brand of the IdP
-    #
-    #   The rendered HTML page should contain a form which submits its results
-    #   back as a GET request, with the following query parameters:
-    #
-    #     * redirectUrl: the client redirect URI (ie, the `redirect_url` passed
-    #       to the template)
-    #
-    #     * idp: the 'idp_id' of the chosen IDP.
-    #
-    # * HTML page to prompt new users to enter a userid and confirm other
-    #   details: 'sso_auth_account_details.html'. This is only shown if the
-    #   SSO implementation (with any user_mapping_provider) does not return
-    #   a localpart.
-    #
-    #   When rendering, this template is given the following variables:
-    #
-    #     * server_name: the homeserver's name.
-    #
-    #     * idp: details of the SSO Identity Provider that the user logged in
-    #       with: an object with the following attributes:
-    #
-    #         * idp_id: unique identifier for the IdP
-    #         * idp_name: user-facing name for the IdP
-    #         * idp_icon: if specified in the IdP config, an MXC URI for an icon
-    #              for the IdP
-    #         * idp_brand: if specified in the IdP config, a textual identifier
-    #              for the brand of the IdP
-    #
-    #     * user_attributes: an object containing details about the user that
-    #       we received from the IdP. May have the following attributes:
-    #
-    #         * display_name: the user's display_name
-    #         * emails: a list of email addresses
-    #
-    #   The template should render a form which submits the following fields:
-    #
-    #     * username: the localpart of the user's chosen user id
-    #
-    # * HTML page allowing the user to consent to the server's terms and
-    #   conditions. This is only shown for new users, and only if
-    #   `user_consent.require_at_registration` is set.
-    #
-    #   When rendering, this template is given the following variables:
-    #
-    #     * server_name: the homeserver's name.
-    #
-    #     * user_id: the user's matrix proposed ID.
-    #
-    #     * user_profile.display_name: the user's proposed display name, if any.
-    #
-    #     * consent_version: the version of the terms that the user will be
-    #       shown
-    #
-    #     * terms_url: a link to the page showing the terms.
-    #
-    #   The template should render a form which submits the following fields:
-    #
-    #     * accepted_version: the version of the terms accepted by the user
-    #       (ie, 'consent_version' from the input variables).
-    #
-    # * HTML page for a confirmation step before redirecting back to the client
-    #   with the login token: 'sso_redirect_confirm.html'.
-    #
-    #   When rendering, this template is given the following variables:
-    #
-    #     * redirect_url: the URL the user is about to be redirected to.
-    #
-    #     * display_url: the same as `redirect_url`, but with the query
-    #                    parameters stripped. The intention is to have a
-    #                    human-readable URL to show to users, not to use it as
-    #                    the final address to redirect to.
-    #
-    #     * server_name: the homeserver's name.
-    #
-    #     * new_user: a boolean indicating whether this is the user's first time
-    #          logging in.
-    #
-    #     * user_id: the user's matrix ID.
-    #
-    #     * user_profile.avatar_url: an MXC URI for the user's avatar, if any.
-    #           None if the user has not set an avatar.
-    #
-    #     * user_profile.display_name: the user's display name. None if the user
-    #           has not set a display name.
-    #
-    # * HTML page which notifies the user that they are authenticating to confirm
-    #   an operation on their account during the user interactive authentication
-    #   process: 'sso_auth_confirm.html'.
-    #
-    #   When rendering, this template is given the following variables:
-    #     * redirect_url: the URL the user is about to be redirected to.
-    #
-    #     * description: the operation which the user is being asked to confirm
-    #
-    #     * idp: details of the Identity Provider that we will use to confirm
-    #       the user's identity: an object with the following attributes:
-    #
-    #         * idp_id: unique identifier for the IdP
-    #         * idp_name: user-facing name for the IdP
-    #         * idp_icon: if specified in the IdP config, an MXC URI for an icon
-    #              for the IdP
-    #         * idp_brand: if specified in the IdP config, a textual identifier
-    #              for the brand of the IdP
-    #
-    # * HTML page shown after a successful user interactive authentication session:
-    #   'sso_auth_success.html'.
-    #
-    #   Note that this page must include the JavaScript which notifies of a successful authentication
-    #   (see https://matrix.org/docs/spec/client_server/r0.6.0#fallback).
-    #
-    #   This template has no additional variables.
-    #
-    # * HTML page shown after a user-interactive authentication session which
-    #   does not map correctly onto the expected user: 'sso_auth_bad_user.html'.
-    #
-    #   When rendering, this template is given the following variables:
-    #     * server_name: the homeserver's name.
-    #     * user_id_to_verify: the MXID of the user that we are trying to
-    #       validate.
-    #
-    # * HTML page shown during single sign-on if a deactivated user (according to Synapse's database)
-    #   attempts to login: 'sso_account_deactivated.html'.
-    #
-    #   This template has no additional variables.
-    #
-    # * HTML page to display to users if something goes wrong during the
-    #   OpenID Connect authentication process: 'sso_error.html'.
-    #
-    #   When rendering, this template is given two variables:
-    #     * error: the technical name of the error
-    #     * error_description: a human-readable message for the error
-    #
-    # You can see the default templates at:
-    # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
-    #
-    #template_dir: "res/templates"
 
 
 # JSON web token integration. The following settings can be used to make
@@ -2127,6 +2171,12 @@ sso:
     # Required if 'enabled' is true.
     #
     #algorithm: "provided-by-your-issuer"
+
+    # Name of the claim containing a unique identifier for the user.
+    #
+    # Optional, defaults to `sub`.
+    #
+    #subject_claim: "sub"
 
     # The issuer to validate the "iss" claim against.
     #
@@ -2193,7 +2243,7 @@ password_config:
       #
       #require_lowercase: true
 
-      # Whether a password must contain at least one lowercase letter.
+      # Whether a password must contain at least one uppercase letter.
       # Defaults to 'false'.
       #
       #require_uppercase: true
@@ -2220,6 +2270,9 @@ ui_auth:
 
 # Configuration for sending emails from Synapse.
 #
+# Server admins can configure custom templates for email content. See
+# https://matrix-org.github.io/synapse/latest/templates.html for more information.
+#
 email:
   # The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.
   #
@@ -2241,6 +2294,14 @@ email:
   # Synapse will refuse to connect unless the server supports STARTTLS.
   #
   #require_transport_security: true
+
+  # Uncomment the following to disable TLS for SMTP.
+  #
+  # By default, if the server supports TLS, it will be used, and the server
+  # must present a certificate that is valid for 'smtp_host'. If this option
+  # is set to false, TLS will not be used.
+  #
+  #enable_tls: false
 
   # notif_from defines the "From" address to use when sending emails.
   # It must be set if email sending is enabled.
@@ -2287,49 +2348,6 @@ email:
   # to unset, giving no guidance to the identity server.
   #
   #invite_client_location: https://app.element.io
-
-  # Directory in which Synapse will try to find the template files below.
-  # If not set, or the files named below are not found within the template
-  # directory, default templates from within the Synapse package will be used.
-  #
-  # Synapse will look for the following templates in this directory:
-  #
-  # * The contents of email notifications of missed events: 'notif_mail.html' and
-  #   'notif_mail.txt'.
-  #
-  # * The contents of account expiry notice emails: 'notice_expiry.html' and
-  #   'notice_expiry.txt'.
-  #
-  # * The contents of password reset emails sent by the homeserver:
-  #   'password_reset.html' and 'password_reset.txt'
-  #
-  # * An HTML page that a user will see when they follow the link in the password
-  #   reset email. The user will be asked to confirm the action before their
-  #   password is reset: 'password_reset_confirmation.html'
-  #
-  # * HTML pages for success and failure that a user will see when they confirm
-  #   the password reset flow using the page above: 'password_reset_success.html'
-  #   and 'password_reset_failure.html'
-  #
-  # * The contents of address verification emails sent during registration:
-  #   'registration.html' and 'registration.txt'
-  #
-  # * HTML pages for success and failure that a user will see when they follow
-  #   the link in an address verification email sent during registration:
-  #   'registration_success.html' and 'registration_failure.html'
-  #
-  # * The contents of address verification emails sent when an address is added
-  #   to a Matrix account: 'add_threepid.html' and 'add_threepid.txt'
-  #
-  # * HTML pages for success and failure that a user will see when they follow
-  #   the link in an address verification email sent when an address is added
-  #   to a Matrix account: 'add_threepid_success.html' and
-  #   'add_threepid_failure.html'
-  #
-  # You can see the default templates at:
-  # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
-  #
-  #template_dir: "res/templates"
 
   # Subjects to use when sending emails from Synapse.
   #
@@ -2399,34 +2417,6 @@ email:
     #email_validation: "[%(server_name)s] Validate your email"
 
 
-# Password providers allow homeserver administrators to integrate
-# their Synapse installation with existing authentication methods
-# ex. LDAP, external tokens, etc.
-#
-# For more information and known implementations, please see
-# https://matrix-org.github.io/synapse/latest/password_auth_providers.html
-#
-# Note: instances wishing to use SAML or CAS authentication should
-# instead use the `saml2_config` or `cas_config` options,
-# respectively.
-#
-password_providers:
-#    # Example config for an LDAP auth provider
-#    - module: "ldap_auth_provider.LdapAuthProvider"
-#      config:
-#        enabled: true
-#        uri: "ldap://ldap.example.com:389"
-#        start_tls: true
-#        base: "ou=users,dc=example,dc=com"
-#        attributes:
-#           uid: "cn"
-#           mail: "email"
-#           name: "givenName"
-#        #bind_dn:
-#        #bind_password:
-#        #filter: "(objectClass=posixAccount)"
-
-
 
 ## Push ##
 
@@ -2478,6 +2468,40 @@ push:
 #
 #encryption_enabled_by_default_for_room_type: invite
 
+# Override the default power levels for rooms created on this server, per
+# room creation preset.
+#
+# The appropriate dictionary for the room preset will be applied on top
+# of the existing power levels content.
+#
+# Useful if you know that your users need special permissions in rooms
+# that they create (e.g. to send particular types of state events without
+# needing an elevated power level).  This takes the same shape as the
+# `power_level_content_override` parameter in the /createRoom API, but
+# is applied before that parameter.
+#
+# Valid keys are some or all of `private_chat`, `trusted_private_chat`
+# and `public_chat`. Inside each of those should be any of the
+# properties allowed in `power_level_content_override` in the
+# /createRoom API. If any property is missing, its default value will
+# continue to be used. If any property is present, it will overwrite
+# the existing default completely (so if the `events` property exists,
+# the default event power levels will be ignored).
+#
+#default_power_level_content_override:
+#    private_chat:
+#        "events":
+#            "com.example.myeventtype" : 0
+#            "m.room.avatar": 50
+#            "m.room.canonical_alias": 50
+#            "m.room.encryption": 100
+#            "m.room.history_visibility": 100
+#            "m.room.name": 50
+#            "m.room.power_levels": 100
+#            "m.room.server_acl": 100
+#            "m.room.tombstone": 100
+#        "events_default": 1
+
 
 # Uncomment to allow non-server-admin users to create groups on this server
 #
@@ -2501,12 +2525,16 @@ user_directory:
     #enabled: false
 
     # Defines whether to search all users visible to your HS when searching
-    # the user directory, rather than limiting to users visible in public
-    # rooms. Defaults to false.
+    # the user directory. If false, search results will only contain users
+    # visible in public rooms and users sharing a room with the requester.
+    # Defaults to false.
     #
-    # If you set it true, you'll have to rebuild the user_directory search
-    # indexes, see:
-    # https://matrix-org.github.io/synapse/latest/user_directory.html
+    # NB. If you set this to true, and the last time the user_directory search
+    # indexes were (re)built was before Synapse 1.44, you'll have to
+    # rebuild the indexes in order to search through all known users.
+    # These indexes are built the first time Synapse starts; admins can
+    # manually trigger a rebuild via API following the instructions at
+    #     https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/background_updates.html#run
     #
     # Uncomment to return search results containing all known users, even if that
     # user does not share a room with the requester.
@@ -2783,3 +2811,35 @@ redis:
   # Optional password if configured on the Redis instance
   #
   #password: <secret_password>
+
+
+## Background Updates ##
+
+# Background updates are database updates that are run in the background in batches.
+# The duration, minimum batch size, default batch size, whether to sleep between batches and if so, how long to
+# sleep can all be configured. This is helpful to speed up or slow down the updates.
+#
+background_updates:
+    # How long in milliseconds to run a batch of background updates for. Defaults to 100. Uncomment and set
+    # a time to change the default.
+    #
+    #background_update_duration_ms: 500
+
+    # Whether to sleep between updates. Defaults to True. Uncomment to change the default.
+    #
+    #sleep_enabled: false
+
+    # If sleeping between updates, how long in milliseconds to sleep for. Defaults to 1000. Uncomment
+    # and set a duration to change the default.
+    #
+    #sleep_duration_ms: 300
+
+    # Minimum size a batch of background updates can be. Must be greater than 0. Defaults to 1. Uncomment and
+    # set a size to change the default.
+    #
+    #min_batch_size: 10
+
+    # The batch size to use for the first iteration of a new background update. The default is 100.
+    # Uncomment and set a size to change the default.
+    #
+    #default_batch_size: 50

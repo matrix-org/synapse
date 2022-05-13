@@ -14,22 +14,31 @@
 
 from unittest.mock import Mock, patch
 
+from twisted.test.proto_helpers import MemoryReactor
+
 import synapse.rest.admin
 from synapse.api.constants import EventTypes
-from synapse.rest.client.v1 import directory, login, profile, room
-from synapse.rest.client.v2_alpha import room_upgrade_rest_servlet
+from synapse.rest.client import (
+    directory,
+    login,
+    profile,
+    room,
+    room_upgrade_rest_servlet,
+)
+from synapse.server import HomeServer
 from synapse.types import UserID
+from synapse.util import Clock
 
 from tests import unittest
 
 
 class _ShadowBannedBase(unittest.HomeserverTestCase):
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         # Create two users, one of which is shadow-banned.
         self.banned_user_id = self.register_user("banned", "test")
         self.banned_access_token = self.login("banned", "test")
 
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
 
         self.get_success(
             self.store.set_shadow_banned(UserID.from_string(self.banned_user_id), True)
@@ -50,7 +59,7 @@ class RoomTestCase(_ShadowBannedBase):
         room_upgrade_rest_servlet.register_servlets,
     ]
 
-    def test_invite(self):
+    def test_invite(self) -> None:
         """Invites from shadow-banned users don't actually get sent."""
 
         # The create works fine.
@@ -72,7 +81,7 @@ class RoomTestCase(_ShadowBannedBase):
         )
         self.assertEqual(invited_rooms, [])
 
-    def test_invite_3pid(self):
+    def test_invite_3pid(self) -> None:
         """Ensure that a 3PID invite does not attempt to contact the identity server."""
         identity_handler = self.hs.get_identity_handler()
         identity_handler.lookup_3pid = Mock(
@@ -91,12 +100,12 @@ class RoomTestCase(_ShadowBannedBase):
             {"id_server": "test", "medium": "email", "address": "test@test.test"},
             access_token=self.banned_access_token,
         )
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
 
         # This should have raised an error earlier, but double check this wasn't called.
         identity_handler.lookup_3pid.assert_not_called()
 
-    def test_create_room(self):
+    def test_create_room(self) -> None:
         """Invitations during a room creation should be discarded, but the room still gets created."""
         # The room creation is successful.
         channel = self.make_request(
@@ -105,7 +114,7 @@ class RoomTestCase(_ShadowBannedBase):
             {"visibility": "public", "invite": [self.other_user_id]},
             access_token=self.banned_access_token,
         )
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
         room_id = channel.json_body["room_id"]
 
         # But the user wasn't actually invited.
@@ -121,7 +130,7 @@ class RoomTestCase(_ShadowBannedBase):
         users = self.get_success(self.store.get_users_in_room(room_id))
         self.assertCountEqual(users, ["@banned:test", "@otheruser:test"])
 
-    def test_message(self):
+    def test_message(self) -> None:
         """Messages from shadow-banned users don't actually get sent."""
 
         room_id = self.helper.create_room_as(
@@ -146,7 +155,7 @@ class RoomTestCase(_ShadowBannedBase):
         )
         self.assertNotIn(event_id, latest_events)
 
-    def test_upgrade(self):
+    def test_upgrade(self) -> None:
         """A room upgrade should fail, but look like it succeeded."""
 
         # The create works fine.
@@ -160,7 +169,7 @@ class RoomTestCase(_ShadowBannedBase):
             {"new_version": "6"},
             access_token=self.banned_access_token,
         )
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
         # A new room_id should be returned.
         self.assertIn("replacement_room", channel.json_body)
 
@@ -172,7 +181,7 @@ class RoomTestCase(_ShadowBannedBase):
         # The summary should be empty since the room doesn't exist.
         self.assertEqual(summary, {})
 
-    def test_typing(self):
+    def test_typing(self) -> None:
         """Typing notifications should not be propagated into the room."""
         # The create works fine.
         room_id = self.helper.create_room_as(
@@ -185,11 +194,11 @@ class RoomTestCase(_ShadowBannedBase):
             {"typing": True, "timeout": 30000},
             access_token=self.banned_access_token,
         )
-        self.assertEquals(200, channel.code)
+        self.assertEqual(200, channel.code)
 
         # There should be no typing events.
-        event_source = self.hs.get_event_sources().sources["typing"]
-        self.assertEquals(event_source.get_current_key(), 0)
+        event_source = self.hs.get_event_sources().sources.typing
+        self.assertEqual(event_source.get_current_key(), 0)
 
         # The other user can join and send typing events.
         self.helper.join(room_id, self.other_user_id, tok=self.other_access_token)
@@ -200,14 +209,20 @@ class RoomTestCase(_ShadowBannedBase):
             {"typing": True, "timeout": 30000},
             access_token=self.other_access_token,
         )
-        self.assertEquals(200, channel.code)
+        self.assertEqual(200, channel.code)
 
         # These appear in the room.
-        self.assertEquals(event_source.get_current_key(), 1)
+        self.assertEqual(event_source.get_current_key(), 1)
         events = self.get_success(
-            event_source.get_new_events(from_key=0, room_ids=[room_id])
+            event_source.get_new_events(
+                user=UserID.from_string(self.other_user_id),
+                from_key=0,
+                limit=None,
+                room_ids=[room_id],
+                is_guest=False,
+            )
         )
-        self.assertEquals(
+        self.assertEqual(
             events[0],
             [
                 {
@@ -229,7 +244,7 @@ class ProfileTestCase(_ShadowBannedBase):
         room.register_servlets,
     ]
 
-    def test_displayname(self):
+    def test_displayname(self) -> None:
         """Profile changes should succeed, but don't end up in a room."""
         original_display_name = "banned"
         new_display_name = "new name"
@@ -246,7 +261,7 @@ class ProfileTestCase(_ShadowBannedBase):
             {"displayname": new_display_name},
             access_token=self.banned_access_token,
         )
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
         self.assertEqual(channel.json_body, {})
 
         # The user's display name should be updated.
@@ -270,7 +285,7 @@ class ProfileTestCase(_ShadowBannedBase):
             event.content, {"membership": "join", "displayname": original_display_name}
         )
 
-    def test_room_displayname(self):
+    def test_room_displayname(self) -> None:
         """Changes to state events for a room should be processed, but not end up in the room."""
         original_display_name = "banned"
         new_display_name = "new name"
@@ -288,7 +303,7 @@ class ProfileTestCase(_ShadowBannedBase):
             {"membership": "join", "displayname": new_display_name},
             access_token=self.banned_access_token,
         )
-        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(200, channel.code, channel.result)
         self.assertIn("event_id", channel.json_body)
 
         # The display name in the room should not be changed.

@@ -11,9 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import base64
 import logging
-from typing import Optional
-from unittest.mock import Mock
+import os
+from typing import Iterable, Optional
+from unittest.mock import Mock, patch
 
 import treq
 from netaddr import IPSet
@@ -22,11 +24,12 @@ from zope.interface import implementer
 
 from twisted.internet import defer
 from twisted.internet._sslverify import ClientTLSOptions, OpenSSLCertificateOptions
+from twisted.internet.interfaces import IProtocolFactory
 from twisted.internet.protocol import Factory
-from twisted.protocols.tls import TLSMemoryBIOFactory
+from twisted.protocols.tls import TLSMemoryBIOFactory, TLSMemoryBIOProtocol
 from twisted.web._newclient import ResponseNeverReceived
 from twisted.web.client import Agent
-from twisted.web.http import HTTPChannel
+from twisted.web.http import HTTPChannel, Request
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IPolicyForHTTPS
 
@@ -48,24 +51,6 @@ from tests.server import FakeTransport, ThreadedMemoryReactorClock
 from tests.utils import default_config
 
 logger = logging.getLogger(__name__)
-
-test_server_connection_factory = None
-
-
-def get_connection_factory():
-    # this needs to happen once, but not until we are ready to run the first test
-    global test_server_connection_factory
-    if test_server_connection_factory is None:
-        test_server_connection_factory = TestServerTLSConnectionFactory(
-            sanlist=[
-                b"DNS:testserv",
-                b"DNS:target-server",
-                b"DNS:xn--bcher-kva.com",
-                b"IP:1.2.3.4",
-                b"IP:::1",
-            ]
-        )
-    return test_server_connection_factory
 
 
 # Once Async Mocks or lambdas are supported this can go away.
@@ -100,24 +85,38 @@ class MatrixFederationAgentTests(unittest.TestCase):
             had_well_known_cache=self.had_well_known_cache,
         )
 
-        self.agent = MatrixFederationAgent(
-            reactor=self.reactor,
-            tls_client_options_factory=self.tls_factory,
-            user_agent="test-agent",  # Note that this is unused since _well_known_resolver is provided.
-            ip_blacklist=IPSet(),
-            _srv_resolver=self.mock_resolver,
-            _well_known_resolver=self.well_known_resolver,
-        )
-
-    def _make_connection(self, client_factory, expected_sni):
+    def _make_connection(
+        self,
+        client_factory: IProtocolFactory,
+        ssl: bool = True,
+        expected_sni: bytes = None,
+        tls_sanlist: Optional[Iterable[bytes]] = None,
+    ) -> HTTPChannel:
         """Builds a test server, and completes the outgoing client connection
+        Args:
+            client_factory: the the factory that the
+                application is trying to use to make the outbound connection. We will
+                invoke it to build the client Protocol
+
+            ssl: If true, we will expect an ssl connection and wrap
+                server_factory with a TLSMemoryBIOFactory
+                False is set only for when proxy expect http connection.
+                Otherwise federation requests use always https.
+
+            expected_sni: the expected SNI value
+
+            tls_sanlist: list of SAN entries for the TLS cert presented by the server.
 
         Returns:
-            HTTPChannel: the test server
+            the server Protocol returned by server_factory
         """
 
         # build the test server
-        server_tls_protocol = _build_test_server(get_connection_factory())
+        server_factory = _get_test_protocol_factory()
+        if ssl:
+            server_factory = _wrap_server_factory_for_tls(server_factory, tls_sanlist)
+
+        server_protocol = server_factory.buildProtocol(None)
 
         # now, tell the client protocol factory to build the client protocol (it will be a
         # _WrappingProtocol, around a TLSMemoryBIOProtocol, around an
@@ -128,35 +127,39 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # stubbing that out here.
         client_protocol = client_factory.buildProtocol(None)
         client_protocol.makeConnection(
-            FakeTransport(server_tls_protocol, self.reactor, client_protocol)
+            FakeTransport(server_protocol, self.reactor, client_protocol)
         )
 
-        # tell the server tls protocol to send its stuff back to the client, too
-        server_tls_protocol.makeConnection(
-            FakeTransport(client_protocol, self.reactor, server_tls_protocol)
+        # tell the server protocol to send its stuff back to the client, too
+        server_protocol.makeConnection(
+            FakeTransport(client_protocol, self.reactor, server_protocol)
         )
 
-        # grab a hold of the TLS connection, in case it gets torn down
-        server_tls_connection = server_tls_protocol._tlsConnection
+        if ssl:
+            # fish the test server back out of the server-side TLS protocol.
+            http_protocol = server_protocol.wrappedProtocol
+            # grab a hold of the TLS connection, in case it gets torn down
+            tls_connection = server_protocol._tlsConnection
+        else:
+            http_protocol = server_protocol
+            tls_connection = None
 
-        # fish the test server back out of the server-side TLS protocol.
-        http_protocol = server_tls_protocol.wrappedProtocol
-
-        # give the reactor a pump to get the TLS juices flowing.
-        self.reactor.pump((0.1,))
+        # give the reactor a pump to get the TLS juices flowing (if needed)
+        self.reactor.advance(0)
 
         # check the SNI
-        server_name = server_tls_connection.get_servername()
-        self.assertEqual(
-            server_name,
-            expected_sni,
-            "Expected SNI %s but got %s" % (expected_sni, server_name),
-        )
+        if expected_sni is not None:
+            server_name = tls_connection.get_servername()
+            self.assertEqual(
+                server_name,
+                expected_sni,
+                f"Expected SNI {expected_sni!s} but got {server_name!s}",
+            )
 
         return http_protocol
 
     @defer.inlineCallbacks
-    def _make_get_request(self, uri):
+    def _make_get_request(self, uri: bytes):
         """
         Sends a simple GET request via the agent, and checks its logcontext management
         """
@@ -180,20 +183,20 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
     def _handle_well_known_connection(
         self,
-        client_factory,
-        expected_sni,
-        content,
+        client_factory: IProtocolFactory,
+        expected_sni: bytes,
+        content: bytes,
         response_headers: Optional[dict] = None,
-    ):
+    ) -> HTTPChannel:
         """Handle an outgoing HTTPs connection: wire it up to a server, check that the
         request is for a .well-known, and send the response.
 
         Args:
-            client_factory (IProtocolFactory): outgoing connection
-            expected_sni (bytes): SNI that we expect the outgoing connection to send
-            content (bytes): content to send back as the .well-known
+            client_factory: outgoing connection
+            expected_sni: SNI that we expect the outgoing connection to send
+            content: content to send back as the .well-known
         Returns:
-            HTTPChannel: server impl
+            server impl
         """
         # make the connection for .well-known
         well_known_server = self._make_connection(
@@ -209,7 +212,10 @@ class MatrixFederationAgentTests(unittest.TestCase):
         return well_known_server
 
     def _send_well_known_response(
-        self, request, content, headers: Optional[dict] = None
+        self,
+        request: Request,
+        content: bytes,
+        headers: Optional[dict] = None,
     ):
         """Check that an incoming request looks like a valid .well-known request, and
         send back the response.
@@ -225,10 +231,37 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
         self.reactor.pump((0.1,))
 
+    def _make_agent(self) -> MatrixFederationAgent:
+        """
+        If a proxy server is set, the MatrixFederationAgent must be created again
+        because it is created too early during setUp
+        """
+        return MatrixFederationAgent(
+            reactor=self.reactor,
+            tls_client_options_factory=self.tls_factory,
+            user_agent="test-agent",  # Note that this is unused since _well_known_resolver is provided.
+            ip_whitelist=IPSet(),
+            ip_blacklist=IPSet(),
+            _srv_resolver=self.mock_resolver,
+            _well_known_resolver=self.well_known_resolver,
+        )
+
     def test_get(self):
-        """
-        happy-path test of a GET request with an explicit port
-        """
+        """happy-path test of a GET request with an explicit port"""
+        self._do_get()
+
+    @patch.dict(
+        os.environ,
+        {"https_proxy": "proxy.com", "no_proxy": "testserv"},
+    )
+    def test_get_bypass_proxy(self):
+        """test of a GET request with an explicit port and bypass proxy"""
+        self._do_get()
+
+    def _do_get(self):
+        """test of a GET request with an explicit port"""
+        self.agent = self._make_agent()
+
         self.reactor.lookups["testserv"] = "1.2.3.4"
         test_d = self._make_get_request(b"matrix://testserv:8448/foo/bar")
 
@@ -282,10 +315,188 @@ class MatrixFederationAgentTests(unittest.TestCase):
         json = self.successResultOf(treq.json_content(response))
         self.assertEqual(json, {"a": 1})
 
+    @patch.dict(
+        os.environ, {"https_proxy": "http://proxy.com", "no_proxy": "unused.com"}
+    )
+    def test_get_via_http_proxy(self):
+        """test for federation request through a http proxy"""
+        self._do_get_via_proxy(expect_proxy_ssl=False, expected_auth_credentials=None)
+
+    @patch.dict(
+        os.environ,
+        {"https_proxy": "http://user:pass@proxy.com", "no_proxy": "unused.com"},
+    )
+    def test_get_via_http_proxy_with_auth(self):
+        """test for federation request through a http proxy with authentication"""
+        self._do_get_via_proxy(
+            expect_proxy_ssl=False, expected_auth_credentials=b"user:pass"
+        )
+
+    @patch.dict(
+        os.environ, {"https_proxy": "https://proxy.com", "no_proxy": "unused.com"}
+    )
+    def test_get_via_https_proxy(self):
+        """test for federation request through a https proxy"""
+        self._do_get_via_proxy(expect_proxy_ssl=True, expected_auth_credentials=None)
+
+    @patch.dict(
+        os.environ,
+        {"https_proxy": "https://user:pass@proxy.com", "no_proxy": "unused.com"},
+    )
+    def test_get_via_https_proxy_with_auth(self):
+        """test for federation request through a https proxy with authentication"""
+        self._do_get_via_proxy(
+            expect_proxy_ssl=True, expected_auth_credentials=b"user:pass"
+        )
+
+    def _do_get_via_proxy(
+        self,
+        expect_proxy_ssl: bool = False,
+        expected_auth_credentials: Optional[bytes] = None,
+    ):
+        """Send a https federation request via an agent and check that it is correctly
+            received at the proxy and client. The proxy can use either http or https.
+        Args:
+            expect_proxy_ssl: True if we expect the request to connect to the proxy via https.
+            expected_auth_credentials: credentials we expect to be presented to authenticate at the proxy
+        """
+        self.agent = self._make_agent()
+
+        self.reactor.lookups["testserv"] = "1.2.3.4"
+        self.reactor.lookups["proxy.com"] = "9.9.9.9"
+        test_d = self._make_get_request(b"matrix://testserv:8448/foo/bar")
+
+        # Nothing happened yet
+        self.assertNoResult(test_d)
+
+        # Make sure treq is trying to connect
+        clients = self.reactor.tcpClients
+        self.assertEqual(len(clients), 1)
+        (host, port, client_factory, _timeout, _bindAddress) = clients[0]
+        # make sure we are connecting to the proxy
+        self.assertEqual(host, "9.9.9.9")
+        self.assertEqual(port, 1080)
+
+        # make a test server to act as the proxy, and wire up the client
+        proxy_server = self._make_connection(
+            client_factory,
+            ssl=expect_proxy_ssl,
+            tls_sanlist=[b"DNS:proxy.com"] if expect_proxy_ssl else None,
+            expected_sni=b"proxy.com" if expect_proxy_ssl else None,
+        )
+
+        assert isinstance(proxy_server, HTTPChannel)
+
+        # now there should be a pending CONNECT request
+        self.assertEqual(len(proxy_server.requests), 1)
+
+        request = proxy_server.requests[0]
+        self.assertEqual(request.method, b"CONNECT")
+        self.assertEqual(request.path, b"testserv:8448")
+
+        # Check whether auth credentials have been supplied to the proxy
+        proxy_auth_header_values = request.requestHeaders.getRawHeaders(
+            b"Proxy-Authorization"
+        )
+
+        if expected_auth_credentials is not None:
+            # Compute the correct header value for Proxy-Authorization
+            encoded_credentials = base64.b64encode(expected_auth_credentials)
+            expected_header_value = b"Basic " + encoded_credentials
+
+            # Validate the header's value
+            self.assertIn(expected_header_value, proxy_auth_header_values)
+        else:
+            # Check that the Proxy-Authorization header has not been supplied to the proxy
+            self.assertIsNone(proxy_auth_header_values)
+
+        # tell the proxy server not to close the connection
+        proxy_server.persistent = True
+
+        request.finish()
+
+        # now we make another test server to act as the upstream HTTP server.
+        server_ssl_protocol = _wrap_server_factory_for_tls(
+            _get_test_protocol_factory()
+        ).buildProtocol(None)
+
+        # Tell the HTTP server to send outgoing traffic back via the proxy's transport.
+        proxy_server_transport = proxy_server.transport
+        server_ssl_protocol.makeConnection(proxy_server_transport)
+
+        # ... and replace the protocol on the proxy's transport with the
+        # TLSMemoryBIOProtocol for the test server, so that incoming traffic
+        # to the proxy gets sent over to the HTTP(s) server.
+
+        # See also comment at `_do_https_request_via_proxy`
+        # in ../test_proxyagent.py for more details
+        if expect_proxy_ssl:
+            assert isinstance(proxy_server_transport, TLSMemoryBIOProtocol)
+            proxy_server_transport.wrappedProtocol = server_ssl_protocol
+        else:
+            assert isinstance(proxy_server_transport, FakeTransport)
+            client_protocol = proxy_server_transport.other
+            c2s_transport = client_protocol.transport
+            c2s_transport.other = server_ssl_protocol
+
+        self.reactor.advance(0)
+
+        server_name = server_ssl_protocol._tlsConnection.get_servername()
+        expected_sni = b"testserv"
+        self.assertEqual(
+            server_name,
+            expected_sni,
+            f"Expected SNI {expected_sni!s} but got {server_name!s}",
+        )
+
+        # now there should be a pending request
+        http_server = server_ssl_protocol.wrappedProtocol
+        self.assertEqual(len(http_server.requests), 1)
+
+        request = http_server.requests[0]
+        self.assertEqual(request.method, b"GET")
+        self.assertEqual(request.path, b"/foo/bar")
+        self.assertEqual(
+            request.requestHeaders.getRawHeaders(b"host"), [b"testserv:8448"]
+        )
+        self.assertEqual(
+            request.requestHeaders.getRawHeaders(b"user-agent"), [b"test-agent"]
+        )
+        # Check that the destination server DID NOT receive proxy credentials
+        self.assertIsNone(request.requestHeaders.getRawHeaders(b"Proxy-Authorization"))
+        content = request.content.read()
+        self.assertEqual(content, b"")
+
+        # Deferred is still without a result
+        self.assertNoResult(test_d)
+
+        # send the headers
+        request.responseHeaders.setRawHeaders(b"Content-Type", [b"application/json"])
+        request.write("")
+
+        self.reactor.pump((0.1,))
+
+        response = self.successResultOf(test_d)
+
+        # that should give us a Response object
+        self.assertEqual(response.code, 200)
+
+        # Send the body
+        request.write('{ "a": 1 }'.encode("ascii"))
+        request.finish()
+
+        self.reactor.pump((0.1,))
+
+        # check it can be read
+        json = self.successResultOf(treq.json_content(response))
+        self.assertEqual(json, {"a": 1})
+
     def test_get_ip_address(self):
         """
         Test the behaviour when the server name contains an explicit IP (with no port)
         """
+        self.agent = self._make_agent()
+
         # there will be a getaddrinfo on the IP
         self.reactor.lookups["1.2.3.4"] = "1.2.3.4"
 
@@ -320,6 +531,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         Test the behaviour when the server name contains an explicit IPv6 address
         (with no port)
         """
+        self.agent = self._make_agent()
 
         # there will be a getaddrinfo on the IP
         self.reactor.lookups["::1"] = "::1"
@@ -355,6 +567,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         Test the behaviour when the server name contains an explicit IPv6 address
         (with explicit port)
         """
+        self.agent = self._make_agent()
 
         # there will be a getaddrinfo on the IP
         self.reactor.lookups["::1"] = "::1"
@@ -389,6 +602,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """
         Test the behaviour when the certificate on the server doesn't match the hostname
         """
+        self.agent = self._make_agent()
+
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv1"] = "1.2.3.4"
 
@@ -441,6 +656,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         Test the behaviour when the server name contains an explicit IP, but
         the server cert doesn't cover it
         """
+        self.agent = self._make_agent()
+
         # there will be a getaddrinfo on the IP
         self.reactor.lookups["1.2.3.5"] = "1.2.3.5"
 
@@ -471,6 +688,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """
         Test the behaviour when the server name has no port, no SRV, and no well-known
         """
+        self.agent = self._make_agent()
 
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv"] = "1.2.3.4"
@@ -524,6 +742,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
     def test_get_well_known(self):
         """Test the behaviour when the .well-known delegates elsewhere"""
+        self.agent = self._make_agent()
 
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv"] = "1.2.3.4"
@@ -587,6 +806,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """Test the behaviour when the server name has no port and no SRV record, but
         the .well-known has a 300 redirect
         """
+        self.agent = self._make_agent()
+
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.reactor.lookups["target-server"] = "1::f"
@@ -675,6 +896,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """
         Test the behaviour when the server name has an *invalid* well-known (and no SRV)
         """
+        self.agent = self._make_agent()
 
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv"] = "1.2.3.4"
@@ -743,6 +965,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
             reactor=self.reactor,
             tls_client_options_factory=tls_factory,
             user_agent=b"test-agent",  # This is unused since _well_known_resolver is passed below.
+            ip_whitelist=IPSet(),
             ip_blacklist=IPSet(),
             _srv_resolver=self.mock_resolver,
             _well_known_resolver=WellKnownResolver(
@@ -780,6 +1003,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """
         Test the behaviour when there is a single SRV record
         """
+        self.agent = self._make_agent()
+
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service(
             [Server(host=b"srvtarget", port=8443)]
         )
@@ -820,6 +1045,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """Test the behaviour when the .well-known redirects to a place where there
         is a SRV.
         """
+        self.agent = self._make_agent()
+
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.reactor.lookups["srvtarget"] = "5.6.7.8"
 
@@ -876,6 +1103,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
     def test_idna_servername(self):
         """test the behaviour when the server name has idna chars in"""
+        self.agent = self._make_agent()
 
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
 
@@ -937,6 +1165,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
     def test_idna_srv_target(self):
         """test the behaviour when the target of a SRV record has idna chars"""
+        self.agent = self._make_agent()
 
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service(
             [Server(host=b"xn--trget-3qa.com", port=8443)]  # târget.com
@@ -1140,6 +1369,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
     def test_srv_fallbacks(self):
         """Test that other SRV results are tried if the first one fails."""
+        self.agent = self._make_agent()
+
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service(
             [
                 Server(host=b"target.com", port=8443),
@@ -1266,34 +1497,49 @@ def _check_logcontext(context):
         raise AssertionError("Expected logcontext %s but was %s" % (context, current))
 
 
-def _build_test_server(connection_creator):
-    """Construct a test server
-
-    This builds an HTTP channel, wrapped with a TLSMemoryBIOProtocol
-
+def _wrap_server_factory_for_tls(
+    factory: IProtocolFactory, sanlist: Iterable[bytes] = None
+) -> IProtocolFactory:
+    """Wrap an existing Protocol Factory with a test TLSMemoryBIOFactory
+    The resultant factory will create a TLS server which presents a certificate
+    signed by our test CA, valid for the domains in `sanlist`
     Args:
-        connection_creator (IOpenSSLServerConnectionCreator): thing to build
-            SSL connections
-        sanlist (list[bytes]): list of the SAN entries for the cert returned
-            by the server
-
+        factory: protocol factory to wrap
+        sanlist: list of domains the cert should be valid for
     Returns:
-        TLSMemoryBIOProtocol
+        interfaces.IProtocolFactory
+    """
+    if sanlist is None:
+        sanlist = [
+            b"DNS:testserv",
+            b"DNS:target-server",
+            b"DNS:xn--bcher-kva.com",
+            b"IP:1.2.3.4",
+            b"IP:::1",
+        ]
+
+    connection_creator = TestServerTLSConnectionFactory(sanlist=sanlist)
+    return TLSMemoryBIOFactory(
+        connection_creator, isClient=False, wrappedFactory=factory
+    )
+
+
+def _get_test_protocol_factory() -> IProtocolFactory:
+    """Get a protocol Factory which will build an HTTPChannel
+    Returns:
+        interfaces.IProtocolFactory
     """
     server_factory = Factory.forProtocol(HTTPChannel)
+
     # Request.finish expects the factory to have a 'log' method.
     server_factory.log = _log_request
 
-    server_tls_factory = TLSMemoryBIOFactory(
-        connection_creator, isClient=False, wrappedFactory=server_factory
-    )
-
-    return server_tls_factory.buildProtocol(None)
+    return server_factory
 
 
-def _log_request(request):
+def _log_request(request: str):
     """Implements Factory.log, which is expected by Request.finish"""
-    logger.info("Completed request %s", request)
+    logger.info(f"Completed request {request}")
 
 
 @implementer(IPolicyForHTTPS)

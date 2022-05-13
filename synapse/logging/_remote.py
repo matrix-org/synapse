@@ -39,7 +39,7 @@ from twisted.python.failure import Failure
 logger = logging.getLogger(__name__)
 
 
-@attr.s
+@attr.s(slots=True, auto_attribs=True)
 @implementer(IPushProducer)
 class LogProducer:
     """
@@ -54,10 +54,10 @@ class LogProducer:
 
     # This is essentially ITCPTransport, but that is missing certain fields
     # (connected and registerProducer) which are part of the implementation.
-    transport = attr.ib(type=Connection)
-    _format = attr.ib(type=Callable[[logging.LogRecord], str])
-    _buffer = attr.ib(type=deque)
-    _paused = attr.ib(default=False, type=bool, init=False)
+    transport: Connection
+    _format: Callable[[logging.LogRecord], str]
+    _buffer: Deque[logging.LogRecord]
+    _paused: bool = attr.ib(default=False, init=False)
 
     def pauseProducing(self):
         self._paused = True

@@ -76,6 +76,7 @@ class CachedCall(Generic[TV]):
 
         # Fire off the callable now if this is our first time
         if not self._deferred:
+            assert self._callable is not None
             self._deferred = run_in_background(self._callable)
 
             # we will never need the callable again, so make sure it can be GCed
@@ -85,7 +86,7 @@ class CachedCall(Generic[TV]):
             # result in the deferred, since `awaiting` a deferred destroys its result.
             # (Also, if it's a Failure, GCing the deferred would log a critical error
             # about unhandled Failures)
-            def got_result(r):
+            def got_result(r: Union[TV, Failure]) -> None:
                 self._result = r
 
             self._deferred.addBoth(got_result)

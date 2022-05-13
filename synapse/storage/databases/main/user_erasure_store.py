@@ -14,11 +14,12 @@
 
 from typing import Dict, Iterable
 
-from synapse.storage._base import SQLBaseStore
+from synapse.storage.database import LoggingTransaction
+from synapse.storage.databases.main import CacheInvalidationWorkerStore
 from synapse.util.caches.descriptors import cached, cachedList
 
 
-class UserErasureWorkerStore(SQLBaseStore):
+class UserErasureWorkerStore(CacheInvalidationWorkerStore):
     @cached()
     async def is_user_erased(self, user_id: str) -> bool:
         """
@@ -69,7 +70,7 @@ class UserErasureStore(UserErasureWorkerStore):
             user_id: full user_id to be erased
         """
 
-        def f(txn):
+        def f(txn: LoggingTransaction) -> None:
             # first check if they are already in the list
             txn.execute("SELECT 1 FROM erased_users WHERE user_id = ?", (user_id,))
             if txn.fetchone():
@@ -89,7 +90,7 @@ class UserErasureStore(UserErasureWorkerStore):
             user_id: full user_id to be un-erased
         """
 
-        def f(txn):
+        def f(txn: LoggingTransaction) -> None:
             # first check if they are already in the list
             txn.execute("SELECT 1 FROM erased_users WHERE user_id = ?", (user_id,))
             if not txn.fetchone():

@@ -25,7 +25,7 @@ class MockClockTestCase(unittest.TestCase):
 
         self.clock.advance_time(20)
 
-        self.assertEquals(20, self.clock.time() - start_time)
+        self.assertEqual(20, self.clock.time() - start_time)
 
     def test_later(self):
         invoked = [0, 0]

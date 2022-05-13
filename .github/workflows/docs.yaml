@@ -22,7 +22,7 @@ jobs:
       - name: Setup mdbook
         uses: peaceiris/actions-mdbook@4b5ef36b314c2599664ca107bb8c02412548d79d # v1.1.14
         with:
-          mdbook-version: '0.4.9'
+          mdbook-version: '0.4.17'
 
       - name: Build the documentation
         # mdbook will only create an index.html if we're including docs/README.md in SUMMARY.md.
@@ -61,6 +61,5 @@ jobs:
         uses: peaceiris/actions-gh-pages@068dc23d9710f1ba62e86896f84735d869951305 # v3.8.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          keep_files: true
           publish_dir: ./book
           destination_dir: ./${{ steps.vars.outputs.branch-version }}

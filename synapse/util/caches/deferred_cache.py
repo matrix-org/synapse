@@ -22,6 +22,7 @@ from typing import (
     Iterable,
     MutableMapping,
     Optional,
+    Sized,
     TypeVar,
     Union,
     cast,
@@ -31,6 +32,7 @@ from prometheus_client import Gauge
 
 from twisted.internet import defer
 from twisted.python import failure
+from twisted.python.failure import Failure
 
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.lrucache import LruCache
@@ -73,18 +75,20 @@ class DeferredCache(Generic[KT, VT]):
         tree: bool = False,
         iterable: bool = False,
         apply_cache_factor_from_config: bool = True,
+        prune_unread_entries: bool = True,
     ):
         """
         Args:
             name: The name of the cache
             max_entries: Maximum amount of entries that the cache will hold
-            keylen: The length of the tuple used as the cache key. Ignored unless
-               `tree` is True.
             tree: Use a TreeCache instead of a dict as the underlying cache type
             iterable: If True, count each item in the cached object as an entry,
                 rather than each cached object
             apply_cache_factor_from_config: Whether cache factors specified in the
                 config file affect `max_entries`
+            prune_unread_entries: If True, cache entries that haven't been read recently
+                will be evicted from the cache in the background. Set to False to
+                opt-out of this behaviour.
         """
         cache_type = TreeCache if tree else dict
 
@@ -93,7 +97,7 @@ class DeferredCache(Generic[KT, VT]):
             TreeCache, "MutableMapping[KT, CacheEntry]"
         ] = cache_type()
 
-        def metrics_cb():
+        def metrics_cb() -> None:
             cache_pending_metric.labels(name).set(len(self._pending_deferred_cache))
 
         # cache is used for completed results and maps to the result itself, rather than
@@ -102,18 +106,25 @@ class DeferredCache(Generic[KT, VT]):
             max_size=max_entries,
             cache_name=name,
             cache_type=cache_type,
-            size_callback=(lambda d: len(d) or 1) if iterable else None,
+            size_callback=(
+                (lambda d: len(cast(Sized, d)) or 1)
+                # Argument 1 to "len" has incompatible type "VT"; expected "Sized"
+                # We trust that `VT` is `Sized` when `iterable` is `True`
+                if iterable
+                else None
+            ),
             metrics_collection_callback=metrics_cb,
             apply_cache_factor_from_config=apply_cache_factor_from_config,
+            prune_unread_entries=prune_unread_entries,
         )
 
         self.thread: Optional[threading.Thread] = None
 
     @property
-    def max_entries(self):
+    def max_entries(self) -> int:
         return self.cache.max_size
 
-    def check_thread(self):
+    def check_thread(self) -> None:
         expected_thread = self.thread
         if expected_thread is None:
             self.thread = threading.current_thread()
@@ -235,7 +246,7 @@ class DeferredCache(Generic[KT, VT]):
 
         self._pending_deferred_cache[key] = entry
 
-        def compare_and_pop():
+        def compare_and_pop() -> bool:
             """Check if our entry is still the one in _pending_deferred_cache, and
             if so, pop it.
 
@@ -256,7 +267,7 @@ class DeferredCache(Generic[KT, VT]):
 
             return False
 
-        def cb(result):
+        def cb(result: VT) -> None:
             if compare_and_pop():
                 self.cache.set(key, result, entry.callbacks)
             else:
@@ -268,7 +279,7 @@ class DeferredCache(Generic[KT, VT]):
                 # not have been. Either way, let's double-check now.
                 entry.invalidate()
 
-        def eb(_fail):
+        def eb(_fail: Failure) -> None:
             compare_and_pop()
             entry.invalidate()
 
@@ -282,11 +293,11 @@ class DeferredCache(Generic[KT, VT]):
 
     def prefill(
         self, key: KT, value: VT, callback: Optional[Callable[[], None]] = None
-    ):
+    ) -> None:
         callbacks = [callback] if callback else []
         self.cache.set(key, value, callbacks=callbacks)
 
-    def invalidate(self, key):
+    def invalidate(self, key: KT) -> None:
         """Delete a key, or tree of entries
 
         If the cache is backed by a regular dict, then "key" must be of
@@ -314,7 +325,7 @@ class DeferredCache(Generic[KT, VT]):
             for entry in iterate_tree_cache_entry(entry):
                 entry.invalidate()
 
-    def invalidate_all(self):
+    def invalidate_all(self) -> None:
         self.check_thread()
         self.cache.clear()
         for entry in self._pending_deferred_cache.values():
@@ -332,7 +343,7 @@ class CacheEntry:
         self.callbacks = set(callbacks)
         self.invalidated = False
 
-    def invalidate(self):
+    def invalidate(self) -> None:
         if not self.invalidated:
             self.invalidated = True
             for callback in self.callbacks:

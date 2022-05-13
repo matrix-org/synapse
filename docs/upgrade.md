@@ -19,35 +19,39 @@ this document.
     packages](setup/installation.md#prebuilt-packages), you will need to follow the
     normal process for upgrading those packages.
 
+-   If Synapse was installed using pip then upgrade to the latest
+    version by running:
+
+    ```bash
+    pip install --upgrade matrix-synapse
+    ```
+
 -   If Synapse was installed from source, then:
 
-    1.  Activate the virtualenv before upgrading. For example, if
-        Synapse is installed in a virtualenv in `~/synapse/env` then
+    1.  Obtain the latest version of the source code. Git users can run
+        `git pull` to do this.
+
+    2.  If you're running Synapse in a virtualenv, make sure to activate it before
+        upgrading. For example, if Synapse is installed in a virtualenv in `~/synapse/env` then
         run:
 
         ```bash
         source ~/synapse/env/bin/activate
-        ```
-
-    2.  If Synapse was installed using pip then upgrade to the latest
-        version by running:
-
-        ```bash
-        pip install --upgrade matrix-synapse
-        ```
-
-        If Synapse was installed using git then upgrade to the latest
-        version by running:
-
-        ```bash
-        git pull
         pip install --upgrade .
         ```
+        Include any relevant extras between square brackets, e.g. `pip install --upgrade ".[postgres,oidc]"`.
 
-    3.  Restart Synapse:
+    3.  If you're using `poetry` to manage a Synapse installation, run:
+        ```bash
+        poetry install
+        ```
+        Include any relevant extras with `--extras`, e.g. `poetry install --extras postgres --extras oidc`.
+        It's probably easiest to run `poetry install --extras all`.
+
+    4.  Restart Synapse:
 
         ```bash
-        ./synctl restart
+        synctl restart
         ```
 
 To check whether your update was successful, you can check the running
@@ -85,6 +89,390 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.59.0
+
+## Device name lookup over federation has been disabled by default
+
+The names of user devices are no longer visible to users on other homeservers by default.
+Device IDs are unaffected, as these are necessary to facilitate end-to-end encryption.
+
+To re-enable this functionality, set the
+[`allow_device_name_lookup_over_federation`](https://matrix-org.github.io/synapse/v1.59/usage/configuration/config_documentation.html#federation)
+homeserver config option to `true`.
+
+
+## Deprecation of the `synapse.app.appservice` and `synapse.app.user_dir` worker application types
+
+The `synapse.app.appservice` worker application type allowed you to configure a
+single worker to use to notify application services of new events, as long
+as this functionality was disabled on the main process with `notify_appservices: False`.
+Further, the `synapse.app.user_dir` worker application type allowed you to configure
+a single worker to be responsible for updating the user directory, as long as this
+was disabled on the main process with `update_user_directory: False`.
+
+To unify Synapse's worker types, the `synapse.app.appservice` worker application
+type and the `notify_appservices` configuration option have been deprecated.
+The `synapse.app.user_dir` worker application type and `update_user_directory`
+configuration option have also been deprecated.
+
+To get the same functionality as was provided by the deprecated options, it's now recommended that the `synapse.app.generic_worker`
+worker application type is used and that the `notify_appservices_from_worker` and/or
+`update_user_directory_from_worker` options are set to the name of a worker.
+
+For the time being, the old options can be used alongside the new options to make
+it easier to transition between the two configurations, however please note that:
+
+- the options must not contradict each other (otherwise Synapse won't start); and
+- the `notify_appservices` and `update_user_directory` options will be removed in a future release of Synapse.
+
+Please see the [*Notifying Application Services*][v1_59_notify_ases_from] and
+[*Updating the User Directory*][v1_59_update_user_dir] sections of the worker
+documentation for more information.
+
+[v1_59_notify_ases_from]: workers.md#notifying-application-services
+[v1_59_update_user_dir]: workers.md#updating-the-user-directory
+
+
+# Upgrading to v1.58.0
+
+## Groups/communities feature has been disabled by default
+
+The non-standard groups/communities feature in Synapse has been disabled by default
+and will be removed in Synapse v1.61.0.
+
+
+# Upgrading to v1.57.0
+
+## Changes to database schema for application services
+
+Synapse v1.57.0 includes a [change](https://github.com/matrix-org/synapse/pull/12209) to the
+way transaction IDs are managed for application services. If your deployment uses a dedicated
+worker for application service traffic, **it must be stopped** when the database is upgraded
+(which normally happens when the main process is upgraded), to ensure the change is made safely
+without any risk of reusing transaction IDs.
+
+Deployments which do not use separate worker processes can be upgraded as normal. Similarly,
+deployments where no application services are in use can be upgraded as normal.
+
+<details>
+<summary><b>Recovering from an incorrect upgrade</b></summary>
+
+If the database schema is upgraded *without* stopping the worker responsible
+for AS traffic, then the following error may be given when attempting to start
+a Synapse worker or master process:
+
+```
+**********************************************************************************
+ Error during initialisation:
+
+ Postgres sequence 'application_services_txn_id_seq' is inconsistent with associated
+ table 'application_services_txns'. This can happen if Synapse has been downgraded and
+ then upgraded again, or due to a bad migration.
+
+ To fix this error, shut down Synapse (including any and all workers)
+ and run the following SQL:
+
+     SELECT setval('application_services_txn_id_seq', (
+         SELECT GREATEST(MAX(txn_id), 0) FROM application_services_txns
+     ));
+
+ See docs/postgres.md for more information.
+
+ There may be more information in the logs.
+**********************************************************************************
+```
+
+This error may also be seen if Synapse is *downgraded* to an earlier version,
+and then upgraded again to v1.57.0 or later.
+
+In either case:
+
+ 1. Ensure that the worker responsible for AS traffic is stopped.
+ 2. Run the SQL command given in the error message via `psql`.
+
+Synapse should then start correctly.
+</details>
+
+# Upgrading to v1.56.0
+
+## Open registration without verification is now disabled by default
+
+Synapse will refuse to start if registration is enabled without email, captcha, or token-based verification unless the new config
+flag `enable_registration_without_verification` is set to "true".
+
+## Groups/communities feature has been deprecated
+
+The non-standard groups/communities feature in Synapse has been deprecated and will
+be disabled by default in Synapse v1.58.0.
+
+You can test disabling it by adding the following to your homeserver configuration:
+
+```yaml
+experimental_features:
+  groups_enabled: false
+```
+
+## Change in behaviour for PostgreSQL databases with unsafe locale
+
+Synapse now refuses to start when using PostgreSQL with non-`C` values for `COLLATE` and
+`CTYPE` unless the config flag `allow_unsafe_locale`, found in the database section of
+the configuration file, is set to `true`. See the [PostgreSQL documentation](https://matrix-org.github.io/synapse/latest/postgres.html#fixing-incorrect-collate-or-ctype)
+for more information and instructions on how to fix a database with incorrect values.
+
+# Upgrading to v1.55.0
+
+## `synctl` script has been moved
+
+The `synctl` script
+[has been made](https://github.com/matrix-org/synapse/pull/12140) an
+[entry point](https://packaging.python.org/en/latest/specifications/entry-points/)
+and no longer exists at the root of Synapse's source tree. If you wish to use
+`synctl` to manage your homeserver, you should invoke `synctl` directly, e.g.
+`synctl start` instead of `./synctl start` or `/path/to/synctl start`.
+
+You will need to ensure `synctl` is on your `PATH`.
+  - This is automatically the case when using
+    [Debian packages](https://packages.matrix.org/debian/) or
+    [docker images](https://hub.docker.com/r/matrixdotorg/synapse)
+    provided by Matrix.org.
+  - When installing from a wheel, sdist, or PyPI, a `synctl` executable is added
+    to your Python installation's `bin`. This should be on your `PATH`
+    automatically, though you might need to activate a virtual environment
+    depending on how you installed Synapse.
+
+
+## Compatibility dropped for Mjolnir 1.3.1 and earlier
+
+Synapse v1.55.0 drops support for Mjolnir 1.3.1 and earlier.
+If you use the Mjolnir module to moderate your homeserver,
+please upgrade Mjolnir to version 1.3.2 or later before upgrading Synapse.
+
+
+# Upgrading to v1.54.0
+
+## Legacy structured logging configuration removal
+
+This release removes support for the `structured: true` logging configuration
+which was deprecated in Synapse v1.23.0. If your logging configuration contains
+`structured: true` then it should be modified based on the
+[structured logging documentation](https://matrix-org.github.io/synapse/v1.56/structured_logging.html#upgrading-from-legacy-structured-logging-configuration).
+
+# Upgrading to v1.53.0
+
+## Dropping support for `webclient` listeners and non-HTTP(S) `web_client_location`
+
+Per the deprecation notice in Synapse v1.51.0, listeners of type  `webclient`
+are no longer supported and configuring them is a now a configuration error.
+
+Configuring a non-HTTP(S) `web_client_location` configuration is is now a
+configuration error. Since the `webclient` listener is no longer supported, this
+setting only applies to the root path `/` of Synapse's web server and no longer
+the `/_matrix/client/` path.
+
+## Stablisation of MSC3231
+
+The unstable validity-check endpoint for the
+[Registration Tokens](https://spec.matrix.org/v1.2/client-server-api/#get_matrixclientv1registermloginregistration_tokenvalidity)
+feature has been stabilised and moved from:
+
+`/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity`
+
+to:
+
+`/_matrix/client/v1/register/m.login.registration_token/validity`
+
+Please update any relevant reverse proxy or firewall configurations appropriately.
+
+## Time-based cache expiry is now enabled by default
+
+Formerly, entries in the cache were not evicted regardless of whether they were accessed after storing.
+This behavior has now changed. By default entries in the cache are now evicted after 30m of not being accessed.
+To change the default behavior, go to the `caches` section of the config and change the `expire_caches` and
+`cache_entry_ttl` flags as necessary. Please note that these flags replace the `expiry_time` flag in the config.
+The `expiry_time` flag will still continue to work, but it has been deprecated and will be removed in the future.
+
+## Deprecation of `capability` `org.matrix.msc3283.*`
+
+The `capabilities` of MSC3283 from the REST API `/_matrix/client/r0/capabilities`
+becomes stable.
+
+The old `capabilities`
+- `org.matrix.msc3283.set_displayname`,
+- `org.matrix.msc3283.set_avatar_url` and
+- `org.matrix.msc3283.3pid_changes`
+
+are deprecated and scheduled to be removed in Synapse v1.54.0.
+
+The new `capabilities`
+- `m.set_displayname`,
+- `m.set_avatar_url` and
+- `m.3pid_changes`
+
+are now active by default.
+
+## Removal of `user_may_create_room_with_invites`
+
+As announced with the release of [Synapse 1.47.0](#deprecation-of-the-user_may_create_room_with_invites-module-callback),
+the deprecated `user_may_create_room_with_invites` module callback has been removed.
+
+Modules relying on it can instead implement [`user_may_invite`](https://matrix-org.github.io/synapse/latest/modules/spam_checker_callbacks.html#user_may_invite)
+and use the [`get_room_state`](https://github.com/matrix-org/synapse/blob/872f23b95fa980a61b0866c1475e84491991fa20/synapse/module_api/__init__.py#L869-L876)
+module API to infer whether the invite is happening while creating a room (see [this function](https://github.com/matrix-org/synapse-domain-rule-checker/blob/e7d092dd9f2a7f844928771dbfd9fd24c2332e48/synapse_domain_rule_checker/__init__.py#L56-L89)
+as an example). Alternately, modules can also implement [`on_create_room`](https://matrix-org.github.io/synapse/latest/modules/third_party_rules_callbacks.html#on_create_room).
+
+
+# Upgrading to v1.52.0
+
+## Twisted security release
+
+Note that [Twisted 22.1.0](https://github.com/twisted/twisted/releases/tag/twisted-22.1.0)
+has recently been released, which fixes a [security issue](https://github.com/twisted/twisted/security/advisories/GHSA-92x2-jw7w-xvvx)
+within the Twisted library. We do not believe Synapse is affected by this vulnerability,
+though we advise server administrators who installed Synapse via pip to upgrade Twisted
+with `pip install --upgrade Twisted treq` as a matter of good practice. The Docker image
+`matrixdotorg/synapse` and the Debian packages from `packages.matrix.org` are using the
+updated library.
+
+# Upgrading to v1.51.0
+
+## Deprecation of `webclient` listeners and non-HTTP(S) `web_client_location`
+
+Listeners of type  `webclient` are deprecated and scheduled to be removed in
+Synapse v1.53.0.
+
+Similarly, a non-HTTP(S) `web_client_location` configuration is deprecated and
+will become a configuration error in Synapse v1.53.0.
+
+
+# Upgrading to v1.50.0
+
+## Dropping support for old Python and Postgres versions
+
+In line with our [deprecation policy](deprecation_policy.md),
+we've dropped support for Python 3.6 and PostgreSQL 9.6, as they are no
+longer supported upstream.
+
+This release of Synapse requires Python 3.7+ and PostgreSQL 10+.
+
+
+# Upgrading to v1.47.0
+
+## Removal of old Room Admin API
+
+The following admin APIs were deprecated in [Synapse 1.34](https://github.com/matrix-org/synapse/blob/v1.34.0/CHANGES.md#deprecations-and-removals)
+(released on 2021-05-17) and have now been removed:
+
+- `POST /_synapse/admin/v1/<room_id>/delete`
+
+Any scripts still using the above APIs should be converted to use the
+[Delete Room API](https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#delete-room-api).
+
+## Deprecation of the `user_may_create_room_with_invites` module callback
+
+The `user_may_create_room_with_invites` is deprecated and will be removed in a future
+version of Synapse. Modules implementing this callback can instead implement
+[`user_may_invite`](https://matrix-org.github.io/synapse/latest/modules/spam_checker_callbacks.html#user_may_invite)
+and use the [`get_room_state`](https://github.com/matrix-org/synapse/blob/872f23b95fa980a61b0866c1475e84491991fa20/synapse/module_api/__init__.py#L869-L876)
+module API method to infer whether the invite is happening in the context of creating a
+room.
+
+We plan to remove this callback in January 2022.
+
+# Upgrading to v1.45.0
+
+## Changes required to media storage provider modules when reading from the Synapse configuration object
+
+Media storage provider modules that read from the Synapse configuration object (i.e. that
+read the value of `hs.config.[...]`) now need to specify the configuration section they're
+reading from. This means that if a module reads the value of e.g. `hs.config.media_store_path`,
+it needs to replace it with `hs.config.media.media_store_path`.
+
+# Upgrading to v1.44.0
+
+## The URL preview cache is no longer mirrored to storage providers
+The `url_cache/` and `url_cache_thumbnails/` directories in the media store are
+no longer mirrored to storage providers. These two directories can be safely
+deleted from any configured storage providers to reclaim space.
+
+# Upgrading to v1.43.0
+
+## The spaces summary APIs can now be handled by workers
+
+The [available worker applications documentation](https://matrix-org.github.io/synapse/latest/workers.html#available-worker-applications)
+has been updated to reflect that calls to the `/spaces`, `/hierarchy`, and
+`/summary` endpoints can now be routed to workers for both client API and
+federation requests.
+
+# Upgrading to v1.42.0
+
+## Removal of old Room Admin API
+
+The following admin APIs were deprecated in [Synapse 1.25](https://github.com/matrix-org/synapse/blob/v1.25.0/CHANGES.md#removal-warning)
+(released on 2021-01-13) and have now been removed:
+
+-   `POST /_synapse/admin/v1/purge_room`
+-   `POST /_synapse/admin/v1/shutdown_room/<room_id>`
+
+Any scripts still using the above APIs should be converted to use the
+[Delete Room API](https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#delete-room-api).
+
+## User-interactive authentication fallback templates can now display errors
+
+This may affect you if you make use of custom HTML templates for the
+[reCAPTCHA](../synapse/res/templates/recaptcha.html) or
+[terms](../synapse/res/templates/terms.html) fallback pages.
+
+The template is now provided an `error` variable if the authentication
+process failed. See the default templates linked above for an example.
+
+## Removal of out-of-date email pushers
+
+Users will stop receiving message updates via email for addresses that were
+once, but not still, linked to their account.
+
+# Upgrading to v1.41.0
+
+## Add support for routing outbound HTTP requests via a proxy for federation
+
+Since Synapse 1.6.0 (2019-11-26) you can set a proxy for outbound HTTP requests via
+http_proxy/https_proxy environment variables. This proxy was set for:
+- push
+- url previews
+- phone-home stats
+- recaptcha validation
+- CAS auth validation
+- OpenID Connect
+- Federation (checking public key revocation)
+
+In this version we have added support for outbound requests for:
+- Outbound federation
+- Downloading remote media
+- Fetching public keys of other servers
+
+These requests use the same proxy configuration. If you have a proxy configuration we
+recommend to verify the configuration. It may be necessary to adjust the `no_proxy`
+environment variable.
+
+See [using a forward proxy with Synapse documentation](setup/forward_proxy.md) for
+details.
+
+## Deprecation of `template_dir`
+
+The `template_dir` settings in the `sso`, `account_validity` and `email` sections of the
+configuration file are now deprecated. Server admins should use the new
+`templates.custom_template_directory` setting in the configuration file and use one single
+custom template directory for all aforementioned features. Template file names remain
+unchanged. See [the related documentation](https://matrix-org.github.io/synapse/latest/templates.html)
+for more information and examples.
+
+We plan to remove support for these settings in October 2021.
+
+## `/_synapse/admin/v1/users/{userId}/media` must be handled by media workers
+
+The [media repository worker documentation](https://matrix-org.github.io/synapse/latest/workers.html#synapseappmedia_repository)
+has been updated to reflect that calls to `/_synapse/admin/v1/users/{userId}/media`
+must now be handled by media repository workers. This is due to the new `DELETE` method
+of this endpoint modifying the media store.
 
 # Upgrading to v1.39.0
 
@@ -92,8 +480,8 @@ process, for example:
 
 The current third-party rules module interface is deprecated in favour of the new generic
 modules system introduced in Synapse v1.37.0. Authors of third-party rules modules can refer
-to [this documentation](modules.md#porting-an-existing-module-that-uses-the-old-interface)
-to update their modules. Synapse administrators can refer to [this documentation](modules.md#using-modules)
+to [this documentation](modules/porting_legacy_module.md)
+to update their modules. Synapse administrators can refer to [this documentation](modules/index.md)
 to update their configuration once the modules they are using have been updated.
 
 We plan to remove support for the current third-party rules interface in September 2021.
@@ -142,9 +530,9 @@ SQLite databases are unaffected by this change.
 
 The current spam checker interface is deprecated in favour of a new generic modules system.
 Authors of spam checker modules can refer to [this
-documentation](https://matrix-org.github.io/synapse/develop/modules.html#porting-an-existing-module-that-uses-the-old-interface)
+documentation](modules/porting_legacy_module.md
 to update their modules. Synapse administrators can refer to [this
-documentation](https://matrix-org.github.io/synapse/develop/modules.html#using-modules)
+documentation](modules/index.md)
 to update their configuration once the modules they are using have been updated.
 
 We plan to remove support for the current spam checker interface in August 2021.
@@ -217,8 +605,7 @@ Instructions for doing so are provided
 
 ## Dropping support for old Python, Postgres and SQLite versions
 
-In line with our [deprecation
-policy](https://github.com/matrix-org/synapse/blob/release-v1.32.0/docs/deprecation_policy.md),
+In line with our [deprecation policy](deprecation_policy.md),
 we've dropped support for Python 3.5 and PostgreSQL 9.5, as they are no
 longer supported upstream.
 
@@ -231,8 +618,7 @@ The deprecated v1 "list accounts" admin API
 (`GET /_synapse/admin/v1/users/<user_id>`) has been removed in this
 version.
 
-The [v2 list accounts
-API](https://github.com/matrix-org/synapse/blob/master/docs/admin_api/user_admin_api.rst#list-accounts)
+The [v2 list accounts API](admin_api/user_admin_api.md#list-accounts)
 has been available since Synapse 1.7.0 (2019-12-13), and is accessible
 under `GET /_synapse/admin/v2/users`.
 
@@ -255,24 +641,24 @@ Please ensure your Application Services are up to date.
 ## Requirement for X-Forwarded-Proto header
 
 When using Synapse with a reverse proxy (in particular, when using the
-[x_forwarded]{.title-ref} option on an HTTP listener), Synapse now
-expects to receive an [X-Forwarded-Proto]{.title-ref} header on incoming
+`x_forwarded` option on an HTTP listener), Synapse now
+expects to receive an `X-Forwarded-Proto` header on incoming
 HTTP requests. If it is not set, Synapse will log a warning on each
 received request.
 
 To avoid the warning, administrators using a reverse proxy should ensure
-that the reverse proxy sets [X-Forwarded-Proto]{.title-ref} header to
-[https]{.title-ref} or [http]{.title-ref} to indicate the protocol used
+that the reverse proxy sets `X-Forwarded-Proto` header to
+`https` or `http` to indicate the protocol used
 by the client.
 
-Synapse also requires the [Host]{.title-ref} header to be preserved.
+Synapse also requires the `Host` header to be preserved.
 
-See the [reverse proxy documentation](../reverse_proxy.md), where the
+See the [reverse proxy documentation](reverse_proxy.md), where the
 example configurations have been updated to show how to set these
 headers.
 
 (Users of [Caddy](https://caddyserver.com/) are unaffected, since we
-believe it sets [X-Forwarded-Proto]{.title-ref} by default.)
+believe it sets `X-Forwarded-Proto` by default.)
 
 # Upgrading to v1.27.0
 
@@ -286,7 +672,7 @@ identity providers:
     `[synapse public baseurl]/_synapse/client/oidc/callback` to the list
     of permitted "redirect URIs" at the identity provider.
 
-    See the [OpenID docs](../openid.md) for more information on setting
+    See the [OpenID docs](openid.md) for more information on setting
     up OpenID Connect.
 
 -   If your server is configured for single sign-on via a SAML2 identity
@@ -436,13 +822,13 @@ mapping provider to specify different algorithms, instead of the
 way](<https://matrix.org/docs/spec/appendices#mapping-from-other-character-sets>).
 
 If your Synapse configuration uses a custom mapping provider
-([oidc_config.user_mapping_provider.module]{.title-ref} is specified and
+(`oidc_config.user_mapping_provider.module` is specified and
 not equal to
-[synapse.handlers.oidc_handler.JinjaOidcMappingProvider]{.title-ref})
-then you *must* ensure that [map_user_attributes]{.title-ref} of the
+`synapse.handlers.oidc_handler.JinjaOidcMappingProvider`)
+then you *must* ensure that `map_user_attributes` of the
 mapping provider performs some normalisation of the
-[localpart]{.title-ref} returned. To match previous behaviour you can
-use the [map_username_to_mxid_localpart]{.title-ref} function provided
+`localpart` returned. To match previous behaviour you can
+use the `map_username_to_mxid_localpart` function provided
 by Synapse. An example is shown below:
 
 ```python
@@ -471,7 +857,7 @@ v1.24.0. The Admin API is now only accessible under:
 
 -   `/_synapse/admin/v1`
 
-The only exception is the [/admin/whois]{.title-ref} endpoint, which is
+The only exception is the `/admin/whois` endpoint, which is
 [also available via the client-server
 API](https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid).
 
@@ -486,8 +872,7 @@ lock down external access to the Admin API endpoints.
 This release deprecates use of the `structured: true` logging
 configuration for structured logging. If your logging configuration
 contains `structured: true` then it should be modified based on the
-[structured logging
-documentation](../structured_logging.md).
+[structured logging documentation](https://matrix-org.github.io/synapse/v1.56/structured_logging.html#upgrading-from-legacy-structured-logging-configuration).
 
 The `structured` and `drains` logging options are now deprecated and
 should be replaced by standard logging configuration of `handlers` and
@@ -517,14 +902,13 @@ acts the same as the `http_client` argument previously passed to
 
 ## Forwarding `/_synapse/client` through your reverse proxy
 
-The [reverse proxy
-documentation](https://github.com/matrix-org/synapse/blob/develop/docs/reverse_proxy.md)
+The [reverse proxy documentation](reverse_proxy.md)
 has been updated to include reverse proxy directives for
 `/_synapse/client/*` endpoints. As the user password reset flow now uses
 endpoints under this prefix, **you must update your reverse proxy
 configurations for user password reset to work**.
 
-Additionally, note that the [Synapse worker documentation](https://github.com/matrix-org/synapse/blob/develop/docs/workers.md) has been updated to
+Additionally, note that the [Synapse worker documentation](workers.md) has been updated to
 
 :   state that the `/_synapse/client/password_reset/email/submit_token`
     endpoint can be handled
@@ -548,7 +932,7 @@ This page will appear to the user after clicking a password reset link
 that has been emailed to them.
 
 To complete password reset, the page must include a way to make a
-[POST]{.title-ref} request to
+`POST` request to
 `/_synapse/client/password_reset/{medium}/submit_token` with the query
 parameters from the original link, presented as a URL-encoded form. See
 the file itself for more details.
@@ -569,18 +953,18 @@ but the parameters are slightly different:
 
 # Upgrading to v1.18.0
 
-## Docker [-py3]{.title-ref} suffix will be removed in future versions
+## Docker `-py3` suffix will be removed in future versions
 
 From 10th August 2020, we will no longer publish Docker images with the
-[-py3]{.title-ref} tag suffix. The images tagged with the
-[-py3]{.title-ref} suffix have been identical to the non-suffixed tags
+`-py3` tag suffix. The images tagged with the
+`-py3` suffix have been identical to the non-suffixed tags
 since release 0.99.0, and the suffix is obsolete.
 
-On 10th August, we will remove the [latest-py3]{.title-ref} tag.
-Existing per-release tags (such as [v1.18.0-py3]{.title-ref}) will not
-be removed, but no new [-py3]{.title-ref} tags will be added.
+On 10th August, we will remove the `latest-py3` tag.
+Existing per-release tags (such as `v1.18.0-py3` will not
+be removed, but no new `-py3` tags will be added.
 
-Scripts relying on the [-py3]{.title-ref} suffix will need to be
+Scripts relying on the `-py3` suffix will need to be
 updated.
 
 ## Redis replication is now recommended in lieu of TCP replication
@@ -588,7 +972,7 @@ updated.
 When setting up worker processes, we now recommend the use of a Redis
 server for replication. **The old direct TCP connection method is
 deprecated and will be removed in a future release.** See
-[workers](../workers.md) for more details.
+[workers](workers.md) for more details.
 
 # Upgrading to v1.14.0
 
@@ -614,8 +998,8 @@ This will *not* be a problem for Synapse installations which were:
 If completeness of the room directory is a concern, installations which
 are affected can be repaired as follows:
 
-1.  Run the following sql from a [psql]{.title-ref} or
-    [sqlite3]{.title-ref} console:
+1.  Run the following sql from a `psql` or
+    `sqlite3` console:
 
     ```sql
     INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
@@ -679,8 +1063,8 @@ participating in many rooms.
     of any problems.
 
 1.  As an initial check to see if you will be affected, you can try
-    running the following query from the [psql]{.title-ref} or
-    [sqlite3]{.title-ref} console. It is safe to run it while Synapse is
+    running the following query from the `psql` or
+    `sqlite3` console. It is safe to run it while Synapse is
     still running.
 
     ```sql
@@ -720,8 +1104,7 @@ participating in many rooms.
     omitting the `CONCURRENTLY` keyword. Note however that this
     operation may in itself cause Synapse to stop running for some time.
     Synapse admins are reminded that [SQLite is not recommended for use
-    outside a test
-    environment](https://github.com/matrix-org/synapse/blob/master/README.rst#using-postgresql).
+    outside a test environment](postgres.md).
 
 3.  Once the index has been created, the `SELECT` query in step 1 above
     should complete quickly. It is therefore safe to upgrade to Synapse
@@ -739,7 +1122,7 @@ participating in many rooms.
 Synapse will now log a warning on start up if used with a PostgreSQL
 database that has a non-recommended locale set.
 
-See [Postgres](../postgres.md) for details.
+See [Postgres](postgres.md) for details.
 
 # Upgrading to v1.8.0
 
@@ -856,8 +1239,8 @@ section headed `email`, and be sure to have at least the
 You may also need to set `smtp_user`, `smtp_pass`, and
 `require_transport_security`.
 
-See the [sample configuration file](docs/sample_config.yaml) for more
-details on these settings.
+See the [sample configuration file](usage/configuration/homeserver_sample_config.md)
+for more details on these settings.
 
 #### Delegate email to an identity server
 
@@ -959,7 +1342,7 @@ back to v1.3.1, subject to the following:
 
 Some counter metrics have been renamed, with the old names deprecated.
 See [the metrics
-documentation](../metrics-howto.md#renaming-of-metrics--deprecation-of-old-names-in-12)
+documentation](metrics-howto.md#renaming-of-metrics--deprecation-of-old-names-in-12)
 for details.
 
 # Upgrading to v1.1.0
@@ -994,8 +1377,7 @@ more details on upgrading your database.
 
 Synapse v1.0 is the first release to enforce validation of TLS
 certificates for the federation API. It is therefore essential that your
-certificates are correctly configured. See the
-[FAQ](../MSC1711_certificates_FAQ.md) for more information.
+certificates are correctly configured.
 
 Note, v1.0 installations will also no longer be able to federate with
 servers that have not correctly configured their certificates.
@@ -1010,8 +1392,8 @@ ways:-
 -   Configure a whitelist of server domains to trust via
     `federation_certificate_verification_whitelist`.
 
-See the [sample configuration file](docs/sample_config.yaml) for more
-details on these settings.
+See the [sample configuration file](usage/configuration/homeserver_sample_config.md)
+for more details on these settings.
 
 ## Email
 
@@ -1036,8 +1418,8 @@ If you are absolutely certain that you wish to continue using an
 identity server for password resets, set
 `trust_identity_server_for_password_resets` to `true`.
 
-See the [sample configuration file](docs/sample_config.yaml) for more
-details on these settings.
+See the [sample configuration file](usage/configuration/homeserver_sample_config.md)
+for more details on these settings.
 
 ## New email templates
 
@@ -1057,11 +1439,8 @@ sent to them.
 
 Please be aware that, before Synapse v1.0 is released around March 2019,
 you will need to replace any self-signed certificates with those
-verified by a root CA. Information on how to do so can be found at [the
-ACME docs](../ACME.md).
-
-For more information on configuring TLS certificates see the
-[FAQ](../MSC1711_certificates_FAQ.md).
+verified by a root CA. Information on how to do so can be found at the
+ACME docs.
 
 # Upgrading to v0.34.0
 
@@ -1073,16 +1452,20 @@ For more information on configuring TLS certificates see the
     For users who have installed Synapse into a virtualenv, we recommend
     doing this by creating a new virtualenv. For example:
 
-        virtualenv -p python3 ~/synapse/env3
-        source ~/synapse/env3/bin/activate
-        pip install matrix-synapse
+    ```sh
+    virtualenv -p python3 ~/synapse/env3
+    source ~/synapse/env3/bin/activate
+    pip install matrix-synapse
+    ```
 
     You can then start synapse as normal, having activated the new
     virtualenv:
 
-        cd ~/synapse
-        source env3/bin/activate
-        synctl start
+    ```sh
+    cd ~/synapse
+    source env3/bin/activate
+    synctl start
+    ```
 
     Users who have installed from distribution packages should see the
     relevant package documentation. See below for notes on Debian
@@ -1094,34 +1477,38 @@ For more information on configuring TLS certificates see the
         `<server>.log.config` file. For example, if your `log.config`
         file contains:
 
-            handlers:
-              file:
-                class: logging.handlers.RotatingFileHandler
-                formatter: precise
-                filename: homeserver.log
-                maxBytes: 104857600
-                backupCount: 10
-                filters: [context]
-              console:
-                class: logging.StreamHandler
-                formatter: precise
-                filters: [context]
+        ```yaml
+        handlers:
+          file:
+            class: logging.handlers.RotatingFileHandler
+            formatter: precise
+            filename: homeserver.log
+            maxBytes: 104857600
+            backupCount: 10
+            filters: [context]
+          console:
+            class: logging.StreamHandler
+            formatter: precise
+            filters: [context]
+        ```
 
         Then you should update this to be:
 
-            handlers:
-              file:
-                class: logging.handlers.RotatingFileHandler
-                formatter: precise
-                filename: homeserver.log
-                maxBytes: 104857600
-                backupCount: 10
-                filters: [context]
-                encoding: utf8
-              console:
-                class: logging.StreamHandler
-                formatter: precise
-                filters: [context]
+        ```yaml
+        handlers:
+          file:
+            class: logging.handlers.RotatingFileHandler
+            formatter: precise
+            filename: homeserver.log
+            maxBytes: 104857600
+            backupCount: 10
+            filters: [context]
+            encoding: utf8
+          console:
+            class: logging.StreamHandler
+            formatter: precise
+            filters: [context]
+        ```
 
         There is no need to revert this change if downgrading to
         Python 2.
@@ -1207,24 +1594,28 @@ with the HS remotely has been removed.
 It has been replaced by specifying a list of application service
 registrations in `homeserver.yaml`:
 
-    app_service_config_files: ["registration-01.yaml", "registration-02.yaml"]
+```yaml
+app_service_config_files: ["registration-01.yaml", "registration-02.yaml"]
+```
 
 Where `registration-01.yaml` looks like:
 
-    url: <String>  # e.g. "https://my.application.service.com"
-    as_token: <String>
-    hs_token: <String>
-    sender_localpart: <String>  # This is a new field which denotes the user_id localpart when using the AS token
-    namespaces:
-      users:
-        - exclusive: <Boolean>
-          regex: <String>  # e.g. "@prefix_.*"
-      aliases:
-        - exclusive: <Boolean>
-          regex: <String>
-      rooms:
-        - exclusive: <Boolean>
-          regex: <String>
+```yaml
+url: <String>  # e.g. "https://my.application.service.com"
+as_token: <String>
+hs_token: <String>
+sender_localpart: <String>  # This is a new field which denotes the user_id localpart when using the AS token
+namespaces:
+  users:
+    - exclusive: <Boolean>
+      regex: <String>  # e.g. "@prefix_.*"
+  aliases:
+    - exclusive: <Boolean>
+      regex: <String>
+  rooms:
+    - exclusive: <Boolean>
+      regex: <String>
+```
 
 # Upgrading to v0.8.0
 
@@ -1263,9 +1654,9 @@ first need to upgrade the database by running:
 
     python scripts/upgrade_db_to_v0.6.0.py <db> <server_name> <signing_key>
 
-Where [<db>]{.title-ref} is the location of the database,
-[<server_name>]{.title-ref} is the server name as specified in the
-synapse configuration, and [<signing_key>]{.title-ref} is the location
+Where `<db>` is the location of the database,
+`<server_name>` is the server name as specified in the
+synapse configuration, and `<signing_key>` is the location
 of the signing key as specified in the synapse configuration.
 
 This may take some time to complete. Failures of signatures and content

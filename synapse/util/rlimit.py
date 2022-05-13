@@ -18,7 +18,7 @@ import resource
 logger = logging.getLogger("synapse.app.homeserver")
 
 
-def change_resource_limit(soft_file_no):
+def change_resource_limit(soft_file_no: int) -> None:
     try:
         soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
 

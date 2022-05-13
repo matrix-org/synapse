@@ -1,5 +1,8 @@
 # User Admin API
 
+To use it, you will need to authenticate by providing an `access_token`
+for a server admin: see [Admin API](../usage/administration/admin_api).
+
 ## Query User Account
 
 This API returns information about a specific user account.
@@ -10,29 +13,31 @@ The api is:
 GET /_synapse/admin/v2/users/<user_id>
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 It returns a JSON body like the following:
 
-```json
+```jsonc
 {
-    "displayname": "User",
+    "name": "@user:example.com",
+    "displayname": "User", // can be null if not set
     "threepids": [
         {
             "medium": "email",
-            "address": "<user_mail_1>"
+            "address": "<user_mail_1>",
+            "added_at": 1586458409743,
+            "validated_at": 1586458409743
         },
         {
             "medium": "email",
-            "address": "<user_mail_2>"
+            "address": "<user_mail_2>",
+            "added_at": 1586458409743,
+            "validated_at": 1586458409743
         }
     ],
-    "avatar_url": "<avatar_url>",
+    "avatar_url": "<avatar_url>",  // can be null if not set
+    "is_guest": 0,
     "admin": 0,
     "deactivated": 0,
     "shadow_banned": 0,
-    "password_hash": "$2b$12$p9B4GkqYdRTPGD",
     "creation_ts": 1560432506,
     "appservice_id": null,
     "consent_server_notice_sent": null,
@@ -46,7 +51,8 @@ It returns a JSON body like the following:
             "auth_provider": "<provider2>",
             "external_id": "<user_id_provider_2>"
         }
-    ]
+    ],
+    "user_type": null
 }
 ```
 
@@ -81,14 +87,26 @@ with a body of:
             "address": "<user_mail_2>"
         }
     ],
+    "external_ids": [
+        {
+            "auth_provider": "<provider1>",
+            "external_id": "<user_id_provider_1>"
+        },
+        {
+            "auth_provider": "<provider2>",
+            "external_id": "<user_id_provider_2>"
+        }
+    ],
     "avatar_url": "<avatar_url>",
     "admin": false,
-    "deactivated": false
+    "deactivated": false,
+    "user_type": null
 }
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
+Returns HTTP status code:
+- `201` - When a new user object was created.
+- `200` - When a user was modified.
 
 URL parameters:
 
@@ -96,23 +114,31 @@ URL parameters:
 
 Body parameters:
 
-- `password`, optional. If provided, the user's password is updated and all
+- `password` - string, optional. If provided, the user's password is updated and all
   devices are logged out.
-
-- `displayname`, optional, defaults to the value of `user_id`.
-
-- `threepids`, optional, allows setting the third-party IDs (email, msisdn)
+- `displayname` - string, optional, defaults to the value of `user_id`.
+- `threepids` - array, optional, allows setting the third-party IDs (email, msisdn)
+  - `medium` - string. Kind of third-party ID, either `email` or `msisdn`.
+  - `address` - string. Value of third-party ID.
   belonging to a user.
-
-- `avatar_url`, optional, must be a
+- `external_ids` - array, optional. Allow setting the identifier of the external identity
+  provider for SSO (Single sign-on). Details in
+  [Sample Configuration File](../usage/configuration/homeserver_sample_config.html)
+  section `sso` and `oidc_providers`.
+  - `auth_provider` - string. ID of the external identity provider. Value of `idp_id`
+    in the homeserver configuration. Note that no error is raised if the provided
+    value is not in the homeserver configuration.
+  - `external_id` - string, user ID in the external identity provider.
+- `avatar_url` - string, optional, must be a
   [MXC URI](https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris).
-
-- `admin`, optional, defaults to `false`.
-
-- `deactivated`, optional. If unspecified, deactivation state will be left
+- `admin` - bool, optional, defaults to `false`.
+- `deactivated` - bool, optional. If unspecified, deactivation state will be left
   unchanged on existing accounts and set to `false` for new accounts.
   A user cannot be erased by deactivating with this API. For details on
   deactivating users see [Deactivate Account](#deactivate-account).
+- `user_type` - string or null, optional. If provided, the user type will be
+  adjusted. If `null` given, the user type will be cleared. Other 
+  allowed options are: `bot` and `support`.
 
 If the user already exists then optional parameters default to the current value.
 
@@ -127,9 +153,6 @@ By default, the response is ordered by ascending user ID.
 ```
 GET /_synapse/admin/v2/users?from=0&limit=10&guests=false
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 A response body like the following is returned:
 
@@ -250,9 +273,6 @@ GET /_matrix/client/r0/admin/whois/<userId>
 See also: [Client Server
 API Whois](https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid).
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 It returns a JSON body like the following:
 
 ```json
@@ -307,23 +327,26 @@ with a body of:
 }
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 The erase parameter is optional and defaults to `false`.
 An empty body may be passed for backwards compatibility.
 
 The following actions are performed when deactivating an user:
 
-- Try to unpind 3PIDs from the identity server
+- Try to unbind 3PIDs from the identity server
 - Remove all 3PIDs from the homeserver
 - Delete all devices and E2EE keys
 - Delete all access tokens
+- Delete all pushers
 - Delete the password hash
 - Removal from all rooms the user is a member of
 - Remove the user from the user directory
 - Reject all pending invites
 - Remove all account validity information related to the user
+- Remove the arbitrary data store known as *account data*. For example, this includes:
+    - list of ignored users;
+    - push rules;
+    - secret storage keys; and
+    - cross-signing keys.
 
 The following additional actions are performed during deactivation if `erase`
 is set to `true`:
@@ -332,6 +355,14 @@ is set to `true`:
 - Remove the user's avatar URL
 - Mark the user as erased
 
+The following actions are **NOT** performed. The list may be incomplete.
+
+- Remove mappings of SSO IDs
+- [Delete media uploaded](#delete-media-uploaded-by-a-user) by user (included avatar images)
+- Delete sent and received messages
+- Remove the user's creation (registration) timestamp
+- [Remove rate limit overrides](#override-ratelimiting-for-users)
+- Remove from monthly active users
 
 ## Reset password
 
@@ -352,9 +383,6 @@ with a body of:
 }
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 The parameter `new_password` is required.
 The parameter `logout_devices` is optional and defaults to `true`.
 
@@ -366,9 +394,6 @@ The api is:
 ```
 GET /_synapse/admin/v1/users/<user_id>/admin
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 A response body like the following is returned:
 
@@ -397,10 +422,6 @@ with a body of:
 }
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
-
 ## List room memberships of a user
 
 Gets a list of all `room_id` that a specific `user_id` is member.
@@ -410,9 +431,6 @@ The API is:
 ```
 GET /_synapse/admin/v1/users/<user_id>/joined_rooms
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 A response body like the following is returned:
 
@@ -443,9 +461,90 @@ The following fields are returned in the JSON response body:
 - `joined_rooms` - An array of `room_id`.
 - `total` - Number of rooms.
 
+## Account Data
+Gets information about account data for a specific `user_id`.
 
-## List media of a user
+The API is:
+
+```
+GET /_synapse/admin/v1/users/<user_id>/accountdata
+```
+
+A response body like the following is returned:
+
+```json
+{
+    "account_data": {
+        "global": {
+            "m.secret_storage.key.LmIGHTg5W": {
+                "algorithm": "m.secret_storage.v1.aes-hmac-sha2",
+                "iv": "fwjNZatxg==",
+                "mac": "eWh9kNnLWZUNOgnc="
+            },
+            "im.vector.hide_profile": {
+                "hide_profile": true
+            },
+            "org.matrix.preview_urls": {
+                "disable": false
+            },
+            "im.vector.riot.breadcrumb_rooms": {
+                "rooms": [
+                    "!LxcBDAsDUVAfJDEo:matrix.org",
+                    "!MAhRxqasbItjOqxu:matrix.org"
+                ]
+            },
+            "m.accepted_terms": {
+                "accepted": [
+                    "https://example.org/somewhere/privacy-1.2-en.html",
+                    "https://example.org/somewhere/terms-2.0-en.html"
+                ]
+            },
+            "im.vector.setting.breadcrumbs": {
+                "recent_rooms": [
+                    "!MAhRxqasbItqxuEt:matrix.org",
+                    "!ZtSaPCawyWtxiImy:matrix.org"
+                ]
+            }
+        },
+        "rooms": {
+            "!GUdfZSHUJibpiVqHYd:matrix.org": {
+                "m.fully_read": {
+                    "event_id": "$156334540fYIhZ:matrix.org"
+                }
+            },
+            "!tOZwOOiqwCYQkLhV:matrix.org": {
+                "m.fully_read": {
+                    "event_id": "$xjsIyp4_NaVl2yPvIZs_k1Jl8tsC_Sp23wjqXPno"
+                }
+            }
+        }
+    }
+}
+```
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `user_id` - fully qualified: for example, `@user:server.com`.
+
+**Response**
+
+The following fields are returned in the JSON response body:
+
+- `account_data` - A map containing the account data for the user
+  - `global` - A map containing the global account data for the user
+  - `rooms` - A map containing the account data per room for the user
+
+## User media
+
+### List media uploaded by a user
 Gets a list of all local media that a specific `user_id` has created.
+These are media that the user has uploaded themselves
+([local media](../media_repository.md#local-media)), as well as
+[URL preview images](../media_repository.md#url-previews) requested by the user if the
+[feature is enabled](../development/url_previews.md).
+
 By default, the response is ordered by descending creation date and ascending media ID.
 The newest media is on top. You can change the order with parameters
 `order_by` and `dir`.
@@ -455,9 +554,6 @@ The API is:
 ```
 GET /_synapse/admin/v1/users/<user_id>/media
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 A response body like the following is returned:
 
@@ -543,20 +639,63 @@ The following fields are returned in the JSON response body:
 
 - `media` - An array of objects, each containing information about a media.
   Media objects contain the following fields:
-
   - `created_ts` - integer - Timestamp when the content was uploaded in ms.
   - `last_access_ts` - integer - Timestamp when the content was last accessed in ms.
-  - `media_id` - string - The id used to refer to the media.
+  - `media_id` - string - The id used to refer to the media. Details about the format
+    are documented under
+    [media repository](../media_repository.md).
   - `media_length` - integer - Length of the media in bytes.
   - `media_type` - string - The MIME-type of the media.
   - `quarantined_by` - string - The user ID that initiated the quarantine request
     for this media.
-
   - `safe_from_quarantine` - bool - Status if this media is safe from quarantining.
   - `upload_name` - string - The name the media was uploaded with.
-
 - `next_token`: integer - Indication for pagination. See above.
 - `total` - integer - Total number of media.
+
+### Delete media uploaded by a user
+
+This API deletes the *local* media from the disk of your own server
+that a specific `user_id` has created. This includes any local thumbnails.
+
+This API will not affect media that has been uploaded to external
+media repositories (e.g https://github.com/turt2live/matrix-media-repo/).
+
+By default, the API deletes media ordered by descending creation date and ascending media ID.
+The newest media is deleted first. You can change the order with parameters
+`order_by` and `dir`. If no `limit` is set the API deletes `100` files per request.
+
+The API is:
+
+```
+DELETE /_synapse/admin/v1/users/<user_id>/media
+```
+
+A response body like the following is returned:
+
+```json
+{
+  "deleted_media": [
+    "abcdefghijklmnopqrstuvwx"
+  ],
+  "total": 1
+}
+```
+
+The following fields are returned in the JSON response body:
+
+* `deleted_media`: an array of strings - List of deleted `media_id`
+* `total`: integer - Total number of deleted `media_id`
+
+**Note**: There is no `next_token`. This is not useful for deleting media, because
+after deleting media the remaining media have a new order.
+
+**Parameters**
+
+This API has the same parameters as
+[List media uploaded by a user](#list-media-uploaded-by-a-user).
+With the parameters you can for example limit the number of files to delete at once or
+delete largest/smallest or newest/oldest files first.
 
 ## Login as a user
 
@@ -603,9 +742,6 @@ The API is:
 ```
 GET /_synapse/admin/v2/users/<user_id>/devices
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 A response body like the following is returned:
 
@@ -668,12 +804,9 @@ POST /_synapse/admin/v2/users/<user_id>/delete_devices
   "devices": [
     "QBUAZIFURK",
     "AUIECTSRND"
-  ],
+  ]
 }
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 An empty JSON dict is returned.
 
@@ -695,9 +828,6 @@ The API is:
 ```
 GET /_synapse/admin/v2/users/<user_id>/devices/<device_id>
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 A response body like the following is returned:
 
@@ -744,9 +874,6 @@ PUT /_synapse/admin/v2/users/<user_id>/devices/<device_id>
 }
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 An empty JSON dict is returned.
 
 **Parameters**
@@ -773,9 +900,6 @@ DELETE /_synapse/admin/v2/users/<user_id>/devices/<device_id>
 {}
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 An empty JSON dict is returned.
 
 **Parameters**
@@ -793,9 +917,6 @@ The API is:
 ```
 GET /_synapse/admin/v1/users/<user_id>/pushers
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 A response body like the following is returned:
 
@@ -866,7 +987,7 @@ The following fields are returned in the JSON response body:
 See also the
 [Client-Server API Spec on pushers](https://matrix.org/docs/spec/client_server/latest#get-matrix-client-r0-pushers).
 
-## Shadow-banning users
+## Controlling whether a user is shadow-banned
 
 Shadow-banning is a useful tool for moderating malicious or egregiously abusive users.
 A shadow-banned users receives successful responses to their client-server API requests,
@@ -879,16 +1000,19 @@ or broken behaviour for the client. A shadow-banned user will not receive any
 notification and it is generally more appropriate to ban or kick abusive users.
 A shadow-banned user will be unable to contact anyone on the server.
 
-The API is:
+To shadow-ban a user the API is:
 
 ```
 POST /_synapse/admin/v1/users/<user_id>/shadow_ban
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
+To un-shadow-ban a user the API is:
 
-An empty JSON dict is returned.
+```
+DELETE /_synapse/admin/v1/users/<user_id>/shadow_ban
+```
+
+An empty JSON dict is returned in both cases.
 
 **Parameters**
 
@@ -909,9 +1033,6 @@ The API is:
 ```
 GET /_synapse/admin/v1/users/<user_id>/override_ratelimit
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 A response body like the following is returned:
 
@@ -951,9 +1072,6 @@ The API is:
 ```
 POST /_synapse/admin/v1/users/<user_id>/override_ratelimit
 ```
-
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
 
 A response body like the following is returned:
 
@@ -997,9 +1115,6 @@ The API is:
 DELETE /_synapse/admin/v1/users/<user_id>/override_ratelimit
 ```
 
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../usage/administration/admin_api)
-
 An empty JSON dict is returned.
 
 ```json
@@ -1013,3 +1128,20 @@ The following parameters should be set in the URL:
 - `user_id` - The fully qualified MXID: for example, `@user:server.com`. The user must
   be local.
 
+### Check username availability
+
+Checks to see if a username is available, and valid, for the server. See [the client-server 
+API](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available)
+for more information.
+
+This endpoint will work even if registration is disabled on the server, unlike 
+`/_matrix/client/r0/register/available`.
+
+The API is:
+
+```
+GET /_synapse/admin/v1/username_available?username=$localpart
+```
+
+The request and response format is the same as the
+[/_matrix/client/r0/register/available](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available) API.

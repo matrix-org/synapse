@@ -19,7 +19,9 @@ from synapse.push.rulekinds import PRIORITY_CLASS_INVERSE_MAP, PRIORITY_CLASS_MA
 from synapse.types import UserID
 
 
-def format_push_rules_for_user(user: UserID, ruleslist) -> Dict[str, Dict[str, list]]:
+def format_push_rules_for_user(
+    user: UserID, ruleslist: List
+) -> Dict[str, Dict[str, list]]:
     """Converts a list of rawrules and a enabled map into nested dictionaries
     to match the Matrix client-server format for push rules"""
 
@@ -38,7 +40,7 @@ def format_push_rules_for_user(user: UserID, ruleslist) -> Dict[str, Dict[str, l
 
         # Remove internal stuff.
         for c in r["conditions"]:
-            c.pop("_id", None)
+            c.pop("_cache_key", None)
 
             pattern_type = c.pop("pattern_type", None)
             if pattern_type == "user_id":

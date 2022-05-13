@@ -18,12 +18,14 @@ import itertools
 import logging
 from collections import deque
 from typing import (
+    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
     Collection,
     Deque,
     Dict,
+    Generator,
     Generic,
     Iterable,
     List,
@@ -55,6 +57,9 @@ from synapse.types import (
 )
 from synapse.util.async_helpers import ObservableDeferred, yieldable_gather_results
 from synapse.util.metrics import Measure
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +208,7 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
 
         return res
 
-    def _handle_queue(self, room_id):
+    def _handle_queue(self, room_id: str) -> None:
         """Attempts to handle the queue for a room if not already being handled.
 
         The queue's callback will be invoked with for each item in the queue,
@@ -223,7 +228,7 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
 
         self._currently_persisting_rooms.add(room_id)
 
-        async def handle_queue_loop():
+        async def handle_queue_loop() -> None:
             try:
                 queue = self._get_drainining_queue(room_id)
                 for item in queue:
@@ -246,15 +251,17 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
                         with PreserveLoggingContext():
                             item.deferred.callback(ret)
             finally:
-                queue = self._event_persist_queues.pop(room_id, None)
-                if queue:
-                    self._event_persist_queues[room_id] = queue
+                remaining_queue = self._event_persist_queues.pop(room_id, None)
+                if remaining_queue:
+                    self._event_persist_queues[room_id] = remaining_queue
                 self._currently_persisting_rooms.discard(room_id)
 
         # set handle_queue_loop off in the background
         run_as_background_process("persist_events", handle_queue_loop)
 
-    def _get_drainining_queue(self, room_id):
+    def _get_drainining_queue(
+        self, room_id: str
+    ) -> Generator[_EventPersistQueueItem, None, None]:
         queue = self._event_persist_queues.setdefault(room_id, deque())
 
         try:
@@ -272,7 +279,7 @@ class EventsPersistenceStorage:
     current state and forward extremity changes.
     """
 
-    def __init__(self, hs, stores: Databases):
+    def __init__(self, hs: "HomeServer", stores: Databases):
         # We ultimately want to split out the state store from the main store,
         # so we use separate variables here even though they point to the same
         # store for now.
@@ -313,7 +320,9 @@ class EventsPersistenceStorage:
         for event, ctx in events_and_contexts:
             partitioned.setdefault(event.room_id, []).append((event, ctx))
 
-        async def enqueue(item):
+        async def enqueue(
+            item: Tuple[str, List[Tuple[EventBase, EventContext]]]
+        ) -> Dict[str, str]:
             room_id, evs_ctxs = item
             return await self._event_persist_queue.add_to_queue(
                 room_id, evs_ctxs, backfilled=backfilled
@@ -372,6 +381,62 @@ class EventsPersistenceStorage:
         pos = PersistedEventPosition(self._instance_name, event_stream_id)
         return event, pos, self.main_store.get_room_max_token()
 
+    async def update_current_state(self, room_id: str) -> None:
+        """Recalculate the current state for a room, and persist it"""
+        state = await self._calculate_current_state(room_id)
+        delta = await self._calculate_state_delta(room_id, state)
+
+        # TODO(faster_joins): get a real stream ordering, to make this work correctly
+        #    across workers.
+        #
+        # TODO(faster_joins): this can race against event persistence, in which case we
+        #    will end up with incorrect state. Perhaps we should make this a job we
+        #    farm out to the event persister, somehow.
+        stream_id = self.main_store.get_room_max_stream_ordering()
+        await self.persist_events_store.update_current_state(room_id, delta, stream_id)
+
+    async def _calculate_current_state(self, room_id: str) -> StateMap[str]:
+        """Calculate the current state of a room, based on the forward extremities
+
+        Args:
+            room_id: room for which to calculate current state
+
+        Returns:
+            map from (type, state_key) to event id for the  current state in the room
+        """
+        latest_event_ids = await self.main_store.get_latest_event_ids_in_room(room_id)
+        state_groups = set(
+            (
+                await self.main_store._get_state_group_for_events(latest_event_ids)
+            ).values()
+        )
+
+        state_maps_by_state_group = await self.state_store._get_state_for_groups(
+            state_groups
+        )
+
+        if len(state_groups) == 1:
+            # If there is only one state group, then we know what the current
+            # state is.
+            return state_maps_by_state_group[state_groups.pop()]
+
+        # Ok, we need to defer to the state handler to resolve our state sets.
+        logger.debug("calling resolve_state_groups from preserve_events")
+
+        # Avoid a circular import.
+        from synapse.state import StateResolutionStore
+
+        room_version = await self.main_store.get_room_version_id(room_id)
+        res = await self._state_resolution_handler.resolve_state_groups(
+            room_id,
+            room_version,
+            state_maps_by_state_group,
+            event_map=None,
+            state_res_store=StateResolutionStore(self.main_store),
+        )
+
+        return res.state
+
     async def _persist_event_batch(
         self,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
@@ -423,21 +488,15 @@ class EventsPersistenceStorage:
             # NB: Assumes that we are only persisting events for one room
             # at a time.
 
-            # map room_id->list[event_ids] giving the new forward
+            # map room_id->set[event_ids] giving the new forward
             # extremities in each room
-            new_forward_extremeties = {}
-
-            # map room_id->(type,state_key)->event_id tracking the full
-            # state in each room after adding these events.
-            # This is simply used to prefill the get_current_state_ids
-            # cache
-            current_state_for_room = {}
+            new_forward_extremities: Dict[str, Set[str]] = {}
 
             # map room_id->(to_delete, to_insert) where to_delete is a list
             # of type/state keys to remove from current state, and to_insert
             # is a map (type,key)->event_id giving the state delta in each
             # room
-            state_delta_for_room = {}
+            state_delta_for_room: Dict[str, DeltaState] = {}
 
             # Set of remote users which were in rooms the server has left. We
             # should check if we still share any rooms and if not we mark their
@@ -456,14 +515,13 @@ class EventsPersistenceStorage:
                         )
 
                     for room_id, ev_ctx_rm in events_by_room.items():
-                        latest_event_ids = (
+                        latest_event_ids = set(
                             await self.main_store.get_latest_event_ids_in_room(room_id)
                         )
                         new_latest_event_ids = await self._calculate_new_extremities(
                             room_id, ev_ctx_rm, latest_event_ids
                         )
 
-                        latest_event_ids = set(latest_event_ids)
                         if new_latest_event_ids == latest_event_ids:
                             # No change in extremities, so no change in state
                             continue
@@ -474,7 +532,7 @@ class EventsPersistenceStorage:
                         # extremities, so we'll `continue` above and skip this bit.)
                         assert new_latest_event_ids, "No forward extremities left!"
 
-                        new_forward_extremeties[room_id] = new_latest_event_ids
+                        new_forward_extremities[room_id] = new_latest_event_ids
 
                         len_1 = (
                             len(latest_event_ids) == 1
@@ -529,7 +587,7 @@ class EventsPersistenceStorage:
                             # extremities, so we'll `continue` above and skip this bit.)
                             assert new_latest_event_ids, "No forward extremities left!"
 
-                            new_forward_extremeties[room_id] = new_latest_event_ids
+                            new_forward_extremities[room_id] = new_latest_event_ids
 
                         # If either are not None then there has been a change,
                         # and we need to work out the delta (or use that
@@ -563,23 +621,18 @@ class EventsPersistenceStorage:
                             )
                             if not is_still_joined:
                                 logger.info("Server no longer in room %s", room_id)
-                                latest_event_ids = []
+                                latest_event_ids = set()
                                 current_state = {}
                                 delta.no_longer_in_room = True
 
                             state_delta_for_room[room_id] = delta
 
-                        # If we have the current_state then lets prefill
-                        # the cache with it.
-                        if current_state is not None:
-                            current_state_for_room[room_id] = current_state
-
             await self.persist_events_store._persist_events_and_state_updates(
                 chunk,
-                current_state_for_room=current_state_for_room,
                 state_delta_for_room=state_delta_for_room,
-                new_forward_extremeties=new_forward_extremeties,
-                backfilled=backfilled,
+                new_forward_extremities=new_forward_extremities,
+                use_negative_stream_ordering=backfilled,
+                inhibit_local_membership_updates=backfilled,
             )
 
             await self._handle_potentially_left_users(potentially_left_users)
@@ -591,7 +644,7 @@ class EventsPersistenceStorage:
         room_id: str,
         event_contexts: List[Tuple[EventBase, EventContext]],
         latest_event_ids: Collection[str],
-    ):
+    ) -> Set[str]:
         """Calculates the new forward extremities for a room given events to
         persist.
 
@@ -673,7 +726,8 @@ class EventsPersistenceStorage:
 
             The first state map is the full new current state and the second
             is the delta to the existing current state. If both are None then
-            there has been no change.
+            there has been no change. Either or neither can be None if there
+            has been a change.
 
             The function may prune some old entries from the set of new
             forward extremities if it's safe to do so.
@@ -683,9 +737,6 @@ class EventsPersistenceStorage:
             the new current state is only returned if we've already calculated
             it.
         """
-        # map from state_group to ((type, key) -> event_id) state map
-        state_groups_map = {}
-
         # Map from (prev state group, new state group) -> delta state dict
         state_group_deltas = {}
 
@@ -698,16 +749,6 @@ class EventsPersistenceStorage:
                         "group" % (ev.event_id,)
                     )
                 continue
-
-            if ctx.state_group in state_groups_map:
-                continue
-
-            # We're only interested in pulling out state that has already
-            # been cached in the context. We'll pull stuff out of the DB later
-            # if necessary.
-            current_state_ids = ctx.get_cached_current_state_ids()
-            if current_state_ids is not None:
-                state_groups_map[ctx.state_group] = current_state_ids
 
             if ctx.prev_group:
                 state_group_deltas[(ctx.prev_group, ctx.state_group)] = ctx.delta_ids
@@ -766,18 +807,14 @@ class EventsPersistenceStorage:
             delta_ids = state_group_deltas.get((old_state_group, new_state_group), None)
             if delta_ids is not None:
                 # We have a delta from the existing to new current state,
-                # so lets just return that. If we happen to already have
-                # the current state in memory then lets also return that,
-                # but it doesn't matter if we don't.
-                new_state = state_groups_map.get(new_state_group)
-                return new_state, delta_ids, new_latest_event_ids
+                # so lets just return that.
+                return None, delta_ids, new_latest_event_ids
 
         # Now that we have calculated new_state_groups we need to get
         # their state IDs so we can resolve to a single state set.
-        missing_state = new_state_groups - set(state_groups_map)
-        if missing_state:
-            group_to_state = await self.state_store._get_state_for_groups(missing_state)
-            state_groups_map.update(group_to_state)
+        state_groups_map = await self.state_store._get_state_for_groups(
+            new_state_groups
+        )
 
         if len(new_state_groups) == 1:
             # If there is only one state group, then we know what the current
@@ -883,7 +920,7 @@ class EventsPersistenceStorage:
         dropped_events = await self.main_store.get_events(
             dropped_extrems,
             allow_rejected=True,
-            redact_behaviour=EventRedactBehaviour.AS_IS,
+            redact_behaviour=EventRedactBehaviour.as_is,
         )
 
         new_senders = {get_domain_from_id(e.sender) for e, _ in events_context}
@@ -901,9 +938,9 @@ class EventsPersistenceStorage:
             # Ideally we'd figure out a way of still being able to drop old
             # dummy events that reference local events, but this is good enough
             # as a first cut.
-            events_to_check = [event]
+            events_to_check: Collection[EventBase] = [event]
             while events_to_check:
-                new_events = set()
+                new_events: Set[str] = set()
                 for event_to_check in events_to_check:
                     if self.is_mine_id(event_to_check.sender):
                         if event_to_check.type != EventTypes.Dummy:
@@ -914,7 +951,7 @@ class EventsPersistenceStorage:
                 prev_events = await self.main_store.get_events(
                     new_events,
                     allow_rejected=True,
-                    redact_behaviour=EventRedactBehaviour.AS_IS,
+                    redact_behaviour=EventRedactBehaviour.as_is,
                 )
                 events_to_check = prev_events.values()
 
@@ -1019,8 +1056,13 @@ class EventsPersistenceStorage:
 
         # Check if any of the changes that we don't have events for are joins.
         if events_to_check:
-            rows = await self.main_store.get_membership_from_event_ids(events_to_check)
-            is_still_joined = any(row["membership"] == Membership.JOIN for row in rows)
+            members = await self.main_store.get_membership_from_event_ids(
+                events_to_check
+            )
+            is_still_joined = any(
+                member and member.membership == Membership.JOIN
+                for member in members.values()
+            )
             if is_still_joined:
                 return True
 
@@ -1056,14 +1098,16 @@ class EventsPersistenceStorage:
             ), event_id in current_state.items()
             if typ == EventTypes.Member and not self.is_mine_id(state_key)
         ]
-        rows = await self.main_store.get_membership_from_event_ids(remote_event_ids)
+        members = await self.main_store.get_membership_from_event_ids(remote_event_ids)
         potentially_left_users.update(
-            row["user_id"] for row in rows if row["membership"] == Membership.JOIN
+            member.user_id
+            for member in members.values()
+            if member and member.membership == Membership.JOIN
         )
 
         return False
 
-    async def _handle_potentially_left_users(self, user_ids: Set[str]):
+    async def _handle_potentially_left_users(self, user_ids: Set[str]) -> None:
         """Given a set of remote users check if the server still shares a room with
         them. If not then mark those users' device cache as stale.
         """

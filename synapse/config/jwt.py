@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any
+
+from synapse.types import JsonDict
+
 from ._base import Config, ConfigError
 
 MISSING_JWT = """Missing jwt library. This is required for jwt login.
@@ -24,12 +28,14 @@ MISSING_JWT = """Missing jwt library. This is required for jwt login.
 class JWTConfig(Config):
     section = "jwt"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         jwt_config = config.get("jwt_config", None)
         if jwt_config:
             self.jwt_enabled = jwt_config.get("enabled", False)
             self.jwt_secret = jwt_config["secret"]
             self.jwt_algorithm = jwt_config["algorithm"]
+
+            self.jwt_subject_claim = jwt_config.get("subject_claim", "sub")
 
             # The issuer and audiences are optional, if provided, it is asserted
             # that the claims exist on the JWT.
@@ -46,10 +52,11 @@ class JWTConfig(Config):
             self.jwt_enabled = False
             self.jwt_secret = None
             self.jwt_algorithm = None
+            self.jwt_subject_claim = None
             self.jwt_issuer = None
             self.jwt_audiences = None
 
-    def generate_config_section(self, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         # JSON web token integration. The following settings can be used to make
         # Synapse JSON web tokens for authentication, instead of its internal
@@ -87,6 +94,12 @@ class JWTConfig(Config):
             # Required if 'enabled' is true.
             #
             #algorithm: "provided-by-your-issuer"
+
+            # Name of the claim containing a unique identifier for the user.
+            #
+            # Optional, defaults to `sub`.
+            #
+            #subject_claim: "sub"
 
             # The issuer to validate the "iss" claim against.
             #

@@ -14,6 +14,10 @@
 
 import logging
 import re
+import typing
+
+if typing.TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -28,20 +32,31 @@ logger = logging.getLogger(__name__)
 MAX_EMAIL_ADDRESS_LENGTH = 500
 
 
-def check_3pid_allowed(hs, medium, address):
+async def check_3pid_allowed(
+    hs: "HomeServer",
+    medium: str,
+    address: str,
+    registration: bool = False,
+) -> bool:
     """Checks whether a given format of 3PID is allowed to be used on this HS
 
     Args:
-        hs (synapse.server.HomeServer): server
-        medium (str): 3pid medium - e.g. email, msisdn
-        address (str): address within that medium (e.g. "wotan@matrix.org")
+        hs: server
+        medium: 3pid medium - e.g. email, msisdn
+        address: address within that medium (e.g. "wotan@matrix.org")
             msisdns need to first have been canonicalised
+        registration: whether we want to bind the 3PID as part of registering a new user.
+
     Returns:
         bool: whether the 3PID medium/address is allowed to be added to this HS
     """
+    if not await hs.get_password_auth_provider().is_3pid_allowed(
+        medium, address, registration
+    ):
+        return False
 
-    if hs.config.allowed_local_3pids:
-        for constraint in hs.config.allowed_local_3pids:
+    if hs.config.registration.allowed_local_3pids:
+        for constraint in hs.config.registration.allowed_local_3pids:
             logger.debug(
                 "Checking 3PID %s (%s) against %s (%s)",
                 address,

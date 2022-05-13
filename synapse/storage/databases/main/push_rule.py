@@ -14,13 +14,14 @@
 # limitations under the License.
 import abc
 import logging
-from typing import List, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 
-from synapse.api.errors import NotFoundError, StoreError
+from synapse.api.errors import StoreError
+from synapse.config.homeserver import ExperimentalConfig
 from synapse.push.baserules import list_with_base_rules
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.appservice import ApplicationServiceWorkerStore
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.pusher import PusherWorkerStore
@@ -28,15 +29,35 @@ from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
-from synapse.storage.util.id_generators import StreamIdGenerator
+from synapse.storage.util.id_generators import (
+    AbstractStreamIdTracker,
+    StreamIdGenerator,
+)
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 
-def _load_rules(rawrules, enabled_map, use_new_defaults=False):
+def _is_experimental_rule_enabled(
+    rule_id: str, experimental_config: ExperimentalConfig
+) -> bool:
+    """Used by `_load_rules` to filter out experimental rules when they
+    have not been enabled.
+    """
+    if (
+        rule_id == "global/override/.org.matrix.msc3786.rule.room.server_acl"
+        and not experimental_config.msc3786_enabled
+    ):
+        return False
+    return True
+
+
+def _load_rules(rawrules, enabled_map, experimental_config: ExperimentalConfig):
     ruleslist = []
     for rawrule in rawrules:
         rule = dict(rawrule)
@@ -45,17 +66,26 @@ def _load_rules(rawrules, enabled_map, use_new_defaults=False):
         rule["default"] = False
         ruleslist.append(rule)
 
-    # We're going to be mutating this a lot, so do a deep copy
-    rules = list(list_with_base_rules(ruleslist, use_new_defaults))
+    # We're going to be mutating this a lot, so copy it. We also filter out
+    # any experimental default push rules that aren't enabled.
+    rules = [
+        rule
+        for rule in list_with_base_rules(ruleslist)
+        if _is_experimental_rule_enabled(rule["rule_id"], experimental_config)
+    ]
 
     for i, rule in enumerate(rules):
         rule_id = rule["rule_id"]
-        if rule_id in enabled_map:
-            if rule.get("enabled", True) != bool(enabled_map[rule_id]):
-                # Rules are cached across users.
-                rule = dict(rule)
-                rule["enabled"] = bool(enabled_map[rule_id])
-                rules[i] = rule
+
+        if rule_id not in enabled_map:
+            continue
+        if rule.get("enabled", True) == bool(enabled_map[rule_id]):
+            continue
+
+        # Rules are cached across users.
+        rule = dict(rule)
+        rule["enabled"] = bool(enabled_map[rule_id])
+        rules[i] = rule
 
     return rules
 
@@ -75,13 +105,18 @@ class PushRulesWorkerStore(
     `get_max_push_rules_stream_id` which can be called in the initializer.
     """
 
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
         if hs.config.worker.worker_app is None:
-            self._push_rules_stream_id_gen: Union[
-                StreamIdGenerator, SlavedIdTracker
-            ] = StreamIdGenerator(db_conn, "push_rules_stream", "stream_id")
+            self._push_rules_stream_id_gen: AbstractStreamIdTracker = StreamIdGenerator(
+                db_conn, "push_rules_stream", "stream_id"
+            )
         else:
             self._push_rules_stream_id_gen = SlavedIdTracker(
                 db_conn, "push_rules_stream", "stream_id"
@@ -100,8 +135,6 @@ class PushRulesWorkerStore(
             push_rules_id,
             prefilled_cache=push_rules_prefill,
         )
-
-        self._users_new_default_push_rules = hs.config.users_new_default_push_rules
 
     @abc.abstractmethod
     def get_max_push_rules_stream_id(self):
@@ -132,12 +165,10 @@ class PushRulesWorkerStore(
 
         enabled_map = await self.get_push_rules_enabled_for_user(user_id)
 
-        use_new_defaults = user_id in self._users_new_default_push_rules
-
-        return _load_rules(rows, enabled_map, use_new_defaults)
+        return _load_rules(rows, enabled_map, self.hs.config.experimental)
 
     @cached(max_entries=5000)
-    async def get_push_rules_enabled_for_user(self, user_id):
+    async def get_push_rules_enabled_for_user(self, user_id) -> Dict[str, bool]:
         results = await self.db_pool.simple_select_list(
             table="push_rules_enable",
             keyvalues={"user_name": user_id},
@@ -193,12 +224,8 @@ class PushRulesWorkerStore(
         enabled_map_by_user = await self.bulk_get_push_rules_enabled(user_ids)
 
         for user_id, rules in results.items():
-            use_new_defaults = user_id in self._users_new_default_push_rules
-
             results[user_id] = _load_rules(
-                rules,
-                enabled_map_by_user.get(user_id, {}),
-                use_new_defaults,
+                rules, enabled_map_by_user.get(user_id, {}), self.hs.config.experimental
             )
 
         return results
@@ -617,7 +644,7 @@ class PushRuleStore(PushRulesWorkerStore):
                 are always stored in the database `push_rules` table).
 
         Raises:
-            NotFoundError if the rule does not exist.
+            RuleNotFoundException if the rule does not exist.
         """
         async with self._push_rules_stream_id_gen.get_next() as stream_id:
             event_stream_ordering = self._stream_id_gen.get_current_token()
@@ -667,8 +694,7 @@ class PushRuleStore(PushRulesWorkerStore):
             )
             txn.execute(sql, (user_id, rule_id))
             if txn.fetchone() is None:
-                # needed to set NOT_FOUND code.
-                raise NotFoundError("Push rule does not exist.")
+                raise RuleNotFoundException("Push rule does not exist.")
 
         self.db_pool.simple_upsert_txn(
             txn,
@@ -697,9 +723,6 @@ class PushRuleStore(PushRulesWorkerStore):
         """
         Sets the `actions` state of a push rule.
 
-        Will throw NotFoundError if the rule does not exist; the Code for this
-        is NOT_FOUND.
-
         Args:
             user_id: the user ID of the user who wishes to enable/disable the rule
                 e.g. '@tina:example.org'
@@ -711,6 +734,9 @@ class PushRuleStore(PushRulesWorkerStore):
             is_default_rule: True if and only if this is a server-default rule.
                 This skips the check for existence (as only user-created rules
                 are always stored in the database `push_rules` table).
+
+        Raises:
+            RuleNotFoundException if the rule does not exist.
         """
         actions_json = json_encoder.encode(actions)
 
@@ -743,7 +769,7 @@ class PushRuleStore(PushRulesWorkerStore):
                 except StoreError as serr:
                     if serr.code == 404:
                         # this sets the NOT_FOUND error Code
-                        raise NotFoundError("Push rule does not exist")
+                        raise RuleNotFoundException("Push rule does not exist")
                     else:
                         raise
 

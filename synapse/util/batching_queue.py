@@ -122,7 +122,7 @@ class BatchingQueue(Generic[V, R]):
 
         # First we create a defer and add it and the value to the list of
         # pending items.
-        d = defer.Deferred()
+        d: defer.Deferred[R] = defer.Deferred()
         self._next_values.setdefault(key, []).append((value, d))
 
         # If we're not currently processing the key fire off a background

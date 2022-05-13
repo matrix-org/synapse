@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+from typing import List
 from unittest.mock import Mock
 
 from synapse.util.caches.lrucache import LruCache, setup_expire_lru_cache_entries
@@ -26,37 +27,37 @@ class LruCacheTestCase(unittest.HomeserverTestCase):
     def test_get_set(self):
         cache = LruCache(1)
         cache["key"] = "value"
-        self.assertEquals(cache.get("key"), "value")
-        self.assertEquals(cache["key"], "value")
+        self.assertEqual(cache.get("key"), "value")
+        self.assertEqual(cache["key"], "value")
 
     def test_eviction(self):
         cache = LruCache(2)
         cache[1] = 1
         cache[2] = 2
 
-        self.assertEquals(cache.get(1), 1)
-        self.assertEquals(cache.get(2), 2)
+        self.assertEqual(cache.get(1), 1)
+        self.assertEqual(cache.get(2), 2)
 
         cache[3] = 3
 
-        self.assertEquals(cache.get(1), None)
-        self.assertEquals(cache.get(2), 2)
-        self.assertEquals(cache.get(3), 3)
+        self.assertEqual(cache.get(1), None)
+        self.assertEqual(cache.get(2), 2)
+        self.assertEqual(cache.get(3), 3)
 
     def test_setdefault(self):
         cache = LruCache(1)
-        self.assertEquals(cache.setdefault("key", 1), 1)
-        self.assertEquals(cache.get("key"), 1)
-        self.assertEquals(cache.setdefault("key", 2), 1)
-        self.assertEquals(cache.get("key"), 1)
+        self.assertEqual(cache.setdefault("key", 1), 1)
+        self.assertEqual(cache.get("key"), 1)
+        self.assertEqual(cache.setdefault("key", 2), 1)
+        self.assertEqual(cache.get("key"), 1)
         cache["key"] = 2  # Make sure overriding works.
-        self.assertEquals(cache.get("key"), 2)
+        self.assertEqual(cache.get("key"), 2)
 
     def test_pop(self):
         cache = LruCache(1)
         cache["key"] = 1
-        self.assertEquals(cache.pop("key"), 1)
-        self.assertEquals(cache.pop("key"), None)
+        self.assertEqual(cache.pop("key"), 1)
+        self.assertEqual(cache.pop("key"), None)
 
     def test_del_multi(self):
         cache = LruCache(4, cache_type=TreeCache)
@@ -65,23 +66,23 @@ class LruCacheTestCase(unittest.HomeserverTestCase):
         cache[("vehicles", "car")] = "vroom"
         cache[("vehicles", "train")] = "chuff"
 
-        self.assertEquals(len(cache), 4)
+        self.assertEqual(len(cache), 4)
 
-        self.assertEquals(cache.get(("animal", "cat")), "mew")
-        self.assertEquals(cache.get(("vehicles", "car")), "vroom")
+        self.assertEqual(cache.get(("animal", "cat")), "mew")
+        self.assertEqual(cache.get(("vehicles", "car")), "vroom")
         cache.del_multi(("animal",))
-        self.assertEquals(len(cache), 2)
-        self.assertEquals(cache.get(("animal", "cat")), None)
-        self.assertEquals(cache.get(("animal", "dog")), None)
-        self.assertEquals(cache.get(("vehicles", "car")), "vroom")
-        self.assertEquals(cache.get(("vehicles", "train")), "chuff")
+        self.assertEqual(len(cache), 2)
+        self.assertEqual(cache.get(("animal", "cat")), None)
+        self.assertEqual(cache.get(("animal", "dog")), None)
+        self.assertEqual(cache.get(("vehicles", "car")), "vroom")
+        self.assertEqual(cache.get(("vehicles", "train")), "chuff")
         # Man from del_multi say "Yes".
 
     def test_clear(self):
         cache = LruCache(1)
         cache["key"] = 1
         cache.clear()
-        self.assertEquals(len(cache), 0)
+        self.assertEqual(len(cache), 0)
 
     @override_config({"caches": {"per_cache_factors": {"mycache": 10}}})
     def test_special_size(self):
@@ -104,10 +105,10 @@ class LruCacheCallbacksTestCase(unittest.HomeserverTestCase):
         self.assertFalse(m.called)
 
         cache.set("key", "value2")
-        self.assertEquals(m.call_count, 1)
+        self.assertEqual(m.call_count, 1)
 
         cache.set("key", "value")
-        self.assertEquals(m.call_count, 1)
+        self.assertEqual(m.call_count, 1)
 
     def test_multi_get(self):
         m = Mock()
@@ -123,10 +124,10 @@ class LruCacheCallbacksTestCase(unittest.HomeserverTestCase):
         self.assertFalse(m.called)
 
         cache.set("key", "value2")
-        self.assertEquals(m.call_count, 1)
+        self.assertEqual(m.call_count, 1)
 
         cache.set("key", "value")
-        self.assertEquals(m.call_count, 1)
+        self.assertEqual(m.call_count, 1)
 
     def test_set(self):
         m = Mock()
@@ -139,10 +140,10 @@ class LruCacheCallbacksTestCase(unittest.HomeserverTestCase):
         self.assertFalse(m.called)
 
         cache.set("key", "value2")
-        self.assertEquals(m.call_count, 1)
+        self.assertEqual(m.call_count, 1)
 
         cache.set("key", "value")
-        self.assertEquals(m.call_count, 1)
+        self.assertEqual(m.call_count, 1)
 
     def test_pop(self):
         m = Mock()
@@ -152,13 +153,13 @@ class LruCacheCallbacksTestCase(unittest.HomeserverTestCase):
         self.assertFalse(m.called)
 
         cache.pop("key")
-        self.assertEquals(m.call_count, 1)
+        self.assertEqual(m.call_count, 1)
 
         cache.set("key", "value")
-        self.assertEquals(m.call_count, 1)
+        self.assertEqual(m.call_count, 1)
 
         cache.pop("key")
-        self.assertEquals(m.call_count, 1)
+        self.assertEqual(m.call_count, 1)
 
     def test_del_multi(self):
         m1 = Mock()
@@ -172,17 +173,17 @@ class LruCacheCallbacksTestCase(unittest.HomeserverTestCase):
         cache.set(("b", "1"), "value", callbacks=[m3])
         cache.set(("b", "2"), "value", callbacks=[m4])
 
-        self.assertEquals(m1.call_count, 0)
-        self.assertEquals(m2.call_count, 0)
-        self.assertEquals(m3.call_count, 0)
-        self.assertEquals(m4.call_count, 0)
+        self.assertEqual(m1.call_count, 0)
+        self.assertEqual(m2.call_count, 0)
+        self.assertEqual(m3.call_count, 0)
+        self.assertEqual(m4.call_count, 0)
 
         cache.del_multi(("a",))
 
-        self.assertEquals(m1.call_count, 1)
-        self.assertEquals(m2.call_count, 1)
-        self.assertEquals(m3.call_count, 0)
-        self.assertEquals(m4.call_count, 0)
+        self.assertEqual(m1.call_count, 1)
+        self.assertEqual(m2.call_count, 1)
+        self.assertEqual(m3.call_count, 0)
+        self.assertEqual(m4.call_count, 0)
 
     def test_clear(self):
         m1 = Mock()
@@ -192,13 +193,13 @@ class LruCacheCallbacksTestCase(unittest.HomeserverTestCase):
         cache.set("key1", "value", callbacks=[m1])
         cache.set("key2", "value", callbacks=[m2])
 
-        self.assertEquals(m1.call_count, 0)
-        self.assertEquals(m2.call_count, 0)
+        self.assertEqual(m1.call_count, 0)
+        self.assertEqual(m2.call_count, 0)
 
         cache.clear()
 
-        self.assertEquals(m1.call_count, 1)
-        self.assertEquals(m2.call_count, 1)
+        self.assertEqual(m1.call_count, 1)
+        self.assertEqual(m2.call_count, 1)
 
     def test_eviction(self):
         m1 = Mock(name="m1")
@@ -209,33 +210,33 @@ class LruCacheCallbacksTestCase(unittest.HomeserverTestCase):
         cache.set("key1", "value", callbacks=[m1])
         cache.set("key2", "value", callbacks=[m2])
 
-        self.assertEquals(m1.call_count, 0)
-        self.assertEquals(m2.call_count, 0)
-        self.assertEquals(m3.call_count, 0)
+        self.assertEqual(m1.call_count, 0)
+        self.assertEqual(m2.call_count, 0)
+        self.assertEqual(m3.call_count, 0)
 
         cache.set("key3", "value", callbacks=[m3])
 
-        self.assertEquals(m1.call_count, 1)
-        self.assertEquals(m2.call_count, 0)
-        self.assertEquals(m3.call_count, 0)
+        self.assertEqual(m1.call_count, 1)
+        self.assertEqual(m2.call_count, 0)
+        self.assertEqual(m3.call_count, 0)
 
         cache.set("key3", "value")
 
-        self.assertEquals(m1.call_count, 1)
-        self.assertEquals(m2.call_count, 0)
-        self.assertEquals(m3.call_count, 0)
+        self.assertEqual(m1.call_count, 1)
+        self.assertEqual(m2.call_count, 0)
+        self.assertEqual(m3.call_count, 0)
 
         cache.get("key2")
 
-        self.assertEquals(m1.call_count, 1)
-        self.assertEquals(m2.call_count, 0)
-        self.assertEquals(m3.call_count, 0)
+        self.assertEqual(m1.call_count, 1)
+        self.assertEqual(m2.call_count, 0)
+        self.assertEqual(m3.call_count, 0)
 
         cache.set("key1", "value", callbacks=[m1])
 
-        self.assertEquals(m1.call_count, 1)
-        self.assertEquals(m2.call_count, 0)
-        self.assertEquals(m3.call_count, 1)
+        self.assertEqual(m1.call_count, 1)
+        self.assertEqual(m2.call_count, 0)
+        self.assertEqual(m3.call_count, 1)
 
 
 class LruCacheSizedTestCase(unittest.HomeserverTestCase):
@@ -246,20 +247,31 @@ class LruCacheSizedTestCase(unittest.HomeserverTestCase):
         cache["key3"] = [3]
         cache["key4"] = [4]
 
-        self.assertEquals(cache["key1"], [0])
-        self.assertEquals(cache["key2"], [1, 2])
-        self.assertEquals(cache["key3"], [3])
-        self.assertEquals(cache["key4"], [4])
-        self.assertEquals(len(cache), 5)
+        self.assertEqual(cache["key1"], [0])
+        self.assertEqual(cache["key2"], [1, 2])
+        self.assertEqual(cache["key3"], [3])
+        self.assertEqual(cache["key4"], [4])
+        self.assertEqual(len(cache), 5)
 
         cache["key5"] = [5, 6]
 
-        self.assertEquals(len(cache), 4)
-        self.assertEquals(cache.get("key1"), None)
-        self.assertEquals(cache.get("key2"), None)
-        self.assertEquals(cache["key3"], [3])
-        self.assertEquals(cache["key4"], [4])
-        self.assertEquals(cache["key5"], [5, 6])
+        self.assertEqual(len(cache), 4)
+        self.assertEqual(cache.get("key1"), None)
+        self.assertEqual(cache.get("key2"), None)
+        self.assertEqual(cache["key3"], [3])
+        self.assertEqual(cache["key4"], [4])
+        self.assertEqual(cache["key5"], [5, 6])
+
+    def test_zero_size_drop_from_cache(self) -> None:
+        """Test that `drop_from_cache` works correctly with 0-sized entries."""
+        cache: LruCache[str, List[int]] = LruCache(5, size_callback=lambda x: 0)
+        cache["key1"] = []
+
+        self.assertEqual(len(cache), 0)
+        cache.cache["key1"].drop_from_cache()
+        self.assertIsNone(
+            cache.pop("key1"), "Cache entry should have been evicted but wasn't"
+        )
 
 
 class TimeEvictionTestCase(unittest.HomeserverTestCase):

@@ -48,7 +48,7 @@ class FederationAckTestCase(HomeserverTestCase):
         transport, rather than assuming that the implementation has a
         ReplicationCommandHandler.
         """
-        rch = self.hs.get_tcp_replication()
+        rch = self.hs.get_replication_command_handler()
 
         # wire up the ReplicationCommandHandler to a mock connection, which needs
         # to implement IReplicationConnection. (Note that Mock doesn't understand
@@ -62,7 +62,11 @@ class FederationAckTestCase(HomeserverTestCase):
                 "federation",
                 "master",
                 token=10,
-                rows=[FederationStream.FederationStreamRow(type="x", data=[1, 2, 3])],
+                rows=[
+                    FederationStream.FederationStreamRow(
+                        type="x", data={"test": [1, 2, 3]}
+                    )
+                ],
             )
         )
 

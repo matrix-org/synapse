@@ -2,12 +2,13 @@
 
 This API returns information about reported events.
 
+To use it, you will need to authenticate by providing an `access_token`
+for a server admin: see [Admin API](../usage/administration/admin_api).
+
 The api is:
 ```
 GET /_synapse/admin/v1/event_reports?from=0&limit=10
 ```
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: see [Admin API](../usage/administration/admin_api).
 
 It returns a JSON body like the following:
 
@@ -94,12 +95,10 @@ The api is:
 ```
 GET /_synapse/admin/v1/event_reports/<report_id>
 ```
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: see [Admin API](../usage/administration/admin_api).
 
 It returns a JSON body like the following:
 
-```jsonc
+```json
 {
     "event_id": "$bNUFCwGzWca1meCGkjp-zwslF-GfVcXukvRLI1_FaVY",
     "event_json": {
@@ -132,7 +131,7 @@ It returns a JSON body like the following:
         },
         "type": "m.room.message",
         "unsigned": {
-            "age_ts": 1592291711430,
+            "age_ts": 1592291711430
         }
     },
     "id": <report_id>,

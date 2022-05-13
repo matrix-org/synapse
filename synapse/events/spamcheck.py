@@ -21,7 +21,6 @@ from typing import (
     Awaitable,
     Callable,
     Collection,
-    Dict,
     List,
     Optional,
     Tuple,
@@ -31,8 +30,8 @@ from typing import (
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
 from synapse.spam_checker_api import RegistrationBehaviour
-from synapse.types import RoomAlias
-from synapse.util.async_helpers import maybe_awaitable
+from synapse.types import RoomAlias, UserProfile
+from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 
 if TYPE_CHECKING:
     import synapse.events
@@ -44,11 +43,13 @@ CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
     ["synapse.events.EventBase"],
     Awaitable[Union[bool, str]],
 ]
+USER_MAY_JOIN_ROOM_CALLBACK = Callable[[str, str, bool], Awaitable[bool]]
 USER_MAY_INVITE_CALLBACK = Callable[[str, str, str], Awaitable[bool]]
+USER_MAY_SEND_3PID_INVITE_CALLBACK = Callable[[str, str, str, str], Awaitable[bool]]
 USER_MAY_CREATE_ROOM_CALLBACK = Callable[[str], Awaitable[bool]]
 USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[[str, RoomAlias], Awaitable[bool]]
 USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[[str, str], Awaitable[bool]]
-CHECK_USERNAME_FOR_SPAM_CALLBACK = Callable[[Dict[str, str]], Awaitable[bool]]
+CHECK_USERNAME_FOR_SPAM_CALLBACK = Callable[[UserProfile], Awaitable[bool]]
 LEGACY_CHECK_REGISTRATION_FOR_SPAM_CALLBACK = Callable[
     [
         Optional[dict],
@@ -72,13 +73,13 @@ CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK = Callable[
 ]
 
 
-def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
+def load_legacy_spam_checkers(hs: "synapse.server.HomeServer") -> None:
     """Wrapper that loads spam checkers configured using the old configuration, and
     registers the spam checker hooks they implement.
     """
     spam_checkers: List[Any] = []
     api = hs.get_module_api()
-    for module, config in hs.config.spam_checkers:
+    for module, config in hs.config.spamchecker.spam_checkers:
         # Older spam checkers don't accept the `api` argument, so we
         # try and detect support.
         spam_args = inspect.getfullargspec(module)
@@ -124,9 +125,9 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
                         request_info: Collection[Tuple[str, str]],
                         auth_provider_id: Optional[str],
                     ) -> Union[Awaitable[RegistrationBehaviour], RegistrationBehaviour]:
-                        # We've already made sure f is not None above, but mypy doesn't
-                        # do well across function boundaries so we need to tell it f is
-                        # definitely not None.
+                        # Assertion required because mypy can't prove we won't
+                        # change `f` back to `None`. See
+                        # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
                         assert f is not None
 
                         return f(
@@ -141,9 +142,10 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
                         "Bad signature for callback check_registration_for_spam",
                     )
 
-            def run(*args, **kwargs):
-                # mypy doesn't do well across function boundaries so we need to tell it
-                # wrapped_func is definitely not None.
+            def run(*args: Any, **kwargs: Any) -> Awaitable:
+                # Assertion required because mypy can't prove we won't change `f`
+                # back to `None`. See
+                # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
                 assert wrapped_func is not None
 
                 return maybe_awaitable(wrapped_func(*args, **kwargs))
@@ -160,9 +162,13 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
 
 
 class SpamChecker:
-    def __init__(self):
+    def __init__(self) -> None:
         self._check_event_for_spam_callbacks: List[CHECK_EVENT_FOR_SPAM_CALLBACK] = []
+        self._user_may_join_room_callbacks: List[USER_MAY_JOIN_ROOM_CALLBACK] = []
         self._user_may_invite_callbacks: List[USER_MAY_INVITE_CALLBACK] = []
+        self._user_may_send_3pid_invite_callbacks: List[
+            USER_MAY_SEND_3PID_INVITE_CALLBACK
+        ] = []
         self._user_may_create_room_callbacks: List[USER_MAY_CREATE_ROOM_CALLBACK] = []
         self._user_may_create_room_alias_callbacks: List[
             USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
@@ -181,7 +187,9 @@ class SpamChecker:
     def register_callbacks(
         self,
         check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
+        user_may_join_room: Optional[USER_MAY_JOIN_ROOM_CALLBACK] = None,
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
+        user_may_send_3pid_invite: Optional[USER_MAY_SEND_3PID_INVITE_CALLBACK] = None,
         user_may_create_room: Optional[USER_MAY_CREATE_ROOM_CALLBACK] = None,
         user_may_create_room_alias: Optional[
             USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
@@ -192,13 +200,21 @@ class SpamChecker:
             CHECK_REGISTRATION_FOR_SPAM_CALLBACK
         ] = None,
         check_media_file_for_spam: Optional[CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK] = None,
-    ):
+    ) -> None:
         """Register callbacks from module for each hook."""
         if check_event_for_spam is not None:
             self._check_event_for_spam_callbacks.append(check_event_for_spam)
 
+        if user_may_join_room is not None:
+            self._user_may_join_room_callbacks.append(user_may_join_room)
+
         if user_may_invite is not None:
             self._user_may_invite_callbacks.append(user_may_invite)
+
+        if user_may_send_3pid_invite is not None:
+            self._user_may_send_3pid_invite_callbacks.append(
+                user_may_send_3pid_invite,
+            )
 
         if user_may_create_room is not None:
             self._user_may_create_room_callbacks.append(user_may_create_room)
@@ -228,8 +244,8 @@ class SpamChecker:
         """Checks if a given event is considered "spammy" by this server.
 
         If the server considers an event spammy, then it will be rejected if
-        sent by a local user. If it is sent by a user on another server, then
-        users receive a blank event.
+        sent by a local user. If it is sent by a user on another server, the
+        event is soft-failed.
 
         Args:
             event: the event to be checked
@@ -239,11 +255,34 @@ class SpamChecker:
             will be used as the error message returned to the user.
         """
         for callback in self._check_event_for_spam_callbacks:
-            res: Union[bool, str] = await callback(event)
+            res: Union[bool, str] = await delay_cancellation(callback(event))
             if res:
                 return res
 
         return False
+
+    async def user_may_join_room(
+        self, user_id: str, room_id: str, is_invited: bool
+    ) -> bool:
+        """Checks if a given users is allowed to join a room.
+        Not called when a user creates a room.
+
+        Args:
+            userid: The ID of the user wanting to join the room
+            room_id: The ID of the room the user wants to join
+            is_invited: Whether the user is invited into the room
+
+        Returns:
+            Whether the user may join the room
+        """
+        for callback in self._user_may_join_room_callbacks:
+            may_join_room = await delay_cancellation(
+                callback(user_id, room_id, is_invited)
+            )
+            if may_join_room is False:
+                return False
+
+        return True
 
     async def user_may_invite(
         self, inviter_userid: str, invitee_userid: str, room_id: str
@@ -261,7 +300,38 @@ class SpamChecker:
             True if the user may send an invite, otherwise False
         """
         for callback in self._user_may_invite_callbacks:
-            if await callback(inviter_userid, invitee_userid, room_id) is False:
+            may_invite = await delay_cancellation(
+                callback(inviter_userid, invitee_userid, room_id)
+            )
+            if may_invite is False:
+                return False
+
+        return True
+
+    async def user_may_send_3pid_invite(
+        self, inviter_userid: str, medium: str, address: str, room_id: str
+    ) -> bool:
+        """Checks if a given user may invite a given threepid into the room
+
+        If this method returns false, the threepid invite will be rejected.
+
+        Note that if the threepid is already associated with a Matrix user ID, Synapse
+        will call user_may_invite with said user ID instead.
+
+        Args:
+            inviter_userid: The user ID of the sender of the invitation
+            medium: The 3PID's medium (e.g. "email")
+            address: The 3PID's address (e.g. "alice@example.com")
+            room_id: The room ID
+
+        Returns:
+            True if the user may send the invite, otherwise False
+        """
+        for callback in self._user_may_send_3pid_invite_callbacks:
+            may_send_3pid_invite = await delay_cancellation(
+                callback(inviter_userid, medium, address, room_id)
+            )
+            if may_send_3pid_invite is False:
                 return False
 
         return True
@@ -278,7 +348,8 @@ class SpamChecker:
             True if the user may create a room, otherwise False
         """
         for callback in self._user_may_create_room_callbacks:
-            if await callback(userid) is False:
+            may_create_room = await delay_cancellation(callback(userid))
+            if may_create_room is False:
                 return False
 
         return True
@@ -298,7 +369,10 @@ class SpamChecker:
             True if the user may create a room alias, otherwise False
         """
         for callback in self._user_may_create_room_alias_callbacks:
-            if await callback(userid, room_alias) is False:
+            may_create_room_alias = await delay_cancellation(
+                callback(userid, room_alias)
+            )
+            if may_create_room_alias is False:
                 return False
 
         return True
@@ -316,12 +390,13 @@ class SpamChecker:
             True if the user may publish the room, otherwise False
         """
         for callback in self._user_may_publish_room_callbacks:
-            if await callback(userid, room_id) is False:
+            may_publish_room = await delay_cancellation(callback(userid, room_id))
+            if may_publish_room is False:
                 return False
 
         return True
 
-    async def check_username_for_spam(self, user_profile: Dict[str, str]) -> bool:
+    async def check_username_for_spam(self, user_profile: UserProfile) -> bool:
         """Checks if a user ID or display name are considered "spammy" by this server.
 
         If the server considers a username spammy, then it will not be included in
@@ -339,7 +414,7 @@ class SpamChecker:
         for callback in self._check_username_for_spam_callbacks:
             # Make a copy of the user profile object to ensure the spam checker cannot
             # modify it.
-            if await callback(user_profile.copy()):
+            if await delay_cancellation(callback(user_profile.copy())):
                 return True
 
         return False
@@ -367,7 +442,7 @@ class SpamChecker:
         """
 
         for callback in self._check_registration_for_spam_callbacks:
-            behaviour = await (
+            behaviour = await delay_cancellation(
                 callback(email_threepid, username, request_info, auth_provider_id)
             )
             assert isinstance(behaviour, RegistrationBehaviour)
@@ -411,7 +486,7 @@ class SpamChecker:
         """
 
         for callback in self._check_media_file_for_spam_callbacks:
-            spam = await callback(file_wrapper, file_info)
+            spam = await delay_cancellation(callback(file_wrapper, file_info))
             if spam:
                 return True
 

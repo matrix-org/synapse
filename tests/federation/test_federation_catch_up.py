@@ -6,7 +6,7 @@ from synapse.events import EventBase
 from synapse.federation.sender import PerDestinationQueue, TransactionManager
 from synapse.federation.units import Edu
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.util.retryutils import NotRetryingDestination
 
 from tests.test_utils import event_injection, make_awaitable
@@ -64,7 +64,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
             Dictionary of { event_id: str, stream_ordering: int }
         """
         event_id, stream_ordering = self.get_success(
-            self.hs.get_datastore().db_pool.execute(
+            self.hs.get_datastores().main.db_pool.execute(
                 "test:get_destination_rooms",
                 None,
                 """
@@ -125,7 +125,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         self.pump()
 
         lsso_1 = self.get_success(
-            self.hs.get_datastore().get_destination_last_successful_stream_ordering(
+            self.hs.get_datastores().main.get_destination_last_successful_stream_ordering(
                 "host2"
             )
         )
@@ -141,7 +141,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         event_id_2 = self.helper.send(room, "rabbits!", tok=u1_token)["event_id"]
 
         lsso_2 = self.get_success(
-            self.hs.get_datastore().get_destination_last_successful_stream_ordering(
+            self.hs.get_datastores().main.get_destination_last_successful_stream_ordering(
                 "host2"
             )
         )
@@ -216,7 +216,9 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
 
         # let's also clear any backoffs
         self.get_success(
-            self.hs.get_datastore().set_destination_retry_timings("host2", None, 0, 0)
+            self.hs.get_datastores().main.set_destination_retry_timings(
+                "host2", None, 0, 0
+            )
         )
 
         # bring the remote online and clear the received pdu list
@@ -296,13 +298,13 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
 
         # destination_rooms should already be populated, but let us pretend that we already
         # sent (successfully) up to and including event id 2
-        event_2 = self.get_success(self.hs.get_datastore().get_event(event_id_2))
+        event_2 = self.get_success(self.hs.get_datastores().main.get_event(event_id_2))
 
         # also fetch event 5 so we know its last_successful_stream_ordering later
-        event_5 = self.get_success(self.hs.get_datastore().get_event(event_id_5))
+        event_5 = self.get_success(self.hs.get_datastores().main.get_event(event_id_5))
 
         self.get_success(
-            self.hs.get_datastore().set_destination_last_successful_stream_ordering(
+            self.hs.get_datastores().main.set_destination_last_successful_stream_ordering(
                 "host2", event_2.internal_metadata.stream_ordering
             )
         )
@@ -359,7 +361,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # ASSERT:
         # - All servers are up to date so none should have outstanding catch-up
         outstanding_when_successful = self.get_success(
-            self.hs.get_datastore().get_catch_up_outstanding_destinations(None)
+            self.hs.get_datastores().main.get_catch_up_outstanding_destinations(None)
         )
         self.assertEqual(outstanding_when_successful, [])
 
@@ -370,7 +372,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # - Mark zzzerver as being backed-off from
         now = self.clock.time_msec()
         self.get_success(
-            self.hs.get_datastore().set_destination_retry_timings(
+            self.hs.get_datastores().main.set_destination_retry_timings(
                 "zzzerver", now, now, 24 * 60 * 60 * 1000  # retry in 1 day
             )
         )
@@ -382,14 +384,14 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # - all remotes are outstanding
         # - they are returned in batches of 25, in order
         outstanding_1 = self.get_success(
-            self.hs.get_datastore().get_catch_up_outstanding_destinations(None)
+            self.hs.get_datastores().main.get_catch_up_outstanding_destinations(None)
         )
 
         self.assertEqual(len(outstanding_1), 25)
         self.assertEqual(outstanding_1, server_names[0:25])
 
         outstanding_2 = self.get_success(
-            self.hs.get_datastore().get_catch_up_outstanding_destinations(
+            self.hs.get_datastores().main.get_catch_up_outstanding_destinations(
                 outstanding_1[-1]
             )
         )
@@ -457,7 +459,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         )
 
         self.get_success(
-            self.hs.get_datastore().set_destination_last_successful_stream_ordering(
+            self.hs.get_datastores().main.set_destination_last_successful_stream_ordering(
                 "host2", event_1.internal_metadata.stream_ordering
             )
         )

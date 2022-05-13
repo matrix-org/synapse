@@ -14,7 +14,7 @@
 
 from synapse.events.snapshot import EventContext
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 
 from tests import unittest
 from tests.test_utils.event_injection import create_event
@@ -28,7 +28,7 @@ class TestEventContext(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
 
         self.user_id = self.register_user("u1", "pass")

@@ -95,4 +95,4 @@ def build_rc_config(settings: Optional[dict] = None):
     config_dict.update(settings or {})
     config = HomeServerConfig()
     config.parse_config_dict(config_dict, "", "")
-    return config.rc_federation
+    return config.ratelimiting.rc_federation

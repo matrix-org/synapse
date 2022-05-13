@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import SynapseError
@@ -29,7 +30,7 @@ logger = logging.getLogger(__name__)
 class DeleteGroupAdminRestServlet(RestServlet):
     """Allows deleting of local groups"""
 
-    PATTERNS = admin_patterns("/delete_group/(?P<group_id>[^/]*)")
+    PATTERNS = admin_patterns("/delete_group/(?P<group_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
         self.group_server = hs.get_groups_server_handler()
@@ -43,7 +44,7 @@ class DeleteGroupAdminRestServlet(RestServlet):
         await assert_user_is_admin(self.auth, requester.user)
 
         if not self.is_mine_id(group_id):
-            raise SynapseError(400, "Can only delete local groups")
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Can only delete local groups")
 
         await self.group_server.delete_group(group_id, requester.user.to_string())
-        return 200, {}
+        return HTTPStatus.OK, {}

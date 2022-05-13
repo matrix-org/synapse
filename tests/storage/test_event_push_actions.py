@@ -14,6 +14,8 @@
 
 from unittest.mock import Mock
 
+from synapse.storage.databases.main.event_push_actions import NotifCounts
+
 from tests.unittest import HomeserverTestCase
 
 USER_ID = "@user:example.com"
@@ -28,7 +30,7 @@ HIGHLIGHT = [
 
 class EventPushActionsStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.persist_events_store = hs.get_datastores().persist_events
 
     def test_get_unread_push_actions_for_user_in_range_for_http(self):
@@ -55,13 +57,13 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                     "", self.store._get_unread_counts_by_pos_txn, room_id, user_id, 0
                 )
             )
-            self.assertEquals(
+            self.assertEqual(
                 counts,
-                {
-                    "notify_count": noitf_count,
-                    "unread_count": 0,  # Unread counts are tested in the sync tests.
-                    "highlight_count": highlight_count,
-                },
+                NotifCounts(
+                    notify_count=noitf_count,
+                    unread_count=0,  # Unread counts are tested in the sync tests.
+                    highlight_count=highlight_count,
+                ),
             )
 
         def _inject_actions(stream, action):
@@ -69,6 +71,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             event.room_id = room_id
             event.event_id = "$test:example.com"
             event.internal_metadata.stream_ordering = stream
+            event.internal_metadata.is_outlier.return_value = False
             event.depth = stream
 
             self.get_success(

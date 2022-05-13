@@ -1,6 +1,6 @@
-=========================================================
-Synapse |support| |development| |license| |pypi| |python|
-=========================================================
+=========================================================================
+Synapse |support| |development| |documentation| |license| |pypi| |python|
+=========================================================================
 
 .. contents::
 
@@ -55,11 +55,8 @@ solutions. The hope is for Matrix to act as the building blocks for a new
 generation of fully open and interoperable messaging and VoIP apps for the
 internet.
 
-Synapse is a reference "homeserver" implementation of Matrix from the core
-development team at matrix.org, written in Python/Twisted.  It is intended to
-showcase the concept of Matrix and let folks see the spec in the context of a
-codebase and let you run your own homeserver and generally help bootstrap the
-ecosystem.
+Synapse is a Matrix "homeserver" implementation developed by the matrix.org core
+team, written in Python 3/Twisted.
 
 In Matrix, every user runs one or more Matrix clients, which connect through to
 a Matrix homeserver. The homeserver stores all their personal chat history and
@@ -85,9 +82,14 @@ For support installing or managing Synapse, please join |room|_ (from a matrix.o
 account if necessary) and ask questions there. We do not use GitHub issues for
 support requests, only for bug reports and feature requests.
 
+Synapse's documentation is `nicely rendered on GitHub Pages <https://matrix-org.github.io/synapse>`_,
+with its source available in |docs|_.
+
 .. |room| replace:: ``#synapse:matrix.org``
 .. _room: https://matrix.to/#/#synapse:matrix.org
 
+.. |docs| replace:: ``docs``
+.. _docs: docs
 
 Synapse Installation
 ====================
@@ -244,7 +246,7 @@ Password reset
 ==============
 
 Users can reset their password through their client. Alternatively, a server admin
-can reset a users password using the `admin API <docs/admin_api/user_admin_api.rst#reset-password>`_
+can reset a users password using the `admin API <docs/admin_api/user_admin_api.md#reset-password>`_
 or by directly editing the database as shown below.
 
 First calculate the hash of the new password::
@@ -263,11 +265,27 @@ Then update the ``users`` table in the database::
 Synapse Development
 ===================
 
-Join our developer community on Matrix: `#synapse-dev:matrix.org <https://matrix.to/#/#synapse-dev:matrix.org>`_
+The best place to get started is our
+`guide for contributors <https://matrix-org.github.io/synapse/latest/development/contributing_guide.html>`_.
+This is part of our larger `documentation <https://matrix-org.github.io/synapse/latest>`_, which includes
+information for synapse developers as well as synapse administrators.
+
+Developers might be particularly interested in:
+
+* `Synapse's database schema <https://matrix-org.github.io/synapse/latest/development/database_schema.html>`_,
+* `notes on Synapse's implementation details <https://matrix-org.github.io/synapse/latest/development/internal_documentation/index.html>`_, and
+* `how we use git <https://matrix-org.github.io/synapse/latest/development/git.html>`_.
+
+Alongside all that, join our developer community on Matrix:
+`#synapse-dev:matrix.org <https://matrix.to/#/#synapse-dev:matrix.org>`_, featuring real humans!
+
+
+Quick start
+-----------
 
 Before setting up a development environment for synapse, make sure you have the
 system dependencies (such as the python header files) installed - see
-`Installing from source <https://matrix-org.github.io/synapse/latest/setup/installation.html#installing-from-source>`_.
+`Platform-specific prerequisites <https://matrix-org.github.io/synapse/latest/setup/installation.html#platform-specific-prerequisites>`_.
 
 To check out a synapse for development, clone the git repo into a working
 directory of your choice::
@@ -275,45 +293,51 @@ directory of your choice::
     git clone https://github.com/matrix-org/synapse.git
     cd synapse
 
-Synapse has a number of external dependencies, that are easiest
-to install using pip and a virtualenv::
+Synapse has a number of external dependencies. We maintain a fixed development
+environment using `Poetry <https://python-poetry.org/>`_. First, install poetry. We recommend::
 
-    python3 -m venv ./env
-    source ./env/bin/activate
-    pip install -e ".[all,test]"
+    pip install --user pipx
+    pipx install poetry
+
+as described `here <https://python-poetry.org/docs/#installing-with-pipx>`_.
+(See `poetry's installation docs <https://python-poetry.org/docs/#installation>`_
+for other installation methods.) Then ask poetry to create a virtual environment
+from the project and install Synapse's dependencies::
+
+    poetry install --extras "all test"
 
 This will run a process of downloading and installing all the needed
-dependencies into a virtual env. If any dependencies fail to install,
-try installing the failing modules individually::
+dependencies into a virtual env.
 
-    pip install -e "module-name"
+We recommend using the demo which starts 3 federated instances running on ports `8080` - `8082`::
 
-We recommend using the demo which starts 3 federated instances running on ports `8080` - `8082`
+    poetry run ./demo/start.sh
 
-    ./demo/start.sh
+(to stop, you can use ``poetry run ./demo/stop.sh``)
 
-(to stop, you can use `./demo/stop.sh`)
+See the `demo documentation <https://matrix-org.github.io/synapse/develop/development/demo.html>`_
+for more information.
 
 If you just want to start a single instance of the app and run it directly::
 
     # Create the homeserver.yaml config once
-    python -m synapse.app.homeserver \
+    poetry run synapse_homeserver \
       --server-name my.domain.name \
       --config-path homeserver.yaml \
       --generate-config \
       --report-stats=[yes|no]
 
     # Start the app
-    python -m synapse.app.homeserver --config-path homeserver.yaml
+    poetry run synapse_homeserver --config-path homeserver.yaml
 
 
 Running the unit tests
-======================
+----------------------
 
 After getting up and running, you may wish to run Synapse's unit tests to
 check that everything is installed correctly::
 
-    trial tests
+    poetry run trial tests
 
 This should end with a 'PASSED' result (note that exact numbers will
 differ)::
@@ -327,7 +351,7 @@ to see the logging output, see the `CONTRIBUTING doc <CONTRIBUTING.md#run-the-un
 
 
 Running the Integration Tests
-=============================
+-----------------------------
 
 Synapse is accompanied by `SyTest <https://github.com/matrix-org/sytest>`_,
 a Matrix homeserver integration testing suite, which uses HTTP requests to
@@ -444,6 +468,10 @@ This is normally caused by a misconfiguration in your reverse-proxy. See
 .. |development| image:: https://img.shields.io/matrix/synapse-dev:matrix.org?label=development&logo=matrix
   :alt: (discuss development on #synapse-dev:matrix.org)
   :target: https://matrix.to/#/#synapse-dev:matrix.org
+
+.. |documentation| image:: https://img.shields.io/badge/documentation-%E2%9C%93-success
+  :alt: (Rendered documentation on GitHub Pages)
+  :target: https://matrix-org.github.io/synapse/latest/
 
 .. |license| image:: https://img.shields.io/github/license/matrix-org/synapse
   :alt: (check license in LICENSE file)

@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import TYPE_CHECKING
 
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.event_federation import EventFederationWorkerStore
 from synapse.storage.databases.main.event_push_actions import (
     EventPushActionsWorkerStore,
@@ -29,6 +30,9 @@ from synapse.storage.databases.main.user_erasure_store import UserErasureWorkerS
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from ._base import BaseSlavedStore
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -48,13 +52,18 @@ class SlavedEventStore(
     EventPushActionsWorkerStore,
     StreamWorkerStore,
     StateGroupWorkerStore,
-    EventsWorkerStore,
     SignatureWorkerStore,
+    EventsWorkerStore,
     UserErasureWorkerStore,
     RelationsWorkerStore,
     BaseSlavedStore,
 ):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
         events_max = self._stream_id_gen.get_current_token()
@@ -71,12 +80,3 @@ class SlavedEventStore(
             min_curr_state_delta_id,
             prefilled_cache=curr_state_delta_prefill,
         )
-
-    # Cached functions can't be accessed through a class instance so we need
-    # to reach inside the __dict__ to extract them.
-
-    def get_room_max_stream_ordering(self):
-        return self._stream_id_gen.get_current_token()
-
-    def get_room_min_stream_ordering(self):
-        return self._backfill_id_gen.get_current_token()

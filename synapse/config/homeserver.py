@@ -16,6 +16,7 @@ from .account_validity import AccountValidityConfig
 from .api import ApiConfig
 from .appservice import AppServiceConfig
 from .auth import AuthConfig
+from .background_updates import BackgroundUpdateConfig
 from .cache import CacheConfig
 from .captcha import CaptchaConfig
 from .cas import CasConfig
@@ -30,6 +31,7 @@ from .key import KeyConfig
 from .logger import LoggingConfig
 from .metrics import MetricsConfig
 from .modules import ModulesConfig
+from .oembed import OembedConfig
 from .oidc import OIDCConfig
 from .password_auth_providers import PasswordAuthProviderConfig
 from .push import PushConfig
@@ -37,6 +39,7 @@ from .ratelimiting import RatelimitConfig
 from .redis import RedisConfig
 from .registration import RegistrationConfig
 from .repository import ContentRepositoryConfig
+from .retention import RetentionConfig
 from .room import RoomConfig
 from .room_directory import RoomDirectoryConfig
 from .saml2 import SAML2Config
@@ -58,6 +61,7 @@ class HomeServerConfig(RootConfig):
     config_classes = [
         ModulesConfig,
         ServerConfig,
+        RetentionConfig,
         TlsConfig,
         FederationConfig,
         CacheConfig,
@@ -65,6 +69,7 @@ class HomeServerConfig(RootConfig):
         LoggingConfig,
         RatelimitConfig,
         ContentRepositoryConfig,
+        OembedConfig,
         CaptchaConfig,
         VoipConfig,
         RegistrationConfig,
@@ -95,4 +100,5 @@ class HomeServerConfig(RootConfig):
         WorkerConfig,
         RedisConfig,
         ExperimentalConfig,
+        BackgroundUpdateConfig,
     ]

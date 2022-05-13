@@ -14,10 +14,11 @@
 
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, TypeVar
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, TypeVar
 
 import bleach
 import jinja2
+from markupsafe import Markup
 
 from synapse.api.constants import EventTypes, Membership, RoomTypes
 from synapse.api.errors import StoreError
@@ -28,6 +29,14 @@ from synapse.push.presentable_names import (
     descriptor_from_member_events,
     name_from_member_event,
 )
+from synapse.push.push_types import (
+    EmailReason,
+    MessageVars,
+    NotifVars,
+    RoomVars,
+    TemplateVars,
+)
+from synapse.storage.databases.main.event_push_actions import EmailPushAction
 from synapse.storage.state import StateFilter
 from synapse.types import StateMap, UserID
 from synapse.util.async_helpers import concurrently_execute
@@ -104,13 +113,13 @@ class Mailer:
         self.template_text = template_text
 
         self.send_email_handler = hs.get_send_email_handler()
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.state_store = self.hs.get_storage().state
         self.macaroon_gen = self.hs.get_macaroon_generator()
         self.state_handler = self.hs.get_state_handler()
         self.storage = hs.get_storage()
         self.app_name = app_name
-        self.email_subjects: EmailSubjectConfig = hs.config.email_subjects
+        self.email_subjects: EmailSubjectConfig = hs.config.email.email_subjects
 
         logger.info("Created Mailer for app_name %s" % app_name)
 
@@ -130,17 +139,17 @@ class Mailer:
         """
         params = {"token": token, "client_secret": client_secret, "sid": sid}
         link = (
-            self.hs.config.public_baseurl
+            self.hs.config.server.public_baseurl
             + "_synapse/client/password_reset/email/submit_token?%s"
             % urllib.parse.urlencode(params)
         )
 
-        template_vars = {"link": link}
+        template_vars: TemplateVars = {"link": link}
 
         await self.send_email(
             email_address,
             self.email_subjects.password_reset
-            % {"server_name": self.hs.config.server_name},
+            % {"server_name": self.hs.config.server.server_name},
             template_vars,
         )
 
@@ -160,17 +169,17 @@ class Mailer:
         """
         params = {"token": token, "client_secret": client_secret, "sid": sid}
         link = (
-            self.hs.config.public_baseurl
+            self.hs.config.server.public_baseurl
             + "_matrix/client/unstable/registration/email/submit_token?%s"
             % urllib.parse.urlencode(params)
         )
 
-        template_vars = {"link": link}
+        template_vars: TemplateVars = {"link": link}
 
         await self.send_email(
             email_address,
             self.email_subjects.email_validation
-            % {"server_name": self.hs.config.server_name},
+            % {"server_name": self.hs.config.server.server_name, "app": self.app_name},
             template_vars,
         )
 
@@ -191,17 +200,17 @@ class Mailer:
         """
         params = {"token": token, "client_secret": client_secret, "sid": sid}
         link = (
-            self.hs.config.public_baseurl
+            self.hs.config.server.public_baseurl
             + "_matrix/client/unstable/add_threepid/email/submit_token?%s"
             % urllib.parse.urlencode(params)
         )
 
-        template_vars = {"link": link}
+        template_vars: TemplateVars = {"link": link}
 
         await self.send_email(
             email_address,
             self.email_subjects.email_validation
-            % {"server_name": self.hs.config.server_name},
+            % {"server_name": self.hs.config.server.server_name, "app": self.app_name},
             template_vars,
         )
 
@@ -210,8 +219,8 @@ class Mailer:
         app_id: str,
         user_id: str,
         email_address: str,
-        push_actions: Iterable[Dict[str, Any]],
-        reason: Dict[str, Any],
+        push_actions: Iterable[EmailPushAction],
+        reason: EmailReason,
     ) -> None:
         """
         Send email regarding a user's room notifications
@@ -224,15 +233,13 @@ class Mailer:
             reason: The notification that was ready and is the cause of an email
                 being sent.
         """
-        rooms_in_order = deduped_ordered_list([pa["room_id"] for pa in push_actions])
+        rooms_in_order = deduped_ordered_list([pa.room_id for pa in push_actions])
 
-        notif_events = await self.store.get_events(
-            [pa["event_id"] for pa in push_actions]
-        )
+        notif_events = await self.store.get_events([pa.event_id for pa in push_actions])
 
-        notifs_by_room: Dict[str, List[Dict[str, Any]]] = {}
+        notifs_by_room: Dict[str, List[EmailPushAction]] = {}
         for pa in push_actions:
-            notifs_by_room.setdefault(pa["room_id"], []).append(pa)
+            notifs_by_room.setdefault(pa.room_id, []).append(pa)
 
         # collect the current state for all the rooms in which we have
         # notifications
@@ -256,9 +263,9 @@ class Mailer:
         await concurrently_execute(_fetch_room_state, rooms_in_order, 3)
 
         # actually sort our so-called rooms_in_order list, most recent room first
-        rooms_in_order.sort(key=lambda r: -(notifs_by_room[r][-1]["received_ts"] or 0))
+        rooms_in_order.sort(key=lambda r: -(notifs_by_room[r][-1].received_ts or 0))
 
-        rooms = []
+        rooms: List[RoomVars] = []
 
         for r in rooms_in_order:
             roomvars = await self._get_room_vars(
@@ -289,7 +296,7 @@ class Mailer:
                 notifs_by_room, state_by_room, notif_events, reason
             )
 
-        template_vars = {
+        template_vars: TemplateVars = {
             "user_display_name": user_display_name,
             "unsubscribe_link": self._make_unsubscribe_link(
                 user_id, app_id, email_address
@@ -302,10 +309,10 @@ class Mailer:
         await self.send_email(email_address, summary_text, template_vars)
 
     async def send_email(
-        self, email_address: str, subject: str, extra_template_vars: Dict[str, Any]
+        self, email_address: str, subject: str, extra_template_vars: TemplateVars
     ) -> None:
         """Send an email with the given information and template text"""
-        template_vars = {
+        template_vars: TemplateVars = {
             "app_name": self.app_name,
             "server_name": self.hs.config.server.server_name,
         }
@@ -327,10 +334,10 @@ class Mailer:
         self,
         room_id: str,
         user_id: str,
-        notifs: Iterable[Dict[str, Any]],
+        notifs: Iterable[EmailPushAction],
         notif_events: Dict[str, EventBase],
         room_state_ids: StateMap[str],
-    ) -> Dict[str, Any]:
+    ) -> RoomVars:
         """
         Generate the variables for notifications on a per-room basis.
 
@@ -348,7 +355,7 @@ class Mailer:
         # Check if one of the notifs is an invite event for the user.
         is_invite = False
         for n in notifs:
-            ev = notif_events[n["event_id"]]
+            ev = notif_events[n.event_id]
             if ev.type == EventTypes.Member and ev.state_key == user_id:
                 if ev.content.get("membership") == Membership.INVITE:
                     is_invite = True
@@ -356,18 +363,19 @@ class Mailer:
 
         room_name = await calculate_room_name(self.store, room_state_ids, user_id)
 
-        room_vars: Dict[str, Any] = {
+        room_vars: RoomVars = {
             "title": room_name,
             "hash": string_ordinal_total(room_id),  # See sender avatar hash
             "notifs": [],
             "invite": is_invite,
             "link": self._make_room_link(room_id),
+            "avatar_url": await self._get_room_avatar(room_state_ids),
         }
 
         if not is_invite:
             for n in notifs:
                 notifvars = await self._get_notif_vars(
-                    n, user_id, notif_events[n["event_id"]], room_state_ids
+                    n, user_id, notif_events[n.event_id], room_state_ids
                 )
 
                 # merge overlapping notifs together.
@@ -393,13 +401,34 @@ class Mailer:
 
         return room_vars
 
+    async def _get_room_avatar(
+        self,
+        room_state_ids: StateMap[str],
+    ) -> Optional[str]:
+        """
+        Retrieve the avatar url for this room---if it exists.
+
+        Args:
+            room_state_ids: The event IDs of the current room state.
+
+        Returns:
+             room's avatar url if it's present and a string; otherwise None.
+        """
+        event_id = room_state_ids.get((EventTypes.RoomAvatar, ""))
+        if event_id:
+            ev = await self.store.get_event(event_id)
+            url = ev.content.get("url")
+            if isinstance(url, str):
+                return url
+        return None
+
     async def _get_notif_vars(
         self,
-        notif: Dict[str, Any],
+        notif: EmailPushAction,
         user_id: str,
         notif_event: EventBase,
         room_state_ids: StateMap[str],
-    ) -> Dict[str, Any]:
+    ) -> NotifVars:
         """
         Generate the variables for a single notification.
 
@@ -414,20 +443,20 @@ class Mailer:
         """
 
         results = await self.store.get_events_around(
-            notif["room_id"],
-            notif["event_id"],
+            notif.room_id,
+            notif.event_id,
             before_limit=CONTEXT_BEFORE,
             after_limit=CONTEXT_AFTER,
         )
 
-        ret = {
+        ret: NotifVars = {
             "link": self._make_notif_link(notif),
-            "ts": notif["received_ts"],
+            "ts": notif.received_ts,
             "messages": [],
         }
 
         the_events = await filter_events_for_client(
-            self.storage, user_id, results["events_before"]
+            self.storage, user_id, results.events_before
         )
         the_events.append(notif_event)
 
@@ -439,8 +468,8 @@ class Mailer:
         return ret
 
     async def _get_message_vars(
-        self, notif: Dict[str, Any], event: EventBase, room_state_ids: StateMap[str]
-    ) -> Optional[Dict[str, Any]]:
+        self, notif: EmailPushAction, event: EventBase, room_state_ids: StateMap[str]
+    ) -> Optional[MessageVars]:
         """
         Generate the variables for a single event, if possible.
 
@@ -472,7 +501,9 @@ class Mailer:
 
         if sender_state_event:
             sender_name = name_from_member_event(sender_state_event)
-            sender_avatar_url = sender_state_event.content.get("avatar_url")
+            sender_avatar_url: Optional[str] = sender_state_event.content.get(
+                "avatar_url"
+            )
         else:
             # No state could be found, fallback to the MXID.
             sender_name = event.sender
@@ -482,9 +513,9 @@ class Mailer:
         # sender_hash % the number of default images to choose from
         sender_hash = string_ordinal_total(event.sender)
 
-        ret = {
+        ret: MessageVars = {
             "event_type": event.type,
-            "is_historical": event.event_id != notif["event_id"],
+            "is_historical": event.event_id != notif.event_id,
             "id": event.event_id,
             "ts": event.origin_server_ts,
             "sender_name": sender_name,
@@ -497,6 +528,8 @@ class Mailer:
             return ret
 
         msgtype = event.content.get("msgtype")
+        if not isinstance(msgtype, str):
+            msgtype = None
 
         ret["msgtype"] = msgtype
 
@@ -511,7 +544,7 @@ class Mailer:
         return ret
 
     def _add_text_message_vars(
-        self, messagevars: Dict[str, Any], event: EventBase
+        self, messagevars: MessageVars, event: EventBase
     ) -> None:
         """
         Potentially add a sanitised message body to the message variables.
@@ -521,8 +554,8 @@ class Mailer:
             event: The event under consideration.
         """
         msgformat = event.content.get("format")
-
-        messagevars["format"] = msgformat
+        if not isinstance(msgformat, str):
+            msgformat = None
 
         formatted_body = event.content.get("formatted_body")
         body = event.content.get("body")
@@ -533,7 +566,7 @@ class Mailer:
             messagevars["body_text_html"] = safe_text(body)
 
     def _add_image_message_vars(
-        self, messagevars: Dict[str, Any], event: EventBase
+        self, messagevars: MessageVars, event: EventBase
     ) -> None:
         """
         Potentially add an image URL to the message variables.
@@ -548,7 +581,7 @@ class Mailer:
     async def _make_summary_text_single_room(
         self,
         room_id: str,
-        notifs: List[Dict[str, Any]],
+        notifs: List[EmailPushAction],
         room_state_ids: StateMap[str],
         notif_events: Dict[str, EventBase],
         user_id: str,
@@ -576,7 +609,7 @@ class Mailer:
         # See if one of the notifs is an invite event for the user
         invite_event = None
         for n in notifs:
-            ev = notif_events[n["event_id"]]
+            ev = notif_events[n.event_id]
             if ev.type == EventTypes.Member and ev.state_key == user_id:
                 if ev.content.get("membership") == Membership.INVITE:
                     invite_event = ev
@@ -625,7 +658,7 @@ class Mailer:
         if len(notifs) == 1:
             # There is just the one notification, so give some detail
             sender_name = None
-            event = notif_events[notifs[0]["event_id"]]
+            event = notif_events[notifs[0].event_id]
             if ("m.room.member", event.sender) in room_state_ids:
                 state_event_id = room_state_ids[("m.room.member", event.sender)]
                 state_event = await self.store.get_event(state_event_id)
@@ -663,10 +696,10 @@ class Mailer:
 
     async def _make_summary_text(
         self,
-        notifs_by_room: Dict[str, List[Dict[str, Any]]],
+        notifs_by_room: Dict[str, List[EmailPushAction]],
         room_state_ids: Dict[str, StateMap[str]],
         notif_events: Dict[str, EventBase],
-        reason: Dict[str, Any],
+        reason: EmailReason,
     ) -> str:
         """
         Make a summary text for the email when multiple rooms have notifications.
@@ -696,7 +729,7 @@ class Mailer:
     async def _make_summary_text_from_member_events(
         self,
         room_id: str,
-        notifs: List[Dict[str, Any]],
+        notifs: List[EmailPushAction],
         room_state_ids: StateMap[str],
         notif_events: Dict[str, EventBase],
     ) -> str:
@@ -719,9 +752,9 @@ class Mailer:
         # are already in descending received_ts.
         sender_ids = {}
         for n in notifs:
-            sender = notif_events[n["event_id"]].sender
+            sender = notif_events[n.event_id].sender
             if sender not in sender_ids:
-                sender_ids[sender] = n["event_id"]
+                sender_ids[sender] = n.event_id
 
         # Get the actual member events (in order to calculate a pretty name for
         # the room).
@@ -774,8 +807,8 @@ class Mailer:
         Returns:
              A link to open a room in the web client.
         """
-        if self.hs.config.email_riot_base_url:
-            base_url = "%s/#/room" % (self.hs.config.email_riot_base_url)
+        if self.hs.config.email.email_riot_base_url:
+            base_url = "%s/#/room" % (self.hs.config.email.email_riot_base_url)
         elif self.app_name == "Vector":
             # need /beta for Universal Links to work on iOS
             base_url = "https://vector.im/beta/#/room"
@@ -783,7 +816,7 @@ class Mailer:
             base_url = "https://matrix.to/#"
         return "%s/%s" % (base_url, room_id)
 
-    def _make_notif_link(self, notif: Dict[str, str]) -> str:
+    def _make_notif_link(self, notif: EmailPushAction) -> str:
         """
         Generate a link to open an event in the web client.
 
@@ -793,20 +826,20 @@ class Mailer:
         Returns:
              A link to open the notification in the web client.
         """
-        if self.hs.config.email_riot_base_url:
+        if self.hs.config.email.email_riot_base_url:
             return "%s/#/room/%s/%s" % (
-                self.hs.config.email_riot_base_url,
-                notif["room_id"],
-                notif["event_id"],
+                self.hs.config.email.email_riot_base_url,
+                notif.room_id,
+                notif.event_id,
             )
         elif self.app_name == "Vector":
             # need /beta for Universal Links to work on iOS
             return "https://vector.im/beta/#/room/%s/%s" % (
-                notif["room_id"],
-                notif["event_id"],
+                notif.room_id,
+                notif.event_id,
             )
         else:
-            return "https://matrix.to/#/%s/%s" % (notif["room_id"], notif["event_id"])
+            return "https://matrix.to/#/%s/%s" % (notif.room_id, notif.event_id)
 
     def _make_unsubscribe_link(
         self, user_id: str, app_id: str, email_address: str
@@ -830,12 +863,12 @@ class Mailer:
 
         # XXX: make r0 once API is stable
         return "%s_matrix/client/unstable/pushers/remove?%s" % (
-            self.hs.config.public_baseurl,
+            self.hs.config.server.public_baseurl,
             urllib.parse.urlencode(params),
         )
 
 
-def safe_markup(raw_html: str) -> jinja2.Markup:
+def safe_markup(raw_html: str) -> Markup:
     """
     Sanitise a raw HTML string to a set of allowed tags and attributes, and linkify any bare URLs.
 
@@ -845,7 +878,7 @@ def safe_markup(raw_html: str) -> jinja2.Markup:
     Returns:
         A Markup object ready to safely use in a Jinja template.
     """
-    return jinja2.Markup(
+    return Markup(
         bleach.linkify(
             bleach.clean(
                 raw_html,
@@ -859,7 +892,7 @@ def safe_markup(raw_html: str) -> jinja2.Markup:
     )
 
 
-def safe_text(raw_text: str) -> jinja2.Markup:
+def safe_text(raw_text: str) -> Markup:
     """
     Sanitise text (escape any HTML tags), and then linkify any bare URLs.
 
@@ -869,8 +902,8 @@ def safe_text(raw_text: str) -> jinja2.Markup:
     Returns:
         A Markup object ready to safely use in a Jinja template.
     """
-    return jinja2.Markup(
-        bleach.linkify(bleach.clean(raw_text, tags=[], attributes={}, strip=False))
+    return Markup(
+        bleach.linkify(bleach.clean(raw_text, tags=[], attributes=[], strip=False))
     )
 
 

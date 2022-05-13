@@ -30,7 +30,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         return config
 
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.event_builder_factory = hs.get_event_builder_factory()
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -119,11 +119,9 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         return event
 
     def test_redact(self):
-        self.get_success(
-            self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
-        )
+        self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
 
-        msg_event = self.get_success(self.inject_message(self.room1, self.u_alice, "t"))
+        msg_event = self.inject_message(self.room1, self.u_alice, "t")
 
         # Check event has not been redacted:
         event = self.get_success(self.store.get_event(msg_event.event_id))
@@ -141,9 +139,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
 
         # Redact event
         reason = "Because I said so"
-        self.get_success(
-            self.inject_redaction(self.room1, msg_event.event_id, self.u_alice, reason)
-        )
+        self.inject_redaction(self.room1, msg_event.event_id, self.u_alice, reason)
 
         event = self.get_success(self.store.get_event(msg_event.event_id))
 
@@ -170,14 +166,10 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         )
 
     def test_redact_join(self):
-        self.get_success(
-            self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
-        )
+        self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
 
-        msg_event = self.get_success(
-            self.inject_room_member(
-                self.room1, self.u_bob, Membership.JOIN, extra_content={"blue": "red"}
-            )
+        msg_event = self.inject_room_member(
+            self.room1, self.u_bob, Membership.JOIN, extra_content={"blue": "red"}
         )
 
         event = self.get_success(self.store.get_event(msg_event.event_id))
@@ -195,9 +187,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
 
         # Redact event
         reason = "Because I said so"
-        self.get_success(
-            self.inject_redaction(self.room1, msg_event.event_id, self.u_alice, reason)
-        )
+        self.inject_redaction(self.room1, msg_event.event_id, self.u_alice, reason)
 
         # Check redaction
 
@@ -311,11 +301,9 @@ class RedactionTestCase(unittest.HomeserverTestCase):
     def test_redact_censor(self):
         """Test that a redacted event gets censored in the DB after a month"""
 
-        self.get_success(
-            self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
-        )
+        self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
 
-        msg_event = self.get_success(self.inject_message(self.room1, self.u_alice, "t"))
+        msg_event = self.inject_message(self.room1, self.u_alice, "t")
 
         # Check event has not been redacted:
         event = self.get_success(self.store.get_event(msg_event.event_id))
@@ -333,9 +321,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
 
         # Redact event
         reason = "Because I said so"
-        self.get_success(
-            self.inject_redaction(self.room1, msg_event.event_id, self.u_alice, reason)
-        )
+        self.inject_redaction(self.room1, msg_event.event_id, self.u_alice, reason)
 
         event = self.get_success(self.store.get_event(msg_event.event_id))
 
@@ -381,25 +367,19 @@ class RedactionTestCase(unittest.HomeserverTestCase):
     def test_redact_redaction(self):
         """Tests that we can redact a redaction and can fetch it again."""
 
-        self.get_success(
-            self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
+        self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
+
+        msg_event = self.inject_message(self.room1, self.u_alice, "t")
+
+        first_redact_event = self.inject_redaction(
+            self.room1, msg_event.event_id, self.u_alice, "Redacting message"
         )
 
-        msg_event = self.get_success(self.inject_message(self.room1, self.u_alice, "t"))
-
-        first_redact_event = self.get_success(
-            self.inject_redaction(
-                self.room1, msg_event.event_id, self.u_alice, "Redacting message"
-            )
-        )
-
-        self.get_success(
-            self.inject_redaction(
-                self.room1,
-                first_redact_event.event_id,
-                self.u_alice,
-                "Redacting redaction",
-            )
+        self.inject_redaction(
+            self.room1,
+            first_redact_event.event_id,
+            self.u_alice,
+            "Redacting redaction",
         )
 
         # Now lets jump to the future where we have censored the redaction event
@@ -414,9 +394,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
     def test_store_redacted_redaction(self):
         """Tests that we can store a redacted redaction."""
 
-        self.get_success(
-            self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
-        )
+        self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
 
         builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,

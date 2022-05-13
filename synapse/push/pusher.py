@@ -35,12 +35,12 @@ class PusherFactory:
             "http": HttpPusher
         }
 
-        logger.info("email enable notifs: %r", hs.config.email_enable_notifs)
-        if hs.config.email_enable_notifs:
+        logger.info("email enable notifs: %r", hs.config.email.email_enable_notifs)
+        if hs.config.email.email_enable_notifs:
             self.mailers: Dict[str, Mailer] = {}
 
-            self._notif_template_html = hs.config.email_notif_template_html
-            self._notif_template_text = hs.config.email_notif_template_text
+            self._notif_template_html = hs.config.email.email_notif_template_html
+            self._notif_template_text = hs.config.email.email_notif_template_text
 
             self.pusher_types["email"] = self._create_email_pusher
 
@@ -77,4 +77,4 @@ class PusherFactory:
             if isinstance(brand, str):
                 return brand
 
-        return self.config.email_app_name
+        return self.config.email.email_app_name

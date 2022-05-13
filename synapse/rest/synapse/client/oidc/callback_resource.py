@@ -16,6 +16,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from synapse.http.server import DirectServeHtmlResource
+from synapse.http.site import SynapseRequest
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -30,10 +31,10 @@ class OIDCCallbackResource(DirectServeHtmlResource):
         super().__init__()
         self._oidc_handler = hs.get_oidc_handler()
 
-    async def _async_render_GET(self, request):
+    async def _async_render_GET(self, request: SynapseRequest) -> None:
         await self._oidc_handler.handle_oidc_callback(request)
 
-    async def _async_render_POST(self, request):
+    async def _async_render_POST(self, request: SynapseRequest) -> None:
         # the auth response can be returned via an x-www-form-urlencoded form instead
         # of GET params, as per
         # https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html.

@@ -17,7 +17,7 @@ from unittest.mock import Mock
 from twisted.internet import defer
 
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 
@@ -50,7 +50,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
 
         # Register a pusher
         user_dict = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(access_token)
+            self.hs.get_datastores().main.get_user_by_access_token(access_token)
         )
         token_id = user_dict.token_id
 

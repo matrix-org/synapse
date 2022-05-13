@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
+from twisted.internet.address import IPv4Address
 from twisted.internet.protocol import Protocol
 from twisted.web.resource import Resource
 
 from synapse.app.generic_worker import GenericWorkerServer
-from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.replication.http import ReplicationRestResource
 from synapse.replication.tcp.client import ReplicationDataHandler
@@ -54,7 +54,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         server_factory = ReplicationStreamProtocolFactory(hs)
         self.streamer = hs.get_replication_streamer()
         self.server: ServerReplicationStreamProtocol = server_factory.buildProtocol(
-            None
+            IPv4Address("TCP", "127.0.0.1", 0)
         )
 
         # Make a new HomeServer object for the worker
@@ -68,10 +68,18 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
 
         # Since we use sqlite in memory databases we need to make sure the
         # databases objects are the same.
-        self.worker_hs.get_datastore().db_pool = hs.get_datastore().db_pool
+        self.worker_hs.get_datastores().main.db_pool = hs.get_datastores().main.db_pool
 
+        # Normally we'd pass in the handler to `setup_test_homeserver`, which would
+        # eventually hit "Install @cache_in_self attributes" in tests/utils.py.
+        # Unfortunately our handler wants a reference to the homeserver. That leaves
+        # us with a chicken-and-egg problem.
+        # We can workaround this: create the homeserver first, create the handler
+        # and bodge it in after the fact. The bodging requires us to know the
+        # dirty details of how `cache_in_self` works. We politely ask mypy to
+        # ignore our dirty dealings.
         self.test_handler = self._build_replication_data_handler()
-        self.worker_hs._replication_data_handler = self.test_handler
+        self.worker_hs._replication_data_handler = self.test_handler  # type: ignore[attr-defined]
 
         repl_handler = ReplicationCommandHandler(self.worker_hs)
         self.client = ClientReplicationStreamProtocol(
@@ -146,10 +154,12 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         self.assertEqual(port, 8765)
 
         # Set up client side protocol
-        client_protocol = client_factory.buildProtocol(None)
+        client_address = IPv4Address("TCP", "127.0.0.1", 1234)
+        client_protocol = client_factory.buildProtocol(("127.0.0.1", 1234))
 
         # Set up the server side protocol
-        channel = self.site.buildProtocol(None)
+        server_address = IPv4Address("TCP", host, port)
+        channel = self.site.buildProtocol((host, port))
 
         # hook into the channel's request factory so that we can keep a record
         # of the requests
@@ -165,12 +175,12 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
 
         # Connect client to server and vice versa.
         client_to_server_transport = FakeTransport(
-            channel, self.reactor, client_protocol
+            channel, self.reactor, client_protocol, server_address, client_address
         )
         client_protocol.makeConnection(client_to_server_transport)
 
         server_to_client_transport = FakeTransport(
-            client_protocol, self.reactor, channel
+            client_protocol, self.reactor, channel, client_address, server_address
         )
         channel.makeConnection(server_to_client_transport)
 
@@ -198,7 +208,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         path: bytes = request.path  # type: ignore
         self.assertRegex(
             path,
-            br"^/_synapse/replication/get_repl_stream_updates/%s/[^/]+$"
+            rb"^/_synapse/replication/get_repl_stream_updates/%s/[^/]+$"
             % (stream_name.encode("ascii"),),
         )
 
@@ -211,8 +221,6 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
     Automatically handle HTTP replication requests from workers to master,
     unlike `BaseStreamTestCase`.
     """
-
-    servlets: List[Callable[[HomeServer, JsonResource], None]] = []
 
     def setUp(self):
         super().setUp()
@@ -227,7 +235,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         # We may have an attempt to connect to redis for the external cache already.
         self.connect_any_redis_attempts()
 
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         self.database_pool = store.db_pool
 
         self.reactor.lookups["testserv"] = "1.2.3.4"
@@ -240,12 +248,12 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         if self.hs.config.redis.redis_enabled:
             # Handle attempts to connect to fake redis server.
             self.reactor.add_tcp_client_callback(
-                b"localhost",
+                "localhost",
                 6379,
                 self.connect_any_redis_attempts,
             )
 
-            self.hs.get_tcp_replication().start_replication(self.hs)
+            self.hs.get_replication_command_handler().start_replication(self.hs)
 
         # When we see a connection attempt to the master replication listener we
         # automatically set up the connection. This is so that tests don't
@@ -315,20 +323,23 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
                     )
                 )
 
+            # Copy the port into a new, non-Optional variable so mypy knows we're
+            # not going to reset `instance_loc` to `None` under its feet. See
+            # https://mypy.readthedocs.io/en/latest/common_issues.html#narrowing-and-inner-functions
+            port = instance_loc.port
+
             self.reactor.add_tcp_client_callback(
                 self.reactor.lookups[instance_loc.host],
                 instance_loc.port,
-                lambda: self._handle_http_replication_attempt(
-                    worker_hs, instance_loc.port
-                ),
+                lambda: self._handle_http_replication_attempt(worker_hs, port),
             )
 
-        store = worker_hs.get_datastore()
+        store = worker_hs.get_datastores().main
         store.db_pool._db_pool = self.database_pool._db_pool
 
         # Set up TCP replication between master and the new worker if we don't
         # have Redis support enabled.
-        if not worker_hs.config.redis_enabled:
+        if not worker_hs.config.redis.redis_enabled:
             repl_handler = ReplicationCommandHandler(worker_hs)
             client = ClientReplicationStreamProtocol(
                 worker_hs,
@@ -337,7 +348,9 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
                 self.clock,
                 repl_handler,
             )
-            server = self.server_factory.buildProtocol(None)
+            server = self.server_factory.buildProtocol(
+                IPv4Address("TCP", "127.0.0.1", 0)
+            )
 
             client_transport = FakeTransport(server, self.reactor)
             client.makeConnection(client_transport)
@@ -364,7 +377,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         )
 
         if worker_hs.config.redis.redis_enabled:
-            worker_hs.get_tcp_replication().start_replication(worker_hs)
+            worker_hs.get_replication_command_handler().start_replication(worker_hs)
 
         return worker_hs
 
@@ -395,19 +408,21 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         self.assertEqual(port, repl_port)
 
         # Set up client side protocol
-        client_protocol = client_factory.buildProtocol(None)
+        client_address = IPv4Address("TCP", "127.0.0.1", 1234)
+        client_protocol = client_factory.buildProtocol(("127.0.0.1", 1234))
 
         # Set up the server side protocol
-        channel = self._hs_to_site[hs].buildProtocol(None)
+        server_address = IPv4Address("TCP", host, port)
+        channel = self._hs_to_site[hs].buildProtocol((host, port))
 
         # Connect client to server and vice versa.
         client_to_server_transport = FakeTransport(
-            channel, self.reactor, client_protocol
+            channel, self.reactor, client_protocol, server_address, client_address
         )
         client_protocol.makeConnection(client_to_server_transport)
 
         server_to_client_transport = FakeTransport(
-            client_protocol, self.reactor, channel
+            client_protocol, self.reactor, channel, client_address, server_address
         )
         channel.makeConnection(server_to_client_transport)
 
@@ -424,7 +439,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         clients = self.reactor.tcpClients
         while clients:
             (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
-            self.assertEqual(host, b"localhost")
+            self.assertEqual(host, "localhost")
             self.assertEqual(port, 6379)
 
             client_protocol = client_factory.buildProtocol(None)

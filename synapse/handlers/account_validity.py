@@ -23,6 +23,7 @@ from synapse.api.errors import AuthError, StoreError, SynapseError
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.types import UserID
 from synapse.util import stringutils
+from synapse.util.async_helpers import delay_cancellation
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -43,11 +44,11 @@ class AccountValidityHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.config = hs.config
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.send_email_handler = self.hs.get_send_email_handler()
         self.clock = self.hs.get_clock()
 
-        self._app_name = self.hs.config.email_app_name
+        self._app_name = self.hs.config.email.email_app_name
 
         self._account_validity_enabled = (
             hs.config.account_validity.account_validity_enabled
@@ -67,18 +68,14 @@ class AccountValidityHandler:
             and self._account_validity_renew_by_email_enabled
         ):
             # Don't do email-specific configuration if renewal by email is disabled.
-            self._template_html = (
-                hs.config.account_validity.account_validity_template_html
-            )
-            self._template_text = (
-                hs.config.account_validity.account_validity_template_text
-            )
+            self._template_html = hs.config.email.account_validity_template_html
+            self._template_text = hs.config.email.account_validity_template_text
             self._renew_email_subject = (
                 hs.config.account_validity.account_validity_renew_email_subject
             )
 
             # Check the renewal emails to send and send them every 30min.
-            if hs.config.run_background_tasks:
+            if hs.config.worker.run_background_tasks:
                 self.clock.looping_call(self._send_renewal_emails, 30 * 60 * 1000)
 
         self._is_user_expired_callbacks: List[IS_USER_EXPIRED_CALLBACK] = []
@@ -99,7 +96,7 @@ class AccountValidityHandler:
         on_legacy_send_mail: Optional[ON_LEGACY_SEND_MAIL_CALLBACK] = None,
         on_legacy_renew: Optional[ON_LEGACY_RENEW_CALLBACK] = None,
         on_legacy_admin_request: Optional[ON_LEGACY_ADMIN_REQUEST] = None,
-    ):
+    ) -> None:
         """Register callbacks from module for each hook."""
         if is_user_expired is not None:
             self._is_user_expired_callbacks.append(is_user_expired)
@@ -154,7 +151,7 @@ class AccountValidityHandler:
             Whether the user has expired.
         """
         for callback in self._is_user_expired_callbacks:
-            expired = await callback(user_id)
+            expired = await delay_cancellation(callback(user_id))
             if expired is not None:
                 return expired
 
@@ -165,7 +162,7 @@ class AccountValidityHandler:
 
         return False
 
-    async def on_user_registration(self, user_id: str):
+    async def on_user_registration(self, user_id: str) -> None:
         """Tell third-party modules about a user's registration.
 
         Args:
@@ -184,9 +181,9 @@ class AccountValidityHandler:
         expiring_users = await self.store.get_users_expiring_soon()
 
         if expiring_users:
-            for user in expiring_users:
+            for user_id, expiration_ts_ms in expiring_users:
                 await self._send_renewal_email(
-                    user_id=user["user_id"], expiration_ts=user["expiration_ts_ms"]
+                    user_id=user_id, expiration_ts=expiration_ts_ms
                 )
 
     async def send_renewal_email_to_user(self, user_id: str) -> None:
@@ -249,7 +246,7 @@ class AccountValidityHandler:
 
         renewal_token = await self._get_renewal_token(user_id)
         url = "%s_matrix/client/unstable/account_validity/renew?token=%s" % (
-            self.hs.config.public_baseurl,
+            self.hs.config.server.public_baseurl,
             renewal_token,
         )
 
@@ -398,6 +395,7 @@ class AccountValidityHandler:
         """
         now = self.clock.time_msec()
         if expiration_ts is None:
+            assert self._account_validity_period is not None
             expiration_ts = now + self._account_validity_period
 
         await self.store.set_account_validity_for_user(

@@ -13,7 +13,7 @@
 # limitations under the License.
 import logging
 
-from synapse.rest.client.v2_alpha import register
+from synapse.rest.client import register
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.server import FakeChannel, make_request

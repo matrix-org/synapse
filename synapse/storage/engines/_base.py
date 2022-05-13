@@ -12,9 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import abc
-from typing import Generic, TypeVar
+from enum import IntEnum
+from typing import Generic, Optional, TypeVar
 
 from synapse.storage.types import Connection
+
+
+class IsolationLevel(IntEnum):
+    READ_COMMITTED: int = 1
+    REPEATABLE_READ: int = 2
+    SERIALIZABLE: int = 3
 
 
 class IncorrectDatabaseSetup(RuntimeError):
@@ -107,5 +114,15 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
 
         Note: This has no effect on SQLite3, so callers still need to
         commit/rollback the connections.
+        """
+        ...
+
+    @abc.abstractmethod
+    def attempt_to_set_isolation_level(
+        self, conn: Connection, isolation_level: Optional[int]
+    ):
+        """Attempt to set the connections isolation level.
+
+        Note: This has no effect on SQLite3, as transactions are SERIALIZABLE by default.
         """
         ...
