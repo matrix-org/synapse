@@ -24,7 +24,6 @@ from twisted.internet.address import IPv4Address, IPv6Address
 from twisted.internet.interfaces import IAddress, IConnector
 from twisted.python.failure import Failure
 
-from synapse.config.homeserver import HomeServerConfig
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import (
     BackgroundProcessLoggingContext,
@@ -344,17 +343,6 @@ class RedisDirectTcpReplicationClientFactory(SynapseRedisFactory):
         self.synapse_channel_names = channel_names
 
         self.synapse_outbound_redis_connection = outbound_redis_connection
-
-    @staticmethod
-    def channels_to_subscribe_to_for_config(config: HomeServerConfig) -> List[str]:
-        subscribe_to = []
-
-        if config.worker.run_background_tasks or config.worker.worker_app is None:
-            # If we're the main process or the background worker, we want to process
-            # User IP addresses
-            subscribe_to.append("USER_IP")
-
-        return subscribe_to
 
     def buildProtocol(self, addr: IAddress) -> RedisSubscriber:
         p = super().buildProtocol(addr)
