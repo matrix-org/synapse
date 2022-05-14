@@ -1,1 +1,1 @@
-Explicitly select the `flake8` lints used.
+Specify and explicitly select which flake8 lint categories are used.

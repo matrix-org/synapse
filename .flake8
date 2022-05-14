@@ -10,7 +10,11 @@
 #  E501: Line too long (black enforces this for us)
 ignore=W503,W504,E203,E731,E501
 
-# Default + Enabled flake8 error codes:
+# Here we explicitly specify the error codes we *do* lint for.
+# This includes the default flake8 (E,W,F,C90) and default bugbear (B) codes.
+# Note: This excludes B90 (opinionated bugbear lints), which would need to be
+#  added here explicitly to be included.
+# Codes and their origins:
 #  E/W: pycodestyle errors and warnings
 #    F: PyFlakes lints
 #  C90: complexity (mccabe)
