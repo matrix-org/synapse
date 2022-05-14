@@ -412,8 +412,8 @@ class SyncHandler:
 
     async def push_rules_for_user(self, user: UserID) -> Dict[str, Dict[str, list]]:
         user_id = user.to_string()
-        rules_raw  = await self.store.get_push_rules_for_user(user_id)
-        rules  = format_push_rules_for_user(user, rules_raw )
+        rules_raw = await self.store.get_push_rules_for_user(user_id)
+        rules = format_push_rules_for_user(user, rules_raw)
         return rules
 
     async def ephemeral_by_room(
