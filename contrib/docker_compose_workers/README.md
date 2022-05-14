@@ -4,11 +4,13 @@ This section describes how deploy and manage Synapse and workers via [Docker Com
 
 Example worker configuration files can be found [here](workers).
 
-All examples assume that your Synapse service is called `synapse` in your Docker Compose file.
+All examples and snippets assume that your Synapse service is called `synapse` in your Docker Compose file.
 
-## Example Worker Service in Docker Compose
+An example Docker Compose file can be found [here](docker-compose.yaml).
 
-In order to start the Synapse container as a worker, you must specify an `entrypoint` that loads both the `homeserver.yaml` and the configuration for the worker (`generic_worker_1.yaml` in the example below). You must also include the worker type in the environment variable `SYNAPSE_WORKER` or alternatively pass `-m synapse.app.generic_worker` as part of the `entrypoint` after `"/start.py", "run"`).
+## Worker Service Examples in Docker Compose
+
+In order to start the Synapse container as a worker, you must specify an `entrypoint` that loads both the `homeserver.yaml` and the configuration for the worker (`synapse-generic-worker-1.yaml` in the example below). You must also include the worker type in the environment variable `SYNAPSE_WORKER` or alternatively pass `-m synapse.app.generic_worker` as part of the `entrypoint` after `"/start.py", "run"`).
 
 ### Generic Worker Example
 
@@ -115,5 +117,9 @@ This section is applicable if you are using Federation senders (synapse.app.fede
 send_federation: false
 
 federation_sender_instances:
-  - synapse-federation-sender-1 # The worker_name setting in the federation sender worker configuration file
+  - synapse-federation-sender-1 # The worker_name setting in your federation sender worker configuration file
 ```
+
+## Other Worker types
+
+Using the concepts shown here it is possible to create other worker types in Docker Compose. See the [Workers](https://matrix-org.github.io/synapse/latest/workers.html#available-worker-applications) documentation for a list of available workers.
