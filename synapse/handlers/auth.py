@@ -1204,7 +1204,7 @@ class AuthHandler:
                     await self._failed_login_attempts_ratelimiter.can_do_action(
                         None, (medium, address)
                     )
-                raise LoginError(403, "", errcode=Codes.FORBIDDEN)
+                raise LoginError(403, "Invalid password", errcode=Codes.FORBIDDEN)
 
             identifier_dict = {"type": "m.id.user", "user": user_id}
 
