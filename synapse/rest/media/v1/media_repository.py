@@ -68,9 +68,6 @@ logger = logging.getLogger(__name__)
 # How often to run the background job to update the "recently accessed"
 # attribute of local and remote media.
 UPDATE_RECENTLY_ACCESSED_TS = 60 * 1000  # 1 minute
-# How often to run the background job that purges local and remote media
-# according to the configured media retention rules.
-APPLY_MEDIA_RETENTION_RULES_PERIOD_MS = 60 * 60 * 1000  # 1 hour
 
 
 class MediaRepository:
@@ -136,11 +133,11 @@ class MediaRepository:
         )
 
         if hs.config.media.media_retention_enabled:
-            # Run the background job to apply media retention rules every
-            # $APPLY_MEDIA_RETENTION_RULES_PERIOD_MS milliseconds.
+            # Run the background job to apply media retention rules routinely,
+            # with the duration between runs dictated by the homeserver config.
             self.clock.looping_call(
                 self._start_apply_media_retention_rules,
-                APPLY_MEDIA_RETENTION_RULES_PERIOD_MS,
+                hs.config.media.media_retention_purge_period,
             )
 
     def _start_update_recently_accessed(self) -> Deferred:

@@ -1525,6 +1525,11 @@ option set to 'true'). This may be the main process.
 The `media_retention.enabled` option globally controls whether media
 retention is enabled.
 
+The `media_retention.purge_period` option dictates how often Synapse should
+scan and purge media to be removed according to the configured thresholds.
+For example, if set to "6h", Synapse will check every 6 hours for media
+that can be purged. The default value is "24h" meaning 24 hours.
+
 The `media_retention.local_media_lifetime` and
 `media_retention.remote_media_lifetime` config options control whether
 media will be purged if it has not been accessed in a given amount of
@@ -1538,6 +1543,7 @@ Example configuration:
 ```yaml
 media_retention:
     enabled: true
+    purge_period: 24h
     local_media_lifetime: 30d
     remote_media_lifetime: 7d
 ```
