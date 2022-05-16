@@ -32,6 +32,7 @@ well as some specific methods:
 * `check_username_for_spam`
 * `check_registration_for_spam`
 * `check_media_file_for_spam`
+* `drop_federated_event`
 
 The details of each of these methods (as well as their inputs and outputs)
 are documented in the `synapse.events.spamcheck.SpamChecker` class.
@@ -86,6 +87,10 @@ class ExampleSpamChecker:
 
     async def check_media_file_for_spam(self, file_wrapper, file_info):
         return False  # allow all media
+
+
+    async def drop_federated_event(self, foo):
+        return False  # don't silently drop any inbound federated events
 ```
 
 ## Configuration
