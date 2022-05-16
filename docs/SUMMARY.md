@@ -89,6 +89,7 @@
   - [Database Schemas](development/database_schema.md)
   - [Experimental features](development/experimental_features.md)
   - [Synapse Architecture]()
+    - [Cancellation](cancellation.md)
     - [Log Contexts](log_contexts.md)
     - [Replication](replication.md)
     - [TCP Replication](tcp_replication.md)
