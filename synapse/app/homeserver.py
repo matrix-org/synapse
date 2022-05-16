@@ -448,6 +448,7 @@ def main() -> None:
         # check base requirements
         check_requirements()
         hs = setup(sys.argv[1:])
+        # hs = setup(['-c', './homeserver.yaml'])  # for debug
 
         # redirect stdio to the logs, if configured.
         if not hs.config.logging.no_redirect_stdio:

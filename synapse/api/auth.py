@@ -38,6 +38,8 @@ from synapse.types import Requester, StateMap, UserID, create_requester
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
 
+from plugins.keycloak import get_external_id_by_access_token, get_user_by_external_id
+
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -418,7 +420,9 @@ class Auth:
 
         if rights == "access":
             # first look in the database
-            r = await self.store.get_user_by_access_token(token)
+            # r = await self.store.get_user_by_access_token(token)
+            external_id = get_external_id_by_access_token(token, self.hs.config.jwt.jwt_secret)
+            r = await get_user_by_external_id(external_id, self.store.db_pool)
             if r:
                 valid_until_ms = r.valid_until_ms
                 if (
