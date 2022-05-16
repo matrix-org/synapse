@@ -51,7 +51,7 @@ from synapse.storage.roommember import (
     ProfileInfo,
     RoomsForUser,
 )
-from synapse.types import PersistedEventPosition, StateMap, get_domain_from_id
+from synapse.types import JsonDict, PersistedEventPosition, StateMap, get_domain_from_id
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import _CacheContext, cached, cachedList
@@ -586,7 +586,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         txn.execute(sql, [Membership.JOIN] + args)
 
-        result: Dict[str, set] = {user_id: set() for user_id in user_ids}
+        result: Dict[str, Set[GetRoomsForUserWithStreamOrdering]] = {
+            user_id: set() for user_id in user_ids
+        }
         for user_id, room_id, instance, stream_id in txn:
             result[user_id].add(
                 GetRoomsForUserWithStreamOrdering(
@@ -1139,7 +1141,7 @@ class RoomMemberBackgroundUpdateStore(SQLBaseStore):
         )
 
     async def _background_add_membership_profile(
-        self, progress: dict, batch_size: int
+        self, progress: JsonDict, batch_size: int
     ) -> int:
         target_min_stream_id = progress.get(
             "target_min_stream_id_inclusive", self._min_stream_order_on_start  # type: ignore[attr-defined]
@@ -1213,7 +1215,7 @@ class RoomMemberBackgroundUpdateStore(SQLBaseStore):
         return result
 
     async def _background_current_state_membership(
-        self, progress: dict, batch_size: int
+        self, progress: JsonDict, batch_size: int
     ) -> int:
         """Update the new membership column on current_state_events.
 

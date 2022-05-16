@@ -346,7 +346,7 @@ class PushRulesWorkerStore(
 
         def get_all_push_rule_updates_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[List[Tuple[int, tuple]], int, bool]:
+        ) -> Tuple[List[Tuple[int, Tuple[str]]], int, bool]:
             sql = """
                 SELECT stream_id, user_id
                 FROM push_rules_stream
@@ -356,7 +356,7 @@ class PushRulesWorkerStore(
             """
             txn.execute(sql, (last_id, current_id, limit))
             updates = cast(
-                List[Tuple[int, tuple]],
+                List[Tuple[int, Tuple[str]]],
                 [(stream_id, (user_id,)) for stream_id, user_id in txn],
             )
 
@@ -380,7 +380,7 @@ class PushRuleStore(PushRulesWorkerStore):
         rule_id: str,
         priority_class: int,
         conditions: List[Dict[str, str]],
-        actions: List[Union[dict, str]],
+        actions: List[Union[JsonDict, str]],
         before: Optional[str] = None,
         after: Optional[str] = None,
     ) -> None:
