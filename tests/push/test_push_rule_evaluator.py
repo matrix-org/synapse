@@ -27,7 +27,10 @@ from tests import unittest
 
 class PushRuleEvaluatorTestCase(unittest.TestCase):
     def _get_evaluator(
-        self, content: JsonDict, relations: Optional[Set[Tuple[str, str, str]]] = None
+        self,
+        content: JsonDict,
+        relations: Optional[Set[Tuple[str, str, str]]] = None,
+        relations_match_enabled: bool = False,
     ) -> PushRuleEvaluatorForEvent:
         event = FrozenEvent(
             {
@@ -49,6 +52,7 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             sender_power_level,
             power_levels,
             relations or set(),
+            relations_match_enabled,
         )
 
     def test_display_name(self) -> None:
@@ -285,8 +289,18 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
 
     def test_relation_match(self) -> None:
         """Test the relation_match push rule kind."""
+
+        # Check if the experimental feature is disabled.
         evaluator = self._get_evaluator(
             {}, {("m.annotation", "@user:test", "m.reaction")}
+        )
+        condition = {"kind": "relation_match"}
+        # Oddly, an unknown condition always matches.
+        self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))
+
+        # A push rule evaluator with the experimental rule enabled.
+        evaluator = self._get_evaluator(
+            {}, {("m.annotation", "@user:test", "m.reaction")}, True
         )
 
         # Check just relation type.

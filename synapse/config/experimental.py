@@ -84,3 +84,6 @@ class ExperimentalConfig(Config):
 
         # MSC3786 (Add a default push rule to ignore m.room.server_acl events)
         self.msc3786_enabled: bool = experimental.get("msc3786_enabled", False)
+
+        # MSC3772: A push rule for mutual relations.
+        self.msc3772_enabled: bool = experimental.get("msc3772_enabled", False)

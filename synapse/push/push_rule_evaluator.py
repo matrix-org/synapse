@@ -121,12 +121,14 @@ class PushRuleEvaluatorForEvent:
         sender_power_level: int,
         power_levels: Dict[str, Union[int, Dict[str, int]]],
         relations: Set[Tuple[str, str, str]],
+        relations_match_enabled: bool,
     ):
         self._event = event
         self._room_member_count = room_member_count
         self._sender_power_level = sender_power_level
         self._power_levels = power_levels
         self._relations = relations
+        self._relations_match_enabled = relations_match_enabled
 
         # Maps strings of e.g. 'content.body' -> event["content"]["body"]
         self._value_cache = _flatten_dict(event)
@@ -190,7 +192,10 @@ class PushRuleEvaluatorForEvent:
             return _sender_notification_permission(
                 self._event, condition, self._sender_power_level, self._power_levels
             )
-        elif condition["kind"] == "org.matrix.msc3772.relation_match":
+        elif (
+            condition["kind"] == "org.matrix.msc3772.relation_match"
+            and self._relations_match_enabled
+        ):
             return self._relation_match(condition, user_id)
         else:
             return True

@@ -120,6 +120,9 @@ class BulkPushRuleEvaluator:
             resizable=False,
         )
 
+        # Whether to support MSC3772 is supported.
+        self._relations_match_enabled = self.hs.config.experimental.msc3772_enabled
+
     async def _get_rules_for_event(
         self, event: EventBase, context: EventContext
     ) -> Dict[str, List[Dict[str, Any]]]:
@@ -214,7 +217,12 @@ class BulkPushRuleEvaluator:
         relations = await self.store.get_mutual_event_relations(event)
 
         evaluator = PushRuleEvaluatorForEvent(
-            event, len(room_members), sender_power_level, power_levels, relations
+            event,
+            len(room_members),
+            sender_power_level,
+            power_levels,
+            relations,
+            self._relations_match_enabled,
         )
 
         # If the event is not a state event check if any users ignore the sender.
