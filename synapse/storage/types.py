@@ -109,54 +109,54 @@ class DBAPI2Module(Protocol):
     # - Python's sqlite3 module doesn't contains the same descriptions as the
     #   DBAPI2 spec, see https://docs.python.org/3/library/sqlite3.html#exceptions
     # - Psycopg2 maps every Postgres error code onto a unique exception class which
-    #   extends from this heirarchy. See
+    #   extends from this hierarchy. See
     #     https://docs.python.org/3/library/sqlite3.html?highlight=sqlite3#exceptions
     #     https://www.postgresql.org/docs/current/errcodes-appendix.html#ERRCODES-TABLE
     Warning: Type[Exception]
     Error: Type[Exception]
 
-    # Errors are divided into InterfaceErrors (something went wrong in the DB driver)
-    # and DatabaseErrors (something went wrong in the DB). These are both subclasses of
-    # Error, but we can't currently express this in type annotations due to
-    # https://github.com/python/mypy/issues/8397
+    # Errors are divided into `InterfaceError`s (something went wrong in the database
+    # driver) and `DatabaseError`s (something went wrong in the database). These are
+    # both subclasses of `Error`, but we can't currently express this in type
+    # annotations due to https://github.com/python/mypy/issues/8397
     InterfaceError: Type[Exception]
     DatabaseError: Type[Exception]
 
     # Everything below is a subclass of `DatabaseError`.
 
-    # Roughly: the DB rejected a nonsensical value. Examples:
-    # - integer too big for its data type
-    # - invalid date time format
-    # - strings containing null code points
+    # Roughly: the database rejected a nonsensical value. Examples:
+    # - An integer was too big for its data type.
+    # - An invalid date time was provided.
+    # - A string contained a null code point.
     DataError: Type[Exception]
 
-    # Roughly: something went wrong in the DB, but it's not within the application
+    # Roughly: something went wrong in the database, but it's not within the application
     # programmer's control. Examples:
-    # - we failed to establish connection to the DB
-    # - we lost connection to the DB
-    # - deadlock detected
-    # - serialisation failure
-    # - the DB ran out of resources (storage, ram, connections...)
-    # - the DB encountered an error from the OS
-    OperationalError: Type[Exception]
+    # - We failed to establish a connection to the database.
+    # - The connection to the database was lost.
+    # - A deadlock was detected.
+    # - A serialisation failure occurred.
+    # - The database ran out of resources, such as storage, memory, connections, etc.
+    # - The database encountered an error from the operating system.
+OperationalError: Type[Exception]
 
-    # Roughly: you've given the DB data which breaks a rule you asked it to enforce.
+    # Roughly: we've given the database data which breaks a rule we asked it to enforce.
     # Examples:
     # - Stop, criminal scum! You violated the foreign key constraint
     # - Also check constraints, non-null constraints, etc.
     IntegrityError: Type[Exception]
 
-    # Roughly: something went wrong within the DB server itself.
+    # Roughly: something went wrong within the database server itself.
     InternalError: Type[Exception]
 
-    # Roughly: your application did something silly that you need to fix. Examples:
-    # - You don't have permissions to do something.
-    # - You tried to create a table with duplicate column names.
-    # - You tried to use a reserved name.
-    # - You referred to a column that doesn't exist.
+    # Roughly: the application did something silly that needs to be fixed. Examples:
+    # - We don't have permissions to do something.
+    # - We tried to create a table with duplicate column names.
+    # - We tried to use a reserved name.
+    # - We referred to a column that doesn't exist.
     ProgrammingError: Type[Exception]
 
-    # Roughly: you've tried to do something that this DB doesn't support.
+    # Roughly: we've tried to do something that this database doesn't support.
     NotSupportedError: Type[Exception]
 
     def connect(self, **parameters: object) -> Connection:
