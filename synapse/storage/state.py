@@ -593,7 +593,9 @@ class StateGroupStorage:
 
         return group_to_state
 
-    async def get_state_ids_for_group(self, state_group: int, state_filter: Optional[StateFilter] = None) -> StateMap[str]:
+    async def get_state_ids_for_group(
+        self, state_group: int, state_filter: Optional[StateFilter] = None
+    ) -> StateMap[str]:
         """Get the event IDs of all the state in the given state group
 
         Args:

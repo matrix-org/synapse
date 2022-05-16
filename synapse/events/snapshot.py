@@ -197,7 +197,9 @@ class EventContext:
 
         return self._state_group
 
-    async def get_current_state_ids(self, state_filter: Optional["StateFilter"] = None) -> Optional[StateMap[str]]:
+    async def get_current_state_ids(
+        self, state_filter: Optional["StateFilter"] = None
+    ) -> Optional[StateMap[str]]:
         """
         Gets the room state map, including this event - ie, the state in ``state_group``
 
@@ -228,7 +230,9 @@ class EventContext:
 
         return prev_state_ids
 
-    async def get_prev_state_ids(self, state_filter: Optional["StateFilter"] = None) -> StateMap[str]:
+    async def get_prev_state_ids(
+        self, state_filter: Optional["StateFilter"] = None
+    ) -> StateMap[str]:
         """
         Gets the room state map, excluding this event.
 
