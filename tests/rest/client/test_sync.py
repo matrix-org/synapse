@@ -656,12 +656,13 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(3)
 
         # Check that custom events with a body increase the unread counter.
-        self.helper.send_event(
+        result = self.helper.send_event(
             self.room_id,
             "org.matrix.custom_type",
             {"body": "hello"},
             tok=self.tok2,
         )
+        event_id = result["event_id"]
         self._check_unread_count(4)
 
         # Check that edits don't increase the unread counter.
@@ -671,7 +672,10 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             content={
                 "body": "hello",
                 "msgtype": "m.text",
-                "m.relates_to": {"rel_type": RelationTypes.REPLACE},
+                "m.relates_to": {
+                    "rel_type": RelationTypes.REPLACE,
+                    "event_id": event_id,
+                },
             },
             tok=self.tok2,
         )
