@@ -306,43 +306,6 @@ class ContentRepositoryConfig(Config):
         #thumbnail_sizes:
 %(formatted_thumbnail_sizes)s
 
-        # Configure media retention settings. Media will be purged if it
-        # has not been accessed in at least this amount of time. If the
-        # media has never been accessed, the media's creation time is used
-        # instead. Both thumbnails and the original media will be removed.
-        #
-        # Media is 'accessed' when loaded in a room in a client, or
-        # otherwise downloaded by a local or remote user.
-        #
-        # Purging the media will be the carried out by the media worker
-        # (whichever worker has the 'enable_media_repo' homeserver config
-        # option enabled). This may be the main process.
-        #
-        media_retention:
-            # Whether media retention settings should apply. Defaults to
-            # false.
-            #
-            # Uncomment to enable media retention on this homeserver.
-            #
-            #enabled: true
-
-            # How long to keep local media since its last access. Local
-            # media that is removed will be permanently deleted.
-            #
-            # If this option is not set, local media will not have a
-            # retention policy applied.
-            #
-            #local_media_lifetime: 30d
-
-            # How long to keep downloaded remote media since its last
-            # access. Remote media will be downloaded again from the
-            # originating server on demand.
-            #
-            # If this option is not set, remote media will not have a
-            # retention policy applied.
-            #
-            remote_media_lifetime: 7d
-
         # Is the preview URL API enabled?
         #
         # 'false' by default: uncomment the following to enable it (and specify a

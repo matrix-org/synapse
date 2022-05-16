@@ -1407,7 +1407,7 @@ federation_rr_transactions_per_room_per_second: 40
 ```
 ---
 ## Media Store ##
-Config options relating to Synapse media store.
+Config options related to Synapse's media store.
 
 ---
 Config option: `enable_media_repo` 
@@ -1511,6 +1511,37 @@ thumbnail_sizes:
     height: 600
     method: scale
 ```
+---
+Config option: `media_retention`
+
+Controls whether local media and entries in the remote media cache
+(media that is downloaded from other homeservers) should be removed
+under certain conditions, typically for the purpose of saving space.
+
+Purging media files will be the carried out by the media worker
+(that is, the worker that has the `enable_media_repo` homeserver config
+option set to 'true'). This may be the main process.
+
+The `media_retention.enabled` option globally controls whether media
+retention is enabled.
+
+The `media_retention.local_media_lifetime` and
+`media_retention.remote_media_lifetime` config options control whether
+media will be purged if it has not been accessed in a given amount of
+time. Note that media is 'accessed' when loaded in a room in a client, or
+otherwise downloaded by a local or remote user. If the media has never
+been accessed, the media's creation time is used instead. Both thumbnails
+and the original media will be removed. If either of these options are unset,
+then media of that type will not be purged.
+
+Example configuration:
+```yaml
+media_retention:
+    enabled: true
+    local_media_lifetime: 30d
+    remote_media_lifetime: 7d
+```
+---
 Config option: `url_preview_enabled`
 
 This setting determines whether the preview URL API is enabled.
