@@ -251,7 +251,7 @@ any of the subsequent implementations of this callback.
 
 ### `drop_federated_event`
 
-_First introduced in Synapse v1.?.?_
+_First introduced in Synapse v1.60.0_
 
 ```python
 async def drop_federated_event(event: "synapse.events.EventBase") -> bool
