@@ -138,7 +138,7 @@ class DBAPI2Module(Protocol):
     # - A serialisation failure occurred.
     # - The database ran out of resources, such as storage, memory, connections, etc.
     # - The database encountered an error from the operating system.
-OperationalError: Type[Exception]
+    OperationalError: Type[Exception]
 
     # Roughly: we've given the database data which breaks a rule we asked it to enforce.
     # Examples:
