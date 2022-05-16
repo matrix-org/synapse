@@ -750,7 +750,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 WHERE room_id = ?
                     AND stream_ordering <= ?
                     AND NOT outlier
-                    AND rejections.reason IS NULL
+                    AND rejections.event_id IS NULL
                 ORDER BY stream_ordering DESC
                 LIMIT 1
             """
