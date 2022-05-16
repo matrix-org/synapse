@@ -593,16 +593,17 @@ class StateGroupStorage:
 
         return group_to_state
 
-    async def get_state_ids_for_group(self, state_group: int) -> StateMap[str]:
+    async def get_state_ids_for_group(self, state_group: int, state_filter: Optional[StateFilter] = None) -> StateMap[str]:
         """Get the event IDs of all the state in the given state group
 
         Args:
             state_group: A state group for which we want to get the state IDs.
+            state_filter: specifies the type of state event to fetch from DB, example: EventTypes.JoinRules
 
         Returns:
             Resolves to a map of (type, state_key) -> event_id
         """
-        group_to_state = await self._get_state_for_groups((state_group,))
+        group_to_state = await self._get_state_for_groups((state_group,), state_filter)
 
         return group_to_state[state_group]
 
