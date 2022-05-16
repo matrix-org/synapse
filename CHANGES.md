@@ -1,3 +1,12 @@
+Synapse 1.59.0rc2 (2022-05-16)
+==============================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.58.0 where `/sync` would fail if the most recent event in a room was rejected. ([\#12729](https://github.com/matrix-org/synapse/issues/12729))
+
+
 Synapse 1.59.0rc1 (2022-05-10)
 ==============================
 
