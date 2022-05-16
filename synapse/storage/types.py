@@ -103,11 +103,61 @@ class DBAPI2Module(Protocol):
 
     __name__: str
 
+    # Exceptions. See https://peps.python.org/pep-0249/#exceptions
+
+    # For our specific drivers:
+    # - Python's sqlite3 module doesn't contains the same descriptions as the
+    #   DBAPI2 spec, see https://docs.python.org/3/library/sqlite3.html#exceptions
+    # - Psycopg2 maps every Postgres error code onto a unique exception class which
+    #   extends from this heirarchy. See
+    #     https://docs.python.org/3/library/sqlite3.html?highlight=sqlite3#exceptions
+    #     https://www.postgresql.org/docs/current/errcodes-appendix.html#ERRCODES-TABLE
     Warning: Type[Exception]
     Error: Type[Exception]
+
+    # Errors are divided into InterfaceErrors (something went wrong in the DB driver)
+    # and DatabaseErrors (something went wrong in the DB). These are both subclasses of
+    # Error, but we can't currently express this in type annotations due to
+    # https://github.com/python/mypy/issues/8397
+    InterfaceError: Type[Exception]
     DatabaseError: Type[Exception]
+
+    # Everything below is a subclass of `DatabaseError`.
+
+    # Roughly: the DB rejected a nonsensical value. Examples:
+    # - integer too big for its data type
+    # - invalid date time format
+    # - strings containing null code points
+    DataError: Type[Exception]
+
+    # Roughly: something went wrong in the DB, but it's not within the application
+    # programmer's control. Examples:
+    # - we failed to establish connection to the DB
+    # - we lost connection to the DB
+    # - deadlock detected
+    # - serialisation failure
+    # - the DB ran out of resources (storage, ram, connections...)
+    # - the DB encountered an error from the OS
     OperationalError: Type[Exception]
+
+    # Roughly: you've given the DB data which breaks a rule you asked it to enforce.
+    # Examples:
+    # - Stop, criminal scum! You violated the foreign key constraint
+    # - Also check constraints, non-null constraints, etc.
     IntegrityError: Type[Exception]
+
+    # Roughly: something went wrong within the DB server itself.
+    InternalError: Type[Exception]
+
+    # Roughly: your application did something silly that you need to fix. Examples:
+    # - You don't have permissions to do something.
+    # - You tried to create a table with duplicate column names.
+    # - You tried to use a reserved name.
+    # - You referred to a column that doesn't exist.
+    ProgrammingError: Type[Exception]
+
+    # Roughly: you've tried to do something that this DB doesn't support.
+    NotSupportedError: Type[Exception]
 
     def connect(self, **parameters: object) -> Connection:
         ...
