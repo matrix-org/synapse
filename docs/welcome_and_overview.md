@@ -10,7 +10,7 @@ This documentation covers topics for **installation**, **configuration** and
 **maintainence** of your Synapse process:
 
 * Learn how to [install](setup/installation.md) and
-  [configure](usage/configuration/index.html) your own instance, perhaps with [Single
+  [configure](usage/configuration/config_documentation.md) your own instance, perhaps with [Single
   Sign-On](usage/configuration/user_authentication/index.html).
 
 * See how to [upgrade](upgrade.md) between Synapse versions.
