@@ -172,7 +172,9 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         Filters a list of serialized receipts (as returned by /sync and /initialSync)
         and removes private read receipts of other users.
 
-        This operates on the return value of get_linearized_receipts_for_rooms():
+        This operates on the return value of get_linearized_receipts_for_rooms(),
+        which is wrapped in a cache. Care must be taken to ensure that the input
+        values are not modified.
 
         Args:
             rooms: A list of mappings, each mapping has a `content` field, which

@@ -26,25 +26,24 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         self.event_source = hs.get_event_sources().sources.receipt
 
     def test_filters_out_private_receipt(self):
-        events = [
-            {
-                "content": {
-                    "$1435641916114394fHBLK:matrix.org": {
-                        ReceiptTypes.READ_PRIVATE: {
-                            "@rikj:jki.re": {
-                                "ts": 1436451550453,
+        self._test_filters_private(
+            [
+                {
+                    "content": {
+                        "$1435641916114394fHBLK:matrix.org": {
+                            ReceiptTypes.READ_PRIVATE: {
+                                "@rikj:jki.re": {
+                                    "ts": 1436451550453,
+                                }
                             }
                         }
-                    }
-                },
-                "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                "type": "m.receipt",
-            }
-        ]
-        original_events = deepcopy(events)
-        self._test_filters_private(events, [])
-        # Since the events are fed in from a cache they should not be modified.
-        self.assertEqual(events, original_events)
+                    },
+                    "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
+                    "type": "m.receipt",
+                }
+            ],
+            [],
+        )
 
     def test_filters_out_private_receipt_and_ignores_rest(self):
         self._test_filters_private(
@@ -119,40 +118,6 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                                 }
                             }
                         }
-                    },
-                    "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
-                }
-            ],
-        )
-
-    def test_handles_missing_content_of_m_read(self):
-        self._test_filters_private(
-            [
-                {
-                    "content": {
-                        "$1435641916114394fHBLK:matrix.org": {
-                            ReceiptTypes.READ: {
-                                "@user:jki.re": {
-                                    "ts": 1436451550453,
-                                }
-                            }
-                        },
-                    },
-                    "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
-                }
-            ],
-            [
-                {
-                    "content": {
-                        "$1435641916114394fHBLK:matrix.org": {
-                            ReceiptTypes.READ: {
-                                "@user:jki.re": {
-                                    "ts": 1436451550453,
-                                }
-                            }
-                        },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
                     "type": "m.receipt",
@@ -330,6 +295,28 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                 }
             ],
         )
+
+    def test_we_do_not_mutate(self):
+        """Ensure the input values are not modified."""
+        events = [
+            {
+                "content": {
+                    "$1435641916114394fHBLK:matrix.org": {
+                        ReceiptTypes.READ_PRIVATE: {
+                            "@rikj:jki.re": {
+                                "ts": 1436451550453,
+                            }
+                        }
+                    }
+                },
+                "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
+                "type": "m.receipt",
+            }
+        ]
+        original_events = deepcopy(events)
+        self._test_filters_private(events, [])
+        # Since the events are fed in from a cache they should not be modified.
+        self.assertEqual(events, original_events)
 
     def _test_filters_private(
         self, events: List[JsonDict], expected_output: List[JsonDict]
