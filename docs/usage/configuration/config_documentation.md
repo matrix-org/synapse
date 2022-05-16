@@ -3454,7 +3454,7 @@ stream_writers:
   typing: worker1
 ```
 ---
-Config option: `run_background_task_on`
+Config option: `run_background_tasks_on`
 
 The worker that is used to run background tasks (e.g. cleaning up expired
 data). If not provided this defaults to the main process.
