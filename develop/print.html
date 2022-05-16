@@ -3386,7 +3386,7 @@ additional endpoints which should be loaded via dynamic modules.</p>
 <p>Valid resource names are:</p>
 <ul>
 <li>
-<p><code>client</code>: the client-server API (/_matrix/client), and the synapse admin API (/_synapse/admin). Also implies 'media' and 'static'.</p>
+<p><code>client</code>: the client-server API (/_matrix/client), and the synapse admin API (/_synapse/admin). Also implies <code>media</code> and <code>static</code>.</p>
 </li>
 <li>
 <p><code>consent</code>: user consent forms (/_matrix/consent). See <a href="usage/configuration/../../consent_tracking.html">here</a> for more.</p>
@@ -3395,7 +3395,7 @@ additional endpoints which should be loaded via dynamic modules.</p>
 <p><code>federation</code>: the server-server API (/_matrix/federation). Also implies <code>media</code>, <code>keys</code>, <code>openid</code></p>
 </li>
 <li>
-<p><code>keys</code>: the key discovery API (/_matrix/keys).</p>
+<p><code>keys</code>: the key discovery API (/_matrix/key).</p>
 </li>
 <li>
 <p><code>media</code>: the media API (/_matrix/media).</p>
@@ -6315,7 +6315,7 @@ presence:
 #   federation: the server-server API (/_matrix/federation). Also implies
 #       'media', 'keys', 'openid'
 #
-#   keys: the key discovery API (/_matrix/keys).
+#   keys: the key discovery API (/_matrix/key).
 #
 #   media: the media API (/_matrix/media).
 #
