@@ -110,6 +110,7 @@ class FederationServer(FederationBase):
 
         self.handler = hs.get_federation_handler()
         self.storage = hs.get_storage()
+        self._spam_checker = hs.get_spam_checker()
         self._federation_event_handler = hs.get_federation_event_handler()
         self.state = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
@@ -1019,6 +1020,12 @@ class FederationServer(FederationBase):
         except SynapseError as e:
             raise FederationError("ERROR", e.code, e.msg, affected=pdu.event_id)
 
+        if await self._spam_checker.drop_federated_event(pdu):
+            logger.warning(
+                "Unstaged federated event contains spam, dropping %s", pdu.event_id
+            )
+            return
+
         # Add the event to our staging area
         await self.store.insert_received_event_to_staging(origin, pdu)
 
@@ -1109,16 +1116,30 @@ class FederationServer(FederationBase):
                         (self._clock.time_msec() - received_ts) / 1000
                     )
 
-            # We need to do this check outside the lock to avoid a race between
-            # a new event being inserted by another instance and it attempting
-            # to acquire the lock.
-            next = await self.store.get_next_staged_event_for_room(
-                room_id, room_version
-            )
-            if not next:
+            while True:
+                # We need to do this check outside the lock to avoid a race between
+                # a new event being inserted by another instance and it attempting
+                # to acquire the lock.
+                next = await self.store.get_next_staged_event_for_room(
+                    room_id, room_version
+                )
+
+                if next is None:
+                    break
+
+                origin, event = next
+
+                if await self._spam_checker.drop_federated_event(event):
+                    logger.warning(
+                        "Staged federated event contains spam, dropping %s",
+                        event.event_id,
+                    )
+                    continue
+
                 break
 
-            origin, event = next
+            if not next:
+                break
 
             # Prune the event queue if it's getting large.
             #
