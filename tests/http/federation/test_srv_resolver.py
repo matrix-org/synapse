@@ -65,9 +65,9 @@ class SrvResolverTestCase(unittest.TestCase):
 
         servers = self.successResultOf(test_d)
 
-        self.assertEquals(len(servers), 1)
-        self.assertEquals(servers, cache[service_name])
-        self.assertEquals(servers[0].host, host_name)
+        self.assertEqual(len(servers), 1)
+        self.assertEqual(servers, cache[service_name])
+        self.assertEqual(servers[0].host, host_name)
 
     @defer.inlineCallbacks
     def test_from_cache_expired_and_dns_fail(self):
@@ -88,8 +88,8 @@ class SrvResolverTestCase(unittest.TestCase):
 
         dns_client_mock.lookupService.assert_called_once_with(service_name)
 
-        self.assertEquals(len(servers), 1)
-        self.assertEquals(servers, cache[service_name])
+        self.assertEqual(len(servers), 1)
+        self.assertEqual(servers, cache[service_name])
 
     @defer.inlineCallbacks
     def test_from_cache(self):
@@ -114,8 +114,8 @@ class SrvResolverTestCase(unittest.TestCase):
 
         self.assertFalse(dns_client_mock.lookupService.called)
 
-        self.assertEquals(len(servers), 1)
-        self.assertEquals(servers, cache[service_name])
+        self.assertEqual(len(servers), 1)
+        self.assertEqual(servers, cache[service_name])
 
     @defer.inlineCallbacks
     def test_empty_cache(self):
@@ -144,8 +144,8 @@ class SrvResolverTestCase(unittest.TestCase):
 
         servers = yield defer.ensureDeferred(resolver.resolve_service(service_name))
 
-        self.assertEquals(len(servers), 0)
-        self.assertEquals(len(cache), 0)
+        self.assertEqual(len(servers), 0)
+        self.assertEqual(len(cache), 0)
 
     def test_disabled_service(self):
         """
@@ -201,6 +201,6 @@ class SrvResolverTestCase(unittest.TestCase):
 
         servers = self.successResultOf(resolve_d)
 
-        self.assertEquals(len(servers), 1)
-        self.assertEquals(servers, cache[service_name])
-        self.assertEquals(servers[0].host, b"host")
+        self.assertEqual(len(servers), 1)
+        self.assertEqual(servers, cache[service_name])
+        self.assertEqual(servers[0].host, b"host")

@@ -13,12 +13,16 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from synapse.events.utils import prune_event_dict
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.util import json_encoder
@@ -31,24 +35,29 @@ logger = logging.getLogger(__name__)
 
 
 class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBaseStore):
-    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
         if (
-            hs.config.run_background_tasks
-            and self.hs.config.redaction_retention_period is not None
+            hs.config.worker.run_background_tasks
+            and self.hs.config.server.redaction_retention_period is not None
         ):
             hs.get_clock().looping_call(self._censor_redactions, 5 * 60 * 1000)
 
     @wrap_as_background_process("_censor_redactions")
-    async def _censor_redactions(self):
+    async def _censor_redactions(self) -> None:
         """Censors all redactions older than the configured period that haven't
         been censored yet.
 
         By censor we mean update the event_json table with the redacted event.
         """
 
-        if self.hs.config.redaction_retention_period is None:
+        if self.hs.config.server.redaction_retention_period is None:
             return
 
         if not (
@@ -60,7 +69,9 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
             # created.
             return
 
-        before_ts = self._clock.time_msec() - self.hs.config.redaction_retention_period
+        before_ts = (
+            self._clock.time_msec() - self.hs.config.server.redaction_retention_period
+        )
 
         # We fetch all redactions that:
         #   1. point to an event we have,
@@ -103,7 +114,7 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
                 and original_event.internal_metadata.is_redacted()
             ):
                 # Redaction was allowed
-                pruned_json = json_encoder.encode(
+                pruned_json: Optional[str] = json_encoder.encode(
                     prune_event_dict(
                         original_event.room_version, original_event.get_dict()
                     )
@@ -114,7 +125,7 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
 
             updates.append((redaction_id, event_id, pruned_json))
 
-        def _update_censor_txn(txn):
+        def _update_censor_txn(txn: LoggingTransaction) -> None:
             for redaction_id, event_id, pruned_json in updates:
                 if pruned_json:
                     self._censor_event_txn(txn, event_id, pruned_json)
@@ -128,14 +139,16 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
 
         await self.db_pool.runInteraction("_update_censor_txn", _update_censor_txn)
 
-    def _censor_event_txn(self, txn, event_id, pruned_json):
+    def _censor_event_txn(
+        self, txn: LoggingTransaction, event_id: str, pruned_json: str
+    ) -> None:
         """Censor an event by replacing its JSON in the event_json table with the
         provided pruned JSON.
 
         Args:
-            txn (LoggingTransaction): The database transaction.
-            event_id (str): The ID of the event to censor.
-            pruned_json (str): The pruned JSON
+            txn: The database transaction.
+            event_id: The ID of the event to censor.
+            pruned_json: The pruned JSON
         """
         self.db_pool.simple_update_one_txn(
             txn,
@@ -155,7 +168,7 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
         # Try to retrieve the event's content from the database or the event cache.
         event = await self.get_event(event_id)
 
-        def delete_expired_event_txn(txn):
+        def delete_expired_event_txn(txn: LoggingTransaction) -> None:
             # Delete the expiry timestamp associated with this event from the database.
             self._delete_event_expiry_txn(txn, event_id)
 
@@ -192,14 +205,14 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
             "delete_expired_event", delete_expired_event_txn
         )
 
-    def _delete_event_expiry_txn(self, txn, event_id):
+    def _delete_event_expiry_txn(self, txn: LoggingTransaction, event_id: str) -> None:
         """Delete the expiry timestamp associated with an event ID without deleting the
         actual event.
 
         Args:
-            txn (LoggingTransaction): The transaction to use to perform the deletion.
-            event_id (str): The event ID to delete the associated expiry timestamp of.
+            txn: The transaction to use to perform the deletion.
+            event_id: The event ID to delete the associated expiry timestamp of.
         """
-        return self.db_pool.simple_delete_txn(
+        self.db_pool.simple_delete_txn(
             txn=txn, table="event_expiry", keyvalues={"event_id": event_id}
         )

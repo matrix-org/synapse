@@ -17,6 +17,7 @@ import logging
 from typing import (
     Awaitable,
     Callable,
+    Collection,
     Dict,
     Iterable,
     List,
@@ -29,7 +30,7 @@ from typing import (
 from synapse import event_auth
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
-from synapse.api.room_versions import RoomVersions
+from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.events import EventBase
 from synapse.types import MutableStateMap, StateMap
 
@@ -41,9 +42,10 @@ POWER_KEY = (EventTypes.PowerLevels, "")
 
 async def resolve_events_with_store(
     room_id: str,
+    room_version: RoomVersion,
     state_sets: Sequence[StateMap[str]],
     event_map: Optional[Dict[str, EventBase]],
-    state_map_factory: Callable[[Iterable[str]], Awaitable[Dict[str, EventBase]]],
+    state_map_factory: Callable[[Collection[str]], Awaitable[Dict[str, EventBase]]],
 ) -> StateMap[str]:
     """
     Args:
@@ -104,7 +106,7 @@ async def resolve_events_with_store(
     # get the ids of the auth events which allow us to authenticate the
     # conflicted state, picking only from the unconflicting state.
     auth_events = _create_auth_events_from_maps(
-        unconflicted_state, conflicted_state, state_map
+        room_version, unconflicted_state, conflicted_state, state_map
     )
 
     new_needed_events = set(auth_events.values())
@@ -132,7 +134,7 @@ async def resolve_events_with_store(
     state_map.update(state_map_new)
 
     return _resolve_with_state(
-        unconflicted_state, conflicted_state, auth_events, state_map
+        room_version, unconflicted_state, conflicted_state, auth_events, state_map
     )
 
 
@@ -159,7 +161,7 @@ def _seperate(
     """
     state_set_iterator = iter(state_sets)
     unconflicted_state = dict(next(state_set_iterator))
-    conflicted_state = {}  # type: MutableStateMap[Set[str]]
+    conflicted_state: MutableStateMap[Set[str]] = {}
 
     for state_set in state_set_iterator:
         for key, value in state_set.items():
@@ -187,6 +189,7 @@ def _seperate(
 
 
 def _create_auth_events_from_maps(
+    room_version: RoomVersion,
     unconflicted_state: StateMap[str],
     conflicted_state: StateMap[Set[str]],
     state_map: Dict[str, EventBase],
@@ -194,6 +197,7 @@ def _create_auth_events_from_maps(
     """
 
     Args:
+        room_version: The room version.
         unconflicted_state: The unconflicted state map.
         conflicted_state: The conflicted state map.
         state_map:
@@ -205,7 +209,9 @@ def _create_auth_events_from_maps(
     for event_ids in conflicted_state.values():
         for event_id in event_ids:
             if event_id in state_map:
-                keys = event_auth.auth_types_for_event(state_map[event_id])
+                keys = event_auth.auth_types_for_event(
+                    room_version, state_map[event_id]
+                )
                 for key in keys:
                     if key not in auth_events:
                         auth_event_id = unconflicted_state.get(key, None)
@@ -215,11 +221,12 @@ def _create_auth_events_from_maps(
 
 
 def _resolve_with_state(
+    room_version: RoomVersion,
     unconflicted_state_ids: MutableStateMap[str],
     conflicted_state_ids: StateMap[Set[str]],
     auth_event_ids: StateMap[str],
     state_map: Dict[str, EventBase],
-):
+) -> MutableStateMap[str]:
     conflicted_state = {}
     for key, event_ids in conflicted_state_ids.items():
         events = [state_map[ev_id] for ev_id in event_ids if ev_id in state_map]
@@ -235,7 +242,9 @@ def _resolve_with_state(
     }
 
     try:
-        resolved_state = _resolve_state_events(conflicted_state, auth_events)
+        resolved_state = _resolve_state_events(
+            room_version, conflicted_state, auth_events
+        )
     except Exception:
         logger.exception("Failed to resolve state")
         raise
@@ -248,7 +257,9 @@ def _resolve_with_state(
 
 
 def _resolve_state_events(
-    conflicted_state: StateMap[List[EventBase]], auth_events: MutableStateMap[EventBase]
+    room_version: RoomVersion,
+    conflicted_state: StateMap[List[EventBase]],
+    auth_events: MutableStateMap[EventBase],
 ) -> StateMap[EventBase]:
     """This is where we actually decide which of the conflicted state to
     use.
@@ -263,21 +274,27 @@ def _resolve_state_events(
     if POWER_KEY in conflicted_state:
         events = conflicted_state[POWER_KEY]
         logger.debug("Resolving conflicted power levels %r", events)
-        resolved_state[POWER_KEY] = _resolve_auth_events(events, auth_events)
+        resolved_state[POWER_KEY] = _resolve_auth_events(
+            room_version, events, auth_events
+        )
 
     auth_events.update(resolved_state)
 
     for key, events in conflicted_state.items():
         if key[0] == EventTypes.JoinRules:
             logger.debug("Resolving conflicted join rules %r", events)
-            resolved_state[key] = _resolve_auth_events(events, auth_events)
+            resolved_state[key] = _resolve_auth_events(
+                room_version, events, auth_events
+            )
 
     auth_events.update(resolved_state)
 
     for key, events in conflicted_state.items():
         if key[0] == EventTypes.Member:
             logger.debug("Resolving conflicted member lists %r", events)
-            resolved_state[key] = _resolve_auth_events(events, auth_events)
+            resolved_state[key] = _resolve_auth_events(
+                room_version, events, auth_events
+            )
 
     auth_events.update(resolved_state)
 
@@ -290,12 +307,14 @@ def _resolve_state_events(
 
 
 def _resolve_auth_events(
-    events: List[EventBase], auth_events: StateMap[EventBase]
+    room_version: RoomVersion, events: List[EventBase], auth_events: StateMap[EventBase]
 ) -> EventBase:
     reverse = list(reversed(_ordered_events(events)))
 
     auth_keys = {
-        key for event in events for key in event_auth.auth_types_for_event(event)
+        key
+        for event in events
+        for key in event_auth.auth_types_for_event(room_version, event)
     }
 
     new_auth_events = {}
@@ -311,12 +330,10 @@ def _resolve_auth_events(
         auth_events[(prev_event.type, prev_event.state_key)] = prev_event
         try:
             # The signatures have already been checked at this point
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V1,
                 event,
-                auth_events,
-                do_sig_check=False,
-                do_size_check=False,
+                auth_events.values(),
             )
             prev_event = event
         except AuthError:
@@ -331,12 +348,10 @@ def _resolve_normal_events(
     for event in _ordered_events(events):
         try:
             # The signatures have already been checked at this point
-            event_auth.check(
+            event_auth.check_auth_rules_for_event(
                 RoomVersions.V1,
                 event,
-                auth_events,
-                do_sig_check=False,
-                do_size_check=False,
+                auth_events.values(),
             )
             return event
         except AuthError:
@@ -348,7 +363,7 @@ def _resolve_normal_events(
 
 
 def _ordered_events(events: Iterable[EventBase]) -> List[EventBase]:
-    def key_func(e):
+    def key_func(e: EventBase) -> Tuple[int, str]:
         # we have to use utf-8 rather than ascii here because it turns out we allow
         # people to send us events with non-ascii event IDs :/
         return -int(e.depth), hashlib.sha1(e.event_id.encode("utf-8")).hexdigest()

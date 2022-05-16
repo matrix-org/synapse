@@ -15,15 +15,38 @@
 import logging
 import threading
 from functools import wraps
-from typing import TYPE_CHECKING, Dict, Optional, Set, Union
+from types import TracebackType
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    Optional,
+    Set,
+    Type,
+    TypeVar,
+    Union,
+)
 
+from prometheus_client import Metric
 from prometheus_client.core import REGISTRY, Counter, Gauge
+from typing_extensions import ParamSpec
 
 from twisted.internet import defer
 
-from synapse.logging.context import LoggingContext, PreserveLoggingContext
-from synapse.logging.opentracing import noop_context_manager, start_active_span
-from synapse.util.async_helpers import maybe_awaitable
+from synapse.logging.context import (
+    ContextResourceUsage,
+    LoggingContext,
+    PreserveLoggingContext,
+)
+from synapse.logging.opentracing import (
+    SynapseTags,
+    noop_context_manager,
+    start_active_span,
+)
+from synapse.metrics._types import Collector
 
 if TYPE_CHECKING:
     import resource
@@ -89,7 +112,7 @@ _background_process_db_sched_duration = Counter(
 # map from description to a counter, so that we can name our logcontexts
 # incrementally. (It actually duplicates _background_process_start_count, but
 # it's much simpler to do so than to try to combine them.)
-_background_process_counts = {}  # type: Dict[str, int]
+_background_process_counts: Dict[str, int] = {}
 
 # Set of all running background processes that became active active since the
 # last time metrics were scraped (i.e. background processes that performed some
@@ -99,20 +122,20 @@ _background_process_counts = {}  # type: Dict[str, int]
 # background processes stacking up behind a lock or linearizer, where we then
 # only need to iterate over and update metrics for the process that have
 # actually been active and can ignore the idle ones.
-_background_processes_active_since_last_scrape = set()  # type: Set[_BackgroundProcess]
+_background_processes_active_since_last_scrape: "Set[_BackgroundProcess]" = set()
 
 # A lock that covers the above set and dict
 _bg_metrics_lock = threading.Lock()
 
 
-class _Collector:
+class _Collector(Collector):
     """A custom metrics collector for the background process metrics.
 
     Ensures that all of the metrics are up-to-date with any in-flight processes
     before they are returned.
     """
 
-    def collect(self):
+    def collect(self) -> Iterable[Metric]:
         global _background_processes_active_since_last_scrape
 
         # We swap out the _background_processes set with an empty one so that
@@ -133,20 +156,19 @@ class _Collector:
             _background_process_db_txn_duration,
             _background_process_db_sched_duration,
         ):
-            for r in m.collect():
-                yield r
+            yield from m.collect()
 
 
 REGISTRY.register(_Collector())
 
 
 class _BackgroundProcess:
-    def __init__(self, desc, ctx):
+    def __init__(self, desc: str, ctx: LoggingContext):
         self.desc = desc
         self._context = ctx
-        self._reported_stats = None
+        self._reported_stats: Optional[ContextResourceUsage] = None
 
-    def update_metrics(self):
+    def update_metrics(self) -> None:
         """Updates the metrics with values from this process."""
         new_stats = self._context.get_resource_usage()
         if self._reported_stats is None:
@@ -166,7 +188,16 @@ class _BackgroundProcess:
         )
 
 
-def run_as_background_process(desc: str, func, *args, bg_start_span=True, **kwargs):
+R = TypeVar("R")
+
+
+def run_as_background_process(
+    desc: str,
+    func: Callable[..., Awaitable[Optional[R]]],
+    *args: Any,
+    bg_start_span: bool = True,
+    **kwargs: Any,
+) -> "defer.Deferred[Optional[R]]":
     """Run the given function in its own logcontext, with resource metrics
 
     This should be used to wrap processes which are fired off to run in the
@@ -186,11 +217,13 @@ def run_as_background_process(desc: str, func, *args, bg_start_span=True, **kwar
         args: positional args for func
         kwargs: keyword args for func
 
-    Returns: Deferred which returns the result of func, but note that it does not
-        follow the synapse logcontext rules.
+    Returns:
+        Deferred which returns the result of func, or `None` if func raises.
+        Note that the returned Deferred does not follow the synapse logcontext
+        rules.
     """
 
-    async def run():
+    async def run() -> Optional[R]:
         with _bg_metrics_lock:
             count = _background_process_counts.get(desc, 0)
             _background_process_counts[desc] = count + 1
@@ -200,16 +233,20 @@ def run_as_background_process(desc: str, func, *args, bg_start_span=True, **kwar
 
         with BackgroundProcessLoggingContext(desc, count) as context:
             try:
-                ctx = noop_context_manager()
                 if bg_start_span:
-                    ctx = start_active_span(desc, tags={"request_id": str(context)})
+                    ctx = start_active_span(
+                        f"bgproc.{desc}", tags={SynapseTags.REQUEST_ID: str(context)}
+                    )
+                else:
+                    ctx = noop_context_manager()
                 with ctx:
-                    return await maybe_awaitable(func(*args, **kwargs))
+                    return await func(*args, **kwargs)
             except Exception:
                 logger.exception(
                     "Background process '%s' threw an exception",
                     desc,
                 )
+                return None
             finally:
                 _background_process_in_flight_count.labels(desc).dec()
 
@@ -219,17 +256,46 @@ def run_as_background_process(desc: str, func, *args, bg_start_span=True, **kwar
         return defer.ensureDeferred(run())
 
 
-def wrap_as_background_process(desc):
-    """Decorator that wraps a function that gets called as a background
-    process.
+P = ParamSpec("P")
 
-    Equivalent of calling the function with `run_as_background_process`
+
+def wrap_as_background_process(
+    desc: str,
+) -> Callable[
+    [Callable[P, Awaitable[Optional[R]]]],
+    Callable[P, "defer.Deferred[Optional[R]]"],
+]:
+    """Decorator that wraps an asynchronous function `func`, returning a synchronous
+    decorated function. Calling the decorated version runs `func` as a background
+    process, forwarding all arguments verbatim.
+
+    That is,
+
+        @wrap_as_background_process
+        def func(*args): ...
+        func(1, 2, third=3)
+
+    is equivalent to:
+
+        def func(*args): ...
+        run_as_background_process(func, 1, 2, third=3)
+
+    The former can be convenient if `func` needs to be run as a background process in
+    multiple places.
     """
 
-    def wrap_as_background_process_inner(func):
+    def wrap_as_background_process_inner(
+        func: Callable[P, Awaitable[Optional[R]]]
+    ) -> Callable[P, "defer.Deferred[Optional[R]]"]:
         @wraps(func)
-        def wrap_as_background_process_inner_2(*args, **kwargs):
-            return run_as_background_process(desc, func, *args, **kwargs)
+        def wrap_as_background_process_inner_2(
+            *args: P.args, **kwargs: P.kwargs
+        ) -> "defer.Deferred[Optional[R]]":
+            # type-ignore: mypy is confusing kwargs with the bg_start_span kwarg.
+            #     Argument 4 to "run_as_background_process" has incompatible type
+            #     "**P.kwargs"; expected "bool"
+            # See https://github.com/python/mypy/issues/8862
+            return run_as_background_process(desc, func, *args, **kwargs)  # type: ignore[arg-type]
 
         return wrap_as_background_process_inner_2
 
@@ -259,7 +325,7 @@ class BackgroundProcessLoggingContext(LoggingContext):
         super().__init__("%s-%s" % (name, instance_id))
         self._proc = _BackgroundProcess(name, self)
 
-    def start(self, rusage: "Optional[resource._RUsage]"):
+    def start(self, rusage: "Optional[resource.struct_rusage]") -> None:
         """Log context has started running (again)."""
 
         super().start(rusage)
@@ -270,7 +336,12 @@ class BackgroundProcessLoggingContext(LoggingContext):
         with _bg_metrics_lock:
             _background_processes_active_since_last_scrape.add(self._proc)
 
-    def __exit__(self, type, value, traceback) -> None:
+    def __exit__(
+        self,
+        type: Optional[Type[BaseException]],
+        value: Optional[BaseException],
+        traceback: Optional[TracebackType],
+    ) -> None:
         """Log context has finished."""
 
         super().__exit__(type, value, traceback)

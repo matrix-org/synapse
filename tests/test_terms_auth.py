@@ -17,7 +17,7 @@ from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactorClock
 
-from synapse.rest.client.v2_alpha.register import register_servlets
+from synapse.rest.client.register import register_servlets
 from synapse.util import Clock
 
 from tests import unittest
@@ -54,7 +54,7 @@ class TermsTestCase(unittest.HomeserverTestCase):
         request_data = json.dumps({"username": "kermit", "password": "monkey"})
         channel = self.make_request(b"POST", self.url, request_data)
 
-        self.assertEquals(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.result["code"], b"401", channel.result)
 
         self.assertTrue(channel.json_body is not None)
         self.assertIsInstance(channel.json_body["session"], str)
@@ -99,7 +99,7 @@ class TermsTestCase(unittest.HomeserverTestCase):
 
         # We don't bother checking that the response is correct - we'll leave that to
         # other tests. We just want to make sure we're on the right path.
-        self.assertEquals(channel.result["code"], b"401", channel.result)
+        self.assertEqual(channel.result["code"], b"401", channel.result)
 
         # Finish the UI auth for terms
         request_data = json.dumps(
@@ -117,7 +117,7 @@ class TermsTestCase(unittest.HomeserverTestCase):
         # We're interested in getting a response that looks like a successful
         # registration, not so much that the details are exactly what we want.
 
-        self.assertEquals(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.result["code"], b"200", channel.result)
 
         self.assertTrue(channel.json_body is not None)
         self.assertIsInstance(channel.json_body["user_id"], str)

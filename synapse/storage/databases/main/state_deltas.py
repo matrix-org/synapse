@@ -16,11 +16,17 @@ import logging
 from typing import Any, Dict, List, Tuple
 
 from synapse.storage._base import SQLBaseStore
+from synapse.storage.database import LoggingTransaction
+from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 logger = logging.getLogger(__name__)
 
 
 class StateDeltasStore(SQLBaseStore):
+    # This class must be mixed in with a child class which provides the following
+    # attribute. TODO: can we get static analysis to enforce this?
+    _curr_state_delta_stream_cache: StreamChangeCache
+
     async def get_current_state_deltas(
         self, prev_stream_id: int, max_stream_id: int
     ) -> Tuple[int, List[Dict[str, Any]]]:
@@ -50,7 +56,9 @@ class StateDeltasStore(SQLBaseStore):
         prev_stream_id = int(prev_stream_id)
 
         # check we're not going backwards
-        assert prev_stream_id <= max_stream_id
+        assert (
+            prev_stream_id <= max_stream_id
+        ), f"New stream id {max_stream_id} is smaller than prev stream id {prev_stream_id}"
 
         if not self._curr_state_delta_stream_cache.has_any_entity_changed(
             prev_stream_id
@@ -58,9 +66,11 @@ class StateDeltasStore(SQLBaseStore):
             # if the CSDs haven't changed between prev_stream_id and now, we
             # know for certain that they haven't changed between prev_stream_id and
             # max_stream_id.
-            return (max_stream_id, [])
+            return max_stream_id, []
 
-        def get_current_state_deltas_txn(txn):
+        def get_current_state_deltas_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[int, List[Dict[str, Any]]]:
             # First we calculate the max stream id that will give us less than
             # N results.
             # We arbitrarily limit to 100 stream_id entries to ensure we don't
@@ -106,7 +116,9 @@ class StateDeltasStore(SQLBaseStore):
             "get_current_state_deltas", get_current_state_deltas_txn
         )
 
-    def _get_max_stream_id_in_current_state_deltas_txn(self, txn):
+    def _get_max_stream_id_in_current_state_deltas_txn(
+        self, txn: LoggingTransaction
+    ) -> int:
         return self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="current_state_delta_stream",
@@ -114,7 +126,7 @@ class StateDeltasStore(SQLBaseStore):
             retcol="COALESCE(MAX(stream_id), -1)",
         )
 
-    async def get_max_stream_id_in_current_state_deltas(self):
+    async def get_max_stream_id_in_current_state_deltas(self) -> int:
         return await self.db_pool.runInteraction(
             "get_max_stream_id_in_current_state_deltas",
             self._get_max_stream_id_in_current_state_deltas_txn,

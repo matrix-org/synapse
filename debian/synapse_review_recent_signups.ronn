@@ -1,0 +1,37 @@
+synapse_review_recent_signups(1) -- Print users that have recently registered on Synapse
+========================================================================================
+
+## SYNOPSIS
+
+`synapse_review_recent_signups` `-c`|`--config` <file> [`-s`|`--since` <period>] [`-e`|`--exclude-emails`] [`-u`|`--only-users`]
+
+## DESCRIPTION
+
+**synapse_review_recent_signups** prints out recently registered users on a
+Synapse server, as well as some basic information about the user.
+
+`synapse_review_recent_signups` must be supplied with the config of the Synapse
+server, so that it can fetch the database config and connect to the database.
+
+
+## OPTIONS
+
+  * `-c`, `--config`:
+    The config file(s) used by the Synapse server.
+
+  * `-s`, `--since`:
+    How far back to search for newly registered users. Defaults to 7d, i.e. up
+    to seven days in the past. Valid units are 's', 'm', 'h', 'd', 'w', or 'y'.
+
+  * `-e`, `--exclude-emails`:
+    Do not print out users that have validated emails associated with their
+    account.
+
+  * `-u`, `--only-users`:
+    Only print out the user IDs of recently registered users, without any
+    additional information
+
+
+## SEE ALSO
+
+synctl(1), synapse_port_db(1), register_new_matrix_user(1), hash_password(1)

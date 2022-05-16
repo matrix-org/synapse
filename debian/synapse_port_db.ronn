@@ -47,7 +47,7 @@ following options.
     * `args`:
       DB API 2.0 compatible arguments to send to the `psycopg2` module.
 
-      * `dbname` - the database name 
+      * `dbname` - the database name
 
       * `user` - user name used to authenticate
 
@@ -58,7 +58,7 @@ following options.
 
       * `port` - connection port number (defaults to 5432 if not
         provided)
-      
+
 
     * `synchronous_commit`:
       Optional.  Default is True.  If the value is `False`, enable
@@ -76,7 +76,7 @@ Following example illustrates the configuration file format.
         password: ORohmi9Eet=ohphi
         host: localhost
       synchronous_commit: false
-  
+
 ## COPYRIGHT
 
 This man page was written by Sunil Mohan Adapa <<sunil@medhas.org>> for
@@ -84,4 +84,4 @@ Debian GNU/Linux distribution.
 
 ## SEE ALSO
 
-synctl(1), hash_password(1), register_new_matrix_user(1)
+synctl(1), hash_password(1), register_new_matrix_user(1), synapse_review_recent_signups(1)

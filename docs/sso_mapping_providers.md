@@ -49,12 +49,12 @@ comment these options out and use those specified by the module instead.
 
 A custom mapping provider must specify the following methods:
 
-* `__init__(self, parsed_config)`
+* `def __init__(self, parsed_config)`
    - Arguments:
      - `parsed_config` - A configuration object that is the return value of the
        `parse_config` method. You should set any configuration options needed by
        the module here.
-* `parse_config(config)`
+* `def parse_config(config)`
     - This method should have the `@staticmethod` decoration.
     - Arguments:
         - `config` - A `dict` representing the parsed content of the
@@ -63,13 +63,13 @@ A custom mapping provider must specify the following methods:
            any option values they need here.
     - Whatever is returned will be passed back to the user mapping provider module's
       `__init__` method during construction.
-* `get_remote_user_id(self, userinfo)`
+* `def get_remote_user_id(self, userinfo)`
     - Arguments:
       - `userinfo` - A `authlib.oidc.core.claims.UserInfo` object to extract user
                      information from.
-    - This method must return a string, which is the unique identifier for the
-      user. Commonly the ``sub`` claim of the response.
-* `map_user_attributes(self, userinfo, token, failures)`
+    - This method must return a string, which is the unique, immutable identifier
+      for the user. Commonly the `sub` claim of the response.
+* `async def map_user_attributes(self, userinfo, token, failures)`
     - This method must be async.
     - Arguments:
       - `userinfo` - A `authlib.oidc.core.claims.UserInfo` object to extract user
@@ -87,9 +87,11 @@ A custom mapping provider must specify the following methods:
                      `localpart` value, such as `john.doe1`.
     - Returns a dictionary with two keys:
       - `localpart`: A string, used to generate the Matrix ID. If this is
-        `None`, the user is prompted to pick their own username.
+        `None`, the user is prompted to pick their own username. This is only used
+        during a user's first login. Once a localpart has been associated with a
+        remote user ID (see `get_remote_user_id`) it cannot be updated.
       - `displayname`: An optional string, the display name for the user.
-* `get_extra_attributes(self, userinfo, token)`
+* `async def get_extra_attributes(self, userinfo, token)`
     - This method must be async.
     - Arguments:
       - `userinfo` - A `authlib.oidc.core.claims.UserInfo` object to extract user
@@ -106,7 +108,7 @@ A custom mapping provider must specify the following methods:
 
 Synapse has a built-in OpenID mapping provider if a custom provider isn't
 specified in the config. It is located at
-[`synapse.handlers.oidc.JinjaOidcMappingProvider`](../synapse/handlers/oidc.py).
+[`synapse.handlers.oidc.JinjaOidcMappingProvider`](https://github.com/matrix-org/synapse/blob/develop/synapse/handlers/oidc.py).
 
 ## SAML Mapping Providers
 
@@ -123,15 +125,15 @@ comment these options out and use those specified by the module instead.
 
 A custom mapping provider must specify the following methods:
 
-* `__init__(self, parsed_config, module_api)`
+* `def __init__(self, parsed_config, module_api)`
    - Arguments:
      - `parsed_config` - A configuration object that is the return value of the
        `parse_config` method. You should set any configuration options needed by
        the module here.
      - `module_api` - a `synapse.module_api.ModuleApi` object which provides the
        stable API available for extension modules.
-* `parse_config(config)`
-    - This method should have the `@staticmethod` decoration.
+* `def parse_config(config)`
+    - **This method should have the `@staticmethod` decoration.**
     - Arguments:
         - `config` - A `dict` representing the parsed content of the
           `saml_config.user_mapping_provider.config` homeserver config option.
@@ -139,23 +141,23 @@ A custom mapping provider must specify the following methods:
            any option values they need here.
     - Whatever is returned will be passed back to the user mapping provider module's
       `__init__` method during construction.
-* `get_saml_attributes(config)`
-    - This method should have the `@staticmethod` decoration.
+* `def get_saml_attributes(config)`
+    - **This method should have the `@staticmethod` decoration.**
     - Arguments:
         - `config` - A object resulting from a call to `parse_config`.
     - Returns a tuple of two sets. The first set equates to the SAML auth
       response attributes that are required for the module to function, whereas
       the second set consists of those attributes which can be used if available,
       but are not necessary.
-* `get_remote_user_id(self, saml_response, client_redirect_url)`
+* `def get_remote_user_id(self, saml_response, client_redirect_url)`
     - Arguments:
       - `saml_response` - A `saml2.response.AuthnResponse` object to extract user
                           information from.
       - `client_redirect_url` - A string, the URL that the client will be
                                 redirected to.
-    - This method must return a string, which is the unique identifier for the
-      user. Commonly the ``uid`` claim of the response.
-* `saml_response_to_user_attributes(self, saml_response, failures, client_redirect_url)`
+    - This method must return a string, which is the unique, immutable identifier
+      for the user. Commonly the `uid` claim of the response.
+* `def saml_response_to_user_attributes(self, saml_response, failures, client_redirect_url)`
     - Arguments:
       - `saml_response` - A `saml2.response.AuthnResponse` object to extract user
                           information from.
@@ -172,8 +174,10 @@ A custom mapping provider must specify the following methods:
                                 redirected to.
     - This method must return a dictionary, which will then be used by Synapse
       to build a new user. The following keys are allowed:
-       * `mxid_localpart` - The mxid localpart of the new user.  If this is
-         `None`, the user is prompted to pick their own username.
+       * `mxid_localpart` - A string, the mxid localpart of the new user. If this is
+         `None`, the user is prompted to pick their own username. This is only used
+         during a user's first login. Once a localpart has been associated with a
+         remote user ID (see `get_remote_user_id`) it cannot be updated.
        * `displayname` - The displayname of the new user. If not provided, will default to
                          the value of `mxid_localpart`.
        * `emails` - A list of emails for the new user. If not provided, will
@@ -190,4 +194,4 @@ A custom mapping provider must specify the following methods:
 
 Synapse has a built-in SAML mapping provider if a custom provider isn't
 specified in the config. It is located at
-[`synapse.handlers.saml.DefaultSamlMappingProvider`](../synapse/handlers/saml.py).
+[`synapse.handlers.saml.DefaultSamlMappingProvider`](https://github.com/matrix-org/synapse/blob/develop/synapse/handlers/saml.py).

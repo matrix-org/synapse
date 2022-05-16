@@ -13,39 +13,66 @@
 # limitations under the License.
 
 import logging
-from collections import namedtuple
-from typing import Iterable, List, Optional, Tuple
+from enum import Enum
+from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple, cast
 
+import attr
 from canonicaljson import encode_canonical_json
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import DatabasePool, LoggingTransaction
+from synapse.storage._base import db_to_json
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
+from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.types import JsonDict
-from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.caches.descriptors import cached
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 db_binary_type = memoryview
 
 logger = logging.getLogger(__name__)
 
 
-_TransactionRow = namedtuple(
-    "_TransactionRow",
-    ("id", "transaction_id", "destination", "ts", "response_code", "response_json"),
-)
+class DestinationSortOrder(Enum):
+    """Enum to define the sorting method used when returning destinations."""
 
-_UpdateTransactionRow = namedtuple(
-    "_TransactionRow", ("response_code", "response_json")
-)
-
-SENTINEL = object()
+    DESTINATION = "destination"
+    RETRY_LAST_TS = "retry_last_ts"
+    RETTRY_INTERVAL = "retry_interval"
+    FAILURE_TS = "failure_ts"
+    LAST_SUCCESSFUL_STREAM_ORDERING = "last_successful_stream_ordering"
 
 
-class TransactionWorkerStore(SQLBaseStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class DestinationRetryTimings:
+    """The current destination retry timing info for a remote server."""
+
+    # The first time we tried and failed to reach the remote server, in ms.
+    failure_ts: int
+
+    # The last time we tried and failed to reach the remote server, in ms.
+    retry_last_ts: int
+
+    # How long since the last time we tried to reach the remote server before
+    # trying again, in ms.
+    retry_interval: int
+
+
+class TransactionWorkerStore(CacheInvalidationWorkerStore):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             self._clock.looping_call(self._cleanup_transactions, 30 * 60 * 1000)
 
     @wrap_as_background_process("cleanup_transactions")
@@ -53,24 +80,11 @@ class TransactionWorkerStore(SQLBaseStore):
         now = self._clock.time_msec()
         month_ago = now - 30 * 24 * 60 * 60 * 1000
 
-        def _cleanup_transactions_txn(txn):
+        def _cleanup_transactions_txn(txn: LoggingTransaction) -> None:
             txn.execute("DELETE FROM received_transactions WHERE ts < ?", (month_ago,))
 
         await self.db_pool.runInteraction(
             "_cleanup_transactions", _cleanup_transactions_txn
-        )
-
-
-class TransactionStore(TransactionWorkerStore):
-    """A collection of queries for handling PDUs."""
-
-    def __init__(self, database: DatabasePool, db_conn, hs):
-        super().__init__(database, db_conn, hs)
-
-        self._destination_retry_cache = ExpiringCache(
-            cache_name="get_destination_retry_timings",
-            clock=self._clock,
-            expiry_ms=5 * 60 * 1000,
         )
 
     async def get_received_txn_response(
@@ -96,7 +110,9 @@ class TransactionStore(TransactionWorkerStore):
             origin,
         )
 
-    def _get_received_txn_response(self, txn, transaction_id, origin):
+    def _get_received_txn_response(
+        self, txn: LoggingTransaction, transaction_id: str, origin: str
+    ) -> Optional[Tuple[int, JsonDict]]:
         result = self.db_pool.simple_select_one_txn(
             txn,
             table="received_transactions",
@@ -132,20 +148,26 @@ class TransactionStore(TransactionWorkerStore):
             response_dict: The response, to be encoded into JSON.
         """
 
-        await self.db_pool.simple_insert(
+        await self.db_pool.simple_upsert(
             table="received_transactions",
-            values={
+            keyvalues={
                 "transaction_id": transaction_id,
                 "origin": origin,
+            },
+            values={},
+            insertion_values={
                 "response_code": code,
                 "response_json": db_binary_type(encode_canonical_json(response_dict)),
                 "ts": self._clock.time_msec(),
             },
-            or_ignore=True,
             desc="set_received_txn_response",
         )
 
-    async def get_destination_retry_timings(self, destination):
+    @cached(max_entries=10000)
+    async def get_destination_retry_timings(
+        self,
+        destination: str,
+    ) -> Optional[DestinationRetryTimings]:
         """Gets the current retry timings (if any) for a given destination.
 
         Args:
@@ -156,34 +178,29 @@ class TransactionStore(TransactionWorkerStore):
             Otherwise a dict for the retry scheme
         """
 
-        result = self._destination_retry_cache.get(destination, SENTINEL)
-        if result is not SENTINEL:
-            return result
-
         result = await self.db_pool.runInteraction(
             "get_destination_retry_timings",
             self._get_destination_retry_timings,
             destination,
         )
 
-        # We don't hugely care about race conditions between getting and
-        # invalidating the cache, since we time out fairly quickly anyway.
-        self._destination_retry_cache[destination] = result
         return result
 
-    def _get_destination_retry_timings(self, txn, destination):
+    def _get_destination_retry_timings(
+        self, txn: LoggingTransaction, destination: str
+    ) -> Optional[DestinationRetryTimings]:
         result = self.db_pool.simple_select_one_txn(
             txn,
             table="destinations",
             keyvalues={"destination": destination},
-            retcols=("destination", "failure_ts", "retry_last_ts", "retry_interval"),
+            retcols=("failure_ts", "retry_last_ts", "retry_interval"),
             allow_none=True,
         )
 
         # check we have a row and retry_last_ts is not null or zero
         # (retry_last_ts can't be negative)
         if result and result["retry_last_ts"]:
-            return result
+            return DestinationRetryTimings(**result)
         else:
             return None
 
@@ -204,9 +221,8 @@ class TransactionStore(TransactionWorkerStore):
             retry_interval: how long until next retry in ms
         """
 
-        self._destination_retry_cache.pop(destination, None)
         if self.database_engine.can_native_upsert:
-            return await self.db_pool.runInteraction(
+            await self.db_pool.runInteraction(
                 "set_destination_retry_timings",
                 self._set_destination_retry_timings_native,
                 destination,
@@ -216,7 +232,7 @@ class TransactionStore(TransactionWorkerStore):
                 db_autocommit=True,  # Safe as its a single upsert
             )
         else:
-            return await self.db_pool.runInteraction(
+            await self.db_pool.runInteraction(
                 "set_destination_retry_timings",
                 self._set_destination_retry_timings_emulated,
                 destination,
@@ -226,8 +242,13 @@ class TransactionStore(TransactionWorkerStore):
             )
 
     def _set_destination_retry_timings_native(
-        self, txn, destination, failure_ts, retry_last_ts, retry_interval
-    ):
+        self,
+        txn: LoggingTransaction,
+        destination: str,
+        failure_ts: Optional[int],
+        retry_last_ts: int,
+        retry_interval: int,
+    ) -> None:
         assert self.database_engine.can_native_upsert
 
         # Upsert retry time interval if retry_interval is zero (i.e. we're
@@ -252,9 +273,18 @@ class TransactionStore(TransactionWorkerStore):
 
         txn.execute(sql, (destination, failure_ts, retry_last_ts, retry_interval))
 
+        self._invalidate_cache_and_stream(
+            txn, self.get_destination_retry_timings, (destination,)
+        )
+
     def _set_destination_retry_timings_emulated(
-        self, txn, destination, failure_ts, retry_last_ts, retry_interval
-    ):
+        self,
+        txn: LoggingTransaction,
+        destination: str,
+        failure_ts: Optional[int],
+        retry_last_ts: int,
+        retry_interval: int,
+    ) -> None:
         self.database_engine.lock_table(txn, "destinations")
 
         # We need to be careful here as the data may have changed from under us
@@ -294,6 +324,10 @@ class TransactionStore(TransactionWorkerStore):
                     "retry_interval": retry_interval,
                 },
             )
+
+        self._invalidate_cache_and_stream(
+            txn, self.get_destination_retry_timings, (destination,)
+        )
 
     async def store_destination_rooms_entries(
         self,
@@ -360,7 +394,7 @@ class TransactionStore(TransactionWorkerStore):
             last_successful_stream_ordering: the stream_ordering of the most
                 recent successfully-sent PDU
         """
-        return await self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             "destinations",
             keyvalues={"destination": destination},
             values={"last_successful_stream_ordering": last_successful_stream_ordering},
@@ -467,3 +501,121 @@ class TransactionStore(TransactionWorkerStore):
 
         destinations = [row[0] for row in txn]
         return destinations
+
+    async def get_destinations_paginate(
+        self,
+        start: int,
+        limit: int,
+        destination: Optional[str] = None,
+        order_by: str = DestinationSortOrder.DESTINATION.value,
+        direction: str = "f",
+    ) -> Tuple[List[JsonDict], int]:
+        """Function to retrieve a paginated list of destinations.
+        This will return a json list of destinations and the
+        total number of destinations matching the filter criteria.
+
+        Args:
+            start: start number to begin the query from
+            limit: number of rows to retrieve
+            destination: search string in destination
+            order_by: the sort order of the returned list
+            direction: sort ascending or descending
+        Returns:
+            A tuple of a list of mappings from destination to information
+            and a count of total destinations.
+        """
+
+        def get_destinations_paginate_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[List[JsonDict], int]:
+            order_by_column = DestinationSortOrder(order_by).value
+
+            if direction == "b":
+                order = "DESC"
+            else:
+                order = "ASC"
+
+            args: List[object] = []
+            where_statement = ""
+            if destination:
+                args.extend(["%" + destination.lower() + "%"])
+                where_statement = "WHERE LOWER(destination) LIKE ?"
+
+            sql_base = f"FROM destinations {where_statement} "
+            sql = f"SELECT COUNT(*) as total_destinations {sql_base}"
+            txn.execute(sql, args)
+            count = cast(Tuple[int], txn.fetchone())[0]
+
+            sql = f"""
+                SELECT destination, retry_last_ts, retry_interval, failure_ts,
+                last_successful_stream_ordering
+                {sql_base}
+                ORDER BY {order_by_column} {order}, destination ASC
+                LIMIT ? OFFSET ?
+            """
+            txn.execute(sql, args + [limit, start])
+            destinations = self.db_pool.cursor_to_dict(txn)
+            return destinations, count
+
+        return await self.db_pool.runInteraction(
+            "get_destinations_paginate_txn", get_destinations_paginate_txn
+        )
+
+    async def get_destination_rooms_paginate(
+        self, destination: str, start: int, limit: int, direction: str = "f"
+    ) -> Tuple[List[JsonDict], int]:
+        """Function to retrieve a paginated list of destination's rooms.
+        This will return a json list of rooms and the
+        total number of rooms.
+
+        Args:
+            destination: the destination to query
+            start: start number to begin the query from
+            limit: number of rows to retrieve
+            direction: sort ascending or descending by room_id
+        Returns:
+            A tuple of a dict of rooms and a count of total rooms.
+        """
+
+        def get_destination_rooms_paginate_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[List[JsonDict], int]:
+
+            if direction == "b":
+                order = "DESC"
+            else:
+                order = "ASC"
+
+            sql = """
+                SELECT COUNT(*) as total_rooms
+                FROM destination_rooms
+                WHERE destination = ?
+                """
+            txn.execute(sql, [destination])
+            count = cast(Tuple[int], txn.fetchone())[0]
+
+            rooms = self.db_pool.simple_select_list_paginate_txn(
+                txn=txn,
+                table="destination_rooms",
+                orderby="room_id",
+                start=start,
+                limit=limit,
+                retcols=("room_id", "stream_ordering"),
+                order_direction=order,
+            )
+            return rooms, count
+
+        return await self.db_pool.runInteraction(
+            "get_destination_rooms_paginate_txn", get_destination_rooms_paginate_txn
+        )
+
+    async def is_destination_known(self, destination: str) -> bool:
+        """Check if a destination is known to the server."""
+        result = await self.db_pool.simple_select_one_onecol(
+            table="destinations",
+            keyvalues={"destination": destination},
+            retcol="1",
+            allow_none=True,
+            desc="is_destination_known",
+        )
+        return bool(result)

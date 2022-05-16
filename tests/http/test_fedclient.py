@@ -102,7 +102,7 @@ class FederationClientTests(HomeserverTestCase):
         self.assertNoResult(test_d)
 
         # Send it the HTTP response
-        res_json = '{ "a": 1 }'.encode("ascii")
+        res_json = b'{ "a": 1 }'
         protocol.dataReceived(
             b"HTTP/1.1 200 OK\r\n"
             b"Server: Fake\r\n"
@@ -226,7 +226,7 @@ class FederationClientTests(HomeserverTestCase):
         """Ensure that Synapse does not try to connect to blacklisted IPs"""
 
         # Set up the ip_range blacklist
-        self.hs.config.federation_ip_range_blacklist = IPSet(
+        self.hs.config.server.federation_ip_range_blacklist = IPSet(
             ["127.0.0.0/8", "fe80::/64"]
         )
         self.reactor.lookups["internal"] = "127.0.0.1"
@@ -339,10 +339,8 @@ class FederationClientTests(HomeserverTestCase):
 
         # Send it the HTTP response
         client.dataReceived(
-            (
-                b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
-                b"Server: Fake\r\n\r\n"
-            )
+            b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+            b"Server: Fake\r\n\r\n"
         )
 
         # Push by enough to time it out

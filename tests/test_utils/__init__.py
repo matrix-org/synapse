@@ -1,5 +1,4 @@
-# Copyright 2019 New Vector Ltd
-# Copyright 2020 The Matrix.org Foundation C.I.C
+# Copyright 2019-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +18,8 @@ Utilities for running the unit tests
 import sys
 import warnings
 from asyncio import Future
-from typing import Any, Awaitable, Callable, TypeVar
+from binascii import unhexlify
+from typing import Awaitable, Callable, TypeVar
 from unittest.mock import Mock
 
 import attr
@@ -46,13 +46,13 @@ def get_awaitable_result(awaitable: Awaitable[TV]) -> TV:
     raise Exception("awaitable has not yet completed")
 
 
-def make_awaitable(result: Any) -> Awaitable[Any]:
+def make_awaitable(result: TV) -> Awaitable[TV]:
     """
     Makes an awaitable, suitable for mocking an `async` function.
     This uses Futures as they can be awaited multiple times so can be returned
     to multiple callers.
     """
-    future = Future()  # type: ignore
+    future: Future[TV] = Future()
     future.set_result(result)
     return future
 
@@ -69,7 +69,7 @@ def setup_awaitable_errors() -> Callable[[], None]:
 
     # State shared between unraisablehook and check_for_unraisable_exceptions.
     unraisable_exceptions = []
-    orig_unraisablehook = sys.unraisablehook  # type: ignore
+    orig_unraisablehook = sys.unraisablehook
 
     def unraisablehook(unraisable):
         unraisable_exceptions.append(unraisable.exc_value)
@@ -78,11 +78,11 @@ def setup_awaitable_errors() -> Callable[[], None]:
         """
         A method to be used as a clean-up that fails a test-case if there are any new unraisable exceptions.
         """
-        sys.unraisablehook = orig_unraisablehook  # type: ignore
+        sys.unraisablehook = orig_unraisablehook
         if unraisable_exceptions:
             raise unraisable_exceptions.pop()
 
-    sys.unraisablehook = unraisablehook  # type: ignore
+    sys.unraisablehook = unraisablehook
 
     return cleanup
 
@@ -117,3 +117,13 @@ class FakeResponse:
     def deliverBody(self, protocol):
         protocol.dataReceived(self.body)
         protocol.connectionLost(Failure(ResponseDone()))
+
+
+# A small image used in some tests.
+#
+# Resolution: 1×1, MIME type: image/png, Extension: png, Size: 67 B
+SMALL_PNG = unhexlify(
+    b"89504e470d0a1a0a0000000d4948445200000001000000010806"
+    b"0000001f15c4890000000a49444154789c63000100000500010d"
+    b"0a2db40000000049454e44ae426082"
+)

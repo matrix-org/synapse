@@ -34,10 +34,22 @@ what sort order was used:
     - topological tokems: "t%d-%d", where the integers map to the topological
       and stream ordering columns respectively.
 """
-import abc
+
 import logging
-from collections import namedtuple
-from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Collection,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    cast,
+)
+
+import attr
+from frozendict import frozendict
 
 from twisted.internet import defer
 
@@ -47,6 +59,7 @@ from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
+    LoggingDatabaseConnection,
     LoggingTransaction,
     make_in_list_sql_clause,
 )
@@ -71,9 +84,19 @@ _TOPOLOGICAL_TOKEN = "topological"
 
 
 # Used as return values for pagination APIs
-_EventDictReturn = namedtuple(
-    "_EventDictReturn", ("event_id", "topological_ordering", "stream_ordering")
-)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class _EventDictReturn:
+    event_id: str
+    topological_ordering: Optional[int]
+    stream_ordering: int
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class _EventsAround:
+    events_before: List[EventBase]
+    events_after: List[EventBase]
+    start: RoomStreamToken
+    end: RoomStreamToken
 
 
 def generate_pagination_where_clause(
@@ -270,31 +293,37 @@ def filter_to_clause(event_filter: Optional[Filter]) -> Tuple[str, List[str]]:
     args = []
 
     if event_filter.types:
-        clauses.append("(%s)" % " OR ".join("type = ?" for _ in event_filter.types))
+        clauses.append(
+            "(%s)" % " OR ".join("event.type = ?" for _ in event_filter.types)
+        )
         args.extend(event_filter.types)
 
     for typ in event_filter.not_types:
-        clauses.append("type != ?")
+        clauses.append("event.type != ?")
         args.append(typ)
 
     if event_filter.senders:
-        clauses.append("(%s)" % " OR ".join("sender = ?" for _ in event_filter.senders))
+        clauses.append(
+            "(%s)" % " OR ".join("event.sender = ?" for _ in event_filter.senders)
+        )
         args.extend(event_filter.senders)
 
     for sender in event_filter.not_senders:
-        clauses.append("sender != ?")
+        clauses.append("event.sender != ?")
         args.append(sender)
 
     if event_filter.rooms:
-        clauses.append("(%s)" % " OR ".join("room_id = ?" for _ in event_filter.rooms))
+        clauses.append(
+            "(%s)" % " OR ".join("event.room_id = ?" for _ in event_filter.rooms)
+        )
         args.extend(event_filter.rooms)
 
     for room_id in event_filter.not_rooms:
-        clauses.append("room_id != ?")
+        clauses.append("event.room_id != ?")
         args.append(room_id)
 
     if event_filter.contains_url:
-        clauses.append("contains_url = ?")
+        clauses.append("event.contains_url = ?")
         args.append(event_filter.contains_url)
 
     # We're only applying the "labels" filter on the database query, because applying the
@@ -305,16 +334,35 @@ def filter_to_clause(event_filter: Optional[Filter]) -> Tuple[str, List[str]]:
         clauses.append("(%s)" % " OR ".join("label = ?" for _ in event_filter.labels))
         args.extend(event_filter.labels)
 
+    # Filter on relation_senders / relation types from the joined tables.
+    if event_filter.related_by_senders:
+        clauses.append(
+            "(%s)"
+            % " OR ".join(
+                "related_event.sender = ?" for _ in event_filter.related_by_senders
+            )
+        )
+        args.extend(event_filter.related_by_senders)
+
+    if event_filter.related_by_rel_types:
+        clauses.append(
+            "(%s)"
+            % " OR ".join(
+                "relation_type = ?" for _ in event_filter.related_by_rel_types
+            )
+        )
+        args.extend(event_filter.related_by_rel_types)
+
     return " AND ".join(clauses), args
 
 
-class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
-    """This is an abstract base class where subclasses must implement
-    `get_room_max_stream_ordering` and `get_room_min_stream_ordering`
-    which can be called in the initializer.
-    """
-
-    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
+class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
         self._instance_name = hs.get_instance_name()
@@ -346,13 +394,22 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
 
         self._stream_order_on_start = self.get_room_max_stream_ordering()
 
-    @abc.abstractmethod
     def get_room_max_stream_ordering(self) -> int:
-        raise NotImplementedError()
+        """Get the stream_ordering of regular events that we have committed up to
 
-    @abc.abstractmethod
+        Returns the maximum stream id such that all stream ids less than or
+        equal to it have been successfully persisted.
+        """
+        return self._stream_id_gen.get_current_token()
+
     def get_room_min_stream_ordering(self) -> int:
-        raise NotImplementedError()
+        """Get the stream_ordering of backfilled events that we have committed up to
+
+        Backfilled events use *negative* stream orderings, so this returns the
+        minimum negative stream id such that all stream ids greater than or
+        equal to it have been successfully persisted.
+        """
+        return self._backfill_id_gen.get_current_token()
 
     def get_room_max_token(self) -> RoomStreamToken:
         """Get a `RoomStreamToken` that marks the current maximum persisted
@@ -379,7 +436,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
                 if p > min_pos
             }
 
-        return RoomStreamToken(None, min_pos, positions)
+        return RoomStreamToken(None, min_pos, frozendict(positions))
 
     async def get_room_events_stream_for_rooms(
         self,
@@ -472,7 +529,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
                 oldest `limit` events.
 
         Returns:
-            The list of events (in ascending order) and the token from the start
+            The list of events (in ascending stream order) and the token from the start
             of the chunk of events returned.
         """
         if from_key == to_key:
@@ -485,7 +542,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
         if not has_changed:
             return [], from_key
 
-        def f(txn):
+        def f(txn: LoggingTransaction) -> List[_EventDictReturn]:
             # To handle tokens with a non-empty instance_map we fetch more
             # results than necessary and then filter down
             min_from_id = from_key.stream
@@ -538,8 +595,19 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
         return ret, key
 
     async def get_membership_changes_for_user(
-        self, user_id: str, from_key: RoomStreamToken, to_key: RoomStreamToken
+        self,
+        user_id: str,
+        from_key: RoomStreamToken,
+        to_key: RoomStreamToken,
+        excluded_rooms: Optional[List[str]] = None,
     ) -> List[EventBase]:
+        """Fetch membership events for a given user.
+
+        All such events whose stream ordering `s` lies in the range
+        `from_key < s <= to_key` are returned. Events are ordered by ascending stream
+        order.
+        """
+        # Start by ruling out cases where a DB query is not necessary.
         if from_key == to_key:
             return []
 
@@ -550,11 +618,20 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
             if not has_changed:
                 return []
 
-        def f(txn):
+        def f(txn: LoggingTransaction) -> List[_EventDictReturn]:
             # To handle tokens with a non-empty instance_map we fetch more
             # results than necessary and then filter down
             min_from_id = from_key.stream
             max_to_id = to_key.get_max_stream_pos()
+
+            args: List[Any] = [user_id, min_from_id, max_to_id]
+
+            ignore_room_clause = ""
+            if excluded_rooms is not None and len(excluded_rooms) > 0:
+                ignore_room_clause = "AND e.room_id NOT IN (%s)" % ",".join(
+                    "?" for _ in excluded_rooms
+                )
+                args = args + excluded_rooms
 
             sql = """
                 SELECT m.event_id, instance_name, topological_ordering, stream_ordering
@@ -562,16 +639,13 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
                 WHERE e.event_id = m.event_id
                     AND m.user_id = ?
                     AND e.stream_ordering > ? AND e.stream_ordering <= ?
+                    %s
                 ORDER BY e.stream_ordering ASC
-            """
-            txn.execute(
-                sql,
-                (
-                    user_id,
-                    min_from_id,
-                    max_to_id,
-                ),
+            """ % (
+                ignore_room_clause,
             )
+
+            txn.execute(sql, args)
 
             rows = [
                 _EventDictReturn(event_id, None, stream_ordering)
@@ -609,7 +683,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
 
         Returns:
             A list of events and a token pointing to the start of the returned
-            events. The events returned are in ascending order.
+            events. The events returned are in ascending topological order.
         """
 
         rows, token = await self.get_recent_event_ids_for_room(
@@ -622,7 +696,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
 
         self._set_before_and_after(events, rows)
 
-        return (events, token)
+        return events, token
 
     async def get_recent_event_ids_for_room(
         self, room_id: str, limit: int, end_token: RoomStreamToken
@@ -668,7 +742,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
             A tuple of (stream ordering, topological ordering, event_id)
         """
 
-        def _f(txn):
+        def _f(txn: LoggingTransaction) -> Optional[Tuple[int, int, str]]:
             sql = (
                 "SELECT stream_ordering, topological_ordering, event_id"
                 " FROM events"
@@ -678,35 +752,57 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
                 " LIMIT 1"
             )
             txn.execute(sql, (room_id, stream_ordering))
-            return txn.fetchone()
+            return cast(Optional[Tuple[int, int, str]], txn.fetchone())
 
         return await self.db_pool.runInteraction(
             "get_room_event_before_stream_ordering", _f
         )
 
-    async def get_room_events_max_id(self, room_id: Optional[str] = None) -> str:
-        """Returns the current token for rooms stream.
+    async def get_last_event_in_room_before_stream_ordering(
+        self,
+        room_id: str,
+        end_token: RoomStreamToken,
+    ) -> Optional[EventBase]:
+        """Returns the last event in a room at or before a stream ordering
 
-        By default, it returns the current global stream token. Specifying a
-        `room_id` causes it to return the current room specific topological
-        token.
+        Args:
+            room_id
+            end_token: The token used to stream from
+
+        Returns:
+            The most recent event.
         """
-        token = self.get_room_max_stream_ordering()
-        if room_id is None:
-            return "s%d" % (token,)
-        else:
-            topo = await self.db_pool.runInteraction(
-                "_get_max_topological_txn", self._get_max_topological_txn, room_id
-            )
-            return "t%d-%d" % (topo, token)
+
+        last_row = await self.get_room_event_before_stream_ordering(
+            room_id=room_id,
+            stream_ordering=end_token.stream,
+        )
+        if last_row:
+            _, _, event_id = last_row
+            event = await self.get_event(event_id, get_prev_content=True)
+            return event
+
+        return None
+
+    async def get_current_room_stream_token_for_room_id(
+        self, room_id: str
+    ) -> RoomStreamToken:
+        """Returns the current position of the rooms stream (historic token)."""
+        stream_ordering = self.get_room_max_stream_ordering()
+        topo = await self.db_pool.runInteraction(
+            "_get_max_topological_txn", self._get_max_topological_txn, room_id
+        )
+        return RoomStreamToken(topo, stream_ordering)
 
     def get_stream_id_for_event_txn(
         self,
         txn: LoggingTransaction,
         event_id: str,
-        allow_none=False,
-    ) -> int:
-        return self.db_pool.simple_select_one_onecol_txn(
+        allow_none: bool = False,
+    ) -> Optional[int]:
+        # Type ignore: we pass keyvalues a Dict[str, str]; the function wants
+        # Dict[str, Any]. I think mypy is unhappy because Dict is invariant?
+        return self.db_pool.simple_select_one_onecol_txn(  # type: ignore[call-overload]
             txn=txn,
             table="events",
             keyvalues={"event_id": event_id},
@@ -768,12 +864,16 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
         )
 
         rows = txn.fetchall()
-        return rows[0][0] if rows else 0
+        # An aggregate function like MAX() will always return one row per group
+        # so we can safely rely on the lookup here. For example, when a we
+        # lookup a `room_id` which does not exist, `rows` will look like
+        # `[(None,)]`
+        return rows[0][0] if rows[0][0] is not None else 0
 
     @staticmethod
     def _set_before_and_after(
         events: List[EventBase], rows: List[_EventDictReturn], topo_order: bool = True
-    ):
+    ) -> None:
         """Inserts ordering information to events' internal metadata from
         the DB rows.
 
@@ -787,7 +887,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
         for event, row in zip(events, rows):
             stream = row.stream_ordering
             if topo_order and row.topological_ordering:
-                topo = row.topological_ordering
+                topo: Optional[int] = row.topological_ordering
             else:
                 topo = None
             internal = event.internal_metadata
@@ -802,7 +902,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
         before_limit: int,
         after_limit: int,
         event_filter: Optional[Filter] = None,
-    ) -> dict:
+    ) -> _EventsAround:
         """Retrieve events and pagination tokens around a given event in a
         room.
         """
@@ -825,12 +925,12 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
             list(results["after"]["event_ids"]), get_prev_content=True
         )
 
-        return {
-            "events_before": events_before,
-            "events_after": events_after,
-            "start": results["before"]["token"],
-            "end": results["after"]["token"],
-        }
+        return _EventsAround(
+            events_before=events_before,
+            events_after=events_after,
+            start=results["before"]["token"],
+            end=results["after"]["token"],
+        )
 
     def _get_events_around_txn(
         self,
@@ -919,7 +1019,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
             the `current_id`).
         """
 
-        def get_all_new_events_stream_txn(txn):
+        def get_all_new_events_stream_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[int, List[str]]:
             sql = (
                 "SELECT e.stream_ordering, e.event_id"
                 " FROM events AS e"
@@ -1085,9 +1187,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
         # stream token (as returned by `RoomStreamToken.get_max_stream_pos`) and
         # then filtering the results.
         if from_token.topological is not None:
-            from_bound = (
-                from_token.as_historical_tuple()
-            )  # type: Tuple[Optional[int], int]
+            from_bound: Tuple[Optional[int], int] = from_token.as_historical_tuple()
         elif direction == "b":
             from_bound = (
                 None,
@@ -1099,7 +1199,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
                 from_token.stream,
             )
 
-        to_bound = None  # type: Optional[Tuple[Optional[int], int]]
+        to_bound: Optional[Tuple[Optional[int], int]] = None
         if to_token:
             if to_token.topological is not None:
                 to_bound = to_token.as_historical_tuple()
@@ -1116,7 +1216,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
 
         bounds = generate_pagination_where_clause(
             direction=direction,
-            column_names=("topological_ordering", "stream_ordering"),
+            column_names=("event.topological_ordering", "event.stream_ordering"),
             from_token=from_bound,
             to_token=to_bound,
             engine=self.database_engine,
@@ -1133,32 +1233,51 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
 
         select_keywords = "SELECT"
         join_clause = ""
+        # Using DISTINCT in this SELECT query is quite expensive, because it
+        # requires the engine to sort on the entire (not limited) result set,
+        # i.e. the entire events table. Only use it in scenarios that could result
+        # in the same event ID occurring multiple times in the results.
+        needs_distinct = False
         if event_filter and event_filter.labels:
             # If we're not filtering on a label, then joining on event_labels will
             # return as many row for a single event as the number of labels it has. To
             # avoid this, only join if we're filtering on at least one label.
-            join_clause = """
+            join_clause += """
                 LEFT JOIN event_labels
                 USING (event_id, room_id, topological_ordering)
             """
             if len(event_filter.labels) > 1:
-                # Using DISTINCT in this SELECT query is quite expensive, because it
-                # requires the engine to sort on the entire (not limited) result set,
-                # i.e. the entire events table. We only need to use it when we're
-                # filtering on more than two labels, because that's the only scenario
-                # in which we can possibly to get multiple times the same event ID in
-                # the results.
-                select_keywords += "DISTINCT"
+                # Multiple labels could cause the same event to appear multiple times.
+                needs_distinct = True
+
+        # If there is a filter on relation_senders and relation_types join to the
+        # relations table.
+        if event_filter and (
+            event_filter.related_by_senders or event_filter.related_by_rel_types
+        ):
+            # Filtering by relations could cause the same event to appear multiple
+            # times (since there's no limit on the number of relations to an event).
+            needs_distinct = True
+            join_clause += """
+                LEFT JOIN event_relations AS relation ON (event.event_id = relation.relates_to_id)
+            """
+            if event_filter.related_by_senders:
+                join_clause += """
+                    LEFT JOIN events AS related_event ON (relation.event_id = related_event.event_id)
+                """
+
+        if needs_distinct:
+            select_keywords += " DISTINCT"
 
         sql = """
             %(select_keywords)s
-                event_id, instance_name,
-                topological_ordering, stream_ordering
-            FROM events
+                event.event_id, event.instance_name,
+                event.topological_ordering, event.stream_ordering
+            FROM events AS event
             %(join_clause)s
-            WHERE outlier = ? AND room_id = ? AND %(bounds)s
-            ORDER BY topological_ordering %(order)s,
-            stream_ordering %(order)s LIMIT ?
+            WHERE event.outlier = ? AND event.room_id = ? AND %(bounds)s
+            ORDER BY event.topological_ordering %(order)s,
+            event.stream_ordering %(order)s LIMIT ?
         """ % {
             "select_keywords": select_keywords,
             "join_clause": join_clause,
@@ -1242,13 +1361,13 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
 
         self._set_before_and_after(events, rows)
 
-        return (events, token)
+        return events, token
 
     @cached()
     async def get_id_for_instance(self, instance_name: str) -> int:
         """Get a unique, immutable ID that corresponds to the given Synapse worker instance."""
 
-        def _get_id_for_instance_txn(txn):
+        def _get_id_for_instance_txn(txn: LoggingTransaction) -> int:
             instance_id = self.db_pool.simple_select_one_onecol_txn(
                 txn,
                 table="instance_map",
@@ -1294,11 +1413,3 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
             retcol="instance_name",
             desc="get_name_from_instance_id",
         )
-
-
-class StreamStore(StreamWorkerStore):
-    def get_room_max_stream_ordering(self) -> int:
-        return self._stream_id_gen.get_current_token()
-
-    def get_room_min_stream_ordering(self) -> int:
-        return self._backfill_id_gen.get_current_token()

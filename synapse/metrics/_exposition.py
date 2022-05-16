@@ -25,27 +25,25 @@ import math
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
-from typing import Dict, List
+from typing import Any, Dict, List, Type, Union
 from urllib.parse import parse_qs, urlparse
 
-from prometheus_client import REGISTRY
+from prometheus_client import REGISTRY, CollectorRegistry
+from prometheus_client.core import Sample
 
 from twisted.web.resource import Resource
+from twisted.web.server import Request
 
 from synapse.util import caches
 
-CONTENT_TYPE_LATEST = str("text/plain; version=0.0.4; charset=utf-8")
+CONTENT_TYPE_LATEST = "text/plain; version=0.0.4; charset=utf-8"
 
 
-INF = float("inf")
-MINUS_INF = float("-inf")
-
-
-def floatToGoString(d):
+def floatToGoString(d: Union[int, float]) -> str:
     d = float(d)
-    if d == INF:
+    if d == math.inf:
         return "+Inf"
-    elif d == MINUS_INF:
+    elif d == -math.inf:
         return "-Inf"
     elif math.isnan(d):
         return "NaN"
@@ -55,17 +53,17 @@ def floatToGoString(d):
         # Go switches to exponents sooner than Python.
         # We only need to care about positive values for le/quantile.
         if d > 0 and dot > 6:
-            mantissa = "{0}.{1}{2}".format(s[0], s[1:dot], s[dot + 1 :]).rstrip("0.")
-            return "{0}e+0{1}".format(mantissa, dot - 1)
+            mantissa = f"{s[0]}.{s[1:dot]}{s[dot + 1 :]}".rstrip("0.")
+            return f"{mantissa}e+0{dot - 1}"
         return s
 
 
-def sample_line(line, name):
+def sample_line(line: Sample, name: str) -> str:
     if line.labels:
         labelstr = "{{{0}}}".format(
             ",".join(
                 [
-                    '{0}="{1}"'.format(
+                    '{}="{}"'.format(
                         k,
                         v.replace("\\", r"\\").replace("\n", r"\n").replace('"', r"\""),
                     )
@@ -78,13 +76,11 @@ def sample_line(line, name):
     timestamp = ""
     if line.timestamp is not None:
         # Convert to milliseconds.
-        timestamp = " {0:d}".format(int(float(line.timestamp) * 1000))
-    return "{0}{1} {2}{3}\n".format(
-        name, labelstr, floatToGoString(line.value), timestamp
-    )
+        timestamp = f" {int(float(line.timestamp) * 1000):d}"
+    return "{}{} {}{}\n".format(name, labelstr, floatToGoString(line.value), timestamp)
 
 
-def generate_latest(registry, emit_help=False):
+def generate_latest(registry: CollectorRegistry, emit_help: bool = False) -> bytes:
 
     # Trigger the cache metrics to be rescraped, which updates the common
     # metrics but do not produce metrics themselves
@@ -118,14 +114,14 @@ def generate_latest(registry, emit_help=False):
         # Output in the old format for compatibility.
         if emit_help:
             output.append(
-                "# HELP {0} {1}\n".format(
+                "# HELP {} {}\n".format(
                     mname,
                     metric.documentation.replace("\\", r"\\").replace("\n", r"\n"),
                 )
             )
-        output.append("# TYPE {0} {1}\n".format(mname, mtype))
+        output.append(f"# TYPE {mname} {mtype}\n")
 
-        om_samples = {}  # type: Dict[str, List[str]]
+        om_samples: Dict[str, List[str]] = {}
         for s in metric.samples:
             for suffix in ["_created", "_gsum", "_gcount"]:
                 if s.name == metric.name + suffix:
@@ -143,13 +139,13 @@ def generate_latest(registry, emit_help=False):
         for suffix, lines in sorted(om_samples.items()):
             if emit_help:
                 output.append(
-                    "# HELP {0}{1} {2}\n".format(
+                    "# HELP {}{} {}\n".format(
                         metric.name,
                         suffix,
                         metric.documentation.replace("\\", r"\\").replace("\n", r"\n"),
                     )
                 )
-            output.append("# TYPE {0}{1} gauge\n".format(metric.name, suffix))
+            output.append(f"# TYPE {metric.name}{suffix} gauge\n")
             output.extend(lines)
 
         # Get rid of the weird colon things while we're at it
@@ -163,12 +159,12 @@ def generate_latest(registry, emit_help=False):
         # Also output in the new format, if it's different.
         if emit_help:
             output.append(
-                "# HELP {0} {1}\n".format(
+                "# HELP {} {}\n".format(
                     mnewname,
                     metric.documentation.replace("\\", r"\\").replace("\n", r"\n"),
                 )
             )
-        output.append("# TYPE {0} {1}\n".format(mnewname, mtype))
+        output.append(f"# TYPE {mnewname} {mtype}\n")
 
         for s in metric.samples:
             # Get rid of the OpenMetrics specific samples (we should already have
@@ -189,7 +185,7 @@ class MetricsHandler(BaseHTTPRequestHandler):
 
     registry = REGISTRY
 
-    def do_GET(self):
+    def do_GET(self) -> None:
         registry = self.registry
         params = parse_qs(urlparse(self.path).query)
 
@@ -209,11 +205,11 @@ class MetricsHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(output)
 
-    def log_message(self, format, *args):
+    def log_message(self, format: str, *args: Any) -> None:
         """Log nothing."""
 
     @classmethod
-    def factory(cls, registry):
+    def factory(cls, registry: CollectorRegistry) -> Type:
         """Returns a dynamic MetricsHandler class tied
         to the passed registry.
         """
@@ -238,7 +234,9 @@ class _ThreadingSimpleServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
 
-def start_http_server(port, addr="", registry=REGISTRY):
+def start_http_server(
+    port: int, addr: str = "", registry: CollectorRegistry = REGISTRY
+) -> None:
     """Starts an HTTP server for prometheus metrics as a daemon thread"""
     CustomMetricsHandler = MetricsHandler.factory(registry)
     httpd = _ThreadingSimpleServer((addr, port), CustomMetricsHandler)
@@ -254,10 +252,10 @@ class MetricsResource(Resource):
 
     isLeaf = True
 
-    def __init__(self, registry=REGISTRY):
+    def __init__(self, registry: CollectorRegistry = REGISTRY):
         self.registry = registry
 
-    def render_GET(self, request):
+    def render_GET(self, request: Request) -> bytes:
         request.setHeader(b"Content-Type", CONTENT_TYPE_LATEST.encode("ascii"))
         response = generate_latest(self.registry)
         request.setHeader(b"Content-Length", str(len(response)))

@@ -21,18 +21,15 @@ from synapse.events import EventBase
 from synapse.types import JsonDict, RoomStreamToken, StateMap, UserID
 from synapse.visibility import filter_events_for_client
 
-from ._base import BaseHandler
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
-class AdminHandler(BaseHandler):
+class AdminHandler:
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
 
@@ -58,14 +55,47 @@ class AdminHandler(BaseHandler):
 
     async def get_user(self, user: UserID) -> Optional[JsonDict]:
         """Function to get user details"""
-        ret = await self.store.get_user_by_id(user.to_string())
-        if ret:
-            profile = await self.store.get_profileinfo(user.localpart)
-            threepids = await self.store.user_get_threepids(user.to_string())
-            ret["displayname"] = profile.display_name
-            ret["avatar_url"] = profile.avatar_url
-            ret["threepids"] = threepids
-        return ret
+        user_info_dict = await self.store.get_user_by_id(user.to_string())
+        if user_info_dict is None:
+            return None
+
+        # Restrict returned information to a known set of fields. This prevents additional
+        # fields added to get_user_by_id from modifying Synapse's external API surface.
+        user_info_to_return = {
+            "name",
+            "admin",
+            "deactivated",
+            "shadow_banned",
+            "creation_ts",
+            "appservice_id",
+            "consent_server_notice_sent",
+            "consent_version",
+            "user_type",
+            "is_guest",
+        }
+
+        # Restrict returned keys to a known set.
+        user_info_dict = {
+            key: value
+            for key, value in user_info_dict.items()
+            if key in user_info_to_return
+        }
+
+        # Add additional user metadata
+        profile = await self.store.get_profileinfo(user.localpart)
+        threepids = await self.store.user_get_threepids(user.to_string())
+        external_ids = [
+            ({"auth_provider": auth_provider, "external_id": external_id})
+            for auth_provider, external_id in await self.store.get_external_ids_by_user(
+                user.to_string()
+            )
+        ]
+        user_info_dict["displayname"] = profile.display_name
+        user_info_dict["avatar_url"] = profile.avatar_url
+        user_info_dict["threepids"] = threepids
+        user_info_dict["external_ids"] = external_ids
+
+        return user_info_dict
 
     async def export_user_data(self, user_id: str, writer: "ExfiltrationWriter") -> Any:
         """Write all data we have on the user to the given writer.
@@ -86,6 +116,7 @@ class AdminHandler(BaseHandler):
                 Membership.LEAVE,
                 Membership.BAN,
                 Membership.INVITE,
+                Membership.KNOCK,
             ),
         )
 
@@ -118,6 +149,13 @@ class AdminHandler(BaseHandler):
                         invited_state = invite.unsigned["invite_room_state"]
                         writer.write_invite(room_id, invite, invited_state)
 
+                if room.membership == Membership.KNOCK:
+                    event_id = room.event_id
+                    knock = await self.store.get_event(event_id, allow_none=True)
+                    if knock:
+                        knock_state = knock.unsigned["knock_room_state"]
+                        writer.write_knock(room_id, knock, knock_state)
+
                 continue
 
             # We only want to bother fetching events up to the last time they
@@ -132,7 +170,7 @@ class AdminHandler(BaseHandler):
             to_key = RoomStreamToken(None, stream_ordering)
 
             # Events that we've processed in this room
-            written_events = set()  # type: Set[str]
+            written_events: Set[str] = set()
 
             # We need to track gaps in the events stream so that we can then
             # write out the state at those events. We do this by keeping track
@@ -145,7 +183,7 @@ class AdminHandler(BaseHandler):
             # The reverse mapping to above, i.e. map from unseen event to events
             # that have the unseen event in their prev_events, i.e. the unseen
             # events "children".
-            unseen_to_child_events = {}  # type: Dict[str, Set[str]]
+            unseen_to_child_events: Dict[str, Set[str]] = {}
 
             # We fetch events in the room the user could see by fetching *all*
             # events that we have and then filtering, this isn't the most
@@ -222,7 +260,7 @@ class ExfiltrationWriter(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def write_invite(
-        self, room_id: str, event: EventBase, state: StateMap[dict]
+        self, room_id: str, event: EventBase, state: StateMap[EventBase]
     ) -> None:
         """Write an invite for the room, with associated invite state.
 
@@ -230,6 +268,20 @@ class ExfiltrationWriter(metaclass=abc.ABCMeta):
             room_id: The room ID the invite is for.
             event: The invite event.
             state: A subset of the state at the invite, with a subset of the
+                event keys (type, state_key content and sender).
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def write_knock(
+        self, room_id: str, event: EventBase, state: StateMap[EventBase]
+    ) -> None:
+        """Write a knock for the room, with associated knock state.
+
+        Args:
+            room_id: The room ID the knock is for.
+            event: The knock event.
+            state: A subset of the state at the knock, with a subset of the
                 event keys (type, state_key content and sender).
         """
         raise NotImplementedError()

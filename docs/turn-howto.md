@@ -1,12 +1,12 @@
 # Overview
 
-This document explains how to enable VoIP relaying on your Home Server with
+This document explains how to enable VoIP relaying on your homeserver with
 TURN.
 
-The synapse Matrix Home Server supports integration with TURN server via the
-[TURN server REST API](<http://tools.ietf.org/html/draft-uberti-behave-turn-rest-00>). This
-allows the Home Server to generate credentials that are valid for use on the
-TURN server through the use of a secret shared between the Home Server and the
+The synapse Matrix homeserver supports integration with TURN server via the
+[TURN server REST API](<https://tools.ietf.org/html/draft-uberti-behave-turn-rest-00>). This
+allows the homeserver to generate credentials that are valid for use on the
+TURN server through the use of a secret shared between the homeserver and the
 TURN server.
 
 The following sections describe how to install [coturn](<https://github.com/coturn/coturn>) (which implements the TURN REST API) and integrate it with synapse.
@@ -15,8 +15,8 @@ The following sections describe how to install [coturn](<https://github.com/cotu
 
 For TURN relaying with `coturn` to work, it must be hosted on a server/endpoint with a public IP.
 
-Hosting TURN behind a NAT (even with appropriate port forwarding) is known to cause issues
-and to often not work.
+Hosting TURN behind NAT requires port forwaring and for the NAT gateway to have a public IP.
+However, even with appropriate configuration, NAT is known to cause issues and to often not work.
 
 ## `coturn` setup
 
@@ -40,7 +40,9 @@ This will install and start a systemd service called `coturn`.
 
 1.  Configure it:
 
-        ./configure
+    ```sh
+    ./configure
+    ```
 
     You may need to install `libevent2`: if so, you should do so in
     the way recommended by your operating system. You can ignore
@@ -49,22 +51,28 @@ This will install and start a systemd service called `coturn`.
 
 1.  Build and install it:
 
-        make
-        make install
+    ```sh
+    make
+    make install
+    ```
 
 ### Configuration
 
 1.  Create or edit the config file in `/etc/turnserver.conf`. The relevant
     lines, with example values, are:
 
-        use-auth-secret
-        static-auth-secret=[your secret key here]
-        realm=turn.myserver.org
+    ```
+    use-auth-secret
+    static-auth-secret=[your secret key here]
+    realm=turn.myserver.org
+    ```
 
     See `turnserver.conf` for explanations of the options. One way to generate
     the `static-auth-secret` is with `pwgen`:
 
-        pwgen -s 64 1
+    ```sh
+    pwgen -s 64 1
+    ```
 
     A `realm` must be specified, but its value is somewhat arbitrary. (It is
     sent to clients as part of the authentication flow.) It is conventional to
@@ -73,7 +81,9 @@ This will install and start a systemd service called `coturn`.
 1.  You will most likely want to configure coturn to write logs somewhere. The
     easiest way is normally to send them to the syslog:
 
-        syslog
+    ```sh
+    syslog
+    ```
 
     (in which case, the logs will be available via `journalctl -u coturn` on a
     systemd system). Alternatively, coturn can be configured to write to a
@@ -83,56 +93,102 @@ This will install and start a systemd service called `coturn`.
     connect to arbitrary IP addresses and ports. The following configuration is
     suggested as a minimum starting point:
 
-        # VoIP traffic is all UDP. There is no reason to let users connect to arbitrary TCP endpoints via the relay.
-        no-tcp-relay
+    ```
+    # VoIP traffic is all UDP. There is no reason to let users connect to arbitrary TCP endpoints via the relay.
+    no-tcp-relay
 
-        # don't let the relay ever try to connect to private IP address ranges within your network (if any)
-        # given the turn server is likely behind your firewall, remember to include any privileged public IPs too.
-        denied-peer-ip=10.0.0.0-10.255.255.255
-        denied-peer-ip=192.168.0.0-192.168.255.255
-        denied-peer-ip=172.16.0.0-172.31.255.255
+    # don't let the relay ever try to connect to private IP address ranges within your network (if any)
+    # given the turn server is likely behind your firewall, remember to include any privileged public IPs too.
+    denied-peer-ip=10.0.0.0-10.255.255.255
+    denied-peer-ip=192.168.0.0-192.168.255.255
+    denied-peer-ip=172.16.0.0-172.31.255.255
 
-        # special case the turn server itself so that client->TURN->TURN->client flows work
-        allowed-peer-ip=10.0.0.1
+    # recommended additional local peers to block, to mitigate external access to internal services.
+    # https://www.rtcsec.com/article/slack-webrtc-turn-compromise-and-bug-bounty/#how-to-fix-an-open-turn-relay-to-address-this-vulnerability
+    no-multicast-peers
+    denied-peer-ip=0.0.0.0-0.255.255.255
+    denied-peer-ip=100.64.0.0-100.127.255.255
+    denied-peer-ip=127.0.0.0-127.255.255.255
+    denied-peer-ip=169.254.0.0-169.254.255.255
+    denied-peer-ip=192.0.0.0-192.0.0.255
+    denied-peer-ip=192.0.2.0-192.0.2.255
+    denied-peer-ip=192.88.99.0-192.88.99.255
+    denied-peer-ip=198.18.0.0-198.19.255.255
+    denied-peer-ip=198.51.100.0-198.51.100.255
+    denied-peer-ip=203.0.113.0-203.0.113.255
+    denied-peer-ip=240.0.0.0-255.255.255.255
 
-        # consider whether you want to limit the quota of relayed streams per user (or total) to avoid risk of DoS.
-        user-quota=12 # 4 streams per video call, so 12 streams = 3 simultaneous relayed calls per user.
-        total-quota=1200
+    # special case the turn server itself so that client->TURN->TURN->client flows work
+    # this should be one of the turn server's listening IPs
+    allowed-peer-ip=10.0.0.1
+
+    # consider whether you want to limit the quota of relayed streams per user (or total) to avoid risk of DoS.
+    user-quota=12 # 4 streams per video call, so 12 streams = 3 simultaneous relayed calls per user.
+    total-quota=1200
+    ```
 
 1.  Also consider supporting TLS/DTLS. To do this, add the following settings
     to `turnserver.conf`:
 
-        # TLS certificates, including intermediate certs.
-        # For Let's Encrypt certificates, use `fullchain.pem` here.
-        cert=/path/to/fullchain.pem
+    ```
+    # TLS certificates, including intermediate certs.
+    # For Let's Encrypt certificates, use `fullchain.pem` here.
+    cert=/path/to/fullchain.pem
 
-        # TLS private key file
-        pkey=/path/to/privkey.pem
+    # TLS private key file
+    pkey=/path/to/privkey.pem
 
-    In this case, replace the `turn:` schemes in the `turn_uri` settings below
+    # Ensure the configuration lines that disable TLS/DTLS are commented-out or removed
+    #no-tls
+    #no-dtls
+    ```
+
+    In this case, replace the `turn:` schemes in the `turn_uris` settings below
     with `turns:`.
 
     We recommend that you only try to set up TLS/DTLS once you have set up a
     basic installation and got it working.
+
+    NB: If your TLS certificate was provided by Let's Encrypt, TLS/DTLS will
+    not work with any Matrix client that uses Chromium's WebRTC library. This
+    currently includes Element Android & iOS; for more details, see their
+    [respective](https://github.com/vector-im/element-android/issues/1533)
+    [issues](https://github.com/vector-im/element-ios/issues/2712) as well as the underlying
+    [WebRTC issue](https://bugs.chromium.org/p/webrtc/issues/detail?id=11710).
+    Consider using a ZeroSSL certificate for your TURN server as a working alternative.
 
 1.  Ensure your firewall allows traffic into the TURN server on the ports
     you've configured it to listen on (By default: 3478 and 5349 for TURN
     traffic (remember to allow both TCP and UDP traffic), and ports 49152-65535
     for the UDP relay.)
 
-1.  We do not recommend running a TURN server behind NAT, and are not aware of
-    anyone doing so successfully.
+1.  If your TURN server is behind NAT, the NAT gateway must have an external,
+    publicly-reachable IP address. You must configure coturn to advertise that
+    address to connecting clients:
 
-    If you want to try it anyway, you will at least need to tell coturn its
-    external IP address:
+    ```
+    external-ip=EXTERNAL_NAT_IPv4_ADDRESS
+    ```
 
-        external-ip=192.88.99.1
+    You may optionally limit the TURN server to listen only on the local
+    address that is mapped by NAT to the external address:
 
-    ... and your NAT gateway must forward all of the relayed ports directly
-    (eg, port 56789 on the external IP must be always be forwarded to port
-    56789 on the internal IP).
+    ```
+    listening-ip=INTERNAL_TURNSERVER_IPv4_ADDRESS
+    ```
 
-    If you get this working, let us know!
+    If your NAT gateway is reachable over both IPv4 and IPv6, you may
+    configure coturn to advertise each available address:
+
+    ```
+    external-ip=EXTERNAL_NAT_IPv4_ADDRESS
+    external-ip=EXTERNAL_NAT_IPv6_ADDRESS
+    ```
+
+    When advertising an external IPv6 address, ensure that the firewall and
+    network settings of the system running your TURN server are configured to
+    accept IPv6 traffic, and that the TURN server is listening on the local
+    IPv6 address that is mapped by NAT to the external IPv6 address.
 
 1.  (Re)start the turn server:
 
@@ -149,18 +205,18 @@ This will install and start a systemd service called `coturn`.
 
 ## Synapse setup
 
-Your home server configuration file needs the following extra keys:
+Your homeserver configuration file needs the following extra keys:
 
 1.  "`turn_uris`": This needs to be a yaml list of public-facing URIs
     for your TURN server to be given out to your clients. Add separate
     entries for each transport your TURN server supports.
 2.  "`turn_shared_secret`": This is the secret shared between your
-    Home server and your TURN server, so you should set it to the same
+    homeserver and your TURN server, so you should set it to the same
     string you used in turnserver.conf.
 3.  "`turn_user_lifetime`": This is the amount of time credentials
-    generated by your Home Server are valid for (in milliseconds).
+    generated by your homeserver are valid for (in milliseconds).
     Shorter times offer less potential for abuse at the expense of
-    increased traffic between web clients and your home server to
+    increased traffic between web clients and your homeserver to
     refresh credentials. The TURN REST API specification recommends
     one day (86400000).
 4.  "`turn_allow_guests`": Whether to allow guest users to use the
@@ -182,11 +238,12 @@ After updating the homeserver configuration, you must restart synapse:
 
   * If you use synctl:
     ```sh
-    cd /where/you/run/synapse
-    ./synctl restart
+    # Depending on how Synapse is installed, synctl may already be on
+    # your PATH. If not, you may need to activate a virtual environment.
+    synctl restart
     ```
   * If you use systemd:
-    ```
+    ```sh
     systemctl restart matrix-synapse.service
     ```
 ... and then reload any clients (or wait an hour for them to refresh their
@@ -200,14 +257,15 @@ connecting". Unfortunately, troubleshooting this can be tricky.
 
 Here are a few things to try:
 
- * Check that your TURN server is not behind NAT. As above, we're not aware of
-   anyone who has successfully set this up.
-
  * Check that you have opened your firewall to allow TCP and UDP traffic to the
-   TURN ports (normally 3478 and 5479).
+   TURN ports (normally 3478 and 5349).
 
  * Check that you have opened your firewall to allow UDP traffic to the UDP
    relay ports (49152-65535 by default).
+
+ * Try disabling `coturn`'s TLS/DTLS listeners and enable only its (unencrypted)
+   TCP/UDP listeners. (This will only leave signaling traffic unencrypted;
+   voice & video WebRTC traffic is always encrypted.)
 
  * Some WebRTC implementations (notably, that of Google Chrome) appear to get
    confused by TURN servers which are reachable over IPv6 (this appears to be
@@ -217,6 +275,18 @@ Here are a few things to try:
 
    Try removing any AAAA records for your TURN server, so that it is only
    reachable over IPv4.
+
+ * If your TURN server is behind NAT:
+
+    * double-check that your NAT gateway is correctly forwarding all TURN
+      ports (normally 3478 & 5349 for TCP & UDP TURN traffic, and 49152-65535 for the UDP
+      relay) to the NAT-internal address of your TURN server. If advertising
+      both IPv4 and IPv6 external addresses via the `external-ip` option, ensure
+      that the NAT is forwarding both IPv4 and IPv6 traffic to the IPv4 and IPv6
+      internal addresses of your TURN server. When in doubt, remove AAAA records
+      for your TURN server and specify only an IPv4 address as your `external-ip`.
+
+    * ensure that your TURN server uses the NAT gateway as its default route.
 
  * Enable more verbose logging in coturn via the `verbose` setting:
 
@@ -232,14 +302,14 @@ Here are a few things to try:
 
    (Understanding the output is beyond the scope of this document!)
 
- * You can test your Matrix homeserver TURN setup with https://test.voip.librepush.net/.
+ * You can test your Matrix homeserver TURN setup with <https://test.voip.librepush.net/>.
    Note that this test is not fully reliable yet, so don't be discouraged if
    the test fails.
    [Here](https://github.com/matrix-org/voip-tester) is the github repo of the
    source of the tester, where you can file bug reports.
 
  * There is a WebRTC test tool at
-   https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/. To
+   <https://webrtc.github.io/samples/src/content/peerconnection/trickle-ice/>. To
    use it, you will need a username/password for your TURN server. You can
    either:
 

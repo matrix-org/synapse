@@ -1,4 +1,4 @@
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2019-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,54 +13,91 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Set, Tuple, cast
 
 import attr
 
-from synapse.api.constants import EventContentFields
+from synapse.api.constants import EventContentFields, RelationTypes
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import make_event_from_dict
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
-from synapse.storage.database import DatabasePool, make_tuple_comparison_clause
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+    make_tuple_comparison_clause,
+)
 from synapse.storage.databases.main.events import PersistEventsStore
 from synapse.storage.types import Cursor
 from synapse.types import JsonDict
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 
-@attr.s(slots=True, frozen=True)
+_REPLACE_STREAM_ORDERING_SQL_COMMANDS = (
+    # there should be no leftover rows without a stream_ordering2, but just in case...
+    "UPDATE events SET stream_ordering2 = stream_ordering WHERE stream_ordering2 IS NULL",
+    # now we can drop the rule and switch the columns
+    "DROP RULE populate_stream_ordering2 ON events",
+    "ALTER TABLE events DROP COLUMN stream_ordering",
+    "ALTER TABLE events RENAME COLUMN stream_ordering2 TO stream_ordering",
+    # ... and finally, rename the indexes into place for consistency with sqlite
+    "ALTER INDEX event_contains_url_index2 RENAME TO event_contains_url_index",
+    "ALTER INDEX events_order_room2 RENAME TO events_order_room",
+    "ALTER INDEX events_room_stream2 RENAME TO events_room_stream",
+    "ALTER INDEX events_ts2 RENAME TO events_ts",
+)
+
+
+class _BackgroundUpdates:
+    EVENT_ORIGIN_SERVER_TS_NAME = "event_origin_server_ts"
+    EVENT_FIELDS_SENDER_URL_UPDATE_NAME = "event_fields_sender_url"
+    DELETE_SOFT_FAILED_EXTREMITIES = "delete_soft_failed_extremities"
+    POPULATE_STREAM_ORDERING2 = "populate_stream_ordering2"
+    INDEX_STREAM_ORDERING2 = "index_stream_ordering2"
+    INDEX_STREAM_ORDERING2_CONTAINS_URL = "index_stream_ordering2_contains_url"
+    INDEX_STREAM_ORDERING2_ROOM_ORDER = "index_stream_ordering2_room_order"
+    INDEX_STREAM_ORDERING2_ROOM_STREAM = "index_stream_ordering2_room_stream"
+    INDEX_STREAM_ORDERING2_TS = "index_stream_ordering2_ts"
+    REPLACE_STREAM_ORDERING_COLUMN = "replace_stream_ordering_column"
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class _CalculateChainCover:
     """Return value for _calculate_chain_cover_txn."""
 
     # The last room_id/depth/stream processed.
-    room_id = attr.ib(type=str)
-    depth = attr.ib(type=int)
-    stream = attr.ib(type=int)
+    room_id: str
+    depth: int
+    stream: int
 
     # Number of rows processed
-    processed_count = attr.ib(type=int)
+    processed_count: int
 
     # Map from room_id to last depth/stream processed for each room that we have
     # processed all events for (i.e. the rooms we can flip the
     # `has_auth_chain_index` for)
-    finished_room_map = attr.ib(type=Dict[str, Tuple[int, int]])
+    finished_room_map: Dict[str, Tuple[int, int]]
 
 
 class EventsBackgroundUpdatesStore(SQLBaseStore):
-
-    EVENT_ORIGIN_SERVER_TS_NAME = "event_origin_server_ts"
-    EVENT_FIELDS_SENDER_URL_UPDATE_NAME = "event_fields_sender_url"
-    DELETE_SOFT_FAILED_EXTREMITIES = "delete_soft_failed_extremities"
-
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
         self.db_pool.updates.register_background_update_handler(
-            self.EVENT_ORIGIN_SERVER_TS_NAME, self._background_reindex_origin_server_ts
+            _BackgroundUpdates.EVENT_ORIGIN_SERVER_TS_NAME,
+            self._background_reindex_origin_server_ts,
         )
         self.db_pool.updates.register_background_update_handler(
-            self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME,
+            _BackgroundUpdates.EVENT_FIELDS_SENDER_URL_UPDATE_NAME,
             self._background_reindex_fields_sender,
         )
 
@@ -85,7 +122,8 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         )
 
         self.db_pool.updates.register_background_update_handler(
-            self.DELETE_SOFT_FAILED_EXTREMITIES, self._cleanup_extremities_bg_update
+            _BackgroundUpdates.DELETE_SOFT_FAILED_EXTREMITIES,
+            self._cleanup_extremities_bg_update,
         )
 
         self.db_pool.updates.register_background_update_handler(
@@ -139,12 +177,77 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             self._purged_chain_cover_index,
         )
 
-    async def _background_reindex_fields_sender(self, progress, batch_size):
+        # The event_thread_relation background update was replaced with the
+        # event_arbitrary_relations one, which handles any relation to avoid
+        # needed to potentially crawl the entire events table in the future.
+        self.db_pool.updates.register_noop_background_update("event_thread_relation")
+
+        self.db_pool.updates.register_background_update_handler(
+            "event_arbitrary_relations",
+            self._event_arbitrary_relations,
+        )
+
+        ################################################################################
+
+        # bg updates for replacing stream_ordering with a BIGINT
+        # (these only run on postgres.)
+
+        self.db_pool.updates.register_background_update_handler(
+            _BackgroundUpdates.POPULATE_STREAM_ORDERING2,
+            self._background_populate_stream_ordering2,
+        )
+        # CREATE UNIQUE INDEX events_stream_ordering ON events(stream_ordering2);
+        self.db_pool.updates.register_background_index_update(
+            _BackgroundUpdates.INDEX_STREAM_ORDERING2,
+            index_name="events_stream_ordering",
+            table="events",
+            columns=["stream_ordering2"],
+            unique=True,
+        )
+        # CREATE INDEX event_contains_url_index ON events(room_id, topological_ordering, stream_ordering) WHERE contains_url = true AND outlier = false;
+        self.db_pool.updates.register_background_index_update(
+            _BackgroundUpdates.INDEX_STREAM_ORDERING2_CONTAINS_URL,
+            index_name="event_contains_url_index2",
+            table="events",
+            columns=["room_id", "topological_ordering", "stream_ordering2"],
+            where_clause="contains_url = true AND outlier = false",
+        )
+        # CREATE INDEX events_order_room ON events(room_id, topological_ordering, stream_ordering);
+        self.db_pool.updates.register_background_index_update(
+            _BackgroundUpdates.INDEX_STREAM_ORDERING2_ROOM_ORDER,
+            index_name="events_order_room2",
+            table="events",
+            columns=["room_id", "topological_ordering", "stream_ordering2"],
+        )
+        # CREATE INDEX events_room_stream ON events(room_id, stream_ordering);
+        self.db_pool.updates.register_background_index_update(
+            _BackgroundUpdates.INDEX_STREAM_ORDERING2_ROOM_STREAM,
+            index_name="events_room_stream2",
+            table="events",
+            columns=["room_id", "stream_ordering2"],
+        )
+        # CREATE INDEX events_ts ON events(origin_server_ts, stream_ordering);
+        self.db_pool.updates.register_background_index_update(
+            _BackgroundUpdates.INDEX_STREAM_ORDERING2_TS,
+            index_name="events_ts2",
+            table="events",
+            columns=["origin_server_ts", "stream_ordering2"],
+        )
+        self.db_pool.updates.register_background_update_handler(
+            _BackgroundUpdates.REPLACE_STREAM_ORDERING_COLUMN,
+            self._background_replace_stream_ordering_column,
+        )
+
+        ################################################################################
+
+    async def _background_reindex_fields_sender(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
         target_min_stream_id = progress["target_min_stream_id_inclusive"]
         max_stream_id = progress["max_stream_id_exclusive"]
         rows_inserted = progress.get("rows_inserted", 0)
 
-        def reindex_txn(txn):
+        def reindex_txn(txn: LoggingTransaction) -> int:
             sql = (
                 "SELECT stream_ordering, event_id, json FROM events"
                 " INNER JOIN event_json USING (event_id)"
@@ -190,28 +293,30 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             }
 
             self.db_pool.updates._background_update_progress_txn(
-                txn, self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME, progress
+                txn, _BackgroundUpdates.EVENT_FIELDS_SENDER_URL_UPDATE_NAME, progress
             )
 
             return len(rows)
 
         result = await self.db_pool.runInteraction(
-            self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME, reindex_txn
+            _BackgroundUpdates.EVENT_FIELDS_SENDER_URL_UPDATE_NAME, reindex_txn
         )
 
         if not result:
             await self.db_pool.updates._end_background_update(
-                self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME
+                _BackgroundUpdates.EVENT_FIELDS_SENDER_URL_UPDATE_NAME
             )
 
         return result
 
-    async def _background_reindex_origin_server_ts(self, progress, batch_size):
+    async def _background_reindex_origin_server_ts(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
         target_min_stream_id = progress["target_min_stream_id_inclusive"]
         max_stream_id = progress["max_stream_id_exclusive"]
         rows_inserted = progress.get("rows_inserted", 0)
 
-        def reindex_search_txn(txn):
+        def reindex_search_txn(txn: LoggingTransaction) -> int:
             sql = (
                 "SELECT stream_ordering, event_id FROM events"
                 " WHERE ? <= stream_ordering AND stream_ordering < ?"
@@ -264,23 +369,25 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             }
 
             self.db_pool.updates._background_update_progress_txn(
-                txn, self.EVENT_ORIGIN_SERVER_TS_NAME, progress
+                txn, _BackgroundUpdates.EVENT_ORIGIN_SERVER_TS_NAME, progress
             )
 
             return len(rows_to_update)
 
         result = await self.db_pool.runInteraction(
-            self.EVENT_ORIGIN_SERVER_TS_NAME, reindex_search_txn
+            _BackgroundUpdates.EVENT_ORIGIN_SERVER_TS_NAME, reindex_search_txn
         )
 
         if not result:
             await self.db_pool.updates._end_background_update(
-                self.EVENT_ORIGIN_SERVER_TS_NAME
+                _BackgroundUpdates.EVENT_ORIGIN_SERVER_TS_NAME
             )
 
         return result
 
-    async def _cleanup_extremities_bg_update(self, progress, batch_size):
+    async def _cleanup_extremities_bg_update(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
         """Background update to clean out extremities that should have been
         deleted previously.
 
@@ -301,12 +408,12 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         # have any descendants, but if they do then we should delete those
         # extremities.
 
-        def _cleanup_extremities_bg_update_txn(txn):
+        def _cleanup_extremities_bg_update_txn(txn: LoggingTransaction) -> int:
             # The set of extremity event IDs that we're checking this round
             original_set = set()
 
-            # A dict[str, set[str]] of event ID to their prev events.
-            graph = {}
+            # A dict[str, Set[str]] of event ID to their prev events.
+            graph: Dict[str, Set[str]] = {}
 
             # The set of descendants of the original set that are not rejected
             # nor soft-failed. Ancestors of these events should be removed
@@ -412,7 +519,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 txn=txn,
                 table="event_forward_extremities",
                 column="event_id",
-                iterable=to_delete,
+                values=to_delete,
                 keyvalues={},
             )
 
@@ -435,14 +542,14 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 room_ids = {row["room_id"] for row in rows}
                 for room_id in room_ids:
                     txn.call_after(
-                        self.get_latest_event_ids_in_room.invalidate, (room_id,)
+                        self.get_latest_event_ids_in_room.invalidate, (room_id,)  # type: ignore[attr-defined]
                     )
 
             self.db_pool.simple_delete_many_txn(
                 txn=txn,
                 table="_extremities_to_check",
                 column="event_id",
-                iterable=original_set,
+                values=original_set,
                 keyvalues={},
             )
 
@@ -454,10 +561,10 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
         if not num_handled:
             await self.db_pool.updates._end_background_update(
-                self.DELETE_SOFT_FAILED_EXTREMITIES
+                _BackgroundUpdates.DELETE_SOFT_FAILED_EXTREMITIES
             )
 
-            def _drop_table_txn(txn):
+            def _drop_table_txn(txn: LoggingTransaction) -> None:
                 txn.execute("DROP TABLE _extremities_to_check")
 
             await self.db_pool.runInteraction(
@@ -466,11 +573,11 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
         return num_handled
 
-    async def _redactions_received_ts(self, progress, batch_size):
+    async def _redactions_received_ts(self, progress: JsonDict, batch_size: int) -> int:
         """Handles filling out the `received_ts` column in redactions."""
         last_event_id = progress.get("last_event_id", "")
 
-        def _redactions_received_ts_txn(txn):
+        def _redactions_received_ts_txn(txn: LoggingTransaction) -> int:
             # Fetch the set of event IDs that we want to update
             sql = """
                 SELECT event_id FROM redactions
@@ -521,10 +628,12 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
         return count
 
-    async def _event_fix_redactions_bytes(self, progress, batch_size):
+    async def _event_fix_redactions_bytes(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
         """Undoes hex encoded censored redacted event JSON."""
 
-        def _event_fix_redactions_bytes_txn(txn):
+        def _event_fix_redactions_bytes_txn(txn: LoggingTransaction) -> None:
             # This update is quite fast due to new index.
             txn.execute(
                 """
@@ -549,11 +658,11 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
         return 1
 
-    async def _event_store_labels(self, progress, batch_size):
+    async def _event_store_labels(self, progress: JsonDict, batch_size: int) -> int:
         """Background update handler which will store labels for existing events."""
         last_event_id = progress.get("last_event_id", "")
 
-        def _event_store_labels_txn(txn):
+        def _event_store_labels_txn(txn: LoggingTransaction) -> int:
             txn.execute(
                 """
                 SELECT event_id, json FROM event_json
@@ -575,13 +684,14 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                     self.db_pool.simple_insert_many_txn(
                         txn=txn,
                         table="event_labels",
+                        keys=("event_id", "label", "room_id", "topological_ordering"),
                         values=[
-                            {
-                                "event_id": event_id,
-                                "label": label,
-                                "room_id": event_json["room_id"],
-                                "topological_ordering": event_json["depth"],
-                            }
+                            (
+                                event_id,
+                                label,
+                                event_json["room_id"],
+                                event_json["depth"],
+                            )
                             for label in event_json["content"].get(
                                 EventContentFields.LABELS, []
                             )
@@ -653,7 +763,10 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 ),
             )
 
-            return [(row[0], row[1], db_to_json(row[2]), row[3], row[4]) for row in txn]  # type: ignore
+            return cast(
+                List[Tuple[str, str, JsonDict, bool, bool]],
+                [(row[0], row[1], db_to_json(row[2]), row[3], row[4]) for row in txn],
+            )
 
         results = await self.db_pool.runInteraction(
             desc="_rejected_events_metadata_get", func=get_rejected_events
@@ -691,29 +804,19 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
             if not has_state:
                 state_events.append(
-                    {
-                        "event_id": event.event_id,
-                        "room_id": event.room_id,
-                        "type": event.type,
-                        "state_key": event.state_key,
-                    }
+                    (event.event_id, event.room_id, event.type, event.state_key)
                 )
 
             if not has_event_auth:
                 # Old, dodgy, events may have duplicate auth events, which we
                 # need to deduplicate as we have a unique constraint.
                 for auth_id in set(event.auth_event_ids()):
-                    auth_events.append(
-                        {
-                            "room_id": event.room_id,
-                            "event_id": event.event_id,
-                            "auth_id": auth_id,
-                        }
-                    )
+                    auth_events.append((event.event_id, event.room_id, auth_id))
 
         if state_events:
             await self.db_pool.simple_insert_many(
                 table="state_events",
+                keys=("event_id", "room_id", "type", "state_key"),
                 values=state_events,
                 desc="_rejected_events_metadata_state_events",
             )
@@ -721,6 +824,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         if auth_events:
             await self.db_pool.simple_insert_many(
                 table="event_auth",
+                keys=("event_id", "room_id", "auth_id"),
                 values=auth_events,
                 desc="_rejected_events_metadata_event_auth",
             )
@@ -811,7 +915,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
     def _calculate_chain_cover_txn(
         self,
-        txn: Cursor,
+        txn: LoggingTransaction,
         last_room_id: str,
         last_depth: int,
         last_stream: int,
@@ -882,9 +986,9 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         event_to_types = {row[0]: (row[1], row[2]) for row in rows}
 
         # Calculate the new last position we've processed up to.
-        new_last_depth = rows[-1][3] if rows else last_depth  # type: int
-        new_last_stream = rows[-1][4] if rows else last_stream  # type: int
-        new_last_room_id = rows[-1][5] if rows else ""  # type: str
+        new_last_depth: int = rows[-1][3] if rows else last_depth
+        new_last_stream: int = rows[-1][4] if rows else last_stream
+        new_last_room_id: str = rows[-1][5] if rows else ""
 
         # Map from room_id to last depth/stream_ordering processed for the room,
         # excluding the last room (which we're likely still processing). We also
@@ -911,7 +1015,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             retcols=("event_id", "auth_id"),
         )
 
-        event_to_auth_chain = {}  # type: Dict[str, List[str]]
+        event_to_auth_chain: Dict[str, List[str]] = {}
         for row in auth_events:
             event_to_auth_chain.setdefault(row["event_id"], []).append(row["auth_id"])
 
@@ -922,10 +1026,10 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         PersistEventsStore._add_chain_cover_index(
             txn,
             self.db_pool,
-            self.event_chain_id_gen,
+            self.event_chain_id_gen,  # type: ignore[attr-defined]
             event_to_room_id,
             event_to_types,
-            event_to_auth_chain,
+            cast(Dict[str, Sequence[str]], event_to_auth_chain),
         )
 
         return _CalculateChainCover(
@@ -945,7 +1049,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         """
         current_event_id = progress.get("current_event_id", "")
 
-        def purged_chain_cover_txn(txn) -> int:
+        def purged_chain_cover_txn(txn: LoggingTransaction) -> int:
             # The event ID from events will be null if the chain ID / sequence
             # number points to a purged event.
             sql = """
@@ -1009,3 +1113,180 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             await self.db_pool.updates._end_background_update("purged_chain_cover")
 
         return result
+
+    async def _event_arbitrary_relations(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """Background update handler which will store previously unknown relations for existing events."""
+        last_event_id = progress.get("last_event_id", "")
+
+        def _event_arbitrary_relations_txn(txn: LoggingTransaction) -> int:
+            # Fetch events and then filter based on whether the event has a
+            # relation or not.
+            txn.execute(
+                """
+                SELECT event_id, json FROM event_json
+                WHERE event_id > ?
+                ORDER BY event_id LIMIT ?
+                """,
+                (last_event_id, batch_size),
+            )
+
+            results = list(txn)
+            # (event_id, parent_id, rel_type) for each relation
+            relations_to_insert: List[Tuple[str, str, str]] = []
+            for (event_id, event_json_raw) in results:
+                try:
+                    event_json = db_to_json(event_json_raw)
+                except Exception as e:
+                    logger.warning(
+                        "Unable to load event %s (no relations will be updated): %s",
+                        event_id,
+                        e,
+                    )
+                    continue
+
+                # If there's no relation, skip!
+                relates_to = event_json["content"].get("m.relates_to")
+                if not relates_to or not isinstance(relates_to, dict):
+                    continue
+
+                # If the relation type or parent event ID is not a string, skip it.
+                #
+                # Do not consider relation types that have existed for a long time,
+                # since they will already be listed in the `event_relations` table.
+                rel_type = relates_to.get("rel_type")
+                if not isinstance(rel_type, str) or rel_type in (
+                    RelationTypes.ANNOTATION,
+                    RelationTypes.REFERENCE,
+                    RelationTypes.REPLACE,
+                ):
+                    continue
+
+                parent_id = relates_to.get("event_id")
+                if not isinstance(parent_id, str):
+                    continue
+
+                relations_to_insert.append((event_id, parent_id, rel_type))
+
+            # Insert the missing data, note that we upsert here in case the event
+            # has already been processed.
+            if relations_to_insert:
+                self.db_pool.simple_upsert_many_txn(
+                    txn=txn,
+                    table="event_relations",
+                    key_names=("event_id",),
+                    key_values=[(r[0],) for r in relations_to_insert],
+                    value_names=("relates_to_id", "relation_type"),
+                    value_values=[r[1:] for r in relations_to_insert],
+                )
+
+                # Iterate the parent IDs and invalidate caches.
+                for parent_id in {r[1] for r in relations_to_insert}:
+                    cache_tuple = (parent_id,)
+                    self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
+                        txn, self.get_relations_for_event, cache_tuple  # type: ignore[attr-defined]
+                    )
+                    self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
+                        txn, self.get_aggregation_groups_for_event, cache_tuple  # type: ignore[attr-defined]
+                    )
+                    self._invalidate_cache_and_stream(  # type: ignore[attr-defined]
+                        txn, self.get_thread_summary, cache_tuple  # type: ignore[attr-defined]
+                    )
+
+            if results:
+                latest_event_id = results[-1][0]
+                self.db_pool.updates._background_update_progress_txn(
+                    txn, "event_arbitrary_relations", {"last_event_id": latest_event_id}
+                )
+
+            return len(results)
+
+        num_rows = await self.db_pool.runInteraction(
+            desc="event_arbitrary_relations", func=_event_arbitrary_relations_txn
+        )
+
+        if not num_rows:
+            await self.db_pool.updates._end_background_update(
+                "event_arbitrary_relations"
+            )
+
+        return num_rows
+
+    async def _background_populate_stream_ordering2(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """Populate events.stream_ordering2, then replace stream_ordering
+
+        This is to deal with the fact that stream_ordering was initially created as a
+        32-bit integer field.
+        """
+        batch_size = max(batch_size, 1)
+
+        def process(txn: LoggingTransaction) -> int:
+            last_stream = progress.get("last_stream", -(1 << 31))
+            txn.execute(
+                """
+                UPDATE events SET stream_ordering2=stream_ordering
+                WHERE stream_ordering IN (
+                   SELECT stream_ordering FROM events WHERE stream_ordering > ?
+                   ORDER BY stream_ordering LIMIT ?
+                )
+                RETURNING stream_ordering;
+                """,
+                (last_stream, batch_size),
+            )
+            row_count = txn.rowcount
+            if row_count == 0:
+                return 0
+            last_stream = max(row[0] for row in txn)
+            logger.info("populated stream_ordering2 up to %i", last_stream)
+
+            self.db_pool.updates._background_update_progress_txn(
+                txn,
+                _BackgroundUpdates.POPULATE_STREAM_ORDERING2,
+                {"last_stream": last_stream},
+            )
+            return row_count
+
+        result = await self.db_pool.runInteraction(
+            "_background_populate_stream_ordering2", process
+        )
+
+        if result != 0:
+            return result
+
+        await self.db_pool.updates._end_background_update(
+            _BackgroundUpdates.POPULATE_STREAM_ORDERING2
+        )
+        return 0
+
+    async def _background_replace_stream_ordering_column(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """Drop the old 'stream_ordering' column and rename 'stream_ordering2' into its place."""
+
+        def process(txn: Cursor) -> None:
+            for sql in _REPLACE_STREAM_ORDERING_SQL_COMMANDS:
+                logger.info("completing stream_ordering migration: %s", sql)
+                txn.execute(sql)
+
+        # ANALYZE the new column to build stats on it, to encourage PostgreSQL to use the
+        # indexes on it.
+        # We need to pass execute a dummy function to handle the txn's result otherwise
+        # it tries to call fetchall() on it and fails because there's no result to fetch.
+        await self.db_pool.execute(
+            "background_analyze_new_stream_ordering_column",
+            lambda txn: None,
+            "ANALYZE events(stream_ordering2)",
+        )
+
+        await self.db_pool.runInteraction(
+            "_background_replace_stream_ordering_column", process
+        )
+
+        await self.db_pool.updates._end_background_update(
+            _BackgroundUpdates.REPLACE_STREAM_ORDERING_COLUMN
+        )
+
+        return 0

@@ -14,7 +14,7 @@
 # limitations under the License.
 import inspect
 import logging
-from typing import TYPE_CHECKING, Dict, Generic, List, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, TypeVar, Union
 from urllib.parse import urlencode, urlparse
 
 import attr
@@ -23,7 +23,7 @@ from authlib.common.security import generate_token
 from authlib.jose import JsonWebToken, jwt
 from authlib.oauth2.auth import ClientAuth
 from authlib.oauth2.rfc6749.parameters import prepare_grant_uri
-from authlib.oidc.core import CodeIDToken, ImplicitIDToken, UserInfo
+from authlib.oidc.core import CodeIDToken, UserInfo
 from authlib.oidc.discovery import OpenIDProviderMetadata, get_well_known_url
 from jinja2 import Environment, Template
 from pymacaroons.exceptions import (
@@ -45,6 +45,7 @@ from synapse.types import JsonDict, UserID, map_username_to_mxid_localpart
 from synapse.util import Clock, json_decoder
 from synapse.util.caches.cached_call import RetryOnExceptionCachedCall
 from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
+from synapse.util.templates import _localpart_from_email_filter
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -72,26 +73,26 @@ _SESSION_COOKIES = [
     (b"oidc_session_no_samesite", b"HttpOnly"),
 ]
 
+
 #: A token exchanged from the token endpoint, as per RFC6749 sec 5.1. and
 #: OpenID.Core sec 3.1.3.3.
-Token = TypedDict(
-    "Token",
-    {
-        "access_token": str,
-        "token_type": str,
-        "id_token": Optional[str],
-        "refresh_token": Optional[str],
-        "expires_in": int,
-        "scope": Optional[str],
-    },
-)
+class Token(TypedDict):
+    access_token: str
+    token_type: str
+    id_token: Optional[str]
+    refresh_token: Optional[str]
+    expires_in: int
+    scope: Optional[str]
+
 
 #: A JWK, as per RFC7517 sec 4. The type could be more precise than that, but
 #: there is no real point of doing this in our case.
 JWK = Dict[str, str]
 
+
 #: A JWK Set, as per RFC7517 sec 5.
-JWKS = TypedDict("JWKS", {"keys": List[JWK]})
+class JWKS(TypedDict):
+    keys: List[JWK]
 
 
 class OidcHandler:
@@ -105,9 +106,9 @@ class OidcHandler:
         assert provider_confs
 
         self._token_generator = OidcSessionTokenGenerator(hs)
-        self._providers = {
+        self._providers: Dict[str, "OidcProvider"] = {
             p.idp_id: OidcProvider(hs, self._token_generator, p) for p in provider_confs
-        }  # type: Dict[str, OidcProvider]
+        }
 
     async def load_metadata(self) -> None:
         """Validate the config and load the metadata from the remote endpoint.
@@ -117,7 +118,8 @@ class OidcHandler:
         for idp_id, p in self._providers.items():
             try:
                 await p.load_metadata()
-                await p.load_jwks()
+                if not p._uses_userinfo:
+                    await p.load_jwks()
             except Exception as e:
                 raise Exception(
                     "Error while initialising OIDC provider %r" % (idp_id,)
@@ -178,7 +180,7 @@ class OidcHandler:
         # are two.
 
         for cookie_name, _ in _SESSION_COOKIES:
-            session = request.getCookie(cookie_name)  # type: Optional[bytes]
+            session: Optional[bytes] = request.getCookie(cookie_name)
             if session is not None:
                 break
         else:
@@ -249,13 +251,13 @@ class OidcHandler:
 class OidcError(Exception):
     """Used to catch errors when calling the token_endpoint"""
 
-    def __init__(self, error, error_description=None):
+    def __init__(self, error: str, error_description: Optional[str] = None):
         self.error = error
         self.error_description = error_description
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.error_description:
-            return "{}: {}".format(self.error, self.error_description)
+            return f"{self.error}: {self.error_description}"
         return self.error
 
 
@@ -272,12 +274,12 @@ class OidcProvider:
         token_generator: "OidcSessionTokenGenerator",
         provider: OidcProviderConfig,
     ):
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
 
         self._token_generator = token_generator
 
         self._config = provider
-        self._callback_url = hs.config.oidc_callback_url  # type: str
+        self._callback_url: str = hs.config.oidc.oidc_callback_url
 
         # Calculate the prefix for OIDC callback paths based on the public_baseurl.
         # We'll insert this into the Path= parameter of any session cookies we set.
@@ -290,7 +292,7 @@ class OidcProvider:
         self._scopes = provider.scopes
         self._user_profile_method = provider.user_profile_method
 
-        client_secret = None  # type: Union[None, str, JwtClientSecret]
+        client_secret: Optional[Union[str, JwtClientSecret]] = None
         if provider.client_secret:
             client_secret = provider.client_secret
         elif provider.client_secret_jwt_key:
@@ -305,7 +307,7 @@ class OidcProvider:
             provider.client_id,
             client_secret,
             provider.client_auth_method,
-        )  # type: ClientAuth
+        )
         self._client_auth_method = provider.client_auth_method
 
         # cache of metadata for the identity provider (endpoint uris, mostly). This is
@@ -324,7 +326,7 @@ class OidcProvider:
         self._allow_existing_users = provider.allow_existing_users
 
         self._http_client = hs.get_proxied_http_client()
-        self._server_name = hs.config.server_name  # type: str
+        self._server_name: str = hs.config.server.server_name
 
         # identifier for the external_ids table
         self.idp_id = provider.idp_id
@@ -337,9 +339,6 @@ class OidcProvider:
 
         # optional brand identifier for this auth provider
         self.idp_brand = provider.idp_brand
-
-        # Optional brand identifier for the unstable API (see MSC2858).
-        self.unstable_idp_brand = provider.unstable_idp_brand
 
         self._sso_handler = hs.get_sso_handler()
 
@@ -501,10 +500,6 @@ class OidcProvider:
         return await self._jwks.get()
 
     async def _load_jwks(self) -> JWKS:
-        if self._uses_userinfo:
-            # We're not using jwt signing, return an empty jwk set
-            return {"keys": []}
-
         metadata = await self.load_metadata()
 
         # Load the JWKS using the `jwks_uri` metadata.
@@ -550,9 +545,9 @@ class OidcProvider:
         """
         metadata = await self.load_metadata()
         token_endpoint = metadata.get("token_endpoint")
-        raw_headers = {
+        raw_headers: Dict[str, str] = {
             "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": self._http_client.user_agent,
+            "User-Agent": self._http_client.user_agent.decode("ascii"),
             "Accept": "application/json",
         }
 
@@ -639,7 +634,7 @@ class OidcProvider:
             )
             logger.warning(description)
             # Body was still valid JSON. Might be useful to log it for debugging.
-            logger.warning("Code exchange response: {resp!r}".format(resp=resp))
+            logger.warning("Code exchange response: %r", resp)
             raise OidcError("server_error", description)
 
         return resp
@@ -666,7 +661,7 @@ class OidcProvider:
 
         return UserInfo(resp)
 
-    async def _parse_id_token(self, token: Token, nonce: str) -> UserInfo:
+    async def _parse_id_token(self, token: Token, nonce: str) -> CodeIDToken:
         """Return an instance of UserInfo from token's ``id_token``.
 
         Args:
@@ -676,7 +671,7 @@ class OidcProvider:
                 request. This value should match the one inside the token.
 
         Returns:
-            An object representing the user.
+            The decoded claims in the ID token.
         """
         metadata = await self.load_metadata()
         claims_params = {
@@ -687,9 +682,6 @@ class OidcProvider:
             # If we got an `access_token`, there should be an `at_hash` claim
             # in the `id_token` that we can check against.
             claims_params["access_token"] = token["access_token"]
-            claims_cls = CodeIDToken
-        else:
-            claims_cls = ImplicitIDToken
 
         alg_values = metadata.get("id_token_signing_alg_values_supported", ["RS256"])
         jwt = JsonWebToken(alg_values)
@@ -706,7 +698,7 @@ class OidcProvider:
             claims = jwt.decode(
                 id_token,
                 key=jwk_set,
-                claims_cls=claims_cls,
+                claims_cls=CodeIDToken,
                 claims_options=claim_options,
                 claims_params=claims_params,
             )
@@ -716,7 +708,7 @@ class OidcProvider:
             claims = jwt.decode(
                 id_token,
                 key=jwk_set,
-                claims_cls=claims_cls,
+                claims_cls=CodeIDToken,
                 claims_options=claim_options,
                 claims_params=claims_params,
             )
@@ -724,7 +716,8 @@ class OidcProvider:
         logger.debug("Decoded id_token JWT %r; validating", claims)
 
         claims.validate(leeway=120)  # allows 2 min of clock skew
-        return UserInfo(claims)
+
+        return claims
 
     async def handle_redirect_request(
         self,
@@ -840,8 +833,22 @@ class OidcProvider:
 
         logger.debug("Successfully obtained OAuth2 token data: %r", token)
 
-        # Now that we have a token, get the userinfo, either by decoding the
-        # `id_token` or by fetching the `userinfo_endpoint`.
+        # If there is an id_token, it should be validated, regardless of the
+        # userinfo endpoint is used or not.
+        if token.get("id_token") is not None:
+            try:
+                id_token = await self._parse_id_token(token, nonce=session_data.nonce)
+                sid = id_token.get("sid")
+            except Exception as e:
+                logger.exception("Invalid id_token")
+                self._sso_handler.render_error(request, "invalid_token", str(e))
+                return
+        else:
+            id_token = None
+            sid = None
+
+        # Now that we have a token, get the userinfo either from the `id_token`
+        # claims or by fetching the `userinfo_endpoint`.
         if self._uses_userinfo:
             try:
                 userinfo = await self._fetch_userinfo(token)
@@ -849,13 +856,14 @@ class OidcProvider:
                 logger.exception("Could not fetch userinfo")
                 self._sso_handler.render_error(request, "fetch_error", str(e))
                 return
+        elif id_token is not None:
+            userinfo = UserInfo(id_token)
         else:
-            try:
-                userinfo = await self._parse_id_token(token, nonce=session_data.nonce)
-            except Exception as e:
-                logger.exception("Invalid id_token")
-                self._sso_handler.render_error(request, "invalid_token", str(e))
-                return
+            logger.error("Missing id_token in token response")
+            self._sso_handler.render_error(
+                request, "invalid_token", "Missing id_token in token response"
+            )
+            return
 
         # first check if we're doing a UIA
         if session_data.ui_auth_session_id:
@@ -887,7 +895,7 @@ class OidcProvider:
         # Call the mapper to register/login the user
         try:
             await self._complete_oidc_login(
-                userinfo, token, request, session_data.client_redirect_url
+                userinfo, token, request, session_data.client_redirect_url, sid
             )
         except MappingException as e:
             logger.exception("Could not map user")
@@ -899,6 +907,7 @@ class OidcProvider:
         token: Token,
         request: SynapseRequest,
         client_redirect_url: str,
+        sid: Optional[str],
     ) -> None:
         """Given a UserInfo response, complete the login flow
 
@@ -957,7 +966,7 @@ class OidcProvider:
                         "Mapping provider does not support de-duplicating Matrix IDs"
                     )
 
-                attributes = await self._user_mapping_provider.map_user_attributes(  # type: ignore
+                attributes = await self._user_mapping_provider.map_user_attributes(
                     userinfo, token
                 )
 
@@ -1011,6 +1020,7 @@ class OidcProvider:
             oidc_response_to_user_attributes,
             grandfather_existing_users,
             extra_attributes,
+            auth_provider_session_id=sid,
         )
 
     def _remote_id_from_userinfo(self, userinfo: UserInfo) -> str:
@@ -1060,13 +1070,13 @@ class JwtClientSecret:
         self._cached_secret = b""
         self._cached_secret_replacement_time = 0
 
-    def __str__(self):
+    def __str__(self) -> str:
         # if client_auth_method is client_secret_basic, then ClientAuth.prepare calls
         # encode_client_secret_basic, which calls "{}".format(secret), which ends up
         # here.
         return self._get_secret().decode("ascii")
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         # if client_auth_method is client_secret_post, then ClientAuth.prepare calls
         # encode_client_secret_post, which ends up here.
         return self._get_secret()
@@ -1200,27 +1210,30 @@ class OidcSessionTokenGenerator:
         )
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class OidcSessionData:
     """The attributes which are stored in a OIDC session cookie"""
 
     # the Identity Provider being used
-    idp_id = attr.ib(type=str)
+    idp_id: str
 
     # The `nonce` parameter passed to the OIDC provider.
-    nonce = attr.ib(type=str)
+    nonce: str
 
     # The URL the client gave when it initiated the flow. ("" if this is a UI Auth)
-    client_redirect_url = attr.ib(type=str)
+    client_redirect_url: str
 
     # The session ID of the ongoing UI Auth ("" if this is a login)
-    ui_auth_session_id = attr.ib(type=str)
+    ui_auth_session_id: str
 
 
-UserAttributeDict = TypedDict(
-    "UserAttributeDict",
-    {"localpart": Optional[str], "display_name": Optional[str], "emails": List[str]},
-)
+class UserAttributeDict(TypedDict):
+    localpart: Optional[str]
+    confirm_localpart: bool
+    display_name: Optional[str]
+    emails: List[str]
+
+
 C = TypeVar("C")
 
 
@@ -1291,20 +1304,26 @@ class OidcMappingProvider(Generic[C]):
 
 
 # Used to clear out "None" values in templates
-def jinja_finalize(thing):
+def jinja_finalize(thing: Any) -> Any:
     return thing if thing is not None else ""
 
 
 env = Environment(finalize=jinja_finalize)
+env.filters.update(
+    {
+        "localpart_from_email": _localpart_from_email_filter,
+    }
+)
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class JinjaOidcMappingConfig:
-    subject_claim = attr.ib(type=str)
-    localpart_template = attr.ib(type=Optional[Template])
-    display_name_template = attr.ib(type=Optional[Template])
-    email_template = attr.ib(type=Optional[Template])
-    extra_attributes = attr.ib(type=Dict[str, Template])
+    subject_claim: str
+    localpart_template: Optional[Template]
+    display_name_template: Optional[Template]
+    email_template: Optional[Template]
+    extra_attributes: Dict[str, Template]
+    confirm_localpart: bool = False
 
 
 class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
@@ -1346,12 +1365,17 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
                         "invalid jinja template", path=["extra_attributes", key]
                     ) from e
 
+        confirm_localpart = config.get("confirm_localpart") or False
+        if not isinstance(confirm_localpart, bool):
+            raise ConfigError("must be a bool", path=["confirm_localpart"])
+
         return JinjaOidcMappingConfig(
             subject_claim=subject_claim,
             localpart_template=localpart_template,
             display_name_template=display_name_template,
             email_template=email_template,
             extra_attributes=extra_attributes,
+            confirm_localpart=confirm_localpart,
         )
 
     def get_remote_user_id(self, userinfo: UserInfo) -> str:
@@ -1381,17 +1405,20 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         if display_name == "":
             display_name = None
 
-        emails = []  # type: List[str]
+        emails: List[str] = []
         email = render_template_field(self._config.email_template)
         if email:
             emails.append(email)
 
         return UserAttributeDict(
-            localpart=localpart, display_name=display_name, emails=emails
+            localpart=localpart,
+            display_name=display_name,
+            emails=emails,
+            confirm_localpart=self._config.confirm_localpart,
         )
 
     async def get_extra_attributes(self, userinfo: UserInfo, token: Token) -> JsonDict:
-        extras = {}  # type: Dict[str, str]
+        extras: Dict[str, str] = {}
         for key, template in self._config.extra_attributes.items():
             try:
                 extras[key] = template.render(user=userinfo).strip()

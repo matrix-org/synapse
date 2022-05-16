@@ -67,7 +67,7 @@ def run_upgrade(cur, database_engine, config, *args, **kwargs):
                 INNER JOIN room_memberships AS r USING (event_id)
                 WHERE type = 'm.room.member' AND state_key LIKE ?
         """
-    cur.execute(sql, ("%:" + config.server_name,))
+    cur.execute(sql, ("%:" + config.server.server_name,))
 
     cur.execute(
         "CREATE UNIQUE INDEX local_current_membership_idx ON local_current_membership(user_id, room_id)"

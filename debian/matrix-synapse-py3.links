@@ -1,4 +1,6 @@
 opt/venvs/matrix-synapse/bin/hash_password usr/bin/hash_password
 opt/venvs/matrix-synapse/bin/register_new_matrix_user usr/bin/register_new_matrix_user
 opt/venvs/matrix-synapse/bin/synapse_port_db usr/bin/synapse_port_db
+opt/venvs/matrix-synapse/bin/synapse_review_recent_signups usr/bin/synapse_review_recent_signups
 opt/venvs/matrix-synapse/bin/synctl usr/bin/synctl
+opt/venvs/matrix-synapse/bin/update_synapse_database usr/bin/update_synapse_database

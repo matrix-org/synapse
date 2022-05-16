@@ -14,15 +14,19 @@
 import calendar
 import logging
 import time
-from typing import Dict
+from typing import TYPE_CHECKING, Dict
 
 from synapse.metrics import GaugeBucketCollector
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.event_push_actions import (
     EventPushActionsWorkerStore,
 )
+from synapse.storage.types import Cursor
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -52,18 +56,23 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
     stats and prometheus metrics.
     """
 
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
         # Read the extrems every 60 minutes
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             self._clock.looping_call(self._read_forward_extremities, 60 * 60 * 1000)
 
         # Used in _generate_user_daily_visits to keep track of progress
         self._last_user_visit_update = self._get_start_of_day()
 
     @wrap_as_background_process("read_forward_extremities")
-    async def _read_forward_extremities(self):
+    async def _read_forward_extremities(self) -> None:
         def fetch(txn):
             txn.execute(
                 """
@@ -87,7 +96,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             (x[0] - 1) * x[1] for x in res if x[1]
         )
 
-    async def count_daily_e2ee_messages(self):
+    async def count_daily_e2ee_messages(self) -> int:
         """
         Returns an estimate of the number of messages sent in the last day.
 
@@ -97,7 +106,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
 
         def _count_messages(txn):
             sql = """
-                SELECT COALESCE(COUNT(*), 0) FROM events
+                SELECT COUNT(*) FROM events
                 WHERE type = 'm.room.encrypted'
                 AND stream_ordering > ?
             """
@@ -107,14 +116,14 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
 
         return await self.db_pool.runInteraction("count_e2ee_messages", _count_messages)
 
-    async def count_daily_sent_e2ee_messages(self):
+    async def count_daily_sent_e2ee_messages(self) -> int:
         def _count_messages(txn):
             # This is good enough as if you have silly characters in your own
             # hostname then that's your own fault.
             like_clause = "%:" + self.hs.hostname
 
             sql = """
-                SELECT COALESCE(COUNT(*), 0) FROM events
+                SELECT COUNT(*) FROM events
                 WHERE type = 'm.room.encrypted'
                     AND sender LIKE ?
                 AND stream_ordering > ?
@@ -128,10 +137,10 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             "count_daily_sent_e2ee_messages", _count_messages
         )
 
-    async def count_daily_active_e2ee_rooms(self):
+    async def count_daily_active_e2ee_rooms(self) -> int:
         def _count(txn):
             sql = """
-                SELECT COALESCE(COUNT(DISTINCT room_id), 0) FROM events
+                SELECT COUNT(DISTINCT room_id) FROM events
                 WHERE type = 'm.room.encrypted'
                 AND stream_ordering > ?
             """
@@ -143,7 +152,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             "count_daily_active_e2ee_rooms", _count
         )
 
-    async def count_daily_messages(self):
+    async def count_daily_messages(self) -> int:
         """
         Returns an estimate of the number of messages sent in the last day.
 
@@ -153,7 +162,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
 
         def _count_messages(txn):
             sql = """
-                SELECT COALESCE(COUNT(*), 0) FROM events
+                SELECT COUNT(*) FROM events
                 WHERE type = 'm.room.message'
                 AND stream_ordering > ?
             """
@@ -163,14 +172,14 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
 
         return await self.db_pool.runInteraction("count_messages", _count_messages)
 
-    async def count_daily_sent_messages(self):
+    async def count_daily_sent_messages(self) -> int:
         def _count_messages(txn):
             # This is good enough as if you have silly characters in your own
             # hostname then that's your own fault.
             like_clause = "%:" + self.hs.hostname
 
             sql = """
-                SELECT COALESCE(COUNT(*), 0) FROM events
+                SELECT COUNT(*) FROM events
                 WHERE type = 'm.room.message'
                     AND sender LIKE ?
                 AND stream_ordering > ?
@@ -184,10 +193,10 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             "count_daily_sent_messages", _count_messages
         )
 
-    async def count_daily_active_rooms(self):
+    async def count_daily_active_rooms(self) -> int:
         def _count(txn):
             sql = """
-                SELECT COALESCE(COUNT(DISTINCT room_id), 0) FROM events
+                SELECT COUNT(DISTINCT room_id) FROM events
                 WHERE type = 'm.room.message'
                 AND stream_ordering > ?
             """
@@ -218,19 +227,22 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             "count_monthly_users", self._count_users, thirty_days_ago
         )
 
-    def _count_users(self, txn, time_from):
+    def _count_users(self, txn: Cursor, time_from: int) -> int:
         """
         Returns number of users seen in the past time_from period
         """
         sql = """
-            SELECT COALESCE(count(*), 0) FROM (
+            SELECT COUNT(*) FROM (
                 SELECT user_id FROM user_ips
                 WHERE last_seen > ?
                 GROUP BY user_id
             ) u
         """
         txn.execute(sql, (time_from,))
-        (count,) = txn.fetchone()
+        # Mypy knows that fetchone() might return None if there are no rows.
+        # We know better: "SELECT COUNT(...) FROM ..." without any GROUP BY always
+        # returns exactly one row.
+        (count,) = txn.fetchone()  # type: ignore[misc]
         return count
 
     async def count_r30_users(self) -> Dict[str, int]:
@@ -250,7 +262,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             thirty_days_ago_in_secs = now - thirty_days_in_secs
 
             sql = """
-                SELECT platform, COALESCE(count(*), 0) FROM (
+                SELECT platform, COUNT(*) FROM (
                      SELECT
                         users.name, platform, users.creation_ts * 1000,
                         MAX(uip.last_seen)
@@ -288,7 +300,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                 results[row[0]] = row[1]
 
             sql = """
-                SELECT COALESCE(count(*), 0) FROM (
+                SELECT COUNT(*) FROM (
                     SELECT users.name, users.creation_ts * 1000,
                                                         MAX(uip.last_seen)
                     FROM users
@@ -316,11 +328,140 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
 
         return await self.db_pool.runInteraction("count_r30_users", _count_r30_users)
 
-    def _get_start_of_day(self):
+    async def count_r30v2_users(self) -> Dict[str, int]:
+        """
+        Counts the number of 30 day retained users, defined as users that:
+         - Appear more than once in the past 60 days
+         - Have more than 30 days between the most and least recent appearances that
+           occurred in the past 60 days.
+
+        (This is the second version of this metric, hence R30'v2')
+
+        Returns:
+             A mapping from client type to the number of 30-day retained users for that client.
+
+             The dict keys are:
+              - "all" (a combined number of users across any and all clients)
+              - "android" (Element Android)
+              - "ios" (Element iOS)
+              - "electron" (Element Desktop)
+              - "web" (any web application -- it's not possible to distinguish Element Web here)
+        """
+
+        def _count_r30v2_users(txn):
+            thirty_days_in_secs = 86400 * 30
+            now = int(self._clock.time())
+            sixty_days_ago_in_secs = now - 2 * thirty_days_in_secs
+            one_day_from_now_in_secs = now + 86400
+
+            # This is the 'per-platform' count.
+            sql = """
+                SELECT
+                    client_type,
+                    count(client_type)
+                FROM
+                    (
+                        SELECT
+                            user_id,
+                            CASE
+                                WHEN
+                                    LOWER(user_agent) LIKE '%%riot%%' OR
+                                    LOWER(user_agent) LIKE '%%element%%'
+                                    THEN CASE
+                                        WHEN
+                                            LOWER(user_agent) LIKE '%%electron%%'
+                                            THEN 'electron'
+                                        WHEN
+                                            LOWER(user_agent) LIKE '%%android%%'
+                                            THEN 'android'
+                                        WHEN
+                                            LOWER(user_agent) LIKE '%%ios%%'
+                                            THEN 'ios'
+                                        ELSE 'unknown'
+                                    END
+                                WHEN
+                                    LOWER(user_agent) LIKE '%%mozilla%%' OR
+                                    LOWER(user_agent) LIKE '%%gecko%%'
+                                    THEN 'web'
+                                ELSE 'unknown'
+                            END as client_type
+                        FROM
+                            user_daily_visits
+                        WHERE
+                            timestamp > ?
+                            AND
+                            timestamp < ?
+                        GROUP BY
+                            user_id,
+                            client_type
+                        HAVING
+                            max(timestamp) - min(timestamp) > ?
+                    ) AS temp
+                GROUP BY
+                    client_type
+                ;
+            """
+
+            # We initialise all the client types to zero, so we get an explicit
+            # zero if they don't appear in the query results
+            results = {"ios": 0, "android": 0, "web": 0, "electron": 0}
+            txn.execute(
+                sql,
+                (
+                    sixty_days_ago_in_secs * 1000,
+                    one_day_from_now_in_secs * 1000,
+                    thirty_days_in_secs * 1000,
+                ),
+            )
+
+            for row in txn:
+                if row[0] == "unknown":
+                    continue
+                results[row[0]] = row[1]
+
+            # This is the 'all users' count.
+            sql = """
+                SELECT COUNT(*) FROM (
+                    SELECT
+                        1
+                    FROM
+                        user_daily_visits
+                    WHERE
+                        timestamp > ?
+                        AND
+                        timestamp < ?
+                    GROUP BY
+                        user_id
+                    HAVING
+                        max(timestamp) - min(timestamp) > ?
+                ) AS r30_users
+            """
+
+            txn.execute(
+                sql,
+                (
+                    sixty_days_ago_in_secs * 1000,
+                    one_day_from_now_in_secs * 1000,
+                    thirty_days_in_secs * 1000,
+                ),
+            )
+            row = txn.fetchone()
+            if row is None:
+                results["all"] = 0
+            else:
+                results["all"] = row[0]
+
+            return results
+
+        return await self.db_pool.runInteraction(
+            "count_r30v2_users", _count_r30v2_users
+        )
+
+    def _get_start_of_day(self) -> int:
         """
         Returns millisecond unixtime for start of UTC day.
         """
-        now = time.gmtime()
+        now = time.gmtime(self._clock.time())
         today_start = calendar.timegm((now.tm_year, now.tm_mon, now.tm_mday, 0, 0, 0))
         return today_start * 1000
 
@@ -352,7 +493,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                     ) udv
                     ON u.user_id = udv.user_id AND u.device_id=udv.device_id
                     INNER JOIN users ON users.name=u.user_id
-                    WHERE last_seen > ? AND last_seen <= ?
+                    WHERE ? <= last_seen AND last_seen < ?
                     AND udv.timestamp IS NULL AND users.is_guest=0
                     AND users.appservice_id IS NULL
                     GROUP BY u.user_id, u.device_id

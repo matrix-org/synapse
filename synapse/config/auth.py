@@ -12,6 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any
+
+from synapse.types import JsonDict
 
 from ._base import Config
 
@@ -21,7 +24,7 @@ class AuthConfig(Config):
 
     section = "auth"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         password_config = config.get("password_config", {})
         if password_config is None:
             password_config = {}
@@ -40,7 +43,7 @@ class AuthConfig(Config):
             ui_auth.get("session_timeout", 0)
         )
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         password_config:
            # Uncomment to disable password login
@@ -88,7 +91,7 @@ class AuthConfig(Config):
               #
               #require_lowercase: true
 
-              # Whether a password must contain at least one lowercase letter.
+              # Whether a password must contain at least one uppercase letter.
               # Defaults to 'false'.
               #
               #require_uppercase: true
@@ -102,6 +105,10 @@ class AuthConfig(Config):
             # validation to be re-used.  This weakens the protections afforded by
             # the user-interactive authentication process, by allowing for multiple
             # (and potentially different) operations to use the same validation session.
+            #
+            # This is ignored for potentially "dangerous" operations (including
+            # deactivating an account, modifying an account password, and
+            # adding a 3PID).
             #
             # Uncomment below to allow for credential validation to last for 15
             # seconds.

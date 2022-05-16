@@ -15,6 +15,7 @@ import platform
 import struct
 import threading
 import typing
+from typing import Optional
 
 from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.types import Connection
@@ -59,6 +60,11 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
     def supports_using_any_list(self):
         """Do we support using `a = ANY(?)` and passing a list"""
         return False
+
+    @property
+    def supports_returning(self) -> bool:
+        """Do we support the `RETURNING` clause in insert/update/delete?"""
+        return self.module.sqlite_version_info >= (3, 35, 0)
 
     def check_database(self, db_conn, allow_outdated_version: bool = False):
         if not allow_outdated_version:
@@ -115,6 +121,12 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
     def attempt_to_set_autocommit(self, conn: Connection, autocommit: bool):
         # Twisted doesn't let us set attributes on the connections, so we can't
         # set the connection to autocommit mode.
+        pass
+
+    def attempt_to_set_isolation_level(
+        self, conn: Connection, isolation_level: Optional[int]
+    ):
+        # All transactions are SERIALIZABLE by default in sqllite
         pass
 
 

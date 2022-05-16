@@ -12,14 +12,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import inspect
 import sys
 import traceback
+from typing import Any, Dict, Optional
 
 from twisted.conch import manhole_ssh
 from twisted.conch.insults import insults
 from twisted.conch.manhole import ColoredManhole, ManholeInterpreter
 from twisted.conch.ssh.keys import Key
 from twisted.cred import checkers, portal
+from twisted.internet import defer
+from twisted.internet.protocol import ServerFactory
+
+from synapse.config.server import ManholeConfig
 
 PUBLIC_KEY = (
     "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDHhGATaW4KhE23+7nrH4jFx3yLq9OjaEs5"
@@ -59,41 +65,54 @@ EddTrx3TNpr1D5m/f+6mnXWrc8u9y1+GNx9yz889xMjIBTBI9KqaaOs=
 -----END RSA PRIVATE KEY-----"""
 
 
-def manhole(username, password, globals):
+def manhole(settings: ManholeConfig, globals: Dict[str, Any]) -> ServerFactory:
     """Starts a ssh listener with password authentication using
     the given username and password. Clients connecting to the ssh
     listener will find themselves in a colored python shell with
     the supplied globals.
 
     Args:
-        username(str): The username ssh clients should auth with.
-        password(str): The password ssh clients should auth with.
-        globals(dict): The variables to expose in the shell.
+        username: The username ssh clients should auth with.
+        password: The password ssh clients should auth with.
+        globals: The variables to expose in the shell.
 
     Returns:
-        twisted.internet.protocol.Factory: A factory to pass to ``listenTCP``
+        A factory to pass to ``listenTCP``
     """
-    if not isinstance(password, bytes):
-        password = password.encode("ascii")
+    username = settings.username
+    password = settings.password.encode("ascii")
+    priv_key = settings.priv_key
+    if priv_key is None:
+        priv_key = Key.fromString(PRIVATE_KEY)
+    pub_key = settings.pub_key
+    if pub_key is None:
+        pub_key = Key.fromString(PUBLIC_KEY)
 
     checker = checkers.InMemoryUsernamePasswordDatabaseDontUse(**{username: password})
 
     rlm = manhole_ssh.TerminalRealm()
-    rlm.chainedProtocolFactory = lambda: insults.ServerProtocol(
+    # mypy ignored here because:
+    # - can't deduce types of lambdas
+    # - variable is Type[ServerProtocol], expr is Callable[[], ServerProtocol]
+    rlm.chainedProtocolFactory = lambda: insults.ServerProtocol(  # type: ignore[misc,assignment]
         SynapseManhole, dict(globals, __name__="__console__")
     )
 
     factory = manhole_ssh.ConchFactory(portal.Portal(rlm, [checker]))
-    factory.publicKeys[b"ssh-rsa"] = Key.fromString(PUBLIC_KEY)
-    factory.privateKeys[b"ssh-rsa"] = Key.fromString(PRIVATE_KEY)
 
-    return factory
+    # conch has the wrong type on these dicts (says bytes to bytes,
+    # should be bytes to Keys judging by how it's used).
+    factory.privateKeys[b"ssh-rsa"] = priv_key  # type: ignore[assignment]
+    factory.publicKeys[b"ssh-rsa"] = pub_key  # type: ignore[assignment]
+
+    # ConchFactory is a Factory, not a ServerFactory, but they are identical.
+    return factory  # type: ignore[return-value]
 
 
 class SynapseManhole(ColoredManhole):
     """Overrides connectionMade to create our own ManholeInterpreter"""
 
-    def connectionMade(self):
+    def connectionMade(self) -> None:
         super().connectionMade()
 
         # replace the manhole interpreter with our own impl
@@ -103,13 +122,14 @@ class SynapseManhole(ColoredManhole):
 
 
 class SynapseManholeInterpreter(ManholeInterpreter):
-    def showsyntaxerror(self, filename=None):
+    def showsyntaxerror(self, filename: Optional[str] = None) -> None:
         """Display the syntax error that just occurred.
 
         Overrides the base implementation, ignoring sys.excepthook. We always want
         any syntax errors to be sent to the terminal, rather than sentry.
         """
         type, value, tb = sys.exc_info()
+        assert value is not None
         sys.last_type = type
         sys.last_value = value
         sys.last_traceback = tb
@@ -127,7 +147,7 @@ class SynapseManholeInterpreter(ManholeInterpreter):
         lines = traceback.format_exception_only(type, value)
         self.write("".join(lines))
 
-    def showtraceback(self):
+    def showtraceback(self) -> None:
         """Display the exception that just occurred.
 
         Overrides the base implementation, ignoring sys.excepthook. We always want
@@ -135,9 +155,29 @@ class SynapseManholeInterpreter(ManholeInterpreter):
         """
         sys.last_type, sys.last_value, last_tb = ei = sys.exc_info()
         sys.last_traceback = last_tb
+        assert last_tb is not None
+
         try:
             # We remove the first stack item because it is our own code.
             lines = traceback.format_exception(ei[0], ei[1], last_tb.tb_next)
             self.write("".join(lines))
         finally:
-            last_tb = ei = None
+            # On the line below, last_tb and ei appear to be dead.
+            # It's unclear whether there is a reason behind this line.
+            # It conceivably could be because an exception raised in this block
+            # will keep the local frame (containing these local variables) around.
+            # This was adapted taken from CPython's Lib/code.py; see here:
+            # https://github.com/python/cpython/blob/4dc4300c686f543d504ab6fa9fe600eaf11bb695/Lib/code.py#L131-L150
+            last_tb = ei = None  # type: ignore
+
+    def displayhook(self, obj: Any) -> None:
+        """
+        We override the displayhook so that we automatically convert coroutines
+        into Deferreds. (Our superclass' displayhook will take care of the rest,
+        by displaying the Deferred if it's ready, or registering a callback
+        if it's not).
+        """
+        if inspect.iscoroutine(obj):
+            super().displayhook(defer.ensureDeferred(obj))
+        else:
+            super().displayhook(obj)

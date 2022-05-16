@@ -58,3 +58,7 @@ textarea, input {
     background-color: #f8f8f8;
     border: 1px #ccc solid;
 }
+
+.error {
+	color: red;
+}

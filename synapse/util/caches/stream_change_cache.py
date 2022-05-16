@@ -40,15 +40,15 @@ class StreamChangeCache:
         self,
         name: str,
         current_stream_pos: int,
-        max_size=10000,
+        max_size: int = 10000,
         prefilled_cache: Optional[Mapping[EntityType, int]] = None,
-    ):
-        self._original_max_size = max_size
+    ) -> None:
+        self._original_max_size: int = max_size
         self._max_size = math.floor(max_size)
-        self._entity_to_key = {}  # type: Dict[EntityType, int]
+        self._entity_to_key: Dict[EntityType, int] = {}
 
         # map from stream id to the a set of entities which changed at that stream id.
-        self._cache = SortedDict()  # type: SortedDict[int, Set[EntityType]]
+        self._cache: SortedDict[int, Set[EntityType]] = SortedDict()
 
         # the earliest stream_pos for which we can reliably answer
         # get_all_entities_changed. In other words, one less than the earliest
@@ -155,7 +155,7 @@ class StreamChangeCache:
         if stream_pos < self._earliest_known_stream_pos:
             return None
 
-        changed_entities = []  # type: List[EntityType]
+        changed_entities: List[EntityType] = []
 
         for k in self._cache.islice(start=self._cache.bisect_right(stream_pos)):
             changed_entities.extend(self._cache[k])
@@ -195,7 +195,7 @@ class StreamChangeCache:
             for entity in r:
                 del self._entity_to_key[entity]
 
-    def _evict(self):
+    def _evict(self) -> None:
         while len(self._cache) > self._max_size:
             k, r = self._cache.popitem(0)
             self._earliest_known_stream_pos = max(k, self._earliest_known_stream_pos)

@@ -51,7 +51,7 @@ clients.
 
 Support for this feature can be enabled and configured in the
 `retention` section of the Synapse configuration file (see the
-[sample file](https://github.com/matrix-org/synapse/blob/v1.7.3/docs/sample_config.yaml#L332-L393)).
+[sample file](https://github.com/matrix-org/synapse/blob/v1.36.0/docs/sample_config.yaml#L451-L518)).
 
 To enable support for message retention policies, set the setting
 `enabled` in this section to `true`.
@@ -69,9 +69,9 @@ A default policy can be defined as such, in the `retention` section of
 the configuration file:
 
 ```yaml
-  default_policy:
-    min_lifetime: 1d
-    max_lifetime: 1y
+default_policy:
+  min_lifetime: 1d
+  max_lifetime: 1y
 ```
 
 Here, `min_lifetime` and `max_lifetime` have the same meaning and level
@@ -87,7 +87,7 @@ expired events from the database. They are only run if support for
 message retention policies is enabled in the server's configuration. If
 no configuration for purge jobs is configured by the server admin,
 Synapse will use a default configuration, which is described in the
-[sample configuration file](https://github.com/matrix-org/synapse/blob/master/docs/sample_config.yaml#L332-L393).
+[sample configuration file](https://github.com/matrix-org/synapse/blob/v1.36.0/docs/sample_config.yaml#L451-L518).
 
 Some server admins might want a finer control on when events are removed
 depending on an event's room's policy. This can be done by setting the
@@ -95,14 +95,14 @@ depending on an event's room's policy. This can be done by setting the
 file. An example of such configuration could be:
 
 ```yaml
-  purge_jobs:
-    - longest_max_lifetime: 3d
-      interval: 12h
-    - shortest_max_lifetime: 3d
-      longest_max_lifetime: 1w
-      interval: 1d
-    - shortest_max_lifetime: 1w
-      interval: 2d
+purge_jobs:
+  - longest_max_lifetime: 3d
+    interval: 12h
+  - shortest_max_lifetime: 3d
+    longest_max_lifetime: 1w
+    interval: 1d
+  - shortest_max_lifetime: 1w
+    interval: 2d
 ```
 
 In this example, we define three jobs:
@@ -141,8 +141,8 @@ purging old events in a room. These limits can be defined as such in the
 `retention` section of the configuration file:
 
 ```yaml
-  allowed_lifetime_min: 1d
-  allowed_lifetime_max: 1y
+allowed_lifetime_min: 1d
+allowed_lifetime_max: 1y
 ```
 
 The limits are considered when running purge jobs. If necessary, the

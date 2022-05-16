@@ -22,9 +22,9 @@ class UserIDTestCase(unittest.HomeserverTestCase):
     def test_parse(self):
         user = UserID.from_string("@1234abcd:test")
 
-        self.assertEquals("1234abcd", user.localpart)
-        self.assertEquals("test", user.domain)
-        self.assertEquals(True, self.hs.is_mine(user))
+        self.assertEqual("1234abcd", user.localpart)
+        self.assertEqual("test", user.domain)
+        self.assertEqual(True, self.hs.is_mine(user))
 
     def test_pase_empty(self):
         with self.assertRaises(SynapseError):
@@ -33,7 +33,7 @@ class UserIDTestCase(unittest.HomeserverTestCase):
     def test_build(self):
         user = UserID("5678efgh", "my.domain")
 
-        self.assertEquals(user.to_string(), "@5678efgh:my.domain")
+        self.assertEqual(user.to_string(), "@5678efgh:my.domain")
 
     def test_compare(self):
         userA = UserID.from_string("@userA:my.domain")
@@ -48,14 +48,14 @@ class RoomAliasTestCase(unittest.HomeserverTestCase):
     def test_parse(self):
         room = RoomAlias.from_string("#channel:test")
 
-        self.assertEquals("channel", room.localpart)
-        self.assertEquals("test", room.domain)
-        self.assertEquals(True, self.hs.is_mine(room))
+        self.assertEqual("channel", room.localpart)
+        self.assertEqual("test", room.domain)
+        self.assertEqual(True, self.hs.is_mine(room))
 
     def test_build(self):
         room = RoomAlias("channel", "my.domain")
 
-        self.assertEquals(room.to_string(), "#channel:my.domain")
+        self.assertEqual(room.to_string(), "#channel:my.domain")
 
     def test_validate(self):
         id_string = "#test:domain,test"
@@ -103,6 +103,4 @@ class MapUsernameTestCase(unittest.TestCase):
     def testNonAscii(self):
         # this should work with either a unicode or a bytes
         self.assertEqual(map_username_to_mxid_localpart("têst"), "t=c3=aast")
-        self.assertEqual(
-            map_username_to_mxid_localpart("têst".encode("utf-8")), "t=c3=aast"
-        )
+        self.assertEqual(map_username_to_mxid_localpart("têst".encode()), "t=c3=aast")

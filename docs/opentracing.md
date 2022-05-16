@@ -42,17 +42,17 @@ To receive OpenTracing spans, start up a Jaeger server. This can be done
 using docker like so:
 
 ```sh
-docker run -d --name jaeger
+docker run -d --name jaeger \
   -p 6831:6831/udp \
   -p 6832:6832/udp \
   -p 5778:5778 \
   -p 16686:16686 \
   -p 14268:14268 \
-  jaegertracing/all-in-one:1.13
+  jaegertracing/all-in-one:1
 ```
 
 Latest documentation is probably at
-<https://www.jaegertracing.io/docs/1.13/getting-started/>
+https://www.jaegertracing.io/docs/latest/getting-started.
 
 ## Enable OpenTracing in Synapse
 
@@ -62,7 +62,7 @@ as shown in the [sample config](./sample_config.yaml). For example:
 
 ```yaml
 opentracing:
-  tracer_enabled: true
+  enabled: true
   homeserver_whitelist:
     - "mytrustedhomeserver.org"
     - "*.myotherhomeservers.com"
@@ -90,4 +90,4 @@ to two problems, namely:
 ## Configuring Jaeger
 
 Sampling strategies can be set as in this document:
-<https://www.jaegertracing.io/docs/1.13/sampling/>
+<https://www.jaegertracing.io/docs/latest/sampling/>.

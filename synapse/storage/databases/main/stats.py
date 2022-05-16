@@ -16,19 +16,25 @@
 import logging
 from enum import Enum
 from itertools import chain
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
 
 from typing_extensions import Counter
 
 from twisted.internet.defer import DeferredLock
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.api.errors import StoreError
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
-from synapse.storage.engines import PostgresEngine
 from synapse.types import JsonDict
 from synapse.util.caches.descriptors import cached
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -41,19 +47,12 @@ ABSOLUTE_STATS_FIELDS = {
         "current_state_events",
         "joined_members",
         "invited_members",
+        "knocked_members",
         "left_members",
         "banned_members",
         "local_users_in_room",
     ),
     "user": ("joined_rooms",),
-}
-
-# these fields are per-timeslice and so should be reset to 0 upon a new slice
-# You can draw these stats on a histogram.
-# Example: number of events sent locally during a time slice
-PER_SLICE_FIELDS = {
-    "room": ("total_events", "total_event_bytes"),
-    "user": ("invites_sent", "rooms_created", "total_events", "total_event_bytes"),
 }
 
 TYPE_TO_TABLE = {"room": ("room_stats", "room_id"), "user": ("user_stats", "user_id")}
@@ -83,6 +82,7 @@ class UserSortOrder(Enum):
     USER_TYPE = ordered alphabetically by `user_type`
     AVATAR_URL = ordered alphabetically by `avatar_url`
     SHADOW_BANNED = ordered by `shadow_banned`
+    CREATION_TS = ordered by `creation_ts`
     """
 
     MEDIA_LENGTH = "media_length"
@@ -96,16 +96,21 @@ class UserSortOrder(Enum):
     USER_TYPE = "user_type"
     AVATAR_URL = "avatar_url"
     SHADOW_BANNED = "shadow_banned"
+    CREATION_TS = "creation_ts"
 
 
 class StatsStore(StateDeltasStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
-        self.server_name = hs.hostname
+        self.server_name: str = hs.hostname
         self.clock = self.hs.get_clock()
-        self.stats_enabled = hs.config.stats_enabled
-        self.stats_bucket_size = hs.config.stats_bucket_size
+        self.stats_enabled = hs.config.stats.stats_enabled
 
         self.stats_delta_processing_lock = DeferredLock()
 
@@ -121,23 +126,9 @@ class StatsStore(StateDeltasStore):
         self.db_pool.updates.register_noop_background_update("populate_stats_cleanup")
         self.db_pool.updates.register_noop_background_update("populate_stats_prepare")
 
-    def quantise_stats_time(self, ts):
-        """
-        Quantises a timestamp to be a multiple of the bucket size.
-
-        Args:
-            ts (int): the timestamp to quantise, in milliseconds since the Unix
-                Epoch
-
-        Returns:
-            int: a timestamp which
-              - is divisible by the bucket size;
-              - is no later than `ts`; and
-              - is the largest such timestamp.
-        """
-        return (ts // self.stats_bucket_size) * self.stats_bucket_size
-
-    async def _populate_stats_process_users(self, progress, batch_size):
+    async def _populate_stats_process_users(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
         """
         This is a background update which regenerates statistics for users.
         """
@@ -149,7 +140,7 @@ class StatsStore(StateDeltasStore):
 
         last_user_id = progress.get("last_user_id", "")
 
-        def _get_next_batch(txn):
+        def _get_next_batch(txn: LoggingTransaction) -> List[str]:
             sql = """
                     SELECT DISTINCT name FROM users
                     WHERE name > ?
@@ -183,7 +174,9 @@ class StatsStore(StateDeltasStore):
 
         return len(users_to_work_on)
 
-    async def _populate_stats_process_rooms(self, progress, batch_size):
+    async def _populate_stats_process_rooms(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
         """This is a background update which regenerates statistics for rooms."""
         if not self.stats_enabled:
             await self.db_pool.updates._end_background_update(
@@ -193,7 +186,7 @@ class StatsStore(StateDeltasStore):
 
         last_room_id = progress.get("last_room_id", "")
 
-        def _get_next_batch(txn):
+        def _get_next_batch(txn: LoggingTransaction) -> List[str]:
             sql = """
                     SELECT DISTINCT room_id FROM current_state_events
                     WHERE room_id > ?
@@ -287,56 +280,6 @@ class StatsStore(StateDeltasStore):
             desc="update_room_state",
         )
 
-    async def get_statistics_for_subject(
-        self, stats_type: str, stats_id: str, start: str, size: int = 100
-    ) -> List[dict]:
-        """
-        Get statistics for a given subject.
-
-        Args:
-            stats_type: The type of subject
-            stats_id: The ID of the subject (e.g. room_id or user_id)
-            start: Pagination start. Number of entries, not timestamp.
-            size: How many entries to return.
-
-        Returns:
-            A list of dicts, where the dict has the keys of
-            ABSOLUTE_STATS_FIELDS[stats_type],  and "bucket_size" and "end_ts".
-        """
-        return await self.db_pool.runInteraction(
-            "get_statistics_for_subject",
-            self._get_statistics_for_subject_txn,
-            stats_type,
-            stats_id,
-            start,
-            size,
-        )
-
-    def _get_statistics_for_subject_txn(
-        self, txn, stats_type, stats_id, start, size=100
-    ):
-        """
-        Transaction-bound version of L{get_statistics_for_subject}.
-        """
-
-        table, id_col = TYPE_TO_TABLE[stats_type]
-        selected_columns = list(
-            ABSOLUTE_STATS_FIELDS[stats_type] + PER_SLICE_FIELDS[stats_type]
-        )
-
-        slice_list = self.db_pool.simple_select_list_paginate_txn(
-            txn,
-            table + "_historical",
-            "end_ts",
-            start,
-            size,
-            retcols=selected_columns + ["bucket_size", "end_ts"],
-            keyvalues={id_col: stats_id},
-            order_direction="DESC",
-        )
-
-        return slice_list
-
     @cached()
     async def get_earliest_token_for_stats(
         self, stats_type: str, id: str
@@ -372,7 +315,7 @@ class StatsStore(StateDeltasStore):
             stream_id: Current position.
         """
 
-        def _bulk_update_stats_delta_txn(txn):
+        def _bulk_update_stats_delta_txn(txn: LoggingTransaction) -> None:
             for stats_type, stats_updates in updates.items():
                 for stats_id, fields in stats_updates.items():
                     logger.debug(
@@ -404,7 +347,7 @@ class StatsStore(StateDeltasStore):
         stats_type: str,
         stats_id: str,
         fields: Dict[str, int],
-        complete_with_stream_id: Optional[int],
+        complete_with_stream_id: int,
         absolute_field_overrides: Optional[Dict[str, int]] = None,
     ) -> None:
         """
@@ -437,27 +380,23 @@ class StatsStore(StateDeltasStore):
 
     def _update_stats_delta_txn(
         self,
-        txn,
-        ts,
-        stats_type,
-        stats_id,
-        fields,
-        complete_with_stream_id,
-        absolute_field_overrides=None,
-    ):
+        txn: LoggingTransaction,
+        ts: int,
+        stats_type: str,
+        stats_id: str,
+        fields: Dict[str, int],
+        complete_with_stream_id: int,
+        absolute_field_overrides: Optional[Dict[str, int]] = None,
+    ) -> None:
         if absolute_field_overrides is None:
             absolute_field_overrides = {}
 
         table, id_col = TYPE_TO_TABLE[stats_type]
 
-        quantised_ts = self.quantise_stats_time(int(ts))
-        end_ts = quantised_ts + self.stats_bucket_size
-
         # Lets be paranoid and check that all the given field names are known
         abs_field_names = ABSOLUTE_STATS_FIELDS[stats_type]
-        slice_field_names = PER_SLICE_FIELDS[stats_type]
         for field in chain(fields.keys(), absolute_field_overrides.keys()):
-            if field not in abs_field_names and field not in slice_field_names:
+            if field not in abs_field_names:
                 # guard against potential SQL injection dodginess
                 raise ValueError(
                     "%s is not a recognised field"
@@ -490,35 +429,24 @@ class StatsStore(StateDeltasStore):
             additive_relatives=deltas_of_absolute_fields,
         )
 
-        per_slice_additive_relatives = {
-            key: fields.get(key, 0) for key in slice_field_names
-        }
-        self._upsert_copy_from_table_with_additive_relatives_txn(
-            txn=txn,
-            into_table=table + "_historical",
-            keyvalues={id_col: stats_id},
-            extra_dst_insvalues={"bucket_size": self.stats_bucket_size},
-            extra_dst_keyvalues={"end_ts": end_ts},
-            additive_relatives=per_slice_additive_relatives,
-            src_table=table + "_current",
-            copy_columns=abs_field_names,
-        )
-
     def _upsert_with_additive_relatives_txn(
-        self, txn, table, keyvalues, absolutes, additive_relatives
-    ):
+        self,
+        txn: LoggingTransaction,
+        table: str,
+        keyvalues: Dict[str, Any],
+        absolutes: Dict[str, Any],
+        additive_relatives: Dict[str, int],
+    ) -> None:
         """Used to update values in the stats tables.
 
         This is basically a slightly convoluted upsert that *adds* to any
         existing rows.
 
         Args:
-            txn
-            table (str): Table name
-            keyvalues (dict[str, any]): Row-identifying key values
-            absolutes (dict[str, any]): Absolute (set) fields
-            additive_relatives (dict[str, int]): Fields that will be added onto
-                if existing row present.
+            table: Table name
+            keyvalues: Row-identifying key values
+            absolutes: Absolute (set) fields
+            additive_relatives: Fields that will be added onto if existing row present.
         """
         if self.database_engine.can_native_upsert:
             absolute_updates = [
@@ -527,7 +455,7 @@ class StatsStore(StateDeltasStore):
             ]
 
             relative_updates = [
-                "%(field)s = EXCLUDED.%(field)s + %(table)s.%(field)s"
+                "%(field)s = EXCLUDED.%(field)s + COALESCE(%(table)s.%(field)s, 0)"
                 % {"table": table, "field": field}
                 for field in additive_relatives.keys()
             ]
@@ -567,219 +495,24 @@ class StatsStore(StateDeltasStore):
                 self.db_pool.simple_insert_txn(txn, table, merged_dict)
             else:
                 for (key, val) in additive_relatives.items():
-                    current_row[key] += val
+                    if current_row[key] is None:
+                        current_row[key] = val
+                    else:
+                        current_row[key] += val
                 current_row.update(absolutes)
                 self.db_pool.simple_update_one_txn(txn, table, keyvalues, current_row)
 
-    def _upsert_copy_from_table_with_additive_relatives_txn(
-        self,
-        txn,
-        into_table,
-        keyvalues,
-        extra_dst_keyvalues,
-        extra_dst_insvalues,
-        additive_relatives,
-        src_table,
-        copy_columns,
-    ):
-        """Updates the historic stats table with latest updates.
-
-        This involves copying "absolute" fields from the `_current` table, and
-        adding relative fields to any existing values.
-
-        Args:
-             txn: Transaction
-             into_table (str): The destination table to UPSERT the row into
-             keyvalues (dict[str, any]): Row-identifying key values
-             extra_dst_keyvalues (dict[str, any]): Additional keyvalues
-                for `into_table`.
-             extra_dst_insvalues (dict[str, any]): Additional values to insert
-                on new row creation for `into_table`.
-             additive_relatives (dict[str, any]): Fields that will be added onto
-                if existing row present. (Must be disjoint from copy_columns.)
-             src_table (str): The source table to copy from
-             copy_columns (iterable[str]): The list of columns to copy
-        """
-        if self.database_engine.can_native_upsert:
-            ins_columns = chain(
-                keyvalues,
-                copy_columns,
-                additive_relatives,
-                extra_dst_keyvalues,
-                extra_dst_insvalues,
-            )
-            sel_exprs = chain(
-                keyvalues,
-                copy_columns,
-                (
-                    "?"
-                    for _ in chain(
-                        additive_relatives, extra_dst_keyvalues, extra_dst_insvalues
-                    )
-                ),
-            )
-            keyvalues_where = ("%s = ?" % f for f in keyvalues)
-
-            sets_cc = ("%s = EXCLUDED.%s" % (f, f) for f in copy_columns)
-            sets_ar = (
-                "%s = EXCLUDED.%s + %s.%s" % (f, f, into_table, f)
-                for f in additive_relatives
-            )
-
-            sql = """
-                INSERT INTO %(into_table)s (%(ins_columns)s)
-                SELECT %(sel_exprs)s
-                FROM %(src_table)s
-                WHERE %(keyvalues_where)s
-                ON CONFLICT (%(keyvalues)s)
-                DO UPDATE SET %(sets)s
-            """ % {
-                "into_table": into_table,
-                "ins_columns": ", ".join(ins_columns),
-                "sel_exprs": ", ".join(sel_exprs),
-                "keyvalues_where": " AND ".join(keyvalues_where),
-                "src_table": src_table,
-                "keyvalues": ", ".join(
-                    chain(keyvalues.keys(), extra_dst_keyvalues.keys())
-                ),
-                "sets": ", ".join(chain(sets_cc, sets_ar)),
-            }
-
-            qargs = list(
-                chain(
-                    additive_relatives.values(),
-                    extra_dst_keyvalues.values(),
-                    extra_dst_insvalues.values(),
-                    keyvalues.values(),
-                )
-            )
-            txn.execute(sql, qargs)
-        else:
-            self.database_engine.lock_table(txn, into_table)
-            src_row = self.db_pool.simple_select_one_txn(
-                txn, src_table, keyvalues, copy_columns
-            )
-            all_dest_keyvalues = {**keyvalues, **extra_dst_keyvalues}
-            dest_current_row = self.db_pool.simple_select_one_txn(
-                txn,
-                into_table,
-                keyvalues=all_dest_keyvalues,
-                retcols=list(chain(additive_relatives.keys(), copy_columns)),
-                allow_none=True,
-            )
-
-            if dest_current_row is None:
-                merged_dict = {
-                    **keyvalues,
-                    **extra_dst_keyvalues,
-                    **extra_dst_insvalues,
-                    **src_row,
-                    **additive_relatives,
-                }
-                self.db_pool.simple_insert_txn(txn, into_table, merged_dict)
-            else:
-                for (key, val) in additive_relatives.items():
-                    src_row[key] = dest_current_row[key] + val
-                self.db_pool.simple_update_txn(
-                    txn, into_table, all_dest_keyvalues, src_row
-                )
-
-    async def get_changes_room_total_events_and_bytes(
-        self, min_pos: int, max_pos: int
-    ) -> Tuple[Dict[str, Dict[str, int]], Dict[str, Dict[str, int]]]:
-        """Fetches the counts of events in the given range of stream IDs.
-
-        Args:
-            min_pos
-            max_pos
-
-        Returns:
-            Mapping of room ID to field changes.
-        """
-
-        return await self.db_pool.runInteraction(
-            "stats_incremental_total_events_and_bytes",
-            self.get_changes_room_total_events_and_bytes_txn,
-            min_pos,
-            max_pos,
-        )
-
-    def get_changes_room_total_events_and_bytes_txn(
-        self, txn, low_pos: int, high_pos: int
-    ) -> Tuple[Dict[str, Dict[str, int]], Dict[str, Dict[str, int]]]:
-        """Gets the total_events and total_event_bytes counts for rooms and
-        senders, in a range of stream_orderings (including backfilled events).
-
-        Args:
-            txn
-            low_pos: Low stream ordering
-            high_pos: High stream ordering
-
-        Returns:
-            The room and user deltas for total_events/total_event_bytes in the
-            format of `stats_id` -> fields
-        """
-
-        if low_pos >= high_pos:
-            # nothing to do here.
-            return {}, {}
-
-        if isinstance(self.database_engine, PostgresEngine):
-            new_bytes_expression = "OCTET_LENGTH(json)"
-        else:
-            new_bytes_expression = "LENGTH(CAST(json AS BLOB))"
-
-        sql = """
-            SELECT events.room_id, COUNT(*) AS new_events, SUM(%s) AS new_bytes
-            FROM events INNER JOIN event_json USING (event_id)
-            WHERE (? < stream_ordering AND stream_ordering <= ?)
-                OR (? <= stream_ordering AND stream_ordering <= ?)
-            GROUP BY events.room_id
-        """ % (
-            new_bytes_expression,
-        )
-
-        txn.execute(sql, (low_pos, high_pos, -high_pos, -low_pos))
-
-        room_deltas = {
-            room_id: {"total_events": new_events, "total_event_bytes": new_bytes}
-            for room_id, new_events, new_bytes in txn
-        }
-
-        sql = """
-            SELECT events.sender, COUNT(*) AS new_events, SUM(%s) AS new_bytes
-            FROM events INNER JOIN event_json USING (event_id)
-            WHERE (? < stream_ordering AND stream_ordering <= ?)
-                OR (? <= stream_ordering AND stream_ordering <= ?)
-            GROUP BY events.sender
-        """ % (
-            new_bytes_expression,
-        )
-
-        txn.execute(sql, (low_pos, high_pos, -high_pos, -low_pos))
-
-        user_deltas = {
-            user_id: {"total_events": new_events, "total_event_bytes": new_bytes}
-            for user_id, new_events, new_bytes in txn
-            if self.hs.is_mine_id(user_id)
-        }
-
-        return room_deltas, user_deltas
-
-    async def _calculate_and_set_initial_state_for_room(
-        self, room_id: str
-    ) -> Tuple[dict, dict, int]:
+    async def _calculate_and_set_initial_state_for_room(self, room_id: str) -> None:
         """Calculate and insert an entry into room_stats_current.
 
         Args:
             room_id: The room ID under calculation.
-
-        Returns:
-            A tuple of room state, membership counts and stream position.
         """
 
-        def _fetch_current_state_stats(txn):
-            pos = self.get_room_max_stream_ordering()
+        def _fetch_current_state_stats(
+            txn: LoggingTransaction,
+        ) -> Tuple[List[str], Dict[str, int], int, List[str], int]:
+            pos = self.get_room_max_stream_ordering()  # type: ignore[attr-defined]
 
             rows = self.db_pool.simple_select_many_txn(
                 txn,
@@ -799,7 +532,7 @@ class StatsStore(StateDeltasStore):
                 retcols=["event_id"],
             )
 
-            event_ids = [row["event_id"] for row in rows]
+            event_ids = cast(List[str], [row["event_id"] for row in rows])
 
             txn.execute(
                 """
@@ -813,15 +546,15 @@ class StatsStore(StateDeltasStore):
 
             txn.execute(
                 """
-                    SELECT COALESCE(count(*), 0) FROM current_state_events
+                    SELECT COUNT(*) FROM current_state_events
                     WHERE room_id = ?
                 """,
                 (room_id,),
             )
 
-            (current_state_events_count,) = txn.fetchone()
+            current_state_events_count = cast(Tuple[int], txn.fetchone())[0]
 
-            users_in_room = self.get_users_in_room_txn(txn, room_id)
+            users_in_room = self.get_users_in_room_txn(txn, room_id)  # type: ignore[attr-defined]
 
             return (
                 event_ids,
@@ -841,7 +574,7 @@ class StatsStore(StateDeltasStore):
             "get_initial_state_for_room", _fetch_current_state_stats
         )
 
-        state_event_map = await self.get_events(event_ids, get_prev_content=False)
+        state_event_map = await self.get_events(event_ids, get_prev_content=False)  # type: ignore[attr-defined]
 
         room_state = {
             "join_rules": None,
@@ -873,7 +606,7 @@ class StatsStore(StateDeltasStore):
                 room_state["canonical_alias"] = event.content.get("alias")
             elif event.type == EventTypes.Create:
                 room_state["is_federatable"] = (
-                    event.content.get("m.federate", True) is True
+                    event.content.get(EventContentFields.FEDERATE, True) is True
                 )
 
         await self.update_room_state(room_id, room_state)
@@ -892,12 +625,15 @@ class StatsStore(StateDeltasStore):
                 "invited_members": membership_counts.get(Membership.INVITE, 0),
                 "left_members": membership_counts.get(Membership.LEAVE, 0),
                 "banned_members": membership_counts.get(Membership.BAN, 0),
+                "knocked_members": membership_counts.get(Membership.KNOCK, 0),
                 "local_users_in_room": len(local_users_in_room),
             },
         )
 
-    async def _calculate_and_set_initial_state_for_user(self, user_id):
-        def _calculate_and_set_initial_state_for_user_txn(txn):
+    async def _calculate_and_set_initial_state_for_user(self, user_id: str) -> None:
+        def _calculate_and_set_initial_state_for_user_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[int, int]:
             pos = self._get_max_stream_id_in_current_state_deltas_txn(txn)
 
             txn.execute(
@@ -908,7 +644,7 @@ class StatsStore(StateDeltasStore):
                 """,
                 (user_id,),
             )
-            (count,) = txn.fetchone()
+            count = cast(Tuple[int], txn.fetchone())[0]
             return count, pos
 
         joined_rooms, pos = await self.db_pool.runInteraction(
@@ -931,10 +667,10 @@ class StatsStore(StateDeltasStore):
         limit: int,
         from_ts: Optional[int] = None,
         until_ts: Optional[int] = None,
-        order_by: Optional[UserSortOrder] = UserSortOrder.USER_ID.value,
+        order_by: Optional[str] = UserSortOrder.USER_ID.value,
         direction: Optional[str] = "f",
         search_term: Optional[str] = None,
-    ) -> Tuple[List[JsonDict], Dict[str, int]]:
+    ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users and their uploaded local media
         (size and number). This will return a json list of users and the
         total number of users matching the filter criteria.
@@ -952,9 +688,11 @@ class StatsStore(StateDeltasStore):
             users that exist given this query
         """
 
-        def get_users_media_usage_paginate_txn(txn):
+        def get_users_media_usage_paginate_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[List[JsonDict], int]:
             filters = []
-            args = [self.hs.config.server_name]
+            args = [self.hs.config.server.server_name]
 
             if search_term:
                 filters.append("(lmr.user_id LIKE ? OR displayname LIKE ?)")
@@ -1007,7 +745,7 @@ class StatsStore(StateDeltasStore):
                 sql_base=sql_base,
             )
             txn.execute(sql, args)
-            count = txn.fetchone()[0]
+            count = cast(Tuple[int], txn.fetchone())[0]
 
             sql = """
                 SELECT

@@ -68,4 +68,4 @@ Debian GNU/Linux distribution.
 
 ## SEE ALSO
 
-synapse_port_db(1), hash_password(1), register_new_matrix_user(1)
+synapse_port_db(1), hash_password(1), register_new_matrix_user(1), synapse_review_recent_signups(1)

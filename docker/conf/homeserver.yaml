@@ -7,12 +7,6 @@
 tls_certificate_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.crt"
 tls_private_key_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.key"
 
-{% if SYNAPSE_ACME %}
-acme:
-    enabled: true
-    port: 8009
-{% endif %}
-
 {% endif %}
 
 ## Server ##
@@ -154,14 +148,6 @@ bcrypt_rounds: 12
 allow_guest_access: {{ "True" if SYNAPSE_ALLOW_GUEST else "False" }}
 enable_group_creation: true
 
-# The list of identity servers trusted to verify third party
-# identifiers by this server.
-#
-# Also defines the ID server which will be called when an account is
-# deactivated (one will be picked arbitrarily).
-trusted_third_party_id_servers:
-    - matrix.org
-    - vector.im
 
 ## Metrics ###
 

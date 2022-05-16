@@ -15,7 +15,6 @@
 
 import heapq
 import logging
-from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -30,6 +29,7 @@ from typing import (
 import attr
 
 from synapse.replication.http.streams import ReplicationGetStreamUpdates
+from synapse.types import JsonDict
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -85,12 +85,12 @@ class Stream:
     time it was called.
     """
 
-    NAME = None  # type: str  # The name of the stream
+    NAME: str  # The name of the stream
     # The type of the row. Used by the default impl of parse_row.
-    ROW_TYPE = None  # type: Any
+    ROW_TYPE: Any = None
 
     @classmethod
-    def parse_row(cls, row: StreamRow):
+    def parse_row(cls, row: StreamRow) -> Any:
         """Parse a row received over replication
 
         By default, assumes that the row data is an array object and passes its contents
@@ -139,7 +139,7 @@ class Stream:
         # The token from which we last asked for updates
         self.last_token = self.current_token(self.local_instance_name)
 
-    def discard_updates_and_advance(self):
+    def discard_updates_and_advance(self) -> None:
         """Called when the stream should advance but the updates would be discarded,
         e.g. when there are no currently connected workers.
         """
@@ -200,7 +200,7 @@ def current_token_without_instance(
     return lambda instance_name: current_token()
 
 
-def make_http_update_function(hs, stream_name: str) -> UpdateFunction:
+def make_http_update_function(hs: "HomeServer", stream_name: str) -> UpdateFunction:
     """Makes a suitable function for use as an `update_function` that queries
     the master process for updates.
     """
@@ -226,23 +226,20 @@ class BackfillStream(Stream):
     or it went from being an outlier to not.
     """
 
-    BackfillStreamRow = namedtuple(
-        "BackfillStreamRow",
-        (
-            "event_id",  # str
-            "room_id",  # str
-            "type",  # str
-            "state_key",  # str, optional
-            "redacts",  # str, optional
-            "relates_to",  # str, optional
-        ),
-    )
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
+    class BackfillStreamRow:
+        event_id: str
+        room_id: str
+        type: str
+        state_key: Optional[str]
+        redacts: Optional[str]
+        relates_to: Optional[str]
 
     NAME = "backfill"
     ROW_TYPE = BackfillStreamRow
 
-    def __init__(self, hs):
-        self.store = hs.get_datastore()
+    def __init__(self, hs: "HomeServer"):
+        self.store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             self._current_token,
@@ -256,24 +253,21 @@ class BackfillStream(Stream):
 
 
 class PresenceStream(Stream):
-    PresenceStreamRow = namedtuple(
-        "PresenceStreamRow",
-        (
-            "user_id",  # str
-            "state",  # str
-            "last_active_ts",  # int
-            "last_federation_update_ts",  # int
-            "last_user_sync_ts",  # int
-            "status_msg",  # str
-            "currently_active",  # bool
-        ),
-    )
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
+    class PresenceStreamRow:
+        user_id: str
+        state: str
+        last_active_ts: int
+        last_federation_update_ts: int
+        last_user_sync_ts: int
+        status_msg: str
+        currently_active: bool
 
     NAME = "presence"
     ROW_TYPE = PresenceStreamRow
 
     def __init__(self, hs: "HomeServer"):
-        store = hs.get_datastore()
+        store = hs.get_datastores().main
 
         if hs.get_instance_name() in hs.config.worker.writers.presence:
             # on the presence writer, query the presence handler
@@ -283,9 +277,7 @@ class PresenceStream(Stream):
 
             assert isinstance(presence_handler, PresenceHandler)
 
-            update_function = (
-                presence_handler.get_all_presence_updates
-            )  # type: UpdateFunction
+            update_function: UpdateFunction = presence_handler.get_all_presence_updates
         else:
             # Query presence writer process
             update_function = make_http_update_function(hs, self.NAME)
@@ -304,7 +296,7 @@ class PresenceFederationStream(Stream):
     send.
     """
 
-    @attr.s(slots=True, auto_attribs=True)
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
     class PresenceFederationStreamRow:
         destination: str
         user_id: str
@@ -322,21 +314,33 @@ class PresenceFederationStream(Stream):
 
 
 class TypingStream(Stream):
-    TypingStreamRow = namedtuple(
-        "TypingStreamRow", ("room_id", "user_ids")  # str  # list(str)
-    )
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
+    class TypingStreamRow:
+        """
+        An entry in the typing stream.
+        Describes all the users that are 'typing' right now in one room.
+
+        When a user stops typing, it will be streamed as a new update with that
+        user absent; you can think of the `user_ids` list as overwriting the
+        entire list that was there previously.
+        """
+
+        # The room that this update is for.
+        room_id: str
+
+        # All the users that are 'typing' right now in the specified room.
+        user_ids: List[str]
 
     NAME = "typing"
     ROW_TYPE = TypingStreamRow
 
     def __init__(self, hs: "HomeServer"):
-        writer_instance = hs.config.worker.writers.typing
-        if writer_instance == hs.get_instance_name():
+        if hs.get_instance_name() in hs.config.worker.writers.typing:
             # On the writer, query the typing handler
             typing_writer_handler = hs.get_typing_writer_handler()
-            update_function = (
-                typing_writer_handler.get_all_typing_updates
-            )  # type: Callable[[str, int, int, int], Awaitable[Tuple[List[Tuple[int, Any]], int, bool]]]
+            update_function: Callable[
+                [str, int, int, int], Awaitable[Tuple[List[Tuple[int, Any]], int, bool]]
+            ] = typing_writer_handler.get_all_typing_updates
             current_token_function = typing_writer_handler.get_current_token
         else:
             # Query the typing writer process
@@ -351,22 +355,19 @@ class TypingStream(Stream):
 
 
 class ReceiptsStream(Stream):
-    ReceiptsStreamRow = namedtuple(
-        "ReceiptsStreamRow",
-        (
-            "room_id",  # str
-            "receipt_type",  # str
-            "user_id",  # str
-            "event_id",  # str
-            "data",  # dict
-        ),
-    )
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
+    class ReceiptsStreamRow:
+        room_id: str
+        receipt_type: str
+        user_id: str
+        event_id: str
+        data: dict
 
     NAME = "receipts"
     ROW_TYPE = ReceiptsStreamRow
 
-    def __init__(self, hs):
-        store = hs.get_datastore()
+    def __init__(self, hs: "HomeServer"):
+        store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             current_token_without_instance(store.get_max_receipt_stream_id),
@@ -377,13 +378,15 @@ class ReceiptsStream(Stream):
 class PushRulesStream(Stream):
     """A user has changed their push rules"""
 
-    PushRulesStreamRow = namedtuple("PushRulesStreamRow", ("user_id",))  # str
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
+    class PushRulesStreamRow:
+        user_id: str
 
     NAME = "push_rules"
     ROW_TYPE = PushRulesStreamRow
 
-    def __init__(self, hs):
-        self.store = hs.get_datastore()
+    def __init__(self, hs: "HomeServer"):
+        self.store = hs.get_datastores().main
 
         super().__init__(
             hs.get_instance_name(),
@@ -399,16 +402,18 @@ class PushRulesStream(Stream):
 class PushersStream(Stream):
     """A user has added/changed/removed a pusher"""
 
-    PushersStreamRow = namedtuple(
-        "PushersStreamRow",
-        ("user_id", "app_id", "pushkey", "deleted"),  # str  # str  # str  # bool
-    )
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
+    class PushersStreamRow:
+        user_id: str
+        app_id: str
+        pushkey: str
+        deleted: bool
 
     NAME = "pushers"
     ROW_TYPE = PushersStreamRow
 
-    def __init__(self, hs):
-        store = hs.get_datastore()
+    def __init__(self, hs: "HomeServer"):
+        store = hs.get_datastores().main
 
         super().__init__(
             hs.get_instance_name(),
@@ -422,7 +427,7 @@ class CachesStream(Stream):
     the cache on the workers
     """
 
-    @attr.s(slots=True)
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
     class CachesStreamRow:
         """Stream to inform workers they should invalidate their cache.
 
@@ -433,44 +438,19 @@ class CachesStream(Stream):
             invalidation_ts: Timestamp of when the invalidation took place.
         """
 
-        cache_func = attr.ib(type=str)
-        keys = attr.ib(type=Optional[List[Any]])
-        invalidation_ts = attr.ib(type=int)
+        cache_func: str
+        keys: Optional[List[Any]]
+        invalidation_ts: int
 
     NAME = "caches"
     ROW_TYPE = CachesStreamRow
 
-    def __init__(self, hs):
-        store = hs.get_datastore()
+    def __init__(self, hs: "HomeServer"):
+        store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             store.get_cache_stream_token_for_writer,
             store.get_all_updated_caches,
-        )
-
-
-class PublicRoomsStream(Stream):
-    """The public rooms list changed"""
-
-    PublicRoomsStreamRow = namedtuple(
-        "PublicRoomsStreamRow",
-        (
-            "room_id",  # str
-            "visibility",  # str
-            "appservice_id",  # str, optional
-            "network_id",  # str, optional
-        ),
-    )
-
-    NAME = "public_rooms"
-    ROW_TYPE = PublicRoomsStreamRow
-
-    def __init__(self, hs):
-        store = hs.get_datastore()
-        super().__init__(
-            hs.get_instance_name(),
-            current_token_without_instance(store.get_current_public_room_stream_id),
-            store.get_all_new_public_rooms,
         )
 
 
@@ -479,15 +459,15 @@ class DeviceListsStream(Stream):
     told about a device update.
     """
 
-    @attr.s(slots=True)
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
     class DeviceListsStreamRow:
-        entity = attr.ib(type=str)
+        entity: str
 
     NAME = "device_lists"
     ROW_TYPE = DeviceListsStreamRow
 
-    def __init__(self, hs):
-        store = hs.get_datastore()
+    def __init__(self, hs: "HomeServer"):
+        store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             current_token_without_instance(store.get_device_stream_token),
@@ -498,13 +478,15 @@ class DeviceListsStream(Stream):
 class ToDeviceStream(Stream):
     """New to_device messages for a client"""
 
-    ToDeviceStreamRow = namedtuple("ToDeviceStreamRow", ("entity",))  # str
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
+    class ToDeviceStreamRow:
+        entity: str
 
     NAME = "to_device"
     ROW_TYPE = ToDeviceStreamRow
 
-    def __init__(self, hs):
-        store = hs.get_datastore()
+    def __init__(self, hs: "HomeServer"):
+        store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             current_token_without_instance(store.get_to_device_stream_token),
@@ -515,15 +497,17 @@ class ToDeviceStream(Stream):
 class TagAccountDataStream(Stream):
     """Someone added/removed a tag for a room"""
 
-    TagAccountDataStreamRow = namedtuple(
-        "TagAccountDataStreamRow", ("user_id", "room_id", "data")  # str  # str  # dict
-    )
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
+    class TagAccountDataStreamRow:
+        user_id: str
+        room_id: str
+        data: JsonDict
 
     NAME = "tag_account_data"
     ROW_TYPE = TagAccountDataStreamRow
 
-    def __init__(self, hs):
-        store = hs.get_datastore()
+    def __init__(self, hs: "HomeServer"):
+        store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             current_token_without_instance(store.get_max_account_data_stream_id),
@@ -534,16 +518,17 @@ class TagAccountDataStream(Stream):
 class AccountDataStream(Stream):
     """Global or per room account data was changed"""
 
-    AccountDataStreamRow = namedtuple(
-        "AccountDataStreamRow",
-        ("user_id", "room_id", "data_type"),  # str  # Optional[str]  # str
-    )
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
+    class AccountDataStreamRow:
+        user_id: str
+        room_id: Optional[str]
+        data_type: str
 
     NAME = "account_data"
     ROW_TYPE = AccountDataStreamRow
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             current_token_without_instance(self.store.get_max_account_data_stream_id),
@@ -601,16 +586,18 @@ class AccountDataStream(Stream):
 
 
 class GroupServerStream(Stream):
-    GroupsStreamRow = namedtuple(
-        "GroupsStreamRow",
-        ("group_id", "user_id", "type", "content"),  # str  # str  # str  # dict
-    )
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
+    class GroupsStreamRow:
+        group_id: str
+        user_id: str
+        type: str
+        content: JsonDict
 
     NAME = "groups"
     ROW_TYPE = GroupsStreamRow
 
-    def __init__(self, hs):
-        store = hs.get_datastore()
+    def __init__(self, hs: "HomeServer"):
+        store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             current_token_without_instance(store.get_group_stream_token),
@@ -621,13 +608,15 @@ class GroupServerStream(Stream):
 class UserSignatureStream(Stream):
     """A user has signed their own device with their user-signing key"""
 
-    UserSignatureStreamRow = namedtuple("UserSignatureStreamRow", ("user_id"))  # str
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
+    class UserSignatureStreamRow:
+        user_id: str
 
     NAME = "user_signature"
     ROW_TYPE = UserSignatureStreamRow
 
-    def __init__(self, hs):
-        store = hs.get_datastore()
+    def __init__(self, hs: "HomeServer"):
+        store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             current_token_without_instance(store.get_device_stream_token),

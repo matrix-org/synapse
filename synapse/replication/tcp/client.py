@@ -14,12 +14,14 @@
 """A replication client for use by synapse workers.
 """
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
 
 from twisted.internet.defer import Deferred
+from twisted.internet.interfaces import IAddress, IConnector
 from twisted.internet.protocol import ReconnectingClientFactory
+from twisted.python.failure import Failure
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, ReceiptTypes
 from synapse.federation import send_queue
 from synapse.federation.sender import FederationSender
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
@@ -73,16 +75,16 @@ class DirectTcpReplicationClientFactory(ReconnectingClientFactory):
     ):
         self.client_name = client_name
         self.command_handler = command_handler
-        self.server_name = hs.config.server_name
+        self.server_name = hs.config.server.server_name
         self.hs = hs
         self._clock = hs.get_clock()  # As self.clock is defined in super class
 
         hs.get_reactor().addSystemEventTrigger("before", "shutdown", self.stopTrying)
 
-    def startedConnecting(self, connector):
+    def startedConnecting(self, connector: IConnector) -> None:
         logger.info("Connecting to replication: %r", connector.getDestination())
 
-    def buildProtocol(self, addr):
+    def buildProtocol(self, addr: IAddress) -> ClientReplicationStreamProtocol:
         logger.info("Connected to replication: %r", addr)
         return ClientReplicationStreamProtocol(
             self.hs,
@@ -92,11 +94,11 @@ class DirectTcpReplicationClientFactory(ReconnectingClientFactory):
             self.command_handler,
         )
 
-    def clientConnectionLost(self, connector, reason):
+    def clientConnectionLost(self, connector: IConnector, reason: Failure) -> None:
         logger.error("Lost replication conn: %r", reason)
         ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
 
-    def clientConnectionFailed(self, connector, reason):
+    def clientConnectionFailed(self, connector: IConnector, reason: Failure) -> None:
         logger.error("Failed to connect to replication: %r", reason)
         ReconnectingClientFactory.clientConnectionFailed(self, connector, reason)
 
@@ -109,7 +111,7 @@ class ReplicationDataHandler:
     """
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.notifier = hs.get_notifier()
         self._reactor = hs.get_reactor()
         self._clock = hs.get_clock()
@@ -117,21 +119,21 @@ class ReplicationDataHandler:
         self._instance_name = hs.get_instance_name()
         self._typing_handler = hs.get_typing_handler()
 
-        self._notify_pushers = hs.config.start_pushers
+        self._notify_pushers = hs.config.worker.start_pushers
         self._pusher_pool = hs.get_pusherpool()
         self._presence_handler = hs.get_presence_handler()
 
-        self.send_handler = None  # type: Optional[FederationSenderHandler]
+        self.send_handler: Optional[FederationSenderHandler] = None
         if hs.should_send_federation():
             self.send_handler = FederationSenderHandler(hs)
 
         # Map from stream to list of deferreds waiting for the stream to
         # arrive at a particular position. The lists are sorted by stream position.
-        self._streams_to_waiters = {}  # type: Dict[str, List[Tuple[int, Deferred]]]
+        self._streams_to_waiters: Dict[str, List[Tuple[int, Deferred]]] = {}
 
     async def on_rdata(
         self, stream_name: str, instance_name: str, token: int, rows: list
-    ):
+    ) -> None:
         """Called to handle a batch of replication data with a given stream token.
 
         By default this just pokes the slave store. Can be overridden in subclasses to
@@ -173,7 +175,7 @@ class ReplicationDataHandler:
             if entities:
                 self.notifier.on_new_event("to_device_key", token, users=entities)
         elif stream_name == DeviceListsStream.NAME:
-            all_room_ids = set()  # type: Set[str]
+            all_room_ids: Set[str] = set()
             for row in rows:
                 if row.entity.startswith("@"):
                     room_ids = await self.store.get_rooms_for_user(row.entity)
@@ -201,17 +203,18 @@ class ReplicationDataHandler:
                 if row.data.rejected:
                     continue
 
-                extra_users = ()  # type: Tuple[UserID, ...]
+                extra_users: Tuple[UserID, ...] = ()
                 if row.data.type == EventTypes.Member and row.data.state_key:
                     extra_users = (UserID.from_string(row.data.state_key),)
 
                 max_token = self.store.get_room_max_token()
                 event_pos = PersistedEventPosition(instance_name, token)
-                self.notifier.on_new_room_event_args(
+                await self.notifier.on_new_room_event_args(
                     event_pos=event_pos,
                     max_room_stream_token=max_token,
                     extra_users=extra_users,
                     room_id=row.data.room_id,
+                    event_id=row.data.event_id,
                     event_type=row.data.type,
                     state_key=row.data.state_key,
                     membership=row.data.membership,
@@ -251,14 +254,16 @@ class ReplicationDataHandler:
         # loop. (This maintains the order so no need to resort)
         waiting_list[:] = waiting_list[index_of_first_deferred_not_called:]
 
-    async def on_position(self, stream_name: str, instance_name: str, token: int):
+    async def on_position(
+        self, stream_name: str, instance_name: str, token: int
+    ) -> None:
         await self.on_rdata(stream_name, instance_name, token, [])
 
         # We poke the generic "replication" notifier to wake anything up that
         # may be streaming.
         self.notifier.notify_replication()
 
-    def on_remote_server_up(self, server: str):
+    def on_remote_server_up(self, server: str) -> None:
         """Called when get a new REMOTE_SERVER_UP command."""
 
         # Let's wake up the transaction queue for the server in case we have
@@ -268,7 +273,7 @@ class ReplicationDataHandler:
 
     async def wait_for_stream_position(
         self, instance_name: str, stream_name: str, position: int
-    ):
+    ) -> None:
         """Wait until this instance has received updates up to and including
         the given stream position.
         """
@@ -285,7 +290,7 @@ class ReplicationDataHandler:
 
         # Create a new deferred that times out after N seconds, as we don't want
         # to wedge here forever.
-        deferred = Deferred()
+        deferred: "Deferred[None]" = Deferred()
         deferred = timeout_deferred(
             deferred, _WAIT_FOR_REPLICATION_TIMEOUT_SECONDS, self._reactor
         )
@@ -303,7 +308,7 @@ class ReplicationDataHandler:
                 "Finished waiting for repl stream %r to reach %s", stream_name, position
             )
 
-    def stop_pusher(self, user_id, app_id, pushkey):
+    def stop_pusher(self, user_id: str, app_id: str, pushkey: str) -> None:
         if not self._notify_pushers:
             return
 
@@ -315,13 +320,13 @@ class ReplicationDataHandler:
         logger.info("Stopping pusher %r / %r", user_id, key)
         pusher.on_stop()
 
-    async def start_pusher(self, user_id, app_id, pushkey):
+    async def start_pusher(self, user_id: str, app_id: str, pushkey: str) -> None:
         if not self._notify_pushers:
             return
 
         key = "%s:%s" % (app_id, pushkey)
         logger.info("Starting pusher %r / %r", user_id, key)
-        return await self._pusher_pool.start_pusher_by_id(app_id, pushkey, user_id)
+        await self._pusher_pool.start_pusher_by_id(app_id, pushkey, user_id)
 
 
 class FederationSenderHandler:
@@ -335,7 +340,7 @@ class FederationSenderHandler:
     def __init__(self, hs: "HomeServer"):
         assert hs.should_send_federation()
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self._is_mine_id = hs.is_mine_id
         self._hs = hs
 
@@ -348,14 +353,16 @@ class FederationSenderHandler:
 
         # Stores the latest position in the federation stream we've gotten up
         # to. This is always set before we use it.
-        self.federation_position = None  # type: Optional[int]
+        self.federation_position: Optional[int] = None
 
         self._fed_position_linearizer = Linearizer(name="_fed_position_linearizer")
 
-    def wake_destination(self, server: str):
+    def wake_destination(self, server: str) -> None:
         self.federation_sender.wake_destination(server)
 
-    async def process_replication_rows(self, stream_name, token, rows):
+    async def process_replication_rows(
+        self, stream_name: str, token: int, rows: list
+    ) -> None:
         # The federation stream contains things that we want to send out, e.g.
         # presence, typing, etc.
         if stream_name == "federation":
@@ -373,7 +380,7 @@ class FederationSenderHandler:
             # changes.
             hosts = {row.entity for row in rows if not row.entity.startswith("@")}
             for host in hosts:
-                self.federation_sender.send_device_messages(host)
+                self.federation_sender.send_device_messages(host, immediate=False)
 
         elif stream_name == ToDeviceStream.NAME:
             # The to_device stream includes stuff to be pushed to both local
@@ -383,15 +390,19 @@ class FederationSenderHandler:
             for host in hosts:
                 self.federation_sender.send_device_messages(host)
 
-    async def _on_new_receipts(self, rows):
+    async def _on_new_receipts(
+        self, rows: Iterable[ReceiptsStream.ReceiptsStreamRow]
+    ) -> None:
         """
         Args:
-            rows (Iterable[synapse.replication.tcp.streams.ReceiptsStream.ReceiptsStreamRow]):
-                new receipts to be processed
+            rows: new receipts to be processed
         """
         for receipt in rows:
             # we only want to send on receipts for our own users
             if not self._is_mine_id(receipt.user_id):
+                continue
+            # Private read receipts never get sent over federation.
+            if receipt.receipt_type == ReceiptTypes.READ_PRIVATE:
                 continue
             receipt_info = ReadReceipt(
                 receipt.room_id,
@@ -402,7 +413,7 @@ class FederationSenderHandler:
             )
             await self.federation_sender.send_read_receipt(receipt_info)
 
-    async def update_token(self, token):
+    async def update_token(self, token: int) -> None:
         """Update the record of where we have processed to in the federation stream.
 
         Called after we have processed a an update received over replication. Sends
@@ -422,7 +433,7 @@ class FederationSenderHandler:
 
         run_as_background_process("_save_and_send_ack", self._save_and_send_ack)
 
-    async def _save_and_send_ack(self):
+    async def _save_and_send_ack(self) -> None:
         """Save the current federation position in the database and send an ACK
         to master with where we're up to.
         """
@@ -438,7 +449,7 @@ class FederationSenderHandler:
             # service for robustness? Or could we replace it with an assertion that
             # we're not being re-entered?
 
-            with (await self._fed_position_linearizer.queue(None)):
+            async with self._fed_position_linearizer.queue(None):
                 # We persist and ack the same position, so we take a copy of it
                 # here as otherwise it can get modified from underneath us.
                 current_position = self.federation_position
@@ -449,6 +460,8 @@ class FederationSenderHandler:
 
                 # We ACK this token over replication so that the master can drop
                 # its in memory queues
-                self._hs.get_tcp_replication().send_federation_ack(current_position)
+                self._hs.get_replication_command_handler().send_federation_ack(
+                    current_position
+                )
         except Exception:
             logger.exception("Error updating federation stream position")

@@ -1,0 +1,39 @@
+# Documentation for possible options in this file is at
+# https://rust-lang.github.io/mdBook/format/config.html
+[book]
+title = "Synapse"
+authors = ["The Matrix.org Foundation C.I.C."]
+language = "en"
+multilingual = false
+
+# The directory that documentation files are stored in
+src = "docs"
+
+[build]
+# Prevent markdown pages from being automatically generated when they're
+# linked to in SUMMARY.md
+create-missing = false
+
+[output.html]
+# The URL visitors will be directed to when they try to edit a page
+edit-url-template = "https://github.com/matrix-org/synapse/edit/develop/{path}"
+
+# Remove the numbers that appear before each item in the sidebar, as they can
+# get quite messy as we nest deeper
+no-section-label = true
+
+# The source code URL of the repository
+git-repository-url = "https://github.com/matrix-org/synapse"
+
+# The path that the docs are hosted on
+site-url = "/synapse/"
+
+# Additional HTML, JS, CSS that's injected into each page of the book.
+# More information available in docs/website_files/README.md
+additional-css = [
+    "docs/website_files/table-of-contents.css",
+    "docs/website_files/remove-nav-buttons.css",
+    "docs/website_files/indent-section-headers.css",
+]
+additional-js = ["docs/website_files/table-of-contents.js"]
+theme = "docs/website_files/theme"

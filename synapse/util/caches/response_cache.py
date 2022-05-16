@@ -12,21 +12,81 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Any, Callable, Dict, Generic, Optional, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Generic,
+    Iterable,
+    Optional,
+    TypeVar,
+)
+
+import attr
 
 from twisted.internet import defer
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.logging.opentracing import (
+    active_span,
+    start_active_span,
+    start_active_span_follows_from,
+)
 from synapse.util import Clock
-from synapse.util.async_helpers import ObservableDeferred
+from synapse.util.async_helpers import AbstractObservableDeferred, ObservableDeferred
 from synapse.util.caches import register_cache
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T")
+if TYPE_CHECKING:
+    import opentracing
+
+# the type of the key in the cache
+KV = TypeVar("KV")
+
+# the type of the result from the operation
+RV = TypeVar("RV")
 
 
-class ResponseCache(Generic[T]):
+@attr.s(auto_attribs=True)
+class ResponseCacheContext(Generic[KV]):
+    """Information about a missed ResponseCache hit
+
+    This object can be passed into the callback for additional feedback
+    """
+
+    cache_key: KV
+    """The cache key that caused the cache miss
+
+    This should be considered read-only.
+
+    TODO: in attrs 20.1, make it frozen with an on_setattr.
+    """
+
+    should_cache: bool = True
+    """Whether the result should be cached once the request completes.
+
+    This can be modified by the callback if it decides its result should not be cached.
+    """
+
+
+@attr.s(auto_attribs=True)
+class ResponseCacheEntry:
+    result: AbstractObservableDeferred
+    """The (possibly incomplete) result of the operation.
+
+    Note that we continue to store an ObservableDeferred even after the operation
+    completes (rather than switching to an immediate value), since that makes it
+    easier to cache Failure results.
+    """
+
+    opentracing_span_context: "Optional[opentracing.SpanContext]"
+    """The opentracing span which generated/is generating the result"""
+
+
+class ResponseCache(Generic[KV]):
     """
     This caches a deferred response. Until the deferred completes it will be
     returned from the cache. This means that if the client retries the request
@@ -35,8 +95,7 @@ class ResponseCache(Generic[T]):
     """
 
     def __init__(self, clock: Clock, name: str, timeout_ms: float = 0):
-        # Requests that haven't finished yet.
-        self.pending_result_cache = {}  # type: Dict[T, ObservableDeferred]
+        self._result_cache: Dict[KV, ResponseCacheEntry] = {}
 
         self.clock = clock
         self.timeout_sec = timeout_ms / 1000.0
@@ -45,73 +104,91 @@ class ResponseCache(Generic[T]):
         self._metrics = register_cache("response_cache", name, self, resizable=False)
 
     def size(self) -> int:
-        return len(self.pending_result_cache)
+        return len(self._result_cache)
 
     def __len__(self) -> int:
         return self.size()
 
-    def get(self, key: T) -> Optional[defer.Deferred]:
+    def keys(self) -> Iterable[KV]:
+        """Get the keys currently in the result cache
+
+        Returns both incomplete entries, and (if the timeout on this cache is non-zero),
+        complete entries which are still in the cache.
+
+        Note that the returned iterator is not safe in the face of concurrent execution:
+        behaviour is undefined if `wrap` is called during iteration.
+        """
+        return self._result_cache.keys()
+
+    def _get(self, key: KV) -> Optional[ResponseCacheEntry]:
         """Look up the given key.
 
-        Can return either a new Deferred (which also doesn't follow the synapse
-        logcontext rules), or, if the request has completed, the actual
-        result. You will probably want to make_deferred_yieldable the result.
-
-        If there is no entry for the key, returns None. It is worth noting that
-        this means there is no way to distinguish a completed result of None
-        from an absent cache entry.
-
         Args:
-            key: key to get/set in the cache
+            key: key to get in the cache
 
         Returns:
-            None if there is no entry for this key; otherwise a deferred which
-            resolves to the result.
+            The entry for this key, if any; else None.
         """
-        result = self.pending_result_cache.get(key)
-        if result is not None:
+        entry = self._result_cache.get(key)
+        if entry is not None:
             self._metrics.inc_hits()
-            return result.observe()
+            return entry
         else:
             self._metrics.inc_misses()
             return None
 
-    def set(self, key: T, deferred: defer.Deferred) -> defer.Deferred:
+    def _set(
+        self,
+        context: ResponseCacheContext[KV],
+        deferred: "defer.Deferred[RV]",
+        opentracing_span_context: "Optional[opentracing.SpanContext]",
+    ) -> ResponseCacheEntry:
         """Set the entry for the given key to the given deferred.
 
         *deferred* should run its callbacks in the sentinel logcontext (ie,
         you should wrap normal synapse deferreds with
         synapse.logging.context.run_in_background).
 
-        Can return either a new Deferred (which also doesn't follow the synapse
-        logcontext rules), or, if *deferred* was already complete, the actual
-        result. You will probably want to make_deferred_yieldable the result.
-
         Args:
-            key: key to get/set in the cache
+            context: Information about the cache miss
             deferred: The deferred which resolves to the result.
+            opentracing_span_context: An opentracing span wrapping the calculation
 
         Returns:
-            A new deferred which resolves to the actual result.
+            The cache entry object.
         """
         result = ObservableDeferred(deferred, consumeErrors=True)
-        self.pending_result_cache[key] = result
+        key = context.cache_key
+        entry = ResponseCacheEntry(result, opentracing_span_context)
+        self._result_cache[key] = entry
 
-        def remove(r):
-            if self.timeout_sec:
+        def on_complete(r: RV) -> RV:
+            # if this cache has a non-zero timeout, and the callback has not cleared
+            # the should_cache bit, we leave it in the cache for now and schedule
+            # its removal later.
+            if self.timeout_sec and context.should_cache:
                 self.clock.call_later(
-                    self.timeout_sec, self.pending_result_cache.pop, key, None
+                    self.timeout_sec, self._result_cache.pop, key, None
                 )
             else:
-                self.pending_result_cache.pop(key, None)
+                # otherwise, remove the result immediately.
+                self._result_cache.pop(key, None)
             return r
 
-        result.addBoth(remove)
-        return result.observe()
+        # make sure we do this *after* adding the entry to result_cache,
+        # in case the result is already complete (in which case flipping the order would
+        # leave us with a stuck entry in the cache).
+        result.addBoth(on_complete)
+        return entry
 
-    def wrap(
-        self, key: T, callback: Callable[..., Any], *args: Any, **kwargs: Any
-    ) -> defer.Deferred:
+    async def wrap(
+        self,
+        key: KV,
+        callback: Callable[..., Awaitable[RV]],
+        *args: Any,
+        cache_context: bool = False,
+        **kwargs: Any,
+    ) -> RV:
         """Wrap together a *get* and *set* call, taking care of logcontexts
 
         First looks up the key in the cache, and if it is present makes it
@@ -140,22 +217,49 @@ class ResponseCache(Generic[T]):
 
             *args: positional parameters to pass to the callback, if it is used
 
+            cache_context: if set, the callback will be given a `cache_context` kw arg,
+                which will be a ResponseCacheContext object.
+
             **kwargs: named parameters to pass to the callback, if it is used
 
         Returns:
-            Deferred which resolves to the result
+            The result of the callback (from the cache, or otherwise)
         """
-        result = self.get(key)
-        if not result:
+        entry = self._get(key)
+        if not entry:
             logger.debug(
                 "[%s]: no cached result for [%s], calculating new one", self._name, key
             )
-            d = run_in_background(callback, *args, **kwargs)
-            result = self.set(key, d)
-        elif not isinstance(result, defer.Deferred) or result.called:
+            context = ResponseCacheContext(cache_key=key)
+            if cache_context:
+                kwargs["cache_context"] = context
+
+            span_context: Optional[opentracing.SpanContext] = None
+
+            async def cb() -> RV:
+                # NB it is important that we do not `await` before setting span_context!
+                nonlocal span_context
+                with start_active_span(f"ResponseCache[{self._name}].calculate"):
+                    span = active_span()
+                    if span:
+                        span_context = span.context
+                    return await callback(*args, **kwargs)
+
+            d = run_in_background(cb)
+            entry = self._set(context, d, span_context)
+            return await make_deferred_yieldable(entry.result.observe())
+
+        result = entry.result.observe()
+        if result.called:
             logger.info("[%s]: using completed cached result for [%s]", self._name, key)
         else:
             logger.info(
                 "[%s]: using incomplete cached result for [%s]", self._name, key
             )
-        return make_deferred_yieldable(result)
+
+        span_context = entry.opentracing_span_context
+        with start_active_span_follows_from(
+            f"ResponseCache[{self._name}].wait",
+            contexts=(span_context,) if span_context else (),
+        ):
+            return await make_deferred_yieldable(result)

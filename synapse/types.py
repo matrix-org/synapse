@@ -15,14 +15,18 @@
 import abc
 import re
 import string
-from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
     Any,
+    ClassVar,
     Dict,
+    List,
     Mapping,
+    Match,
     MutableMapping,
+    NoReturn,
     Optional,
+    Set,
     Tuple,
     Type,
     TypeVar,
@@ -30,14 +34,20 @@ from typing import (
 )
 
 import attr
+from frozendict import frozendict
 from signedjson.key import decode_verify_key_bytes
+from signedjson.types import VerifyKey
+from typing_extensions import TypedDict
 from unpaddedbase64 import decode_base64
 from zope.interface import Interface
 
+from twisted.internet.defer import CancelledError
 from twisted.internet.interfaces import (
     IReactorCore,
     IReactorPluggableNameResolver,
+    IReactorSSL,
     IReactorTCP,
+    IReactorThreads,
     IReactorTime,
 )
 
@@ -46,7 +56,8 @@ from synapse.util.stringutils import parse_and_validate_server_name
 
 if TYPE_CHECKING:
     from synapse.appservice.api import ApplicationService
-    from synapse.storage.databases.main import DataStore
+    from synapse.storage.databases.main import DataStore, PurgeEventsStore
+    from synapse.storage.databases.main.appservice import ApplicationServiceWorkerStore
 
 # Define a state map type from type/state_key to T (usually an event ID or
 # event)
@@ -55,20 +66,32 @@ StateKey = Tuple[str, str]
 StateMap = Mapping[StateKey, T]
 MutableStateMap = MutableMapping[StateKey, T]
 
-# the type of a JSON-serialisable dict. This could be made stronger, but it will
-# do for now.
+# JSON types. These could be made stronger, but will do for now.
+# A JSON-serialisable dict.
 JsonDict = Dict[str, Any]
+# A JSON-serialisable mapping; roughly speaking an immutable JSONDict.
+# Useful when you have a TypedDict which isn't going to be mutated and you don't want
+# to cast to JsonDict everywhere.
+JsonMapping = Mapping[str, Any]
+# A JSON-serialisable object.
+JsonSerializable = object
 
 
 # Note that this seems to require inheriting *directly* from Interface in order
 # for mypy-zope to realize it is an interface.
 class ISynapseReactor(
-    IReactorTCP, IReactorPluggableNameResolver, IReactorTime, IReactorCore, Interface
+    IReactorTCP,
+    IReactorSSL,
+    IReactorPluggableNameResolver,
+    IReactorTime,
+    IReactorCore,
+    IReactorThreads,
+    Interface,
 ):
     """The interfaces necessary for Synapse to function."""
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class Requester:
     """
     Represents the user making a request
@@ -86,15 +109,15 @@ class Requester:
             "puppeting" the user.
     """
 
-    user = attr.ib(type="UserID")
-    access_token_id = attr.ib(type=Optional[int])
-    is_guest = attr.ib(type=bool)
-    shadow_banned = attr.ib(type=bool)
-    device_id = attr.ib(type=Optional[str])
-    app_service = attr.ib(type=Optional["ApplicationService"])
-    authenticated_entity = attr.ib(type=str)
+    user: "UserID"
+    access_token_id: Optional[int]
+    is_guest: bool
+    shadow_banned: bool
+    device_id: Optional[str]
+    app_service: Optional["ApplicationService"]
+    authenticated_entity: str
 
-    def serialize(self):
+    def serialize(self) -> Dict[str, Any]:
         """Converts self to a type that can be serialized as JSON, and then
         deserialized by `deserialize`
 
@@ -112,7 +135,9 @@ class Requester:
         }
 
     @staticmethod
-    def deserialize(store, input):
+    def deserialize(
+        store: "ApplicationServiceWorkerStore", input: Dict[str, Any]
+    ) -> "Requester":
         """Converts a dict that was produced by `serialize` back into a
         Requester.
 
@@ -182,14 +207,14 @@ def create_requester(
     )
 
 
-def get_domain_from_id(string):
+def get_domain_from_id(string: str) -> str:
     idx = string.find(":")
     if idx == -1:
         raise SynapseError(400, "Invalid ID: %r" % (string,))
     return string[idx + 1 :]
 
 
-def get_localpart_from_id(string):
+def get_localpart_from_id(string: str) -> str:
     idx = string.find(":")
     if idx == -1:
         raise SynapseError(400, "Invalid ID: %r" % (string,))
@@ -199,7 +224,7 @@ def get_localpart_from_id(string):
 DS = TypeVar("DS", bound="DomainSpecificString")
 
 
-@attr.s(slots=True, frozen=True, repr=False)
+@attr.s(slots=True, frozen=True, repr=False, auto_attribs=True)
 class DomainSpecificString(metaclass=abc.ABCMeta):
     """Common base class among ID/name strings that have a local part and a
     domain name, prefixed with a sigil.
@@ -210,17 +235,16 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
         'domain' : The domain part of the name
     """
 
-    SIGIL = abc.abstractproperty()  # type: str  # type: ignore
+    SIGIL: ClassVar[str] = abc.abstractproperty()  # type: ignore
 
-    localpart = attr.ib(type=str)
-    domain = attr.ib(type=str)
+    localpart: str
+    domain: str
 
-    # Because this class is a namedtuple of strings and booleans, it is deeply
-    # immutable.
-    def __copy__(self):
+    # Because this is a frozen class, it is deeply immutable.
+    def __copy__(self: DS) -> DS:
         return self
 
-    def __deepcopy__(self, memo):
+    def __deepcopy__(self: DS, memo: Dict[str, object]) -> DS:
         return self
 
     @classmethod
@@ -284,14 +308,14 @@ class RoomAlias(DomainSpecificString):
 
 @attr.s(slots=True, frozen=True, repr=False)
 class RoomID(DomainSpecificString):
-    """Structure representing a room id. """
+    """Structure representing a room id."""
 
     SIGIL = "!"
 
 
 @attr.s(slots=True, frozen=True, repr=False)
 class EventID(DomainSpecificString):
-    """Structure representing an event id. """
+    """Structure representing an event id."""
 
     SIGIL = "$"
 
@@ -304,7 +328,7 @@ class GroupID(DomainSpecificString):
 
     @classmethod
     def from_string(cls: Type[DS], s: str) -> DS:
-        group_id = super().from_string(s)  # type: DS # type: ignore
+        group_id: DS = super().from_string(s)  # type: ignore
 
         if not group_id.localpart:
             raise SynapseError(400, "Group ID cannot be empty", Codes.INVALID_PARAM)
@@ -370,7 +394,7 @@ def map_username_to_mxid_localpart(
             onto different mxids
 
     Returns:
-        unicode: string suitable for a mxid localpart
+        string suitable for a mxid localpart
     """
     if not isinstance(username, bytes):
         username = username.encode("utf-8")
@@ -378,54 +402,70 @@ def map_username_to_mxid_localpart(
     # first we sort out upper-case characters
     if case_sensitive:
 
-        def f1(m):
+        def f1(m: Match[bytes]) -> bytes:
             return b"_" + m.group().lower()
 
         username = UPPER_CASE_PATTERN.sub(f1, username)
     else:
         username = username.lower()
 
-    # then we sort out non-ascii characters
-    def f2(m):
-        g = m.group()[0]
-        if isinstance(g, str):
-            # on python 2, we need to do a ord(). On python 3, the
-            # byte itself will do.
-            g = ord(g)
-        return b"=%02x" % (g,)
+    # then we sort out non-ascii characters by converting to the hex equivalent.
+    def f2(m: Match[bytes]) -> bytes:
+        return b"=%02x" % (m.group()[0],)
 
     username = NON_MXID_CHARACTER_PATTERN.sub(f2, username)
 
     # we also do the =-escaping to mxids starting with an underscore.
     username = re.sub(b"^_", b"=5f", username)
 
-    # we should now only have ascii bytes left, so can decode back to a
-    # unicode.
+    # we should now only have ascii bytes left, so can decode back to a string.
     return username.decode("ascii")
 
 
-@attr.s(frozen=True, slots=True, cmp=False)
+@attr.s(frozen=True, slots=True, order=False)
 class RoomStreamToken:
     """Tokens are positions between events. The token "s1" comes after event 1.
 
             s0    s1
             |     |
-        [0] V [1] V [2]
+        [0] ▼ [1] ▼ [2]
 
     Tokens can either be a point in the live event stream or a cursor going
     through historic events.
 
-    When traversing the live event stream events are ordered by when they
-    arrived at the homeserver.
+    When traversing the live event stream, events are ordered by
+    `stream_ordering` (when they arrived at the homeserver).
 
-    When traversing historic events the events are ordered by their depth in
-    the event graph "topological_ordering" and then by when they arrived at the
-    homeserver "stream_ordering".
+    When traversing historic events, events are first ordered by their `depth`
+    (`topological_ordering` in the event graph) and tie-broken by
+    `stream_ordering` (when the event arrived at the homeserver).
 
-    Live tokens start with an "s" followed by the "stream_ordering" id of the
-    event it comes after. Historic tokens start with a "t" followed by the
-    "topological_ordering" id of the event it comes after, followed by "-",
-    followed by the "stream_ordering" id of the event it comes after.
+    If you're looking for more info about what a token with all of the
+    underscores means, ex.
+    `s2633508_17_338_6732159_1082514_541479_274711_265584_1`, see the docstring
+    for `StreamToken` below.
+
+    ---
+
+    Live tokens start with an "s" followed by the `stream_ordering` of the event
+    that comes before the position of the token. Said another way:
+    `stream_ordering` uniquely identifies a persisted event. The live token
+    means "the position just after the event identified by `stream_ordering`".
+    An example token is:
+
+        s2633508
+
+    ---
+
+    Historic tokens start with a "t" followed by the `depth`
+    (`topological_ordering` in the event graph) of the event that comes before
+    the position of the token, followed by "-", followed by the
+    `stream_ordering` of the event that comes before the position of the token.
+    An example token is:
+
+        t426-2633508
+
+    ---
 
     There is also a third mode for live tokens where the token starts with "m",
     which is sometimes used when using sharded event persisters. In this case
@@ -451,25 +491,28 @@ class RoomStreamToken:
 
     Note: The `RoomStreamToken` cannot have both a topological part and an
     instance map.
+
+    ---
+
+    For caching purposes, `RoomStreamToken`s and by extension, all their
+    attributes, must be hashable.
     """
 
-    topological = attr.ib(
-        type=Optional[int],
+    topological: Optional[int] = attr.ib(
         validator=attr.validators.optional(attr.validators.instance_of(int)),
     )
-    stream = attr.ib(type=int, validator=attr.validators.instance_of(int))
+    stream: int = attr.ib(validator=attr.validators.instance_of(int))
 
-    instance_map = attr.ib(
-        type=Dict[str, int],
-        factory=dict,
+    instance_map: "frozendict[str, int]" = attr.ib(
+        factory=frozendict,
         validator=attr.validators.deep_mapping(
             key_validator=attr.validators.instance_of(str),
             value_validator=attr.validators.instance_of(int),
-            mapping_validator=attr.validators.instance_of(dict),
+            mapping_validator=attr.validators.instance_of(frozendict),
         ),
     )
 
-    def __attrs_post_init__(self):
+    def __attrs_post_init__(self) -> None:
         """Validates that both `topological` and `instance_map` aren't set."""
 
         if self.instance_map and self.topological:
@@ -478,7 +521,7 @@ class RoomStreamToken:
             )
 
     @classmethod
-    async def parse(cls, store: "DataStore", string: str) -> "RoomStreamToken":
+    async def parse(cls, store: "PurgeEventsStore", string: str) -> "RoomStreamToken":
         try:
             if string[0] == "s":
                 return cls(topological=None, stream=int(string[1:]))
@@ -495,17 +538,19 @@ class RoomStreamToken:
                     instance_id = int(key)
                     pos = int(value)
 
-                    instance_name = await store.get_name_from_instance_id(instance_id)
+                    instance_name = await store.get_name_from_instance_id(instance_id)  # type: ignore[attr-defined]
                     instance_map[instance_name] = pos
 
                 return cls(
                     topological=None,
                     stream=stream,
-                    instance_map=instance_map,
+                    instance_map=frozendict(instance_map),
                 )
+        except CancelledError:
+            raise
         except Exception:
             pass
-        raise SynapseError(400, "Invalid token %r" % (string,))
+        raise SynapseError(400, "Invalid room stream token %r" % (string,))
 
     @classmethod
     def parse_stream_token(cls, string: str) -> "RoomStreamToken":
@@ -514,7 +559,7 @@ class RoomStreamToken:
                 return cls(topological=None, stream=int(string[1:]))
         except Exception:
             pass
-        raise SynapseError(400, "Invalid token %r" % (string,))
+        raise SynapseError(400, "Invalid room stream token %r" % (string,))
 
     def copy_and_advance(self, other: "RoomStreamToken") -> "RoomStreamToken":
         """Return a new token such that if an event is after both this token and
@@ -534,7 +579,7 @@ class RoomStreamToken:
             for instance in set(self.instance_map).union(other.instance_map)
         }
 
-        return RoomStreamToken(None, max_stream, instance_map)
+        return RoomStreamToken(None, max_stream, frozendict(instance_map))
 
     def as_historical_tuple(self) -> Tuple[int, int]:
         """Returns a tuple of `(topological, stream)` for historical tokens.
@@ -546,7 +591,7 @@ class RoomStreamToken:
                 "Cannot call `RoomStreamToken.as_historical_tuple` on live token"
             )
 
-        return (self.topological, self.stream)
+        return self.topological, self.stream
 
     def get_stream_pos_for_instance(self, instance_name: str) -> int:
         """Get the stream position that the given writer was at at this token.
@@ -577,30 +622,86 @@ class RoomStreamToken:
             entries = []
             for name, pos in self.instance_map.items():
                 instance_id = await store.get_id_for_instance(name)
-                entries.append("{}.{}".format(instance_id, pos))
+                entries.append(f"{instance_id}.{pos}")
 
             encoded_map = "~".join(entries)
-            return "m{}~{}".format(self.stream, encoded_map)
+            return f"m{self.stream}~{encoded_map}"
         else:
             return "s%d" % (self.stream,)
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class StreamToken:
-    room_key = attr.ib(
-        type=RoomStreamToken, validator=attr.validators.instance_of(RoomStreamToken)
+    """A collection of keys joined together by underscores in the following
+    order and which represent the position in their respective streams.
+
+    ex. `s2633508_17_338_6732159_1082514_541479_274711_265584_1`
+        1. `room_key`: `s2633508` which is a `RoomStreamToken`
+           - `RoomStreamToken`'s can also look like `t426-2633508` or `m56~2.58~3.59`
+           - See the docstring for `RoomStreamToken` for more details.
+        2. `presence_key`: `17`
+        3. `typing_key`: `338`
+        4. `receipt_key`: `6732159`
+        5. `account_data_key`: `1082514`
+        6. `push_rules_key`: `541479`
+        7. `to_device_key`: `274711`
+        8. `device_list_key`: `265584`
+        9. `groups_key`: `1`
+
+    You can see how many of these keys correspond to the various
+    fields in a "/sync" response:
+    ```json
+    {
+        "next_batch": "s12_4_0_1_1_1_1_4_1",
+        "presence": {
+            "events": []
+        },
+        "device_lists": {
+            "changed": []
+        },
+        "rooms": {
+            "join": {
+                "!QrZlfIDQLNLdZHqTnt:hs1": {
+                    "timeline": {
+                        "events": [],
+                        "prev_batch": "s10_4_0_1_1_1_1_4_1",
+                        "limited": false
+                    },
+                    "state": {
+                        "events": []
+                    },
+                    "account_data": {
+                        "events": []
+                    },
+                    "ephemeral": {
+                        "events": []
+                    }
+                }
+            }
+        }
+    }
+    ```
+
+    ---
+
+    For caching purposes, `StreamToken`s and by extension, all their attributes,
+    must be hashable.
+    """
+
+    room_key: RoomStreamToken = attr.ib(
+        validator=attr.validators.instance_of(RoomStreamToken)
     )
-    presence_key = attr.ib(type=int)
-    typing_key = attr.ib(type=int)
-    receipt_key = attr.ib(type=int)
-    account_data_key = attr.ib(type=int)
-    push_rules_key = attr.ib(type=int)
-    to_device_key = attr.ib(type=int)
-    device_list_key = attr.ib(type=int)
-    groups_key = attr.ib(type=int)
+    presence_key: int
+    typing_key: int
+    receipt_key: int
+    account_data_key: int
+    push_rules_key: int
+    to_device_key: int
+    device_list_key: int
+    groups_key: int
 
     _SEPARATOR = "_"
-    START = None  # type: StreamToken
+    START: ClassVar["StreamToken"]
 
     @classmethod
     async def from_string(cls, store: "DataStore", string: str) -> "StreamToken":
@@ -612,8 +713,10 @@ class StreamToken:
             return cls(
                 await RoomStreamToken.parse(store, keys[0]), *(int(k) for k in keys[1:])
             )
+        except CancelledError:
+            raise
         except Exception:
-            raise SynapseError(400, "Invalid Token")
+            raise SynapseError(400, "Invalid stream token")
 
     async def to_string(self, store: "DataStore") -> str:
         return self._SEPARATOR.join(
@@ -631,12 +734,14 @@ class StreamToken:
         )
 
     @property
-    def room_stream_id(self):
+    def room_stream_id(self) -> int:
         return self.room_key.stream
 
-    def copy_and_advance(self, key, new_value) -> "StreamToken":
+    def copy_and_advance(self, key: str, new_value: Any) -> "StreamToken":
         """Advance the given key in the token to a new value if and only if the
         new value is after the old value.
+
+        :raises TypeError: if `key` is not the one of the keys tracked by a StreamToken.
         """
         if key == "room_key":
             new_token = self.copy_and_replace(
@@ -653,14 +758,14 @@ class StreamToken:
         else:
             return self
 
-    def copy_and_replace(self, key, new_value) -> "StreamToken":
+    def copy_and_replace(self, key: str, new_value: Any) -> "StreamToken":
         return attr.evolve(self, **{key: new_value})
 
 
 StreamToken.START = StreamToken(RoomStreamToken(None, 0), 0, 0, 0, 0, 0, 0, 0, 0)
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class PersistedEventPosition:
     """Position of a newly persisted event with instance that persisted it.
 
@@ -668,8 +773,8 @@ class PersistedEventPosition:
     RoomStreamToken.
     """
 
-    instance_name = attr.ib(type=str)
-    stream = attr.ib(type=int)
+    instance_name: str
+    stream: int
 
     def persisted_after(self, token: RoomStreamToken) -> bool:
         return token.get_stream_pos_for_instance(self.instance_name) < self.stream
@@ -687,67 +792,127 @@ class PersistedEventPosition:
         return RoomStreamToken(None, self.stream)
 
 
-class ThirdPartyInstanceID(
-    namedtuple("ThirdPartyInstanceID", ("appservice_id", "network_id"))
-):
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class ThirdPartyInstanceID:
+    appservice_id: Optional[str]
+    network_id: Optional[str]
+
     # Deny iteration because it will bite you if you try to create a singleton
     # set by:
     #    users = set(user)
-    def __iter__(self):
+    def __iter__(self) -> NoReturn:
         raise ValueError("Attempted to iterate a %s" % (type(self).__name__,))
 
-    # Because this class is a namedtuple of strings, it is deeply immutable.
-    def __copy__(self):
+    # Because this class is a frozen class, it is deeply immutable.
+    def __copy__(self) -> "ThirdPartyInstanceID":
         return self
 
-    def __deepcopy__(self, memo):
+    def __deepcopy__(self, memo: Dict[str, object]) -> "ThirdPartyInstanceID":
         return self
 
     @classmethod
-    def from_string(cls, s):
+    def from_string(cls, s: str) -> "ThirdPartyInstanceID":
         bits = s.split("|", 2)
         if len(bits) != 2:
             raise SynapseError(400, "Invalid ID %r" % (s,))
 
         return cls(appservice_id=bits[0], network_id=bits[1])
 
-    def to_string(self):
+    def to_string(self) -> str:
         return "%s|%s" % (self.appservice_id, self.network_id)
 
     __str__ = to_string
 
-    @classmethod
-    def create(cls, appservice_id, network_id):
-        return cls(appservice_id=appservice_id, network_id=network_id)
 
-
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class ReadReceipt:
     """Information about a read-receipt"""
 
-    room_id = attr.ib()
-    receipt_type = attr.ib()
-    user_id = attr.ib()
-    event_ids = attr.ib()
-    data = attr.ib()
+    room_id: str
+    receipt_type: str
+    user_id: str
+    event_ids: List[str]
+    data: JsonDict
 
 
-def get_verify_key_from_cross_signing_key(key_info):
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class DeviceListUpdates:
+    """
+    An object containing a diff of information regarding other users' device lists, intended for
+    a recipient to carry out device list tracking.
+
+    Attributes:
+        changed: A set of users whose device lists have changed recently.
+        left: A set of users who the recipient no longer needs to track the device lists of.
+            Typically when those users no longer share any end-to-end encryption enabled rooms.
+    """
+
+    # We need to use a factory here, otherwise `set` is not evaluated at
+    # object instantiation, but instead at class definition instantiation.
+    # The latter happening only once, thus always giving you the same sets
+    # across multiple DeviceListUpdates instances.
+    # Also see: don't define mutable default arguments.
+    changed: Set[str] = attr.ib(factory=set)
+    left: Set[str] = attr.ib(factory=set)
+
+    def __bool__(self) -> bool:
+        return bool(self.changed or self.left)
+
+
+def get_verify_key_from_cross_signing_key(
+    key_info: Mapping[str, Any]
+) -> Tuple[str, VerifyKey]:
     """Get the key ID and signedjson verify key from a cross-signing key dict
 
     Args:
-        key_info (dict): a cross-signing key dict, which must have a "keys"
+        key_info: a cross-signing key dict, which must have a "keys"
             property that has exactly one item in it
 
     Returns:
-        (str, VerifyKey): the key ID and verify key for the cross-signing key
+        the key ID and verify key for the cross-signing key
     """
-    # make sure that exactly one key is provided
+    # make sure that a `keys` field is provided
     if "keys" not in key_info:
         raise ValueError("Invalid key")
     keys = key_info["keys"]
-    if len(keys) != 1:
+    # and that it contains exactly one key
+    if len(keys) == 1:
+        key_id, key_data = next(iter(keys.items()))
+        return key_id, decode_verify_key_bytes(key_id, decode_base64(key_data))
+    else:
         raise ValueError("Invalid key")
-    # and return that one key
-    for key_id, key_data in keys.items():
-        return (key_id, decode_verify_key_bytes(key_id, decode_base64(key_data)))
+
+
+@attr.s(auto_attribs=True, frozen=True, slots=True)
+class UserInfo:
+    """Holds information about a user. Result of get_userinfo_by_id.
+
+    Attributes:
+        user_id:  ID of the user.
+        appservice_id:  Application service ID that created this user.
+        consent_server_notice_sent:  Version of policy documents the user has been sent.
+        consent_version:  Version of policy documents the user has consented to.
+        creation_ts:  Creation timestamp of the user.
+        is_admin:  True if the user is an admin.
+        is_deactivated:  True if the user has been deactivated.
+        is_guest:  True if the user is a guest user.
+        is_shadow_banned:  True if the user has been shadow-banned.
+        user_type:  User type (None for normal user, 'support' and 'bot' other options).
+    """
+
+    user_id: UserID
+    appservice_id: Optional[int]
+    consent_server_notice_sent: Optional[str]
+    consent_version: Optional[str]
+    user_type: Optional[str]
+    creation_ts: int
+    is_admin: bool
+    is_deactivated: bool
+    is_guest: bool
+    is_shadow_banned: bool
+
+
+class UserProfile(TypedDict):
+    user_id: str
+    display_name: Optional[str]
+    avatar_url: Optional[str]

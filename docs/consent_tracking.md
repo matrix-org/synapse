@@ -24,8 +24,8 @@ To enable this, first create templates for the policy and success pages.
 These should be stored on the local filesystem.
 
 These templates use the [Jinja2](http://jinja.pocoo.org) templating language,
-and [docs/privacy_policy_templates](privacy_policy_templates) gives
-examples of the sort of thing that can be done.
+and [docs/privacy_policy_templates](https://github.com/matrix-org/synapse/tree/develop/docs/privacy_policy_templates/)
+gives examples of the sort of thing that can be done.
 
 Note that the templates must be stored under a name giving the language of the
 template - currently this must always be `en` (for "English");
@@ -99,7 +99,7 @@ construct URIs where users can give their consent.
    see if an unauthenticated user is viewing the page. This is typically
    wrapped around the form that would be used to actually agree to the document:
 
-   ```
+   ```html
    {% if not public_version %}
      <!-- The variables used here are only provided when the 'u' param is given to the homeserver -->
      <form method="post" action="consent">
@@ -152,7 +152,7 @@ version of the policy. To do so:
 
  * ensure that the consent resource is configured, as in the previous section
 
- * ensure that server notices are configured, as in [server_notices.md](server_notices.md).
+ * ensure that server notices are configured, as in [the server notice documentation](server_notices.md).
 
  * Add `server_notice_content` under `user_consent` in `homeserver.yaml`. For
    example:

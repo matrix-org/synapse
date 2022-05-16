@@ -13,11 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import itertools
-import random
 import re
+import secrets
 import string
-from collections.abc import Iterable
-from typing import Optional, Tuple
+from typing import Iterable, Optional, Tuple
+
+from netaddr import valid_ipv6
 
 from synapse.api.errors import Codes, SynapseError
 
@@ -35,26 +36,27 @@ CLIENT_SECRET_REGEX = re.compile(r"^[0-9a-zA-Z\.=_\-]+$")
 #
 MXC_REGEX = re.compile("^mxc://([^/]+)/([^/#?]+)$")
 
-# random_string and random_string_with_symbols are used for a range of things,
-# some cryptographically important, some less so. We use SystemRandom to make sure
-# we get cryptographically-secure randoms.
-rand = random.SystemRandom()
-
 
 def random_string(length: int) -> str:
-    return "".join(rand.choice(string.ascii_letters) for _ in range(length))
+    """Generate a cryptographically secure string of random letters.
+
+    Drawn from the characters: `a-z` and `A-Z`
+    """
+    return "".join(secrets.choice(string.ascii_letters) for _ in range(length))
 
 
 def random_string_with_symbols(length: int) -> str:
-    return "".join(rand.choice(_string_with_symbols) for _ in range(length))
+    """Generate a cryptographically secure string of random letters/numbers/symbols.
+
+    Drawn from the characters: `a-z`, `A-Z`, `0-9`, and `.,;:^&*-_+=#~@`
+    """
+    return "".join(secrets.choice(_string_with_symbols) for _ in range(length))
 
 
 def is_ascii(s: bytes) -> bool:
     try:
         s.decode("ascii").encode("ascii")
-    except UnicodeDecodeError:
-        return False
-    except UnicodeEncodeError:
+    except UnicodeError:
         return False
     return True
 
@@ -96,7 +98,10 @@ def parse_server_name(server_name: str) -> Tuple[str, Optional[int]]:
         raise ValueError("Invalid server name '%s'" % server_name)
 
 
-VALID_HOST_REGEX = re.compile("\\A[0-9a-zA-Z.-]+\\Z")
+# An approximation of the domain name syntax in RFC 1035, section 2.3.1.
+# NB: "\Z" is not equivalent to "$".
+#     The latter will match the position before a "\n" at the end of a string.
+VALID_HOST_REGEX = re.compile("\\A[0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*\\Z")
 
 
 def parse_and_validate_server_name(server_name: str) -> Tuple[str, Optional[int]]:
@@ -121,13 +126,15 @@ def parse_and_validate_server_name(server_name: str) -> Tuple[str, Optional[int]
     if host[0] == "[":
         if host[-1] != "]":
             raise ValueError("Mismatched [...] in server name '%s'" % (server_name,))
-        return host, port
 
-    # otherwise it should only be alphanumerics.
-    if not VALID_HOST_REGEX.match(host):
-        raise ValueError(
-            "Server name '%s' contains invalid characters" % (server_name,)
-        )
+        # valid_ipv6 raises when given an empty string
+        ipv6_address = host[1:-1]
+        if not ipv6_address or not valid_ipv6(ipv6_address):
+            raise ValueError(
+                "Server name '%s' is not a valid IPv6 address" % (server_name,)
+            )
+    elif not VALID_HOST_REGEX.match(host):
+        raise ValueError("Server name '%s' has an invalid format" % (server_name,))
 
     return host, port
 
@@ -189,7 +196,7 @@ def shortstr(iterable: Iterable, maxitems: int = 5) -> str:
     """If iterable has maxitems or fewer, return the stringification of a list
     containing those items.
 
-    Otherwise, return the stringification of a a list with the first maxitems items,
+    Otherwise, return the stringification of a list with the first maxitems items,
     followed by "...".
 
     Args:

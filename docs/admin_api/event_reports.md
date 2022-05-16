@@ -2,12 +2,13 @@
 
 This API returns information about reported events.
 
+To use it, you will need to authenticate by providing an `access_token`
+for a server admin: see [Admin API](../usage/administration/admin_api).
+
 The api is:
 ```
 GET /_synapse/admin/v1/event_reports?from=0&limit=10
 ```
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: see [README.rst](README.rst).
 
 It returns a JSON body like the following:
 
@@ -75,9 +76,9 @@ The following fields are returned in the JSON response body:
 * `name`: string - The name of the room.
 * `event_id`: string - The ID of the reported event.
 * `user_id`: string - This is the user who reported the event and wrote the reason.
-* `reason`: string - Comment made by the `user_id` in this report. May be blank.
+* `reason`: string - Comment made by the `user_id` in this report. May be blank or `null`.
 * `score`: integer - Content is reported based upon a negative score, where -100 is
-  "most offensive" and 0 is "inoffensive".
+  "most offensive" and 0 is "inoffensive". May be `null`.
 * `sender`: string - This is the ID of the user who sent the original message/event that
   was reported.
 * `canonical_alias`: string - The canonical alias of the room. `null` if the room does not
@@ -94,12 +95,10 @@ The api is:
 ```
 GET /_synapse/admin/v1/event_reports/<report_id>
 ```
-To use it, you will need to authenticate by providing an `access_token` for a
-server admin: see [README.rst](README.rst).
 
 It returns a JSON body like the following:
 
-```jsonc
+```json
 {
     "event_id": "$bNUFCwGzWca1meCGkjp-zwslF-GfVcXukvRLI1_FaVY",
     "event_json": {
@@ -132,7 +131,7 @@ It returns a JSON body like the following:
         },
         "type": "m.room.message",
         "unsigned": {
-            "age_ts": 1592291711430,
+            "age_ts": 1592291711430
         }
     },
     "id": <report_id>,

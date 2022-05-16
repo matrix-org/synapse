@@ -31,7 +31,11 @@ from twisted.internet.endpoints import (
     TCP4ClientEndpoint,
     TCP6ClientEndpoint,
 )
-from twisted.internet.interfaces import IPushProducer, IStreamClientEndpoint
+from twisted.internet.interfaces import (
+    IPushProducer,
+    IReactorTCP,
+    IStreamClientEndpoint,
+)
 from twisted.internet.protocol import Factory, Protocol
 from twisted.internet.tcp import Connection
 from twisted.python.failure import Failure
@@ -39,7 +43,7 @@ from twisted.python.failure import Failure
 logger = logging.getLogger(__name__)
 
 
-@attr.s
+@attr.s(slots=True, auto_attribs=True)
 @implementer(IPushProducer)
 class LogProducer:
     """
@@ -54,19 +58,19 @@ class LogProducer:
 
     # This is essentially ITCPTransport, but that is missing certain fields
     # (connected and registerProducer) which are part of the implementation.
-    transport = attr.ib(type=Connection)
-    _format = attr.ib(type=Callable[[logging.LogRecord], str])
-    _buffer = attr.ib(type=deque)
-    _paused = attr.ib(default=False, type=bool, init=False)
+    transport: Connection
+    _format: Callable[[logging.LogRecord], str]
+    _buffer: Deque[logging.LogRecord]
+    _paused: bool = attr.ib(default=False, init=False)
 
-    def pauseProducing(self):
+    def pauseProducing(self) -> None:
         self._paused = True
 
-    def stopProducing(self):
+    def stopProducing(self) -> None:
         self._paused = True
         self._buffer = deque()
 
-    def resumeProducing(self):
+    def resumeProducing(self) -> None:
         # If we're already producing, nothing to do.
         self._paused = False
 
@@ -102,30 +106,30 @@ class RemoteHandler(logging.Handler):
         host: str,
         port: int,
         maximum_buffer: int = 1000,
-        level=logging.NOTSET,
-        _reactor=None,
+        level: int = logging.NOTSET,
+        _reactor: Optional[IReactorTCP] = None,
     ):
         super().__init__(level=level)
         self.host = host
         self.port = port
         self.maximum_buffer = maximum_buffer
 
-        self._buffer = deque()  # type: Deque[logging.LogRecord]
-        self._connection_waiter = None  # type: Optional[Deferred]
-        self._producer = None  # type: Optional[LogProducer]
+        self._buffer: Deque[logging.LogRecord] = deque()
+        self._connection_waiter: Optional[Deferred] = None
+        self._producer: Optional[LogProducer] = None
 
         # Connect without DNS lookups if it's a direct IP.
         if _reactor is None:
             from twisted.internet import reactor
 
-            _reactor = reactor
+            _reactor = reactor  # type: ignore[assignment]
 
         try:
             ip = ip_address(self.host)
             if isinstance(ip, IPv4Address):
-                endpoint = TCP4ClientEndpoint(
+                endpoint: IStreamClientEndpoint = TCP4ClientEndpoint(
                     _reactor, self.host, self.port
-                )  # type: IStreamClientEndpoint
+                )
             elif isinstance(ip, IPv6Address):
                 endpoint = TCP6ClientEndpoint(_reactor, self.host, self.port)
             else:
@@ -139,7 +143,7 @@ class RemoteHandler(logging.Handler):
         self._stopping = False
         self._connect()
 
-    def close(self):
+    def close(self) -> None:
         self._stopping = True
         self._service.stopService()
 
@@ -165,7 +169,7 @@ class RemoteHandler(logging.Handler):
         def writer(result: Protocol) -> None:
             # Force recognising transport as a Connection and not the more
             # generic ITransport.
-            transport = result.transport  # type: Connection  # type: ignore
+            transport: Connection = result.transport  # type: ignore
 
             # We have a connection. If we already have a producer, and its
             # transport is the same, just trigger a resumeProducing.
@@ -188,7 +192,7 @@ class RemoteHandler(logging.Handler):
             self._producer.resumeProducing()
             self._connection_waiter = None
 
-        deferred = self._service.whenConnected(failAfterFailures=1)  # type: Deferred
+        deferred: Deferred = self._service.whenConnected(failAfterFailures=1)
         deferred.addCallbacks(writer, fail)
         self._connection_waiter = deferred
 

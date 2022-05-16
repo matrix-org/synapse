@@ -13,8 +13,10 @@
 # limitations under the License.
 
 from os import path
+from typing import Any, Optional
 
 from synapse.config import ConfigError
+from synapse.types import JsonDict
 
 from ._base import Config
 
@@ -22,7 +24,7 @@ DEFAULT_CONFIG = """\
 # User Consent configuration
 #
 # for detailed instructions, see
-# https://github.com/matrix-org/synapse/blob/master/docs/consent_tracking.md
+# https://matrix-org.github.io/synapse/latest/consent_tracking.html
 #
 # Parts of this section are required if enabling the 'consent' resource under
 # 'listeners', in particular 'template_dir' and 'version'.
@@ -75,18 +77,18 @@ class ConsentConfig(Config):
 
     section = "consent"
 
-    def __init__(self, *args):
+    def __init__(self, *args: Any):
         super().__init__(*args)
 
-        self.user_consent_version = None
-        self.user_consent_template_dir = None
-        self.user_consent_server_notice_content = None
+        self.user_consent_version: Optional[str] = None
+        self.user_consent_template_dir: Optional[str] = None
+        self.user_consent_server_notice_content: Optional[JsonDict] = None
         self.user_consent_server_notice_to_guests = False
-        self.block_events_without_consent_error = None
+        self.block_events_without_consent_error: Optional[str] = None
         self.user_consent_at_registration = False
         self.user_consent_policy_name = "Privacy Policy"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         consent_config = config.get("user_consent")
         self.terms_template = self.read_template("terms.html")
 
@@ -94,7 +96,9 @@ class ConsentConfig(Config):
             return
         self.user_consent_version = str(consent_config["version"])
         self.user_consent_template_dir = self.abspath(consent_config["template_dir"])
-        if not path.isdir(self.user_consent_template_dir):
+        if not isinstance(self.user_consent_template_dir, str) or not path.isdir(
+            self.user_consent_template_dir
+        ):
             raise ConfigError(
                 "Could not find template directory '%s'"
                 % (self.user_consent_template_dir,)
@@ -115,5 +119,5 @@ class ConsentConfig(Config):
             "policy_name", "Privacy Policy"
         )
 
-    def generate_config_section(self, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return DEFAULT_CONFIG

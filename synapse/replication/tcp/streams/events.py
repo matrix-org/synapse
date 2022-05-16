@@ -13,12 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import heapq
-from collections.abc import Iterable
-from typing import TYPE_CHECKING, List, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Type, TypeVar, cast
 
 import attr
 
-from ._base import Stream, StreamUpdateResult, Token
+from synapse.replication.tcp.streams._base import (
+    Stream,
+    StreamRow,
+    StreamUpdateResult,
+    Token,
+)
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -50,12 +54,15 @@ data part are:
 """
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class EventsStreamRow:
     """A parsed row from the events replication stream"""
 
-    type = attr.ib()  # str: the TypeId of one of the *EventsStreamRows
-    data = attr.ib()  # BaseEventsStreamRow
+    type: str  # the TypeId of one of the *EventsStreamRows
+    data: "BaseEventsStreamRow"
+
+
+T = TypeVar("T", bound="BaseEventsStreamRow")
 
 
 class BaseEventsStreamRow:
@@ -65,10 +72,10 @@ class BaseEventsStreamRow:
     """
 
     # Unique string that ids the type. Must be overridden in sub classes.
-    TypeId = None  # type: str
+    TypeId: str
 
     @classmethod
-    def from_data(cls, data):
+    def from_data(cls: Type[T], data: Iterable[Optional[str]]) -> T:
         """Parse the data from the replication stream into a row.
 
         By default we just call the constructor with the data list as arguments
@@ -79,34 +86,34 @@ class BaseEventsStreamRow:
         return cls(*data)
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class EventsStreamEventRow(BaseEventsStreamRow):
     TypeId = "ev"
 
-    event_id = attr.ib(type=str)
-    room_id = attr.ib(type=str)
-    type = attr.ib(type=str)
-    state_key = attr.ib(type=Optional[str])
-    redacts = attr.ib(type=Optional[str])
-    relates_to = attr.ib(type=Optional[str])
-    membership = attr.ib(type=Optional[str])
-    rejected = attr.ib(type=bool)
+    event_id: str
+    room_id: str
+    type: str
+    state_key: Optional[str]
+    redacts: Optional[str]
+    relates_to: Optional[str]
+    membership: Optional[str]
+    rejected: bool
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class EventsStreamCurrentStateRow(BaseEventsStreamRow):
     TypeId = "state"
 
-    room_id = attr.ib()  # str
-    type = attr.ib()  # str
-    state_key = attr.ib()  # str
-    event_id = attr.ib()  # str, optional
+    room_id: str
+    type: str
+    state_key: str
+    event_id: Optional[str]
 
 
-_EventRows = (
+_EventRows: Tuple[Type[BaseEventsStreamRow], ...] = (
     EventsStreamEventRow,
     EventsStreamCurrentStateRow,
-)  # type: Tuple[Type[BaseEventsStreamRow], ...]
+)
 
 TypeToRow = {Row.TypeId: Row for Row in _EventRows}
 
@@ -117,7 +124,7 @@ class EventsStream(Stream):
     NAME = "events"
 
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         super().__init__(
             hs.get_instance_name(),
             self._store._stream_id_gen.get_current_token_for_writer,
@@ -159,7 +166,7 @@ class EventsStream(Stream):
 
         event_rows = await self._store.get_all_new_forward_event_rows(
             instance_name, from_token, current_token, target_row_count
-        )  # type: List[Tuple]
+        )
 
         # we rely on get_all_new_forward_event_rows strictly honouring the limit, so
         # that we know it is safe to just take upper_limit = event_rows[-1][0].
@@ -172,7 +179,7 @@ class EventsStream(Stream):
 
         if len(event_rows) == target_row_count:
             limited = True
-            upper_limit = event_rows[-1][0]  # type: int
+            upper_limit: int = event_rows[-1][0]
         else:
             limited = False
             upper_limit = current_token
@@ -193,35 +200,35 @@ class EventsStream(Stream):
 
         ex_outliers_rows = await self._store.get_ex_outlier_stream_rows(
             instance_name, from_token, upper_limit
-        )  # type: List[Tuple]
+        )
 
         # we now need to turn the raw database rows returned into tuples suitable
         # for the replication protocol (basically, we add an identifier to
         # distinguish the row type). At the same time, we can limit the event_rows
         # to the max stream_id from state_rows.
 
-        event_updates = (
+        event_updates: Iterable[Tuple[int, Tuple]] = (
             (stream_id, (EventsStreamEventRow.TypeId, rest))
             for (stream_id, *rest) in event_rows
             if stream_id <= upper_limit
-        )  # type: Iterable[Tuple[int, Tuple]]
+        )
 
-        state_updates = (
+        state_updates: Iterable[Tuple[int, Tuple]] = (
             (stream_id, (EventsStreamCurrentStateRow.TypeId, rest))
             for (stream_id, *rest) in state_rows
-        )  # type: Iterable[Tuple[int, Tuple]]
+        )
 
-        ex_outliers_updates = (
+        ex_outliers_updates: Iterable[Tuple[int, Tuple]] = (
             (stream_id, (EventsStreamEventRow.TypeId, rest))
             for (stream_id, *rest) in ex_outliers_rows
-        )  # type: Iterable[Tuple[int, Tuple]]
+        )
 
         # we need to return a sorted list, so merge them together.
         updates = list(heapq.merge(event_updates, state_updates, ex_outliers_updates))
         return updates, upper_limit, limited
 
     @classmethod
-    def parse_row(cls, row):
-        (typ, data) = row
-        data = TypeToRow[typ].from_data(data)
-        return EventsStreamRow(typ, data)
+    def parse_row(cls, row: StreamRow) -> "EventsStreamRow":
+        (typ, data) = cast(Tuple[str, Iterable[Optional[str]]], row)
+        event_stream_row_data = TypeToRow[typ].from_data(data)
+        return EventsStreamRow(typ, event_stream_row_data)

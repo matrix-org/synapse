@@ -12,15 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Dict, List, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Tuple, cast
 
 from synapse.api.presence import PresenceState, UserPresenceState
 from synapse.replication.tcp.streams import PresenceStream
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.types import Connection
-from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
+from synapse.storage.util.id_generators import (
+    AbstractStreamIdGenerator,
+    MultiWriterIdGenerator,
+    StreamIdGenerator,
+)
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.iterutils import batch_iter
@@ -29,17 +37,39 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
-class PresenceStore(SQLBaseStore):
+class PresenceBackgroundUpdateStore(SQLBaseStore):
     def __init__(
         self,
         database: DatabasePool,
-        db_conn: Connection,
+        db_conn: LoggingDatabaseConnection,
         hs: "HomeServer",
-    ):
+    ) -> None:
         super().__init__(database, db_conn, hs)
 
+        # Used by `PresenceStore._get_active_presence()`
+        self.db_pool.updates.register_background_index_update(
+            "presence_stream_not_offline_index",
+            index_name="presence_stream_state_not_offline_idx",
+            table="presence_stream",
+            columns=["state"],
+            where_clause="state != 'offline'",
+        )
+
+
+class PresenceStore(PresenceBackgroundUpdateStore):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ) -> None:
+        super().__init__(database, db_conn, hs)
+
+        self._instance_name = hs.get_instance_name()
+        self._presence_id_gen: AbstractStreamIdGenerator
+
         self._can_persist_presence = (
-            hs.get_instance_name() in hs.config.worker.writers.presence
+            self._instance_name in hs.config.worker.writers.presence
         )
 
         if isinstance(database.engine, PostgresEngine):
@@ -50,13 +80,14 @@ class PresenceStore(SQLBaseStore):
                 instance_name=self._instance_name,
                 tables=[("presence_stream", "instance_name", "stream_id")],
                 sequence_name="presence_stream_sequence",
-                writers=hs.config.worker.writers.to_device,
+                writers=hs.config.worker.writers.presence,
             )
         else:
             self._presence_id_gen = StreamIdGenerator(
                 db_conn, "presence_stream", "stream_id"
             )
 
+        self.hs = hs
         self._presence_on_startup = self._get_active_presence(db_conn)
 
         presence_cache_prefill, min_presence_val = self.db_pool.get_cache_dict(
@@ -72,7 +103,9 @@ class PresenceStore(SQLBaseStore):
             prefilled_cache=presence_cache_prefill,
         )
 
-    async def update_presence(self, presence_states):
+    async def update_presence(
+        self, presence_states: List[UserPresenceState]
+    ) -> Tuple[int, int]:
         assert self._can_persist_presence
 
         stream_ordering_manager = self._presence_id_gen.get_next_mult(
@@ -89,32 +122,17 @@ class PresenceStore(SQLBaseStore):
 
         return stream_orderings[-1], self._presence_id_gen.get_current_token()
 
-    def _update_presence_txn(self, txn, stream_orderings, presence_states):
+    def _update_presence_txn(
+        self,
+        txn: LoggingTransaction,
+        stream_orderings: List[int],
+        presence_states: List[UserPresenceState],
+    ) -> None:
         for stream_id, state in zip(stream_orderings, presence_states):
             txn.call_after(
                 self.presence_stream_cache.entity_has_changed, state.user_id, stream_id
             )
             txn.call_after(self._get_presence_for_user.invalidate, (state.user_id,))
-
-        # Actually insert new rows
-        self.db_pool.simple_insert_many_txn(
-            txn,
-            table="presence_stream",
-            values=[
-                {
-                    "stream_id": stream_id,
-                    "user_id": state.user_id,
-                    "state": state.state,
-                    "last_active_ts": state.last_active_ts,
-                    "last_federation_update_ts": state.last_federation_update_ts,
-                    "last_user_sync_ts": state.last_user_sync_ts,
-                    "status_msg": state.status_msg,
-                    "currently_active": state.currently_active,
-                    "instance_name": self._instance_name,
-                }
-                for stream_id, state in zip(stream_orderings, presence_states)
-            ],
-        )
 
         # Delete old rows to stop database from getting really big
         sql = "DELETE FROM presence_stream WHERE stream_id < ? AND "
@@ -124,6 +142,37 @@ class PresenceStore(SQLBaseStore):
                 self.database_engine, "user_id", [s.user_id for s in states]
             )
             txn.execute(sql + clause, [stream_id] + list(args))
+
+        # Actually insert new rows
+        self.db_pool.simple_insert_many_txn(
+            txn,
+            table="presence_stream",
+            keys=(
+                "stream_id",
+                "user_id",
+                "state",
+                "last_active_ts",
+                "last_federation_update_ts",
+                "last_user_sync_ts",
+                "status_msg",
+                "currently_active",
+                "instance_name",
+            ),
+            values=[
+                (
+                    stream_id,
+                    state.user_id,
+                    state.state,
+                    state.last_active_ts,
+                    state.last_federation_update_ts,
+                    state.last_user_sync_ts,
+                    state.status_msg,
+                    state.currently_active,
+                    self._instance_name,
+                )
+                for stream_id, state in zip(stream_orderings, presence_states)
+            ],
+        )
 
     async def get_all_presence_updates(
         self, instance_name: str, last_id: int, current_id: int, limit: int
@@ -152,19 +201,23 @@ class PresenceStore(SQLBaseStore):
         if last_id == current_id:
             return [], current_id, False
 
-        def get_all_presence_updates_txn(txn):
+        def get_all_presence_updates_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[List[Tuple[int, list]], int, bool]:
             sql = """
                 SELECT stream_id, user_id, state, last_active_ts,
                     last_federation_update_ts, last_user_sync_ts,
-                    status_msg,
-                currently_active
+                    status_msg, currently_active
                 FROM presence_stream
                 WHERE ? < stream_id AND stream_id <= ?
                 ORDER BY stream_id ASC
                 LIMIT ?
             """
             txn.execute(sql, (last_id, current_id, limit))
-            updates = [(row[0], row[1:]) for row in txn]
+            updates = cast(
+                List[Tuple[int, list]],
+                [(row[0], row[1:]) for row in txn],
+            )
 
             upper_bound = current_id
             limited = False
@@ -179,7 +232,7 @@ class PresenceStore(SQLBaseStore):
         )
 
     @cached()
-    def _get_presence_for_user(self, user_id):
+    def _get_presence_for_user(self, user_id: str) -> None:
         raise NotImplementedError()
 
     @cachedList(
@@ -187,7 +240,9 @@ class PresenceStore(SQLBaseStore):
         list_name="user_ids",
         num_args=1,
     )
-    async def get_presence_for_users(self, user_ids):
+    async def get_presence_for_users(
+        self, user_ids: Iterable[str]
+    ) -> Dict[str, UserPresenceState]:
         rows = await self.db_pool.simple_select_many_batch(
             table="presence_stream",
             column="user_id",
@@ -209,6 +264,62 @@ class PresenceStore(SQLBaseStore):
             row["currently_active"] = bool(row["currently_active"])
 
         return {row["user_id"]: UserPresenceState(**row) for row in rows}
+
+    async def should_user_receive_full_presence_with_token(
+        self,
+        user_id: str,
+        from_token: int,
+    ) -> bool:
+        """Check whether the given user should receive full presence using the stream token
+        they're updating from.
+
+        Args:
+            user_id: The ID of the user to check.
+            from_token: The stream token included in their /sync token.
+
+        Returns:
+            True if the user should have full presence sent to them, False otherwise.
+        """
+
+        def _should_user_receive_full_presence_with_token_txn(
+            txn: LoggingTransaction,
+        ) -> bool:
+            sql = """
+                SELECT 1 FROM users_to_send_full_presence_to
+                WHERE user_id = ?
+                AND presence_stream_id >= ?
+            """
+            txn.execute(sql, (user_id, from_token))
+            return bool(txn.fetchone())
+
+        return await self.db_pool.runInteraction(
+            "should_user_receive_full_presence_with_token",
+            _should_user_receive_full_presence_with_token_txn,
+        )
+
+    async def add_users_to_send_full_presence_to(self, user_ids: Iterable[str]) -> None:
+        """Adds to the list of users who should receive a full snapshot of presence
+        upon their next sync.
+
+        Args:
+            user_ids: An iterable of user IDs.
+        """
+        # Add user entries to the table, updating the presence_stream_id column if the user already
+        # exists in the table.
+        presence_stream_id = self._presence_id_gen.get_current_token()
+        await self.db_pool.simple_upsert_many(
+            table="users_to_send_full_presence_to",
+            key_names=("user_id",),
+            key_values=[(user_id,) for user_id in user_ids],
+            value_names=("presence_stream_id",),
+            # We save the current presence stream ID token along with the user ID entry so
+            # that when a user /sync's, even if they syncing multiple times across separate
+            # devices at different times, each device will receive full presence once - when
+            # the presence stream ID in their sync token is less than the one in the table
+            # for their user ID.
+            value_values=[(presence_stream_id,) for _ in user_ids],
+            desc="add_users_to_send_full_presence_to",
+        )
 
     async def get_presence_for_all_users(
         self,
@@ -268,14 +379,16 @@ class PresenceStore(SQLBaseStore):
 
         return users_to_state
 
-    def get_current_presence_token(self):
+    def get_current_presence_token(self) -> int:
         return self._presence_id_gen.get_current_token()
 
-    def _get_active_presence(self, db_conn: Connection):
+    def _get_active_presence(self, db_conn: Connection) -> List[UserPresenceState]:
         """Fetch non-offline presence from the database so that we can register
         the appropriate time outs.
         """
 
+        # The `presence_stream_state_not_offline_idx` index should be used for this
+        # query.
         sql = (
             "SELECT user_id, state, last_active_ts, last_federation_update_ts,"
             " last_user_sync_ts, status_msg, currently_active FROM presence_stream"
@@ -292,12 +405,18 @@ class PresenceStore(SQLBaseStore):
 
         return [UserPresenceState(**row) for row in rows]
 
-    def take_presence_startup_info(self):
+    def take_presence_startup_info(self) -> List[UserPresenceState]:
         active_on_startup = self._presence_on_startup
-        self._presence_on_startup = None
+        self._presence_on_startup = []
         return active_on_startup
 
-    def process_replication_rows(self, stream_name, instance_name, token, rows):
+    def process_replication_rows(
+        self,
+        stream_name: str,
+        instance_name: str,
+        token: int,
+        rows: Iterable[Any],
+    ) -> None:
         if stream_name == PresenceStream.NAME:
             self._presence_id_gen.advance(instance_name, token)
             for row in rows:

@@ -26,8 +26,8 @@ class ExpiringCacheTestCase(unittest.HomeserverTestCase):
         cache = ExpiringCache("test", clock, max_len=1)
 
         cache["key"] = "value"
-        self.assertEquals(cache.get("key"), "value")
-        self.assertEquals(cache["key"], "value")
+        self.assertEqual(cache.get("key"), "value")
+        self.assertEqual(cache["key"], "value")
 
     def test_eviction(self):
         clock = MockClock()
@@ -35,13 +35,13 @@ class ExpiringCacheTestCase(unittest.HomeserverTestCase):
 
         cache["key"] = "value"
         cache["key2"] = "value2"
-        self.assertEquals(cache.get("key"), "value")
-        self.assertEquals(cache.get("key2"), "value2")
+        self.assertEqual(cache.get("key"), "value")
+        self.assertEqual(cache.get("key2"), "value2")
 
         cache["key3"] = "value3"
-        self.assertEquals(cache.get("key"), None)
-        self.assertEquals(cache.get("key2"), "value2")
-        self.assertEquals(cache.get("key3"), "value3")
+        self.assertEqual(cache.get("key"), None)
+        self.assertEqual(cache.get("key2"), "value2")
+        self.assertEqual(cache.get("key3"), "value3")
 
     def test_iterable_eviction(self):
         clock = MockClock()
@@ -51,15 +51,15 @@ class ExpiringCacheTestCase(unittest.HomeserverTestCase):
         cache["key2"] = [2, 3]
         cache["key3"] = [4, 5]
 
-        self.assertEquals(cache.get("key"), [1])
-        self.assertEquals(cache.get("key2"), [2, 3])
-        self.assertEquals(cache.get("key3"), [4, 5])
+        self.assertEqual(cache.get("key"), [1])
+        self.assertEqual(cache.get("key2"), [2, 3])
+        self.assertEqual(cache.get("key3"), [4, 5])
 
         cache["key4"] = [6, 7]
-        self.assertEquals(cache.get("key"), None)
-        self.assertEquals(cache.get("key2"), None)
-        self.assertEquals(cache.get("key3"), [4, 5])
-        self.assertEquals(cache.get("key4"), [6, 7])
+        self.assertEqual(cache.get("key"), None)
+        self.assertEqual(cache.get("key2"), None)
+        self.assertEqual(cache.get("key3"), [4, 5])
+        self.assertEqual(cache.get("key4"), [6, 7])
 
     def test_time_eviction(self):
         clock = MockClock()
@@ -69,13 +69,13 @@ class ExpiringCacheTestCase(unittest.HomeserverTestCase):
         clock.advance_time(0.5)
         cache["key2"] = 2
 
-        self.assertEquals(cache.get("key"), 1)
-        self.assertEquals(cache.get("key2"), 2)
+        self.assertEqual(cache.get("key"), 1)
+        self.assertEqual(cache.get("key2"), 2)
 
         clock.advance_time(0.9)
-        self.assertEquals(cache.get("key"), None)
-        self.assertEquals(cache.get("key2"), 2)
+        self.assertEqual(cache.get("key"), None)
+        self.assertEqual(cache.get("key2"), 2)
 
         clock.advance_time(1)
-        self.assertEquals(cache.get("key"), None)
-        self.assertEquals(cache.get("key2"), None)
+        self.assertEqual(cache.get("key"), None)
+        self.assertEqual(cache.get("key2"), None)

@@ -3,14 +3,14 @@
 Returns information about all local media usage of users. Gives the
 possibility to filter them by time and user.
 
+To use it, you will need to authenticate by providing an `access_token`
+for a server admin: see [Admin API](../usage/administration/admin_api).
+
 The API is:
 
 ```
 GET /_synapse/admin/v1/statistics/users/media
 ```
-
-To use it, you will need to authenticate by providing an `access_token`
-for a server admin: see [README.rst](README.rst).
 
 A response body like the following is returned:
 

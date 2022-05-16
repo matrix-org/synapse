@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 
 from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
+from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 
 
@@ -73,25 +74,25 @@ class ProfileWorkerStore(SQLBaseStore):
     async def set_profile_displayname(
         self, user_localpart: str, new_displayname: Optional[str]
     ) -> None:
-        await self.db_pool.simple_update_one(
+        await self.db_pool.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            updatevalues={"displayname": new_displayname},
+            values={"displayname": new_displayname},
             desc="set_profile_displayname",
         )
 
     async def set_profile_avatar_url(
         self, user_localpart: str, new_avatar_url: Optional[str]
     ) -> None:
-        await self.db_pool.simple_update_one(
+        await self.db_pool.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            updatevalues={"avatar_url": new_avatar_url},
+            values={"avatar_url": new_avatar_url},
             desc="set_profile_avatar_url",
         )
 
     async def update_remote_profile_cache(
-        self, user_id: str, displayname: str, avatar_url: str
+        self, user_id: str, displayname: Optional[str], avatar_url: Optional[str]
     ) -> int:
         return await self.db_pool.simple_update(
             table="remote_profile_cache",
@@ -104,7 +105,7 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="update_remote_profile_cache",
         )
 
-    async def maybe_delete_remote_profile_cache(self, user_id):
+    async def maybe_delete_remote_profile_cache(self, user_id: str) -> None:
         """Check if we still care about the remote user's profile, and if we
         don't then remove their profile from the cache
         """
@@ -116,9 +117,9 @@ class ProfileWorkerStore(SQLBaseStore):
                 desc="delete_remote_profile_cache",
             )
 
-    async def is_subscribed_remote_profile_for_user(self, user_id):
+    async def is_subscribed_remote_profile_for_user(self, user_id: str) -> bool:
         """Check whether we are interested in a remote user's profile."""
-        res = await self.db_pool.simple_select_one_onecol(
+        res: Optional[str] = await self.db_pool.simple_select_one_onecol(
             table="group_users",
             keyvalues={"user_id": user_id},
             retcol="user_id",
@@ -139,13 +140,16 @@ class ProfileWorkerStore(SQLBaseStore):
 
         if res:
             return True
+        return False
 
     async def get_remote_profile_cache_entries_that_expire(
         self, last_checked: int
     ) -> List[Dict[str, str]]:
         """Get all users who haven't been checked since `last_checked`"""
 
-        def _get_remote_profile_cache_entries_that_expire_txn(txn):
+        def _get_remote_profile_cache_entries_that_expire_txn(
+            txn: LoggingTransaction,
+        ) -> List[Dict[str, str]]:
             sql = """
                 SELECT user_id, displayname, avatar_url
                 FROM remote_profile_cache

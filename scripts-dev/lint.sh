@@ -79,9 +79,20 @@ else
   # If we were not asked to lint changed files, and no paths were found as a result,
   # then lint everything!
   if [[ -z ${files+x} ]]; then
-    # Lint all source code files and directories
-    # Note: this list aims the mirror the one in tox.ini
-    files=("synapse" "docker" "tests" "scripts-dev" "scripts" "contrib" "synctl" "setup.py" "synmark" "stubs" ".buildkite")
+      # CI runs each linter on the entire checkout, e.g. `black .`. So don't
+      # rely on this list to *find* lint targets if that misses a file; instead;
+      # use it to exclude files from linters when this can't be done by config.
+      #
+      # To check which files the linters examine, use:
+      #     black --verbose . 2>&1 | \grep -v ignored
+      #     isort --show-files .
+      #     flake8 --verbose .  # This isn't a great option
+      #     mypy has explicit config in mypy.ini; there is also mypy --verbose
+      files=(
+          "synapse" "docker" "tests"
+          "scripts-dev"
+          "contrib" "synmark" "stubs" ".ci"
+      )
   fi
 fi
 

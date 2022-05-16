@@ -15,6 +15,9 @@ _trial_temp*/
 .DS_Store
 __pycache__/
 
+# We do want the poetry lockfile.
+!poetry.lock
+
 # stuff that is likely to exist when you run a server locally
 /*.db
 /*.log
@@ -30,6 +33,9 @@ __pycache__/
 /media_store/
 /uploads
 
+# For direnv users
+/.envrc
+
 # IDEs
 /.idea/
 /.ropeproject/
@@ -40,9 +46,17 @@ __pycache__/
 /.coverage*
 /.mypy_cache/
 /.tox
+/.tox-pg-container
 /build/
 /coverage.*
 /dist/
 /docs/build/
 /htmlcov
 /pip-wheel-metadata/
+
+# docs
+book/
+
+# complement
+/complement-*
+/master.tar.gz

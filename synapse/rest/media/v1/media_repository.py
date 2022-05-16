@@ -21,8 +21,8 @@ from typing import IO, TYPE_CHECKING, Dict, List, Optional, Set, Tuple
 
 import twisted.internet.error
 import twisted.web.http
+from twisted.internet.defer import Deferred
 from twisted.web.resource import Resource
-from twisted.web.server import Request
 
 from synapse.api.errors import (
     FederationDeniedError,
@@ -32,6 +32,8 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.config._base import ConfigError
+from synapse.config.repository import ThumbnailRequirement
+from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import UserID
@@ -42,6 +44,7 @@ from synapse.util.stringutils import random_string
 from ._base import (
     FileInfo,
     Responder,
+    ThumbnailInfo,
     get_filename_from_headers,
     respond_404,
     respond_with_responder,
@@ -72,28 +75,36 @@ class MediaRepository:
         self.client = hs.get_federation_http_client()
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
-        self.store = hs.get_datastore()
-        self.max_upload_size = hs.config.max_upload_size
-        self.max_image_pixels = hs.config.max_image_pixels
+        self.store = hs.get_datastores().main
+        self.max_upload_size = hs.config.media.max_upload_size
+        self.max_image_pixels = hs.config.media.max_image_pixels
 
-        self.primary_base_path = hs.config.media_store_path  # type: str
-        self.filepaths = MediaFilePaths(self.primary_base_path)  # type: MediaFilePaths
+        Thumbnailer.set_limits(self.max_image_pixels)
 
-        self.dynamic_thumbnails = hs.config.dynamic_thumbnails
-        self.thumbnail_requirements = hs.config.thumbnail_requirements
+        self.primary_base_path: str = hs.config.media.media_store_path
+        self.filepaths: MediaFilePaths = MediaFilePaths(self.primary_base_path)
+
+        self.dynamic_thumbnails = hs.config.media.dynamic_thumbnails
+        self.thumbnail_requirements = hs.config.media.thumbnail_requirements
 
         self.remote_media_linearizer = Linearizer(name="media_remote")
 
-        self.recently_accessed_remotes = set()  # type: Set[Tuple[str, str]]
-        self.recently_accessed_locals = set()  # type: Set[str]
+        self.recently_accessed_remotes: Set[Tuple[str, str]] = set()
+        self.recently_accessed_locals: Set[str] = set()
 
-        self.federation_domain_whitelist = hs.config.federation_domain_whitelist
+        self.federation_domain_whitelist = (
+            hs.config.federation.federation_domain_whitelist
+        )
 
         # List of StorageProviders where we should search for media and
         # potentially upload to.
         storage_providers = []
 
-        for clz, provider_config, wrapper_config in hs.config.media_storage_providers:
+        for (
+            clz,
+            provider_config,
+            wrapper_config,
+        ) in hs.config.media.media_storage_providers:
             backend = clz(hs, provider_config)
             provider = StorageProviderWrapper(
                 backend,
@@ -111,7 +122,7 @@ class MediaRepository:
             self._start_update_recently_accessed, UPDATE_RECENTLY_ACCESSED_TS
         )
 
-    def _start_update_recently_accessed(self):
+    def _start_update_recently_accessed(self) -> Deferred:
         return run_as_background_process(
             "update_recently_accessed_media", self._update_recently_accessed
         )
@@ -182,7 +193,7 @@ class MediaRepository:
         return "mxc://%s/%s" % (self.server_name, media_id)
 
     async def get_local_media(
-        self, request: Request, media_id: str, name: Optional[str]
+        self, request: SynapseRequest, media_id: str, name: Optional[str]
     ) -> None:
         """Responds to requests for local media, if exists, or returns 404.
 
@@ -204,11 +215,13 @@ class MediaRepository:
         self.mark_recently_accessed(None, media_id)
 
         media_type = media_info["media_type"]
+        if not media_type:
+            media_type = "application/octet-stream"
         media_length = media_info["media_length"]
         upload_name = name if name else media_info["upload_name"]
         url_cache = media_info["url_cache"]
 
-        file_info = FileInfo(None, media_id, url_cache=url_cache)
+        file_info = FileInfo(None, media_id, url_cache=bool(url_cache))
 
         responder = await self.media_storage.fetch_media(file_info)
         await respond_with_responder(
@@ -216,7 +229,11 @@ class MediaRepository:
         )
 
     async def get_remote_media(
-        self, request: Request, server_name: str, media_id: str, name: Optional[str]
+        self,
+        request: SynapseRequest,
+        server_name: str,
+        media_id: str,
+        name: Optional[str],
     ) -> None:
         """Respond to requests for remote media.
 
@@ -241,7 +258,7 @@ class MediaRepository:
         # We linearize here to ensure that we don't try and download remote
         # media multiple times concurrently
         key = (server_name, media_id)
-        with (await self.remote_media_linearizer.queue(key)):
+        async with self.remote_media_linearizer.queue(key):
             responder, media_info = await self._get_remote_media_impl(
                 server_name, media_id
             )
@@ -277,7 +294,7 @@ class MediaRepository:
         # We linearize here to ensure that we don't try and download remote
         # media multiple times concurrently
         key = (server_name, media_id)
-        with (await self.remote_media_linearizer.queue(key)):
+        async with self.remote_media_linearizer.queue(key):
             responder, media_info = await self._get_remote_media_impl(
                 server_name, media_id
             )
@@ -318,6 +335,9 @@ class MediaRepository:
                 logger.info("Media is quarantined")
                 raise NotFoundError()
 
+            if not media_info["media_type"]:
+                media_info["media_type"] = "application/octet-stream"
+
             responder = await self.media_storage.fetch_media(file_info)
             if responder:
                 return responder, media_info
@@ -339,6 +359,8 @@ class MediaRepository:
                 raise e
 
         file_id = media_info["filesystem_id"]
+        if not media_info["media_type"]:
+            media_info["media_type"] = "application/octet-stream"
         file_info = FileInfo(server_name, file_id)
 
         # We generate thumbnails even if another process downloaded the media
@@ -430,7 +452,10 @@ class MediaRepository:
 
             await finish()
 
-            media_type = headers[b"Content-Type"][0].decode("ascii")
+            if b"Content-Type" in headers:
+                media_type = headers[b"Content-Type"][0].decode("ascii")
+            else:
+                media_type = "application/octet-stream"
             upload_name = get_filename_from_headers(headers)
             time_now_ms = self.clock.time_msec()
 
@@ -466,7 +491,9 @@ class MediaRepository:
 
         return media_info
 
-    def _get_thumbnail_requirements(self, media_type):
+    def _get_thumbnail_requirements(
+        self, media_type: str
+    ) -> Tuple[ThumbnailRequirement, ...]:
         scpos = media_type.find(";")
         if scpos > 0:
             media_type = media_type[:scpos]
@@ -512,7 +539,7 @@ class MediaRepository:
         t_height: int,
         t_method: str,
         t_type: str,
-        url_cache: Optional[str],
+        url_cache: bool,
     ) -> Optional[str]:
         input_path = await self.media_storage.ensure_media_is_in_local_cache(
             FileInfo(None, media_id, url_cache=url_cache)
@@ -546,11 +573,12 @@ class MediaRepository:
                     server_name=None,
                     file_id=media_id,
                     url_cache=url_cache,
-                    thumbnail=True,
-                    thumbnail_width=t_width,
-                    thumbnail_height=t_height,
-                    thumbnail_method=t_method,
-                    thumbnail_type=t_type,
+                    thumbnail=ThumbnailInfo(
+                        width=t_width,
+                        height=t_height,
+                        method=t_method,
+                        type=t_type,
+                    ),
                 )
 
                 output_path = await self.media_storage.store_file(
@@ -583,7 +611,7 @@ class MediaRepository:
         t_type: str,
     ) -> Optional[str]:
         input_path = await self.media_storage.ensure_media_is_in_local_cache(
-            FileInfo(server_name, file_id, url_cache=False)
+            FileInfo(server_name, file_id)
         )
 
         try:
@@ -614,11 +642,12 @@ class MediaRepository:
                 file_info = FileInfo(
                     server_name=server_name,
                     file_id=file_id,
-                    thumbnail=True,
-                    thumbnail_width=t_width,
-                    thumbnail_height=t_height,
-                    thumbnail_method=t_method,
-                    thumbnail_type=t_type,
+                    thumbnail=ThumbnailInfo(
+                        width=t_width,
+                        height=t_height,
+                        method=t_method,
+                        type=t_type,
+                    ),
                 )
 
                 output_path = await self.media_storage.store_file(
@@ -709,15 +738,22 @@ class MediaRepository:
 
         # We deduplicate the thumbnail sizes by ignoring the cropped versions if
         # they have the same dimensions of a scaled one.
-        thumbnails = {}  # type: Dict[Tuple[int, int, str], str]
-        for r_width, r_height, r_method, r_type in requirements:
-            if r_method == "crop":
-                thumbnails.setdefault((r_width, r_height, r_type), r_method)
-            elif r_method == "scale":
-                t_width, t_height = thumbnailer.aspect(r_width, r_height)
+        thumbnails: Dict[Tuple[int, int, str], str] = {}
+        for requirement in requirements:
+            if requirement.method == "crop":
+                thumbnails.setdefault(
+                    (requirement.width, requirement.height, requirement.media_type),
+                    requirement.method,
+                )
+            elif requirement.method == "scale":
+                t_width, t_height = thumbnailer.aspect(
+                    requirement.width, requirement.height
+                )
                 t_width = min(m_width, t_width)
                 t_height = min(m_height, t_height)
-                thumbnails[(t_width, t_height, r_type)] = r_method
+                thumbnails[
+                    (t_width, t_height, requirement.media_type)
+                ] = requirement.method
 
         # Now we generate the thumbnails for each dimension, store it
         for (t_width, t_height, t_type), t_method in thumbnails.items():
@@ -740,12 +776,13 @@ class MediaRepository:
             file_info = FileInfo(
                 server_name=server_name,
                 file_id=file_id,
-                thumbnail=True,
-                thumbnail_width=t_width,
-                thumbnail_height=t_height,
-                thumbnail_method=t_method,
-                thumbnail_type=t_type,
                 url_cache=url_cache,
+                thumbnail=ThumbnailInfo(
+                    width=t_width,
+                    height=t_height,
+                    method=t_method,
+                    type=t_type,
+                ),
             )
 
             with self.media_storage.store_into_file(file_info) as (f, fname, finish):
@@ -813,7 +850,7 @@ class MediaRepository:
 
             # TODO: Should we delete from the backup store
 
-            with (await self.remote_media_linearizer.queue(key)):
+            async with self.remote_media_linearizer.queue(key):
                 full_path = self.filepaths.remote_media_filepath(origin, file_id)
                 try:
                     os.remove(full_path)
@@ -834,7 +871,9 @@ class MediaRepository:
 
         return {"deleted": deleted}
 
-    async def delete_local_media(self, media_id: str) -> Tuple[List[str], int]:
+    async def delete_local_media_ids(
+        self, media_ids: List[str]
+    ) -> Tuple[List[str], int]:
         """
         Delete the given local or remote media ID from this server
 
@@ -843,7 +882,7 @@ class MediaRepository:
         Returns:
             A tuple of (list of deleted media IDs, total deleted media IDs).
         """
-        return await self._remove_local_media_from_disk([media_id])
+        return await self._remove_local_media_from_disk(media_ids)
 
     async def delete_old_local_media(
         self,
@@ -957,7 +996,7 @@ class MediaRepositoryResource(Resource):
 
     def __init__(self, hs: "HomeServer"):
         # If we're not configured to use it, raise if we somehow got here.
-        if not hs.config.can_load_media_repo:
+        if not hs.config.media.can_load_media_repo:
             raise ConfigError("Synapse is not configured to use a media repo.")
 
         super().__init__()
@@ -968,7 +1007,7 @@ class MediaRepositoryResource(Resource):
         self.putChild(
             b"thumbnail", ThumbnailResource(hs, media_repo, media_repo.media_storage)
         )
-        if hs.config.url_preview_enabled:
+        if hs.config.media.url_preview_enabled:
             self.putChild(
                 b"preview_url",
                 PreviewUrlResource(hs, media_repo, media_repo.media_storage),

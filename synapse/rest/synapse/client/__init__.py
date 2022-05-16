@@ -45,12 +45,12 @@ def build_synapse_client_resource_tree(hs: "HomeServer") -> Mapping[str, Resourc
 
     # provider-specific SSO bits. Only load these if they are enabled, since they
     # rely on optional dependencies.
-    if hs.config.oidc_enabled:
+    if hs.config.oidc.oidc_enabled:
         from synapse.rest.synapse.client.oidc import OIDCResource
 
         resources["/_synapse/client/oidc"] = OIDCResource(hs)
 
-    if hs.config.saml2_enabled:
+    if hs.config.saml2.saml2_enabled:
         from synapse.rest.synapse.client.saml2 import SAML2Resource
 
         res = SAML2Resource(hs)

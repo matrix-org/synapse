@@ -13,14 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from collections import namedtuple
-from typing import Iterable, List
+from typing import TYPE_CHECKING
 
-from twisted.internet import defer
-from twisted.internet.defer import Deferred, DeferredList
-from twisted.python.failure import Failure
-
-from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
+from synapse.api.constants import MAX_DEPTH, EventContentFields, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import EventFormatVersions, RoomVersion
 from synapse.crypto.event_signing import check_event_content_hash
@@ -28,136 +23,105 @@ from synapse.crypto.keyring import Keyring
 from synapse.events import EventBase, make_event_from_dict
 from synapse.events.utils import prune_event, validate_canonicaljson
 from synapse.http.servlet import assert_params_in_dict
-from synapse.logging.context import (
-    PreserveLoggingContext,
-    current_context,
-    make_deferred_yieldable,
-)
 from synapse.types import JsonDict, get_domain_from_id
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 
 logger = logging.getLogger(__name__)
 
 
 class FederationBase:
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
 
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
         self.spam_checker = hs.get_spam_checker()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self._clock = hs.get_clock()
 
-    def _check_sigs_and_hash(
+    async def _check_sigs_and_hash(
         self, room_version: RoomVersion, pdu: EventBase
-    ) -> Deferred:
-        return make_deferred_yieldable(
-            self._check_sigs_and_hashes(room_version, [pdu])[0]
-        )
+    ) -> EventBase:
+        """Checks that event is correctly signed by the sending server.
 
-    def _check_sigs_and_hashes(
-        self, room_version: RoomVersion, pdus: List[EventBase]
-    ) -> List[Deferred]:
-        """Checks that each of the received events is correctly signed by the
-        sending server.
+        Also checks the content hash, and redacts the event if there is a mismatch.
+
+        Also runs the event through the spam checker; if it fails, redacts the event
+        and flags it as soft-failed.
 
         Args:
-            room_version: The room version of the PDUs
-            pdus: the events to be checked
+            room_version: The room version of the PDU
+            pdu: the event to be checked
 
         Returns:
-            For each input event, a deferred which:
-              * returns the original event if the checks pass
-              * returns a redacted version of the event (if the signature
+              * the original event if the checks pass
+              * a redacted version of the event (if the signature
                 matched but the hash did not)
-              * throws a SynapseError if the signature check failed.
-            The deferreds run their callbacks in the sentinel
+
+        Raises:
+              SynapseError if the signature check failed.
         """
-        deferreds = _check_sigs_on_pdus(self.keyring, room_version, pdus)
-
-        ctx = current_context()
-
-        @defer.inlineCallbacks
-        def callback(_, pdu: EventBase):
-            with PreserveLoggingContext(ctx):
-                if not check_event_content_hash(pdu):
-                    # let's try to distinguish between failures because the event was
-                    # redacted (which are somewhat expected) vs actual ball-tampering
-                    # incidents.
-                    #
-                    # This is just a heuristic, so we just assume that if the keys are
-                    # about the same between the redacted and received events, then the
-                    # received event was probably a redacted copy (but we then use our
-                    # *actual* redacted copy to be on the safe side.)
-                    redacted_event = prune_event(pdu)
-                    if set(redacted_event.keys()) == set(pdu.keys()) and set(
-                        redacted_event.content.keys()
-                    ) == set(pdu.content.keys()):
-                        logger.info(
-                            "Event %s seems to have been redacted; using our redacted "
-                            "copy",
-                            pdu.event_id,
-                        )
-                    else:
-                        logger.warning(
-                            "Event %s content has been tampered, redacting",
-                            pdu.event_id,
-                        )
-                    return redacted_event
-
-                result = yield defer.ensureDeferred(
-                    self.spam_checker.check_event_for_spam(pdu)
-                )
-
-                if result:
-                    logger.warning(
-                        "Event contains spam, redacting %s: %s",
-                        pdu.event_id,
-                        pdu.get_pdu_json(),
-                    )
-                    return prune_event(pdu)
-
-                return pdu
-
-        def errback(failure: Failure, pdu: EventBase):
-            failure.trap(SynapseError)
-            with PreserveLoggingContext(ctx):
-                logger.warning(
-                    "Signature check failed for %s: %s",
-                    pdu.event_id,
-                    failure.getErrorMessage(),
-                )
-            return failure
-
-        for deferred, pdu in zip(deferreds, pdus):
-            deferred.addCallbacks(
-                callback, errback, callbackArgs=[pdu], errbackArgs=[pdu]
+        try:
+            await _check_sigs_on_pdu(self.keyring, room_version, pdu)
+        except SynapseError as e:
+            logger.warning(
+                "Signature check failed for %s: %s",
+                pdu.event_id,
+                e,
             )
+            raise
 
-        return deferreds
+        if not check_event_content_hash(pdu):
+            # let's try to distinguish between failures because the event was
+            # redacted (which are somewhat expected) vs actual ball-tampering
+            # incidents.
+            #
+            # This is just a heuristic, so we just assume that if the keys are
+            # about the same between the redacted and received events, then the
+            # received event was probably a redacted copy (but we then use our
+            # *actual* redacted copy to be on the safe side.)
+            redacted_event = prune_event(pdu)
+            if set(redacted_event.keys()) == set(pdu.keys()) and set(
+                redacted_event.content.keys()
+            ) == set(pdu.content.keys()):
+                logger.info(
+                    "Event %s seems to have been redacted; using our redacted copy",
+                    pdu.event_id,
+                )
+            else:
+                logger.warning(
+                    "Event %s content has been tampered, redacting",
+                    pdu.event_id,
+                )
+            return redacted_event
+
+        result = await self.spam_checker.check_event_for_spam(pdu)
+
+        if result:
+            logger.warning("Event contains spam, soft-failing %s", pdu.event_id)
+            # we redact (to save disk space) as well as soft-failing (to stop
+            # using the event in prev_events).
+            redacted_event = prune_event(pdu)
+            redacted_event.internal_metadata.soft_failed = True
+            return redacted_event
+
+        return pdu
 
 
-class PduToCheckSig(
-    namedtuple(
-        "PduToCheckSig", ["pdu", "redacted_pdu_json", "sender_domain", "deferreds"]
-    )
-):
-    pass
-
-
-def _check_sigs_on_pdus(
-    keyring: Keyring, room_version: RoomVersion, pdus: Iterable[EventBase]
-) -> List[Deferred]:
+async def _check_sigs_on_pdu(
+    keyring: Keyring, room_version: RoomVersion, pdu: EventBase
+) -> None:
     """Check that the given events are correctly signed
+
+    Raise a SynapseError if the event wasn't correctly signed.
 
     Args:
         keyring: keyring object to do the checks
         room_version: the room version of the PDUs
         pdus: the events to be checked
-
-    Returns:
-        A Deferred for each event in pdus, which will either succeed if
-           the signatures are valid, or fail (with a SynapseError) if not.
     """
 
     # we want to check that the event is signed by:
@@ -181,92 +145,74 @@ def _check_sigs_on_pdus(
     # let's start by getting the domain for each pdu, and flattening the event back
     # to JSON.
 
-    pdus_to_check = [
-        PduToCheckSig(
-            pdu=p,
-            redacted_pdu_json=prune_event(p).get_pdu_json(),
-            sender_domain=get_domain_from_id(p.sender),
-            deferreds=[],
-        )
-        for p in pdus
-    ]
-
     # First we check that the sender event is signed by the sender's domain
     # (except if its a 3pid invite, in which case it may be sent by any server)
-    pdus_to_check_sender = [p for p in pdus_to_check if not _is_invite_via_3pid(p.pdu)]
-
-    more_deferreds = keyring.verify_json_objects_for_server(
-        [
-            (
-                p.sender_domain,
-                p.redacted_pdu_json,
-                p.pdu.origin_server_ts if room_version.enforce_key_validity else 0,
-                p.pdu.event_id,
+    if not _is_invite_via_3pid(pdu):
+        try:
+            await keyring.verify_event_for_server(
+                get_domain_from_id(pdu.sender),
+                pdu,
+                pdu.origin_server_ts if room_version.enforce_key_validity else 0,
             )
-            for p in pdus_to_check_sender
-        ]
-    )
-
-    def sender_err(e, pdu_to_check):
-        errmsg = "event id %s: unable to verify signature for sender %s: %s" % (
-            pdu_to_check.pdu.event_id,
-            pdu_to_check.sender_domain,
-            e.getErrorMessage(),
-        )
-        raise SynapseError(403, errmsg, Codes.FORBIDDEN)
-
-    for p, d in zip(pdus_to_check_sender, more_deferreds):
-        d.addErrback(sender_err, p)
-        p.deferreds.append(d)
+        except Exception as e:
+            errmsg = "event id %s: unable to verify signature for sender %s: %s" % (
+                pdu.event_id,
+                get_domain_from_id(pdu.sender),
+                e,
+            )
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
 
     # now let's look for events where the sender's domain is different to the
     # event id's domain (normally only the case for joins/leaves), and add additional
     # checks. Only do this if the room version has a concept of event ID domain
     # (ie, the room version uses old-style non-hash event IDs).
-    if room_version.event_format == EventFormatVersions.V1:
-        pdus_to_check_event_id = [
-            p
-            for p in pdus_to_check
-            if p.sender_domain != get_domain_from_id(p.pdu.event_id)
-        ]
-
-        more_deferreds = keyring.verify_json_objects_for_server(
-            [
-                (
-                    get_domain_from_id(p.pdu.event_id),
-                    p.redacted_pdu_json,
-                    p.pdu.origin_server_ts if room_version.enforce_key_validity else 0,
-                    p.pdu.event_id,
-                )
-                for p in pdus_to_check_event_id
-            ]
-        )
-
-        def event_err(e, pdu_to_check):
+    if room_version.event_format == EventFormatVersions.V1 and get_domain_from_id(
+        pdu.event_id
+    ) != get_domain_from_id(pdu.sender):
+        try:
+            await keyring.verify_event_for_server(
+                get_domain_from_id(pdu.event_id),
+                pdu,
+                pdu.origin_server_ts if room_version.enforce_key_validity else 0,
+            )
+        except Exception as e:
             errmsg = (
-                "event id %s: unable to verify signature for event id domain: %s"
-                % (pdu_to_check.pdu.event_id, e.getErrorMessage())
+                "event id %s: unable to verify signature for event id domain %s: %s"
+                % (
+                    pdu.event_id,
+                    get_domain_from_id(pdu.event_id),
+                    e,
+                )
             )
             raise SynapseError(403, errmsg, Codes.FORBIDDEN)
 
-        for p, d in zip(pdus_to_check_event_id, more_deferreds):
-            d.addErrback(event_err, p)
-            p.deferreds.append(d)
-
-    # replace lists of deferreds with single Deferreds
-    return [_flatten_deferred_list(p.deferreds) for p in pdus_to_check]
-
-
-def _flatten_deferred_list(deferreds: List[Deferred]) -> Deferred:
-    """Given a list of deferreds, either return the single deferred,
-    combine into a DeferredList, or return an already resolved deferred.
-    """
-    if len(deferreds) > 1:
-        return DeferredList(deferreds, fireOnOneErrback=True, consumeErrors=True)
-    elif len(deferreds) == 1:
-        return deferreds[0]
-    else:
-        return defer.succeed(None)
+    # If this is a join event for a restricted room it may have been authorised
+    # via a different server from the sending server. Check those signatures.
+    if (
+        room_version.msc3083_join_rules
+        and pdu.type == EventTypes.Member
+        and pdu.membership == Membership.JOIN
+        and EventContentFields.AUTHORISING_USER in pdu.content
+    ):
+        authorising_server = get_domain_from_id(
+            pdu.content[EventContentFields.AUTHORISING_USER]
+        )
+        try:
+            await keyring.verify_event_for_server(
+                authorising_server,
+                pdu,
+                pdu.origin_server_ts if room_version.enforce_key_validity else 0,
+            )
+        except Exception as e:
+            errmsg = (
+                "event id %s: unable to verify signature for authorising server %s: %s"
+                % (
+                    pdu.event_id,
+                    authorising_server,
+                    e,
+                )
+            )
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
 
 
 def _is_invite_via_3pid(event: EventBase) -> bool:
@@ -277,15 +223,12 @@ def _is_invite_via_3pid(event: EventBase) -> bool:
     )
 
 
-def event_from_pdu_json(
-    pdu_json: JsonDict, room_version: RoomVersion, outlier: bool = False
-) -> EventBase:
+def event_from_pdu_json(pdu_json: JsonDict, room_version: RoomVersion) -> EventBase:
     """Construct an EventBase from an event json received over federation
 
     Args:
         pdu_json: pdu as received over federation
         room_version: The version of the room this event belongs to
-        outlier: True to mark this event as an outlier
 
     Raises:
         SynapseError: if the pdu is missing required fields or is otherwise
@@ -294,6 +237,10 @@ def event_from_pdu_json(
     # we could probably enforce a bunch of other fields here (room_id, sender,
     # origin, etc etc)
     assert_params_in_dict(pdu_json, ("type", "depth"))
+
+    # Strip any unauthorized values from "unsigned" if they exist
+    if "unsigned" in pdu_json:
+        _strip_unsigned_values(pdu_json)
 
     depth = pdu_json["depth"]
     if not isinstance(depth, int):
@@ -309,6 +256,25 @@ def event_from_pdu_json(
         validate_canonicaljson(pdu_json)
 
     event = make_event_from_dict(pdu_json, room_version)
-    event.internal_metadata.outlier = outlier
-
     return event
+
+
+def _strip_unsigned_values(pdu_dict: JsonDict) -> None:
+    """
+    Strip any unsigned values unless specifically allowed, as defined by the whitelist.
+
+    pdu: the json dict to strip values from. Note that the dict is mutated by this
+    function
+    """
+    unsigned = pdu_dict["unsigned"]
+
+    if not isinstance(unsigned, dict):
+        pdu_dict["unsigned"] = {}
+
+    if pdu_dict["type"] == "m.room.member":
+        whitelist = ["knock_room_state", "invite_room_state", "age"]
+    else:
+        whitelist = ["age"]
+
+    filtered_unsigned = {k: v for k, v in unsigned.items() if k in whitelist}
+    pdu_dict["unsigned"] = filtered_unsigned

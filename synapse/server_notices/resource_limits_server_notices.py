@@ -21,7 +21,6 @@ from synapse.api.constants import (
     ServerNoticeMsgType,
 )
 from synapse.api.errors import AuthError, ResourceLimitError, SynapseError
-from synapse.server_notices.server_notices_manager import SERVER_NOTICE_ROOM_TAG
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -36,7 +35,7 @@ class ResourceLimitsServerNotices:
 
     def __init__(self, hs: "HomeServer"):
         self._server_notices_manager = hs.get_server_notices_manager()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._auth = hs.get_auth()
         self._config = hs.config
         self._resouce_limited = False
@@ -47,9 +46,9 @@ class ResourceLimitsServerNotices:
         self._notifier = hs.get_notifier()
 
         self._enabled = (
-            hs.config.limit_usage_by_mau
+            hs.config.server.limit_usage_by_mau
             and self._server_notices_manager.is_enabled()
-            and not hs.config.hs_disabled
+            and not hs.config.server.hs_disabled
         )
 
     async def maybe_send_server_notice_to_user(self, user_id: str) -> None:
@@ -71,18 +70,19 @@ class ResourceLimitsServerNotices:
             # In practice, not sure we can ever get here
             return
 
-        room_id = await self._server_notices_manager.get_or_create_notice_room_for_user(
+        # Check if there's a server notice room for this user.
+        room_id = await self._server_notices_manager.maybe_get_notice_room_for_user(
             user_id
         )
 
-        if not room_id:
-            logger.warning("Failed to get server notices room")
-            return
-
-        await self._check_and_set_tags(user_id, room_id)
-
-        # Determine current state of room
-        currently_blocked, ref_events = await self._is_room_currently_blocked(room_id)
+        if room_id is not None:
+            # Determine current state of room
+            currently_blocked, ref_events = await self._is_room_currently_blocked(
+                room_id
+            )
+        else:
+            currently_blocked = False
+            ref_events = []
 
         limit_msg = None
         limit_type = None
@@ -98,7 +98,7 @@ class ResourceLimitsServerNotices:
         try:
             if (
                 limit_type == LimitBlockingTypes.MONTHLY_ACTIVE_USER
-                and not self._config.mau_limit_alerting
+                and not self._config.server.mau_limit_alerting
             ):
                 # We have hit the MAU limit, but MAU alerting is disabled:
                 # reset room if necessary and return
@@ -149,7 +149,7 @@ class ResourceLimitsServerNotices:
             "body": event_body,
             "msgtype": ServerNoticeMsgType,
             "server_notice_type": ServerNoticeLimitReached,
-            "admin_contact": self._config.admin_contact,
+            "admin_contact": self._config.server.admin_contact,
             "limit_type": event_limit_type,
         }
         event = await self._server_notices_manager.send_notice(
@@ -160,26 +160,6 @@ class ResourceLimitsServerNotices:
         await self._server_notices_manager.send_notice(
             user_id, content, EventTypes.Pinned, ""
         )
-
-    async def _check_and_set_tags(self, user_id: str, room_id: str) -> None:
-        """
-        Since server notices rooms were originally not with tags,
-        important to check that tags have been set correctly
-        Args:
-            user_id(str): the user in question
-            room_id(str): the server notices room for that user
-        """
-        tags = await self._store.get_tags_for_room(user_id, room_id)
-        need_to_set_tag = True
-        if tags:
-            if SERVER_NOTICE_ROOM_TAG in tags:
-                # tag already present, nothing to do here
-                need_to_set_tag = False
-        if need_to_set_tag:
-            max_id = await self._account_data_handler.add_tag_to_room(
-                user_id, room_id, SERVER_NOTICE_ROOM_TAG, {}
-            )
-            self._notifier.on_new_event("account_data_key", max_id, users=[user_id])
 
     async def _is_room_currently_blocked(self, room_id: str) -> Tuple[bool, List[str]]:
         """
@@ -205,7 +185,7 @@ class ResourceLimitsServerNotices:
             # The user has yet to join the server notices room
             pass
 
-        referenced_events = []  # type: List[str]
+        referenced_events: List[str] = []
         if pinned_state_event is not None:
             referenced_events = list(pinned_state_event.content.get("pinned", []))
 

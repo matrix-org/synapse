@@ -16,23 +16,24 @@ import resource
 from unittest import mock
 
 from synapse.app.phone_stats_home import phone_stats_home
+from synapse.types import JsonDict
 
 from tests.unittest import HomeserverTestCase
 
 
 class PhoneHomeStatsTestCase(HomeserverTestCase):
-    def test_performance_frozen_clock(self):
+    def test_performance_frozen_clock(self) -> None:
         """
         If time doesn't move, don't error out.
         """
         past_stats = [
             (self.hs.get_clock().time(), resource.getrusage(resource.RUSAGE_SELF))
         ]
-        stats = {}
+        stats: JsonDict = {}
         self.get_success(phone_stats_home(self.hs, stats, past_stats))
         self.assertEqual(stats["cpu_average"], 0)
 
-    def test_performance_100(self):
+    def test_performance_100(self) -> None:
         """
         1 second of usage over 1 second is 100% CPU usage.
         """
@@ -43,7 +44,8 @@ class PhoneHomeStatsTestCase(HomeserverTestCase):
         old_resource.ru_maxrss = real_res.ru_maxrss
 
         past_stats = [(self.hs.get_clock().time(), old_resource)]
-        stats = {}
+        stats: JsonDict = {}
         self.reactor.advance(1)
-        self.get_success(phone_stats_home(self.hs, stats, past_stats))
+        # `old_resource` has type `Mock` instead of `struct_rusage`
+        self.get_success(phone_stats_home(self.hs, stats, past_stats))  # type: ignore[arg-type]
         self.assertApproximates(stats["cpu_average"], 100, tolerance=2.5)

@@ -12,14 +12,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from collections import namedtuple
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, List, Tuple
+
+import attr
 
 from synapse.replication.tcp.streams._base import (
     Stream,
     current_token_without_instance,
     make_http_update_function,
 )
+from synapse.types import JsonDict
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -30,19 +32,16 @@ class FederationStream(Stream):
     sending disabled.
     """
 
-    FederationStreamRow = namedtuple(
-        "FederationStreamRow",
-        (
-            "type",  # str, the type of data as defined in the BaseFederationRows
-            "data",  # dict, serialization of a federation.send_queue.BaseFederationRow
-        ),
-    )
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
+    class FederationStreamRow:
+        type: str  # the type of data as defined in the BaseFederationRows
+        data: JsonDict  # serialization of a federation.send_queue.BaseFederationRow
 
     NAME = "federation"
     ROW_TYPE = FederationStreamRow
 
     def __init__(self, hs: "HomeServer"):
-        if hs.config.worker_app is None:
+        if hs.config.worker.worker_app is None:
             # master process: get updates from the FederationRemoteSendQueue.
             # (if the master is configured to send federation itself, federation_sender
             # will be a real FederationSender, which has stubs for current_token and
@@ -51,9 +50,9 @@ class FederationStream(Stream):
             current_token = current_token_without_instance(
                 federation_sender.get_current_token
             )
-            update_function = (
-                federation_sender.get_replication_rows
-            )  # type: Callable[[str, int, int, int], Awaitable[Tuple[List[Tuple[int, Any]], int, bool]]]
+            update_function: Callable[
+                [str, int, int, int], Awaitable[Tuple[List[Tuple[int, Any]], int, bool]]
+            ] = federation_sender.get_replication_rows
 
         elif hs.should_send_federation():
             # federation sender: Query master process
