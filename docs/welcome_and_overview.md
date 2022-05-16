@@ -11,13 +11,13 @@ This documentation covers topics for **installation**, **configuration** and
 
 * Learn how to [install](setup/installation.md) and
   [configure](usage/configuration/config_documentation.md) your own instance, perhaps with [Single
-  Sign-On](usage/configuration/user_authentication/index.html).
+  Sign-On](usage/configuration/user_authentication/README.md).
 
 * See how to [upgrade](upgrade.md) between Synapse versions.
 
 * Administer your instance using the [Admin
-  API](usage/administration/admin_api/index.html), installing [pluggable
-  modules](modules/index.html), or by accessing the [manhole](manhole.md).
+  API](usage/administration/admin_api/README.md), installing [pluggable
+  modules](modules/index.md), or by accessing the [manhole](manhole.md).
 
 * Learn how to [read log lines](usage/administration/request_log.md), configure
   [logging](usage/configuration/logging_sample_config.md) or set up [structured
@@ -50,7 +50,7 @@ following documentation:
   issue](https://github.com/matrix-org/synapse/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
 
 * Understand [how Synapse is
-  built](development/internal_documentation/index.html), how to [migrate
+  built](development/internal_documentation/README.md), how to [migrate
   database schemas](development/database_schema.md), learn about
   [federation](federate.md) and how to [set up a local
   federation](federate.md#running-a-demo-federation-of-synapses) for development.
