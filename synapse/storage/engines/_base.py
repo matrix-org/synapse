@@ -13,7 +13,7 @@
 # limitations under the License.
 import abc
 from enum import IntEnum
-from typing import TYPE_CHECKING, Generic, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Mapping, Optional, TypeVar
 
 from synapse.storage.types import Connection, Cursor, DBAPI2Module
 
@@ -35,7 +35,7 @@ ConnectionType = TypeVar("ConnectionType", bound=Connection)
 
 
 class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
-    def __init__(self, module: DBAPI2Module):
+    def __init__(self, module: DBAPI2Module, config: Mapping[str, Any]):
         self.module = module
 
     @property

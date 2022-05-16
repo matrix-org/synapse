@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
     def __init__(self, database_config: Mapping[str, Any]):
-        super().__init__(sqlite3)
+        super().__init__(sqlite3, database_config)
 
         database = database_config.get("args", {}).get("database")
         self._is_in_memory = database in (
