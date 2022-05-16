@@ -176,6 +176,24 @@ class CacheConfig(Config):
           #
           #cache_entry_ttl: 30m
 
+          # This flag enables cache autotuning, and is further specified by the sub-options `max_cache_memory_usage`,
+          # `target_cache_memory_usage`, `min_cache_ttl`. These flags work in conjunction with each other to maintain
+          # a balance between cache memory usage and cache entry availability. You must be using jemalloc to utilize
+          # this option, and all three of the options must be specified for this feature to work.
+          #cache_autotuning:
+            # This flag sets a ceiling on much memory the cache can use before caches begin to be continuously evicted.
+            # They will continue to be evicted until the memory usage drops below the `target_memory_usage`, set in
+            # the flag below, or until the `min_cache_ttl` is hit.
+            #max_cache_memory_usage: 1024M
+
+            # This flag sets a rough target for the desired memory usage of the caches.
+            #target_cache_memory_usage: 758M
+
+            # 'min_cache_ttl` sets a limit under which newer cache entries are not evicted and is only applied when
+            # caches are actively being evicted/`max_cache_memory_usage` has been exceeded. This is to protect hot caches
+            # from being emptied while Synapse is evicting due to memory.
+            #min_cache_ttl: 5m
+
           # Controls how long the results of a /sync request are cached for after
           # a successful response is returned. A higher duration can help clients with
           # intermittent connections, at the cost of higher memory usage.
@@ -262,6 +280,21 @@ class CacheConfig(Config):
                 "instead."
             )
             self.expiry_time_msec = self.parse_duration(expiry_time)
+
+        self.cache_autotuning = cache_config.get("cache_autotuning")
+        if self.cache_autotuning:
+            max_memory_usage = self.cache_autotuning.get("max_cache_memory_usage")
+            self.cache_autotuning["max_cache_memory_usage"] = self.parse_size(
+                max_memory_usage
+            )
+
+            target_mem_size = self.cache_autotuning.get("target_cache_memory_usage")
+            self.cache_autotuning["target_cache_memory_usage"] = self.parse_size(
+                target_mem_size
+            )
+
+            min_cache_ttl = self.cache_autotuning.get("min_cache_ttl")
+            self.cache_autotuning["min_cache_ttl"] = self.parse_duration(min_cache_ttl)
 
         self.sync_response_cache_duration = self.parse_duration(
             cache_config.get("sync_response_cache_duration", 0)

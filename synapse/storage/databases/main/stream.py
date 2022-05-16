@@ -743,14 +743,17 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         """
 
         def _f(txn: LoggingTransaction) -> Optional[Tuple[int, int, str]]:
-            sql = (
-                "SELECT stream_ordering, topological_ordering, event_id"
-                " FROM events"
-                " WHERE room_id = ? AND stream_ordering <= ?"
-                " AND NOT outlier"
-                " ORDER BY stream_ordering DESC"
-                " LIMIT 1"
-            )
+            sql = """
+                SELECT stream_ordering, topological_ordering, event_id
+                FROM events
+                LEFT JOIN rejections USING (event_id)
+                WHERE room_id = ?
+                    AND stream_ordering <= ?
+                    AND NOT outlier
+                    AND rejections.reason IS NULL
+                ORDER BY stream_ordering DESC
+                LIMIT 1
+            """
             txn.execute(sql, (room_id, stream_ordering))
             return cast(Optional[Tuple[int, int, str]], txn.fetchone())
 
@@ -798,9 +801,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         self,
         txn: LoggingTransaction,
         event_id: str,
-        allow_none=False,
-    ) -> int:
-        return self.db_pool.simple_select_one_onecol_txn(
+        allow_none: bool = False,
+    ) -> Optional[int]:
+        # Type ignore: we pass keyvalues a Dict[str, str]; the function wants
+        # Dict[str, Any]. I think mypy is unhappy because Dict is invariant?
+        return self.db_pool.simple_select_one_onecol_txn(  # type: ignore[call-overload]
             txn=txn,
             table="events",
             keyvalues={"event_id": event_id},
