@@ -167,7 +167,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         try:
             args: Mapping[Any, Any] = {
                 **fields,
-                b"access_token": [service.hs_token],
+                b"access_token": service.hs_token,
             }
             response = await self.get_json(uri, args=args)
             if not isinstance(response, list):
