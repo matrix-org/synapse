@@ -88,6 +88,9 @@ class _DummyStore:
 
         return groups
 
+    async def get_state_ids_for_group(self, state_group):
+        return self._group_to_state[state_group]
+
     async def store_state_group(
         self, event_id, room_id, prev_group, delta_ids, current_state_ids
     ):

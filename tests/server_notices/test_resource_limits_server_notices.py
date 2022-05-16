@@ -75,6 +75,9 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         self._rlsn._server_notices_manager.get_or_create_notice_room_for_user = Mock(
             return_value=make_awaitable("!something:localhost")
         )
+        self._rlsn._server_notices_manager.maybe_get_notice_room_for_user = Mock(
+            return_value=make_awaitable("!something:localhost")
+        )
         self._rlsn._store.add_tag_to_room = Mock(return_value=make_awaitable(None))
         self._rlsn._store.get_tags_for_room = Mock(return_value=make_awaitable({}))
 
@@ -102,6 +105,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         )
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
         # Would be better to check the content, but once == remove blocking event
+        self._rlsn._server_notices_manager.maybe_get_notice_room_for_user.assert_called_once()
         self._send_notice.assert_called_once()
 
     def test_maybe_send_server_notice_to_user_remove_blocked_notice_noop(self):
@@ -300,7 +304,10 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         hasn't been reached (since it's the only user and the limit is 5), so users
         shouldn't receive a server notice.
         """
-        self.register_user("user", "password")
+        m = Mock(return_value=make_awaitable(None))
+        self._rlsn._server_notices_manager.maybe_get_notice_room_for_user = m
+
+        user_id = self.register_user("user", "password")
         tok = self.login("user", "password")
 
         channel = self.make_request("GET", "/sync?timeout=0", access_token=tok)
@@ -308,6 +315,8 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         self.assertNotIn(
             "rooms", channel.json_body, "Got invites without server notice"
         )
+
+        m.assert_called_once_with(user_id)
 
     def test_invite_with_notice(self):
         """Tests that, if the MAU limit is hit, the server notices user invites each user

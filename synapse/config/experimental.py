@@ -32,7 +32,7 @@ class ExperimentalConfig(Config):
         # MSC2716 (importing historical messages)
         self.msc2716_enabled: bool = experimental.get("msc2716_enabled", False)
 
-        # MSC2285 (hidden read receipts)
+        # MSC2285 (private read receipts)
         self.msc2285_enabled: bool = experimental.get("msc2285_enabled", False)
 
         # MSC3244 (room version capabilities)
@@ -81,3 +81,6 @@ class ExperimentalConfig(Config):
 
         # MSC2815 (allow room moderators to view redacted event content)
         self.msc2815_enabled: bool = experimental.get("msc2815_enabled", False)
+
+        # MSC3786 (Add a default push rule to ignore m.room.server_acl events)
+        self.msc3786_enabled: bool = experimental.get("msc3786_enabled", False)

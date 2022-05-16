@@ -42,7 +42,7 @@ from typing import (
 )
 
 import attr
-from typing_extensions import AsyncContextManager, Literal
+from typing_extensions import AsyncContextManager, Concatenate, Literal, ParamSpec
 
 from twisted.internet import defer
 from twisted.internet.defer import CancelledError
@@ -237,9 +237,16 @@ async def concurrently_execute(
     )
 
 
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
 async def yieldable_gather_results(
-    func: Callable[..., Awaitable[T]], iter: Iterable, *args: Any, **kwargs: Any
-) -> List[T]:
+    func: Callable[Concatenate[T, P], Awaitable[R]],
+    iter: Iterable[T],
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> List[R]:
     """Executes the function with each argument concurrently.
 
     Args:
@@ -255,7 +262,15 @@ async def yieldable_gather_results(
     try:
         return await make_deferred_yieldable(
             defer.gatherResults(
-                [run_in_background(func, item, *args, **kwargs) for item in iter],
+                # type-ignore: mypy reports two errors:
+                # error: Argument 1 to "run_in_background" has incompatible type
+                #     "Callable[[T, **P], Awaitable[R]]"; expected
+                #     "Callable[[T, **P], Awaitable[R]]"  [arg-type]
+                # error: Argument 2 to "run_in_background" has incompatible type
+                #     "T"; expected "[T, **P.args]"  [arg-type]
+                # The former looks like a mypy bug, and the latter looks like a
+                # false positive.
+                [run_in_background(func, item, *args, **kwargs) for item in iter],  # type: ignore[arg-type]
                 consumeErrors=True,
             )
         )
@@ -577,9 +592,6 @@ class ReadWriteLock:
         return _ctx_manager()
 
 
-R = TypeVar("R")
-
-
 def timeout_deferred(
     deferred: "defer.Deferred[_T]", timeout: float, reactor: IReactorTime
 ) -> "defer.Deferred[_T]":
@@ -766,3 +778,60 @@ def delay_cancellation(awaitable: Awaitable[T]) -> Awaitable[T]:
     new_deferred: "defer.Deferred[T]" = defer.Deferred(handle_cancel)
     deferred.chainDeferred(new_deferred)
     return new_deferred
+
+
+class AwakenableSleeper:
+    """Allows explicitly waking up deferreds related to an entity that are
+    currently sleeping.
+    """
+
+    def __init__(self, reactor: IReactorTime) -> None:
+        self._streams: Dict[str, Set[defer.Deferred[None]]] = {}
+        self._reactor = reactor
+
+    def wake(self, name: str) -> None:
+        """Wake everything related to `name` that is currently sleeping."""
+        stream_set = self._streams.pop(name, set())
+        for deferred in stream_set:
+            try:
+                with PreserveLoggingContext():
+                    deferred.callback(None)
+            except Exception:
+                pass
+
+    async def sleep(self, name: str, delay_ms: int) -> None:
+        """Sleep for the given number of milliseconds, or return if the given
+        `name` is explicitly woken up.
+        """
+
+        # Create a deferred that gets called in N seconds
+        sleep_deferred: "defer.Deferred[None]" = defer.Deferred()
+        call = self._reactor.callLater(delay_ms / 1000, sleep_deferred.callback, None)
+
+        # Create a deferred that will get called if `wake` is called with
+        # the same `name`.
+        stream_set = self._streams.setdefault(name, set())
+        notify_deferred: "defer.Deferred[None]" = defer.Deferred()
+        stream_set.add(notify_deferred)
+
+        try:
+            # Wait for either the delay or for `wake` to be called.
+            await make_deferred_yieldable(
+                defer.DeferredList(
+                    [sleep_deferred, notify_deferred],
+                    fireOnOneCallback=True,
+                    fireOnOneErrback=True,
+                    consumeErrors=True,
+                )
+            )
+        finally:
+            # Clean up the state
+            curr_stream_set = self._streams.get(name)
+            if curr_stream_set is not None:
+                curr_stream_set.discard(notify_deferred)
+                if len(curr_stream_set) == 0:
+                    self._streams.pop(name)
+
+            # Cancel the sleep if we were woken up
+            if call.active():
+                call.cancel()

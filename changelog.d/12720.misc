@@ -1,0 +1,1 @@
+Drop the logging level of status messages for the URL preview cache expiry job from INFO to DEBUG.

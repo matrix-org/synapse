@@ -270,13 +270,13 @@ COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh
 To run a specific test file, you can pass the test name at the end of the command. The name passed comes from the naming structure in your Complement tests. If you're unsure of the name, you can do a full run and copy it from the test output:
 
 ```sh
-COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh TestBackfillingHistory
+COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages
 ```
 
 To run a specific test, you can specify the whole name structure:
 
 ```sh
-COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh TestBackfillingHistory/parallel/Backfilled_historical_events_resolve_with_proper_state_in_correct_order
+COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages/parallel/Historical_events_resolve_in_the_correct_order
 ```
 
 

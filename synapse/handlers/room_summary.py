@@ -105,6 +105,7 @@ class RoomSummaryHandler:
             hs.get_clock(),
             "get_room_hierarchy",
         )
+        self._msc3266_enabled = hs.config.experimental.msc3266_enabled
 
     async def get_room_hierarchy(
         self,
@@ -630,7 +631,7 @@ class RoomSummaryHandler:
         return False
 
     async def _is_remote_room_accessible(
-        self, requester: str, room_id: str, room: JsonDict
+        self, requester: Optional[str], room_id: str, room: JsonDict
     ) -> bool:
         """
         Calculate whether the room received over federation should be shown to the requester.
@@ -645,7 +646,8 @@ class RoomSummaryHandler:
         due to an invite, etc.
 
         Args:
-            requester: The user requesting the summary.
+            requester: The user requesting the summary. If not passed only world
+                readability is checked.
             room_id: The room ID returned over federation.
             room: The summary of the room returned over federation.
 
@@ -659,6 +661,8 @@ class RoomSummaryHandler:
             or room.get("world_readable") is True
         ):
             return True
+        elif not requester:
+            return False
 
         # Check if the user is a member of any of the allowed rooms from the response.
         allowed_rooms = room.get("allowed_room_ids")
@@ -714,6 +718,10 @@ class RoomSummaryHandler:
             "guest_can_join": stats["guest_access"] == "can_join",
             "room_type": create_event.content.get(EventContentFields.ROOM_TYPE),
         }
+
+        if self._msc3266_enabled:
+            entry["im.nheko.summary.version"] = stats["version"]
+            entry["im.nheko.summary.encryption"] = stats["encryption"]
 
         # Federation requests need to provide additional information so the
         # requested server is able to filter the response appropriately.
@@ -812,9 +820,45 @@ class RoomSummaryHandler:
 
                 room_summary["membership"] = membership or "leave"
         else:
-            # TODO federation API, descoped from initial unstable implementation
-            #      as MSC needs more maturing on that side.
-            raise SynapseError(400, "Federation is not currently supported.")
+            # Reuse the hierarchy query over federation
+            if remote_room_hosts is None:
+                raise SynapseError(400, "Missing via to query remote room")
+
+            (
+                room_entry,
+                children_room_entries,
+                inaccessible_children,
+            ) = await self._summarize_remote_room_hierarchy(
+                _RoomQueueEntry(room_id, remote_room_hosts),
+                suggested_only=True,
+            )
+
+            # The results over federation might include rooms that we, as the
+            # requesting server, are allowed to see, but the requesting user is
+            # not permitted to see.
+            #
+            # Filter the returned results to only what is accessible to the user.
+            if not room_entry or not await self._is_remote_room_accessible(
+                requester, room_entry.room_id, room_entry.room
+            ):
+                raise NotFoundError("Room not found or is not accessible")
+
+            room = dict(room_entry.room)
+            room.pop("allowed_room_ids", None)
+
+            # If there was a requester, add their membership.
+            # We keep the membership in the local membership table unless the
+            # room is purged even for remote rooms.
+            if requester:
+                (
+                    membership,
+                    _,
+                ) = await self._store.get_local_current_membership_for_user_in_room(
+                    requester, room_id
+                )
+                room["membership"] = membership or "leave"
+
+            return room
 
         return room_summary
 

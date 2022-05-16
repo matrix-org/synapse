@@ -204,6 +204,15 @@ class ReplicationStreamer:
                                 # turns out that e.g. account data streams share
                                 # their "current token" with each other, meaning
                                 # that it is *not* safe to send a POSITION.
+
+                                # Note: `last_token` may not *actually* be the
+                                # last token we sent out in a RDATA or POSITION.
+                                # This can happen if we sent out an RDATA for
+                                # position X when our current token was say X+1.
+                                # Other workers will see RDATA for X and then a
+                                # POSITION with last token of X+1, which will
+                                # cause them to check if there were any missing
+                                # updates between X and X+1.
                                 logger.info(
                                     "Sending position: %s -> %s",
                                     stream.NAME,

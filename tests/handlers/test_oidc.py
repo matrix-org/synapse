@@ -1300,7 +1300,7 @@ def _build_callback_request(
             "getCookie",
             "cookies",
             "requestHeaders",
-            "getClientIP",
+            "getClientAddress",
             "getHeader",
         ]
     )
@@ -1310,5 +1310,5 @@ def _build_callback_request(
     request.args = {}
     request.args[b"code"] = [code.encode("utf-8")]
     request.args[b"state"] = [state.encode("utf-8")]
-    request.getClientIP.return_value = ip_address
+    request.getClientAddress.return_value.host = ip_address
     return request

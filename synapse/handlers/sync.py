@@ -1048,7 +1048,7 @@ class SyncHandler:
             last_unread_event_id = await self.store.get_last_receipt_event_id_for_user(
                 user_id=sync_config.user.to_string(),
                 room_id=room_id,
-                receipt_type=ReceiptTypes.READ,
+                receipt_types=(ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE),
             )
 
             return await self.store.get_unread_event_push_actions_by_room_for_user(

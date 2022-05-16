@@ -93,7 +93,7 @@ class VersionsRestServlet(RestServlet):
                     "io.element.e2ee_forced.trusted_private": self.e2ee_forced_trusted_private,
                     # Supports the busy presence state described in MSC3026.
                     "org.matrix.msc3026.busy_presence": self.config.experimental.msc3026_enabled,
-                    # Supports receiving hidden read receipts as per MSC2285
+                    # Supports receiving private read receipts as per MSC2285
                     "org.matrix.msc2285": self.config.experimental.msc2285_enabled,
                     # Adds support for importing historical messages as per MSC2716
                     "org.matrix.msc2716": self.config.experimental.msc2716_enabled,

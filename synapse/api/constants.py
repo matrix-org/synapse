@@ -255,7 +255,5 @@ class GuestAccess:
 
 class ReceiptTypes:
     READ: Final = "m.read"
-
-
-class ReadReceiptEventFields:
-    MSC2285_HIDDEN: Final = "org.matrix.msc2285.hidden"
+    READ_PRIVATE: Final = "org.matrix.msc2285.read.private"
+    FULLY_READ: Final = "m.fully_read"

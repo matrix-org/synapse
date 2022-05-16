@@ -1,0 +1,1 @@
+Fixes an incorrect type hint for `Filter._check_event_relations`.
