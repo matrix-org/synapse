@@ -155,6 +155,8 @@ class ApplicationServiceApi(SimpleHttpClient):
         if service.url is None:
             return []
 
+        fields["access_token"] = service.hs_token
+
         uri = "%s%s/thirdparty/%s/%s" % (
             service.url,
             APP_SERVICE_PREFIX,
@@ -196,7 +198,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                 urllib.parse.quote(protocol),
             )
             try:
-                info = await self.get_json(uri)
+                info = await self.get_json(uri, {"access_token": service.hs_token})
 
                 if not _is_valid_3pe_metadata(info):
                     logger.warning(
