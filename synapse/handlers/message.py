@@ -634,7 +634,9 @@ class EventCreationHandler:
             # federation as well as those created locally. As of room v3, aliases events
             # can be created by users that are not in the room, therefore we have to
             # tolerate them in event_auth.check().
-            prev_state_ids = await context.get_prev_state_ids()
+            prev_state_ids = await context.get_prev_state_ids(
+                StateFilter.from_types([(EventTypes.Member, None)])
+            )
             prev_event_id = prev_state_ids.get((EventTypes.Member, event.sender))
             prev_event = (
                 await self.store.get_event(prev_event_id, allow_none=True)
@@ -761,7 +763,9 @@ class EventCreationHandler:
             # This can happen due to out of band memberships
             return None
 
-        prev_state_ids = await context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids(
+            StateFilter.from_types([(event.type, None)])
+        )
         prev_event_id = prev_state_ids.get((event.type, event.state_key))
         if not prev_event_id:
             return None
