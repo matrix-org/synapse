@@ -20,7 +20,16 @@ import itertools
 import logging
 from enum import Enum
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import attr
 from signedjson.key import decode_verify_key_bytes
@@ -545,6 +554,7 @@ class FederationHandler:
                     desc="sync_partial_state_room",
                     func=self._sync_partial_state_room,
                     destination=origin,
+                    destinations=ret.servers_in_room,
                     room_id=room_id,
                 )
 
@@ -1443,13 +1453,16 @@ class FederationHandler:
 
     async def _sync_partial_state_room(
         self,
-        destination: str,
+        destination: Optional[str],
+        destinations: Collection[str],
         room_id: str,
     ) -> None:
         """Background process to resync the state of a partial-state room
 
         Args:
             destination: homeserver to pull the state from
+            destinations: other homeservers to try to pull the state from, if
+                `destination` is unavailable
             room_id: room to be resynced
         """
 
@@ -1460,9 +1473,21 @@ class FederationHandler:
         # TODO(faster_joins): what happens if we leave the room during a resync? if we
         #   really leave, that might mean we have difficulty getting the room state over
         #   federation.
-        #
-        # TODO(faster_joins): try other destinations if the one we have fails
 
+        # Make an infinite iterator of destinations to try. Once we find a working
+        # destination, we'll stick with it until it flakes.
+        if destination is not None:
+            # `destinations` may already contain `destination`. Remove it.
+            destinations = list(destinations)
+            destinations.remove(destination)
+            num_destinations = 1 + len(destinations)
+            destination_iter = itertools.cycle([destination] + destinations)
+        else:
+            num_destinations = len(destinations)
+            destination_iter = itertools.cycle(destinations)
+
+        # `destination` is now the current remote homeserver we're pulling from.
+        destination = next(destination_iter)
         logger.info("Syncing state for room %s via %s", room_id, destination)
 
         # we work through the queue in order of increasing stream ordering.
@@ -1498,6 +1523,42 @@ class FederationHandler:
                 allow_rejected=True,
             )
             for event in events:
-                await self._federation_event_handler.update_state_for_partial_state_event(
-                    destination, event
-                )
+                for attempt in range(num_destinations):
+                    try:
+                        await self._federation_event_handler.update_state_for_partial_state_event(
+                            destination, event
+                        )
+                        break
+                    except (
+                        InvalidResponseError,
+                        FederationDeniedError,
+                        HttpResponseException,
+                        NotRetryingDestination,
+                        RequestSendFailed,
+                    ) as e:
+                        if attempt == num_destinations - 1:
+                            # We have tried every remote server. Give up.
+                            logger.error(
+                                "Failed to get state for %s at %s from %s because %s. "
+                                "Giving up!",
+                                room_id,
+                                event,
+                                destination,
+                                e,
+                            )
+                            raise
+
+                        # Try the next remote server.
+                        logger.info(
+                            "Failed to get state for %s at %s from %s because %s",
+                            room_id,
+                            event,
+                            destination,
+                            e,
+                        )
+                        destination = next(destination_iter)
+                        logger.info(
+                            "Syncing state for room %s via %s instead",
+                            room_id,
+                            destination,
+                        )
