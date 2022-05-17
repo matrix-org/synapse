@@ -176,7 +176,9 @@ def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str, Optional[str
 
         def strip_quotes(value: str) -> str:
             if value.startswith('"'):
-                return re.sub("\\\\(.)", lambda matchobj: matchobj.group(1), value[1:-1])
+                return re.sub(
+                    "\\\\(.)", lambda matchobj: matchobj.group(1), value[1:-1]
+                )
             else:
                 return value
 
