@@ -14,7 +14,7 @@ Additionally, this release removes the non-standard `m.login.jwt` login type fro
 Bugfixes
 --------
 
-- Fix DB performance regression introduced in v1.59.0rc2. ([\#12745](https://github.com/matrix-org/synapse/issues/12745))
+- Fix DB performance regression introduced in Synapse 1.59.0rc2. ([\#12745](https://github.com/matrix-org/synapse/issues/12745))
 
 
 Synapse 1.59.0rc2 (2022-05-16)
