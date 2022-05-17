@@ -1072,11 +1072,19 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
 
             return assert_thread
 
-        self._test_bundled_aggregations(RelationTypes.THREAD, _gen_assert(False), 10)
+        # A user which has sent the root event or replied has participated.
+        self._test_bundled_aggregations(RelationTypes.THREAD, _gen_assert(True), 10)
         # Note that this re-uses some cached values, so the total number of
         # queries is much smaller.
         self._test_bundled_aggregations(
             RelationTypes.THREAD, _gen_assert(True), 2, access_token=self.user2_token
+        )
+
+        # A user with no interactions with the thread has not participated.
+        user3_id, user3_token = self._create_user("charlie")
+        self.helper.join(self.room, user=user3_id, tok=user3_token)
+        self._test_bundled_aggregations(
+            RelationTypes.THREAD, _gen_assert(False), 2, access_token=user3_token
         )
 
     def test_thread_with_bundled_aggregations_for_latest(self) -> None:
