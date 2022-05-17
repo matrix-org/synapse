@@ -1,0 +1,1 @@
+Moves methods that call `add_push_rule` to the `PushRuleStore` class.
