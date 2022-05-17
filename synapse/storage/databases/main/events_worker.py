@@ -748,7 +748,7 @@ class EventsWorkerStore(SQLBaseStore):
         event_map = {}
 
         for event_id in events:
-            # First check if its in the event cache
+            # First check if it's in the event cache
             ret = self._get_event_cache.get(
                 (event_id,), None, update_metrics=update_metrics
             )
