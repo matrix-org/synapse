@@ -416,7 +416,7 @@ class FederationClient(FederationBase):
         if not isinstance(state_event_ids, list) or not isinstance(
             auth_event_ids, list
         ):
-            raise Exception("invalid response from /state_ids")
+            raise InvalidResponseError("invalid response from /state_ids")
 
         return state_event_ids, auth_event_ids
 
