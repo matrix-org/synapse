@@ -15,8 +15,16 @@
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.unittest import HomeserverTestCase, override_config
 
+try:
+    import hiredis
+except ImportError:
+    hiredis = None  # type: ignore
+
 
 class ChannelsMainTestCase(HomeserverTestCase):
+    if not hiredis:
+        skip = "Requires hiredis"
+
     @override_config({"redis": {"enabled": True}})
     def test_subscribed_to_enough_redis_channels(self) -> None:
         # The default main process is subscribed to USER_IP and all RDATA channels.
@@ -27,6 +35,9 @@ class ChannelsMainTestCase(HomeserverTestCase):
 
 
 class ChannelsWorkerTestCase(BaseMultiWorkerStreamTestCase):
+    if not hiredis:
+        skip = "Requires hiredis"
+
     def test_background_worker_subscribed_to_user_ip(self) -> None:
         # The default main process is subscribed to USER_IP and all RDATA channels.
         worker1 = self.make_worker_hs(
