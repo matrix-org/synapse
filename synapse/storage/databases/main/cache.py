@@ -62,6 +62,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             index_name="cache_invalidation_stream_by_instance_instance_index",
             table="cache_invalidation_stream_by_instance",
             columns=("instance_name", "stream_id"),
+            psql_only=True,  # The table is only on postgres DBs.
         )
 
     async def get_all_updated_caches(
