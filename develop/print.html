@@ -16456,7 +16456,20 @@ in production (and indeed, we have some code paths specific to each database).
 This means that we need to run our unit tests against PostgreSQL too. Our CI does
 this automatically for pull requests and release candidates, but it's sometimes
 useful to reproduce this locally.</p>
-<p>To do so, <a href="development/../postgres.html">configure Postgres</a> and run <code>trial</code> with the
+<h4 id="using-docker"><a class="header" href="#using-docker">Using Docker</a></h4>
+<p>The easiest way to do so is to run Postgres via a docker container. In one
+terminal:</p>
+<pre><code class="language-shell">docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgress -p 5432:5432 postgres:14
+</code></pre>
+<p>If you see an error like</p>
+<pre><code>docker: Error response from daemon: driver failed programming external connectivity on endpoint nice_ride (b57bbe2e251b70015518d00c9981e8cb8346b5c785250341a6c53e3c899875f1): Error starting userland proxy: listen tcp4 0.0.0.0:5432: bind: address already in use.
+</code></pre>
+<p>then something is already bound to port 5432. You're probably already running postgres locally.</p>
+<p>Once you have a postgres server running, invoke <code>trial</code> in a second terminal:</p>
+<pre><code class="language-shell">SYNAPSE_POSTGRES=1 SYNAPSE_POSTGRES_HOST=127.0.0.1 SYNAPSE_POSTGRES_USER=postgres SYNAPSE_POSTGRES_PASSWORD=mysecretpassword poetry run trial tests
+</code></pre>
+<h4 id="using-an-existing-postgres-installation"><a class="header" href="#using-an-existing-postgres-installation">Using an existing Postgres installation</a></h4>
+<p>If you have postgres already installed on your system, you can run <code>trial</code> with the
 following environment variables matching your configuration:</p>
 <ul>
 <li><code>SYNAPSE_POSTGRES</code> to anything nonempty</li>
@@ -16475,7 +16488,8 @@ trial
 <p>You don't need to specify the host, user, port or password if your Postgres
 server is set to authenticate you over the UNIX socket (i.e. if the <code>psql</code> command
 works without further arguments).</p>
-<p>Your Postgres account needs to be able to create databases.</p>
+<p>Your Postgres account needs to be able to create databases; see the postgres
+docs for <a href="https://www.postgresql.org/docs/current/sql-alterrole.html"><code>ALTER ROLE</code></a>.</p>
 <h2 id="run-the-integration-tests-sytest"><a class="header" href="#run-the-integration-tests-sytest">Run the integration tests (<a href="https://github.com/matrix-org/sytest">Sytest</a>).</a></h2>
 <p>The integration tests are a more comprehensive suite of tests. They
 run a full version of Synapse, including your changes, to check if
