@@ -896,6 +896,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         relation_type: str,
         assertion_callable: Callable[[JsonDict], None],
         expected_db_txn_for_event: int,
+        access_token: Optional[str] = None,
     ) -> None:
         """
         Makes requests to various endpoints which should include bundled aggregations
@@ -907,7 +908,9 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 for relation-specific assertions.
             expected_db_txn_for_event: The number of database transactions which
                 are expected for a call to /event/.
+            access_token: The access token to user, defaults to self.user_token.
         """
+        access_token = access_token or self.user_token
 
         def assert_bundle(event_json: JsonDict) -> None:
             """Assert the expected values of the bundled aggregations."""
@@ -921,7 +924,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         channel = self.make_request(
             "GET",
             f"/rooms/{self.room}/event/{self.parent_id}",
-            access_token=self.user_token,
+            access_token=access_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
         assert_bundle(channel.json_body)
@@ -932,7 +935,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         channel = self.make_request(
             "GET",
             f"/rooms/{self.room}/messages?dir=b",
-            access_token=self.user_token,
+            access_token=access_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
         assert_bundle(self._find_event_in_chunk(channel.json_body["chunk"]))
@@ -941,7 +944,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         channel = self.make_request(
             "GET",
             f"/rooms/{self.room}/context/{self.parent_id}",
-            access_token=self.user_token,
+            access_token=access_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
         assert_bundle(channel.json_body["event"])
@@ -949,7 +952,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         # Request sync.
         filter = urllib.parse.quote_plus(b'{"room": {"timeline": {"limit": 4}}}')
         channel = self.make_request(
-            "GET", f"/sync?filter={filter}", access_token=self.user_token
+            "GET", f"/sync?filter={filter}", access_token=access_token
         )
         self.assertEqual(200, channel.code, channel.json_body)
         room_timeline = channel.json_body["rooms"]["join"][self.room]["timeline"]
@@ -962,7 +965,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
             "/search",
             # Search term matches the parent message.
             content={"search_categories": {"room_events": {"search_term": "Hi"}}},
-            access_token=self.user_token,
+            access_token=access_token,
         )
         self.assertEqual(200, channel.code, channel.json_body)
         chunk = [
@@ -1037,30 +1040,44 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         """
         Test that threads get correctly bundled.
         """
-        self._send_relation(RelationTypes.THREAD, "m.room.test")
-        channel = self._send_relation(RelationTypes.THREAD, "m.room.test")
+        self._send_relation(
+            RelationTypes.THREAD, "m.room.test", access_token=self.user2_token
+        )
+        channel = self._send_relation(
+            RelationTypes.THREAD, "m.room.test", access_token=self.user2_token
+        )
         thread_2 = channel.json_body["event_id"]
 
-        def assert_thread(bundled_aggregations: JsonDict) -> None:
-            self.assertEqual(2, bundled_aggregations.get("count"))
-            self.assertTrue(bundled_aggregations.get("current_user_participated"))
-            # The latest thread event has some fields that don't matter.
-            self.assert_dict(
-                {
-                    "content": {
-                        "m.relates_to": {
-                            "event_id": self.parent_id,
-                            "rel_type": RelationTypes.THREAD,
-                        }
+        def _gen_assert(participated: bool) -> Callable[[JsonDict], None]:
+            def assert_thread(bundled_aggregations: JsonDict) -> None:
+                self.assertEqual(2, bundled_aggregations.get("count"))
+                self.assertEqual(
+                    participated, bundled_aggregations.get("current_user_participated")
+                )
+                # The latest thread event has some fields that don't matter.
+                self.assert_dict(
+                    {
+                        "content": {
+                            "m.relates_to": {
+                                "event_id": self.parent_id,
+                                "rel_type": RelationTypes.THREAD,
+                            }
+                        },
+                        "event_id": thread_2,
+                        "sender": self.user2_id,
+                        "type": "m.room.test",
                     },
-                    "event_id": thread_2,
-                    "sender": self.user_id,
-                    "type": "m.room.test",
-                },
-                bundled_aggregations.get("latest_event"),
-            )
+                    bundled_aggregations.get("latest_event"),
+                )
 
-        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 10)
+            return assert_thread
+
+        self._test_bundled_aggregations(RelationTypes.THREAD, _gen_assert(False), 10)
+        # Note that this re-uses some cached values, so the total number of
+        # queries is much smaller.
+        self._test_bundled_aggregations(
+            RelationTypes.THREAD, _gen_assert(True), 2, access_token=self.user2_token
+        )
 
     def test_thread_with_bundled_aggregations_for_latest(self) -> None:
         """
