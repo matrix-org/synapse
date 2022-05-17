@@ -218,7 +218,7 @@ docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres 
 Then in a second terminal, invoke `trial`:
 
 ```shell
-`SYNAPSE_POSTGRES=1 SYNAPSE_POSTGRES_HOST=127.0.0.1 SYNAPSE_POSTGRES_USER=postgres SYNAPSE_POSTGRES_PASSWORD=mysecretpassword poetry run trial tests
+SYNAPSE_POSTGRES=1 SYNAPSE_POSTGRES_HOST=127.0.0.1 SYNAPSE_POSTGRES_USER=postgres SYNAPSE_POSTGRES_PASSWORD=mysecretpassword poetry run trial tests
 ````
 
 #### Using an existing Postgres installation
