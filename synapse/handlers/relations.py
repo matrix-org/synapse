@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import collections.abc
 import logging
 from typing import (
     TYPE_CHECKING,
@@ -28,7 +27,7 @@ import attr
 
 from synapse.api.constants import RelationTypes
 from synapse.api.errors import SynapseError
-from synapse.events import EventBase
+from synapse.events import EventBase, relation_from_event
 from synapse.storage.databases.main.relations import _RelatedEvent
 from synapse.types import JsonDict, Requester, StreamToken, UserID
 from synapse.visibility import filter_events_for_client
@@ -373,20 +372,21 @@ class RelationsHandler:
             if event.is_state():
                 continue
 
-            relates_to = event.content.get("m.relates_to")
-            relation_type = None
-            if isinstance(relates_to, collections.abc.Mapping):
-                relation_type = relates_to.get("rel_type")
+            relates_to = relation_from_event(event)
+            if relates_to:
                 # An event which is a replacement (ie edit) or annotation (ie,
                 # reaction) may not have any other event related to it.
-                if relation_type in (RelationTypes.ANNOTATION, RelationTypes.REPLACE):
+                if relates_to.rel_type in (
+                    RelationTypes.ANNOTATION,
+                    RelationTypes.REPLACE,
+                ):
                     continue
+
+                # Track the event's relation information for later.
+                relations_by_id[event.event_id] = relates_to.rel_type
 
             # The event should get bundled aggregations.
             events_by_id[event.event_id] = event
-            # Track the event's relation information for later.
-            if isinstance(relation_type, str):
-                relations_by_id[event.event_id] = relation_type
 
         # event ID -> bundled aggregation in non-serialized form.
         results: Dict[str, BundledAggregations] = {}
