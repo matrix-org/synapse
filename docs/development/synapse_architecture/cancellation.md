@@ -1,8 +1,8 @@
 # Cancellation
 Sometimes, requests take a long time to service and clients disconnect
 before Synapse produces a response. To avoid wasting resources, Synapse
-can cancel request processing for select endpoints with the `@cancelled`
-decorator.
+can cancel request processing for select endpoints marked with the
+`@cancellable` decorator.
 
 Synapse makes use of Twisted's `Deferred.cancel()` feature to make
 cancellation work.
