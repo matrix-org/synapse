@@ -13,6 +13,7 @@
 # limitations under the License.
 from typing import Any, List, Mapping
 from unittest.mock import Mock
+
 from twisted.test.proto_helper import MemoryReactor
 
 from synapse.appservice import ApplicationService
