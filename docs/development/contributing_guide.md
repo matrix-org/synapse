@@ -215,7 +215,15 @@ terminal:
 docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgress -p 5432:5432 postgres:14
 ```
 
-Then in a second terminal, invoke `trial`:
+If you see an error like
+
+```
+docker: Error response from daemon: driver failed programming external connectivity on endpoint nice_ride (b57bbe2e251b70015518d00c9981e8cb8346b5c785250341a6c53e3c899875f1): Error starting userland proxy: listen tcp4 0.0.0.0:5432: bind: address already in use.
+```
+
+then something is already bound to port 5432. You're probably already running postgres locally.
+
+Once you have a postgresThen in a second terminal, invoke `trial`:
 
 ```shell
 SYNAPSE_POSTGRES=1 SYNAPSE_POSTGRES_HOST=127.0.0.1 SYNAPSE_POSTGRES_USER=postgres SYNAPSE_POSTGRES_PASSWORD=mysecretpassword poetry run trial tests
