@@ -747,7 +747,7 @@ class MatrixFederationHttpClient:
         for key, sig in request["signatures"][self.server_name].items():
             auth_headers.append(
                 (
-                    'X-Matrix origin=%s,key="%s",sig="%s",destination="%s"'
+                    'X-Matrix origin="%s",key="%s",sig="%s",destination="%s"'
                     % (
                         self.server_name,
                         key,
