@@ -563,6 +563,11 @@ manhole_settings:
 # sign up in a short space of time never to return after their initial
 # session.
 #
+# The option `mau_appservice_trial_days` is similar to `mau_trial_days`, but
+# applies a different trial number if the user was registered by an appservice.
+# A value of 0 means no trial days are applied. Appservices not listed in this
+# dictionary use the value of `mau_trial_days` instead.
+#
 # 'mau_limit_alerting' is a means of limiting client side alerting
 # should the mau limit be reached. This is useful for small instances
 # where the admin has 5 mau seats (say) for 5 specific people and no
@@ -573,6 +578,8 @@ manhole_settings:
 #max_mau_value: 50
 #mau_trial_days: 2
 #mau_limit_alerting: false
+#mau_appservice_trial_days:
+#  &quot;appservice-id&quot;: 1
 
 # If enabled, the metrics for the number of monthly active users will
 # be populated, however no one will be limited. If limit_usage_by_mau
@@ -865,11 +872,11 @@ retention:
 #
 #allow_profile_lookup_over_federation: false
 
-# Uncomment to disable device display name lookup over federation. By default, the
-# Federation API allows other homeservers to obtain device display names of any user
-# on this homeserver. Defaults to 'true'.
+# Uncomment to allow device display name lookup over federation. By default, the
+# Federation API prevents other homeservers from obtaining the display names of
+# user devices on this homeserver. Defaults to 'false'.
 #
-#allow_device_name_lookup_over_federation: false
+#allow_device_name_lookup_over_federation: true
 
 
 ## Caching ##
@@ -1478,6 +1485,12 @@ oembed:
 # Defaults to false. Uncomment the following to require tokens:
 #
 #registration_requires_token: true
+
+# Allow users to submit a token during registration to bypass any required 3pid
+# steps configured in `registrations_require_3pid`.
+# Defaults to false, requiring that registration tokens (if enabled) complete a 3pid flow.
+#
+#enable_registration_token_3pid_bypass: false
 
 # If set, allows registration of standard or admin accounts by anyone who
 # has the shared secret, even if registration is otherwise disabled.

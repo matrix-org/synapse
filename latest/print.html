@@ -1631,6 +1631,36 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1590"><a class="header" href="#upgrading-to-v1590">Upgrading to v1.59.0</a></h1>
+<h2 id="device-name-lookup-over-federation-has-been-disabled-by-default"><a class="header" href="#device-name-lookup-over-federation-has-been-disabled-by-default">Device name lookup over federation has been disabled by default</a></h2>
+<p>The names of user devices are no longer visible to users on other homeservers by default.
+Device IDs are unaffected, as these are necessary to facilitate end-to-end encryption.</p>
+<p>To re-enable this functionality, set the
+<a href="https://matrix-org.github.io/synapse/v1.59/usage/configuration/config_documentation.html#federation"><code>allow_device_name_lookup_over_federation</code></a>
+homeserver config option to <code>true</code>.</p>
+<h2 id="deprecation-of-the-synapseappappservice-and-synapseappuser_dir-worker-application-types"><a class="header" href="#deprecation-of-the-synapseappappservice-and-synapseappuser_dir-worker-application-types">Deprecation of the <code>synapse.app.appservice</code> and <code>synapse.app.user_dir</code> worker application types</a></h2>
+<p>The <code>synapse.app.appservice</code> worker application type allowed you to configure a
+single worker to use to notify application services of new events, as long
+as this functionality was disabled on the main process with <code>notify_appservices: False</code>.
+Further, the <code>synapse.app.user_dir</code> worker application type allowed you to configure
+a single worker to be responsible for updating the user directory, as long as this
+was disabled on the main process with <code>update_user_directory: False</code>.</p>
+<p>To unify Synapse's worker types, the <code>synapse.app.appservice</code> worker application
+type and the <code>notify_appservices</code> configuration option have been deprecated.
+The <code>synapse.app.user_dir</code> worker application type and <code>update_user_directory</code>
+configuration option have also been deprecated.</p>
+<p>To get the same functionality as was provided by the deprecated options, it's now recommended that the <code>synapse.app.generic_worker</code>
+worker application type is used and that the <code>notify_appservices_from_worker</code> and/or
+<code>update_user_directory_from_worker</code> options are set to the name of a worker.</p>
+<p>For the time being, the old options can be used alongside the new options to make
+it easier to transition between the two configurations, however please note that:</p>
+<ul>
+<li>the options must not contradict each other (otherwise Synapse won't start); and</li>
+<li>the <code>notify_appservices</code> and <code>update_user_directory</code> options will be removed in a future release of Synapse.</li>
+</ul>
+<p>Please see the <a href="workers.html#notifying-application-services"><em>Notifying Application Services</em></a> and
+<a href="workers.html#updating-the-user-directory"><em>Updating the User Directory</em></a> sections of the worker
+documentation for more information.</p>
 <h1 id="upgrading-to-v1580"><a class="header" href="#upgrading-to-v1580">Upgrading to v1.58.0</a></h1>
 <h2 id="groupscommunities-feature-has-been-disabled-by-default"><a class="header" href="#groupscommunities-feature-has-been-disabled-by-default">Groups/communities feature has been disabled by default</a></h2>
 <p>The non-standard groups/communities feature in Synapse has been disabled by default
@@ -3501,6 +3531,17 @@ session. Defaults to 0. </p>
 <pre><code class="language-yaml">mau_trial_days: 5
 </code></pre>
 <hr />
+<p>Config option: <code>mau_appservice_trial_days</code></p>
+<p>The option <code>mau_appservice_trial_days</code> is similar to <code>mau_trial_days</code>, but applies a different
+trial number if the user was registered by an appservice. A value
+of 0 means no trial days are applied. Appservices not listed in this dictionary
+use the value of <code>mau_trial_days</code> instead.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">mau_appservice_trial_days: 
+  my_appservice_id: 3
+  another_appservice_id: 6
+</code></pre>
+<hr />
 <p>Config option: <code>mau_limit_alerting</code></p>
 <p>The option <code>mau_limit_alerting</code> is a means of limiting client-side alerting
 should the mau limit be reached. This is useful for small instances
@@ -3816,11 +3857,11 @@ on this homeserver.</p>
 </code></pre>
 <hr />
 <p>Config option: <code>allow_device_name_lookup_over_federation</code></p>
-<p>Set this option to false to disable device display name lookup over federation. By default, the
-Federation API allows other homeservers to obtain device display names of any user
+<p>Set this option to true to allow device display name lookup over federation. By default, the
+Federation API prevents other homeservers from obtaining the display names of any user devices
 on this homeserver.</p>
 <p>Example configuration:</p>
-<pre><code class="language-yaml">allow_device_name_lookup_over_federation: false
+<pre><code class="language-yaml">allow_device_name_lookup_over_federation: true
 </code></pre>
 <hr />
 <h2 id="caching"><a class="header" href="#caching">Caching</a></h2>
@@ -6345,6 +6386,11 @@ manhole_settings:
 # sign up in a short space of time never to return after their initial
 # session.
 #
+# The option `mau_appservice_trial_days` is similar to `mau_trial_days`, but
+# applies a different trial number if the user was registered by an appservice.
+# A value of 0 means no trial days are applied. Appservices not listed in this
+# dictionary use the value of `mau_trial_days` instead.
+#
 # 'mau_limit_alerting' is a means of limiting client side alerting
 # should the mau limit be reached. This is useful for small instances
 # where the admin has 5 mau seats (say) for 5 specific people and no
@@ -6355,6 +6401,8 @@ manhole_settings:
 #max_mau_value: 50
 #mau_trial_days: 2
 #mau_limit_alerting: false
+#mau_appservice_trial_days:
+#  &quot;appservice-id&quot;: 1
 
 # If enabled, the metrics for the number of monthly active users will
 # be populated, however no one will be limited. If limit_usage_by_mau
@@ -6647,11 +6695,11 @@ retention:
 #
 #allow_profile_lookup_over_federation: false
 
-# Uncomment to disable device display name lookup over federation. By default, the
-# Federation API allows other homeservers to obtain device display names of any user
-# on this homeserver. Defaults to 'true'.
+# Uncomment to allow device display name lookup over federation. By default, the
+# Federation API prevents other homeservers from obtaining the display names of
+# user devices on this homeserver. Defaults to 'false'.
 #
-#allow_device_name_lookup_over_federation: false
+#allow_device_name_lookup_over_federation: true
 
 
 ## Caching ##
@@ -7260,6 +7308,12 @@ oembed:
 # Defaults to false. Uncomment the following to require tokens:
 #
 #registration_requires_token: true
+
+# Allow users to submit a token during registration to bypass any required 3pid
+# steps configured in `registrations_require_3pid`.
+# Defaults to false, requiring that registration tokens (if enabled) complete a 3pid flow.
+#
+#enable_registration_token_3pid_bypass: false
 
 # If set, allows registration of standard or admin accounts by anyone who
 # has the shared secret, even if registration is otherwise disabled.
@@ -8801,13 +8855,6 @@ loggers:
         # information such as access tokens.
         level: INFO
 
-    twisted:
-        # We send the twisted logging directly to the file handler,
-        # to work around https://github.com/matrix-org/synapse/issues/3471
-        # when using &quot;buffer&quot; logger. Use &quot;console&quot; to log to stderr instead.
-        handlers: [file]
-        propagate: false
-
 root:
     level: INFO
 
@@ -10098,8 +10145,6 @@ follows:</p>
   &quot;token&quot;: &quot;&lt;jwt&gt;&quot;
 }
 </code></pre>
-<p>Note that the login type of <code>m.login.jwt</code> is supported, but is deprecated. This
-will be removed in a future version of Synapse.</p>
 <p>The <code>token</code> field should include the JSON web token with the following claims:</p>
 <ul>
 <li>A claim that encodes the local part of the user ID is required. By default,
@@ -12279,7 +12324,7 @@ background tasks. For example, to move background tasks to a dedicated worker,
 the shared configuration would include:</p>
 <pre><code class="language-yaml">run_background_tasks_on: background_worker
 </code></pre>
-<p>You might also wish to investigate the <code>update_user_directory</code> and
+<p>You might also wish to investigate the <code>update_user_directory_from_worker</code> and
 <code>media_instance_running_background_jobs</code> settings.</p>
 <p>An example for a dedicated background worker instance:</p>
 <pre><code class="language-yaml">worker_app: synapse.app.generic_worker
@@ -12291,6 +12336,24 @@ worker_replication_http_port: 9093
 
 worker_log_config: /etc/matrix-synapse/background-worker-log.yaml
 </code></pre>
+<h4 id="updating-the-user-directory"><a class="header" href="#updating-the-user-directory">Updating the User Directory</a></h4>
+<p>You can designate one generic worker to update the user directory.</p>
+<p>Specify its name in the shared configuration as follows:</p>
+<pre><code class="language-yaml">update_user_directory_from_worker: worker_name
+</code></pre>
+<p>This work cannot be load-balanced; please ensure the main process is restarted
+after setting this option in the shared configuration!</p>
+<p>This style of configuration supersedes the legacy <code>synapse.app.user_dir</code>
+worker application type.</p>
+<h4 id="notifying-application-services"><a class="header" href="#notifying-application-services">Notifying Application Services</a></h4>
+<p>You can designate one generic worker to send output traffic to Application Services.</p>
+<p>Specify its name in the shared configuration as follows:</p>
+<pre><code class="language-yaml">notify_appservices_from_worker: worker_name
+</code></pre>
+<p>This work cannot be load-balanced; please ensure the main process is restarted
+after setting this option in the shared configuration!</p>
+<p>This style of configuration supersedes the legacy <code>synapse.app.appservice</code>
+worker application type.</p>
 <h3 id="synapseapppusher"><a class="header" href="#synapseapppusher"><code>synapse.app.pusher</code></a></h3>
 <p>Handles sending push notifications to sygnal and email. Doesn't handle any
 REST endpoints itself, but you should set <code>start_pushers: False</code> in the
@@ -12302,6 +12365,8 @@ pusher instances by their worker name, e.g.:</p>
     - pusher_worker2
 </code></pre>
 <h3 id="synapseappappservice"><a class="header" href="#synapseappappservice"><code>synapse.app.appservice</code></a></h3>
+<p><strong>Deprecated as of Synapse v1.59.</strong> <a href="workers.html#notifying-application-services">Use <code>synapse.app.generic_worker</code> with the
+<code>notify_appservices_from_worker</code> option instead.</a></p>
 <p>Handles sending output traffic to Application Services. Doesn't handle any
 REST endpoints itself, but you should set <code>notify_appservices: False</code> in the
 shared configuration file to stop the main synapse sending appservice notifications.</p>
@@ -12349,6 +12414,8 @@ and you must configure a single instance to run the background tasks, e.g.:</p>
 </code></pre>
 <p>Note that if a reverse proxy is used , then <code>/_matrix/media/</code> must be routed for both inbound client and federation requests (if they are handled separately).</p>
 <h3 id="synapseappuser_dir"><a class="header" href="#synapseappuser_dir"><code>synapse.app.user_dir</code></a></h3>
+<p><strong>Deprecated as of Synapse v1.59.</strong> <a href="workers.html#updating-the-user-directory">Use <code>synapse.app.generic_worker</code> with the
+<code>update_user_directory_from_worker</code> option instead.</a></p>
 <p>Handles searches in the user directory. It can handle REST endpoints matching
 the following regular expressions:</p>
 <pre><code>^/_matrix/client/(r0|v3|unstable)/user_directory/search$
@@ -15861,40 +15928,23 @@ more CPU and RAM, and make use of <a href="usage/administration/../../workers.ht
 to make use of multiple CPU cores / multiple machines for your homeserver.</p>
 <div style="break-before: page; page-break-before: always;"></div><h2 id="some-useful-sql-queries-for-synapse-admins"><a class="header" href="#some-useful-sql-queries-for-synapse-admins">Some useful SQL queries for Synapse Admins</a></h2>
 <h2 id="size-of-full-matrix-db"><a class="header" href="#size-of-full-matrix-db">Size of full matrix db</a></h2>
-<p><code>SELECT pg_size_pretty( pg_database_size( 'matrix' ) );</code></p>
+<pre><code class="language-sql">SELECT pg_size_pretty( pg_database_size( 'matrix' ) );
+</code></pre>
 <h3 id="result-example"><a class="header" href="#result-example">Result example:</a></h3>
 <pre><code>pg_size_pretty 
 ----------------
  6420 MB
 (1 row)
 </code></pre>
-<h2 id="show-top-20-larger-rooms-by-state-events-count"><a class="header" href="#show-top-20-larger-rooms-by-state-events-count">Show top 20 larger rooms by state events count</a></h2>
-<pre><code class="language-sql">SELECT r.name, s.room_id, s.current_state_events
-  FROM room_stats_current s
-  LEFT JOIN room_stats_state r USING (room_id)
-  ORDER BY current_state_events DESC
-  LIMIT 20;
-</code></pre>
-<p>and by state_group_events count:</p>
-<pre><code class="language-sql">SELECT rss.name, s.room_id, count(s.room_id) FROM state_groups_state s
-LEFT JOIN room_stats_state rss USING (room_id)
-GROUP BY s.room_id, rss.name        
-ORDER BY count(s.room_id) DESC
-LIMIT 20;
-</code></pre>
-<p>plus same, but with join removed for performance reasons:</p>
-<pre><code class="language-sql">SELECT s.room_id, count(s.room_id) FROM state_groups_state s
-GROUP BY s.room_id        
-ORDER BY count(s.room_id) DESC
-LIMIT 20;
-</code></pre>
 <h2 id="show-top-20-larger-tables-by-row-count"><a class="header" href="#show-top-20-larger-tables-by-row-count">Show top 20 larger tables by row count</a></h2>
-<pre><code class="language-sql">SELECT relname, n_live_tup as rows
-  FROM pg_stat_user_tables 
+<pre><code class="language-sql">SELECT relname, n_live_tup AS &quot;rows&quot;
+  FROM pg_stat_user_tables
   ORDER BY n_live_tup DESC
   LIMIT 20;
 </code></pre>
-<p>This query is quick, but may be very approximate, for exact number of rows use <code>SELECT COUNT(*) FROM &lt;table_name&gt;</code>.</p>
+<p>This query is quick, but may be very approximate, for exact number of rows use:</p>
+<pre><code class="language-sql">SELECT COUNT(*) FROM &lt;table_name&gt;;
+</code></pre>
 <h3 id="result-example-1"><a class="header" href="#result-example-1">Result example:</a></h3>
 <pre><code>state_groups_state - 161687170
 event_auth - 8584785
@@ -15917,37 +15967,15 @@ users_in_public_rooms - 364059
 device_lists_stream - 326903
 user_directory_search - 316433
 </code></pre>
-<h2 id="show-top-20-rooms-by-new-events-count-in-last-1-day"><a class="header" href="#show-top-20-rooms-by-new-events-count-in-last-1-day">Show top 20 rooms by new events count in last 1 day:</a></h2>
-<pre><code class="language-sql">SELECT e.room_id, r.name, COUNT(e.event_id) cnt FROM events e
-LEFT JOIN room_stats_state r USING (room_id)
-WHERE e.origin_server_ts &gt;= DATE_PART('epoch', NOW() - INTERVAL '1 day') * 1000 GROUP BY e.room_id, r.name ORDER BY cnt DESC LIMIT 20;
-</code></pre>
-<h2 id="show-top-20-users-on-homeserver-by-sent-events-messages-at-last-month"><a class="header" href="#show-top-20-users-on-homeserver-by-sent-events-messages-at-last-month">Show top 20 users on homeserver by sent events (messages) at last month:</a></h2>
-<pre><code class="language-sql">SELECT user_id, SUM(total_events) 
-   FROM user_stats_historical
-   WHERE TO_TIMESTAMP(end_ts/1000) AT TIME ZONE 'UTC' &gt; date_trunc('day', now() - interval '1 month')
-   GROUP BY user_id
-   ORDER BY SUM(total_events) DESC 
-   LIMIT 20;
-</code></pre>
-<h2 id="show-last-100-messages-from-needed-user-with-room-names"><a class="header" href="#show-last-100-messages-from-needed-user-with-room-names">Show last 100 messages from needed user, with room names:</a></h2>
-<pre><code class="language-sql">SELECT e.room_id, r.name, e.event_id, e.type, e.content, j.json FROM events e
-  LEFT JOIN event_json j USING (room_id)
-  LEFT JOIN room_stats_state r USING (room_id)
-  WHERE sender = '@LOGIN:example.com'
-  AND e.type = 'm.room.message'
-  ORDER BY stream_ordering DESC
-  LIMIT 100;
-</code></pre>
 <h2 id="show-top-20-larger-tables-by-storage-size"><a class="header" href="#show-top-20-larger-tables-by-storage-size">Show top 20 larger tables by storage size</a></h2>
 <pre><code class="language-sql">SELECT nspname || '.' || relname AS &quot;relation&quot;,
-    pg_size_pretty(pg_total_relation_size(C.oid)) AS &quot;total_size&quot;
-  FROM pg_class C
-  LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
+    pg_size_pretty(pg_total_relation_size(c.oid)) AS &quot;total_size&quot;
+  FROM pg_class c
+  LEFT JOIN pg_namespace n ON (n.oid = c.relnamespace)
   WHERE nspname NOT IN ('pg_catalog', 'information_schema')
-    AND C.relkind &lt;&gt; 'i'
+    AND c.relkind &lt;&gt; 'i'
     AND nspname !~ '^pg_toast'
-  ORDER BY pg_total_relation_size(C.oid) DESC
+  ORDER BY pg_total_relation_size(c.oid) DESC
   LIMIT 20;
 </code></pre>
 <h3 id="result-example-2"><a class="header" href="#result-example-2">Result example:</a></h3>
@@ -15972,8 +16000,75 @@ public.state_groups - 160 MB
 public.device_lists_remote_cache - 124 MB
 public.state_group_edges - 122 MB
 </code></pre>
+<h2 id="show-top-20-larger-rooms-by-state-events-count"><a class="header" href="#show-top-20-larger-rooms-by-state-events-count">Show top 20 larger rooms by state events count</a></h2>
+<p>You get the same information when you use the
+<a href="usage/administration/../../admin_api/rooms.html#list-room-api">admin API</a>
+and set parameter <code>order_by=state_events</code>.</p>
+<pre><code class="language-sql">SELECT r.name, s.room_id, s.current_state_events
+  FROM room_stats_current s
+  LEFT JOIN room_stats_state r USING (room_id)
+  ORDER BY current_state_events DESC
+  LIMIT 20;
+</code></pre>
+<p>and by state_group_events count:</p>
+<pre><code class="language-sql">SELECT rss.name, s.room_id, COUNT(s.room_id)
+  FROM state_groups_state s
+  LEFT JOIN room_stats_state rss USING (room_id)
+  GROUP BY s.room_id, rss.name
+  ORDER BY COUNT(s.room_id) DESC
+  LIMIT 20;
+</code></pre>
+<p>plus same, but with join removed for performance reasons:</p>
+<pre><code class="language-sql">SELECT s.room_id, COUNT(s.room_id)
+  FROM state_groups_state s
+  GROUP BY s.room_id 
+  ORDER BY COUNT(s.room_id) DESC
+  LIMIT 20;
+</code></pre>
+<h2 id="show-top-20-rooms-by-new-events-count-in-last-1-day"><a class="header" href="#show-top-20-rooms-by-new-events-count-in-last-1-day">Show top 20 rooms by new events count in last 1 day:</a></h2>
+<pre><code class="language-sql">SELECT e.room_id, r.name, COUNT(e.event_id) cnt
+  FROM events e
+  LEFT JOIN room_stats_state r USING (room_id)
+  WHERE e.origin_server_ts &gt;= DATE_PART('epoch', NOW() - INTERVAL '1 day') * 1000
+  GROUP BY e.room_id, r.name 
+  ORDER BY cnt DESC
+  LIMIT 20;
+</code></pre>
+<h2 id="show-top-20-users-on-homeserver-by-sent-events-messages-at-last-month"><a class="header" href="#show-top-20-users-on-homeserver-by-sent-events-messages-at-last-month">Show top 20 users on homeserver by sent events (messages) at last month:</a></h2>
+<p>Caution. This query does not use any indexes, can be slow and create load on the database.</p>
+<pre><code class="language-sql">SELECT COUNT(*), sender
+  FROM events
+  WHERE (type = 'm.room.encrypted' OR type = 'm.room.message')
+    AND origin_server_ts &gt;= DATE_PART('epoch', NOW() - INTERVAL '1 month') * 1000
+  GROUP BY sender
+  ORDER BY COUNT(*) DESC
+  LIMIT 20;
+</code></pre>
+<h2 id="show-last-100-messages-from-needed-user-with-room-names"><a class="header" href="#show-last-100-messages-from-needed-user-with-room-names">Show last 100 messages from needed user, with room names:</a></h2>
+<pre><code class="language-sql">SELECT e.room_id, r.name, e.event_id, e.type, e.content, j.json
+  FROM events e
+  LEFT JOIN event_json j USING (room_id)
+  LEFT JOIN room_stats_state r USING (room_id)
+  WHERE sender = '@LOGIN:example.com'
+    AND e.type = 'm.room.message'
+  ORDER BY stream_ordering DESC
+  LIMIT 100;
+</code></pre>
 <h2 id="show-rooms-with-names-sorted-by-events-in-this-rooms"><a class="header" href="#show-rooms-with-names-sorted-by-events-in-this-rooms">Show rooms with names, sorted by events in this rooms</a></h2>
-<p><code>echo &quot;select event_json.room_id,room_stats_state.name from event_json,room_stats_state where room_stats_state.room_id=event_json.room_id&quot; | psql synapse | sort | uniq -c | sort -n</code></p>
+<p><strong>Sort and order with bash</strong></p>
+<pre><code class="language-bash">echo &quot;SELECT event_json.room_id, room_stats_state.name FROM event_json, room_stats_state \
+WHERE room_stats_state.room_id = event_json.room_id&quot; | psql -d synapse -h localhost -U synapse_user -t \
+| sort | uniq -c | sort -n
+</code></pre>
+<p>Documentation for <code>psql</code> command line parameters: https://www.postgresql.org/docs/current/app-psql.html</p>
+<p><strong>Sort and order with SQL</strong></p>
+<pre><code class="language-sql">SELECT COUNT(*), event_json.room_id, room_stats_state.name
+  FROM event_json, room_stats_state
+  WHERE room_stats_state.room_id = event_json.room_id
+  GROUP BY event_json.room_id, room_stats_state.name
+  ORDER BY COUNT(*) DESC
+  LIMIT 50;
+</code></pre>
 <h3 id="result-example-3"><a class="header" href="#result-example-3">Result example:</a></h3>
 <pre><code>   9459  !FPUfgzXYWTKgIrwKxW:matrix.org              | This Week in Matrix
    9459  !FPUfgzXYWTKgIrwKxW:matrix.org              | This Week in Matrix (TWIM)
@@ -15985,13 +16080,21 @@ public.state_group_edges - 122 MB
   43601  !iNmaIQExDMeqdITdHH:matrix.org              | Riot Web/Desktop
 </code></pre>
 <h2 id="lookup-room-state-info-by-list-of-room_id"><a class="header" href="#lookup-room-state-info-by-list-of-room_id">Lookup room state info by list of room_id</a></h2>
-<pre><code class="language-sql">SELECT rss.room_id, rss.name, rss.canonical_alias, rss.topic, rss.encryption, rsc.joined_members, rsc.local_users_in_room, rss.join_rules
-FROM room_stats_state rss
-LEFT JOIN room_stats_current rsc USING (room_id)
-WHERE room_id IN (WHERE room_id IN (
- '!OGEhHVWSdvArJzumhm:matrix.org',
- '!YTvKGNlinIzlkMTVRl:matrix.org'
-)
+<p>You get the same information when you use the
+<a href="usage/administration/../../admin_api/rooms.html#room-details-api">admin API</a>.</p>
+<pre><code class="language-sql">SELECT rss.room_id, rss.name, rss.canonical_alias, rss.topic, rss.encryption,
+    rsc.joined_members, rsc.local_users_in_room, rss.join_rules
+  FROM room_stats_state rss
+  LEFT JOIN room_stats_current rsc USING (room_id)
+  WHERE room_id IN ( WHERE room_id IN (
+    '!OGEhHVWSdvArJzumhm:matrix.org',
+    '!YTvKGNlinIzlkMTVRl:matrix.org' 
+  );
+</code></pre>
+<h2 id="show-users-and-devices-that-have-not-been-online-for-a-while"><a class="header" href="#show-users-and-devices-that-have-not-been-online-for-a-while">Show users and devices that have not been online for a while</a></h2>
+<pre><code class="language-sql">SELECT user_id, device_id, user_agent, TO_TIMESTAMP(last_seen / 1000) AS &quot;last_seen&quot;
+  FROM devices
+  WHERE last_seen &lt; DATE_PART('epoch', NOW() - INTERVAL '3 month') * 1000;
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><p>This blog post by Victor Berger explains how to use many of the tools listed on this page: https://levans.fr/shrink-synapse-database.html</p>
 <h1 id="list-of-useful-tools-and-scripts-for-maintenance-synapse-database"><a class="header" href="#list-of-useful-tools-and-scripts-for-maintenance-synapse-database">List of useful tools and scripts for maintenance Synapse database:</a></h1>
@@ -16041,7 +16144,7 @@ WHERE room_id IN (WHERE room_id IN (
 <tr><td>NNNN</td><td>Total time waiting for response to DB queries across all parallel DB work from this request</td></tr>
 <tr><td>OOOO</td><td>Count of DB transactions performed</td></tr>
 <tr><td>PPPP</td><td>Response body size</td></tr>
-<tr><td>QQQQ</td><td>Response status code (prefixed with ! if the socket was closed before the response was generated)</td></tr>
+<tr><td>QQQQ</td><td>Response status code<br/>Suffixed with <code>!</code> if the socket was closed before the response was generated.<br/>A <code>499!</code> status code indicates that Synapse also cancelled request processing after the socket was closed.<br/></td></tr>
 <tr><td>RRRR</td><td>Request</td></tr>
 <tr><td>SSSS</td><td>User-agent</td></tr>
 <tr><td>TTTT</td><td>Events fetched from DB to service this request (note that this does not include events fetched from the cache)</td></tr>
@@ -16292,10 +16395,10 @@ Here is how to run your local Synapse checkout against your local Complement che
 <pre><code class="language-sh">COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh
 </code></pre>
 <p>To run a specific test file, you can pass the test name at the end of the command. The name passed comes from the naming structure in your Complement tests. If you're unsure of the name, you can do a full run and copy it from the test output:</p>
-<pre><code class="language-sh">COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh TestBackfillingHistory
+<pre><code class="language-sh">COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages
 </code></pre>
 <p>To run a specific test, you can specify the whole name structure:</p>
-<pre><code class="language-sh">COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh TestBackfillingHistory/parallel/Backfilled_historical_events_resolve_with_proper_state_in_correct_order
+<pre><code class="language-sh">COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages/parallel/Historical_events_resolve_in_the_correct_order
 </code></pre>
 <h3 id="access-database-for-homeserver-after-complement-test-runs"><a class="header" href="#access-database-for-homeserver-after-complement-test-runs">Access database for homeserver after Complement test runs.</a></h3>
 <p>If you're curious what the database looks like after you run some tests, here are some steps to get you going in Synapse:</p>
@@ -17422,6 +17525,10 @@ minimal.</p>
 <p>There are read-only version of the synapse storage layer in
 <code>synapse/replication/slave/storage</code> that use the response of the
 replication API to invalidate their caches.</p>
+<h3 id="the-tcp-replication-module"><a class="header" href="#the-tcp-replication-module">The TCP Replication Module</a></h3>
+<p>Information about how the tcp replication module is structured, including how
+the classes interact, can be found in
+<code>synapse/replication/tcp/__init__.py</code></p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="tcp-replication"><a class="header" href="#tcp-replication">TCP Replication</a></h1>
 <h2 id="motivation-1"><a class="header" href="#motivation-1">Motivation</a></h2>
 <p>Previously the workers used an HTTP long poll mechanism to get updates
