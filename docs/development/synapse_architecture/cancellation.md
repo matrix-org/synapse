@@ -5,14 +5,15 @@ can cancel request processing for select endpoints marked with the
 `@cancellable` decorator.
 
 Synapse makes use of Twisted's `Deferred.cancel()` feature to make
-cancellation work.
+cancellation work. The `@cancellable` decorator does nothing by itself
+and merely acts as a flag.
 
 ## Enabling cancellation for an endpoint
 1. Check that the endpoint method, and any `async` functions in its call
    tree handle cancellation correctly. See
    [Handling cancellation correctly](#handling-cancellation-correctly)
    for a list of things to look out for.
-2. Apply the `@cancellable` decorator to the `on_GET/POST/PUT/DELETE`
+2. Add the `@cancellable` decorator to the `on_GET/POST/PUT/DELETE`
    method. It's not recommended to make non-`GET` methods cancellable,
    since cancellation midway through some database updates is less
    likely to be handled correctly.
@@ -31,12 +32,13 @@ Both Twisted and asyncio have a cancellation mechanism.
 ### Deferred.cancel()
 When Synapse starts handling a request, it runs the async method
 responsible for handling it using `defer.ensureDeferred`, which returns
-a `Deferred`.
+a `Deferred`. For example:
 
 ```python
 def do_something() -> Deferred[None]:
     ...
 
+@cancellable
 async def on_GET() -> Tuple[int, JsonDict]:
     d = make_deferred_yieldable(do_something())
     await d
@@ -45,8 +47,10 @@ async def on_GET() -> Tuple[int, JsonDict]:
 request = defer.ensureDeferred(on_GET())
 ```
 
-During cancellation, `Deferred.cancel()` is called on the `Deferred`
-from `defer.ensureDeferred`, `request`. Twisted knows which `Deferred`
+When a client disconnects early, Synapse checks for the presence of the
+`@cancellable` decorator on `on_GET`. Since `on_GET` is cancellable,
+`Deferred.cancel()` is called on the `Deferred` from
+`defer.ensureDeferred`, `request`. Twisted knows which `Deferred`
 `request` is waiting on and passes the `cancel()` call on to `d`.
 
 The `Deferred` being waited on, `d`, may have its own handling for
