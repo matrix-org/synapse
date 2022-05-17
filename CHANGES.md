@@ -1,5 +1,5 @@
-Synapse 1.59.0rc2 (2022-05-16)
-==============================
+Synapse 1.59.0 (2022-05-17)
+===========================
 
 Synapse 1.59 makes several changes that server administrators should be aware of:
 
@@ -9,6 +9,18 @@ Synapse 1.59 makes several changes that server administrators should be aware of
 See [the upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1590) for more details.
 
 Additionally, this release removes the non-standard `m.login.jwt` login type from Synapse. It can be replaced with `org.matrix.login.jwt` for identical behaviour. This is only used if `jwt_config.enabled` is set to `true` in the configuration. ([\#12597](https://github.com/matrix-org/synapse/issues/12597))
+
+
+Bugfixes
+--------
+
+- Fix DB performance regression introduced in Synapse 1.59.0rc2. ([\#12745](https://github.com/matrix-org/synapse/issues/12745))
+
+
+Synapse 1.59.0rc2 (2022-05-16)
+==============================
+
+Note: this release candidate includes a performance regression which can cause database disruption. Other release candidates in the v1.59.0 series are not affected, and a fix will be included in the v1.59.0 final release.
 
 Bugfixes
 --------
