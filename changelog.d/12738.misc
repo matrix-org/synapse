@@ -1,0 +1,1 @@
+Change error message when attempting to login to a non-existent account to match that returned when the account exists but the password is invalid. Contributed by Daniel Aloni.
