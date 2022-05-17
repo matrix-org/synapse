@@ -316,7 +316,7 @@ class FederationHandler:
 
             events_to_check = await self.store.get_events_as_list(
                 event_ids_to_check,
-                redact_behaviour=EventRedactBehaviour.AS_IS,
+                redact_behaviour=EventRedactBehaviour.as_is,
                 get_prev_content=False,
             )
 
@@ -659,7 +659,7 @@ class FederationHandler:
         # in the invitee's sync stream. It is stripped out for all other local users.
         event.unsigned["knock_room_state"] = stripped_room_state["knock_state_events"]
 
-        context = EventContext.for_outlier()
+        context = EventContext.for_outlier(self.storage)
         stream_id = await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -848,7 +848,7 @@ class FederationHandler:
             )
         )
 
-        context = EventContext.for_outlier()
+        context = EventContext.for_outlier(self.storage)
         await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -877,7 +877,7 @@ class FederationHandler:
 
         await self.federation_client.send_leave(host_list, event)
 
-        context = EventContext.for_outlier()
+        context = EventContext.for_outlier(self.storage)
         stream_id = await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -1494,7 +1494,7 @@ class FederationHandler:
 
             events = await self.store.get_events_as_list(
                 batch,
-                redact_behaviour=EventRedactBehaviour.AS_IS,
+                redact_behaviour=EventRedactBehaviour.as_is,
                 allow_rejected=True,
             )
             for event in events:

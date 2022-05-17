@@ -467,13 +467,13 @@ Sub-options for each listener include:
 
 Valid resource names are:
 
-* `client`: the client-server API (/_matrix/client), and the synapse admin API (/_synapse/admin). Also implies 'media' and 'static'.
+* `client`: the client-server API (/_matrix/client), and the synapse admin API (/_synapse/admin). Also implies `media` and `static`.
 
 * `consent`: user consent forms (/_matrix/consent). See [here](../../consent_tracking.md) for more.
 
 * `federation`: the server-server API (/_matrix/federation). Also implies `media`, `keys`, `openid`
 
-* `keys`: the key discovery API (/_matrix/keys).
+* `keys`: the key discovery API (/_matrix/key).
 
 * `media`: the media API (/_matrix/media).
 
@@ -625,6 +625,20 @@ session. Defaults to 0.
 Example configuration:
 ```yaml
 mau_trial_days: 5
+```
+---
+Config option: `mau_appservice_trial_days`
+
+The option `mau_appservice_trial_days` is similar to `mau_trial_days`, but applies a different
+trial number if the user was registered by an appservice. A value
+of 0 means no trial days are applied. Appservices not listed in this dictionary
+use the value of `mau_trial_days` instead.
+
+Example configuration:
+```yaml
+mau_appservice_trial_days: 
+  my_appservice_id: 3
+  another_appservice_id: 6
 ```
 ---
 Config option: `mau_limit_alerting`
@@ -1035,13 +1049,13 @@ allow_profile_lookup_over_federation: false
 ---
 Config option: `allow_device_name_lookup_over_federation`
 
-Set this option to false to disable device display name lookup over federation. By default, the
-Federation API allows other homeservers to obtain device display names of any user
+Set this option to true to allow device display name lookup over federation. By default, the
+Federation API prevents other homeservers from obtaining the display names of any user devices
 on this homeserver.
 
 Example configuration:
 ```yaml
-allow_device_name_lookup_over_federation: false
+allow_device_name_lookup_over_federation: true
 ```
 ---
 ## Caching ##
@@ -1105,7 +1119,17 @@ Caching can be configured through the following sub-options:
   with intermittent connections, at the cost of higher memory usage.
   By default, this is zero, which means that sync responses are not cached
   at all.
-
+* `cache_autotuning` and its sub-options `max_cache_memory_usage`, `target_cache_memory_usage`, and
+   `min_cache_ttl` work in conjunction with each other to maintain a balance between cache memory 
+   usage and cache entry availability. You must be using [jemalloc](https://github.com/matrix-org/synapse#help-synapse-is-slow-and-eats-all-my-ramcpu) 
+   to utilize this option, and all three of the options must be specified for this feature to work.
+     * `max_cache_memory_usage` sets a ceiling on how much memory the cache can use before caches begin to be continuously evicted.
+        They will continue to be evicted until the memory usage drops below the `target_memory_usage`, set in
+        the flag below, or until the `min_cache_ttl` is hit.
+     * `target_memory_usage` sets a rough target for the desired memory usage of the caches.
+     * `min_cache_ttl` sets a limit under which newer cache entries are not evicted and is only applied when
+        caches are actively being evicted/`max_cache_memory_usage` has been exceeded. This is to protect hot caches
+        from being emptied while Synapse is evicting due to memory.
 
 Example configuration:
 ```yaml
@@ -1113,9 +1137,29 @@ caches:
   global_factor: 1.0
   per_cache_factors:
     get_users_who_share_room_with_user: 2.0
-  expire_caches: false
   sync_response_cache_duration: 2m
+  cache_autotuning:
+    max_cache_memory_usage: 1024M
+    target_cache_memory_usage: 758M
+    min_cache_ttl: 5m
 ```
+
+### Reloading cache factors
+
+The cache factors (i.e. `caches.global_factor` and `caches.per_cache_factors`)  may be reloaded at any time by sending a
+[`SIGHUP`](https://en.wikipedia.org/wiki/SIGHUP) signal to Synapse using e.g.
+
+```commandline
+kill -HUP [PID_OF_SYNAPSE_PROCESS]
+```
+
+If you are running multiple workers, you must individually update the worker 
+config file and send this signal to each worker process.
+
+If you're using the [example systemd service](https://github.com/matrix-org/synapse/blob/develop/contrib/systemd/matrix-synapse.service)
+file in Synapse's `contrib` directory, you can send a `SIGHUP` signal by using
+`systemctl reload matrix-synapse`.
+
 ---
 ## Database ##
 Config options related to database settings.
@@ -3284,6 +3328,32 @@ room_list_publication_rules:
     room_id: "*"
     action: allow
 ```
+
+---
+Config option: `default_power_level_content_override`
+
+The `default_power_level_content_override` option controls the default power
+levels for rooms.
+
+Useful if you know that your users need special permissions in rooms
+that they create (e.g. to send particular types of state events without
+needing an elevated power level).  This takes the same shape as the
+`power_level_content_override` parameter in the /createRoom API, but
+is applied before that parameter.
+
+Note that each key provided inside a preset (for example `events` in the example
+below) will overwrite all existing defaults inside that key. So in the example
+below, newly-created private_chat rooms will have no rules for any event types
+except `com.example.foo`.
+
+Example configuration:
+```yaml
+default_power_level_content_override:
+   private_chat: { "events": { "com.example.foo" : 0 } }
+   trusted_private_chat: null
+   public_chat: null
+```
+
 ---
 ## Opentracing ##
 Configuration options related to Opentracing support.
@@ -3384,7 +3454,7 @@ stream_writers:
   typing: worker1
 ```
 ---
-Config option: `run_background_task_on`
+Config option: `run_background_tasks_on`
 
 The worker that is used to run background tasks (e.g. cleaning up expired
 data). If not provided this defaults to the main process.

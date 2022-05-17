@@ -46,6 +46,7 @@ from synapse.types import (
     JsonDict,
     PersistedEventPosition,
     RoomStreamToken,
+    StreamKeyType,
     StreamToken,
     UserID,
 )
@@ -228,9 +229,7 @@ class Notifier:
         # Called when there are new things to stream over replication
         self.replication_callbacks: List[Callable[[], None]] = []
 
-        # Called when remote servers have come back online after having been
-        # down.
-        self.remote_server_up_callbacks: List[Callable[[str], None]] = []
+        self._federation_client = hs.get_federation_http_client()
 
         self._third_party_rules = hs.get_third_party_event_rules()
 
@@ -372,7 +371,7 @@ class Notifier:
 
         if users or rooms:
             self.on_new_event(
-                "room_key",
+                StreamKeyType.ROOM,
                 max_room_stream_token,
                 users=users,
                 rooms=rooms,
@@ -442,7 +441,7 @@ class Notifier:
             for room in rooms:
                 user_streams |= self.room_to_user_streams.get(room, set())
 
-            if stream_key == "to_device_key":
+            if stream_key == StreamKeyType.TO_DEVICE:
                 issue9533_logger.debug(
                     "to-device messages stream id %s, awaking streams for %s",
                     new_token,
@@ -731,3 +730,7 @@ class Notifier:
         # circular dependencies.
         if self.federation_sender:
             self.federation_sender.wake_destination(server)
+
+        # Tell the federation client about the fact the server is back up, so
+        # that any in flight requests can be immediately retried.
+        self._federation_client.wake_destination(server)

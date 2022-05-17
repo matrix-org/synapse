@@ -26,7 +26,7 @@ from synapse.logging.opentracing import (
     set_tag,
 )
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
-from synapse.types import JsonDict, Requester, UserID, get_domain_from_id
+from synapse.types import JsonDict, Requester, StreamKeyType, UserID, get_domain_from_id
 from synapse.util import json_encoder
 from synapse.util.stringutils import random_string
 
@@ -151,7 +151,7 @@ class DeviceMessageHandler:
         # Notify listeners that there are new to-device messages to process,
         # handing them the latest stream id.
         self.notifier.on_new_event(
-            "to_device_key", last_stream_id, users=local_messages.keys()
+            StreamKeyType.TO_DEVICE, last_stream_id, users=local_messages.keys()
         )
 
     async def _check_for_unknown_devices(
@@ -285,7 +285,7 @@ class DeviceMessageHandler:
         # Notify listeners that there are new to-device messages to process,
         # handing them the latest stream id.
         self.notifier.on_new_event(
-            "to_device_key", last_stream_id, users=local_messages.keys()
+            StreamKeyType.TO_DEVICE, last_stream_id, users=local_messages.keys()
         )
 
         if self.federation_sender:

@@ -23,6 +23,7 @@ from synapse.api.errors import AuthError, StoreError, SynapseError
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.types import UserID
 from synapse.util import stringutils
+from synapse.util.async_helpers import delay_cancellation
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -150,7 +151,7 @@ class AccountValidityHandler:
             Whether the user has expired.
         """
         for callback in self._is_user_expired_callbacks:
-            expired = await callback(user_id)
+            expired = await delay_cancellation(callback(user_id))
             if expired is not None:
                 return expired
 

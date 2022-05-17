@@ -934,7 +934,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         # Before deleting the group lets kick everyone out of it
         users = await self.store.get_users_in_group(group_id, include_private=True)
 
-        async def _kick_user_from_group(user_id):
+        async def _kick_user_from_group(user_id: str) -> None:
             if self.hs.is_mine_id(user_id):
                 groups_local = self.hs.get_groups_local_handler()
                 assert isinstance(
