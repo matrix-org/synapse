@@ -223,7 +223,7 @@ docker: Error response from daemon: driver failed programming external connectiv
 
 then something is already bound to port 5432. You're probably already running postgres locally.
 
-Once you have a postgres server runing, invoke `trial` in a second terminal:
+Once you have a postgres server running, invoke `trial` in a second terminal:
 
 ```shell
 SYNAPSE_POSTGRES=1 SYNAPSE_POSTGRES_HOST=127.0.0.1 SYNAPSE_POSTGRES_USER=postgres SYNAPSE_POSTGRES_PASSWORD=mysecretpassword poetry run trial tests
