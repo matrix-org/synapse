@@ -754,6 +754,7 @@ class EventsWorkerStore(SQLBaseStore):
             )
             if ret:
                 event_map[event_id] = ret
+                continue
 
             # Otherwise check if we still have the event in memory.
             event = self._event_ref.get(event_id)
