@@ -1,0 +1,1 @@
+Delete events from federation_inbound_events_staging table when a room is purged through the admin API.
