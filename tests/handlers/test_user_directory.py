@@ -1012,7 +1012,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Alice creates a public room.
         alice = self.register_user("alice", "pass")
-        alice_token = self.login(alice, "pass")
 
         # Alice has a user directory entry to start with.
         self.assertIn(
