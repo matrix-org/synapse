@@ -1,0 +1,2 @@
+Fix a long-standing bug wherein remote display names or avatar URLs containing null bytes caused updating the user directory to fail resulting in high CPU on the main process. Contributed 
+by Nick @ Beeper.
