@@ -16,7 +16,7 @@ import itertools
 import re
 import secrets
 import string
-from typing import Iterable, Optional, Tuple
+from typing import Any, Iterable, Optional, Tuple
 
 from netaddr import valid_ipv6
 
@@ -247,3 +247,7 @@ def base62_encode(num: int, minwidth: int = 1) -> str:
     # pad to minimum width
     pad = "0" * (minwidth - len(res))
     return pad + res
+
+
+def non_null_str_or_none(val: Any) -> Optional[str]:
+    return val if isinstance(val, str) and "\u0000" not in val else None
