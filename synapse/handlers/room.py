@@ -33,6 +33,7 @@ from typing import (
 import attr
 from typing_extensions import TypedDict
 
+import synapse.events.snapshot
 from synapse.api.constants import (
     EventContentFields,
     EventTypes,
@@ -72,12 +73,12 @@ from synapse.types import (
     RoomID,
     RoomStreamToken,
     StateMap,
+    StreamKeyType,
     StreamToken,
     UserID,
     create_requester,
 )
 from synapse.util import stringutils
-from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_and_validate_server_name
 from synapse.visibility import filter_events_for_client
@@ -155,9 +156,6 @@ class RoomCreationHandler:
 
         self._replication = hs.get_replication_data_handler()
 
-        # linearizer to stop two upgrades happening at once
-        self._upgrade_linearizer = Linearizer("room_upgrade_linearizer")
-
         # If a user tries to update the same room multiple times in quick
         # succession, only process the first attempt and return its result to
         # subsequent requests
@@ -200,50 +198,17 @@ class RoomCreationHandler:
                     400, "An upgrade for this room is currently in progress"
                 )
 
-        # Upgrade the room
-        #
-        # If this user has sent multiple upgrade requests for the same room
-        # and one of them is not complete yet, cache the response and
-        # return it to all subsequent requests
-        ret = await self._upgrade_response_cache.wrap(
-            (old_room_id, user_id),
-            self._upgrade_room,
-            requester,
-            old_room_id,
-            new_version,  # args for _upgrade_room
-        )
-
-        return ret
-
-    async def _upgrade_room(
-        self, requester: Requester, old_room_id: str, new_version: RoomVersion
-    ) -> str:
-        """
-        Args:
-            requester: the user requesting the upgrade
-            old_room_id: the id of the room to be replaced
-            new_versions: the version to upgrade the room to
-
-        Raises:
-            ShadowBanError if the requester is shadow-banned.
-        """
-        user_id = requester.user.to_string()
-        assert self.hs.is_mine_id(user_id), "User must be our own: %s" % (user_id,)
-
-        # start by allocating a new room id
-        r = await self.store.get_room(old_room_id)
-        if r is None:
+        # Check whether the room exists and 404 if it doesn't.
+        # We could go straight for the auth check, but that will raise a 403 instead.
+        old_room = await self.store.get_room(old_room_id)
+        if old_room is None:
             raise NotFoundError("Unknown room id %s" % (old_room_id,))
-        new_room_id = await self._generate_room_id(
-            creator_id=user_id,
-            is_public=r["is_public"],
-            room_version=new_version,
-        )
 
-        logger.info("Creating new room %s to replace %s", new_room_id, old_room_id)
+        new_room_id = self._generate_room_id()
 
-        # we create and auth the tombstone event before properly creating the new
-        # room, to check our user has perms in the old room.
+        # Check whether the user has the power level to carry out the upgrade.
+        # `check_auth_rules_from_context` will check that they are in the room and have
+        # the required power level to send the tombstone event.
         (
             tombstone_event,
             tombstone_context,
@@ -264,6 +229,63 @@ class RoomCreationHandler:
         validate_event_for_room_version(old_room_version, tombstone_event)
         await self._event_auth_handler.check_auth_rules_from_context(
             old_room_version, tombstone_event, tombstone_context
+        )
+
+        # Upgrade the room
+        #
+        # If this user has sent multiple upgrade requests for the same room
+        # and one of them is not complete yet, cache the response and
+        # return it to all subsequent requests
+        ret = await self._upgrade_response_cache.wrap(
+            (old_room_id, user_id),
+            self._upgrade_room,
+            requester,
+            old_room_id,
+            old_room,  # args for _upgrade_room
+            new_room_id,
+            new_version,
+            tombstone_event,
+            tombstone_context,
+        )
+
+        return ret
+
+    async def _upgrade_room(
+        self,
+        requester: Requester,
+        old_room_id: str,
+        old_room: Dict[str, Any],
+        new_room_id: str,
+        new_version: RoomVersion,
+        tombstone_event: EventBase,
+        tombstone_context: synapse.events.snapshot.EventContext,
+    ) -> str:
+        """
+        Args:
+            requester: the user requesting the upgrade
+            old_room_id: the id of the room to be replaced
+            old_room: a dict containing room information for the room to be replaced,
+                as returned by `RoomWorkerStore.get_room`.
+            new_room_id: the id of the replacement room
+            new_version: the version to upgrade the room to
+            tombstone_event: the tombstone event to send to the old room
+            tombstone_context: the context for the tombstone event
+
+        Raises:
+            ShadowBanError if the requester is shadow-banned.
+        """
+        user_id = requester.user.to_string()
+        assert self.hs.is_mine_id(user_id), "User must be our own: %s" % (user_id,)
+
+        logger.info("Creating new room %s to replace %s", new_room_id, old_room_id)
+
+        # create the new room. may raise a `StoreError` in the exceedingly unlikely
+        # event of a room ID collision.
+        await self.store.store_room(
+            room_id=new_room_id,
+            room_creator_user_id=user_id,
+            is_public=old_room["is_public"],
+            room_version=new_version,
         )
 
         await self.clone_existing_room(
@@ -782,7 +804,7 @@ class RoomCreationHandler:
         visibility = config.get("visibility", "private")
         is_public = visibility == "public"
 
-        room_id = await self._generate_room_id(
+        room_id = await self._generate_and_create_room_id(
             creator_id=user_id,
             is_public=is_public,
             room_version=room_version,
@@ -1104,7 +1126,26 @@ class RoomCreationHandler:
 
         return last_sent_stream_id
 
-    async def _generate_room_id(
+    def _generate_room_id(self) -> str:
+        """Generates a random room ID.
+
+        Room IDs look like "!opaque_id:domain" and are case-sensitive as per the spec
+        at https://spec.matrix.org/v1.2/appendices/#room-ids-and-event-ids.
+
+        Does not check for collisions with existing rooms or prevent future calls from
+        returning the same room ID. To ensure the uniqueness of a new room ID, use
+        `_generate_and_create_room_id` instead.
+
+        Synapse's room IDs are 18 [a-zA-Z] characters long, which comes out to around
+        102 bits.
+
+        Returns:
+            A random room ID of the form "!opaque_id:domain".
+        """
+        random_string = stringutils.random_string(18)
+        return RoomID(random_string, self.hs.hostname).to_string()
+
+    async def _generate_and_create_room_id(
         self,
         creator_id: str,
         is_public: bool,
@@ -1115,8 +1156,7 @@ class RoomCreationHandler:
         attempts = 0
         while attempts < 5:
             try:
-                random_string = stringutils.random_string(18)
-                gen_room_id = RoomID(random_string, self.hs.hostname).to_string()
+                gen_room_id = self._generate_room_id()
                 await self.store.store_room(
                     room_id=gen_room_id,
                     room_creator_user_id=creator_id,
@@ -1253,10 +1293,10 @@ class RoomContextHandler:
             events_after=events_after,
             state=await filter_evts(state_events),
             aggregations=aggregations,
-            start=await token.copy_and_replace("room_key", results.start).to_string(
-                self.store
-            ),
-            end=await token.copy_and_replace("room_key", results.end).to_string(
+            start=await token.copy_and_replace(
+                StreamKeyType.ROOM, results.start
+            ).to_string(self.store),
+            end=await token.copy_and_replace(StreamKeyType.ROOM, results.end).to_string(
                 self.store
             ),
         )

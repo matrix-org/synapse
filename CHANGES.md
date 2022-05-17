@@ -1,7 +1,7 @@
-Synapse 1.59.0rc1 (2022-05-10)
-==============================
+Synapse 1.59.0 (2022-05-17)
+===========================
 
-This release makes several changes that server administrators should be aware of:
+Synapse 1.59 makes several changes that server administrators should be aware of:
 
 - Device name lookup over federation is now disabled by default. ([\#12616](https://github.com/matrix-org/synapse/issues/12616))
 - The `synapse.app.appservice` and `synapse.app.user_dir` worker application types are now deprecated. ([\#12452](https://github.com/matrix-org/synapse/issues/12452), [\#12654](https://github.com/matrix-org/synapse/issues/12654))
@@ -9,6 +9,27 @@ This release makes several changes that server administrators should be aware of
 See [the upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1590) for more details.
 
 Additionally, this release removes the non-standard `m.login.jwt` login type from Synapse. It can be replaced with `org.matrix.login.jwt` for identical behaviour. This is only used if `jwt_config.enabled` is set to `true` in the configuration. ([\#12597](https://github.com/matrix-org/synapse/issues/12597))
+
+
+Bugfixes
+--------
+
+- Fix DB performance regression introduced in Synapse 1.59.0rc2. ([\#12745](https://github.com/matrix-org/synapse/issues/12745))
+
+
+Synapse 1.59.0rc2 (2022-05-16)
+==============================
+
+Note: this release candidate includes a performance regression which can cause database disruption. Other release candidates in the v1.59.0 series are not affected, and a fix will be included in the v1.59.0 final release.
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.58.0 where `/sync` would fail if the most recent event in a room was rejected. ([\#12729](https://github.com/matrix-org/synapse/issues/12729))
+
+
+Synapse 1.59.0rc1 (2022-05-10)
+==============================
 
 Features
 --------

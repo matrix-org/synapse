@@ -467,13 +467,13 @@ Sub-options for each listener include:
 
 Valid resource names are:
 
-* `client`: the client-server API (/_matrix/client), and the synapse admin API (/_synapse/admin). Also implies 'media' and 'static'.
+* `client`: the client-server API (/_matrix/client), and the synapse admin API (/_synapse/admin). Also implies `media` and `static`.
 
 * `consent`: user consent forms (/_matrix/consent). See [here](../../consent_tracking.md) for more.
 
 * `federation`: the server-server API (/_matrix/federation). Also implies `media`, `keys`, `openid`
 
-* `keys`: the key discovery API (/_matrix/keys).
+* `keys`: the key discovery API (/_matrix/key).
 
 * `media`: the media API (/_matrix/media).
 
@@ -3454,7 +3454,7 @@ stream_writers:
   typing: worker1
 ```
 ---
-Config option: `run_background_task_on`
+Config option: `run_background_tasks_on`
 
 The worker that is used to run background tasks (e.g. cleaning up expired
 data). If not provided this defaults to the main process.
