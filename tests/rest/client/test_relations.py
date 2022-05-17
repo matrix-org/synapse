@@ -1073,7 +1073,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
             return assert_thread
 
         # A user which has sent the root event or replied has participated.
-        self._test_bundled_aggregations(RelationTypes.THREAD, _gen_assert(True), 10)
+        self._test_bundled_aggregations(RelationTypes.THREAD, _gen_assert(True), 9)
         # Note that this re-uses some cached values, so the total number of
         # queries is much smaller.
         self._test_bundled_aggregations(
@@ -1131,7 +1131,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations["latest_event"].get("unsigned"),
             )
 
-        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 10)
+        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 9)
 
     def test_nested_thread(self) -> None:
         """

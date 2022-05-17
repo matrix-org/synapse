@@ -273,13 +273,28 @@ class RelationsHandler:
         # Fetch thread summaries.
         summaries = await self._main_store.get_thread_summaries(event_ids)
 
-        # Only fetch participated for a limited selection based on what had
+        # Only fetch whether the current user has participated in a thread based
+        # on which returned for a limited selection based on what had
         # summaries.
         thread_event_ids = [
             event_id for event_id, summary in summaries.items() if summary
         ]
-        participated = await self._main_store.get_threads_participated(
-            thread_event_ids, user_id
+
+        # Preseed thread participation with whether the requester send the event.
+        participated = {
+            event_id: events_by_id[event_id].sender == user_id
+            for event_id in thread_event_ids
+        }
+        # Check other events against the database.
+        participated.update(
+            await self._main_store.get_threads_participated(
+                [
+                    event_id
+                    for event_id in thread_event_ids
+                    if not participated[event_id]
+                ],
+                user_id,
+            )
         )
 
         # Then subtract off the results for any ignored users.
