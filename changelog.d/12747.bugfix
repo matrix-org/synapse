@@ -1,1 +1,1 @@
-Fix database performance problem for large servers with lots of workers.
+Fix poor database performance when reading the cache invalidation stream for large servers with lots of workers.
