@@ -14,7 +14,7 @@
 from typing import Any, List, Mapping
 from unittest.mock import Mock
 
-from twisted.test.proto_helper import MemoryReactor
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.appservice import ApplicationService
 from synapse.appservice.api import ApplicationServiceApi
