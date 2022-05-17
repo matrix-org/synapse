@@ -42,6 +42,7 @@ from synapse.storage.database import (
 from synapse.storage.databases.main.state import StateFilter
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.storage.util import non_null_str_or_none
 from synapse.types import (
     JsonDict,
     UserProfile,
@@ -470,10 +471,8 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         Update or add a user's profile in the user directory.
         """
         # If the display name or avatar URL are unexpected types, overwrite them.
-        if not isinstance(display_name, str):
-            display_name = None
-        if not isinstance(avatar_url, str):
-            avatar_url = None
+        display_name = non_null_str_or_none(display_name)
+        avatar_url = non_null_str_or_none(avatar_url)
 
         def _update_profile_in_user_dir_txn(txn: LoggingTransaction) -> None:
             self.db_pool.simple_upsert_txn(

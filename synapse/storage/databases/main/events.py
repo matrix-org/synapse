@@ -47,6 +47,7 @@ from synapse.storage.database import (
 from synapse.storage.databases.main.events_worker import EventCacheEntry
 from synapse.storage.databases.main.search import SearchEntry
 from synapse.storage.engines.postgres import PostgresEngine
+from synapse.storage.util import non_null_str_or_none
 from synapse.storage.util.id_generators import AbstractStreamIdGenerator
 from synapse.storage.util.sequence import SequenceGenerator
 from synapse.types import JsonDict, StateMap, get_domain_from_id
@@ -1727,9 +1728,6 @@ class PersistEventsStore:
                 for backfilled events because backfilled events in the past do
                 not affect the current local state.
         """
-
-        def non_null_str_or_none(val: Any) -> Optional[str]:
-            return val if isinstance(val, str) and "\u0000" not in val else None
 
         self.db_pool.simple_insert_many_txn(
             txn,
