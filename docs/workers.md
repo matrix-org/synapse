@@ -447,10 +447,6 @@ Specify its name in the shared configuration as follows:
 update_user_directory_from_worker: worker_name
 ```
 
-It can handle REST endpoint matching the following regular expression:
-
-    ^/_matrix/client/(r0|v3|unstable)/user_directory/search$
-
 This work cannot be load-balanced; please ensure the main process is restarted
 after setting this option in the shared configuration!
 
