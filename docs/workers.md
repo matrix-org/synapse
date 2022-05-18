@@ -251,7 +251,7 @@ information.
     # Presence requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
 
-    # User directory queries
+    # User directory search requests
     ^/_matrix/client/(r0|v3|unstable)/user_directory/search$
 
 Additionally, the following REST endpoints can be handled for GET requests:
