@@ -6,7 +6,8 @@ can cancel request processing for select endpoints marked with the
 
 Synapse makes use of Twisted's `Deferred.cancel()` feature to make
 cancellation work. The `@cancellable` decorator does nothing by itself
-and merely acts as a flag.
+and merely acts as a flag, signalling to developers and other code alike
+that a method can be cancelled.
 
 ## Enabling cancellation for an endpoint
 1. Check that the endpoint method, and any `async` functions in its call
@@ -50,7 +51,7 @@ request = defer.ensureDeferred(on_GET())
 When a client disconnects early, Synapse checks for the presence of the
 `@cancellable` decorator on `on_GET`. Since `on_GET` is cancellable,
 `Deferred.cancel()` is called on the `Deferred` from
-`defer.ensureDeferred`, `request`. Twisted knows which `Deferred`
+`defer.ensureDeferred`, ie. `request`. Twisted knows which `Deferred`
 `request` is waiting on and passes the `cancel()` call on to `d`.
 
 The `Deferred` being waited on, `d`, may have its own handling for
