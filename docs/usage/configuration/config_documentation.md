@@ -1542,9 +1542,9 @@ Example configuration:
 ```yaml
 media_retention:
     enabled: true
-    purge_period: 24h
-    local_media_lifetime: 30d
-    remote_media_lifetime: 7d
+    purge_period: 7d
+    local_media_lifetime: 90d
+    remote_media_lifetime: 14d
 ```
 ---
 Config option: `url_preview_enabled`
