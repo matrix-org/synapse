@@ -282,12 +282,20 @@ class BackgroundUpdater:
 
         self._running = True
 
+        back_to_back_failures = 0
+
         try:
             logger.info("Starting background schema updates")
             while self.enabled:
                 try:
                     result = await self.do_next_background_update(sleep)
+                    back_to_back_failures = 0
                 except Exception:
+                    back_to_back_failures += 1
+                    if back_to_back_failures >= 5:
+                        raise RuntimeError(
+                            "5 back-to-back background update failures; aborting."
+                        )
                     logger.exception("Error doing update")
                 else:
                     if result:

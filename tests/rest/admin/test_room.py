@@ -2489,4 +2489,5 @@ PURGE_TABLES = [
     "room_tags",
     # "state_groups",  # Current impl leaves orphaned state groups around.
     "state_groups_state",
+    "federation_inbound_events_staging",
 ]
