@@ -765,6 +765,7 @@ class RelationsWorkerStore(SQLBaseStore):
             "get_if_user_has_annotated_event", _get_if_user_has_annotated_event
         )
 
+    @cached(iterable=True)
     async def get_mutual_event_relations(
         self, event_id: str
     ) -> Set[Tuple[str, str, str]]:
