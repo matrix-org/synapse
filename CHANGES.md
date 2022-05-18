@@ -1,10 +1,12 @@
 Synapse 1.59.1 (2022-05-18)
 ===========================
 
-Internal Changes
+This release fixes a long-standing issue which could prevent Synapse's user directory for updating properly.
+
+Bugfixes
 ----------------
 
-- Fix a long-standing bug where the user directory background process would fail to make forward progress if a user included a null codepoint in their display name or avatar. ([\#12762](https://github.com/matrix-org/synapse/issues/12762))
+- Fix a long-standing bug where the user directory background process would fail to make forward progress if a user included a null codepoint in their display name or avatar. Contributed by Nick @ Beeper. ([\#12762](https://github.com/matrix-org/synapse/issues/12762))
 
 
 Synapse 1.59.0 (2022-05-17)
