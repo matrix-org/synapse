@@ -49,7 +49,7 @@ class FederationConfig(Config):
             "allow_device_name_lookup_over_federation", False
         )
 
-    
+
 
 
 _METRICS_FOR_DOMAINS_SCHEMA = {"type": "array", "items": {"type": "string"}}
