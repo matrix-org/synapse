@@ -1123,13 +1123,13 @@ connection pool. For a reference to valid arguments, see:</p>
 <p>For more information on using Synapse with Postgres,
 see <a href="../../postgres.html">here</a>.</p>
 <p>Example SQLite configuration:</p>
-<pre><code>database:
+<pre><code class="language-yaml">database:
   name: sqlite3
   args:
     database: /path/to/homeserver.db
 </code></pre>
 <p>Example Postgres configuration:</p>
-<pre><code>database:
+<pre><code class="language-yaml">database:
   name: psycopg2
   txn_limit: 10000
   args:
@@ -1530,10 +1530,10 @@ using quality value syntax (;q=). '*' translates to any language.</p>
 <p>Defaults to &quot;en&quot;.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml"> url_preview_accept_language:
-   - en-UK
-   - en-US;q=0.9
-   - fr;q=0.8
-   - *;q=0.7
+   - 'en-UK'
+   - 'en-US;q=0.9'
+   - 'fr;q=0.8'
+   - '*;q=0.7'
 </code></pre>
 <hr />
 <p>Config option: <code>oembed</code></p>
