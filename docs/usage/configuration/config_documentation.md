@@ -1125,7 +1125,8 @@ Caching can be configured through the following sub-options:
    to utilize this option, and all three of the options must be specified for this feature to work. This option
    defaults to off, enable it by providing values for the sub-options listed below. Please note that the feature will not work
    and may cause unstable behavior (such as excessive emptying of caches or exceptions) if all of the values are not provided.
-   Please see the [Config Conventions](#config-conventions) for information on how to specify memory size.   
+   Please see the [Config Conventions](#config-conventions) for information on how to specify memory size and cache expiry
+   durations.
      * `max_cache_memory_usage` sets a ceiling on how much memory the cache can use before caches begin to be continuously evicted.
         They will continue to be evicted until the memory usage drops below the `target_memory_usage`, set in
         the setting below, or until the `min_cache_ttl` is hit. There is no default value for this option.
