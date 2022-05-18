@@ -4136,6 +4136,17 @@ Defaults to <code>per_second: 0.003</code>, <code>burst_count: 5</code>.</p>
 <p>This option sets ratelimiting how often invites can be sent in a room or to a 
 specific user. <code>per_room</code> defaults to <code>per_second: 0.3</code>, <code>burst_count: 10</code> and
 <code>per_user</code> defaults to <code>per_second: 0.003</code>, <code>burst_count: 5</code>. </p>
+<p>Client requests that invite user(s) when <a href="https://spec.matrix.org/v1.2/client-server-api/#post_matrixclientv3createroom">creating a
+room</a>
+will count against the <code>rc_invites.per_room</code> limit, whereas
+client requests to <a href="https://spec.matrix.org/v1.2/client-server-api/#post_matrixclientv3roomsroomidinvite">invite a single user to a
+room</a>
+will count against both the <code>rc_invites.per_user</code> and <code>rc_invites.per_room</code> limits.</p>
+<p>Federation requests to invite a user will count against the <code>rc_invites.per_user</code>
+limit only, as Synapse presumes ratelimiting by room will be done by the sending server.</p>
+<p>The <code>rc_invites.per_user</code> limit applies to the <em>receiver</em> of the invite, rather than the
+sender, meaning that a <code>rc_invite.per_user.burst_count</code> of 5 mandates that a single user
+cannot <em>receive</em> more than a burst of 5 invites at a time.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">rc_invites:
   per_room:
