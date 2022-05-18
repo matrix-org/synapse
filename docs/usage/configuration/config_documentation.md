@@ -1194,7 +1194,7 @@ For more information on using Synapse with Postgres,
 see [here](../../postgres.md).
 
 Example SQLite configuration:
-```
+```yaml
 database:
   name: sqlite3
   args:
@@ -1202,7 +1202,7 @@ database:
 ```
 
 Example Postgres configuration:
-```
+```yaml
 database:
   name: psycopg2
   txn_limit: 10000
