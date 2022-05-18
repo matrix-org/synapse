@@ -1147,6 +1147,8 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         )
         events = await self.get_events_as_list(event_ids)
         return sorted(
+            # type-ignore: mypy doesn't like negating the Optional[int] stream_ordering.
+            # But it's never None, because these events were previously persisted to the DB.
             events, key=lambda e: (-e.depth, -e.internal_metadata.stream_ordering)  # type: ignore[operator]
         )
 
