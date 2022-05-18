@@ -1830,6 +1830,10 @@ class PersistEventsStore:
             self.store.get_aggregation_groups_for_event.invalidate,
             (relation.parent_id,),
         )
+        txn.call_after(
+            self.store.get_mutual_event_relations.invalidate,
+            (relation.parent_id,),
+        )
 
         if relation.rel_type == RelationTypes.REPLACE:
             txn.call_after(
@@ -2005,6 +2009,9 @@ class PersistEventsStore:
             )
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_thread_participated, (redacted_relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_mutual_event_relations, (redacted_relates_to,)
             )
 
         self.db_pool.simple_delete_txn(
