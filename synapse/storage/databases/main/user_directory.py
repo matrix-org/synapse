@@ -29,6 +29,7 @@ from typing import (
 from typing_extensions import TypedDict
 
 from synapse.api.errors import StoreError
+from synapse.util.stringutils import non_null_str_or_none
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -469,11 +470,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         """
         Update or add a user's profile in the user directory.
         """
-        # If the display name or avatar URL are unexpected types, overwrite them.
-        if not isinstance(display_name, str):
-            display_name = None
-        if not isinstance(avatar_url, str):
-            avatar_url = None
+        # If the display name or avatar URL are unexpected types, replace with None.
+        display_name = non_null_str_or_none(display_name)
+        avatar_url = non_null_str_or_none(avatar_url)
 
         def _update_profile_in_user_dir_txn(txn: LoggingTransaction) -> None:
             self.db_pool.simple_upsert_txn(
