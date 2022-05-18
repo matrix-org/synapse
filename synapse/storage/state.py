@@ -545,8 +545,12 @@ class StateFilter:
                of a local user
         """
 
-        # XXX: can we be certain that the state at an event never changes (only gets
-        #            enlarged)?
+        # TODO(faster_joins): it's not entirely clear that this is safe. In particular,
+        #  there may be circumstances in which we return a piece of state that, once we
+        #  resync the state, we discover is invalid. For example: if it turns out that
+        #  the sender of a piece of state wasn't actually in the room, then clearly that
+        #  state shouldn't have been returned.
+        #  We should at least add some tests around this to see what happens.
 
         # if we haven't requested membership events, then it depends on the value of
         # 'include_others'
