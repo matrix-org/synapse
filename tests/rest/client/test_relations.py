@@ -1040,6 +1040,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         """
         Test that threads get correctly bundled.
         """
+        # The root message is from "user", send replies as "user2".
         self._send_relation(
             RelationTypes.THREAD, "m.room.test", access_token=self.user2_token
         )
@@ -1048,6 +1049,9 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
         )
         thread_2 = channel.json_body["event_id"]
 
+        # This needs two assertion functions which are identical except for whether
+        # the current_user_participated flag is True, create a factory for the
+        # two versions.
         def _gen_assert(participated: bool) -> Callable[[JsonDict], None]:
             def assert_thread(bundled_aggregations: JsonDict) -> None:
                 self.assertEqual(2, bundled_aggregations.get("count"))
@@ -1072,15 +1076,19 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
 
             return assert_thread
 
-        # A user which has sent the root event or replied has participated.
+        # The "user" sent the root event and is making queries for the bundled
+        # aggregations: they have participated.
         self._test_bundled_aggregations(RelationTypes.THREAD, _gen_assert(True), 9)
+        # The "user2" sent replies in the thread and is making queries for the
+        # bundled aggregations: they have participated.
+        #
         # Note that this re-uses some cached values, so the total number of
         # queries is much smaller.
         self._test_bundled_aggregations(
             RelationTypes.THREAD, _gen_assert(True), 2, access_token=self.user2_token
         )
 
-        # A user with no interactions with the thread has not participated.
+        # A user with no interactions with the thread: they have not participated.
         user3_id, user3_token = self._create_user("charlie")
         self.helper.join(self.room, user=user3_id, tok=user3_token)
         self._test_bundled_aggregations(

@@ -273,19 +273,19 @@ class RelationsHandler:
         # Fetch thread summaries.
         summaries = await self._main_store.get_thread_summaries(event_ids)
 
-        # Only fetch whether the current user has participated in a thread based
-        # on which returned for a limited selection based on what had
-        # summaries.
+        # Limit fetching whether the requester has participated in a thread to
+        # events which are thread roots.
         thread_event_ids = [
             event_id for event_id, summary in summaries.items() if summary
         ]
 
-        # Pre-seed thread participation with whether the requester sent the root event.
+        # Pre-seed thread participation with whether the requester sent the event.
         participated = {
             event_id: events_by_id[event_id].sender == user_id
             for event_id in thread_event_ids
         }
-        # Check other events against the database.
+        # For events the requester did not send, check the database for whether
+        # the requester sent a threaded reply.
         participated.update(
             await self._main_store.get_threads_participated(
                 [
