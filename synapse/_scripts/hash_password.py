@@ -55,7 +55,7 @@ def main() -> None:
         password_config = config.get("password_config", None) or {}
         password_pepper = password_config.get("pepper", password_pepper)
     else:
-        raise Exception("The specified config file could not be found or is missing.")
+        raise Exception("Please specify a path to a config file (-c).")
     password = args.password
 
     if not password:
