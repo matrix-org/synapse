@@ -627,7 +627,7 @@ class StateGroupStorage:
         if not event_ids:
             return {}
 
-        event_to_groups = await self._get_state_group_for_events(event_ids)
+        event_to_groups = await self.get_state_group_for_events(event_ids)
 
         groups = set(event_to_groups.values())
         group_to_state = await self.stores.state._get_state_for_groups(groups)
@@ -643,7 +643,7 @@ class StateGroupStorage:
         Returns:
             Resolves to a map of (type, state_key) -> event_id
         """
-        group_to_state = await self._get_state_for_groups((state_group,))
+        group_to_state = await self.get_state_for_groups((state_group,))
 
         return group_to_state[state_group]
 
@@ -720,7 +720,7 @@ class StateGroupStorage:
         if state_filter and not state_filter.must_await_full_state(self._is_mine_id):
             await_full_state = False
 
-        event_to_groups = await self._get_state_group_for_events(
+        event_to_groups = await self.get_state_group_for_events(
             event_ids, await_full_state=await_full_state
         )
 
@@ -769,7 +769,7 @@ class StateGroupStorage:
         if state_filter and not state_filter.must_await_full_state(self._is_mine_id):
             await_full_state = False
 
-        event_to_groups = await self._get_state_group_for_events(
+        event_to_groups = await self.get_state_group_for_events(
             event_ids, await_full_state=await_full_state
         )
 
@@ -829,7 +829,7 @@ class StateGroupStorage:
         )
         return state_map[event_id]
 
-    def _get_state_for_groups(
+    def get_state_for_groups(
         self, groups: Iterable[int], state_filter: Optional[StateFilter] = None
     ) -> Awaitable[Dict[int, MutableStateMap[str]]]:
         """Gets the state at each of a list of state groups, optionally
@@ -847,7 +847,7 @@ class StateGroupStorage:
             groups, state_filter or StateFilter.all()
         )
 
-    async def _get_state_group_for_events(
+    async def get_state_group_for_events(
         self,
         event_ids: Collection[str],
         await_full_state: bool = True,

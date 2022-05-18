@@ -239,13 +239,13 @@ class StateHandler:
         entry = await self.resolve_state_groups_for_events(room_id, latest_event_ids)
         return await self.store.get_joined_users_from_state(room_id, entry)
 
-    async def get_current_hosts_in_room(self, room_id: str) -> Set[str]:
+    async def get_current_hosts_in_room(self, room_id: str) -> FrozenSet[str]:
         event_ids = await self.store.get_latest_event_ids_in_room(room_id)
         return await self.get_hosts_in_room_at_events(room_id, event_ids)
 
     async def get_hosts_in_room_at_events(
         self, room_id: str, event_ids: Collection[str]
-    ) -> Set[str]:
+    ) -> FrozenSet[str]:
         """Get the hosts that were in a room at the given event ids
 
         Args:
@@ -288,7 +288,6 @@ class StateHandler:
         #
         # first of all, figure out the state before the event
         #
-
         if old_state:
             # if we're given the state before the event, then we use that
             state_ids_before_event: StateMap[str] = {
@@ -419,33 +418,37 @@ class StateHandler:
         """
         logger.debug("resolve_state_groups event_ids %s", event_ids)
 
-        # map from state group id to the state in that state group (where
-        # 'state' is a map from state key to event id)
-        # dict[int, dict[(str, str), str]]
-        state_groups_ids = await self.state_store.get_state_groups_ids(
-            room_id, event_ids
-        )
+        state_groups = await self.state_store.get_state_group_for_events(event_ids)
 
-        if len(state_groups_ids) == 0:
-            return _StateCacheEntry(state={}, state_group=None)
-        elif len(state_groups_ids) == 1:
-            name, state_list = list(state_groups_ids.items()).pop()
+        state_group_ids = state_groups.values()
 
-            prev_group, delta_ids = await self.state_store.get_state_group_delta(name)
-
+        # check if each event has same state group id, if so there's no state to resolve
+        state_group_ids_set = set(state_group_ids)
+        if len(state_group_ids_set) == 1:
+            (state_group_id,) = state_group_ids_set
+            state = await self.state_store.get_state_for_groups(state_group_ids_set)
+            prev_group, delta_ids = await self.state_store.get_state_group_delta(
+                state_group_id
+            )
             return _StateCacheEntry(
-                state=state_list,
-                state_group=name,
+                state=state[state_group_id],
+                state_group=state_group_id,
                 prev_group=prev_group,
                 delta_ids=delta_ids,
             )
+        elif len(state_group_ids_set) == 0:
+            return _StateCacheEntry(state={}, state_group=None)
 
         room_version = await self.store.get_room_version_id(room_id)
+
+        state_to_resolve = await self.state_store.get_state_for_groups(
+            state_group_ids_set
+        )
 
         result = await self._state_resolution_handler.resolve_state_groups(
             room_id,
             room_version,
-            state_groups_ids,
+            state_to_resolve,
             None,
             state_res_store=StateResolutionStore(self.store),
         )
