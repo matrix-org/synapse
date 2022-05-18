@@ -324,6 +324,8 @@ class OidcProvider:
         )
         self._skip_verification = provider.skip_verification
         self._allow_existing_users = provider.allow_existing_users
+        self._sso_jwt_enabled = provider.sso_jwt_enabled
+        self._standalone_jwt_audience = provider.standalone_jwt_audience
 
         self._http_client = hs.get_proxied_http_client()
         self._server_name: str = hs.config.server.server_name
@@ -720,7 +722,7 @@ class OidcProvider:
 
         return claims
 
-    async def _parse_standalone_id_token(self, id_token: Optional[str]) -> CodeIDToken:
+    async def _parse_standalone_id_token(self, id_token: Optional[str]) -> Optional[CodeIDToken]:
         """Return an instance of UserInfo from to given ``id_token``.
 
         Args:
@@ -730,13 +732,19 @@ class OidcProvider:
         Returns:
             The decoded claims in the id_token.
         """
+        if not self._sso_jwt_enabled:
+            return None
+
         metadata = await self.load_metadata()
         claims_params = {}
 
         alg_values = metadata.get("id_token_signing_alg_values_supported", ["RS256"])
         jwt = JsonWebToken(alg_values)
 
-        claim_options = {"iss": {"values": [metadata["issuer"]]}}
+        claim_options = {
+            "iss": {"values": [metadata["issuer"]]}}
+        if not self._standalone_jwt_audience is None:
+            claim_options["aud"] = {"value": self._standalone_jwt_audience}
 
         logger.debug("Attempting to decode JWT id_token %r", id_token)
 

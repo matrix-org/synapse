@@ -112,6 +112,9 @@ class LoginRestServlet(RestServlet):
             hs.config.registration.refreshable_access_token_lifetime is not None
         )
 
+        # SSO JWT configuration
+        self.sso_jwt_enabled = hs.config.oidc.sso_jwt_enabled
+
         self.auth = hs.get_auth()
 
         self.clock = hs.get_clock()
@@ -144,7 +147,7 @@ class LoginRestServlet(RestServlet):
         flows: List[JsonDict] = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
-        if self.oidc_enabled:
+        if self.sso_jwt_enabled:
             flows.append({"type": LoginRestServlet.SSO_JWT_TYPE})
 
         if self.cas_enabled:
@@ -207,7 +210,7 @@ class LoginRestServlet(RestServlet):
                     should_issue_refresh_token=should_issue_refresh_token,
                 )
             elif (
-                self.oidc_enabled
+                self.sso_jwt_enabled
                 and login_submission["type"] == LoginRestServlet.SSO_JWT_TYPE
             ):
                 await self._address_ratelimiter.ratelimit(

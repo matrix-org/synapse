@@ -58,6 +58,8 @@ class OIDCConfig(Config):
                     "Multiple OIDC providers have the idp_id %r." % idp_id
                 )
 
+        self._sso_jwt_enabled = self._check_if_sso_jwt_enabled(self.oidc_providers)
+
         public_baseurl = self.root.server.public_baseurl
         self.oidc_callback_url = public_baseurl + "_synapse/client/oidc/callback"
 
@@ -65,6 +67,17 @@ class OIDCConfig(Config):
     def oidc_enabled(self) -> bool:
         # OIDC is enabled if we have a provider
         return bool(self.oidc_providers)
+
+    @property
+    def sso_jwt_enabled(self) -> bool:
+        return bool(self._sso_jwt_enabled)
+
+    def _check_if_sso_jwt_enabled(self, oidc_providers: Iterable["OidcProviderConfig"]) -> bool:
+        # SSO JWT is enabled if there is at least one oidc_provider with sso_jwt_enabled
+        for oidc in oidc_providers:
+            if oidc.sso_jwt_enabled:
+                return True
+        return False
 
     def generate_config_section(self, **kwargs: Any) -> str:
         return """\
@@ -160,6 +173,20 @@ class OIDCConfig(Config):
         #   allow_existing_users: set to 'true' to allow a user logging in via OIDC to
         #       match a pre-existing account instead of failing. This could be used if
         #       switching from password logins to OIDC. Defaults to false.
+        #
+        #   sso_jwt_enabled: by using the login flow org.matrix.login.sso_jwt it
+        #       is possible to login with a JWT token that was acquired (from this
+        #       provider) via another application. If this should be disallowed
+        #       _for this oidc_provider_ then set this value to 'false'.
+        #
+        #       If not set this defaults to 'true'.
+        #
+        #   standalone_jwt_audience: if sso_jwt_enabled is 'true' (or not set)
+        #       then we accept JWT token acquired via another application. In this case
+        #       there's an additional check: the audience claim given in the token
+        #       must contain this entry.
+        #
+        #       If there is no audience configured then this check is skipped.
         #
         #   user_mapping_provider: Configuration for how attributes returned from a OIDC
         #       provider are mapped onto a matrix user. This setting has the following
@@ -330,6 +357,8 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
             "enum": ["auto", "userinfo_endpoint"],
         },
         "allow_existing_users": {"type": "boolean"},
+        "sso_jwt_enabled": {"type": "boolean"},
+        "standalone_jwt_audience" : {"type": "string"},
         "user_mapping_provider": {"type": ["object", "null"]},
         "attribute_requirements": {
             "type": "array",
@@ -498,6 +527,8 @@ def _parse_oidc_config_dict(
         skip_verification=oidc_config.get("skip_verification", False),
         user_profile_method=oidc_config.get("user_profile_method", "auto"),
         allow_existing_users=oidc_config.get("allow_existing_users", False),
+        sso_jwt_enabled=oidc_config.get("sso_jwt_enabled", True),
+        standalone_jwt_audience=oidc_config.get("standalone_jwt_audience"),
         user_mapping_provider_class=user_mapping_provider_class,
         user_mapping_provider_config=user_mapping_provider_config,
         attribute_requirements=attribute_requirements,
@@ -581,6 +612,14 @@ class OidcProviderConfig:
     # whether to allow a user logging in via OIDC to match a pre-existing account
     # instead of failing
     allow_existing_users: bool
+
+    # accept standalone JWT tokens from this provider (not acquired by this server
+    # but by someone else and now this JWT is used to log in)
+    sso_jwt_enabled: bool
+
+    # if sso_jwt_enabled is true then we only accept it if the audience
+    # contains this entry
+    standalone_jwt_audience: Optional[str]
 
     # the class of the user mapping provider
     user_mapping_provider_class: Type
