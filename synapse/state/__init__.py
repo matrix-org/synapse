@@ -418,7 +418,7 @@ class StateHandler:
         """
         logger.debug("resolve_state_groups event_ids %s", event_ids)
 
-        state_groups = await self.state_store._get_state_group_for_events(event_ids)
+        state_groups = await self.state_store.get_state_group_for_events(event_ids)
 
         state_group_ids = state_groups.values()
 
@@ -426,7 +426,7 @@ class StateHandler:
         state_group_ids_set = set(state_group_ids)
         if len(state_group_ids_set) == 1:
             (state_group_id,) = state_group_ids_set
-            state = await self.state_store._get_state_for_groups(state_group_ids_set)
+            state = await self.state_store.get_state_for_groups(state_group_ids_set)
             prev_group, delta_ids = await self.state_store.get_state_group_delta(
                 state_group_id
             )
@@ -442,7 +442,7 @@ class StateHandler:
         room_version = await self.store.get_room_version_id(room_id)
 
         state_group_ids_list = list(state_group_ids)
-        state_to_resolve = await self.state_store._get_state_for_groups(
+        state_to_resolve = await self.state_store.get_state_for_groups(
             state_group_ids_list
         )
 

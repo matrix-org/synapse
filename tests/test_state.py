@@ -129,13 +129,13 @@ class _DummyStore:
     async def get_room_version_id(self, room_id):
         return RoomVersions.V1.identifier
 
-    async def _get_state_group_for_events(self, event_ids):
+    async def get_state_group_for_events(self, event_ids):
         res = {}
         for event in event_ids:
             res[event] = self._event_to_state_group[event]
         return res
 
-    async def _get_state_for_groups(self, groups):
+    async def get_state_for_groups(self, groups):
         res = {}
         for group in groups:
             state = self._group_to_state[group]
