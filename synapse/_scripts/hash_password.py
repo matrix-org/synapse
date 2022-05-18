@@ -54,6 +54,8 @@ def main() -> None:
         bcrypt_rounds = config.get("bcrypt_rounds", bcrypt_rounds)
         password_config = config.get("password_config", None) or {}
         password_pepper = password_config.get("pepper", password_pepper)
+    else:
+        raise Exception("The specified config file could not be found or is missing.")
     password = args.password
 
     if not password:
