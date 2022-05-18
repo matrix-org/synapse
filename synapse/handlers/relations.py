@@ -280,7 +280,7 @@ class RelationsHandler:
             event_id for event_id, summary in summaries.items() if summary
         ]
 
-        # Preseed thread participation with whether the requester send the event.
+        # Pre-seed thread participation with whether the requester sent the root event.
         participated = {
             event_id: events_by_id[event_id].sender == user_id
             for event_id in thread_event_ids
