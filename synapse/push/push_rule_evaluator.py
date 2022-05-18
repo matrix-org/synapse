@@ -198,6 +198,10 @@ class PushRuleEvaluatorForEvent:
         ):
             return self._relation_match(condition, user_id)
         else:
+            # XXX This looks incorrect -- we have reached an unknown condition
+            #     kind and are unconditionally returning that it matches. Note
+            #     that it seems possible to provide a condition to the /pushrules
+            #     endpoint with an unknown kind, see _rule_tuple_from_request_object.
             return True
 
     def _event_match(self, condition: dict, user_id: str) -> bool:
