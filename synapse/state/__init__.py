@@ -441,9 +441,8 @@ class StateHandler:
 
         room_version = await self.store.get_room_version_id(room_id)
 
-        state_group_ids_list = list(state_group_ids)
         state_to_resolve = await self.state_store.get_state_for_groups(
-            state_group_ids_list
+            state_group_ids_set
         )
 
         result = await self._state_resolution_handler.resolve_state_groups(

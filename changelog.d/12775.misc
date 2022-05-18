@@ -1,1 +1,1 @@
-Refactor resolve_state_groups_for_events to not pull out full state when no state resolution happens.
+Refactor `resolve_state_groups_for_events` to not pull out full state when no state resolution happens.
