@@ -787,7 +787,7 @@ class RelationsWorkerStore(SQLBaseStore):
             return set()
 
         sql = """
-            SELECT relation_type, sender, type FROM event_relations
+            SELECT DISTINCT relation_type, sender, type FROM event_relations
             INNER JOIN events USING (event_id)
             WHERE relates_to_id = ?
         """
