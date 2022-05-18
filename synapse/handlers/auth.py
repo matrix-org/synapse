@@ -41,6 +41,7 @@ import pymacaroons
 import unpaddedbase64
 from pymacaroons.exceptions import MacaroonVerificationFailedException
 
+from twisted.internet.defer import CancelledError
 from twisted.web.server import Request
 
 from synapse.api.constants import LoginType
@@ -67,7 +68,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.roommember import ProfileInfo
 from synapse.types import JsonDict, Requester, UserID
 from synapse.util import stringutils as stringutils
-from synapse.util.async_helpers import maybe_awaitable
+from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import base62_encode
@@ -481,7 +482,7 @@ class AuthHandler:
             sid = authdict["session"]
 
         # Convert the URI and method to strings.
-        uri = request.uri.decode("utf-8")  # type: ignore
+        uri = request.uri.decode("utf-8")
         method = request.method.decode("utf-8")
 
         # If there's no session ID, create a new session.
@@ -551,7 +552,7 @@ class AuthHandler:
             await self.store.set_ui_auth_clientdict(sid, clientdict)
 
         user_agent = get_request_user_agent(request)
-        clientip = request.getClientIP()
+        clientip = request.getClientAddress().host
 
         await self.store.add_user_agent_ip_to_ui_auth_session(
             session.session_id, user_agent, clientip
@@ -2202,7 +2203,11 @@ class PasswordAuthProvider:
         # other than None (i.e. until a callback returns a success)
         for callback in self.auth_checker_callbacks[login_type]:
             try:
-                result = await callback(username, login_type, login_dict)
+                result = await delay_cancellation(
+                    callback(username, login_type, login_dict)
+                )
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue
@@ -2263,7 +2268,9 @@ class PasswordAuthProvider:
 
         for callback in self.check_3pid_auth_callbacks:
             try:
-                result = await callback(medium, address, password)
+                result = await delay_cancellation(callback(medium, address, password))
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue
@@ -2345,7 +2352,7 @@ class PasswordAuthProvider:
         """
         for callback in self.get_username_for_registration_callbacks:
             try:
-                res = await callback(uia_results, params)
+                res = await delay_cancellation(callback(uia_results, params))
 
                 if isinstance(res, str):
                     return res
@@ -2359,6 +2366,8 @@ class PasswordAuthProvider:
                         callback,
                         res,
                     )
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.error(
                     "Module raised an exception in get_username_for_registration: %s",
@@ -2388,7 +2397,7 @@ class PasswordAuthProvider:
         """
         for callback in self.get_displayname_for_registration_callbacks:
             try:
-                res = await callback(uia_results, params)
+                res = await delay_cancellation(callback(uia_results, params))
 
                 if isinstance(res, str):
                     return res
@@ -2402,6 +2411,8 @@ class PasswordAuthProvider:
                         callback,
                         res,
                     )
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.error(
                     "Module raised an exception in get_displayname_for_registration: %s",
@@ -2429,7 +2440,7 @@ class PasswordAuthProvider:
         """
         for callback in self.is_3pid_allowed_callbacks:
             try:
-                res = await callback(medium, address, registration)
+                res = await delay_cancellation(callback(medium, address, registration))
 
                 if res is False:
                     return res
@@ -2443,6 +2454,8 @@ class PasswordAuthProvider:
                         callback,
                         res,
                     )
+            except CancelledError:
+                raise
             except Exception as e:
                 logger.error("Module raised an exception in is_3pid_allowed: %s", e)
                 raise SynapseError(code=500, msg="Internal Server Error")

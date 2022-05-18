@@ -299,6 +299,21 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": True}],
     },
+    # XXX: This is an experimental rule that is only enabled if msc3786_enabled
+    # is enabled, if it is not the rule gets filtered out in _load_rules() in
+    # PushRulesWorkerStore
+    {
+        "rule_id": "global/override/.org.matrix.msc3786.rule.room.server_acl",
+        "conditions": [
+            {
+                "kind": "event_match",
+                "key": "type",
+                "pattern": "m.room.server_acl",
+                "_cache_key": "_room_server_acl",
+            }
+        ],
+        "actions": ["dont_notify"],
+    },
 ]
 
 

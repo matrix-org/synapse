@@ -69,10 +69,10 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "worker_extra_conf": "enable_media_repo: true",
     },
     "appservice": {
-        "app": "synapse.app.appservice",
+        "app": "synapse.app.generic_worker",
         "listener_resources": [],
         "endpoint_patterns": [],
-        "shared_extra_conf": {"notify_appservices": False},
+        "shared_extra_conf": {"notify_appservices_from_worker": "appservice"},
         "worker_extra_conf": "",
     },
     "federation_sender": {
@@ -171,7 +171,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
 # Templates for sections that may be inserted multiple times in config files
 SUPERVISORD_PROCESS_CONFIG_BLOCK = """
 [program:synapse_{name}]
-command=/usr/local/bin/python -m {app} \
+command=/usr/local/bin/prefix-log /usr/local/bin/python -m {app} \
     --config-path="{config_path}" \
     --config-path=/conf/workers/shared.yaml \
     --config-path=/conf/workers/{name}.yaml

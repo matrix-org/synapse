@@ -16,7 +16,7 @@
 can crop up, e.g the cache descriptors.
 """
 
-from typing import Callable, Optional
+from typing import Callable, Optional, Type
 
 from mypy.nodes import ARG_NAMED_OPT
 from mypy.plugin import MethodSigContext, Plugin
@@ -94,7 +94,7 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
     return signature
 
 
-def plugin(version: str):
+def plugin(version: str) -> Type[SynapsePlugin]:
     # This is the entry point of the plugin, and let's us deal with the fact
     # that the mypy plugin interface is *not* stable by looking at the version
     # string.

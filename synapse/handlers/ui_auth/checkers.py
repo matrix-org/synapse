@@ -256,7 +256,9 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.hs = hs
-        self._enabled = bool(hs.config.registration.registration_requires_token)
+        self._enabled = bool(
+            hs.config.registration.registration_requires_token
+        ) or bool(hs.config.registration.enable_registration_token_3pid_bypass)
         self.store = hs.get_datastores().main
 
     def is_enabled(self) -> bool:

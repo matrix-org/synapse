@@ -19,7 +19,6 @@ from unittest import mock
 from parameterized import parameterized
 from signedjson import key as key, sign as sign
 
-from twisted.internet import defer
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import RoomEncryptionAlgorithms
@@ -704,7 +703,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         remote_self_signing_key = "QeIiFEjluPBtI7WQdG365QKZcFs9kqmHir6RBD0//nQ"
 
         self.hs.get_federation_client().query_client_keys = mock.Mock(
-            return_value=defer.succeed(
+            return_value=make_awaitable(
                 {
                     "device_keys": {remote_user_id: {}},
                     "master_keys": {
@@ -777,14 +776,14 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         # Pretend we're sharing a room with the user we're querying. If not,
         # `_query_devices_for_destination` will return early.
         self.store.get_rooms_for_user = mock.Mock(
-            return_value=defer.succeed({"some_room_id"})
+            return_value=make_awaitable({"some_room_id"})
         )
 
         remote_master_key = "85T7JXPFBAySB/jwby4S3lBPTqY3+Zg53nYuGmu1ggY"
         remote_self_signing_key = "QeIiFEjluPBtI7WQdG365QKZcFs9kqmHir6RBD0//nQ"
 
         self.hs.get_federation_client().query_user_devices = mock.Mock(
-            return_value=defer.succeed(
+            return_value=make_awaitable(
                 {
                     "user_id": remote_user_id,
                     "stream_id": 1,

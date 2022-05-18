@@ -38,6 +38,7 @@ from typing import (
 
 from cryptography.utils import CryptographyDeprecationWarning
 from matrix_common.versionstring import get_distribution_version_string
+from typing_extensions import ParamSpec
 
 import twisted
 from twisted.internet import defer, error, reactor as _reactor
@@ -48,7 +49,6 @@ from twisted.logger import LoggingFile, LogLevel
 from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.python.threadpool import ThreadPool
 
-import synapse
 from synapse.api.constants import MAX_PDU_SIZE
 from synapse.app import check_bind_error
 from synapse.app.phone_stats_home import start_phone_stats_home
@@ -60,6 +60,7 @@ from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.logging.context import PreserveLoggingContext
+from synapse.logging.opentracing import init_tracer
 from synapse.metrics import install_gc_manager, register_threadpool
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.metrics.jemalloc import setup_jemalloc_stats
@@ -81,11 +82,12 @@ logger = logging.getLogger(__name__)
 
 # list of tuples of function, args list, kwargs dict
 _sighup_callbacks: List[
-    Tuple[Callable[..., None], Tuple[Any, ...], Dict[str, Any]]
+    Tuple[Callable[..., None], Tuple[object, ...], Dict[str, object]]
 ] = []
+P = ParamSpec("P")
 
 
-def register_sighup(func: Callable[..., None], *args: Any, **kwargs: Any) -> None:
+def register_sighup(func: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None:
     """
     Register a function to be called when a SIGHUP occurs.
 
@@ -93,7 +95,9 @@ def register_sighup(func: Callable[..., None], *args: Any, **kwargs: Any) -> Non
         func: Function to be called when sent a SIGHUP signal.
         *args, **kwargs: args and kwargs to be passed to the target function.
     """
-    _sighup_callbacks.append((func, args, kwargs))
+    # This type-ignore should be redundant once we use a mypy release with
+    # https://github.com/python/mypy/pull/12668.
+    _sighup_callbacks.append((func, args, kwargs))  # type: ignore[arg-type]
 
 
 def start_worker_reactor(
@@ -214,7 +218,9 @@ def redirect_stdio_to_logs() -> None:
     print("Redirected stdout/stderr to logs")
 
 
-def register_start(cb: Callable[..., Awaitable], *args: Any, **kwargs: Any) -> None:
+def register_start(
+    cb: Callable[P, Awaitable], *args: P.args, **kwargs: P.kwargs
+) -> None:
     """Register a callback with the reactor, to be called once it is running
 
     This can be used to initialise parts of the system which require an asynchronous
@@ -431,7 +437,7 @@ async def start(hs: "HomeServer") -> None:
     refresh_certificate(hs)
 
     # Start the tracer
-    synapse.logging.opentracing.init_tracer(hs)  # type: ignore[attr-defined] # noqa
+    init_tracer(hs)  # noqa
 
     # Instantiate the modules so they can register their web resources to the module API
     # before we start the listeners.

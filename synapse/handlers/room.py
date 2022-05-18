@@ -59,7 +59,7 @@ from synapse.api.filtering import Filter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase
-from synapse.events.utils import copy_power_levels_contents
+from synapse.events.utils import copy_and_fixup_power_levels_contents
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.handlers.federation import get_domains_from_state
 from synapse.handlers.relations import BundledAggregations
@@ -350,13 +350,13 @@ class RoomCreationHandler:
         # 50, but if the default PL in a room is 50 or more, then we set the
         # required PL above that.
 
-        pl_content = dict(old_room_pl_state.content)
-        users_default = int(pl_content.get("users_default", 0))
+        pl_content = copy_and_fixup_power_levels_contents(old_room_pl_state.content)
+        users_default: int = pl_content.get("users_default", 0)  # type: ignore[assignment]
         restricted_level = max(users_default + 1, 50)
 
         updated = False
         for v in ("invite", "events_default"):
-            current = int(pl_content.get(v, 0))
+            current: int = pl_content.get(v, 0)  # type: ignore[assignment]
             if current < restricted_level:
                 logger.debug(
                     "Setting level for %s in %s to %i (was %i)",
@@ -393,7 +393,9 @@ class RoomCreationHandler:
                 "state_key": "",
                 "room_id": new_room_id,
                 "sender": requester.user.to_string(),
-                "content": old_room_pl_state.content,
+                "content": copy_and_fixup_power_levels_contents(
+                    old_room_pl_state.content
+                ),
             },
             ratelimit=False,
         )
@@ -484,7 +486,7 @@ class RoomCreationHandler:
         # dict so we can't just copy.deepcopy it.
         initial_state[
             (EventTypes.PowerLevels, "")
-        ] = power_levels = copy_power_levels_contents(
+        ] = power_levels = copy_and_fixup_power_levels_contents(
             initial_state[(EventTypes.PowerLevels, "")]
         )
 

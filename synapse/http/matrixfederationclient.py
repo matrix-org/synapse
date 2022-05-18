@@ -73,7 +73,7 @@ from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.types import JsonDict
 from synapse.util import json_decoder
-from synapse.util.async_helpers import timeout_deferred
+from synapse.util.async_helpers import AwakenableSleeper, timeout_deferred
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
@@ -353,6 +353,13 @@ class MatrixFederationHttpClient:
 
         self._cooperator = Cooperator(scheduler=schedule)
 
+        self._sleeper = AwakenableSleeper(self.reactor)
+
+    def wake_destination(self, destination: str) -> None:
+        """Called when the remote server may have come back online."""
+
+        self._sleeper.wake(destination)
+
     async def _send_request_with_optional_trailing_slash(
         self,
         request: MatrixFederationRequest,
@@ -474,6 +481,8 @@ class MatrixFederationHttpClient:
             self._store,
             backoff_on_404=backoff_on_404,
             ignore_backoff=ignore_backoff,
+            notifier=self.hs.get_notifier(),
+            replication_client=self.hs.get_replication_command_handler(),
         )
 
         method_bytes = request.method.encode("ascii")
@@ -664,7 +673,9 @@ class MatrixFederationHttpClient:
                             delay,
                         )
 
-                        await self.clock.sleep(delay)
+                        # Sleep for the calculated delay, or wake up immediately
+                        # if we get notified that the server is back up.
+                        await self._sleeper.sleep(request.destination, delay * 1000)
                         retries_left -= 1
                     else:
                         raise

@@ -22,12 +22,12 @@ from typing import (
     Iterable,
     List,
     Mapping,
+    MutableMapping,
     Optional,
     Union,
 )
 
 import attr
-from frozendict import frozendict
 
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
 from synapse.api.errors import Codes, SynapseError
@@ -204,7 +204,9 @@ def _copy_field(src: JsonDict, dst: JsonDict, field: List[str]) -> None:
     key_to_move = field.pop(-1)
     sub_dict = src
     for sub_field in field:  # e.g. sub_field => "content"
-        if sub_field in sub_dict and type(sub_dict[sub_field]) in [dict, frozendict]:
+        if sub_field in sub_dict and isinstance(
+            sub_dict[sub_field], collections.abc.Mapping
+        ):
             sub_dict = sub_dict[sub_field]
         else:
             return
@@ -425,13 +427,12 @@ class EventClientSerializer:
 
         # Check if there are any bundled aggregations to include with the event.
         if bundle_aggregations:
-            event_aggregations = bundle_aggregations.get(event.event_id)
-            if event_aggregations:
+            if event.event_id in bundle_aggregations:
                 self._inject_bundled_aggregations(
                     event,
                     time_now,
                     config,
-                    event_aggregations,
+                    bundle_aggregations,
                     serialized_event,
                     apply_edits=apply_edits,
                 )
@@ -470,7 +471,7 @@ class EventClientSerializer:
         event: EventBase,
         time_now: int,
         config: SerializeEventConfig,
-        aggregations: "BundledAggregations",
+        bundled_aggregations: Dict[str, "BundledAggregations"],
         serialized_event: JsonDict,
         apply_edits: bool,
     ) -> None:
@@ -480,22 +481,37 @@ class EventClientSerializer:
             event: The event being serialized.
             time_now: The current time in milliseconds
             config: Event serialization config
-            aggregations: The bundled aggregation to serialize.
+            bundled_aggregations: Bundled aggregations to be injected.
+                A map from event_id to aggregation data. Must contain at least an
+                entry for `event`.
+
+                While serializing the bundled aggregations this map may be searched
+                again for additional events in a recursive manner.
             serialized_event: The serialized event which may be modified.
             apply_edits: Whether the content of the event should be modified to reflect
                any replacement in `aggregations.replace`.
         """
+
+        # We have already checked that aggregations exist for this event.
+        event_aggregations = bundled_aggregations[event.event_id]
+
+        # The JSON dictionary to be added under the unsigned property of the event
+        # being serialized.
         serialized_aggregations = {}
 
-        if aggregations.annotations:
-            serialized_aggregations[RelationTypes.ANNOTATION] = aggregations.annotations
+        if event_aggregations.annotations:
+            serialized_aggregations[
+                RelationTypes.ANNOTATION
+            ] = event_aggregations.annotations
 
-        if aggregations.references:
-            serialized_aggregations[RelationTypes.REFERENCE] = aggregations.references
+        if event_aggregations.references:
+            serialized_aggregations[
+                RelationTypes.REFERENCE
+            ] = event_aggregations.references
 
-        if aggregations.replace:
+        if event_aggregations.replace:
             # If there is an edit, optionally apply it to the event.
-            edit = aggregations.replace
+            edit = event_aggregations.replace
             if apply_edits:
                 self._apply_edit(event, serialized_event, edit)
 
@@ -506,19 +522,16 @@ class EventClientSerializer:
                 "sender": edit.sender,
             }
 
-        # If this event is the start of a thread, include a summary of the replies.
-        if aggregations.thread:
-            thread = aggregations.thread
+        # Include any threaded replies to this event.
+        if event_aggregations.thread:
+            thread = event_aggregations.thread
 
-            # Don't bundle aggregations as this could recurse forever.
-            serialized_latest_event = serialize_event(
-                thread.latest_event, time_now, config=config
+            serialized_latest_event = self.serialize_event(
+                thread.latest_event,
+                time_now,
+                config=config,
+                bundle_aggregations=bundled_aggregations,
             )
-            # Manually apply an edit, if one exists.
-            if thread.latest_edit:
-                self._apply_edit(
-                    thread.latest_event, serialized_latest_event, thread.latest_edit
-                )
 
             thread_summary = {
                 "latest_event": serialized_latest_event,
@@ -568,10 +581,20 @@ class EventClientSerializer:
         ]
 
 
-def copy_power_levels_contents(
-    old_power_levels: Mapping[str, Union[int, Mapping[str, int]]]
+_PowerLevel = Union[str, int]
+
+
+def copy_and_fixup_power_levels_contents(
+    old_power_levels: Mapping[str, Union[_PowerLevel, Mapping[str, _PowerLevel]]]
 ) -> Dict[str, Union[int, Dict[str, int]]]:
-    """Copy the content of a power_levels event, unfreezing frozendicts along the way
+    """Copy the content of a power_levels event, unfreezing frozendicts along the way.
+
+    We accept as input power level values which are strings, provided they represent an
+    integer, e.g. `"`100"` instead of 100. Such strings are converted to integers
+    in the returned dictionary (hence "fixup" in the function name).
+
+    Note that future room versions will outlaw such stringy power levels (see
+    https://github.com/matrix-org/matrix-spec/issues/853).
 
     Raises:
         TypeError if the input does not look like a valid power levels event content
@@ -580,27 +603,45 @@ def copy_power_levels_contents(
         raise TypeError("Not a valid power-levels content: %r" % (old_power_levels,))
 
     power_levels: Dict[str, Union[int, Dict[str, int]]] = {}
+
     for k, v in old_power_levels.items():
-
-        if isinstance(v, int):
-            power_levels[k] = v
-            continue
-
         if isinstance(v, collections.abc.Mapping):
             h: Dict[str, int] = {}
             power_levels[k] = h
             for k1, v1 in v.items():
-                # we should only have one level of nesting
-                if not isinstance(v1, int):
-                    raise TypeError(
-                        "Invalid power_levels value for %s.%s: %r" % (k, k1, v1)
-                    )
-                h[k1] = v1
-            continue
+                _copy_power_level_value_as_integer(v1, h, k1)
 
-        raise TypeError("Invalid power_levels value for %s: %r" % (k, v))
+        else:
+            _copy_power_level_value_as_integer(v, power_levels, k)
 
     return power_levels
+
+
+def _copy_power_level_value_as_integer(
+    old_value: object,
+    power_levels: MutableMapping[str, Any],
+    key: str,
+) -> None:
+    """Set `power_levels[key]` to the integer represented by `old_value`.
+
+    :raises TypeError: if `old_value` is not an integer, nor a base-10 string
+        representation of an integer.
+    """
+    if isinstance(old_value, int):
+        power_levels[key] = old_value
+        return
+
+    if isinstance(old_value, str):
+        try:
+            parsed_value = int(old_value, base=10)
+        except ValueError:
+            # Fall through to the final TypeError.
+            pass
+        else:
+            power_levels[key] = parsed_value
+            return
+
+    raise TypeError(f"Invalid power_levels value for {key}: {old_value}")
 
 
 def validate_canonicaljson(value: Any) -> None:
@@ -622,7 +663,7 @@ def validate_canonicaljson(value: Any) -> None:
         # Note that Infinity, -Infinity, and NaN are also considered floats.
         raise SynapseError(400, "Bad JSON value: float", Codes.BAD_JSON)
 
-    elif isinstance(value, (dict, frozendict)):
+    elif isinstance(value, collections.abc.Mapping):
         for v in value.values():
             validate_canonicaljson(v)
 
