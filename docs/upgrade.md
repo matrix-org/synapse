@@ -89,12 +89,57 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.59.0
+
+## Device name lookup over federation has been disabled by default
+
+The names of user devices are no longer visible to users on other homeservers by default.
+Device IDs are unaffected, as these are necessary to facilitate end-to-end encryption.
+
+To re-enable this functionality, set the
+[`allow_device_name_lookup_over_federation`](https://matrix-org.github.io/synapse/v1.59/usage/configuration/config_documentation.html#federation)
+homeserver config option to `true`.
+
+
+## Deprecation of the `synapse.app.appservice` and `synapse.app.user_dir` worker application types
+
+The `synapse.app.appservice` worker application type allowed you to configure a
+single worker to use to notify application services of new events, as long
+as this functionality was disabled on the main process with `notify_appservices: False`.
+Further, the `synapse.app.user_dir` worker application type allowed you to configure
+a single worker to be responsible for updating the user directory, as long as this
+was disabled on the main process with `update_user_directory: False`.
+
+To unify Synapse's worker types, the `synapse.app.appservice` worker application
+type and the `notify_appservices` configuration option have been deprecated.
+The `synapse.app.user_dir` worker application type and `update_user_directory`
+configuration option have also been deprecated.
+
+To get the same functionality as was provided by the deprecated options, it's now recommended that the `synapse.app.generic_worker`
+worker application type is used and that the `notify_appservices_from_worker` and/or
+`update_user_directory_from_worker` options are set to the name of a worker.
+
+For the time being, the old options can be used alongside the new options to make
+it easier to transition between the two configurations, however please note that:
+
+- the options must not contradict each other (otherwise Synapse won't start); and
+- the `notify_appservices` and `update_user_directory` options will be removed in a future release of Synapse.
+
+Please see the [*Notifying Application Services*][v1_59_notify_ases_from] and
+[*Updating the User Directory*][v1_59_update_user_dir] sections of the worker
+documentation for more information.
+
+[v1_59_notify_ases_from]: workers.md#notifying-application-services
+[v1_59_update_user_dir]: workers.md#updating-the-user-directory
+
+
 # Upgrading to v1.58.0
 
 ## Groups/communities feature has been disabled by default
 
 The non-standard groups/communities feature in Synapse has been disabled by default
 and will be removed in Synapse v1.61.0.
+
 
 # Upgrading to v1.57.0
 

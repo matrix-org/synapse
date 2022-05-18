@@ -130,6 +130,7 @@ class StateHandler:
         self.state_store = hs.get_storage().state
         self.hs = hs
         self._state_resolution_handler = hs.get_state_resolution_handler()
+        self._storage = hs.get_storage()
 
     @overload
     async def get_current_state(
@@ -238,13 +239,13 @@ class StateHandler:
         entry = await self.resolve_state_groups_for_events(room_id, latest_event_ids)
         return await self.store.get_joined_users_from_state(room_id, entry)
 
-    async def get_current_hosts_in_room(self, room_id: str) -> Set[str]:
+    async def get_current_hosts_in_room(self, room_id: str) -> FrozenSet[str]:
         event_ids = await self.store.get_latest_event_ids_in_room(room_id)
         return await self.get_hosts_in_room_at_events(room_id, event_ids)
 
     async def get_hosts_in_room_at_events(
         self, room_id: str, event_ids: Collection[str]
-    ) -> Set[str]:
+    ) -> FrozenSet[str]:
         """Get the hosts that were in a room at the given event ids
 
         Args:
@@ -361,10 +362,10 @@ class StateHandler:
 
         if not event.is_state():
             return EventContext.with_state(
+                storage=self._storage,
                 state_group_before_event=state_group_before_event,
                 state_group=state_group_before_event,
-                current_state_ids=state_ids_before_event,
-                prev_state_ids=state_ids_before_event,
+                state_delta_due_to_event={},
                 prev_group=state_group_before_event_prev_group,
                 delta_ids=deltas_to_state_group_before_event,
                 partial_state=partial_state,
@@ -393,10 +394,10 @@ class StateHandler:
         )
 
         return EventContext.with_state(
+            storage=self._storage,
             state_group=state_group_after_event,
             state_group_before_event=state_group_before_event,
-            current_state_ids=state_ids_after_event,
-            prev_state_ids=state_ids_before_event,
+            state_delta_due_to_event=delta_ids,
             prev_group=state_group_before_event,
             delta_ids=delta_ids,
             partial_state=partial_state,
@@ -800,7 +801,7 @@ class StateResolutionStore:
 
         return self.store.get_events(
             event_ids,
-            redact_behaviour=EventRedactBehaviour.AS_IS,
+            redact_behaviour=EventRedactBehaviour.as_is,
             get_prev_content=False,
             allow_rejected=allow_rejected,
         )

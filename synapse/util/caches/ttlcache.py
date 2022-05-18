@@ -107,7 +107,7 @@ class TTLCache(Generic[KT, VT]):
         self._metrics.inc_hits()
         return e.value, e.expiry_time, e.ttl
 
-    def pop(self, key: KT, default: T = SENTINEL) -> Union[VT, T]:  # type: ignore
+    def pop(self, key: KT, default: T = SENTINEL) -> Union[VT, T]:
         """Remove a value from the cache
 
         If key is in the cache, remove it and return its value, else return default.

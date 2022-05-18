@@ -15,7 +15,7 @@
 """This module implements the TCP replication protocol used by synapse to
 communicate between the master process and its workers (when they're enabled).
 
-Further details can be found in docs/tcp_replication.rst
+Further details can be found in docs/tcp_replication.md
 
 
 Structure of the module:

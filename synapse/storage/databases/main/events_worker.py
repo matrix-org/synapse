@@ -14,6 +14,8 @@
 
 import logging
 import threading
+import weakref
+from enum import Enum, auto
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -22,6 +24,7 @@ from typing import (
     Dict,
     Iterable,
     List,
+    MutableMapping,
     Optional,
     Set,
     Tuple,
@@ -30,7 +33,6 @@ from typing import (
 )
 
 import attr
-from constantly import NamedConstant, Names
 from prometheus_client import Gauge
 from typing_extensions import Literal
 
@@ -150,14 +152,14 @@ class _EventRow:
     outlier: bool
 
 
-class EventRedactBehaviour(Names):
+class EventRedactBehaviour(Enum):
     """
     What to do when retrieving a redacted event from the database.
     """
 
-    AS_IS = NamedConstant()
-    REDACT = NamedConstant()
-    BLOCK = NamedConstant()
+    as_is = auto()
+    redact = auto()
+    block = auto()
 
 
 class EventsWorkerStore(SQLBaseStore):
@@ -248,6 +250,12 @@ class EventsWorkerStore(SQLBaseStore):
             str, ObservableDeferred[Dict[str, EventCacheEntry]]
         ] = {}
 
+        # We keep track of the events we have currently loaded in memory so that
+        # we can reuse them even if they've been evicted from the cache. We only
+        # track events that don't need redacting in here (as then we don't need
+        # to track redaction status).
+        self._event_ref: MutableMapping[str, EventBase] = weakref.WeakValueDictionary()
+
         self._event_fetch_lock = threading.Condition()
         self._event_fetch_list: List[
             Tuple[Iterable[str], "defer.Deferred[Dict[str, _EventRow]]"]
@@ -327,7 +335,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_event(
         self,
         event_id: str,
-        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.REDACT,
+        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.redact,
         get_prev_content: bool = ...,
         allow_rejected: bool = ...,
         allow_none: Literal[False] = ...,
@@ -339,7 +347,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_event(
         self,
         event_id: str,
-        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.REDACT,
+        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.redact,
         get_prev_content: bool = ...,
         allow_rejected: bool = ...,
         allow_none: Literal[True] = ...,
@@ -350,7 +358,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_event(
         self,
         event_id: str,
-        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.REDACT,
+        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.redact,
         get_prev_content: bool = False,
         allow_rejected: bool = False,
         allow_none: bool = False,
@@ -362,9 +370,9 @@ class EventsWorkerStore(SQLBaseStore):
             event_id: The event_id of the event to fetch
 
             redact_behaviour: Determine what to do with a redacted event. Possible values:
-                * AS_IS - Return the full event body with no redacted content
-                * REDACT - Return the event but with a redacted body
-                * DISALLOW - Do not return redacted events (behave as per allow_none
+                * as_is - Return the full event body with no redacted content
+                * redact - Return the event but with a redacted body
+                * block - Do not return redacted events (behave as per allow_none
                     if the event is redacted)
 
             get_prev_content: If True and event is a state event,
@@ -406,7 +414,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_events(
         self,
         event_ids: Collection[str],
-        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.REDACT,
+        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.redact,
         get_prev_content: bool = False,
         allow_rejected: bool = False,
     ) -> Dict[str, EventBase]:
@@ -417,9 +425,9 @@ class EventsWorkerStore(SQLBaseStore):
 
             redact_behaviour: Determine what to do with a redacted event. Possible
                 values:
-                * AS_IS - Return the full event body with no redacted content
-                * REDACT - Return the event but with a redacted body
-                * DISALLOW - Do not return redacted events (omit them from the response)
+                * as_is - Return the full event body with no redacted content
+                * redact - Return the event but with a redacted body
+                * block - Do not return redacted events (omit them from the response)
 
             get_prev_content: If True and event is a state event,
                 include the previous states content in the unsigned field.
@@ -442,7 +450,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_events_as_list(
         self,
         event_ids: Collection[str],
-        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.REDACT,
+        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.redact,
         get_prev_content: bool = False,
         allow_rejected: bool = False,
     ) -> List[EventBase]:
@@ -455,9 +463,9 @@ class EventsWorkerStore(SQLBaseStore):
             event_ids: The event_ids of the events to fetch
 
             redact_behaviour: Determine what to do with a redacted event. Possible values:
-                * AS_IS - Return the full event body with no redacted content
-                * REDACT - Return the event but with a redacted body
-                * DISALLOW - Do not return redacted events (omit them from the response)
+                * as_is - Return the full event body with no redacted content
+                * redact - Return the event but with a redacted body
+                * block - Do not return redacted events (omit them from the response)
 
             get_prev_content: If True and event is a state event,
                 include the previous states content in the unsigned field.
@@ -568,10 +576,10 @@ class EventsWorkerStore(SQLBaseStore):
             event = entry.event
 
             if entry.redacted_event:
-                if redact_behaviour == EventRedactBehaviour.BLOCK:
+                if redact_behaviour == EventRedactBehaviour.block:
                     # Skip this event
                     continue
-                elif redact_behaviour == EventRedactBehaviour.REDACT:
+                elif redact_behaviour == EventRedactBehaviour.redact:
                     event = entry.redacted_event
 
             events.append(event)
@@ -723,6 +731,8 @@ class EventsWorkerStore(SQLBaseStore):
 
     def _invalidate_get_event_cache(self, event_id: str) -> None:
         self._get_event_cache.invalidate((event_id,))
+        self._event_ref.pop(event_id, None)
+        self._current_event_fetches.pop(event_id, None)
 
     def _get_events_from_cache(
         self, events: Iterable[str], update_metrics: bool = True
@@ -738,13 +748,30 @@ class EventsWorkerStore(SQLBaseStore):
         event_map = {}
 
         for event_id in events:
+            # First check if it's in the event cache
             ret = self._get_event_cache.get(
                 (event_id,), None, update_metrics=update_metrics
             )
-            if not ret:
+            if ret:
+                event_map[event_id] = ret
                 continue
 
-            event_map[event_id] = ret
+            # Otherwise check if we still have the event in memory.
+            event = self._event_ref.get(event_id)
+            if event:
+                # Reconstruct an event cache entry
+
+                cache_entry = EventCacheEntry(
+                    event=event,
+                    # We don't cache weakrefs to redacted events, so we know
+                    # this is None.
+                    redacted_event=None,
+                )
+                event_map[event_id] = cache_entry
+
+                # We add the entry back into the cache as we want to keep
+                # recently queried events in the cache.
+                self._get_event_cache.set((event_id,), cache_entry)
 
         return event_map
 
@@ -1094,6 +1121,18 @@ class EventsWorkerStore(SQLBaseStore):
             original_ev.internal_metadata.stream_ordering = row.stream_ordering
             original_ev.internal_metadata.outlier = row.outlier
 
+            # Consistency check: if the content of the event has been modified in the
+            # database, then the calculated event ID will not match the event id in the
+            # database.
+            if original_ev.event_id != event_id:
+                # it's difficult to see what to do here. Pretty much all bets are off
+                # if Synapse cannot rely on the consistency of its database.
+                raise RuntimeError(
+                    f"Database corruption: Event {event_id} in room {d['room_id']} "
+                    f"from the database appears to have been modified (calculated "
+                    f"event id {original_ev.event_id})"
+                )
+
             event_map[event_id] = original_ev
 
         # finally, we can decide whether each one needs redacting, and build
@@ -1111,6 +1150,10 @@ class EventsWorkerStore(SQLBaseStore):
 
             self._get_event_cache.set((event_id,), cache_entry)
             result_map[event_id] = cache_entry
+
+            if not redacted_event:
+                # We only cache references to unredacted events.
+                self._event_ref[event_id] = original_ev
 
         return result_map
 

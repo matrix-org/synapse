@@ -24,11 +24,10 @@ from typing import (
 )
 
 import attr
-from frozendict import frozendict
 
 from synapse.api.constants import RelationTypes
 from synapse.api.errors import SynapseError
-from synapse.events import EventBase
+from synapse.events import EventBase, relation_from_event
 from synapse.storage.databases.main.relations import _RelatedEvent
 from synapse.types import JsonDict, Requester, StreamToken, UserID
 from synapse.visibility import filter_events_for_client
@@ -44,8 +43,6 @@ logger = logging.getLogger(__name__)
 class _ThreadAggregation:
     # The latest event in the thread.
     latest_event: EventBase
-    # The latest edit to the latest event in the thread.
-    latest_edit: Optional[EventBase]
     # The total number of events in the thread.
     count: int
     # True if the current user has sent an event to the thread.
@@ -295,7 +292,7 @@ class RelationsHandler:
 
         for event_id, summary in summaries.items():
             if summary:
-                thread_count, latest_thread_event, edit = summary
+                thread_count, latest_thread_event = summary
 
                 # Subtract off the count of any ignored users.
                 for ignored_user in ignored_users:
@@ -340,7 +337,6 @@ class RelationsHandler:
 
                 results[event_id] = _ThreadAggregation(
                     latest_event=latest_thread_event,
-                    latest_edit=edit,
                     count=thread_count,
                     # If there's a thread summary it must also exist in the
                     # participated dictionary.
@@ -359,15 +355,38 @@ class RelationsHandler:
             user_id: The user requesting the bundled aggregations.
 
         Returns:
-            A map of event ID to the bundled aggregation for the event. Not all
-            events may have bundled aggregations in the results.
+            A map of event ID to the bundled aggregations for the event.
+
+            Not all requested events may exist in the results (if they don't have
+            bundled aggregations).
+
+            The results may include additional events which are related to the
+            requested events.
         """
-        # De-duplicate events by ID to handle the same event requested multiple times.
-        #
-        # State events do not get bundled aggregations.
-        events_by_id = {
-            event.event_id: event for event in events if not event.is_state()
-        }
+        # De-duplicated events by ID to handle the same event requested multiple times.
+        events_by_id = {}
+        # A map of event ID to the relation in that event, if there is one.
+        relations_by_id: Dict[str, str] = {}
+        for event in events:
+            # State events do not get bundled aggregations.
+            if event.is_state():
+                continue
+
+            relates_to = relation_from_event(event)
+            if relates_to:
+                # An event which is a replacement (ie edit) or annotation (ie,
+                # reaction) may not have any other event related to it.
+                if relates_to.rel_type in (
+                    RelationTypes.ANNOTATION,
+                    RelationTypes.REPLACE,
+                ):
+                    continue
+
+                # Track the event's relation information for later.
+                relations_by_id[event.event_id] = relates_to.rel_type
+
+            # The event should get bundled aggregations.
+            events_by_id[event.event_id] = event
 
         # event ID -> bundled aggregation in non-serialized form.
         results: Dict[str, BundledAggregations] = {}
@@ -375,16 +394,34 @@ class RelationsHandler:
         # Fetch any ignored users of the requesting user.
         ignored_users = await self._main_store.ignored_users(user_id)
 
+        # Threads are special as the latest event of a thread might cause additional
+        # events to be fetched. Thus, we check those first!
+
+        # Fetch thread summaries (but only for the directly requested events).
+        threads = await self.get_threads_for_events(
+            # It is not valid to start a thread on an event which itself relates to another event.
+            [eid for eid in events_by_id.keys() if eid not in relations_by_id],
+            user_id,
+            ignored_users,
+        )
+        for event_id, thread in threads.items():
+            results.setdefault(event_id, BundledAggregations()).thread = thread
+
+            # If the latest event in a thread is not already being fetched,
+            # add it. This ensures that the bundled aggregations for the
+            # latest thread event is correct.
+            latest_thread_event = thread.latest_event
+            if latest_thread_event and latest_thread_event.event_id not in events_by_id:
+                events_by_id[latest_thread_event.event_id] = latest_thread_event
+                # Keep relations_by_id in sync with events_by_id:
+                #
+                # We know that the latest event in a thread has a thread relation
+                # (as that is what makes it part of the thread).
+                relations_by_id[latest_thread_event.event_id] = RelationTypes.THREAD
+
         # Fetch other relations per event.
         for event in events_by_id.values():
-            # Do not bundle aggregations for an event which represents an edit or an
-            # annotation. It does not make sense for them to have related events.
-            relates_to = event.content.get("m.relates_to")
-            if isinstance(relates_to, (dict, frozendict)):
-                relation_type = relates_to.get("rel_type")
-                if relation_type in (RelationTypes.ANNOTATION, RelationTypes.REPLACE):
-                    continue
-
+            # Fetch any annotations (ie, reactions) to bundle with this event.
             annotations = await self.get_annotations_for_event(
                 event.event_id, event.room_id, ignored_users=ignored_users
             )
@@ -393,6 +430,7 @@ class RelationsHandler:
                     event.event_id, BundledAggregations()
                 ).annotations = {"chunk": annotations}
 
+            # Fetch any references to bundle with this event.
             references, next_token = await self.get_relations_for_event(
                 event.event_id,
                 event,
@@ -424,11 +462,5 @@ class RelationsHandler:
         )
         for event_id, edit in edits.items():
             results.setdefault(event_id, BundledAggregations()).replace = edit
-
-        threads = await self.get_threads_for_events(
-            events_by_id.keys(), user_id, ignored_users
-        )
-        for event_id, thread in threads.items():
-            results.setdefault(event_id, BundledAggregations()).thread = thread
 
         return results

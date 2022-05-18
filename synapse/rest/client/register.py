@@ -352,7 +352,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
         if self.inhibit_user_in_use_error:
             return 200, {"available": True}
 
-        ip = request.getClientIP()
+        ip = request.getClientAddress().host
         with self.ratelimiter.ratelimit(ip) as wait_deferred:
             await wait_deferred
 
@@ -394,7 +394,7 @@ class RegistrationTokenValidityRestServlet(RestServlet):
         )
 
     async def on_GET(self, request: Request) -> Tuple[int, JsonDict]:
-        await self.ratelimiter.ratelimit(None, (request.getClientIP(),))
+        await self.ratelimiter.ratelimit(None, (request.getClientAddress().host,))
 
         if not self.hs.config.registration.enable_registration:
             raise SynapseError(
@@ -441,7 +441,7 @@ class RegisterRestServlet(RestServlet):
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         body = parse_json_object_from_request(request)
 
-        client_addr = request.getClientIP()
+        client_addr = request.getClientAddress().host
 
         await self.ratelimiter.ratelimit(None, client_addr, update=False)
 
@@ -929,6 +929,10 @@ def _calculate_registration_flows(
         # always let users provide both MSISDN & email
         flows.append([LoginType.MSISDN, LoginType.EMAIL_IDENTITY])
 
+    # Add a flow that doesn't require any 3pids, if the config requests it.
+    if config.registration.enable_registration_token_3pid_bypass:
+        flows.append([LoginType.REGISTRATION_TOKEN])
+
     # Prepend m.login.terms to all flows if we're requiring consent
     if config.consent.user_consent_at_registration:
         for flow in flows:
@@ -942,7 +946,8 @@ def _calculate_registration_flows(
     # Prepend registration token to all flows if we're requiring a token
     if config.registration.registration_requires_token:
         for flow in flows:
-            flow.insert(0, LoginType.REGISTRATION_TOKEN)
+            if LoginType.REGISTRATION_TOKEN not in flow:
+                flow.insert(0, LoginType.REGISTRATION_TOKEN)
 
     return flows
 

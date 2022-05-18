@@ -25,7 +25,7 @@ from synapse.metrics.background_process_metrics import (
 )
 from synapse.replication.tcp.streams import TypingStream
 from synapse.streams import EventSource
-from synapse.types import JsonDict, Requester, UserID, get_domain_from_id
+from synapse.types import JsonDict, Requester, StreamKeyType, UserID, get_domain_from_id
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.metrics import Measure
 from synapse.util.wheel_timer import WheelTimer
@@ -382,7 +382,7 @@ class TypingWriterHandler(FollowerTypingHandler):
         )
 
         self.notifier.on_new_event(
-            "typing_key", self._latest_room_serial, rooms=[member.room_id]
+            StreamKeyType.TYPING, self._latest_room_serial, rooms=[member.room_id]
         )
 
     async def get_all_typing_updates(

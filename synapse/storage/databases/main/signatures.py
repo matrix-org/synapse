@@ -48,7 +48,7 @@ class SignatureWorkerStore(EventsWorkerStore):
         """
         events = await self.get_events(
             event_ids,
-            redact_behaviour=EventRedactBehaviour.AS_IS,
+            redact_behaviour=EventRedactBehaviour.as_is,
             allow_rejected=True,
         )
 

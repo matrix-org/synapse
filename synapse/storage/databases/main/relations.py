@@ -34,7 +34,7 @@ from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import LoggingTransaction, make_in_list_sql_clause
 from synapse.storage.databases.main.stream import generate_pagination_where_clause
 from synapse.storage.engines import PostgresEngine
-from synapse.types import JsonDict, RoomStreamToken, StreamToken
+from synapse.types import JsonDict, RoomStreamToken, StreamKeyType, StreamToken
 from synapse.util.caches.descriptors import cached, cachedList
 
 logger = logging.getLogger(__name__)
@@ -161,7 +161,9 @@ class RelationsWorkerStore(SQLBaseStore):
             if len(events) > limit and last_topo_id and last_stream_id:
                 next_key = RoomStreamToken(last_topo_id, last_stream_id)
                 if from_token:
-                    next_token = from_token.copy_and_replace("room_key", next_key)
+                    next_token = from_token.copy_and_replace(
+                        StreamKeyType.ROOM, next_key
+                    )
                 else:
                     next_token = StreamToken(
                         room_key=next_key,
@@ -445,8 +447,8 @@ class RelationsWorkerStore(SQLBaseStore):
     @cachedList(cached_method_name="get_thread_summary", list_name="event_ids")
     async def get_thread_summaries(
         self, event_ids: Collection[str]
-    ) -> Dict[str, Optional[Tuple[int, EventBase, Optional[EventBase]]]]:
-        """Get the number of threaded replies, the latest reply (if any), and the latest edit for that reply for the given event.
+    ) -> Dict[str, Optional[Tuple[int, EventBase]]]:
+        """Get the number of threaded replies and the latest reply (if any) for the given events.
 
         Args:
             event_ids: Summarize the thread related to this event ID.
@@ -458,7 +460,6 @@ class RelationsWorkerStore(SQLBaseStore):
             Each summary is a tuple of:
                 The number of events in the thread.
                 The most recent event in the thread.
-                The most recent edit to the most recent event in the thread, if applicable.
         """
 
         def _get_thread_summaries_txn(
@@ -544,9 +545,6 @@ class RelationsWorkerStore(SQLBaseStore):
 
         latest_events = await self.get_events(latest_event_ids.values())  # type: ignore[attr-defined]
 
-        # Check to see if any of those events are edited.
-        latest_edits = await self.get_applicable_edits(latest_event_ids.values())
-
         # Map to the event IDs to the thread summary.
         #
         # There might not be a summary due to there not being a thread or
@@ -557,8 +555,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
             summary = None
             if latest_event:
-                latest_edit = latest_edits.get(latest_event_id)
-                summary = (counts[parent_event_id], latest_event, latest_edit)
+                summary = (counts[parent_event_id], latest_event)
             summaries[parent_event_id] = summary
 
         return summaries

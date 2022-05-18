@@ -30,6 +30,7 @@ from typing import (
 
 import attr
 import jinja2
+from typing_extensions import ParamSpec
 
 from twisted.internet import defer
 from twisted.web.resource import Resource
@@ -82,6 +83,7 @@ from synapse.handlers.auth import (
     ON_LOGGED_OUT_CALLBACK,
     AuthHandler,
 )
+from synapse.handlers.push_rules import RuleSpec, check_actions
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
     DirectServeHtmlResource,
@@ -109,6 +111,7 @@ from synapse.storage.state import StateFilter
 from synapse.types import (
     DomainSpecificString,
     JsonDict,
+    JsonMapping,
     Requester,
     StateMap,
     UserID,
@@ -127,6 +130,7 @@ if TYPE_CHECKING:
 
 
 T = TypeVar("T")
+P = ParamSpec("P")
 
 """
 This package defines the 'stable' API which can be used by extension modules which
@@ -151,6 +155,7 @@ __all__ = [
     "PRESENCE_ALL_USERS",
     "LoginResponse",
     "JsonDict",
+    "JsonMapping",
     "EventBase",
     "StateMap",
     "ProfileInfo",
@@ -193,6 +198,7 @@ class ModuleApi:
         self._clock: Clock = hs.get_clock()
         self._registration_handler = hs.get_registration_handler()
         self._send_email_handler = hs.get_send_email_handler()
+        self._push_rules_handler = hs.get_push_rules_handler()
         self.custom_template_dir = hs.config.server.custom_template_directory
 
         try:
@@ -795,9 +801,9 @@ class ModuleApi:
     def run_db_interaction(
         self,
         desc: str,
-        func: Callable[..., T],
-        *args: Any,
-        **kwargs: Any,
+        func: Callable[P, T],
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> "defer.Deferred[T]":
         """Run a function with a database connection
 
@@ -813,8 +819,9 @@ class ModuleApi:
         Returns:
             Deferred[object]: result of func
         """
+        # type-ignore: See https://github.com/python/mypy/issues/8862
         return defer.ensureDeferred(
-            self._store.db_pool.runInteraction(desc, func, *args, **kwargs)
+            self._store.db_pool.runInteraction(desc, func, *args, **kwargs)  # type: ignore[arg-type]
         )
 
     def complete_sso_login(
@@ -1292,9 +1299,9 @@ class ModuleApi:
 
     async def defer_to_thread(
         self,
-        f: Callable[..., T],
-        *args: Any,
-        **kwargs: Any,
+        f: Callable[P, T],
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> T:
         """Runs the given function in a separate thread from Synapse's thread pool.
 
@@ -1349,6 +1356,68 @@ class ModuleApi:
 
         """
         await self._store.add_user_bound_threepid(user_id, medium, address, id_server)
+
+    def check_push_rule_actions(
+        self, actions: List[Union[str, Dict[str, str]]]
+    ) -> None:
+        """Checks if the given push rule actions are valid according to the Matrix
+        specification.
+
+        See https://spec.matrix.org/v1.2/client-server-api/#actions for the list of valid
+        actions.
+
+        Added in Synapse v1.58.0.
+
+        Args:
+            actions: the actions to check.
+
+        Raises:
+            synapse.module_api.errors.InvalidRuleException if the actions are invalid.
+        """
+        check_actions(actions)
+
+    async def set_push_rule_action(
+        self,
+        user_id: str,
+        scope: str,
+        kind: str,
+        rule_id: str,
+        actions: List[Union[str, Dict[str, str]]],
+    ) -> None:
+        """Changes the actions of an existing push rule for the given user.
+
+        See https://spec.matrix.org/v1.2/client-server-api/#push-rules for more
+        information about push rules and their syntax.
+
+        Can only be called on the main process.
+
+        Added in Synapse v1.58.0.
+
+        Args:
+            user_id: the user for which to change the push rule's actions.
+            scope: the push rule's scope, currently only "global" is allowed.
+            kind: the push rule's kind.
+            rule_id: the push rule's identifier.
+            actions: the actions to run when the rule's conditions match.
+
+        Raises:
+            RuntimeError if this method is called on a worker or `scope` is invalid.
+            synapse.module_api.errors.RuleNotFoundException if the rule being modified
+                can't be found.
+            synapse.module_api.errors.InvalidRuleException if the actions are invalid.
+        """
+        if self.worker_app is not None:
+            raise RuntimeError("module tried to change push rule actions on a worker")
+
+        if scope != "global":
+            raise RuntimeError(
+                "invalid scope %s, only 'global' is currently allowed" % scope
+            )
+
+        spec = RuleSpec(scope, kind, rule_id, "actions")
+        await self._push_rules_handler.set_rule_attr(
+            user_id, spec, {"actions": actions}
+        )
 
 
 class PublicRoomListManager:
@@ -1419,7 +1488,7 @@ class AccountDataManager:
                 f"{user_id} is not local to this homeserver; can't access account data for remote users."
             )
 
-    async def get_global(self, user_id: str, data_type: str) -> Optional[JsonDict]:
+    async def get_global(self, user_id: str, data_type: str) -> Optional[JsonMapping]:
         """
         Gets some global account data, of a specified type, for the specified user.
 
