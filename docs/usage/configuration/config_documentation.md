@@ -25,10 +25,10 @@ messages from the database after 5 minutes, rather than 5 months.
 
 In addition, configuration options referring to size use the following suffixes:
 
-* `M` = MB, or 1048576 bytes
-* `K` = KB, or 1024 bytes 
+* `M` = MiB, or 1048576 bytes
+* `K` = KiB, or 1024 bytes 
 
-For example, setting `max_avatar_size: 10M` means that Synapse will not accept files larger than 10MB
+For example, setting `max_avatar_size: 10M` means that Synapse will not accept files larger than 10485760 bytes
 for a user avatar. 
 
 ### YAML 
