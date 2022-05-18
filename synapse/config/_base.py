@@ -123,7 +123,9 @@ CONFIG_FILE_HEADER = """\
 # should have the same indentation.
 #
 # [1] https://docs.ansible.com/ansible/latest/reference_appendices/YAMLSyntax.html
-
+#
+# For more information on how to configure Synapse, including a complete accounting of 
+# each option, go to docs/usage/configuration/config_documentation.md
 """
 
 
