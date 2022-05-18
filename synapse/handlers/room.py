@@ -303,7 +303,9 @@ class RoomCreationHandler:
             context=tombstone_context,
         )
 
-        state_filter = StateFilter.from_types([(EventTypes.CanonicalAlias, ""), (EventTypes.PowerLevels, "")])
+        state_filter = StateFilter.from_types(
+            [(EventTypes.CanonicalAlias, ""), (EventTypes.PowerLevels, "")]
+        )
         old_room_state = await tombstone_context.get_current_state_ids(state_filter)
 
         # We know the tombstone event isn't an outlier so it has current state.
