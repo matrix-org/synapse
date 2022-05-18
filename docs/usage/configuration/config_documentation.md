@@ -1541,7 +1541,6 @@ then media of that type will not be purged.
 Example configuration:
 ```yaml
 media_retention:
-    enabled: true
     purge_period: 7d
     local_media_lifetime: 90d
     remote_media_lifetime: 14d
