@@ -751,6 +751,21 @@ class RoomCreationHandler:
                 if wchar in config["room_alias_name"]:
                     raise SynapseError(400, "Invalid characters in room alias")
 
+            if ":" in config["room_alias_name"]:
+                # Prevent someone from trying to pass in a full alias here.
+                # Note that it's permissible for a room alias to have multiple
+                # hash symbols at the start (notably bridged over from IRC, too),
+                # but the first colon in the alias is defined to separate the local
+                # part from the server name.
+                # (remember server names can contain port numbers, also separated
+                # by a colon. But under no circumstances should the local part be
+                # allowed to contain a colon!)
+                raise SynapseError(
+                    400,
+                    "':' is not permitted in the room alias name. "
+                    "Please note this expects a local part — 'wombat', not '#wombat:example.com'.",
+                )
+
             room_alias = RoomAlias(config["room_alias_name"], self.hs.hostname)
             mapping = await self.store.get_association_from_room_alias(room_alias)
 
