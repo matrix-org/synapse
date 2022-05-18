@@ -214,7 +214,11 @@ class BulkPushRuleEvaluator:
             sender_power_level,
         ) = await self._get_power_levels_and_sender_level(event, context)
 
-        relations = await self.store.get_mutual_event_relations(event)
+        # If the experimental feature is not enabled, skip fetching relations.
+        if self._relations_match_enabled:
+            relations = await self.store.get_mutual_event_relations(event)
+        else:
+            relations = set()
 
         evaluator = PushRuleEvaluatorForEvent(
             event,
