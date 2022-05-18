@@ -49,44 +49,7 @@ class FederationConfig(Config):
             "allow_device_name_lookup_over_federation", False
         )
 
-    def generate_config_section(self, **kwargs: Any) -> str:
-        return """\
-        ## Federation ##
-
-        # Restrict federation to the following whitelist of domains.
-        # N.B. we recommend also firewalling your federation listener to limit
-        # inbound federation traffic as early as possible, rather than relying
-        # purely on this application-layer restriction.  If not specified, the
-        # default is to whitelist everything.
-        #
-        #federation_domain_whitelist:
-        #  - lon.example.com
-        #  - nyc.example.com
-        #  - syd.example.com
-
-        # Report prometheus metrics on the age of PDUs being sent to and received from
-        # the following domains. This can be used to give an idea of "delay" on inbound
-        # and outbound federation, though be aware that any delay can be due to problems
-        # at either end or with the intermediate network.
-        #
-        # By default, no domains are monitored in this way.
-        #
-        #federation_metrics_domains:
-        #  - matrix.org
-        #  - example.com
-
-        # Uncomment to disable profile lookup over federation. By default, the
-        # Federation API allows other homeservers to obtain profile data of any user
-        # on this homeserver. Defaults to 'true'.
-        #
-        #allow_profile_lookup_over_federation: false
-
-        # Uncomment to allow device display name lookup over federation. By default, the
-        # Federation API prevents other homeservers from obtaining the display names of
-        # user devices on this homeserver. Defaults to 'false'.
-        #
-        #allow_device_name_lookup_over_federation: true
-        """
+    
 
 
 _METRICS_FOR_DOMAINS_SCHEMA = {"type": "array", "items": {"type": "string"}}
