@@ -1679,10 +1679,10 @@ Defaults to "en".
 Example configuration:
 ```yaml
  url_preview_accept_language:
-   - en-UK
-   - en-US;q=0.9
-   - fr;q=0.8
-   - *;q=0.7
+   - 'en-UK'
+   - 'en-US;q=0.9'
+   - 'fr;q=0.8'
+   - '*;q=0.7'
 ```
 ----
 Config option: `oembed`
