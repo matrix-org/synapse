@@ -220,7 +220,7 @@ class OidcHandler:
                 session, state
             )
         except (MacaroonInitException, MacaroonDeserializationException, KeyError) as e:
-            logger.warning("Invalid session for OIDC callback: %s", e)
+            logger.exception("Invalid session for OIDC callback")
             self._sso_handler.render_error(request, "invalid_session", str(e))
             return
         except MacaroonInvalidSignatureException as e:
