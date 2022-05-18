@@ -1522,13 +1522,12 @@ Purging media files will be the carried out by the media worker
 (that is, the worker that has the `enable_media_repo` homeserver config
 option set to 'true'). This may be the main process.
 
-The `media_retention.enabled` option globally controls whether media
-retention is enabled.
-
 The `media_retention.purge_period` option dictates how often Synapse should
 scan and purge media to be removed according to the configured thresholds.
 For example, if set to "6h", Synapse will check every 6 hours for media
-that can be purged. The default value is "24h" meaning 24 hours.
+that can be purged. The default value is "24h" meaning 24 hours. Synapse
+will not regularly check for media to purge if no other media retention
+options are set.
 
 The `media_retention.local_media_lifetime` and
 `media_retention.remote_media_lifetime` config options control whether

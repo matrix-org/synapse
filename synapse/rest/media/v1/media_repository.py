@@ -132,7 +132,11 @@ class MediaRepository:
             hs.config.media.media_retention_remote_media_lifetime_ms
         )
 
-        if hs.config.media.media_retention_enabled:
+        # Check whether local or remote media retention is configured
+        if (
+            hs.config.media.media_retention_local_media_lifetime_ms is not None
+            or hs.config.media.media_retention_remote_media_lifetime_ms is not None
+        ):
             # Run the background job to apply media retention rules routinely,
             # with the duration between runs dictated by the homeserver config.
             self.clock.looping_call(

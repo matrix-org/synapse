@@ -224,7 +224,6 @@ class ContentRepositoryConfig(Config):
             ) or ["en"]
 
         media_retention = config.get("media_retention") or {}
-        self.media_retention_enabled = media_retention.get("enabled", False)
 
         self.media_retention_purge_period = self.parse_duration(
             media_retention.get("purge_period", "24h")
