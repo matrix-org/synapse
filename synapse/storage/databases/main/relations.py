@@ -770,7 +770,7 @@ class RelationsWorkerStore(SQLBaseStore):
         self, event_id: str
     ) -> Set[Tuple[str, str, str]]:
         """
-        Fetch event meta data for events which related to the same event as the given event.
+        Fetch event metadata for events which related to the same event as the given event.
 
         If the given event has no relation information, returns an empty set.
 
