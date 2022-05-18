@@ -1,0 +1,1 @@
+The hash_password script now returns an exception when it is called without specifying a config file.
