@@ -216,7 +216,13 @@ class BulkPushRuleEvaluator:
 
         # If the experimental feature is not enabled, skip fetching relations.
         if self._relations_match_enabled:
-            relations = await self.store.get_mutual_event_relations(event)
+            relation = relation_from_event(event)
+            if relation:
+                relations = await self.store.get_mutual_event_relations(
+                    relation.parent_id
+                )
+            else:
+                relations = set()
         else:
             relations = set()
 

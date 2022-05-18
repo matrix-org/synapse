@@ -29,7 +29,7 @@ from typing import (
 import attr
 
 from synapse.api.constants import RelationTypes
-from synapse.events import EventBase, relation_from_event
+from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import LoggingTransaction, make_in_list_sql_clause
 from synapse.storage.databases.main.stream import generate_pagination_where_clause
@@ -766,7 +766,7 @@ class RelationsWorkerStore(SQLBaseStore):
         )
 
     async def get_mutual_event_relations(
-        self, event: EventBase
+        self, event_id: str
     ) -> Set[Tuple[str, str, str]]:
         """
         Fetch event meta data for events which related to the same event as the given event.
@@ -774,7 +774,7 @@ class RelationsWorkerStore(SQLBaseStore):
         If the given event has no relation information, returns an empty set.
 
         Args:
-            event: The event to fetch relations for.
+            event_id: The event ID which is targeted by relations.
 
         Returns:
             A set of tuples of:
@@ -782,10 +782,6 @@ class RelationsWorkerStore(SQLBaseStore):
                 The sender
                 The event type
         """
-        relation = relation_from_event(event)
-        if not relation:
-            return set()
-
         sql = """
             SELECT DISTINCT relation_type, sender, type FROM event_relations
             INNER JOIN events USING (event_id)
@@ -793,7 +789,7 @@ class RelationsWorkerStore(SQLBaseStore):
         """
 
         def _get_event_relations(txn: LoggingTransaction) -> Set[Tuple[str, str, str]]:
-            txn.execute(sql, (relation.parent_id,))  # type: ignore[union-attr]
+            txn.execute(sql, (event_id,))
             return set(cast(List[Tuple[str, str, str]], txn.fetchall()))
 
         return await self.db_pool.runInteraction(
