@@ -27,51 +27,11 @@ from tests import unittest
 PROTOCOL = "myproto"
 TOKEN = "myastoken"
 URL = "http://mytestservice"
-URL_USER = f"{URL}/_matrix/app/unstable/thirdparty/user/{PROTOCOL}"
-URL_LOCATION = f"{URL}/_matrix/app/unstable/thirdparty/location/{PROTOCOL}"
-SUCCESS_RESULT_USER = [
-    {
-        "protocol": PROTOCOL,
-        "userid": "@a:user",
-        "fields": {
-            "more": "fields",
-        },
-    }
-]
-SUCCESS_RESULT_LOCATION = [
-    {
-        "protocol": PROTOCOL,
-        "alias": "#a:room",
-        "fields": {
-            "more": "fields",
-        },
-    }
-]
 
 
 class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
         self.api = ApplicationServiceApi(hs)
-
-        self.request_url = None
-        self.fields = None
-
-        async def get_json(url: str, args: Mapping[Any, Any]) -> List[JsonDict]:
-            if not args.get(b"access_token"):
-                raise Exception("Access token not provided")
-
-            self.assertEqual(args.get(b"access_token"), TOKEN)
-            self.request_url = url
-            self.fields = args
-            if url == URL_USER:
-                return SUCCESS_RESULT_USER
-            elif url == URL_LOCATION:
-                return SUCCESS_RESULT_LOCATION
-            else:
-                self.fail("URL provided was invalid")
-                return []
-
-        self.api.get_json = Mock(side_effect=get_json)  # type: ignore[assignment]  # We assign to a method.
         self.service = ApplicationService(
             id="unique_identifier",
             sender="@as:test",
@@ -82,6 +42,48 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
         )
 
     def test_query_3pe_authenticates_token(self):
+
+        SUCCESS_RESULT_USER = [
+            {
+                "protocol": PROTOCOL,
+                "userid": "@a:user",
+                "fields": {
+                    "more": "fields",
+                },
+            }
+        ]
+        SUCCESS_RESULT_LOCATION = [
+            {
+                "protocol": PROTOCOL,
+                "alias": "#a:room",
+                "fields": {
+                    "more": "fields",
+                },
+            }
+        ]
+
+        URL_USER = f"{URL}/_matrix/app/unstable/thirdparty/user/{PROTOCOL}"
+        URL_LOCATION = f"{URL}/_matrix/app/unstable/thirdparty/location/{PROTOCOL}"
+
+        self.request_url = None
+
+        async def get_json(url: str, args: Mapping[Any, Any]) -> List[JsonDict]:
+            if not args.get(b"access_token"):
+                raise Exception("Access token not provided")
+
+            self.assertEqual(args.get(b"access_token"), TOKEN)
+            self.request_url = url
+            if url == URL_USER:
+                return SUCCESS_RESULT_USER
+            elif url == URL_LOCATION:
+                return SUCCESS_RESULT_LOCATION
+            else:
+                self.fail("URL provided was invalid")
+                return []
+
+        # We assign to a method, which mypy doesn't like.
+        self.api.get_json = Mock(side_effect=get_json)  # type: ignore[assignment]
+
         result = self.get_success(
             self.api.query_3pe(self.service, "user", PROTOCOL, {b"some": [b"field"]})
         )
