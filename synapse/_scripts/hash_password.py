@@ -46,16 +46,14 @@ def main() -> None:
             "Path to server config file. "
             "Used to read in bcrypt_rounds and password_pepper."
         ),
+        required=True,
     )
 
     args = parser.parse_args()
-    if "config" in args and args.config:
-        config = yaml.safe_load(args.config)
-        bcrypt_rounds = config.get("bcrypt_rounds", bcrypt_rounds)
-        password_config = config.get("password_config", None) or {}
-        password_pepper = password_config.get("pepper", password_pepper)
-    else:
-        raise Exception("Please specify a path to a config file (-c).")
+    config = yaml.safe_load(args.config)
+    bcrypt_rounds = config.get("bcrypt_rounds", bcrypt_rounds)
+    password_config = config.get("password_config", None) or {}
+    password_pepper = password_config.get("pepper", password_pepper)
     password = args.password
 
     if not password:
