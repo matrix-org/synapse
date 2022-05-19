@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+from copy import deepcopy
 from typing import List
 
 from synapse.api.constants import ReceiptTypes
@@ -118,42 +118,6 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                                 }
                             }
                         }
-                    },
-                    "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
-                }
-            ],
-        )
-
-    def test_handles_missing_content_of_m_read(self):
-        self._test_filters_private(
-            [
-                {
-                    "content": {
-                        "$14356419ggffg114394fHBLK:matrix.org": {ReceiptTypes.READ: {}},
-                        "$1435641916114394fHBLK:matrix.org": {
-                            ReceiptTypes.READ: {
-                                "@user:jki.re": {
-                                    "ts": 1436451550453,
-                                }
-                            }
-                        },
-                    },
-                    "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
-                }
-            ],
-            [
-                {
-                    "content": {
-                        "$14356419ggffg114394fHBLK:matrix.org": {ReceiptTypes.READ: {}},
-                        "$1435641916114394fHBLK:matrix.org": {
-                            ReceiptTypes.READ: {
-                                "@user:jki.re": {
-                                    "ts": 1436451550453,
-                                }
-                            }
-                        },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
                     "type": "m.receipt",
@@ -332,9 +296,33 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
+    def test_we_do_not_mutate(self):
+        """Ensure the input values are not modified."""
+        events = [
+            {
+                "content": {
+                    "$1435641916114394fHBLK:matrix.org": {
+                        ReceiptTypes.READ_PRIVATE: {
+                            "@rikj:jki.re": {
+                                "ts": 1436451550453,
+                            }
+                        }
+                    }
+                },
+                "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
+                "type": "m.receipt",
+            }
+        ]
+        original_events = deepcopy(events)
+        self._test_filters_private(events, [])
+        # Since the events are fed in from a cache they should not be modified.
+        self.assertEqual(events, original_events)
+
     def _test_filters_private(
         self, events: List[JsonDict], expected_output: List[JsonDict]
     ):
         """Tests that the _filter_out_private returns the expected output"""
-        filtered_events = self.event_source.filter_out_private(events, "@me:server.org")
+        filtered_events = self.event_source.filter_out_private_receipts(
+            events, "@me:server.org"
+        )
         self.assertEqual(filtered_events, expected_output)

@@ -434,16 +434,6 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        # "Complete" a transaction.
-        # All this really does for us is make an entry in the application_services_state
-        # database table, which tracks the current stream_token per stream ID per AS.
-        self.get_success(
-            self.hs.get_datastores().main.complete_appservice_txn(
-                0,
-                interested_appservice,
-            )
-        )
-
         # Now, pretend that we receive a large burst of read receipts (300 total) that
         # all come in at once.
         for i in range(300):

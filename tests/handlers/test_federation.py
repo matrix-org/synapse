@@ -332,6 +332,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
             most_recent_prev_event_depth,
         ) = self.get_success(self.store.get_max_depth_of(prev_event_ids))
         # mapping from (type, state_key) -> state_event_id
+        assert most_recent_prev_event_id is not None
         prev_state_map = self.get_success(
             self.state_store.get_state_ids_for_event(most_recent_prev_event_id)
         )

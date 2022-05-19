@@ -17,7 +17,7 @@ from typing import Dict, List, Tuple
 
 from synapse.api.errors import Codes
 from synapse.federation.transport.server import BaseFederationServlet
-from synapse.federation.transport.server._base import Authenticator
+from synapse.federation.transport.server._base import Authenticator, _parse_auth_header
 from synapse.http.server import JsonResource, cancellable
 from synapse.server import HomeServer
 from synapse.types import JsonDict
@@ -111,4 +111,31 @@ class BaseFederationServletCancellationTests(
             channel,
             expect_cancellation=False,
             expected_body={"result": True},
+        )
+
+
+class BaseFederationAuthorizationTests(unittest.TestCase):
+    def test_authorization_header(self) -> None:
+        """Tests that the Authorization header is parsed correctly."""
+
+        # test a "normal" Authorization header
+        self.assertEqual(
+            _parse_auth_header(
+                b'X-Matrix origin=foo,key="ed25519:1",sig="sig",destination="bar"'
+            ),
+            ("foo", "ed25519:1", "sig", "bar"),
+        )
+        # test an Authorization with extra spaces, upper-case names, and escaped
+        # characters
+        self.assertEqual(
+            _parse_auth_header(
+                b'X-Matrix  ORIGIN=foo,KEY="ed25\\519:1",SIG="sig",destination="bar"'
+            ),
+            ("foo", "ed25519:1", "sig", "bar"),
+        )
+        self.assertEqual(
+            _parse_auth_header(
+                b'X-Matrix origin=foo,key="ed25519:1",sig="sig",destination="bar",extra_field=ignored'
+            ),
+            ("foo", "ed25519:1", "sig", "bar"),
         )
