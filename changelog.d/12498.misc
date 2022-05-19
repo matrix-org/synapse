@@ -1,0 +1,1 @@
+Preparation for faster-room-join work: return subsets of room state which we already have, immediately.

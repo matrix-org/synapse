@@ -1,0 +1,1 @@
+Downgrade some OIDC errors to warnings in the logs, to reduce the noise of Sentry reports.
