@@ -1,1 +1,1 @@
-Properly close `providers.json` file when the resource is loaded. Contributed by @arkamar.
+Fix a bug introduced in 1.43.0 where a file (`providers.json`) was never closed. Contributed by @arkamar.
