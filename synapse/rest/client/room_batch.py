@@ -28,6 +28,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
     parse_strings_from_args,
+    parse_boolean_from_args,
 )
 from synapse.http.site import SynapseRequest
 from synapse.rest.client.transactions import HttpTransactionCache
@@ -103,6 +104,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
         batch_id_from_query = parse_string(request, "batch_id")
         also_allow_from_query = (parse_string(request, "com.beeper.also_allow_user")
                                  if self.enable_also_allow_user else None)
+        beeper_new_messages = parse_boolean_from_args(request.args, "com.beeper.new_messages")
 
         if prev_event_ids_from_query is None:
             raise SynapseError(
@@ -151,7 +153,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
         # Create and persist all of the state events that float off on their own
         # before the batch. These will most likely be all of the invite/member
         # state events used to auth the upcoming historical messages.
-        if body["state_events_at_start"]:
+        if body["state_events_at_start"] and not beeper_new_messages:
             state_event_ids_at_start = (
                 await self.room_batch_handler.persist_state_events_at_start(
                     state_events_at_start=body["state_events_at_start"],
@@ -178,6 +180,8 @@ class RoomBatchSendEventRestServlet(RestServlet):
         base_insertion_event = None
         if batch_id_from_query:
             batch_id_to_connect_to = batch_id_from_query
+        elif beeper_new_messages:
+            batch_id_to_connect_to = None
         # Otherwise, create an insertion event to act as a starting point.
         #
         # We don't always have an insertion event to start hanging more history
@@ -229,11 +233,18 @@ class RoomBatchSendEventRestServlet(RestServlet):
             initial_state_event_ids=state_event_ids,
             app_service_requester=requester,
             also_allow_user=also_allow_from_query,
+            beeper_new_messages=beeper_new_messages,
+            beeper_initial_prev_event_ids=prev_event_ids_from_query if beeper_new_messages else None,
         )
 
-        insertion_event_id = event_ids[0]
-        batch_event_id = event_ids[-1]
-        historical_event_ids = event_ids[1:-1]
+        if beeper_new_messages:
+            insertion_event_id = batch_event_id = None
+            historical_event_ids = event_ids
+            next_batch_id = None
+        else:
+            insertion_event_id = event_ids[0]
+            batch_event_id = event_ids[-1]
+            historical_event_ids = event_ids[1:-1]
 
         response_dict = {
             "state_event_ids": state_event_ids_at_start,

@@ -1113,6 +1113,7 @@ class EventCreationHandler:
         ratelimit: bool = True,
         extra_users: Optional[List[UserID]] = None,
         ignore_shadow_ban: bool = False,
+        dont_notify: bool = False,
     ) -> EventBase:
         """Processes a new event.
 
@@ -1131,6 +1132,8 @@ class EventCreationHandler:
 
             ignore_shadow_ban: True if shadow-banned users should be allowed to
                 send this event.
+
+            dont_notify
 
         Return:
             If the event was deduplicated, the previous, duplicate, event. Otherwise,
@@ -1215,6 +1218,7 @@ class EventCreationHandler:
                         context=context,
                         ratelimit=ratelimit,
                         extra_users=extra_users,
+                        dont_notify=dont_notify,
                     ),
                     run_in_background(
                         self.cache_joined_hosts_for_event, event, context
@@ -1233,6 +1237,7 @@ class EventCreationHandler:
         context: EventContext,
         ratelimit: bool = True,
         extra_users: Optional[List[UserID]] = None,
+        dont_notify: bool = False,
     ) -> EventBase:
         """Actually persists the event. Should only be called by
         `handle_new_client_event`, and see its docstring for documentation of
@@ -1244,7 +1249,7 @@ class EventCreationHandler:
         # The historical messages also do not have the proper `context.current_state_ids`
         # and `state_groups` because they have `prev_events` that aren't persisted yet
         # (historical messages persisted in reverse-chronological order).
-        if not event.internal_metadata.is_historical():
+        if not event.internal_metadata.is_historical() and not event.content.get(EventContentFields.MSC2716_HISTORICAL):
             await self.action_generator.handle_push_actions_for_event(event, context)
 
         try:
@@ -1260,6 +1265,7 @@ class EventCreationHandler:
                     context=context,
                     ratelimit=ratelimit,
                     extra_users=extra_users,
+                    dont_notify=dont_notify,
                 )
                 stream_id = result["stream_id"]
                 event_id = result["event_id"]
@@ -1276,7 +1282,7 @@ class EventCreationHandler:
                 return event
 
             event = await self.persist_and_notify_client_event(
-                requester, event, context, ratelimit=ratelimit, extra_users=extra_users
+                requester, event, context, ratelimit=ratelimit, extra_users=extra_users, dont_notify=dont_notify,
             )
 
             return event
@@ -1378,6 +1384,7 @@ class EventCreationHandler:
         context: EventContext,
         ratelimit: bool = True,
         extra_users: Optional[List[UserID]] = None,
+        dont_notify: bool = False,
     ) -> EventBase:
         """Called when we have fully built the event, have already
         calculated the push actions for the event, and checked auth.
@@ -1630,6 +1637,11 @@ class EventCreationHandler:
         if self._ephemeral_events_enabled:
             # If there's an expiry timestamp on the event, schedule its expiry.
             self._message_handler.maybe_schedule_expiry(event)
+
+        if dont_notify:
+            # Skip notifying clients, this is used for Beeper's custom
+            # batch sending of non-historical messages.
+            return event
 
         async def _notify() -> None:
             try:

@@ -275,6 +275,8 @@ class RoomBatchHandler:
         initial_state_event_ids: List[str],
         app_service_requester: Requester,
         also_allow_user: Optional[str],
+        beeper_new_messages: bool,
+        beeper_initial_prev_event_ids: List[str] = None,
     ) -> List[str]:
         """Create and persists all events provided sequentially. Handles the
         complexity of creating events in chronological order so they can
@@ -295,21 +297,24 @@ class RoomBatchHandler:
                 prev_events to derive state from automatically.
             app_service_requester: The requester of an application service.
             also_allow_user: An additional user ID that the appservice can temporarily control
+            beeper_new_messages: Is this a batch of new events rather than history?
+            beeper_initial_prev_event_ids: prev_event_ids for the first event to send.
 
         Returns:
             List of persisted event IDs
         """
         assert app_service_requester.app_service
 
-        # We expect the first event in a historical batch to be an insertion event
-        assert events_to_create[0]["type"] == EventTypes.MSC2716_INSERTION
-        # We expect the last event in a historical batch to be an batch event
-        assert events_to_create[-1]["type"] == EventTypes.MSC2716_BATCH
+        if not beeper_new_messages:
+            # We expect the first event in a historical batch to be an insertion event
+            assert events_to_create[0]["type"] == EventTypes.MSC2716_INSERTION
+            # We expect the last event in a historical batch to be an batch event
+            assert events_to_create[-1]["type"] == EventTypes.MSC2716_BATCH
 
         # Make the historical event chain float off on its own by specifying no
         # prev_events for the first event in the chain which causes the HS to
         # ask for the state at the start of the batch later.
-        prev_event_ids: List[str] = []
+        prev_event_ids: List[str] = beeper_initial_prev_event_ids or []
 
         event_ids = []
         events_to_persist = []
@@ -340,14 +345,14 @@ class RoomBatchHandler:
                 # Only the first event (which is the insertion event) in the
                 # chain should be floating. The rest should hang off each other
                 # in a chain.
-                allow_no_prev_events=index == 0,
+                allow_no_prev_events=index == 0 and not beeper_new_messages,
                 prev_event_ids=event_dict.get("prev_events"),
                 # Since the first event (which is the insertion event) in the
                 # chain is floating with no `prev_events`, it can't derive state
                 # from anywhere automatically. So we need to set some state
                 # explicitly.
                 state_event_ids=initial_state_event_ids if index == 0 else None,
-                historical=True,
+                historical=not beeper_new_messages,
                 depth=inherited_depth,
             )
 
@@ -375,6 +380,18 @@ class RoomBatchHandler:
             event_ids.append(event_id)
             prev_event_ids = [event_id]
 
+        if beeper_new_messages:
+            for index, (event, context) in enumerate(events_to_persist):
+                await self.event_creation_handler.handle_new_client_event(
+                    await self.create_requester_for_user_id_from_app_service(
+                        event.sender, app_service_requester.app_service
+                    ),
+                    event=event,
+                    context=context,
+                    dont_notify=index < len(events_to_persist) - 1
+                )
+            return event_ids
+
         # Persist events in reverse-chronological order so they have the
         # correct stream_ordering as they are backfilled (which decrements).
         # Events are sorted by (topological_ordering, stream_ordering)
@@ -399,6 +416,8 @@ class RoomBatchHandler:
         initial_state_event_ids: List[str],
         app_service_requester: Requester,
         also_allow_user: Optional[str],
+        beeper_new_messages: bool,
+        beeper_initial_prev_event_ids: List[str] = None,
     ) -> Tuple[List[str], str]:
         """
         Handles creating and persisting all of the historical events as well as
@@ -421,6 +440,8 @@ class RoomBatchHandler:
                 `persist_state_events_at_start`
             app_service_requester: The requester of an application service.
             also_allow_user: An additional user ID that the appservice can temporarily control
+            beeper_new_messages: Is this a batch of new events rather than history?
+            beeper_initial_prev_event_ids: prev_event_ids for the first event to send.
 
         Returns:
             Tuple containing a list of created events and the next_batch_id
@@ -441,8 +462,9 @@ class RoomBatchHandler:
             # the last event we're inserting
             "origin_server_ts": last_event_in_batch["origin_server_ts"],
         }
-        # Add the batch event to the end of the batch (newest-in-time)
-        events_to_create.append(batch_event)
+        if not beeper_new_messages:
+            # Add the batch event to the end of the batch (newest-in-time)
+            events_to_create.append(batch_event)
 
         # Add an "insertion" event to the start of each batch (next to the oldest-in-time
         # event in the batch) so the next batch can be connected to this one.
@@ -457,8 +479,9 @@ class RoomBatchHandler:
         next_batch_id = insertion_event["content"][
             EventContentFields.MSC2716_NEXT_BATCH_ID
         ]
-        # Prepend the insertion event to the start of the batch (oldest-in-time)
-        events_to_create = [insertion_event] + events_to_create
+        if not beeper_new_messages:
+            # Prepend the insertion event to the start of the batch (oldest-in-time)
+            events_to_create = [insertion_event] + events_to_create
 
         # Create and persist all of the historical events
         event_ids = await self.persist_historical_events(
@@ -468,6 +491,8 @@ class RoomBatchHandler:
             initial_state_event_ids=initial_state_event_ids,
             app_service_requester=app_service_requester,
             also_allow_user=also_allow_user,
+            beeper_new_messages=beeper_new_messages,
+            beeper_initial_prev_event_ids=beeper_initial_prev_event_ids,
         )
 
         return event_ids, next_batch_id
