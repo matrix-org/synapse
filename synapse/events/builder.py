@@ -120,8 +120,10 @@ class EventBuilder:
             The signed and hashed event.
         """
         if auth_event_ids is None:
+            # we pick the auth events based on our best knowledge of the current state
+            # of the room, so we don't need to await full state.
             state_ids = await self._state.get_current_state_ids(
-                self.room_id, prev_event_ids
+                self.room_id, prev_event_ids, await_full_state=False
             )
             auth_event_ids = self._event_auth_handler.compute_auth_events(
                 self, state_ids

@@ -85,6 +85,7 @@ async def filter_events_for_client(
     event_id_to_state = await storage.state.get_state_for_events(
         frozenset(e.event_id for e in events if not e.internal_metadata.outlier),
         state_filter=StateFilter.from_types(types),
+        await_full_state=False,
     )
 
     # Get the users who are ignored by the requesting user.

@@ -902,11 +902,15 @@ class SyncHandler:
             if full_state:
                 if batch:
                     current_state_ids = await self.state_store.get_state_ids_for_event(
-                        batch.events[-1].event_id, state_filter=state_filter
+                        batch.events[-1].event_id,
+                        state_filter=state_filter,
+                        await_full_state=not lazy_load_members,  # TODO
                     )
 
                     state_ids = await self.state_store.get_state_ids_for_event(
-                        batch.events[0].event_id, state_filter=state_filter
+                        batch.events[0].event_id,
+                        state_filter=state_filter,
+                        await_full_state=not lazy_load_members,  # TODO
                     )
 
                 else:
