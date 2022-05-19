@@ -167,6 +167,13 @@ followed by a letter. Letters have the following meanings:</p>
 </ul>
 <p>For example, setting <code>redaction_retention_period: 5m</code> would remove redacted
 messages from the database after 5 minutes, rather than 5 months.</p>
+<p>In addition, configuration options referring to size use the following suffixes:</p>
+<ul>
+<li><code>M</code> = MiB, or 1,048,576 bytes</li>
+<li><code>K</code> = KiB, or 1024 bytes </li>
+</ul>
+<p>For example, setting <code>max_avatar_size: 10M</code> means that Synapse will not accept files larger than 10,485,760 bytes
+for a user avatar. </p>
 <h3 id="yaml"><a class="header" href="#yaml">YAML</a></h3>
 <p>The configuration file is a <a href="https://yaml.org/">YAML</a> file, which means that certain syntax rules
 apply if you want your config file to be read properly. A few helpful things to know:</p>
