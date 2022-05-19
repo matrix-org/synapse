@@ -1039,14 +1039,6 @@ class FederationEventHandler:
         )
         logger.info("/state returned %i events", len(auth_events) + len(state_events))
 
-        logger.info(
-            "_get_state_and_persist auth_events(%d)=%s state_events(%d)=%s",
-            len(auth_events),
-            auth_events,
-            len(state_events),
-            state_events,
-        )
-
         await self._auth_and_persist_outliers(
             room_id, itertools.chain(auth_events, state_events)
         )
