@@ -2,6 +2,19 @@ from typing import TYPE_CHECKING, Any, Optional, Tuple
 
 from pydantic import BaseModel, StrictBool, StrictStr, constr
 
+# Ugly workaround for https://github.com/samuelcolvin/pydantic/issues/156. Mypy doesn't
+# consider expressions like `constr(...)` to be valid types.
+
+if TYPE_CHECKING:
+    IDP_ID_TYPE = str
+else:
+    IDP_ID_TYPE = constr(
+        strict=True,
+        min_length=1,
+        max_length=250,
+        regex="^[A-Za-z0-9._~-]+$",  # noqa: F722
+    )
+
 
 class OIDCProviderModel(BaseModel):
     """
@@ -15,17 +28,7 @@ class OIDCProviderModel(BaseModel):
     # a unique identifier for this identity provider. Used in the 'user_external_ids'
     # table, as well as the query/path parameter used in the login protocol.
     # TODO: this is optional in the old-style config, defaulting to "oidc".
-    # Ugly workaround for https://github.com/samuelcolvin/pydantic/issues/156, see also
-    # https://github.com/samuelcolvin/pydantic/issues/156#issuecomment-1130883884
-    if TYPE_CHECKING:
-        idp_id: str
-    else:
-        idp_id: constr(
-            strict=True,
-            min_length=1,
-            max_length=250,
-            regex="^[A-Za-z0-9._~-]+$",  # noqa: F722
-        )
+    idp_id: IDP_ID_TYPE
 
     # user-facing name for this identity provider.
     # TODO: this is optional in the old-style config, defaulting to "OIDC".
