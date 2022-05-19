@@ -1,3 +1,5 @@
+from enum import Enum
+
 from typing import TYPE_CHECKING, Any, Optional, Tuple
 
 from pydantic import BaseModel, StrictBool, StrictStr, constr
@@ -7,6 +9,7 @@ from pydantic import BaseModel, StrictBool, StrictStr, constr
 
 if TYPE_CHECKING:
     IDP_ID_TYPE = str
+    IDP_BRAND_TYPE = str
 else:
     IDP_ID_TYPE = constr(
         strict=True,
@@ -14,15 +17,39 @@ else:
         max_length=250,
         regex="^[A-Za-z0-9._~-]+$",  # noqa: F722
     )
+    IDP_BRAND_TYPE = constr(
+        strict=True,
+        min_length=1,
+        max_length=255,
+        regex="^[a-z][a-z0-9_.-]*$",  # noqa: F722
+    )
+
+# the following list of enum members is the same as the keys of
+# authlib.oauth2.auth.ClientAuth.DEFAULT_AUTH_METHODS. We inline it
+# to avoid importing authlib here.
+class ClientAuthMethods(str, Enum):
+    # The duplication is unfortunate. 3.11 should have StrEnum though,
+    # and there is a backport available for 3.8.6.
+    client_secret_basic = "client_secret_basic"
+    client_secret_post = "client_secret_post"
+    none = "none"
+
+
+class UserProfileMethod(str, Enum):
+    # The duplication is unfortunate. 3.11 should have StrEnum though,
+    # and there is a backport available for 3.8.6.
+    auto = "auto"
+    userinfo_endpoint = "userinfo_endpoint"
 
 
 class OIDCProviderModel(BaseModel):
     """
     Notes on Pydantic:
-    - I've used StrictStr because a plain `str` accepts integers and calls str() on them
-    - I've factored out the validators here to demonstrate that we can avoid some duplication
-      if there are common patterns. Otherwise one could use @validator("field_name") and
-      define the validator function inline.
+    - I've used StrictStr because a plain `str` e.g. accepts integers and calls str()
+      on them
+    - pulling out constr() into IDP_ID_TYPE is a little awkward, but necessary to keep
+      mypy happy
+    -
     """
 
     # a unique identifier for this identity provider. Used in the 'user_external_ids'
@@ -63,7 +90,7 @@ class OIDCProviderModel(BaseModel):
     # auth method to use when exchanging the token.
     # Valid values are 'client_secret_basic', 'client_secret_post' and
     # 'none'.
-    client_auth_method: StrictStr = "client_secret_basic"
+    client_auth_method: ClientAuthMethods = ClientAuthMethods.client_secret_basic
 
     # list of scopes to request
     scopes: Tuple[StrictStr, ...] = ("openid",)
@@ -91,8 +118,7 @@ class OIDCProviderModel(BaseModel):
 
     # Whether to fetch the user profile from the userinfo endpoint. Valid
     # values are: "auto" or "userinfo_endpoint".
-    # TODO enum
-    user_profile_method: StrictStr = "auto"
+    user_profile_method: UserProfileMethod = UserProfileMethod.auto
 
     # whether to allow a user logging in via OIDC to match a pre-existing account
     # instead of failing
