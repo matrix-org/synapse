@@ -481,7 +481,8 @@ class FederationEventHandler:
 
             # If we're joining the room again, check if there is new marker
             # state indicating that there is new history imported somewhere in
-            # the DAG.
+            # the DAG. Multiple markers can exist in the current state with
+            # unique state_keys.
             #
             # Do this after the state from the remote join was persisted (via
             # `persist_events_and_notify`). Otherwise we can run into a
@@ -1241,6 +1242,15 @@ class FederationEventHandler:
 
         if insertion_event_id is None:
             # Nothing to retrieve then (invalid marker)
+            return
+
+        already_seen_insertion_event = await self._store.have_seen_event(
+            marker_event.room_id,
+            insertion_event_id
+        )
+        if already_seen_insertion_event:
+            # No need to process a marker again if we have already seen the
+            # insertion event that it was pointing to
             return
 
         logger.debug(
