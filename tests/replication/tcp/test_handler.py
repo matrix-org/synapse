@@ -27,7 +27,7 @@ class ChannelsMainTestCase(HomeserverTestCase):
 
     @override_config({"redis": {"enabled": True}})
     def test_subscribed_to_enough_redis_channels(self) -> None:
-        # The default main process is subscribed to USER_IP and all RDATA channels.
+        # The default main process is subscribed to the USER_IP channel.
         self.assertCountEqual(
             self.hs.get_replication_command_handler()._channels_to_subscribe_to,
             ["USER_IP"],
@@ -39,7 +39,7 @@ class ChannelsWorkerTestCase(BaseMultiWorkerStreamTestCase):
         skip = "Requires hiredis"
 
     def test_background_worker_subscribed_to_user_ip(self) -> None:
-        # The default main process is subscribed to USER_IP and all RDATA channels.
+        # The default main process is subscribed to the USER_IP channel.
         worker1 = self.make_worker_hs(
             "synapse.app.generic_worker",
             extra_config={
@@ -54,7 +54,7 @@ class ChannelsWorkerTestCase(BaseMultiWorkerStreamTestCase):
         )
 
     def test_non_background_worker_not_subscribed_to_user_ip(self) -> None:
-        # The default main process is subscribed to USER_IP and all RDATA channels.
+        # The default main process is subscribed to the USER_IP channel.
         worker2 = self.make_worker_hs(
             "synapse.app.generic_worker",
             extra_config={
