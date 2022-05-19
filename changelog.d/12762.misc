@@ -1,0 +1,1 @@
+Fix a long-standing bug where the user directory background process would fail to make forward progress if a user included a null codepoint in their display name or avatar.

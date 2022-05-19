@@ -1,0 +1,1 @@
+Capture the `Deferred` for request cancellation in `_AsyncResource`.

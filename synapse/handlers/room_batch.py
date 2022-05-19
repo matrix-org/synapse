@@ -53,6 +53,7 @@ class RoomBatchHandler:
         # We want to use the successor event depth so they appear after `prev_event` because
         # it has a larger `depth` but before the successor event because the `stream_ordering`
         # is negative before the successor event.
+        assert most_recent_prev_event_id is not None
         successor_event_ids = await self.store.get_successor_events(
             most_recent_prev_event_id
         )
@@ -139,6 +140,7 @@ class RoomBatchHandler:
             _,
         ) = await self.store.get_max_depth_of(event_ids)
         # mapping from (type, state_key) -> state_event_id
+        assert most_recent_event_id is not None
         prev_state_map = await self.state_store.get_state_ids_for_event(
             most_recent_event_id
         )

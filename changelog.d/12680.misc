@@ -1,0 +1,1 @@
+Remove code which updates unused database column `application_services_state.last_txn`.
