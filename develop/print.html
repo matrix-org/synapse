@@ -1631,6 +1631,69 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1600"><a class="header" href="#upgrading-to-v1600">Upgrading to v1.60.0</a></h1>
+<h2 id="adding-a-new-unique-index-to-state_group_edges-could-fail-if-your-database-is-corrupted"><a class="header" href="#adding-a-new-unique-index-to-state_group_edges-could-fail-if-your-database-is-corrupted">Adding a new unique index to <code>state_group_edges</code> could fail if your database is corrupted</a></h2>
+<p>This release of Synapse will add a unique index to the <code>state_group_edges</code> table, in order
+to prevent accidentally introducing duplicate information (for example, because a database
+backup was restored multiple times).</p>
+<p>Duplicate rows being present in this table could cause drastic performance problems; see
+<a href="https://github.com/matrix-org/synapse/issues/11779">issue 11779</a> for more details.</p>
+<p>If your Synapse database already has had duplicate rows introduced into this table,
+this could fail, with either of these errors:</p>
+<p><strong>On Postgres:</strong></p>
+<pre><code>synapse.storage.background_updates - 623 - INFO - background_updates-0 - Adding index state_group_edges_unique_idx to state_group_edges
+synapse.storage.background_updates - 282 - ERROR - background_updates-0 - Error doing update
+...
+psycopg2.errors.UniqueViolation: could not create unique index &quot;state_group_edges_unique_idx&quot;
+DETAIL:  Key (state_group, prev_state_group)=(2, 1) is duplicated.
+</code></pre>
+<p>(The numbers may be different.)</p>
+<p><strong>On SQLite:</strong></p>
+<pre><code>synapse.storage.background_updates - 623 - INFO - background_updates-0 - Adding index state_group_edges_unique_idx to state_group_edges
+synapse.storage.background_updates - 282 - ERROR - background_updates-0 - Error doing update
+...
+sqlite3.IntegrityError: UNIQUE constraint failed: state_group_edges.state_group, state_group_edges.prev_state_group
+</code></pre>
+<details>
+<summary><b>Expand this section for steps to resolve this problem</b></summary>
+<h3 id="on-postgres"><a class="header" href="#on-postgres">On Postgres</a></h3>
+<p>Connect to your database with <code>psql</code>.</p>
+<pre><code class="language-sql">BEGIN;
+DELETE FROM state_group_edges WHERE (ctid, state_group, prev_state_group) IN (
+  SELECT row_id, state_group, prev_state_group
+  FROM (
+    SELECT
+      ctid AS row_id,
+      MIN(ctid) OVER (PARTITION BY state_group, prev_state_group) AS min_row_id,
+      state_group,
+      prev_state_group
+    FROM state_group_edges
+  ) AS t1
+  WHERE row_id &lt;&gt; min_row_id
+);
+COMMIT;
+</code></pre>
+<h3 id="on-sqlite"><a class="header" href="#on-sqlite">On SQLite</a></h3>
+<p>At the command-line, use <code>sqlite3 path/to/your-homeserver-database.db</code>:</p>
+<pre><code class="language-sql">BEGIN;
+DELETE FROM state_group_edges WHERE (rowid, state_group, prev_state_group) IN (
+  SELECT row_id, state_group, prev_state_group
+  FROM (
+    SELECT
+      rowid AS row_id,
+      MIN(rowid) OVER (PARTITION BY state_group, prev_state_group) AS min_row_id,
+      state_group,
+      prev_state_group
+    FROM state_group_edges
+  )
+  WHERE row_id &lt;&gt; min_row_id
+);
+COMMIT;
+</code></pre>
+<h3 id="for-more-details"><a class="header" href="#for-more-details">For more details</a></h3>
+<p><a href="https://github.com/matrix-org/synapse/issues/11779#issuecomment-1131545970">This comment on issue 11779</a>
+has queries that can be used to check a database for this problem in advance.</p>
+</details>
 <h1 id="upgrading-to-v1590"><a class="header" href="#upgrading-to-v1590">Upgrading to v1.59.0</a></h1>
 <h2 id="device-name-lookup-over-federation-has-been-disabled-by-default"><a class="header" href="#device-name-lookup-over-federation-has-been-disabled-by-default">Device name lookup over federation has been disabled by default</a></h2>
 <p>The names of user devices are no longer visible to users on other homeservers by default.
