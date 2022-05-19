@@ -12,31 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tests.replication._base import BaseMultiWorkerStreamTestCase
-from tests.unittest import HomeserverTestCase, override_config
-
-try:
-    import hiredis
-except ImportError:
-    hiredis = None  # type: ignore
+from tests.replication._base import RedisMultiWorkerStreamTestCase
 
 
-class ChannelsMainTestCase(HomeserverTestCase):
-    if not hiredis:
-        skip = "Requires hiredis"
-
-    @override_config({"redis": {"enabled": True}})
+class ChannelsTestCase(RedisMultiWorkerStreamTestCase):
     def test_subscribed_to_enough_redis_channels(self) -> None:
         # The default main process is subscribed to the USER_IP channel.
         self.assertCountEqual(
             self.hs.get_replication_command_handler()._channels_to_subscribe_to,
             ["USER_IP"],
         )
-
-
-class ChannelsWorkerTestCase(BaseMultiWorkerStreamTestCase):
-    if not hiredis:
-        skip = "Requires hiredis"
 
     def test_background_worker_subscribed_to_user_ip(self) -> None:
         # The default main process is subscribed to the USER_IP channel.
@@ -53,6 +38,15 @@ class ChannelsWorkerTestCase(BaseMultiWorkerStreamTestCase):
             worker1.get_replication_command_handler()._channels_to_subscribe_to,
         )
 
+        # Advance so the Redis subscription gets processed
+        self.pump(0.1)
+
+        # The counts are 2 because both the main process and the worker are subscribed.
+        self.assertEqual(len(self._redis_server._subscribers_by_channel[b"test"]), 2)
+        self.assertEqual(
+            len(self._redis_server._subscribers_by_channel[b"test/USER_IP"]), 2
+        )
+
     def test_non_background_worker_not_subscribed_to_user_ip(self) -> None:
         # The default main process is subscribed to the USER_IP channel.
         worker2 = self.make_worker_hs(
@@ -66,4 +60,14 @@ class ChannelsWorkerTestCase(BaseMultiWorkerStreamTestCase):
         self.assertNotIn(
             "USER_IP",
             worker2.get_replication_command_handler()._channels_to_subscribe_to,
+        )
+
+        # Advance so the Redis subscription gets processed
+        self.pump(0.1)
+
+        # The count is 2 because both the main process and the worker are subscribed.
+        self.assertEqual(len(self._redis_server._subscribers_by_channel[b"test"]), 2)
+        # For USER_IP, the count is 1 because only the main process is subscribed.
+        self.assertEqual(
+            len(self._redis_server._subscribers_by_channel[b"test/USER_IP"]), 1
         )
