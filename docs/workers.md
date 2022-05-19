@@ -251,6 +251,8 @@ information.
     # Presence requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
 
+    # User directory search requests
+    ^/_matrix/client/(r0|v3|unstable)/user_directory/search$
 
 Additionally, the following REST endpoints can be handled for GET requests:
 
@@ -447,6 +449,14 @@ update_user_directory_from_worker: worker_name
 
 This work cannot be load-balanced; please ensure the main process is restarted
 after setting this option in the shared configuration!
+
+User directory updates allow REST endpoints matching the following regular
+expressions to work:
+
+    ^/_matrix/client/(r0|v3|unstable)/user_directory/search$
+
+The above endpoints can be routed to any worker, though you may choose to route
+it to the chosen user directory worker.
 
 This style of configuration supersedes the legacy `synapse.app.user_dir`
 worker application type.
