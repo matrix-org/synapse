@@ -76,7 +76,7 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
         """
         Upgrading a room should work fine.
         """
-        # THe user isn't in the room.
+        # The user isn't in the room.
         roomless = self.register_user("roomless", "pass")
         roomless_token = self.login(roomless, "pass")
 

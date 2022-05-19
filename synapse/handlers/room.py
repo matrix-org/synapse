@@ -427,7 +427,7 @@ class RoomCreationHandler:
             requester: the user requesting the upgrade
             old_room_id : the id of the room to be replaced
             new_room_id: the id to give the new room (should already have been
-                created with _gemerate_room_id())
+                created with _generate_room_id())
             new_room_version: the new room version to use
             tombstone_event_id: the ID of the tombstone event in the old room.
         """
