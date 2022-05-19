@@ -1245,8 +1245,7 @@ class FederationEventHandler:
             return
 
         already_seen_insertion_event = await self._store.have_seen_event(
-            marker_event.room_id,
-            insertion_event_id
+            marker_event.room_id, insertion_event_id
         )
         if already_seen_insertion_event:
             # No need to process a marker again if we have already seen the
