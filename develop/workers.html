@@ -364,6 +364,9 @@ information.</p>
 
 # Presence requests
 ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
+
+# User directory search requests
+^/_matrix/client/(r0|v3|unstable)/user_directory/search$
 </code></pre>
 <p>Additionally, the following REST endpoints can be handled for GET requests:</p>
 <pre><code>^/_matrix/federation/v1/groups/
@@ -539,6 +542,12 @@ worker_log_config: /etc/matrix-synapse/background-worker-log.yaml
 </code></pre>
 <p>This work cannot be load-balanced; please ensure the main process is restarted
 after setting this option in the shared configuration!</p>
+<p>User directory updates allow REST endpoints matching the following regular
+expressions to work:</p>
+<pre><code>^/_matrix/client/(r0|v3|unstable)/user_directory/search$
+</code></pre>
+<p>The above endpoints can be routed to any worker, though you may choose to route
+it to the chosen user directory worker.</p>
 <p>This style of configuration supersedes the legacy <code>synapse.app.user_dir</code>
 worker application type.</p>
 <h4 id="notifying-application-services"><a class="header" href="#notifying-application-services">Notifying Application Services</a></h4>
