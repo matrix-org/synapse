@@ -265,6 +265,4 @@ class RetryDestinationLimiter:
                 logger.exception("Failed to store destination_retry_timings")
 
         # we deliberately do this in the background.
-        run_as_background_process(
-            f"store_retry_timings-{self.destination}", store_retry_timings
-        )
+        run_as_background_process("store_retry_timings", store_retry_timings)
