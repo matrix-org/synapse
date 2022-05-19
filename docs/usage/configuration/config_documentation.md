@@ -1130,14 +1130,19 @@ Caching can be configured through the following sub-options:
 * `cache_autotuning` and its sub-options `max_cache_memory_usage`, `target_cache_memory_usage`, and
    `min_cache_ttl` work in conjunction with each other to maintain a balance between cache memory 
    usage and cache entry availability. You must be using [jemalloc](https://github.com/matrix-org/synapse#help-synapse-is-slow-and-eats-all-my-ramcpu) 
-   to utilize this option, and all three of the options must be specified for this feature to work.
+   to utilize this option, and all three of the options must be specified for this feature to work. This option
+   defaults to off, enable it by providing values for the sub-options listed below. Please note that the feature will not work
+   and may cause unstable behavior (such as excessive emptying of caches or exceptions) if all of the values are not provided.
+   Please see the [Config Conventions](#config-conventions) for information on how to specify memory size and cache expiry
+   durations.
      * `max_cache_memory_usage` sets a ceiling on how much memory the cache can use before caches begin to be continuously evicted.
         They will continue to be evicted until the memory usage drops below the `target_memory_usage`, set in
-        the flag below, or until the `min_cache_ttl` is hit.
-     * `target_memory_usage` sets a rough target for the desired memory usage of the caches.
+        the setting below, or until the `min_cache_ttl` is hit. There is no default value for this option.
+     * `target_memory_usage` sets a rough target for the desired memory usage of the caches. There is no default value
+        for this option.
      * `min_cache_ttl` sets a limit under which newer cache entries are not evicted and is only applied when
         caches are actively being evicted/`max_cache_memory_usage` has been exceeded. This is to protect hot caches
-        from being emptied while Synapse is evicting due to memory.
+        from being emptied while Synapse is evicting due to memory. There is no default value for this option. 
 
 Example configuration:
 ```yaml
