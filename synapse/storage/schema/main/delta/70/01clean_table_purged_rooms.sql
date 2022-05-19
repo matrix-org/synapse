@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
--- following PR12770 their could be leftover from the fixed bug in this table
+-- Clean up left over rows from bug #11833, which was fixed in #12770.
 DELETE FROM federation_inbound_events_staging WHERE room_id not in (
     SELECT room_id FROM rooms
 );
