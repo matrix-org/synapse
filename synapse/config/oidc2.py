@@ -1,7 +1,6 @@
-from typing import Optional, Tuple, Any
+from typing import TYPE_CHECKING, Any, Optional, Tuple
 
-from pydantic import BaseModel, StrictStr, validator, StrictBool
-from synapse.config.validators import string_length_between, string_contains_characters
+from pydantic import BaseModel, StrictBool, StrictStr, constr
 
 
 class OIDCProviderModel(BaseModel):
@@ -16,11 +15,17 @@ class OIDCProviderModel(BaseModel):
     # a unique identifier for this identity provider. Used in the 'user_external_ids'
     # table, as well as the query/path parameter used in the login protocol.
     # TODO: this is optional in the old-style config, defaulting to "oidc".
-    idp_id: StrictStr
-    _idp_id_length = validator("idp_id")(string_length_between(1, 250))
-    _idp_id_characters = validator("idp_id")(
-        string_contains_characters("A-Za-z0-9._~-")
-    )
+    # Ugly workaround for https://github.com/samuelcolvin/pydantic/issues/156, see also
+    # https://github.com/samuelcolvin/pydantic/issues/156#issuecomment-1130883884
+    if TYPE_CHECKING:
+        idp_id: str
+    else:
+        idp_id: constr(
+            strict=True,
+            min_length=1,
+            max_length=250,
+            regex="^[A-Za-z0-9._~-]+$",  # noqa: F722
+        )
 
     # user-facing name for this identity provider.
     # TODO: this is optional in the old-style config, defaulting to "OIDC".
@@ -99,6 +104,4 @@ class OIDCProviderModel(BaseModel):
     user_mapping_provider_config: Any
 
     # required attributes to require in userinfo to allow login/registration
-    attribute_requirements: Tuple[
-        Any, ...
-    ] = tuple()  # TODO SsoAttributeRequirement] = tuple()
+    attribute_requirements: Tuple[Any, ...] = ()  # TODO SsoAttributeRequirement] = ()

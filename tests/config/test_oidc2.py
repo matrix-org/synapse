@@ -1,14 +1,14 @@
 from copy import deepcopy
-from typing import Any, Mapping, Dict
+from typing import Any, Dict
 
 import yaml
 from pydantic import ValidationError
 
 from synapse.config.oidc2 import OIDCProviderModel
+
 from tests.unittest import TestCase
 
-
-SAMPLE_CONFIG: Mapping[str, Any] = yaml.safe_load(
+SAMPLE_CONFIG = yaml.safe_load(
     """
 idp_id: apple
 idp_name: Apple
@@ -44,20 +44,21 @@ class PydanticOIDCTestCase(TestCase):
 
     def test_idp_id(self) -> None:
         """Demonstrate that Pydantic validates idp_id correctly."""
-        # OIDCProviderModel.parse_obj(self.config)
-        #
-        # # Enforce that idp_id is required.
-        # with self.assertRaises(ValidationError):
-        #     del self.config["idp_id"]
-        #     OIDCProviderModel.parse_obj(self.config)
-        #
-        # # Enforce that idp_id is a string.
-        # with self.assertRaises(ValidationError):
-        #     self.config["idp_id"] = 123
-        #     OIDCProviderModel.parse_obj(self.config)
-        # with self.assertRaises(ValidationError):
-        #     self.config["idp_id"] = None
-        #     OIDCProviderModel.parse_obj(self.config)
+        OIDCProviderModel.parse_obj(self.config)
+
+        # Enforce that idp_id is required.
+        with self.assertRaises(ValidationError):
+            del self.config["idp_id"]
+            OIDCProviderModel.parse_obj(self.config)
+
+        # Enforce that idp_id is a string.
+        with self.assertRaises(ValidationError) as e:
+            self.config["idp_id"] = 123
+            OIDCProviderModel.parse_obj(self.config)
+        print(e.exception)
+        with self.assertRaises(ValidationError):
+            self.config["idp_id"] = None
+            OIDCProviderModel.parse_obj(self.config)
 
         # Enforce a length between 1 and 250.
         with self.assertRaises(ValidationError):
@@ -71,3 +72,9 @@ class PydanticOIDCTestCase(TestCase):
         with self.assertRaises(ValidationError):
             self.config["idp_id"] = "$"
             OIDCProviderModel.parse_obj(self.config)
+
+        # What happens with a really long string of prohibited characters?
+        with self.assertRaises(ValidationError) as e:
+            self.config["idp_id"] = "$" * 500
+            OIDCProviderModel.parse_obj(self.config)
+        print(e.exception)
