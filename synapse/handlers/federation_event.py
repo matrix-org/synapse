@@ -63,6 +63,7 @@ from synapse.replication.http.federation import (
 )
 from synapse.state import StateResolutionStore
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
+from synapse.storage.state import StateFilter
 from synapse.types import (
     PersistedEventPosition,
     RoomStreamToken,
@@ -74,6 +75,7 @@ from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.iterutils import batch_iter
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import shortstr
+from synapse import event_auth
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -1500,7 +1502,8 @@ class FederationEventHandler:
             return context
 
         # now check auth against what we think the auth events *should* be.
-        prev_state_ids = await context.get_prev_state_ids()
+        event_types = event_auth.auth_types_for_event(event.room_version, event)
+        prev_state_ids = await context.get_prev_state_ids(StateFilter.from_types(event_types))
         auth_events_ids = self._event_auth_handler.compute_auth_events(
             event, prev_state_ids, for_verification=True
         )

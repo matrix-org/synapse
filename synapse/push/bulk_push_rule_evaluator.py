@@ -32,6 +32,8 @@ from synapse.util.caches.lrucache import LruCache
 from synapse.util.metrics import measure_func
 
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
+from ..handlers import event_auth
+from ..storage.state import StateFilter
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -168,8 +170,10 @@ class BulkPushRuleEvaluator:
     async def _get_power_levels_and_sender_level(
         self, event: EventBase, context: EventContext
     ) -> Tuple[dict, int]:
-        prev_state_ids = await context.get_prev_state_ids()
+        event_types = event_auth.auth_types_for_event(event.room_version, event)
+        prev_state_ids = await context.get_prev_state_ids(StateFilter.from_types(event_types))
         pl_event_id = prev_state_ids.get(POWER_KEY)
+
         if pl_event_id:
             # fastpath: if there's a power level event, that's all we need, and
             # not having a power level event is an extreme edge case
