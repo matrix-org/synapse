@@ -9618,7 +9618,7 @@ can be used to retrieve information on the authenticated user. As the Synapse
 login mechanism needs an attribute to uniquely identify users, and that endpoint
 does not return a <code>sub</code> property, an alternative <code>subject_claim</code> has to be set.</p>
 <ol>
-<li>Create a new OAuth application: https://github.com/settings/applications/new.</li>
+<li>Create a new OAuth application: <a href="https://github.com/settings/applications/new">https://github.com/settings/applications/new</a>.</li>
 <li>Set the callback URL to <code>[synapse public baseurl]/_synapse/client/oidc/callback</code>.</li>
 </ol>
 <p>Synapse config:</p>
@@ -9643,8 +9643,8 @@ does not return a <code>sub</code> property, an alternative <code>subject_claim<
 <h3 id="google"><a class="header" href="#google">Google</a></h3>
 <p><a href="https://developers.google.com/identity/protocols/oauth2/openid-connect">Google</a> is an OpenID certified authentication and authorisation provider.</p>
 <ol>
-<li>Set up a project in the Google API Console (see
-https://developers.google.com/identity/protocols/oauth2/openid-connect#appsetup).</li>
+<li>Set up a project in the Google API Console (see 
+<a href="https://developers.google.com/identity/protocols/oauth2/openid-connect#appsetup">documentation</a>).</li>
 <li>Add an &quot;OAuth Client ID&quot; for a Web Application under &quot;Credentials&quot;.</li>
 <li>Copy the Client ID and Client Secret, and add the following to your synapse config:
 <pre><code class="language-yaml">oidc_providers:
@@ -9803,8 +9803,8 @@ private key with &quot;SiWA&quot; enabled.</p>
 <li>Team ID: a 10-character ID associated with your developer account.</li>
 <li>Key ID: the 10-character identifier for the key.</li>
 </ul>
-<p>https://help.apple.com/developer-account/?lang=en#/dev77c875b7e has more
-documentation on setting up SiWA.</p>
+<p><a href="https://help.apple.com/developer-account/?lang=en#/dev77c875b7e">Apple's developer documentation</a>
+has more information on setting up SiWA.</p>
 <p>The synapse config will look like this:</p>
 <pre><code class="language-yaml">  - idp_id: apple
     idp_name: Apple
@@ -9831,10 +9831,10 @@ needed to add OAuth2 capabilities to your Django projects. It supports
 <a href="https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html">OpenID Connect too</a>.</p>
 <p>Configuration on Django's side:</p>
 <ol>
-<li>Add an application: https://example.com/admin/oauth2_provider/application/add/ and choose parameters like this:</li>
+<li>Add an application: <code>https://example.com/admin/oauth2_provider/application/add/</code> and choose parameters like this:</li>
 </ol>
 <ul>
-<li><code>Redirect uris</code>: https://synapse.example.com/_synapse/client/oidc/callback</li>
+<li><code>Redirect uris</code>: <code>https://synapse.example.com/_synapse/client/oidc/callback</code></li>
 <li><code>Client type</code>: <code>Confidential</code></li>
 <li><code>Authorization grant type</code>: <code>Authorization code</code></li>
 <li><code>Algorithm</code>: <code>HMAC with SHA-2 256</code></li>
