@@ -1552,7 +1552,9 @@ class EventCreationHandler:
                     )
 
             event_types = event_auth.auth_types_for_event(event.room_version, event)
-            prev_state_ids = await context.get_prev_state_ids(StateFilter.from_types(event_types))
+            prev_state_ids = await context.get_prev_state_ids(
+                StateFilter.from_types(event_types)
+            )
 
             auth_events_ids = self._event_auth_handler.compute_auth_events(
                 event, prev_state_ids, for_verification=True
