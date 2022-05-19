@@ -16,8 +16,8 @@ import random
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Optional, Type
 
-import synapse.logging.context
 from synapse.api.errors import CodeMessageException
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage import DataStore
 from synapse.util import Clock
 
@@ -265,4 +265,6 @@ class RetryDestinationLimiter:
                 logger.exception("Failed to store destination_retry_timings")
 
         # we deliberately do this in the background.
-        synapse.logging.context.run_in_background(store_retry_timings)
+        run_as_background_process(
+            f"store_retry_timings-{self.destination}", store_retry_timings
+        )
