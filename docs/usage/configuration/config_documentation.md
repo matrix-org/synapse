@@ -23,6 +23,14 @@ followed by a letter. Letters have the following meanings:
 For example, setting `redaction_retention_period: 5m` would remove redacted
 messages from the database after 5 minutes, rather than 5 months.
 
+In addition, configuration options referring to size use the following suffixes:
+
+* `M` = MiB, or 1,048,576 bytes
+* `K` = KiB, or 1024 bytes 
+
+For example, setting `max_avatar_size: 10M` means that Synapse will not accept files larger than 10,485,760 bytes
+for a user avatar. 
+
 ### YAML 
 The configuration file is a [YAML](https://yaml.org/) file, which means that certain syntax rules
 apply if you want your config file to be read properly. A few helpful things to know:
