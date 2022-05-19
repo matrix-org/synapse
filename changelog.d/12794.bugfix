@@ -1,0 +1,1 @@
+Properly close `providers.json` file when the resource is loaded. Contributed by @arkamar.
