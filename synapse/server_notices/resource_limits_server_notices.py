@@ -178,8 +178,8 @@ class ResourceLimitsServerNotices:
         currently_blocked = False
         pinned_state_event = None
         try:
-            pinned_state_event = await self._state.get_current_state(
-                room_id, event_type=EventTypes.Pinned
+            pinned_state_event = await self._store.get_current_state_event(
+                room_id, event_type=EventTypes.Pinned, state_key=""
             )
         except AuthError:
             # The user has yet to join the server notices room

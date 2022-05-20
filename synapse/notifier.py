@@ -681,7 +681,7 @@ class Notifier:
         return joined_room_ids, True
 
     async def _is_world_readable(self, room_id: str) -> bool:
-        state = await self.state_handler.get_current_state(
+        state = await self.store.get_current_state_event(
             room_id, EventTypes.RoomHistoryVisibility, ""
         )
         if state and "history_visibility" in state.content:

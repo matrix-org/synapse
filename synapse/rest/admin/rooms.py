@@ -447,7 +447,7 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
         super().__init__(hs)
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
-        self.state_handler = hs.get_state_handler()
+        self.store = hs.get_datastores().main
         self.is_mine = hs.is_mine
 
     async def on_POST(
@@ -489,8 +489,9 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
         )
 
         # send invite if room has "JoinRules.INVITE"
-        room_state = await self.state_handler.get_current_state(room_id)
-        join_rules_event = room_state.get((EventTypes.JoinRules, ""))
+        join_rules_event = await self.store.get_current_state_event(
+            room_id, EventTypes.JoinRules, ""
+        )
         if join_rules_event:
             if not (join_rules_event.content.get("join_rule") == JoinRules.PUBLIC):
                 # update_membership with an action of "invite" can raise a

@@ -319,7 +319,7 @@ class DirectoryHandler:
         Raises:
             ShadowBanError if the requester has been shadow-banned.
         """
-        alias_event = await self.state.get_current_state(
+        alias_event = await self.store.get_current_state_event(
             room_id, EventTypes.CanonicalAlias, ""
         )
 

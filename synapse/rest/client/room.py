@@ -673,7 +673,7 @@ class RoomEventServlet(RestServlet):
         if include_unredacted_content and not await self.auth.is_server_admin(
             requester.user
         ):
-            power_level_event = await self._state.get_current_state(
+            power_level_event = await self._store.get_current_state_event(
                 room_id, EventTypes.PowerLevels, ""
             )
 

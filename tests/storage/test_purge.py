@@ -98,9 +98,8 @@ class PurgeTests(HomeserverTestCase):
         first = self.helper.send(self.room_id, body="test1")
 
         # Get the current room state.
-        state_handler = self.hs.get_state_handler()
         create_event = self.get_success(
-            state_handler.get_current_state(self.room_id, "m.room.create", "")
+            self.store.get_current_state_event(self.room_id, "m.room.create", "")
         )
         self.assertIsNotNone(create_event)
 

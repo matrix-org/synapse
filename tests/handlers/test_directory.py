@@ -335,7 +335,7 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
     def _get_canonical_alias(self):
         """Get the canonical alias state of the room."""
         return self.get_success(
-            self.state_handler.get_current_state(
+            self.store.get_current_state_event(
                 self.room_id, EventTypes.CanonicalAlias, ""
             )
         )

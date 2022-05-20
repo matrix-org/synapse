@@ -1805,7 +1805,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
     async def forget(self, user: UserID, room_id: str) -> None:
         user_id = user.to_string()
 
-        member = await self.state_handler.get_current_state(
+        member = await self.store.get_current_state_event(
             room_id=room_id, event_type=EventTypes.Member, state_key=user_id
         )
         membership = member.membership if member else None

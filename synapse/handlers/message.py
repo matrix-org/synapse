@@ -117,7 +117,9 @@ class MessageHandler:
         )
 
         if membership == Membership.JOIN:
-            data = await self.state.get_current_state(room_id, event_type, state_key)
+            data = await self.store.get_current_state_event(
+                room_id, event_type, state_key
+            )
         elif membership == Membership.LEAVE:
             key = (event_type, state_key)
             # If the membership is not JOIN, then the event ID should exist.
