@@ -152,7 +152,7 @@ def check_auth_rules_for_event(
                 if k in ["events", "notifications", "users"]:
                     if type(v) is not dict:
                         raise AuthError(403, "Not a valid object: %s" % (k,))
-                    for _k2, v2 in v.items():
+                    for v2 in v.values():
                         if type(v2) is not int:
                             raise AuthError(403, "Not a valid power level: %s" % (v2,))
                 else:
