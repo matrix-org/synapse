@@ -9,9 +9,6 @@ function log {
     echo "$d $@"
 }
 
-# Replace the server name in the caddy config
-sed -i "s/{{ server_name }}/${SERVER_NAME}/g" /root/caddy.json
-
 # Set the server name of the homeserver
 export SYNAPSE_SERVER_NAME=${SERVER_NAME}
 
