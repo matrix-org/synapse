@@ -36,12 +36,6 @@ class Codes(str, Enum):
     All known error codes, as an enum of strings.
     """
 
-    def __str__(self) -> str:
-        return self.value
-
-    def __repr__(self) -> str:
-        return repr(self.value)
-
     UNRECOGNIZED = "M_UNRECOGNIZED"
     UNAUTHORIZED = "M_UNAUTHORIZED"
     FORBIDDEN = "M_FORBIDDEN"
