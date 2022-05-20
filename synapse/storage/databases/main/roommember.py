@@ -444,6 +444,15 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return results
 
+    @cached()
+    async def get_local_users_in_room(self, room_id: str) -> List[str]:
+        return await self.db_pool.simple_select_onecol(
+            table="local_current_membership",
+            keyvalues={"room_id": room_id, "membership": Membership.JOIN},
+            retcol="user_id",
+            desc="get_local_users_in_room",
+        )
+
     async def get_local_current_membership_for_user_in_room(
         self, user_id: str, room_id: str
     ) -> Tuple[Optional[str], Optional[str]]:
