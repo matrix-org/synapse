@@ -14,24 +14,14 @@
 import itertools
 import logging
 from collections import defaultdict
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Tuple,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 from synapse.api.constants import Membership, PresenceState
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.api.filtering import FilterCollection
 from synapse.api.presence import UserPresenceState
-from synapse.events import EventBase
 from synapse.events.utils import (
+    SerializeEventConfig,
     format_event_for_client_v2_without_room_id,
     format_event_raw,
 )
@@ -48,7 +38,6 @@ from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import trace
-from synapse.storage.databases.main.relations import BundledAggregations
 from synapse.types import JsonDict, StreamToken
 from synapse.util import json_decoder
 
@@ -103,13 +92,14 @@ class SyncRestServlet(RestServlet):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.sync_handler = hs.get_sync_handler()
         self.clock = hs.get_clock()
         self.filtering = hs.get_filtering()
         self.presence_handler = hs.get_presence_handler()
         self._server_notices_sender = hs.get_server_notices_sender()
         self._event_serializer = hs.get_event_client_serializer()
+        self._msc2654_enabled = hs.config.experimental.msc2654_enabled
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         # This will always be set by the time Twisted calls us.
@@ -190,13 +180,10 @@ class SyncRestServlet(RestServlet):
 
         affect_presence = set_presence != PresenceState.OFFLINE
 
-        if affect_presence:
-            await self.presence_handler.set_state(
-                user, {"presence": set_presence}, True
-            )
-
         context = await self.presence_handler.user_syncing(
-            user.to_string(), affect_presence=affect_presence
+            user.to_string(),
+            affect_presence=affect_presence,
+            presence_state=set_presence,
         )
         with context:
             sync_result = await self.sync_handler.wait_for_sync_for_user(
@@ -239,28 +226,31 @@ class SyncRestServlet(RestServlet):
         else:
             raise Exception("Unknown event format %s" % (filter.event_format,))
 
+        serialize_options = SerializeEventConfig(
+            event_format=event_formatter,
+            token_id=access_token_id,
+            only_event_fields=filter.event_fields,
+        )
+        stripped_serialize_options = SerializeEventConfig(
+            event_format=event_formatter,
+            token_id=access_token_id,
+            include_stripped_room_state=True,
+        )
+
         joined = await self.encode_joined(
-            sync_result.joined,
-            time_now,
-            access_token_id,
-            filter.event_fields,
-            event_formatter,
+            sync_result.joined, time_now, serialize_options
         )
 
         invited = await self.encode_invited(
-            sync_result.invited, time_now, access_token_id, event_formatter
+            sync_result.invited, time_now, stripped_serialize_options
         )
 
         knocked = await self.encode_knocked(
-            sync_result.knocked, time_now, access_token_id, event_formatter
+            sync_result.knocked, time_now, stripped_serialize_options
         )
 
         archived = await self.encode_archived(
-            sync_result.archived,
-            time_now,
-            access_token_id,
-            filter.event_fields,
-            event_formatter,
+            sync_result.archived, time_now, serialize_options
         )
 
         logger.debug("building sync response dict")
@@ -308,14 +298,13 @@ class SyncRestServlet(RestServlet):
         if archived:
             response["rooms"][Membership.LEAVE] = archived
 
-        # By the time we get here groups is no longer optional.
-        assert sync_result.groups is not None
-        if sync_result.groups.join:
-            response["groups"][Membership.JOIN] = sync_result.groups.join
-        if sync_result.groups.invite:
-            response["groups"][Membership.INVITE] = sync_result.groups.invite
-        if sync_result.groups.leave:
-            response["groups"][Membership.LEAVE] = sync_result.groups.leave
+        if sync_result.groups is not None:
+            if sync_result.groups.join:
+                response["groups"][Membership.JOIN] = sync_result.groups.join
+            if sync_result.groups.invite:
+                response["groups"][Membership.INVITE] = sync_result.groups.invite
+            if sync_result.groups.leave:
+                response["groups"][Membership.LEAVE] = sync_result.groups.leave
 
         return response
 
@@ -339,9 +328,7 @@ class SyncRestServlet(RestServlet):
         self,
         rooms: List[JoinedSyncResult],
         time_now: int,
-        token_id: Optional[int],
-        event_fields: List[str],
-        event_formatter: Callable[[JsonDict], JsonDict],
+        serialize_options: SerializeEventConfig,
     ) -> JsonDict:
         """
         Encode the joined rooms in a sync result
@@ -349,24 +336,14 @@ class SyncRestServlet(RestServlet):
         Args:
             rooms: list of sync results for rooms this user is joined to
             time_now: current time - used as a baseline for age calculations
-            token_id: ID of the user's auth token - used for namespacing
-                of transaction IDs
-            event_fields: List of event fields to include. If empty,
-                all fields will be returned.
-            event_formatter: function to convert from federation format
-                to client format
+            serialize_options: Event serializer options
         Returns:
             The joined rooms list, in our response format
         """
         joined = {}
         for room in rooms:
             joined[room.room_id] = await self.encode_room(
-                room,
-                time_now,
-                token_id,
-                joined=True,
-                only_fields=event_fields,
-                event_formatter=event_formatter,
+                room, time_now, joined=True, serialize_options=serialize_options
             )
 
         return joined
@@ -376,8 +353,7 @@ class SyncRestServlet(RestServlet):
         self,
         rooms: List[InvitedSyncResult],
         time_now: int,
-        token_id: Optional[int],
-        event_formatter: Callable[[JsonDict], JsonDict],
+        serialize_options: SerializeEventConfig,
     ) -> JsonDict:
         """
         Encode the invited rooms in a sync result
@@ -385,10 +361,7 @@ class SyncRestServlet(RestServlet):
         Args:
             rooms: list of sync results for rooms this user is invited to
             time_now: current time - used as a baseline for age calculations
-            token_id: ID of the user's auth token - used for namespacing
-                of transaction IDs
-            event_formatter: function to convert from federation format
-                to client format
+            serialize_options: Event serializer options
 
         Returns:
             The invited rooms list, in our response format
@@ -396,11 +369,7 @@ class SyncRestServlet(RestServlet):
         invited = {}
         for room in rooms:
             invite = self._event_serializer.serialize_event(
-                room.invite,
-                time_now,
-                token_id=token_id,
-                event_format=event_formatter,
-                include_stripped_room_state=True,
+                room.invite, time_now, config=serialize_options
             )
             unsigned = dict(invite.get("unsigned", {}))
             invite["unsigned"] = unsigned
@@ -415,8 +384,7 @@ class SyncRestServlet(RestServlet):
         self,
         rooms: List[KnockedSyncResult],
         time_now: int,
-        token_id: Optional[int],
-        event_formatter: Callable[[Dict], Dict],
+        serialize_options: SerializeEventConfig,
     ) -> Dict[str, Dict[str, Any]]:
         """
         Encode the rooms we've knocked on in a sync result.
@@ -424,8 +392,7 @@ class SyncRestServlet(RestServlet):
         Args:
             rooms: list of sync results for rooms this user is knocking on
             time_now: current time - used as a baseline for age calculations
-            token_id: ID of the user's auth token - used for namespacing of transaction IDs
-            event_formatter: function to convert from federation format to client format
+            serialize_options: Event serializer options
 
         Returns:
             The list of rooms the user has knocked on, in our response format.
@@ -433,11 +400,7 @@ class SyncRestServlet(RestServlet):
         knocked = {}
         for room in rooms:
             knock = self._event_serializer.serialize_event(
-                room.knock,
-                time_now,
-                token_id=token_id,
-                event_format=event_formatter,
-                include_stripped_room_state=True,
+                room.knock, time_now, config=serialize_options
             )
 
             # Extract the `unsigned` key from the knock event.
@@ -470,9 +433,7 @@ class SyncRestServlet(RestServlet):
         self,
         rooms: List[ArchivedSyncResult],
         time_now: int,
-        token_id: Optional[int],
-        event_fields: List[str],
-        event_formatter: Callable[[JsonDict], JsonDict],
+        serialize_options: SerializeEventConfig,
     ) -> JsonDict:
         """
         Encode the archived rooms in a sync result
@@ -480,23 +441,14 @@ class SyncRestServlet(RestServlet):
         Args:
             rooms: list of sync results for rooms this user is joined to
             time_now: current time - used as a baseline for age calculations
-            token_id: ID of the user's auth token - used for namespacing
-                of transaction IDs
-            event_fields: List of event fields to include. If empty,
-                all fields will be returned.
-            event_formatter: function to convert from federation format to client format
+            serialize_options: Event serializer options
         Returns:
             The archived rooms list, in our response format
         """
         joined = {}
         for room in rooms:
             joined[room.room_id] = await self.encode_room(
-                room,
-                time_now,
-                token_id,
-                joined=False,
-                only_fields=event_fields,
-                event_formatter=event_formatter,
+                room, time_now, joined=False, serialize_options=serialize_options
             )
 
         return joined
@@ -505,10 +457,8 @@ class SyncRestServlet(RestServlet):
         self,
         room: Union[JoinedSyncResult, ArchivedSyncResult],
         time_now: int,
-        token_id: Optional[int],
         joined: bool,
-        only_fields: Optional[List[str]],
-        event_formatter: Callable[[JsonDict], JsonDict],
+        serialize_options: SerializeEventConfig,
     ) -> JsonDict:
         """
         Args:
@@ -524,20 +474,6 @@ class SyncRestServlet(RestServlet):
         Returns:
             The room, encoded in our response format
         """
-
-        def serialize(
-            events: Iterable[EventBase],
-            aggregations: Optional[Dict[str, BundledAggregations]] = None,
-        ) -> List[JsonDict]:
-            return self._event_serializer.serialize_events(
-                events,
-                time_now=time_now,
-                bundle_aggregations=aggregations,
-                token_id=token_id,
-                event_format=event_formatter,
-                only_event_fields=only_fields,
-            )
-
         state_dict = room.state
         timeline_events = room.timeline.events
 
@@ -554,9 +490,14 @@ class SyncRestServlet(RestServlet):
                     event.room_id,
                 )
 
-        serialized_state = serialize(state_events)
-        serialized_timeline = serialize(
-            timeline_events, room.timeline.bundled_aggregations
+        serialized_state = self._event_serializer.serialize_events(
+            state_events, time_now, config=serialize_options
+        )
+        serialized_timeline = self._event_serializer.serialize_events(
+            timeline_events,
+            time_now,
+            config=serialize_options,
+            bundle_aggregations=room.timeline.bundled_aggregations,
         )
 
         account_data = room.account_data
@@ -577,7 +518,8 @@ class SyncRestServlet(RestServlet):
             result["ephemeral"] = {"events": ephemeral_events}
             result["unread_notifications"] = room.unread_notifications
             result["summary"] = room.summary
-            result["org.matrix.msc2654.unread_count"] = room.unread_count
+            if self._msc2654_enabled:
+                result["org.matrix.msc2654.unread_count"] = room.unread_count
 
         return result
 

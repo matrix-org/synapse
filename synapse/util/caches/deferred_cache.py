@@ -81,13 +81,14 @@ class DeferredCache(Generic[KT, VT]):
         Args:
             name: The name of the cache
             max_entries: Maximum amount of entries that the cache will hold
-            keylen: The length of the tuple used as the cache key. Ignored unless
-               `tree` is True.
             tree: Use a TreeCache instead of a dict as the underlying cache type
             iterable: If True, count each item in the cached object as an entry,
                 rather than each cached object
             apply_cache_factor_from_config: Whether cache factors specified in the
                 config file affect `max_entries`
+            prune_unread_entries: If True, cache entries that haven't been read recently
+                will be evicted from the cache in the background. Set to False to
+                opt-out of this behaviour.
         """
         cache_type = TreeCache if tree else dict
 

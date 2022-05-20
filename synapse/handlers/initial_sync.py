@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, List, Optional, Tuple, cast
 from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
+from synapse.events.utils import SerializeEventConfig
 from synapse.events.validator import EventValidator
 from synapse.handlers.presence import format_user_presence_state
 from synapse.handlers.receipts import ReceiptEventSource
@@ -29,6 +30,7 @@ from synapse.types import (
     Requester,
     RoomStreamToken,
     StateMap,
+    StreamKeyType,
     StreamToken,
     UserID,
 )
@@ -46,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 class InitialSyncHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.state_handler = hs.get_state_handler()
         self.hs = hs
@@ -142,7 +144,7 @@ class InitialSyncHandler:
             to_key=int(now_token.receipt_key),
         )
         if self.hs.config.experimental.msc2285_enabled:
-            receipt = ReceiptEventSource.filter_out_hidden(receipt, user_id)
+            receipt = ReceiptEventSource.filter_out_private_receipts(receipt, user_id)
 
         tags_by_room = await self.store.get_tags_for_user(user_id)
 
@@ -152,9 +154,12 @@ class InitialSyncHandler:
 
         public_room_ids = await self.store.get_public_room_ids()
 
-        limit = pagin_config.limit
-        if limit is None:
+        if pagin_config.limit is not None:
+            limit = pagin_config.limit
+        else:
             limit = 10
+
+        serializer_options = SerializeEventConfig(as_client_event=as_client_event)
 
         async def handle_room(event: RoomsForUser) -> None:
             d: JsonDict = {
@@ -173,7 +178,7 @@ class InitialSyncHandler:
                 d["invite"] = self._event_serializer.serialize_event(
                     invite_event,
                     time_now,
-                    as_client_event=as_client_event,
+                    config=serializer_options,
                 )
 
             rooms_ret.append(d)
@@ -216,8 +221,10 @@ class InitialSyncHandler:
                     self.storage, user_id, messages
                 )
 
-                start_token = now_token.copy_and_replace("room_key", token)
-                end_token = now_token.copy_and_replace("room_key", room_end_token)
+                start_token = now_token.copy_and_replace(StreamKeyType.ROOM, token)
+                end_token = now_token.copy_and_replace(
+                    StreamKeyType.ROOM, room_end_token
+                )
                 time_now = self.clock.time_msec()
 
                 d["messages"] = {
@@ -225,7 +232,7 @@ class InitialSyncHandler:
                         self._event_serializer.serialize_events(
                             messages,
                             time_now=time_now,
-                            as_client_event=as_client_event,
+                            config=serializer_options,
                         )
                     ),
                     "start": await start_token.to_string(self.store),
@@ -235,7 +242,7 @@ class InitialSyncHandler:
                 d["state"] = self._event_serializer.serialize_events(
                     current_state.values(),
                     time_now=time_now,
-                    as_client_event=as_client_event,
+                    config=serializer_options,
                 )
 
                 account_data_events = []
@@ -365,8 +372,8 @@ class InitialSyncHandler:
             self.storage, user_id, messages, is_peeking=is_peeking
         )
 
-        start_token = StreamToken.START.copy_and_replace("room_key", token)
-        end_token = StreamToken.START.copy_and_replace("room_key", stream_token)
+        start_token = StreamToken.START.copy_and_replace(StreamKeyType.ROOM, token)
+        end_token = StreamToken.START.copy_and_replace(StreamKeyType.ROOM, stream_token)
 
         time_now = self.clock.time_msec()
 
@@ -445,7 +452,9 @@ class InitialSyncHandler:
             if not receipts:
                 return []
             if self.hs.config.experimental.msc2285_enabled:
-                receipts = ReceiptEventSource.filter_out_hidden(receipts, user_id)
+                receipts = ReceiptEventSource.filter_out_private_receipts(
+                    receipts, user_id
+                )
             return receipts
 
         presence, receipts, (messages, token) = await make_deferred_yieldable(
@@ -468,7 +477,7 @@ class InitialSyncHandler:
             self.storage, user_id, messages, is_peeking=is_peeking
         )
 
-        start_token = now_token.copy_and_replace("room_key", token)
+        start_token = now_token.copy_and_replace(StreamKeyType.ROOM, token)
         end_token = now_token
 
         time_now = self.clock.time_msec()

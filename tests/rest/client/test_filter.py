@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
+from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.errors import Codes
 from synapse.rest.client import filter
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 
@@ -30,11 +32,11 @@ class FilterTestCase(unittest.HomeserverTestCase):
     EXAMPLE_FILTER_JSON = b'{"room": {"timeline": {"types": ["m.room.message"]}}}'
     servlets = [filter.register_servlets]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.filtering = hs.get_filtering()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
-    def test_add_filter(self):
+    def test_add_filter(self) -> None:
         channel = self.make_request(
             "POST",
             "/_matrix/client/r0/user/%s/filter" % (self.user_id),
@@ -43,11 +45,13 @@ class FilterTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.result["code"], b"200")
         self.assertEqual(channel.json_body, {"filter_id": "0"})
-        filter = self.store.get_user_filter(user_localpart="apple", filter_id=0)
+        filter = self.get_success(
+            self.store.get_user_filter(user_localpart="apple", filter_id=0)
+        )
         self.pump()
-        self.assertEquals(filter.result, self.EXAMPLE_FILTER)
+        self.assertEqual(filter, self.EXAMPLE_FILTER)
 
-    def test_add_filter_for_other_user(self):
+    def test_add_filter_for_other_user(self) -> None:
         channel = self.make_request(
             "POST",
             "/_matrix/client/r0/user/%s/filter" % ("@watermelon:test"),
@@ -55,9 +59,9 @@ class FilterTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(channel.result["code"], b"403")
-        self.assertEquals(channel.json_body["errcode"], Codes.FORBIDDEN)
+        self.assertEqual(channel.json_body["errcode"], Codes.FORBIDDEN)
 
-    def test_add_filter_non_local_user(self):
+    def test_add_filter_non_local_user(self) -> None:
         _is_mine = self.hs.is_mine
         self.hs.is_mine = lambda target_user: False
         channel = self.make_request(
@@ -68,34 +72,33 @@ class FilterTestCase(unittest.HomeserverTestCase):
 
         self.hs.is_mine = _is_mine
         self.assertEqual(channel.result["code"], b"403")
-        self.assertEquals(channel.json_body["errcode"], Codes.FORBIDDEN)
+        self.assertEqual(channel.json_body["errcode"], Codes.FORBIDDEN)
 
-    def test_get_filter(self):
-        filter_id = defer.ensureDeferred(
+    def test_get_filter(self) -> None:
+        filter_id = self.get_success(
             self.filtering.add_user_filter(
                 user_localpart="apple", user_filter=self.EXAMPLE_FILTER
             )
         )
         self.reactor.advance(1)
-        filter_id = filter_id.result
         channel = self.make_request(
             "GET", "/_matrix/client/r0/user/%s/filter/%s" % (self.user_id, filter_id)
         )
 
         self.assertEqual(channel.result["code"], b"200")
-        self.assertEquals(channel.json_body, self.EXAMPLE_FILTER)
+        self.assertEqual(channel.json_body, self.EXAMPLE_FILTER)
 
-    def test_get_filter_non_existant(self):
+    def test_get_filter_non_existant(self) -> None:
         channel = self.make_request(
             "GET", "/_matrix/client/r0/user/%s/filter/12382148321" % (self.user_id)
         )
 
         self.assertEqual(channel.result["code"], b"404")
-        self.assertEquals(channel.json_body["errcode"], Codes.NOT_FOUND)
+        self.assertEqual(channel.json_body["errcode"], Codes.NOT_FOUND)
 
     # Currently invalid params do not have an appropriate errcode
     # in errors.py
-    def test_get_filter_invalid_id(self):
+    def test_get_filter_invalid_id(self) -> None:
         channel = self.make_request(
             "GET", "/_matrix/client/r0/user/%s/filter/foobar" % (self.user_id)
         )
@@ -103,7 +106,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.result["code"], b"400")
 
     # No ID also returns an invalid_id error
-    def test_get_filter_no_id(self):
+    def test_get_filter_no_id(self) -> None:
         channel = self.make_request(
             "GET", "/_matrix/client/r0/user/%s/filter/" % (self.user_id)
         )

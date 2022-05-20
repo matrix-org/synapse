@@ -14,8 +14,13 @@
 
 import json
 
+from twisted.test.proto_helpers import MemoryReactor
+
 import synapse.rest.admin
 from synapse.rest.client import login, report_event, room
+from synapse.server import HomeServer
+from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests import unittest
 
@@ -28,7 +33,7 @@ class ReportEventTestCase(unittest.HomeserverTestCase):
         report_event.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
         self.other_user = self.register_user("user", "pass")
@@ -42,35 +47,35 @@ class ReportEventTestCase(unittest.HomeserverTestCase):
         self.event_id = resp["event_id"]
         self.report_path = f"rooms/{self.room_id}/report/{self.event_id}"
 
-    def test_reason_str_and_score_int(self):
+    def test_reason_str_and_score_int(self) -> None:
         data = {"reason": "this makes me sad", "score": -100}
         self._assert_status(200, data)
 
-    def test_no_reason(self):
+    def test_no_reason(self) -> None:
         data = {"score": 0}
         self._assert_status(200, data)
 
-    def test_no_score(self):
+    def test_no_score(self) -> None:
         data = {"reason": "this makes me sad"}
         self._assert_status(200, data)
 
-    def test_no_reason_and_no_score(self):
-        data = {}
+    def test_no_reason_and_no_score(self) -> None:
+        data: JsonDict = {}
         self._assert_status(200, data)
 
-    def test_reason_int_and_score_str(self):
+    def test_reason_int_and_score_str(self) -> None:
         data = {"reason": 10, "score": "string"}
         self._assert_status(400, data)
 
-    def test_reason_zero_and_score_blank(self):
+    def test_reason_zero_and_score_blank(self) -> None:
         data = {"reason": 0, "score": ""}
         self._assert_status(400, data)
 
-    def test_reason_and_score_null(self):
+    def test_reason_and_score_null(self) -> None:
         data = {"reason": None, "score": None}
         self._assert_status(400, data)
 
-    def _assert_status(self, response_status, data):
+    def _assert_status(self, response_status: int, data: JsonDict) -> None:
         channel = self.make_request(
             "POST",
             self.report_path,

@@ -20,6 +20,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Awaitable,
+    Collection,
     Dict,
     List,
     Optional,
@@ -33,6 +34,7 @@ import attr
 from synapse.api.constants import EventContentFields, EventTypes, JoinRules
 from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions
+from synapse.config.homeserver import HomeServerConfig
 from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import (
@@ -97,7 +99,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
     ):
         super().__init__(database, db_conn, hs)
 
-        self.config = hs.config
+        self.config: HomeServerConfig = hs.config
 
     async def store_room(
         self,
@@ -1075,6 +1077,37 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             get_rooms_for_retention_period_in_range_txn,
         )
 
+    async def clear_partial_state_room(self, room_id: str) -> bool:
+        # this can race with incoming events, so we watch out for FK errors.
+        # TODO(faster_joins): this still doesn't completely fix the race, since the persist process
+        #   is not atomic. I fear we need an application-level lock.
+        try:
+            await self.db_pool.runInteraction(
+                "clear_partial_state_room", self._clear_partial_state_room_txn, room_id
+            )
+            return True
+        except self.db_pool.engine.module.DatabaseError as e:
+            # TODO(faster_joins): how do we distinguish between FK errors and other errors?
+            logger.warning(
+                "Exception while clearing lazy partial-state-room %s, retrying: %s",
+                room_id,
+                e,
+            )
+            return False
+
+    @staticmethod
+    def _clear_partial_state_room_txn(txn: LoggingTransaction, room_id: str) -> None:
+        DatabasePool.simple_delete_txn(
+            txn,
+            table="partial_state_rooms_servers",
+            keyvalues={"room_id": room_id},
+        )
+        DatabasePool.simple_delete_one_txn(
+            txn,
+            table="partial_state_rooms",
+            keyvalues={"room_id": room_id},
+        )
+
 
 class _BackgroundUpdates:
     REMOVE_TOMESTONED_ROOMS_BG_UPDATE = "remove_tombstoned_rooms_from_directory"
@@ -1498,7 +1531,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         self._event_reports_id_gen = IdGenerator(db_conn, "event_reports", "id")
 
     async def upsert_room_on_join(
-        self, room_id: str, room_version: RoomVersion, auth_events: List[EventBase]
+        self, room_id: str, room_version: RoomVersion, state_events: List[EventBase]
     ) -> None:
         """Ensure that the room is stored in the table
 
@@ -1511,7 +1544,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
         has_auth_chain_index = await self.has_auth_chain_index(room_id)
 
         create_event = None
-        for e in auth_events:
+        for e in state_events:
             if (e.type, e.state_key) == (EventTypes.Create, ""):
                 create_event = e
                 break
@@ -1541,6 +1574,42 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore):
             # rooms has a unique constraint on room_id, so no need to lock when doing an
             # emulated upsert.
             lock=False,
+        )
+
+    async def store_partial_state_room(
+        self,
+        room_id: str,
+        servers: Collection[str],
+    ) -> None:
+        """Mark the given room as containing events with partial state
+
+        Args:
+            room_id: the ID of the room
+            servers: other servers known to be in the room
+        """
+        await self.db_pool.runInteraction(
+            "store_partial_state_room",
+            self._store_partial_state_room_txn,
+            room_id,
+            servers,
+        )
+
+    @staticmethod
+    def _store_partial_state_room_txn(
+        txn: LoggingTransaction, room_id: str, servers: Collection[str]
+    ) -> None:
+        DatabasePool.simple_insert_txn(
+            txn,
+            table="partial_state_rooms",
+            values={
+                "room_id": room_id,
+            },
+        )
+        DatabasePool.simple_insert_many_txn(
+            txn,
+            table="partial_state_rooms_servers",
+            keys=("room_id", "server_name"),
+            values=((room_id, s) for s in servers),
         )
 
     async def maybe_store_room_on_outlier_membership(

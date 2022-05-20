@@ -82,7 +82,7 @@ async def phone_stats_home(
     # General statistics
     #
 
-    store = hs.get_datastore()
+    store = hs.get_datastores().main
 
     stats["homeserver"] = hs.config.server.server_name
     stats["server_context"] = hs.config.server.server_context
@@ -170,18 +170,22 @@ def start_phone_stats_home(hs: "HomeServer") -> None:
     # Rather than update on per session basis, batch up the requests.
     # If you increase the loop period, the accuracy of user_daily_visits
     # table will decrease
-    clock.looping_call(hs.get_datastore().generate_user_daily_visits, 5 * 60 * 1000)
+    clock.looping_call(
+        hs.get_datastores().main.generate_user_daily_visits, 5 * 60 * 1000
+    )
 
     # monthly active user limiting functionality
-    clock.looping_call(hs.get_datastore().reap_monthly_active_users, 1000 * 60 * 60)
-    hs.get_datastore().reap_monthly_active_users()
+    clock.looping_call(
+        hs.get_datastores().main.reap_monthly_active_users, 1000 * 60 * 60
+    )
+    hs.get_datastores().main.reap_monthly_active_users()
 
     @wrap_as_background_process("generate_monthly_active_users")
     async def generate_monthly_active_users() -> None:
         current_mau_count = 0
         current_mau_count_by_service = {}
         reserved_users: Sized = ()
-        store = hs.get_datastore()
+        store = hs.get_datastores().main
         if hs.config.server.limit_usage_by_mau or hs.config.server.mau_stats_only:
             current_mau_count = await store.get_monthly_active_count()
             current_mau_count_by_service = (

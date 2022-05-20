@@ -140,7 +140,7 @@ class GroupAttestionRenewer:
 
     def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.assestations = hs.get_groups_attestation_signing()
         self.transport_client = hs.get_federation_transport_client()
         self.is_mine_id = hs.is_mine_id

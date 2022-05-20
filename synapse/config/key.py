@@ -16,7 +16,7 @@
 import hashlib
 import logging
 import os
-from typing import Any, Dict, Iterator, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional
 
 import attr
 import jsonschema
@@ -37,6 +37,9 @@ from synapse.types import JsonDict
 from synapse.util.stringutils import random_string, random_string_with_symbols
 
 from ._base import Config, ConfigError
+
+if TYPE_CHECKING:
+    from signedjson.key import VerifyKeyWithExpiry
 
 INSECURE_NOTARY_ERROR = """\
 Your server is configured to accept key server responses without signature
@@ -96,11 +99,14 @@ class TrustedKeyServer:
 class KeyConfig(Config):
     section = "key"
 
-    def read_config(self, config, config_dir_path, **kwargs):
+    def read_config(
+        self, config: JsonDict, config_dir_path: str, **kwargs: Any
+    ) -> None:
         # the signing key can be specified inline or in a separate file
         if "signing_key" in config:
             self.signing_key = read_signing_keys([config["signing_key"]])
         else:
+            assert config_dir_path is not None
             signing_key_path = config.get("signing_key_path")
             if signing_key_path is None:
                 signing_key_path = os.path.join(
@@ -169,8 +175,12 @@ class KeyConfig(Config):
         self.form_secret = config.get("form_secret", None)
 
     def generate_config_section(
-        self, config_dir_path, server_name, generate_secrets=False, **kwargs
-    ):
+        self,
+        config_dir_path: str,
+        server_name: str,
+        generate_secrets: bool = False,
+        **kwargs: Any,
+    ) -> str:
         base_key_name = os.path.join(config_dir_path, server_name)
 
         if generate_secrets:
@@ -300,7 +310,7 @@ class KeyConfig(Config):
 
     def read_old_signing_keys(
         self, old_signing_keys: Optional[JsonDict]
-    ) -> Dict[str, VerifyKey]:
+    ) -> Dict[str, "VerifyKeyWithExpiry"]:
         if old_signing_keys is None:
             return {}
         keys = {}
@@ -308,8 +318,8 @@ class KeyConfig(Config):
             if is_signing_algorithm_supported(key_id):
                 key_base64 = key_data["key"]
                 key_bytes = decode_base64(key_base64)
-                verify_key = decode_verify_key_bytes(key_id, key_bytes)
-                verify_key.expired_ts = key_data["expired_ts"]
+                verify_key: "VerifyKeyWithExpiry" = decode_verify_key_bytes(key_id, key_bytes)  # type: ignore[assignment]
+                verify_key.expired = key_data["expired_ts"]
                 keys[key_id] = verify_key
             else:
                 raise ConfigError(
@@ -422,7 +432,7 @@ def _parse_key_servers(
         server_name = server["server_name"]
         result = TrustedKeyServer(server_name=server_name)
 
-        verify_keys = server.get("verify_keys")
+        verify_keys: Optional[Dict[str, str]] = server.get("verify_keys")
         if verify_keys is not None:
             result.verify_keys = {}
             for key_id, key_base64 in verify_keys.items():

@@ -28,8 +28,8 @@ from tests import unittest
 SIGNING_KEY_SEED = decode_base64("YJDBA9Xnr2sVqXD9Vj7XVUnmFZcZrlw8Md7kMW+3XA1")
 
 KEY_ALG = "ed25519"
-KEY_VER = 1
-KEY_NAME = "%s:%d" % (KEY_ALG, KEY_VER)
+KEY_VER = "1"
+KEY_NAME = "%s:%s" % (KEY_ALG, KEY_VER)
 
 HOSTNAME = "domain"
 
@@ -39,7 +39,7 @@ class EventSigningTestCase(unittest.TestCase):
         # NB: `signedjson` expects `nacl.signing.SigningKey` instances which have been
         # monkeypatched to include new `alg` and `version` attributes. This is captured
         # by the `signedjson.types.SigningKey` protocol.
-        self.signing_key: signedjson.types.SigningKey = nacl.signing.SigningKey(
+        self.signing_key: signedjson.types.SigningKey = nacl.signing.SigningKey(  # type: ignore[assignment]
             SIGNING_KEY_SEED
         )
         self.signing_key.alg = KEY_ALG
@@ -63,14 +63,14 @@ class EventSigningTestCase(unittest.TestCase):
 
         self.assertTrue(hasattr(event, "hashes"))
         self.assertIn("sha256", event.hashes)
-        self.assertEquals(
+        self.assertEqual(
             event.hashes["sha256"], "6tJjLpXtggfke8UxFhAKg82QVkJzvKOVOOSjUDK4ZSI"
         )
 
         self.assertTrue(hasattr(event, "signatures"))
         self.assertIn(HOSTNAME, event.signatures)
         self.assertIn(KEY_NAME, event.signatures["domain"])
-        self.assertEquals(
+        self.assertEqual(
             event.signatures[HOSTNAME][KEY_NAME],
             "2Wptgo4CwmLo/Y8B8qinxApKaCkBG2fjTWB7AbP5Uy+"
             "aIbygsSdLOFzvdDjww8zUVKCmI02eP9xtyJxc/cLiBA",
@@ -97,14 +97,14 @@ class EventSigningTestCase(unittest.TestCase):
 
         self.assertTrue(hasattr(event, "hashes"))
         self.assertIn("sha256", event.hashes)
-        self.assertEquals(
+        self.assertEqual(
             event.hashes["sha256"], "onLKD1bGljeBWQhWZ1kaP9SorVmRQNdN5aM2JYU2n/g"
         )
 
         self.assertTrue(hasattr(event, "signatures"))
         self.assertIn(HOSTNAME, event.signatures)
         self.assertIn(KEY_NAME, event.signatures["domain"])
-        self.assertEquals(
+        self.assertEqual(
             event.signatures[HOSTNAME][KEY_NAME],
             "Wm+VzmOUOz08Ds+0NTWb1d4CZrVsJSikkeRxh6aCcUw"
             "u6pNC78FunoD7KNWzqFn241eYHYMGCA5McEiVPdhzBA",

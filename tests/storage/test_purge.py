@@ -30,7 +30,7 @@ class PurgeTests(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.room_id = self.helper.create_room_as(self.user_id)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = self.hs.get_storage()
 
     def test_purge_history(self):
@@ -47,7 +47,7 @@ class PurgeTests(HomeserverTestCase):
         token = self.get_success(
             self.store.get_topological_token_for_event(last["event_id"])
         )
-        token_str = self.get_success(token.to_string(self.hs.get_datastore()))
+        token_str = self.get_success(token.to_string(self.hs.get_datastores().main))
 
         # Purge everything before this topological token
         self.get_success(

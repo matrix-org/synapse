@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+import typing
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from canonicaljson import encode_canonical_json
@@ -34,15 +35,18 @@ from synapse.api.room_versions import (
     EventFormatVersions,
     RoomVersion,
 )
-from synapse.events import EventBase
-from synapse.events.builder import EventBuilder
 from synapse.types import StateMap, UserID, get_domain_from_id
+
+if typing.TYPE_CHECKING:
+    # conditional imports to avoid import cycle
+    from synapse.events import EventBase
+    from synapse.events.builder import EventBuilder
 
 logger = logging.getLogger(__name__)
 
 
 def validate_event_for_room_version(
-    room_version_obj: RoomVersion, event: EventBase
+    room_version_obj: RoomVersion, event: "EventBase"
 ) -> None:
     """Ensure that the event complies with the limits, and has the right signatures
 
@@ -113,7 +117,9 @@ def validate_event_for_room_version(
 
 
 def check_auth_rules_for_event(
-    room_version_obj: RoomVersion, event: EventBase, auth_events: Iterable[EventBase]
+    room_version_obj: RoomVersion,
+    event: "EventBase",
+    auth_events: Iterable["EventBase"],
 ) -> None:
     """Check that an event complies with the auth rules
 
@@ -272,7 +278,7 @@ def check_auth_rules_for_event(
     logger.debug("Allowing! %s", event)
 
 
-def _check_size_limits(event: EventBase) -> None:
+def _check_size_limits(event: "EventBase") -> None:
     if len(event.user_id) > 255:
         raise EventSizeError("'user_id' too large")
     if len(event.room_id) > 255:
@@ -287,7 +293,7 @@ def _check_size_limits(event: EventBase) -> None:
         raise EventSizeError("event too large")
 
 
-def _can_federate(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
+def _can_federate(event: "EventBase", auth_events: StateMap["EventBase"]) -> bool:
     creation_event = auth_events.get((EventTypes.Create, ""))
     # There should always be a creation event, but if not don't federate.
     if not creation_event:
@@ -297,7 +303,7 @@ def _can_federate(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
 
 
 def _is_membership_change_allowed(
-    room_version: RoomVersion, event: EventBase, auth_events: StateMap[EventBase]
+    room_version: RoomVersion, event: "EventBase", auth_events: StateMap["EventBase"]
 ) -> None:
     """
     Confirms that the event which changes membership is an allowed change.
@@ -384,9 +390,9 @@ def _is_membership_change_allowed(
         return
 
     # Require the user to be in the room for membership changes other than join/knock.
-    if Membership.JOIN != membership and (
-        RoomVersion.msc2403_knocking and Membership.KNOCK != membership
-    ):
+    # Note that the room version check for knocking is done implicitly by `caller_knocked`
+    # and the ability to set a membership of `knock` in the first place.
+    if Membership.JOIN != membership and Membership.KNOCK != membership:
         # If the user has been invited or has knocked, they are allowed to change their
         # membership event to leave
         if (
@@ -424,7 +430,12 @@ def _is_membership_change_allowed(
             raise AuthError(403, "You are banned from this room")
         elif join_rule == JoinRules.PUBLIC:
             pass
-        elif room_version.msc3083_join_rules and join_rule == JoinRules.RESTRICTED:
+        elif (
+            room_version.msc3083_join_rules and join_rule == JoinRules.RESTRICTED
+        ) or (
+            room_version.msc3787_knock_restricted_join_rule
+            and join_rule == JoinRules.KNOCK_RESTRICTED
+        ):
             # This is the same as public, but the event must contain a reference
             # to the server who authorised the join. If the event does not contain
             # the proper content it is rejected.
@@ -450,8 +461,13 @@ def _is_membership_change_allowed(
                 if authorising_user_level < invite_level:
                     raise AuthError(403, "Join event authorised by invalid server.")
 
-        elif join_rule == JoinRules.INVITE or (
-            room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
+        elif (
+            join_rule == JoinRules.INVITE
+            or (room_version.msc2403_knocking and join_rule == JoinRules.KNOCK)
+            or (
+                room_version.msc3787_knock_restricted_join_rule
+                and join_rule == JoinRules.KNOCK_RESTRICTED
+            )
         ):
             if not caller_in_room and not caller_invited:
                 raise AuthError(403, "You are not invited to this room.")
@@ -472,7 +488,10 @@ def _is_membership_change_allowed(
         if user_level < ban_level or user_level <= target_level:
             raise AuthError(403, "You don't have permission to ban")
     elif room_version.msc2403_knocking and Membership.KNOCK == membership:
-        if join_rule != JoinRules.KNOCK:
+        if join_rule != JoinRules.KNOCK and (
+            not room_version.msc3787_knock_restricted_join_rule
+            or join_rule != JoinRules.KNOCK_RESTRICTED
+        ):
             raise AuthError(403, "You don't have permission to knock")
         elif target_user_id != event.user_id:
             raise AuthError(403, "You cannot knock for other users")
@@ -487,7 +506,7 @@ def _is_membership_change_allowed(
 
 
 def _check_event_sender_in_room(
-    event: EventBase, auth_events: StateMap[EventBase]
+    event: "EventBase", auth_events: StateMap["EventBase"]
 ) -> None:
     key = (EventTypes.Member, event.user_id)
     member_event = auth_events.get(key)
@@ -495,7 +514,9 @@ def _check_event_sender_in_room(
     _check_joined_room(member_event, event.user_id, event.room_id)
 
 
-def _check_joined_room(member: Optional[EventBase], user_id: str, room_id: str) -> None:
+def _check_joined_room(
+    member: Optional["EventBase"], user_id: str, room_id: str
+) -> None:
     if not member or member.membership != Membership.JOIN:
         raise AuthError(
             403, "User %s not in room %s (%s)" % (user_id, room_id, repr(member))
@@ -503,7 +524,7 @@ def _check_joined_room(member: Optional[EventBase], user_id: str, room_id: str) 
 
 
 def get_send_level(
-    etype: str, state_key: Optional[str], power_levels_event: Optional[EventBase]
+    etype: str, state_key: Optional[str], power_levels_event: Optional["EventBase"]
 ) -> int:
     """Get the power level required to send an event of a given type
 
@@ -539,7 +560,7 @@ def get_send_level(
     return int(send_level)
 
 
-def _can_send_event(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
+def _can_send_event(event: "EventBase", auth_events: StateMap["EventBase"]) -> bool:
     power_levels_event = get_power_level_event(auth_events)
 
     send_level = get_send_level(event.type, event.get("state_key"), power_levels_event)
@@ -563,8 +584,8 @@ def _can_send_event(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
 
 def check_redaction(
     room_version_obj: RoomVersion,
-    event: EventBase,
-    auth_events: StateMap[EventBase],
+    event: "EventBase",
+    auth_events: StateMap["EventBase"],
 ) -> bool:
     """Check whether the event sender is allowed to redact the target event.
 
@@ -601,8 +622,8 @@ def check_redaction(
 
 def check_historical(
     room_version_obj: RoomVersion,
-    event: EventBase,
-    auth_events: StateMap[EventBase],
+    event: "EventBase",
+    auth_events: StateMap["EventBase"],
 ) -> None:
     """Check whether the event sender is allowed to send historical related
     events like "insertion", "batch", and "marker".
@@ -632,8 +653,8 @@ def check_historical(
 
 def _check_power_levels(
     room_version_obj: RoomVersion,
-    event: EventBase,
-    auth_events: StateMap[EventBase],
+    event: "EventBase",
+    auth_events: StateMap["EventBase"],
 ) -> None:
     user_list = event.content.get("users", {})
     # Validate users
@@ -726,11 +747,11 @@ def _check_power_levels(
             )
 
 
-def get_power_level_event(auth_events: StateMap[EventBase]) -> Optional[EventBase]:
+def get_power_level_event(auth_events: StateMap["EventBase"]) -> Optional["EventBase"]:
     return auth_events.get((EventTypes.PowerLevels, ""))
 
 
-def get_user_power_level(user_id: str, auth_events: StateMap[EventBase]) -> int:
+def get_user_power_level(user_id: str, auth_events: StateMap["EventBase"]) -> int:
     """Get a user's power level
 
     Args:
@@ -766,7 +787,7 @@ def get_user_power_level(user_id: str, auth_events: StateMap[EventBase]) -> int:
             return 0
 
 
-def get_named_level(auth_events: StateMap[EventBase], name: str, default: int) -> int:
+def get_named_level(auth_events: StateMap["EventBase"], name: str, default: int) -> int:
     power_level_event = get_power_level_event(auth_events)
 
     if not power_level_event:
@@ -779,7 +800,9 @@ def get_named_level(auth_events: StateMap[EventBase], name: str, default: int) -
         return default
 
 
-def _verify_third_party_invite(event: EventBase, auth_events: StateMap[EventBase]):
+def _verify_third_party_invite(
+    event: "EventBase", auth_events: StateMap["EventBase"]
+) -> bool:
     """
     Validates that the invite event is authorized by a previous third-party invite.
 
@@ -843,7 +866,7 @@ def _verify_third_party_invite(event: EventBase, auth_events: StateMap[EventBase
     return False
 
 
-def get_public_keys(invite_event: EventBase) -> List[Dict[str, Any]]:
+def get_public_keys(invite_event: "EventBase") -> List[Dict[str, Any]]:
     public_keys = []
     if "public_key" in invite_event.content:
         o = {"public_key": invite_event.content["public_key"]}
@@ -855,7 +878,7 @@ def get_public_keys(invite_event: EventBase) -> List[Dict[str, Any]]:
 
 
 def auth_types_for_event(
-    room_version: RoomVersion, event: Union[EventBase, EventBuilder]
+    room_version: RoomVersion, event: Union["EventBase", "EventBuilder"]
 ) -> Set[Tuple[str, str]]:
     """Given an event, return a list of (EventType, StateKey) that may be
     needed to auth the event. The returned list may be a superset of what

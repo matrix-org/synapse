@@ -21,7 +21,7 @@ from tests import unittest
 
 class IgnoredUsersTestCase(unittest.HomeserverTestCase):
     def prepare(self, hs, reactor, clock):
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.user = "@user:test"
 
     def _update_ignore_list(
@@ -47,9 +47,18 @@ class IgnoredUsersTestCase(unittest.HomeserverTestCase):
             expected_ignorer_user_ids,
         )
 
+    def assert_ignored(
+        self, ignorer_user_id: str, expected_ignored_user_ids: Set[str]
+    ) -> None:
+        self.assertEqual(
+            self.get_success(self.store.ignored_users(ignorer_user_id)),
+            expected_ignored_user_ids,
+        )
+
     def test_ignoring_users(self):
         """Basic adding/removing of users from the ignore list."""
         self._update_ignore_list("@other:test", "@another:remote")
+        self.assert_ignored(self.user, {"@other:test", "@another:remote"})
 
         # Check a user which no one ignores.
         self.assert_ignorers("@user:test", set())
@@ -62,6 +71,7 @@ class IgnoredUsersTestCase(unittest.HomeserverTestCase):
 
         # Add one user, remove one user, and leave one user.
         self._update_ignore_list("@foo:test", "@another:remote")
+        self.assert_ignored(self.user, {"@foo:test", "@another:remote"})
 
         # Check the removed user.
         self.assert_ignorers("@other:test", set())
@@ -76,20 +86,24 @@ class IgnoredUsersTestCase(unittest.HomeserverTestCase):
         """Ensure that caching works properly between different users."""
         # The first user ignores a user.
         self._update_ignore_list("@other:test")
+        self.assert_ignored(self.user, {"@other:test"})
         self.assert_ignorers("@other:test", {self.user})
 
         # The second user ignores them.
         self._update_ignore_list("@other:test", ignorer_user_id="@second:test")
+        self.assert_ignored("@second:test", {"@other:test"})
         self.assert_ignorers("@other:test", {self.user, "@second:test"})
 
         # The first user un-ignores them.
         self._update_ignore_list()
+        self.assert_ignored(self.user, set())
         self.assert_ignorers("@other:test", {"@second:test"})
 
     def test_invalid_data(self):
         """Invalid data ends up clearing out the ignored users list."""
         # Add some data and ensure it is there.
         self._update_ignore_list("@other:test")
+        self.assert_ignored(self.user, {"@other:test"})
         self.assert_ignorers("@other:test", {self.user})
 
         # No ignored_users key.
@@ -102,10 +116,12 @@ class IgnoredUsersTestCase(unittest.HomeserverTestCase):
         )
 
         # No one ignores the user now.
+        self.assert_ignored(self.user, set())
         self.assert_ignorers("@other:test", set())
 
         # Add some data and ensure it is there.
         self._update_ignore_list("@other:test")
+        self.assert_ignored(self.user, {"@other:test"})
         self.assert_ignorers("@other:test", {self.user})
 
         # Invalid data.
@@ -118,4 +134,5 @@ class IgnoredUsersTestCase(unittest.HomeserverTestCase):
         )
 
         # No one ignores the user now.
+        self.assert_ignored(self.user, set())
         self.assert_ignorers("@other:test", set())

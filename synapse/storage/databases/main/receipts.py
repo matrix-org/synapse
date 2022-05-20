@@ -22,11 +22,9 @@ from typing import (
     Iterable,
     List,
     Optional,
-    Set,
     Tuple,
+    cast,
 )
-
-from twisted.internet import defer
 
 from synapse.api.constants import ReceiptTypes
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
@@ -38,7 +36,11 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.engines import PostgresEngine
-from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
+from synapse.storage.util.id_generators import (
+    AbstractStreamIdTracker,
+    MultiWriterIdGenerator,
+    StreamIdGenerator,
+)
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
@@ -58,6 +60,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         hs: "HomeServer",
     ):
         self._instance_name = hs.get_instance_name()
+        self._receipts_id_gen: AbstractStreamIdTracker
 
         if isinstance(database.engine, PostgresEngine):
             self._can_write_to_receipts = (
@@ -94,62 +97,158 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         super().__init__(database, db_conn, hs)
 
+        max_receipts_stream_id = self.get_max_receipt_stream_id()
+        receipts_stream_prefill, min_receipts_stream_id = self.db_pool.get_cache_dict(
+            db_conn,
+            "receipts_linearized",
+            entity_column="room_id",
+            stream_column="stream_id",
+            max_value=max_receipts_stream_id,
+            limit=10000,
+        )
         self._receipts_stream_cache = StreamChangeCache(
-            "ReceiptsRoomChangeCache", self.get_max_receipt_stream_id()
+            "ReceiptsRoomChangeCache",
+            min_receipts_stream_id,
+            prefilled_cache=receipts_stream_prefill,
         )
 
     def get_max_receipt_stream_id(self) -> int:
         """Get the current max stream ID for receipts stream"""
         return self._receipts_id_gen.get_current_token()
 
-    @cached()
-    async def get_users_with_read_receipts_in_room(self, room_id: str) -> Set[str]:
-        receipts = await self.get_receipts_for_room(room_id, ReceiptTypes.READ)
-        return {r["user_id"] for r in receipts}
-
-    @cached(num_args=2)
-    async def get_receipts_for_room(
-        self, room_id: str, receipt_type: str
-    ) -> List[Dict[str, Any]]:
-        return await self.db_pool.simple_select_list(
-            table="receipts_linearized",
-            keyvalues={"room_id": room_id, "receipt_type": receipt_type},
-            retcols=("user_id", "event_id"),
-            desc="get_receipts_for_room",
-        )
-
-    @cached(num_args=3)
     async def get_last_receipt_event_id_for_user(
-        self, user_id: str, room_id: str, receipt_type: str
+        self, user_id: str, room_id: str, receipt_types: Iterable[str]
     ) -> Optional[str]:
-        return await self.db_pool.simple_select_one_onecol(
-            table="receipts_linearized",
-            keyvalues={
-                "room_id": room_id,
-                "receipt_type": receipt_type,
-                "user_id": user_id,
-            },
-            retcol="event_id",
-            desc="get_own_receipt_for_user",
-            allow_none=True,
-        )
+        """
+        Fetch the event ID for the latest receipt in a room with one of the given receipt types.
 
-    @cached(num_args=2)
+        Args:
+            user_id: The user to fetch receipts for.
+            room_id: The room ID to fetch the receipt for.
+            receipt_type: The receipt types to fetch. Earlier receipt types
+                are given priority if multiple receipts point to the same event.
+
+        Returns:
+            The latest receipt, if one exists.
+        """
+        latest_event_id: Optional[str] = None
+        latest_stream_ordering = 0
+        for receipt_type in receipt_types:
+            result = await self._get_last_receipt_event_id_for_user(
+                user_id, room_id, receipt_type
+            )
+            if result is None:
+                continue
+            event_id, stream_ordering = result
+
+            if latest_event_id is None or latest_stream_ordering < stream_ordering:
+                latest_event_id = event_id
+                latest_stream_ordering = stream_ordering
+
+        return latest_event_id
+
+    @cached()
+    async def _get_last_receipt_event_id_for_user(
+        self, user_id: str, room_id: str, receipt_type: str
+    ) -> Optional[Tuple[str, int]]:
+        """
+        Fetch the event ID and stream ordering for the latest receipt.
+
+        Args:
+            user_id: The user to fetch receipts for.
+            room_id: The room ID to fetch the receipt for.
+            receipt_type: The receipt type to fetch.
+
+        Returns:
+            The event ID and stream ordering of the latest receipt, if one exists;
+            otherwise `None`.
+        """
+        sql = """
+            SELECT event_id, stream_ordering
+            FROM receipts_linearized
+            INNER JOIN events USING (room_id, event_id)
+            WHERE user_id = ?
+            AND room_id = ?
+            AND receipt_type = ?
+        """
+
+        def f(txn: LoggingTransaction) -> Optional[Tuple[str, int]]:
+            txn.execute(sql, (user_id, room_id, receipt_type))
+            return cast(Optional[Tuple[str, int]], txn.fetchone())
+
+        return await self.db_pool.runInteraction("get_own_receipt_for_user", f)
+
     async def get_receipts_for_user(
-        self, user_id: str, receipt_type: str
+        self, user_id: str, receipt_types: Iterable[str]
     ) -> Dict[str, str]:
-        rows = await self.db_pool.simple_select_list(
-            table="receipts_linearized",
-            keyvalues={"user_id": user_id, "receipt_type": receipt_type},
-            retcols=("room_id", "event_id"),
-            desc="get_receipts_for_user",
+        """
+        Fetch the event IDs for the latest receipts sent by the given user.
+
+        Args:
+            user_id: The user to fetch receipts for.
+            receipt_types: The receipt types to check.
+
+        Returns:
+            A map of room ID to the event ID of the latest receipt for that room.
+
+            If the user has not sent a receipt to a room then it will not appear
+            in the returned dictionary.
+        """
+        results = await self.get_receipts_for_user_with_orderings(
+            user_id, receipt_types
         )
 
-        return {row["room_id"]: row["event_id"] for row in rows}
+        # Reduce the result to room ID -> event ID.
+        return {
+            room_id: room_result["event_id"] for room_id, room_result in results.items()
+        }
 
     async def get_receipts_for_user_with_orderings(
+        self, user_id: str, receipt_types: Iterable[str]
+    ) -> JsonDict:
+        """
+        Fetch receipts for all rooms that the given user is joined to.
+
+        Args:
+            user_id: The user to fetch receipts for.
+            receipt_types: The receipt types to fetch. Earlier receipt types
+                are given priority if multiple receipts point to the same event.
+
+        Returns:
+            A map of room ID to the latest receipt (for the given types).
+        """
+        results: JsonDict = {}
+        for receipt_type in receipt_types:
+            partial_result = await self._get_receipts_for_user_with_orderings(
+                user_id, receipt_type
+            )
+            for room_id, room_result in partial_result.items():
+                # If the room has not yet been seen, or the receipt is newer,
+                # use it.
+                if (
+                    room_id not in results
+                    or results[room_id]["stream_ordering"]
+                    < room_result["stream_ordering"]
+                ):
+                    results[room_id] = room_result
+
+        return results
+
+    @cached()
+    async def _get_receipts_for_user_with_orderings(
         self, user_id: str, receipt_type: str
     ) -> JsonDict:
+        """
+        Fetch receipts for all rooms that the given user is joined to.
+
+        Args:
+            user_id: The user to fetch receipts for.
+            receipt_type: The receipt type to fetch.
+
+        Returns:
+            A map of room ID to the latest receipt information.
+        """
+
         def f(txn: LoggingTransaction) -> List[Tuple[str, str, int, int]]:
             sql = (
                 "SELECT rl.room_id, rl.event_id,"
@@ -159,9 +258,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 " WHERE rl.room_id = e.room_id"
                 " AND rl.event_id = e.event_id"
                 " AND user_id = ?"
+                " AND receipt_type = ?"
             )
-            txn.execute(sql, (user_id,))
-            return txn.fetchall()
+            txn.execute(sql, (user_id, receipt_type))
+            return cast(List[Tuple[str, str, int, int]], txn.fetchall())
 
         rows = await self.db_pool.runInteraction(
             "get_receipts_for_user_with_orderings", f
@@ -226,7 +326,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         return await self._get_linearized_receipts_for_room(room_id, to_key, from_key)
 
-    @cached(num_args=3, tree=True)
+    @cached(tree=True)
     async def _get_linearized_receipts_for_room(
         self, room_id: str, to_key: int, from_key: Optional[int] = None
     ) -> List[JsonDict]:
@@ -257,7 +357,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         if not rows:
             return []
 
-        content = {}
+        content: JsonDict = {}
         for row in rows:
             content.setdefault(row["event_id"], {}).setdefault(row["receipt_type"], {})[
                 row["user_id"]
@@ -305,7 +405,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             "_get_linearized_receipts_for_rooms", f
         )
 
-        results = {}
+        results: JsonDict = {}
         for row in txn_results:
             # We want a single event per room, since we want to batch the
             # receipts by room, event and type.
@@ -370,7 +470,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             "get_linearized_receipts_for_all_rooms", f
         )
 
-        results = {}
+        results: JsonDict = {}
         for row in txn_results:
             # We want a single event per room, since we want to batch the
             # receipts by room, event and type.
@@ -399,7 +499,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         """
 
         if last_id == current_id:
-            return defer.succeed([])
+            return []
 
         def _get_users_sent_receipts_between_txn(txn: LoggingTransaction) -> List[str]:
             sql = """
@@ -453,7 +553,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
             """
             txn.execute(sql, (last_id, current_id, limit))
 
-            updates = [(r[0], r[1:5] + (db_to_json(r[5]),)) for r in txn]
+            updates = cast(
+                List[Tuple[int, list]],
+                [(r[0], r[1:5] + (db_to_json(r[5]),)) for r in txn],
+            )
 
             limited = False
             upper_bound = current_id
@@ -468,35 +571,22 @@ class ReceiptsWorkerStore(SQLBaseStore):
             "get_all_updated_receipts", get_all_updated_receipts_txn
         )
 
-    def _invalidate_get_users_with_receipts_in_room(
-        self, room_id: str, receipt_type: str, user_id: str
-    ) -> None:
-        if receipt_type != ReceiptTypes.READ:
-            return
-
-        res = self.get_users_with_read_receipts_in_room.cache.get_immediate(
-            room_id, None, update_metrics=False
-        )
-
-        if res and user_id in res:
-            # We'd only be adding to the set, so no point invalidating if the
-            # user is already there
-            return
-
-        self.get_users_with_read_receipts_in_room.invalidate((room_id,))
-
     def invalidate_caches_for_receipt(
         self, room_id: str, receipt_type: str, user_id: str
     ) -> None:
-        self.get_receipts_for_user.invalidate((user_id, receipt_type))
+        self._get_receipts_for_user_with_orderings.invalidate((user_id, receipt_type))
         self._get_linearized_receipts_for_room.invalidate((room_id,))
-        self.get_last_receipt_event_id_for_user.invalidate(
+        self._get_last_receipt_event_id_for_user.invalidate(
             (user_id, room_id, receipt_type)
         )
-        self._invalidate_get_users_with_receipts_in_room(room_id, receipt_type, user_id)
-        self.get_receipts_for_room.invalidate((room_id, receipt_type))
 
-    def process_replication_rows(self, stream_name, instance_name, token, rows):
+    def process_replication_rows(
+        self,
+        stream_name: str,
+        instance_name: str,
+        token: int,
+        rows: Iterable[Any],
+    ) -> None:
         if stream_name == ReceiptsStream.NAME:
             self._receipts_id_gen.advance(instance_name, token)
             for row in rows:
@@ -517,11 +607,11 @@ class ReceiptsWorkerStore(SQLBaseStore):
         data: JsonDict,
         stream_id: int,
     ) -> Optional[int]:
-        """Inserts a read-receipt into the database if it's newer than the current RR
+        """Inserts a receipt into the database if it's newer than the current one.
 
         Returns:
-            None if the RR is older than the current RR
-            otherwise, the rx timestamp of the event that the RR corresponds to
+            None if the receipt is older than the current receipt
+            otherwise, the rx timestamp of the event that the receipt corresponds to
                 (or 0 if the event is unknown)
         """
         assert self._can_write_to_receipts
@@ -542,7 +632,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         if stream_ordering is not None:
             sql = (
                 "SELECT stream_ordering, event_id FROM events"
-                " INNER JOIN receipts_linearized as r USING (event_id, room_id)"
+                " INNER JOIN receipts_linearized AS r USING (event_id, room_id)"
                 " WHERE r.room_id = ? AND r.receipt_type = ? AND r.user_id = ?"
             )
             txn.execute(sql, (room_id, receipt_type, user_id))
@@ -583,8 +673,11 @@ class ReceiptsWorkerStore(SQLBaseStore):
             lock=False,
         )
 
-        if receipt_type == ReceiptTypes.READ and stream_ordering is not None:
-            self._remove_old_push_actions_before_txn(
+        if (
+            receipt_type in (ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE)
+            and stream_ordering is not None
+        ):
+            self._remove_old_push_actions_before_txn(  # type: ignore[attr-defined]
                 txn, room_id=room_id, user_id=user_id, stream_ordering=stream_ordering
             )
 
@@ -602,6 +695,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         Automatically does conversion between linearized and graph
         representations.
+
+        Returns:
+            The new receipts stream ID and token, if the receipt is newer than
+            what was previously persisted. None, otherwise.
         """
         assert self._can_write_to_receipts
 
@@ -637,7 +734,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 "insert_receipt_conv", graph_to_linear
             )
 
-        async with self._receipts_id_gen.get_next() as stream_id:
+        async with self._receipts_id_gen.get_next() as stream_id:  # type: ignore[attr-defined]
             event_ts = await self.db_pool.runInteraction(
                 "insert_linearized_receipt",
                 self.insert_linearized_receipt_txn,
@@ -649,6 +746,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 stream_id=stream_id,
             )
 
+        # If the receipt was older than the currently persisted one, nothing to do.
         if event_ts is None:
             return None
 
@@ -697,14 +795,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
     ) -> None:
         assert self._can_write_to_receipts
 
-        txn.call_after(self.get_receipts_for_room.invalidate, (room_id, receipt_type))
         txn.call_after(
-            self._invalidate_get_users_with_receipts_in_room,
-            room_id,
-            receipt_type,
-            user_id,
+            self._get_receipts_for_user_with_orderings.invalidate,
+            (user_id, receipt_type),
         )
-        txn.call_after(self.get_receipts_for_user.invalidate, (user_id, receipt_type))
         # FIXME: This shouldn't invalidate the whole cache
         txn.call_after(self._get_linearized_receipts_for_room.invalidate, (room_id,))
 

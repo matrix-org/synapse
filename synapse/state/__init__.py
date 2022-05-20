@@ -126,10 +126,11 @@ class StateHandler:
 
     def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state_store = hs.get_storage().state
         self.hs = hs
         self._state_resolution_handler = hs.get_state_resolution_handler()
+        self._storage = hs.get_storage()
 
     @overload
     async def get_current_state(
@@ -194,7 +195,7 @@ class StateHandler:
         }
 
     async def get_current_state_ids(
-        self, room_id: str, latest_event_ids: Optional[Iterable[str]] = None
+        self, room_id: str, latest_event_ids: Optional[Collection[str]] = None
     ) -> StateMap[str]:
         """Get the current state, or the state at a set of events, for a room
 
@@ -238,13 +239,13 @@ class StateHandler:
         entry = await self.resolve_state_groups_for_events(room_id, latest_event_ids)
         return await self.store.get_joined_users_from_state(room_id, entry)
 
-    async def get_current_hosts_in_room(self, room_id: str) -> Set[str]:
+    async def get_current_hosts_in_room(self, room_id: str) -> FrozenSet[str]:
         event_ids = await self.store.get_latest_event_ids_in_room(room_id)
         return await self.get_hosts_in_room_at_events(room_id, event_ids)
 
     async def get_hosts_in_room_at_events(
-        self, room_id: str, event_ids: Iterable[str]
-    ) -> Set[str]:
+        self, room_id: str, event_ids: Collection[str]
+    ) -> FrozenSet[str]:
         """Get the hosts that were in a room at the given event ids
 
         Args:
@@ -258,7 +259,10 @@ class StateHandler:
         return await self.store.get_joined_hosts(room_id, entry)
 
     async def compute_event_context(
-        self, event: EventBase, old_state: Optional[Iterable[EventBase]] = None
+        self,
+        event: EventBase,
+        old_state: Optional[Iterable[EventBase]] = None,
+        partial_state: bool = False,
     ) -> EventContext:
         """Build an EventContext structure for a non-outlier event.
 
@@ -273,6 +277,8 @@ class StateHandler:
                 calculated from existing events. This is normally only specified
                 when receiving an event from federation where we don't have the
                 prev events for, e.g. when backfilling.
+            partial_state: True if `old_state` is partial and omits non-critical
+                membership events
         Returns:
             The event context.
         """
@@ -282,7 +288,6 @@ class StateHandler:
         #
         # first of all, figure out the state before the event
         #
-
         if old_state:
             # if we're given the state before the event, then we use that
             state_ids_before_event: StateMap[str] = {
@@ -295,8 +300,28 @@ class StateHandler:
 
         else:
             # otherwise, we'll need to resolve the state across the prev_events.
-            logger.debug("calling resolve_state_groups from compute_event_context")
 
+            # partial_state should not be set explicitly in this case:
+            # we work it out dynamically
+            assert not partial_state
+
+            # if any of the prev-events have partial state, so do we.
+            # (This is slightly racy - the prev-events might get fixed up before we use
+            # their states - but I don't think that really matters; it just means we
+            # might redundantly recalculate the state for this event later.)
+            prev_event_ids = event.prev_event_ids()
+            incomplete_prev_events = await self.store.get_partial_state_events(
+                prev_event_ids
+            )
+            if any(incomplete_prev_events.values()):
+                logger.debug(
+                    "New/incoming event %s refers to prev_events %s with partial state",
+                    event.event_id,
+                    [k for (k, v) in incomplete_prev_events.items() if v],
+                )
+                partial_state = True
+
+            logger.debug("calling resolve_state_groups from compute_event_context")
             entry = await self.resolve_state_groups_for_events(
                 event.room_id, event.prev_event_ids()
             )
@@ -336,12 +361,13 @@ class StateHandler:
 
         if not event.is_state():
             return EventContext.with_state(
+                storage=self._storage,
                 state_group_before_event=state_group_before_event,
                 state_group=state_group_before_event,
-                current_state_ids=state_ids_before_event,
-                prev_state_ids=state_ids_before_event,
+                state_delta_due_to_event={},
                 prev_group=state_group_before_event_prev_group,
                 delta_ids=deltas_to_state_group_before_event,
+                partial_state=partial_state,
             )
 
         #
@@ -367,17 +393,18 @@ class StateHandler:
         )
 
         return EventContext.with_state(
+            storage=self._storage,
             state_group=state_group_after_event,
             state_group_before_event=state_group_before_event,
-            current_state_ids=state_ids_after_event,
-            prev_state_ids=state_ids_before_event,
+            state_delta_due_to_event=delta_ids,
             prev_group=state_group_before_event,
             delta_ids=delta_ids,
+            partial_state=partial_state,
         )
 
     @measure_func()
     async def resolve_state_groups_for_events(
-        self, room_id: str, event_ids: Iterable[str]
+        self, room_id: str, event_ids: Collection[str]
     ) -> _StateCacheEntry:
         """Given a list of event_ids this method fetches the state at each
         event, resolves conflicts between them and returns them.
@@ -391,33 +418,37 @@ class StateHandler:
         """
         logger.debug("resolve_state_groups event_ids %s", event_ids)
 
-        # map from state group id to the state in that state group (where
-        # 'state' is a map from state key to event id)
-        # dict[int, dict[(str, str), str]]
-        state_groups_ids = await self.state_store.get_state_groups_ids(
-            room_id, event_ids
-        )
+        state_groups = await self.state_store.get_state_group_for_events(event_ids)
 
-        if len(state_groups_ids) == 0:
-            return _StateCacheEntry(state={}, state_group=None)
-        elif len(state_groups_ids) == 1:
-            name, state_list = list(state_groups_ids.items()).pop()
+        state_group_ids = state_groups.values()
 
-            prev_group, delta_ids = await self.state_store.get_state_group_delta(name)
-
+        # check if each event has same state group id, if so there's no state to resolve
+        state_group_ids_set = set(state_group_ids)
+        if len(state_group_ids_set) == 1:
+            (state_group_id,) = state_group_ids_set
+            state = await self.state_store.get_state_for_groups(state_group_ids_set)
+            prev_group, delta_ids = await self.state_store.get_state_group_delta(
+                state_group_id
+            )
             return _StateCacheEntry(
-                state=state_list,
-                state_group=name,
+                state=state[state_group_id],
+                state_group=state_group_id,
                 prev_group=prev_group,
                 delta_ids=delta_ids,
             )
+        elif len(state_group_ids_set) == 0:
+            return _StateCacheEntry(state={}, state_group=None)
 
         room_version = await self.store.get_room_version_id(room_id)
+
+        state_to_resolve = await self.state_store.get_state_for_groups(
+            state_group_ids_set
+        )
 
         result = await self._state_resolution_handler.resolve_state_groups(
             room_id,
             room_version,
-            state_groups_ids,
+            state_to_resolve,
             None,
             state_res_store=StateResolutionStore(self.store),
         )
@@ -546,7 +577,7 @@ class StateResolutionHandler:
         """
         group_names = frozenset(state_groups_ids.keys())
 
-        with (await self.resolve_linearizer.queue(group_names)):
+        async with self.resolve_linearizer.queue(group_names):
             cache = self._state_cache.get(group_names, None)
             if cache:
                 return cache
@@ -773,7 +804,7 @@ class StateResolutionStore:
 
         return self.store.get_events(
             event_ids,
-            redact_behaviour=EventRedactBehaviour.AS_IS,
+            redact_behaviour=EventRedactBehaviour.as_is,
             get_prev_content=False,
             allow_rejected=allow_rejected,
         )

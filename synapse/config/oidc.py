@@ -20,11 +20,11 @@ import attr
 
 from synapse.config._util import validate_config
 from synapse.config.sso import SsoAttributeRequirement
-from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.types import JsonDict
 from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_mxc_uri
 
+from ..util.check_dependencies import DependencyException, check_requirements
 from ._base import Config, ConfigError, read_file
 
 DEFAULT_USER_MAPPING_PROVIDER = "synapse.handlers.oidc.JinjaOidcMappingProvider"
@@ -36,7 +36,7 @@ LEGACY_USER_MAPPING_PROVIDER = "synapse.handlers.oidc_handler.JinjaOidcMappingPr
 class OIDCConfig(Config):
     section = "oidc"
 
-    def read_config(self, config, **kwargs) -> None:
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.oidc_providers = tuple(_parse_oidc_provider_configs(config))
         if not self.oidc_providers:
             return
@@ -66,7 +66,7 @@ class OIDCConfig(Config):
         # OIDC is enabled if we have a provider
         return bool(self.oidc_providers)
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs) -> str:
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         # List of OpenID Connect (OIDC) / OAuth 2.0 identity providers, for registration
         # and login.
@@ -182,8 +182,14 @@ class OIDCConfig(Config):
         #
         #             localpart_template: Jinja2 template for the localpart of the MXID.
         #                 If this is not set, the user will be prompted to choose their
-        #                 own username (see 'sso_auth_account_details.html' in the 'sso'
-        #                 section of this file).
+        #                 own username (see the documentation for the
+        #                 'sso_auth_account_details.html' template). This template can
+        #                 use the 'localpart_from_email' filter.
+        #
+        #             confirm_localpart: Whether to prompt the user to validate (or
+        #                 change) the generated localpart (see the documentation for the
+        #                 'sso_auth_account_details.html' template), instead of
+        #                 registering the account right away.
         #
         #             display_name_template: Jinja2 template for the display name to set
         #                 on first login. If unset, no displayname will be set.

@@ -30,8 +30,8 @@ class BaseSlavedStoreTestCase(BaseStreamTestCase):
 
         self.reconnect()
 
-        self.master_store = hs.get_datastore()
-        self.slaved_store = self.worker_hs.get_datastore()
+        self.master_store = hs.get_datastores().main
+        self.slaved_store = self.worker_hs.get_datastores().main
         self.storage = hs.get_storage()
 
     def replicate(self):

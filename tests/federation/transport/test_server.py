@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from tests import unittest
-from tests.unittest import override_config
+from tests.unittest import DEBUG, override_config
 
 
 class RoomDirectoryFederationTests(unittest.FederatingHomeserverTestCase):
@@ -22,21 +22,37 @@ class RoomDirectoryFederationTests(unittest.FederatingHomeserverTestCase):
         """Test that unauthenticated requests to the public rooms directory 403 when
         allow_public_rooms_over_federation is False.
         """
-        channel = self.make_request(
+        channel = self.make_signed_federation_request(
             "GET",
             "/_matrix/federation/v1/publicRooms",
-            federation_auth_origin=b"example.com",
         )
-        self.assertEquals(403, channel.code)
+        self.assertEqual(403, channel.code)
 
     @override_config({"allow_public_rooms_over_federation": True})
     def test_open_public_room_list_over_federation(self):
         """Test that unauthenticated requests to the public rooms directory 200 when
         allow_public_rooms_over_federation is True.
         """
-        channel = self.make_request(
+        channel = self.make_signed_federation_request(
             "GET",
             "/_matrix/federation/v1/publicRooms",
-            federation_auth_origin=b"example.com",
         )
-        self.assertEquals(200, channel.code)
+        self.assertEqual(200, channel.code)
+
+    @DEBUG
+    def test_edu_debugging_doesnt_explode(self):
+        """Sanity check incoming federation succeeds with `synapse.debug_8631` enabled.
+
+        Remove this when we strip out issue_8631_logger.
+        """
+        channel = self.make_signed_federation_request(
+            "PUT",
+            "/_matrix/federation/v1/send/txn_id_1234/",
+            content={
+                "edus": [
+                    {"edu_type": "m.device_list_update", "content": {"foo": "bar"}}
+                ],
+                "pdus": [],
+            },
+        )
+        self.assertEqual(200, channel.code)

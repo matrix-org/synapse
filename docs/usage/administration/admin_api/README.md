@@ -12,7 +12,7 @@ UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 ```
 
 A new server admin user can also be created using the `register_new_matrix_user`
-command. This is a script that is located in the `scripts/` directory, or possibly
+command. This is a script that is distributed as part of synapse. It is possibly
 already on your `$PATH` depending on how Synapse was installed.
 
 Finding your user's `access_token` is client-dependent, but will usually be shown in the client's settings.

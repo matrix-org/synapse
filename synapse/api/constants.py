@@ -23,7 +23,7 @@ from typing_extensions import Final
 MAX_PDU_SIZE = 65536
 
 # the "depth" field on events is limited to 2**63 - 1
-MAX_DEPTH = 2 ** 63 - 1
+MAX_DEPTH = 2**63 - 1
 
 # the maximum length for a room alias is 255 characters
 MAX_ALIAS_LENGTH = 255
@@ -65,6 +65,8 @@ class JoinRules:
     PRIVATE: Final = "private"
     # As defined for MSC3083.
     RESTRICTED: Final = "restricted"
+    # As defined for MSC3787.
+    KNOCK_RESTRICTED: Final = "knock_restricted"
 
 
 class RestrictedJoinRuleTypes:
@@ -81,7 +83,7 @@ class LoginType:
     TERMS: Final = "m.login.terms"
     SSO: Final = "m.login.sso"
     DUMMY: Final = "m.login.dummy"
-    REGISTRATION_TOKEN: Final = "org.matrix.msc3231.login.registration_token"
+    REGISTRATION_TOKEN: Final = "m.login.registration_token"
 
 
 # This is used in the `type` parameter for /register when called by
@@ -178,7 +180,7 @@ class RelationTypes:
     ANNOTATION: Final = "m.annotation"
     REPLACE: Final = "m.replace"
     REFERENCE: Final = "m.reference"
-    THREAD: Final = "io.element.thread"
+    THREAD: Final = "m.thread"
 
 
 class LimitBlockingTypes:
@@ -255,7 +257,5 @@ class GuestAccess:
 
 class ReceiptTypes:
     READ: Final = "m.read"
-
-
-class ReadReceiptEventFields:
-    MSC2285_HIDDEN: Final = "org.matrix.msc2285.hidden"
+    READ_PRIVATE: Final = "org.matrix.msc2285.read.private"
+    FULLY_READ: Final = "m.fully_read"

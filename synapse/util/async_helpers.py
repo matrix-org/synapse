@@ -14,21 +14,24 @@
 # limitations under the License.
 
 import abc
+import asyncio
 import collections
 import inspect
 import itertools
 import logging
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
 from typing import (
     Any,
+    AsyncIterator,
     Awaitable,
     Callable,
     Collection,
+    Coroutine,
     Dict,
     Generic,
     Hashable,
     Iterable,
-    Iterator,
+    List,
     Optional,
     Set,
     Tuple,
@@ -39,7 +42,7 @@ from typing import (
 )
 
 import attr
-from typing_extensions import ContextManager
+from typing_extensions import AsyncContextManager, Concatenate, Literal, ParamSpec
 
 from twisted.internet import defer
 from twisted.internet.defer import CancelledError
@@ -51,7 +54,7 @@ from synapse.logging.context import (
     make_deferred_yieldable,
     run_in_background,
 )
-from synapse.util import Clock, unwrapFirstError
+from synapse.util import Clock
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +97,10 @@ class ObservableDeferred(Generic[_T], AbstractObservableDeferred[_T]):
     """
 
     __slots__ = ["_deferred", "_observers", "_result"]
+
+    _deferred: "defer.Deferred[_T]"
+    _observers: Union[List["defer.Deferred[_T]"], Tuple[()]]
+    _result: Union[None, Tuple[Literal[True], _T], Tuple[Literal[False], Failure]]
 
     def __init__(self, deferred: "defer.Deferred[_T]", consumeErrors: bool = False):
         object.__setattr__(self, "_deferred", deferred)
@@ -157,12 +164,14 @@ class ObservableDeferred(Generic[_T], AbstractObservableDeferred[_T]):
         effect the underlying deferred.
         """
         if not self._result:
+            assert isinstance(self._observers, list)
             d: "defer.Deferred[_T]" = defer.Deferred()
             self._observers.append(d)
             return d
+        elif self._result[0]:
+            return defer.succeed(self._result[1])
         else:
-            success, res = self._result
-            return defer.succeed(res) if success else defer.fail(res)
+            return defer.fail(self._result[1])
 
     def observers(self) -> "Collection[defer.Deferred[_T]]":
         return self._observers
@@ -174,6 +183,8 @@ class ObservableDeferred(Generic[_T], AbstractObservableDeferred[_T]):
         return self._result is not None and self._result[0] is True
 
     def get_result(self) -> Union[_T, Failure]:
+        if self._result is None:
+            raise ValueError(f"{self!r} has no result yet")
         return self._result[1]
 
     def __getattr__(self, name: str) -> Any:
@@ -193,9 +204,9 @@ class ObservableDeferred(Generic[_T], AbstractObservableDeferred[_T]):
 T = TypeVar("T")
 
 
-def concurrently_execute(
+async def concurrently_execute(
     func: Callable[[T], Any], args: Iterable[T], limit: int
-) -> defer.Deferred:
+) -> None:
     """Executes the function with each argument concurrently while limiting
     the number of concurrent executions.
 
@@ -221,20 +232,21 @@ def concurrently_execute(
     # We use `itertools.islice` to handle the case where the number of args is
     # less than the limit, avoiding needlessly spawning unnecessary background
     # tasks.
-    return make_deferred_yieldable(
-        defer.gatherResults(
-            [
-                run_in_background(_concurrently_execute_inner, value)
-                for value in itertools.islice(it, limit)
-            ],
-            consumeErrors=True,
-        )
-    ).addErrback(unwrapFirstError)
+    await yieldable_gather_results(
+        _concurrently_execute_inner, (value for value in itertools.islice(it, limit))
+    )
 
 
-def yieldable_gather_results(
-    func: Callable, iter: Iterable, *args: Any, **kwargs: Any
-) -> defer.Deferred:
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+async def yieldable_gather_results(
+    func: Callable[Concatenate[T, P], Awaitable[R]],
+    iter: Iterable[T],
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> List[R]:
     """Executes the function with each argument concurrently.
 
     Args:
@@ -245,15 +257,38 @@ def yieldable_gather_results(
         **kwargs: Keyword arguments to be passed to each call to func
 
     Returns
-        Deferred[list]: Resolved when all functions have been invoked, or errors if
-        one of the function calls fails.
+        A list containing the results of the function
     """
-    return make_deferred_yieldable(
-        defer.gatherResults(
-            [run_in_background(func, item, *args, **kwargs) for item in iter],
-            consumeErrors=True,
+    try:
+        return await make_deferred_yieldable(
+            defer.gatherResults(
+                # type-ignore: mypy reports two errors:
+                # error: Argument 1 to "run_in_background" has incompatible type
+                #     "Callable[[T, **P], Awaitable[R]]"; expected
+                #     "Callable[[T, **P], Awaitable[R]]"  [arg-type]
+                # error: Argument 2 to "run_in_background" has incompatible type
+                #     "T"; expected "[T, **P.args]"  [arg-type]
+                # The former looks like a mypy bug, and the latter looks like a
+                # false positive.
+                [run_in_background(func, item, *args, **kwargs) for item in iter],  # type: ignore[arg-type]
+                consumeErrors=True,
+            )
         )
-    ).addErrback(unwrapFirstError)
+    except defer.FirstError as dfe:
+        # unwrap the error from defer.gatherResults.
+
+        # The raised exception's traceback only includes func() etc if
+        # the 'await' happens before the exception is thrown - ie if the failure
+        # happens *asynchronously* - otherwise Twisted throws away the traceback as it
+        # could be large.
+        #
+        # We could maybe reconstruct a fake traceback from Failure.frames. Or maybe
+        # we could throw Twisted into the fires of Mordor.
+
+        # suppress exception chaining, because the FirstError doesn't tell us anything
+        # very interesting.
+        assert isinstance(dfe.subFailure.value, BaseException)
+        raise dfe.subFailure.value from None
 
 
 T1 = TypeVar("T1")
@@ -323,7 +358,7 @@ class Linearizer:
 
     Example:
 
-        with await limiter.queue("test_key"):
+        async with limiter.queue("test_key"):
             # do some work.
 
     """
@@ -364,95 +399,53 @@ class Linearizer:
         # non-empty.
         return bool(entry.deferreds)
 
-    def queue(self, key: Hashable) -> defer.Deferred:
-        # we avoid doing defer.inlineCallbacks here, so that cancellation works correctly.
-        # (https://twistedmatrix.com/trac/ticket/4632 meant that cancellations were not
-        # propagated inside inlineCallbacks until Twisted 18.7)
+    def queue(self, key: Hashable) -> AsyncContextManager[None]:
+        @asynccontextmanager
+        async def _ctx_manager() -> AsyncIterator[None]:
+            entry = await self._acquire_lock(key)
+            try:
+                yield
+            finally:
+                self._release_lock(key, entry)
+
+        return _ctx_manager()
+
+    async def _acquire_lock(self, key: Hashable) -> _LinearizerEntry:
+        """Acquires a linearizer lock, waiting if necessary.
+
+        Returns once we have secured the lock.
+        """
         entry = self.key_to_defer.setdefault(
             key, _LinearizerEntry(0, collections.OrderedDict())
         )
 
-        # If the number of things executing is greater than the maximum
-        # then add a deferred to the list of blocked items
-        # When one of the things currently executing finishes it will callback
-        # this item so that it can continue executing.
-        if entry.count >= self.max_count:
-            res = self._await_lock(key)
-        else:
+        if entry.count < self.max_count:
+            # The number of things executing is less than the maximum.
             logger.debug(
                 "Acquired uncontended linearizer lock %r for key %r", self.name, key
             )
             entry.count += 1
-            res = defer.succeed(None)
+            return entry
 
-        # once we successfully get the lock, we need to return a context manager which
-        # will release the lock.
-
-        @contextmanager
-        def _ctx_manager(_: None) -> Iterator[None]:
-            try:
-                yield
-            finally:
-                logger.debug("Releasing linearizer lock %r for key %r", self.name, key)
-
-                # We've finished executing so check if there are any things
-                # blocked waiting to execute and start one of them
-                entry.count -= 1
-
-                if entry.deferreds:
-                    (next_def, _) = entry.deferreds.popitem(last=False)
-
-                    # we need to run the next thing in the sentinel context.
-                    with PreserveLoggingContext():
-                        next_def.callback(None)
-                elif entry.count == 0:
-                    # We were the last thing for this key: remove it from the
-                    # map.
-                    del self.key_to_defer[key]
-
-        res.addCallback(_ctx_manager)
-        return res
-
-    def _await_lock(self, key: Hashable) -> defer.Deferred:
-        """Helper for queue: adds a deferred to the queue
-
-        Assumes that we've already checked that we've reached the limit of the number
-        of lock-holders we allow. Creates a new deferred which is added to the list, and
-        adds some management around cancellations.
-
-        Returns the deferred, which will callback once we have secured the lock.
-
-        """
-        entry = self.key_to_defer[key]
-
+        # Otherwise, the number of things executing is at the maximum and we have to
+        # add a deferred to the list of blocked items.
+        # When one of the things currently executing finishes it will callback
+        # this item so that it can continue executing.
         logger.debug("Waiting to acquire linearizer lock %r for key %r", self.name, key)
 
         new_defer: "defer.Deferred[None]" = make_deferred_yieldable(defer.Deferred())
         entry.deferreds[new_defer] = 1
 
-        def cb(_r: None) -> "defer.Deferred[None]":
-            logger.debug("Acquired linearizer lock %r for key %r", self.name, key)
-            entry.count += 1
-
-            # if the code holding the lock completes synchronously, then it
-            # will recursively run the next claimant on the list. That can
-            # relatively rapidly lead to stack exhaustion. This is essentially
-            # the same problem as http://twistedmatrix.com/trac/ticket/9304.
-            #
-            # In order to break the cycle, we add a cheeky sleep(0) here to
-            # ensure that we fall back to the reactor between each iteration.
-            #
-            # (This needs to happen while we hold the lock, and the context manager's exit
-            # code must be synchronous, so this is the only sensible place.)
-            return self._clock.sleep(0)
-
-        def eb(e: Failure) -> Failure:
+        try:
+            await new_defer
+        except Exception as e:
             logger.info("defer %r got err %r", new_defer, e)
             if isinstance(e, CancelledError):
                 logger.debug(
-                    "Cancelling wait for linearizer lock %r for key %r", self.name, key
+                    "Cancelling wait for linearizer lock %r for key %r",
+                    self.name,
+                    key,
                 )
-
             else:
                 logger.warning(
                     "Unexpected exception waiting for linearizer lock %r for key %r",
@@ -462,10 +455,47 @@ class Linearizer:
 
             # we just have to take ourselves back out of the queue.
             del entry.deferreds[new_defer]
-            return e
+            raise
 
-        new_defer.addCallbacks(cb, eb)
-        return new_defer
+        logger.debug("Acquired linearizer lock %r for key %r", self.name, key)
+        entry.count += 1
+
+        # if the code holding the lock completes synchronously, then it
+        # will recursively run the next claimant on the list. That can
+        # relatively rapidly lead to stack exhaustion. This is essentially
+        # the same problem as http://twistedmatrix.com/trac/ticket/9304.
+        #
+        # In order to break the cycle, we add a cheeky sleep(0) here to
+        # ensure that we fall back to the reactor between each iteration.
+        #
+        # This needs to happen while we hold the lock. We could put it on the
+        # exit path, but that would slow down the uncontended case.
+        try:
+            await self._clock.sleep(0)
+        except CancelledError:
+            self._release_lock(key, entry)
+            raise
+
+        return entry
+
+    def _release_lock(self, key: Hashable, entry: _LinearizerEntry) -> None:
+        """Releases a held linearizer lock."""
+        logger.debug("Releasing linearizer lock %r for key %r", self.name, key)
+
+        # We've finished executing so check if there are any things
+        # blocked waiting to execute and start one of them
+        entry.count -= 1
+
+        if entry.deferreds:
+            (next_def, _) = entry.deferreds.popitem(last=False)
+
+            # we need to run the next thing in the sentinel context.
+            with PreserveLoggingContext():
+                next_def.callback(None)
+        elif entry.count == 0:
+            # We were the last thing for this key: remove it from the
+            # map.
+            del self.key_to_defer[key]
 
 
 class ReadWriteLock:
@@ -473,7 +503,7 @@ class ReadWriteLock:
 
     Example:
 
-        with await read_write_lock.read("test_key"):
+        async with read_write_lock.read("test_key"):
             # do some work
     """
 
@@ -496,22 +526,24 @@ class ReadWriteLock:
         # Latest writer queued
         self.key_to_current_writer: Dict[str, defer.Deferred] = {}
 
-    async def read(self, key: str) -> ContextManager:
-        new_defer: "defer.Deferred[None]" = defer.Deferred()
+    def read(self, key: str) -> AsyncContextManager:
+        @asynccontextmanager
+        async def _ctx_manager() -> AsyncIterator[None]:
+            new_defer: "defer.Deferred[None]" = defer.Deferred()
 
-        curr_readers = self.key_to_current_readers.setdefault(key, set())
-        curr_writer = self.key_to_current_writer.get(key, None)
+            curr_readers = self.key_to_current_readers.setdefault(key, set())
+            curr_writer = self.key_to_current_writer.get(key, None)
 
-        curr_readers.add(new_defer)
+            curr_readers.add(new_defer)
 
-        # We wait for the latest writer to finish writing. We can safely ignore
-        # any existing readers... as they're readers.
-        if curr_writer:
-            await make_deferred_yieldable(curr_writer)
-
-        @contextmanager
-        def _ctx_manager() -> Iterator[None]:
             try:
+                # We wait for the latest writer to finish writing. We can safely ignore
+                # any existing readers... as they're readers.
+                # May raise a `CancelledError` if the `Deferred` wrapping us is
+                # cancelled. The `Deferred` we are waiting on must not be cancelled,
+                # since we do not own it.
+                if curr_writer:
+                    await make_deferred_yieldable(stop_cancellation(curr_writer))
                 yield
             finally:
                 with PreserveLoggingContext():
@@ -520,38 +552,44 @@ class ReadWriteLock:
 
         return _ctx_manager()
 
-    async def write(self, key: str) -> ContextManager:
-        new_defer: "defer.Deferred[None]" = defer.Deferred()
+    def write(self, key: str) -> AsyncContextManager:
+        @asynccontextmanager
+        async def _ctx_manager() -> AsyncIterator[None]:
+            new_defer: "defer.Deferred[None]" = defer.Deferred()
 
-        curr_readers = self.key_to_current_readers.get(key, set())
-        curr_writer = self.key_to_current_writer.get(key, None)
+            curr_readers = self.key_to_current_readers.get(key, set())
+            curr_writer = self.key_to_current_writer.get(key, None)
 
-        # We wait on all latest readers and writer.
-        to_wait_on = list(curr_readers)
-        if curr_writer:
-            to_wait_on.append(curr_writer)
+            # We wait on all latest readers and writer.
+            to_wait_on = list(curr_readers)
+            if curr_writer:
+                to_wait_on.append(curr_writer)
 
-        # We can clear the list of current readers since the new writer waits
-        # for them to finish.
-        curr_readers.clear()
-        self.key_to_current_writer[key] = new_defer
+            # We can clear the list of current readers since `new_defer` waits
+            # for them to finish.
+            curr_readers.clear()
+            self.key_to_current_writer[key] = new_defer
 
-        await make_deferred_yieldable(defer.gatherResults(to_wait_on))
-
-        @contextmanager
-        def _ctx_manager() -> Iterator[None]:
+            to_wait_on_defer = defer.gatherResults(to_wait_on)
             try:
+                # Wait for all current readers and the latest writer to finish.
+                # May raise a `CancelledError` immediately after the wait if the
+                # `Deferred` wrapping us is cancelled. We must only release the lock
+                # once we have acquired it, hence the use of `delay_cancellation`
+                # rather than `stop_cancellation`.
+                await make_deferred_yieldable(delay_cancellation(to_wait_on_defer))
                 yield
             finally:
+                # Release the lock.
                 with PreserveLoggingContext():
                     new_defer.callback(None)
-                if self.key_to_current_writer[key] == new_defer:
+                # `self.key_to_current_writer[key]` may be missing if there was another
+                # writer waiting for us and it completed entirely within the
+                # `new_defer.callback()` call above.
+                if self.key_to_current_writer.get(key) == new_defer:
                     self.key_to_current_writer.pop(key)
 
         return _ctx_manager()
-
-
-R = TypeVar("R")
 
 
 def timeout_deferred(
@@ -655,3 +693,145 @@ def maybe_awaitable(value: Union[Awaitable[R], R]) -> Awaitable[R]:
         return value
 
     return DoneAwaitable(value)
+
+
+def stop_cancellation(deferred: "defer.Deferred[T]") -> "defer.Deferred[T]":
+    """Prevent a `Deferred` from being cancelled by wrapping it in another `Deferred`.
+
+    Args:
+        deferred: The `Deferred` to protect against cancellation. Must not follow the
+            Synapse logcontext rules.
+
+    Returns:
+        A new `Deferred`, which will contain the result of the original `Deferred`.
+        The new `Deferred` will not propagate cancellation through to the original.
+        When cancelled, the new `Deferred` will fail with a `CancelledError`.
+
+        The new `Deferred` will not follow the Synapse logcontext rules and should be
+        wrapped with `make_deferred_yieldable`.
+    """
+    new_deferred: "defer.Deferred[T]" = defer.Deferred()
+    deferred.chainDeferred(new_deferred)
+    return new_deferred
+
+
+@overload
+def delay_cancellation(awaitable: "defer.Deferred[T]") -> "defer.Deferred[T]":
+    ...
+
+
+@overload
+def delay_cancellation(awaitable: Coroutine[Any, Any, T]) -> "defer.Deferred[T]":
+    ...
+
+
+@overload
+def delay_cancellation(awaitable: Awaitable[T]) -> Awaitable[T]:
+    ...
+
+
+def delay_cancellation(awaitable: Awaitable[T]) -> Awaitable[T]:
+    """Delay cancellation of a coroutine or `Deferred` awaitable until it resolves.
+
+    Has the same effect as `stop_cancellation`, but the returned `Deferred` will not
+    resolve with a `CancelledError` until the original awaitable resolves.
+
+    Args:
+        deferred: The coroutine or `Deferred` to protect against cancellation. May
+            optionally follow the Synapse logcontext rules.
+
+    Returns:
+        A new `Deferred`, which will contain the result of the original coroutine or
+        `Deferred`. The new `Deferred` will not propagate cancellation through to the
+        original coroutine or `Deferred`.
+
+        When cancelled, the new `Deferred` will wait until the original coroutine or
+        `Deferred` resolves before failing with a `CancelledError`.
+
+        The new `Deferred` will follow the Synapse logcontext rules if `awaitable`
+        follows the Synapse logcontext rules. Otherwise the new `Deferred` should be
+        wrapped with `make_deferred_yieldable`.
+    """
+
+    # First, convert the awaitable into a `Deferred`.
+    if isinstance(awaitable, defer.Deferred):
+        deferred = awaitable
+    elif asyncio.iscoroutine(awaitable):
+        # Ideally we'd use `Deferred.fromCoroutine()` here, to save on redundant
+        # type-checking, but we'd need Twisted >= 21.2.
+        deferred = defer.ensureDeferred(awaitable)
+    else:
+        # We have no idea what to do with this awaitable.
+        # We assume it's already resolved, such as `DoneAwaitable`s or `Future`s from
+        # `make_awaitable`, and let the caller `await` it normally.
+        return awaitable
+
+    def handle_cancel(new_deferred: "defer.Deferred[T]") -> None:
+        # before the new deferred is cancelled, we `pause` it to stop the cancellation
+        # propagating. we then `unpause` it once the wrapped deferred completes, to
+        # propagate the exception.
+        new_deferred.pause()
+        new_deferred.errback(Failure(CancelledError()))
+
+        deferred.addBoth(lambda _: new_deferred.unpause())
+
+    new_deferred: "defer.Deferred[T]" = defer.Deferred(handle_cancel)
+    deferred.chainDeferred(new_deferred)
+    return new_deferred
+
+
+class AwakenableSleeper:
+    """Allows explicitly waking up deferreds related to an entity that are
+    currently sleeping.
+    """
+
+    def __init__(self, reactor: IReactorTime) -> None:
+        self._streams: Dict[str, Set[defer.Deferred[None]]] = {}
+        self._reactor = reactor
+
+    def wake(self, name: str) -> None:
+        """Wake everything related to `name` that is currently sleeping."""
+        stream_set = self._streams.pop(name, set())
+        for deferred in stream_set:
+            try:
+                with PreserveLoggingContext():
+                    deferred.callback(None)
+            except Exception:
+                pass
+
+    async def sleep(self, name: str, delay_ms: int) -> None:
+        """Sleep for the given number of milliseconds, or return if the given
+        `name` is explicitly woken up.
+        """
+
+        # Create a deferred that gets called in N seconds
+        sleep_deferred: "defer.Deferred[None]" = defer.Deferred()
+        call = self._reactor.callLater(delay_ms / 1000, sleep_deferred.callback, None)
+
+        # Create a deferred that will get called if `wake` is called with
+        # the same `name`.
+        stream_set = self._streams.setdefault(name, set())
+        notify_deferred: "defer.Deferred[None]" = defer.Deferred()
+        stream_set.add(notify_deferred)
+
+        try:
+            # Wait for either the delay or for `wake` to be called.
+            await make_deferred_yieldable(
+                defer.DeferredList(
+                    [sleep_deferred, notify_deferred],
+                    fireOnOneCallback=True,
+                    fireOnOneErrback=True,
+                    consumeErrors=True,
+                )
+            )
+        finally:
+            # Clean up the state
+            curr_stream_set = self._streams.get(name)
+            if curr_stream_set is not None:
+                curr_stream_set.discard(notify_deferred)
+                if len(curr_stream_set) == 0:
+                    self._streams.pop(name)
+
+            # Cancel the sleep if we were woken up
+            if call.active():
+                call.cancel()

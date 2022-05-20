@@ -40,7 +40,7 @@ def format_push_rules_for_user(
 
         # Remove internal stuff.
         for c in r["conditions"]:
-            c.pop("_id", None)
+            c.pop("_cache_key", None)
 
             pattern_type = c.pop("pattern_type", None)
             if pattern_type == "user_id":

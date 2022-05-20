@@ -1,4 +1,5 @@
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2022 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,9 +31,11 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
 )
 
 import attr
+from matrix_common.versionstring import get_distribution_version_string
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, Metric
 from prometheus_client.core import (
     REGISTRY,
@@ -42,25 +45,26 @@ from prometheus_client.core import (
 
 from twisted.python.threadpool import ThreadPool
 
-import synapse.metrics._reactor_metrics
+# This module is imported for its side effects; flake8 needn't warn that it's unused.
+import synapse.metrics._reactor_metrics  # noqa: F401
 from synapse.metrics._exposition import (
     MetricsResource,
     generate_latest,
     start_http_server,
 )
 from synapse.metrics._gc import MIN_TIME_BETWEEN_GCS, install_gc_manager
-from synapse.util.versionstring import get_version_string
+from synapse.metrics._types import Collector
 
 logger = logging.getLogger(__name__)
 
 METRICS_PREFIX = "/_synapse/metrics"
 
-all_gauges: "Dict[str, Union[LaterGauge, InFlightGauge]]" = {}
+all_gauges: Dict[str, Collector] = {}
 
 HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
 
 
-class RegistryProxy:
+class _RegistryProxy:
     @staticmethod
     def collect() -> Iterable[Metric]:
         for metric in REGISTRY.collect():
@@ -68,12 +72,18 @@ class RegistryProxy:
                 yield metric
 
 
-@attr.s(slots=True, hash=True, auto_attribs=True)
-class LaterGauge:
+# A little bit nasty, but collect() above is static so a Protocol doesn't work.
+# _RegistryProxy matches the signature of a CollectorRegistry instance enough
+# for it to be usable in the contexts in which we use it.
+# TODO Do something nicer about this.
+RegistryProxy = cast(CollectorRegistry, _RegistryProxy)
 
+
+@attr.s(slots=True, hash=True, auto_attribs=True)
+class LaterGauge(Collector):
     name: str
     desc: str
-    labels: Optional[Iterable[str]] = attr.ib(hash=False)
+    labels: Optional[Sequence[str]] = attr.ib(hash=False)
     # callback: should either return a value (if there are no labels for this metric),
     # or dict mapping from a label tuple to a value
     caller: Callable[
@@ -116,7 +126,7 @@ class LaterGauge:
 MetricsEntry = TypeVar("MetricsEntry")
 
 
-class InFlightGauge(Generic[MetricsEntry]):
+class InFlightGauge(Generic[MetricsEntry], Collector):
     """Tracks number of things (e.g. requests, Measure blocks, etc) in flight
     at any given time.
 
@@ -237,7 +247,7 @@ class InFlightGauge(Generic[MetricsEntry]):
         all_gauges[self.name] = self
 
 
-class GaugeBucketCollector:
+class GaugeBucketCollector(Collector):
     """Like a Histogram, but the buckets are Gauges which are updated atomically.
 
     The data is updated by calling `update_data` with an iterable of measurements.
@@ -331,7 +341,7 @@ class GaugeBucketCollector:
 #
 
 
-class CPUMetrics:
+class CPUMetrics(Collector):
     def __init__(self) -> None:
         ticks_per_sec = 100
         try:
@@ -409,7 +419,7 @@ build_info = Gauge(
 )
 build_info.labels(
     " ".join([platform.python_implementation(), platform.python_version()]),
-    get_version_string(synapse),
+    get_distribution_version_string("matrix-synapse"),
     " ".join([platform.system(), platform.release()]),
 ).set(1)
 
@@ -461,6 +471,7 @@ def register_threadpool(name: str, threadpool: ThreadPool) -> None:
 
 
 __all__ = [
+    "Collector",
     "MetricsResource",
     "generate_latest",
     "start_http_server",

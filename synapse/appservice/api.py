@@ -1,4 +1,5 @@
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2022 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,17 +17,22 @@ import urllib.parse
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
 
 from prometheus_client import Counter
+from typing_extensions import TypeGuard
 
 from synapse.api.constants import EventTypes, Membership, ThirdPartyEntityKind
 from synapse.api.errors import CodeMessageException
+from synapse.appservice import (
+    ApplicationService,
+    TransactionOneTimeKeyCounts,
+    TransactionUnusedFallbackKeys,
+)
 from synapse.events import EventBase
-from synapse.events.utils import serialize_event
+from synapse.events.utils import SerializeEventConfig, serialize_event
 from synapse.http.client import SimpleHttpClient
-from synapse.types import JsonDict, ThirdPartyInstanceID
+from synapse.types import DeviceListUpdates, JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.response_cache import ResponseCache
 
 if TYPE_CHECKING:
-    from synapse.appservice import ApplicationService
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -61,7 +67,7 @@ def _is_valid_3pe_metadata(info: JsonDict) -> bool:
     return True
 
 
-def _is_valid_3pe_result(r: JsonDict, field: str) -> bool:
+def _is_valid_3pe_result(r: object, field: str) -> TypeGuard[JsonDict]:
     if not isinstance(r, dict):
         return False
 
@@ -219,6 +225,9 @@ class ApplicationServiceApi(SimpleHttpClient):
         events: List[EventBase],
         ephemeral: List[JsonDict],
         to_device_messages: List[JsonDict],
+        one_time_key_counts: TransactionOneTimeKeyCounts,
+        unused_fallback_keys: TransactionUnusedFallbackKeys,
+        device_list_summary: DeviceListUpdates,
         txn_id: Optional[int] = None,
     ) -> bool:
         """
@@ -252,7 +261,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         uri = service.url + ("/transactions/%s" % urllib.parse.quote(str(txn_id)))
 
         # Never send ephemeral events to appservices that do not support it
-        body: Dict[str, List[JsonDict]] = {"events": serialized_events}
+        body: JsonDict = {"events": serialized_events}
         if service.supports_ephemeral:
             body.update(
                 {
@@ -261,6 +270,22 @@ class ApplicationServiceApi(SimpleHttpClient):
                     "de.sorunome.msc2409.to_device": to_device_messages,
                 }
             )
+
+        # TODO: Update to stable prefixes once MSC3202 completes FCP merge
+        if service.msc3202_transaction_extensions:
+            if one_time_key_counts:
+                body[
+                    "org.matrix.msc3202.device_one_time_key_counts"
+                ] = one_time_key_counts
+            if unused_fallback_keys:
+                body[
+                    "org.matrix.msc3202.device_unused_fallback_key_types"
+                ] = unused_fallback_keys
+            if device_list_summary:
+                body["org.matrix.msc3202.device_lists"] = {
+                    "changed": list(device_list_summary.changed),
+                    "left": list(device_list_summary.left),
+                }
 
         try:
             await self.put_json(
@@ -305,16 +330,18 @@ class ApplicationServiceApi(SimpleHttpClient):
             serialize_event(
                 e,
                 time_now,
-                as_client_event=True,
-                # If this is an invite or a knock membership event, and we're interested
-                # in this user, then include any stripped state alongside the event.
-                include_stripped_room_state=(
-                    e.type == EventTypes.Member
-                    and (
-                        e.membership == Membership.INVITE
-                        or e.membership == Membership.KNOCK
-                    )
-                    and service.is_interested_in_user(e.state_key)
+                config=SerializeEventConfig(
+                    as_client_event=True,
+                    # If this is an invite or a knock membership event, and we're interested
+                    # in this user, then include any stripped state alongside the event.
+                    include_stripped_room_state=(
+                        e.type == EventTypes.Member
+                        and (
+                            e.membership == Membership.INVITE
+                            or e.membership == Membership.KNOCK
+                        )
+                        and service.is_interested_in_user(e.state_key)
+                    ),
                 ),
             )
             for e in events

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from synapse._scripts.register_new_matrix_user import request_registration
 
@@ -52,16 +52,16 @@ class RegisterTestCase(TestCase):
         out = []
         err_code = []
 
-        request_registration(
-            "user",
-            "pass",
-            "matrix.org",
-            "shared",
-            admin=False,
-            requests=requests,
-            _print=out.append,
-            exit=err_code.append,
-        )
+        with patch("synapse._scripts.register_new_matrix_user.requests", requests):
+            request_registration(
+                "user",
+                "pass",
+                "matrix.org",
+                "shared",
+                admin=False,
+                _print=out.append,
+                exit=err_code.append,
+            )
 
         # We should get the success message making sure everything is OK.
         self.assertIn("Success!", out)
@@ -88,16 +88,16 @@ class RegisterTestCase(TestCase):
         out = []
         err_code = []
 
-        request_registration(
-            "user",
-            "pass",
-            "matrix.org",
-            "shared",
-            admin=False,
-            requests=requests,
-            _print=out.append,
-            exit=err_code.append,
-        )
+        with patch("synapse._scripts.register_new_matrix_user.requests", requests):
+            request_registration(
+                "user",
+                "pass",
+                "matrix.org",
+                "shared",
+                admin=False,
+                _print=out.append,
+                exit=err_code.append,
+            )
 
         # Exit was called
         self.assertEqual(err_code, [1])
@@ -140,16 +140,16 @@ class RegisterTestCase(TestCase):
         out = []
         err_code = []
 
-        request_registration(
-            "user",
-            "pass",
-            "matrix.org",
-            "shared",
-            admin=False,
-            requests=requests,
-            _print=out.append,
-            exit=err_code.append,
-        )
+        with patch("synapse._scripts.register_new_matrix_user.requests", requests):
+            request_registration(
+                "user",
+                "pass",
+                "matrix.org",
+                "shared",
+                admin=False,
+                _print=out.append,
+                exit=err_code.append,
+            )
 
         # Exit was called
         self.assertEqual(err_code, [1])

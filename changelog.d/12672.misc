@@ -1,0 +1,1 @@
+Lay some foundation work to allow workers to only subscribe to some kinds of messages, reducing replication traffic.

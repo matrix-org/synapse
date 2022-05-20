@@ -44,7 +44,7 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.access_token)
 
         self.info = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(
+            self.hs.get_datastores().main.get_user_by_access_token(
                 self.access_token,
             )
         )

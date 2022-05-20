@@ -38,4 +38,4 @@ class UIAuthSessionDataConstants:
     # used during registration to store the registration token used (if required) so that:
     # - we can prevent a token being used twice by one session
     # - we can 'use up' the token after registration has successfully completed
-    REGISTRATION_TOKEN = "org.matrix.msc3231.login.registration_token"
+    REGISTRATION_TOKEN = "m.login.registration_token"

@@ -24,6 +24,7 @@ from synapse.federation.transport.server._base import (
 )
 from synapse.federation.transport.server.federation import (
     FEDERATION_SERVLET_CLASSES,
+    FederationAccountStatusServlet,
     FederationTimestampLookupServlet,
 )
 from synapse.federation.transport.server.groups_local import GROUP_LOCAL_SERVLET_CLASSES
@@ -288,7 +289,7 @@ class OpenIdUserInfo(BaseFederationServlet):
         return 200, {"sub": user_id}
 
 
-DEFAULT_SERVLET_GROUPS: Dict[str, Iterable[Type[BaseFederationServlet]]] = {
+SERVLET_GROUPS: Dict[str, Iterable[Type[BaseFederationServlet]]] = {
     "federation": FEDERATION_SERVLET_CLASSES,
     "room_list": (PublicRoomList,),
     "group_server": GROUP_SERVER_SERVLET_CLASSES,
@@ -296,6 +297,10 @@ DEFAULT_SERVLET_GROUPS: Dict[str, Iterable[Type[BaseFederationServlet]]] = {
     "group_attestation": (FederationGroupsRenewAttestaionServlet,),
     "openid": (OpenIdUserInfo,),
 }
+
+DEFAULT_SERVLET_GROUPS = ("federation", "room_list", "openid")
+
+GROUP_SERVLET_GROUPS = ("group_server", "group_local", "group_attestation")
 
 
 def register_servlets(
@@ -319,20 +324,30 @@ def register_servlets(
             Defaults to ``DEFAULT_SERVLET_GROUPS``.
     """
     if not servlet_groups:
-        servlet_groups = DEFAULT_SERVLET_GROUPS.keys()
+        servlet_groups = DEFAULT_SERVLET_GROUPS
+        # Only allow the groups servlets if the deprecated groups feature is enabled.
+        if hs.config.experimental.groups_enabled:
+            servlet_groups = servlet_groups + GROUP_SERVLET_GROUPS
 
     for servlet_group in servlet_groups:
         # Skip unknown servlet groups.
-        if servlet_group not in DEFAULT_SERVLET_GROUPS:
+        if servlet_group not in SERVLET_GROUPS:
             raise RuntimeError(
                 f"Attempting to register unknown federation servlet: '{servlet_group}'"
             )
 
-        for servletclass in DEFAULT_SERVLET_GROUPS[servlet_group]:
+        for servletclass in SERVLET_GROUPS[servlet_group]:
             # Only allow the `/timestamp_to_event` servlet if msc3030 is enabled
             if (
                 servletclass == FederationTimestampLookupServlet
                 and not hs.config.experimental.msc3030_enabled
+            ):
+                continue
+
+            # Only allow the `/account_status` servlet if msc3720 is enabled
+            if (
+                servletclass == FederationAccountStatusServlet
+                and not hs.config.experimental.msc3720_enabled
             ):
                 continue
 

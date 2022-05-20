@@ -126,7 +126,8 @@ Body parameters:
   [Sample Configuration File](../usage/configuration/homeserver_sample_config.html)
   section `sso` and `oidc_providers`.
   - `auth_provider` - string. ID of the external identity provider. Value of `idp_id`
-    in homeserver configuration.
+    in the homeserver configuration. Note that no error is raised if the provided
+    value is not in the homeserver configuration.
   - `external_id` - string, user ID in the external identity provider.
 - `avatar_url` - string, optional, must be a
   [MXC URI](https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris).
@@ -331,7 +332,7 @@ An empty body may be passed for backwards compatibility.
 
 The following actions are performed when deactivating an user:
 
-- Try to unpind 3PIDs from the identity server
+- Try to unbind 3PIDs from the identity server
 - Remove all 3PIDs from the homeserver
 - Delete all devices and E2EE keys
 - Delete all access tokens
@@ -539,6 +540,11 @@ The following fields are returned in the JSON response body:
 
 ### List media uploaded by a user
 Gets a list of all local media that a specific `user_id` has created.
+These are media that the user has uploaded themselves
+([local media](../media_repository.md#local-media)), as well as
+[URL preview images](../media_repository.md#url-previews) requested by the user if the
+[feature is enabled](../development/url_previews.md).
+
 By default, the response is ordered by descending creation date and ascending media ID.
 The newest media is on top. You can change the order with parameters
 `order_by` and `dir`.
@@ -635,7 +641,9 @@ The following fields are returned in the JSON response body:
   Media objects contain the following fields:
   - `created_ts` - integer - Timestamp when the content was uploaded in ms.
   - `last_access_ts` - integer - Timestamp when the content was last accessed in ms.
-  - `media_id` - string - The id used to refer to the media.
+  - `media_id` - string - The id used to refer to the media. Details about the format
+    are documented under
+    [media repository](../media_repository.md).
   - `media_length` - integer - Length of the media in bytes.
   - `media_type` - string - The MIME-type of the media.
   - `quarantined_by` - string - The user ID that initiated the quarantine request
@@ -796,7 +804,7 @@ POST /_synapse/admin/v2/users/<user_id>/delete_devices
   "devices": [
     "QBUAZIFURK",
     "AUIECTSRND"
-  ],
+  ]
 }
 ```
 

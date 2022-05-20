@@ -75,7 +75,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.event_creation_handler = hs.get_event_creation_handler()
         self.auth = hs.get_auth()
         self.room_batch_handler = hs.get_room_batch_handler()
@@ -123,11 +123,24 @@ class RoomBatchSendEventRestServlet(RestServlet):
                     errcode=Codes.INVALID_PARAM,
                 )
 
+        # Make sure that the prev_event_ids exist and aren't outliers - ie, they are
+        # regular parts of the room DAG where we know the state.
+        non_outlier_prev_events = await self.store.have_events_in_timeline(
+            prev_event_ids_from_query
+        )
+        for prev_event_id in prev_event_ids_from_query:
+            if prev_event_id not in non_outlier_prev_events:
+                raise SynapseError(
+                    HTTPStatus.BAD_REQUEST,
+                    "prev_event %s does not exist, or is an outlier" % (prev_event_id,),
+                    errcode=Codes.INVALID_PARAM,
+                )
+
         # For the event we are inserting next to (`prev_event_ids_from_query`),
-        # find the most recent auth events (derived from state events) that
-        # allowed that message to be sent. We will use that as a base
-        # to auth our historical messages against.
-        auth_event_ids = await self.room_batch_handler.get_most_recent_auth_event_ids_from_event_id_list(
+        # find the most recent state events that allowed that message to be
+        # sent. We will use that as a base to auth our historical messages
+        # against.
+        state_event_ids = await self.room_batch_handler.get_most_recent_full_state_ids_from_event_id_list(
             prev_event_ids_from_query
         )
 
@@ -140,13 +153,13 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 await self.room_batch_handler.persist_state_events_at_start(
                     state_events_at_start=body["state_events_at_start"],
                     room_id=room_id,
-                    initial_auth_event_ids=auth_event_ids,
+                    initial_state_event_ids=state_event_ids,
                     app_service_requester=requester,
                 )
             )
             # Update our ongoing auth event ID list with all of the new state we
             # just created
-            auth_event_ids.extend(state_event_ids_at_start)
+            state_event_ids.extend(state_event_ids_at_start)
 
         inherited_depth = await self.room_batch_handler.inherit_depth_from_prev_ids(
             prev_event_ids_from_query
@@ -188,7 +201,12 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 ),
                 base_insertion_event_dict,
                 prev_event_ids=base_insertion_event_dict.get("prev_events"),
-                auth_event_ids=auth_event_ids,
+                # Also set the explicit state here because we want to resolve
+                # any `state_events_at_start` here too. It's not strictly
+                # necessary to accomplish anything but if someone asks for the
+                # state at this point, we probably want to show them the
+                # historical state that was part of this batch.
+                state_event_ids=state_event_ids,
                 historical=True,
                 depth=inherited_depth,
             )
@@ -197,23 +215,14 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 EventContentFields.MSC2716_NEXT_BATCH_ID
             ]
 
-        # Also connect the historical event chain to the end of the floating
-        # state chain, which causes the HS to ask for the state at the start of
-        # the batch later. If there is no state chain to connect to, just make
-        # the insertion event float itself.
-        prev_event_ids = []
-        if len(state_event_ids_at_start):
-            prev_event_ids = [state_event_ids_at_start[-1]]
-
         # Create and persist all of the historical events as well as insertion
         # and batch meta events to make the batch navigable in the DAG.
         event_ids, next_batch_id = await self.room_batch_handler.handle_batch_of_events(
             events_to_create=events_to_create,
             room_id=room_id,
             batch_id_to_connect_to=batch_id_to_connect_to,
-            initial_prev_event_ids=prev_event_ids,
             inherited_depth=inherited_depth,
-            auth_event_ids=auth_event_ids,
+            initial_state_event_ids=state_event_ids,
             app_service_requester=requester,
         )
 

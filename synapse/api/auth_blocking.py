@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 class AuthBlocking:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self._hs_disabled = hs.config.server.hs_disabled

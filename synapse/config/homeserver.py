@@ -16,6 +16,7 @@ from .account_validity import AccountValidityConfig
 from .api import ApiConfig
 from .appservice import AppServiceConfig
 from .auth import AuthConfig
+from .background_updates import BackgroundUpdateConfig
 from .cache import CacheConfig
 from .captcha import CaptchaConfig
 from .cas import CasConfig
@@ -99,4 +100,5 @@ class HomeServerConfig(RootConfig):
         WorkerConfig,
         RedisConfig,
         ExperimentalConfig,
+        BackgroundUpdateConfig,
     ]
