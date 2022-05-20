@@ -34,6 +34,7 @@ from synapse.util.metrics import measure_func
 
 from ..storage.state import StateFilter
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
+from ..types import get_localpart_from_id
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -265,8 +266,6 @@ class BulkPushRuleEvaluator:
         rules_by_user = await self._get_rules_for_event(event, context)
         actions_by_user: Dict[str, List[Union[dict, str]]] = {}
 
-        room_members = await self.store.get_joined_users_from_context(event, context)
-
         room_member_count = await self.store.get_number_joined_users_in_room(
             event.room_id
         )
@@ -302,10 +301,9 @@ class BulkPushRuleEvaluator:
             if uid in ignorers:
                 continue
 
-            display_name = None
-            profile_info = room_members.get(uid)
-            if profile_info:
-                display_name = profile_info.display_name
+            localpart = get_localpart_from_id(uid)
+            profile_info = await self.store.get_profileinfo(localpart)
+            display_name = profile_info.display_name
 
             if not display_name:
                 # Handle the case where we are pushing a membership event to
