@@ -2292,6 +2292,21 @@ Example configuration:
 track_appservice_user_ips: true
 ```
 ---
+Config option: `appservice_max_backoff_s`
+
+Set to establish a maximum backoff (in seconds) between HS -> AS connection attempts.
+Upon failing to push appservice events, the homeserver will reattempt connection to the
+application service after a delay. The delay increases with subsequent retries.
+This value sets an upper limit on that delay.
+
+Regardless of this setting, the delay will never be longer than 512 seconds (about 8.5 minutes),
+which is the default behaviour if this option is not set.
+
+Example configuration:
+```yaml
+appservice_max_backoff_s: 1
+```
+---
 Config option: `macaroon_secret_key`
 
 A secret which is used to sign access tokens. If none is specified,
