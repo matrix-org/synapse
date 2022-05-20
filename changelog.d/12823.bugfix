@@ -1,1 +1,1 @@
-Fix media thumbnails being unusable before the index had been added in the background.
+Fix a bug, introduced in Synapse 1.21.0, that led to media thumbnails being unusable before the index has been added in the background.
