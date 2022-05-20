@@ -362,11 +362,15 @@ class FederationHandler:
         # First we try hosts that are already in the room
         # TODO: HEURISTIC ALERT.
 
-        users_in_room = await self.store.get_users_in_room(room_id)
-        likely_domains = {get_domain_from_id(u) for u in users_in_room}
-        likely_domains.discard(self.server_name)
+        curr_state = await self.store.get_current_state(room_id)
 
-        async def try_backfill(domains: Collection[str]) -> bool:
+        curr_domains = get_domains_from_state(curr_state)
+
+        likely_domains = [
+            domain for domain, depth in curr_domains if domain != self.server_name
+        ]
+
+        async def try_backfill(domains: List[str]) -> bool:
             # TODO: Should we try multiple of these at a time?
             for dom in domains:
                 try:
