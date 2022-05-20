@@ -1399,7 +1399,7 @@ class TimestampLookupHandler:
             )
 
             # Find other homeservers from the given state in the room
-            curr_state = await self.state_handler.get_current_state(room_id)
+            curr_state = await self.store.get_current_state(room_id)
             curr_domains = get_domains_from_state(curr_state)
             likely_domains = [
                 domain for domain, depth in curr_domains if domain != self.server_name

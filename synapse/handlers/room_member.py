@@ -1409,7 +1409,19 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         txn_id: Optional[str],
         id_access_token: Optional[str] = None,
     ) -> int:
-        room_state = await self.state_handler.get_current_state(room_id)
+        room_state = await self.store.get_filtered_current_state(
+            room_id,
+            StateFilter.from_types(
+                [
+                    (EventTypes.Member, user.to_string()),
+                    (EventTypes.CanonicalAlias, ""),
+                    (EventTypes.Name, ""),
+                    (EventTypes.Create, ""),
+                    (EventTypes.JoinRules, ""),
+                    (EventTypes.RoomAvatar, ""),
+                ]
+            ),
+        )
 
         inviter_display_name = ""
         inviter_avatar_url = ""

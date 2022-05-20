@@ -207,7 +207,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
 
         # the room should show that the new user is a member
         r = self.get_success(
-            self.hs.get_state_handler().get_current_state(self._room_id)
+            self.hs.get_datastores().main.get_current_state(self._room_id)
         )
         self.assertEqual(r[("m.room.member", joining_user)].membership, "join")
 
@@ -258,7 +258,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
 
         # the room should show that the new user is a member
         r = self.get_success(
-            self.hs.get_state_handler().get_current_state(self._room_id)
+            self.hs.get_datastores().main.get_current_state(self._room_id)
         )
         self.assertEqual(r[("m.room.member", joining_user)].membership, "join")
 

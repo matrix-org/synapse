@@ -190,7 +190,7 @@ class InitialSyncHandler:
                 if event.membership == Membership.JOIN:
                     room_end_token = now_token.room_key
                     deferred_room_state = run_in_background(
-                        self.state_handler.get_current_state, event.room_id
+                        self.store.get_current_state, event.room_id
                     )
                 elif event.membership == Membership.LEAVE:
                     room_end_token = RoomStreamToken(
@@ -404,7 +404,7 @@ class InitialSyncHandler:
         membership: str,
         is_peeking: bool,
     ) -> JsonDict:
-        current_state = await self.state.get_current_state(room_id=room_id)
+        current_state = await self.store.get_current_state(room_id=room_id)
 
         # TODO: These concurrently
         time_now = self.clock.time_msec()

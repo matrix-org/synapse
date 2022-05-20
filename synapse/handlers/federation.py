@@ -20,7 +20,16 @@ import itertools
 import logging
 from enum import Enum
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import attr
 from signedjson.key import decode_verify_key_bytes
@@ -353,15 +362,11 @@ class FederationHandler:
         # First we try hosts that are already in the room
         # TODO: HEURISTIC ALERT.
 
-        curr_state = await self.state_handler.get_current_state(room_id)
+        users_in_room = await self.store.get_users_in_room(room_id)
+        likely_domains = {get_domain_from_id(u) for u in users_in_room}
+        likely_domains.discard(self.server_name)
 
-        curr_domains = get_domains_from_state(curr_state)
-
-        likely_domains = [
-            domain for domain, depth in curr_domains if domain != self.server_name
-        ]
-
-        async def try_backfill(domains: List[str]) -> bool:
+        async def try_backfill(domains: Collection[str]) -> bool:
             # TODO: Should we try multiple of these at a time?
             for dom in domains:
                 try:

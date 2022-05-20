@@ -34,6 +34,7 @@ from synapse.rest.admin._base import (
     assert_user_is_admin,
 )
 from synapse.storage.databases.main.room import RoomSortOrder
+from synapse.storage.state import StateFilter
 from synapse.types import JsonDict, RoomID, UserID, create_requester
 from synapse.util import json_decoder
 
@@ -553,12 +554,22 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
         user_to_add = content.get("user_id", requester.user.to_string())
 
         # Figure out which local users currently have power in the room, if any.
-        room_state = await self.state_handler.get_current_state(room_id)
-        if not room_state:
+        filtered_room_state = await self.store.get_filtered_current_state(
+            room_id,
+            StateFilter.from_types(
+                [
+                    (EventTypes.Create, ""),
+                    (EventTypes.PowerLevels, ""),
+                    (EventTypes.JoinRules, ""),
+                    (EventTypes.Member, user_to_add),
+                ]
+            ),
+        )
+        if not filtered_room_state:
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Server not in room")
 
-        create_event = room_state[(EventTypes.Create, "")]
-        power_levels = room_state.get((EventTypes.PowerLevels, ""))
+        create_event = filtered_room_state[(EventTypes.Create, "")]
+        power_levels = filtered_room_state.get((EventTypes.PowerLevels, ""))
 
         if power_levels is not None:
             # We pick the local user with the highest power.
@@ -634,7 +645,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
 
         # Now we check if the user we're granting admin rights to is already in
         # the room. If not and it's not a public room we invite them.
-        member_event = room_state.get((EventTypes.Member, user_to_add))
+        member_event = filtered_room_state.get((EventTypes.Member, user_to_add))
         is_joined = False
         if member_event:
             is_joined = member_event.content["membership"] in (
@@ -645,7 +656,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
         if is_joined:
             return HTTPStatus.OK, {}
 
-        join_rules = room_state.get((EventTypes.JoinRules, ""))
+        join_rules = filtered_room_state.get((EventTypes.JoinRules, ""))
         is_public = False
         if join_rules:
             is_public = join_rules.content.get("join_rule") == JoinRules.PUBLIC

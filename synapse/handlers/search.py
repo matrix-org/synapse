@@ -348,7 +348,7 @@ class SearchHandler:
         state_results = {}
         if include_state:
             for room_id in {e.room_id for e in search_result.allowed_events}:
-                state = await self.state_handler.get_current_state(room_id)
+                state = await self.store.get_current_state(room_id)
                 state_results[room_id] = list(state.values())
 
         aggregations = await self._relations_handler.get_bundled_aggregations(
