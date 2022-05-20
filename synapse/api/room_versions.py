@@ -303,6 +303,7 @@ class RoomVersions:
         msc2716_historical=False,
         msc2716_redactions=False,
         msc3787_knock_restricted_join_rule=True,
+        msc3667_int_only_power_levels=False,
     )
     MSC3667 = RoomVersion(
         # v7 + MSC3667
@@ -320,6 +321,7 @@ class RoomVersions:
         msc2403_knocking=True,
         msc2716_historical=False,
         msc2716_redactions=False,
+        msc3787_knock_restricted_join_rule=False,
         msc3667_int_only_power_levels=True,
     )
 
