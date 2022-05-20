@@ -31,7 +31,7 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class Code(str, Enum):
+class Codes(str, Enum):
     """
     All known error codes, as an enum of strings.
     """
@@ -91,11 +91,6 @@ class Code(str, Enum):
     UNABLE_TO_GRANT_JOIN = "M_UNABLE_TO_GRANT_JOIN"
 
     UNREDACTED_CONTENT_DELETED = "FI.MAU.MSC2815_UNREDACTED_CONTENT_DELETED"
-
-
-# `Codes` used to be a namespace for codes. This is now replaced
-# with the enum `Code` but we maintain it for backwards compatibility.
-Codes = Code
 
 
 class CodeMessageException(RuntimeError):

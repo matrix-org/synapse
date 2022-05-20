@@ -1,1 +1,1 @@
-Introduce a string enum `Code` to replace the namespace class `Codes`.
+Convert namespace class `Codes` into a string enum.
