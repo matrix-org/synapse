@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from collections import defaultdict
 from typing import (
     Collection,
     Dict,
@@ -768,9 +769,18 @@ class RelationsWorkerStore(SQLBaseStore):
         )
 
     @cached(iterable=True)
+    async def get_mutual_event_relations_for_rel_type(
+        self, event_id: str, relation_type: str
+    ) -> Set[Tuple[str, str]]:
+        raise NotImplementedError()
+
+    @cachedList(
+        cached_method_name="get_mutual_event_relations_for_rel_type",
+        list_name="relation_types",
+    )
     async def get_mutual_event_relations(
-        self, event_id: str
-    ) -> Set[Tuple[str, str, str]]:
+        self, event_id: str, relation_types: Collection[str]
+    ) -> Dict[str, Set[Tuple[str, str]]]:
         """
         Fetch event metadata for events which related to the same event as the given event.
 
@@ -780,20 +790,29 @@ class RelationsWorkerStore(SQLBaseStore):
             event_id: The event ID which is targeted by relations.
 
         Returns:
-            A set of tuples of:
-                The relation type
-                The sender
-                The event type
+            A dictionary of relation type to:
+                A set of tuples of:
+                    The sender
+                    The event type
         """
-        sql = """
+        rel_type_sql, rel_type_args = make_in_list_sql_clause(
+            self.database_engine, "rel_type", relation_types
+        )
+
+        sql = f"""
             SELECT DISTINCT relation_type, sender, type FROM event_relations
             INNER JOIN events USING (event_id)
-            WHERE relates_to_id = ?
+            WHERE relates_to_id = ? AND {rel_type_sql}
         """
 
-        def _get_event_relations(txn: LoggingTransaction) -> Set[Tuple[str, str, str]]:
-            txn.execute(sql, (event_id,))
-            return set(cast(List[Tuple[str, str, str]], txn.fetchall()))
+        def _get_event_relations(
+            txn: LoggingTransaction,
+        ) -> Dict[str, Set[Tuple[str, str]]]:
+            txn.execute(sql, [event_id] + rel_type_args)
+            result = defaultdict(set)
+            for rel_type, sender, type in txn.fetchall():
+                result[rel_type].add((sender, type))
+            return result
 
         return await self.db_pool.runInteraction(
             "get_event_relations", _get_event_relations

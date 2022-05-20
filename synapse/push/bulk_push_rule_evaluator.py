@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import itertools
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Union
 
@@ -215,16 +216,33 @@ class BulkPushRuleEvaluator:
         ) = await self._get_power_levels_and_sender_level(event, context)
 
         # If the experimental feature is not enabled, skip fetching relations.
+        relations = {}
         if self._relations_match_enabled:
+            # If the event does not have a relation, then cannot have any mutual
+            # relations.
             relation = relation_from_event(event)
             if relation:
-                relations = await self.store.get_mutual_event_relations(
-                    relation.parent_id
-                )
-            else:
-                relations = set()
-        else:
-            relations = set()
+                # Pre-filter to figure out which relation types are interesting.
+                rel_types = set()
+                for rule in itertools.chain(*rules_by_user.values()):
+                    # Skip disabled rules.
+                    if not rule.get("enabled"):
+                        continue
+
+                    for condition in rule["conditions"]:
+                        if condition["kind"] != "org.matrix.msc3772.relation_match":
+                            continue
+
+                        # rel_type is required.
+                        rel_type = condition.get("rel_type")
+                        if rel_type:
+                            rel_types.add(rel_type)
+
+                # If any valid rules were found, fetch the mutual relations.
+                if rel_types:
+                    relations = await self.store.get_mutual_event_relations(
+                        relation.parent_id, rel_types
+                    )
 
         evaluator = PushRuleEvaluatorForEvent(
             event,

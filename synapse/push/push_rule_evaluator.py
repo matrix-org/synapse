@@ -120,7 +120,7 @@ class PushRuleEvaluatorForEvent:
         room_member_count: int,
         sender_power_level: int,
         power_levels: Dict[str, Union[int, Dict[str, int]]],
-        relations: Set[Tuple[str, str, str]],
+        relations: Dict[str, Set[Tuple[str, str]]],
         relations_match_enabled: bool,
     ):
         self._event = event
@@ -293,12 +293,10 @@ class PushRuleEvaluatorForEvent:
         type_pattern = condition.get("type")
 
         # If any other relations matches, return True.
-        for relation in self._relations:
-            if rel_type != relation[0]:
+        for sender, event_type in self._relations.get(rel_type, ()):
+            if sender_pattern and not _glob_matches(sender_pattern, sender):
                 continue
-            if sender_pattern and not _glob_matches(sender_pattern, relation[1]):
-                continue
-            if type_pattern and not _glob_matches(type_pattern, relation[2]):
+            if type_pattern and not _glob_matches(type_pattern, event_type):
                 continue
             # All values must have matched.
             return True

@@ -1829,7 +1829,7 @@ class PersistEventsStore:
             (relation.parent_id,),
         )
         txn.call_after(
-            self.store.get_mutual_event_relations.invalidate,
+            self.store.get_mutual_event_relations_for_rel_type.invalidate,
             (relation.parent_id,),
         )
 
@@ -2009,7 +2009,9 @@ class PersistEventsStore:
                 txn, self.store.get_thread_participated, (redacted_relates_to,)
             )
             self.store._invalidate_cache_and_stream(
-                txn, self.store.get_mutual_event_relations, (redacted_relates_to,)
+                txn,
+                self.store.get_mutual_event_relations_for_rel_type,
+                (redacted_relates_to,),
             )
 
         self.db_pool.simple_delete_txn(
