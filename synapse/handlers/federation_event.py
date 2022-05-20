@@ -1588,6 +1588,9 @@ class FederationEventHandler:
         room_version = await self._store.get_room_version_id(event.room_id)
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
+        # The event types we want to pull from the "current" state.
+        auth_types = auth_types_for_event(room_version_obj, event)
+
         # Calculate the "current state".
         if state is not None:
             # If we're explicitly given the state then we won't have all the
@@ -1614,8 +1617,8 @@ class FederationEventHandler:
                 k: e.event_id for k, e in current_states.items()
             }
         else:
-            current_state_ids = await self._state_handler.get_current_state_ids(
-                event.room_id, latest_event_ids=extrem_ids
+            current_state_ids = await self._store.get_filtered_current_state_ids(
+                event.room_id, StateFilter.from_types(auth_types)
             )
 
         logger.debug(
@@ -1625,7 +1628,6 @@ class FederationEventHandler:
         )
 
         # Now check if event pass auth against said current state
-        auth_types = auth_types_for_event(room_version_obj, event)
         current_state_ids_list = [
             e for k, e in current_state_ids.items() if k in auth_types
         ]
