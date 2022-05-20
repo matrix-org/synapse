@@ -30,6 +30,7 @@ from typing import (
 
 from prometheus_client import Counter
 
+from synapse import event_auth
 from synapse.api.constants import (
     EventContentFields,
     EventTypes,
@@ -63,6 +64,7 @@ from synapse.replication.http.federation import (
 )
 from synapse.state import StateResolutionStore
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
+from synapse.storage.state import StateFilter
 from synapse.types import (
     PersistedEventPosition,
     RoomStreamToken,
@@ -1500,7 +1502,11 @@ class FederationEventHandler:
             return context
 
         # now check auth against what we think the auth events *should* be.
-        prev_state_ids = await context.get_prev_state_ids()
+        event_types = event_auth.auth_types_for_event(event.room_version, event)
+        prev_state_ids = await context.get_prev_state_ids(
+            StateFilter.from_types(event_types)
+        )
+
         auth_events_ids = self._event_auth_handler.compute_auth_events(
             event, prev_state_ids, for_verification=True
         )
