@@ -32,13 +32,11 @@ from typing import (
     Set,
     Tuple,
     Union,
-    overload,
 )
 
 import attr
 from frozendict import frozendict
 from prometheus_client import Counter, Histogram
-from typing_extensions import Literal
 
 from synapse.api.constants import EventTypes
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, StateResolutionVersions
@@ -131,68 +129,6 @@ class StateHandler:
         self.hs = hs
         self._state_resolution_handler = hs.get_state_resolution_handler()
         self._storage = hs.get_storage()
-
-    @overload
-    async def get_current_state(
-        self,
-        room_id: str,
-        event_type: Literal[None] = None,
-        state_key: str = "",
-        latest_event_ids: Optional[List[str]] = None,
-    ) -> StateMap[EventBase]:
-        ...
-
-    @overload
-    async def get_current_state(
-        self,
-        room_id: str,
-        event_type: str,
-        state_key: str = "",
-        latest_event_ids: Optional[List[str]] = None,
-    ) -> Optional[EventBase]:
-        ...
-
-    async def get_current_state(
-        self,
-        room_id: str,
-        event_type: Optional[str] = None,
-        state_key: str = "",
-        latest_event_ids: Optional[List[str]] = None,
-    ) -> Union[Optional[EventBase], StateMap[EventBase]]:
-        """Retrieves the current state for the room. This is done by
-        calling `get_latest_events_in_room` to get the leading edges of the
-        event graph and then resolving any of the state conflicts.
-
-        This is equivalent to getting the state of an event that were to send
-        next before receiving any new events.
-
-        Returns:
-            If `event_type` is specified, then the method returns only the one
-            event (or None) with that `event_type` and `state_key`.
-
-            Otherwise, a map from (type, state_key) to event.
-        """
-        if not latest_event_ids:
-            latest_event_ids = await self.store.get_latest_event_ids_in_room(room_id)
-        assert latest_event_ids is not None
-
-        logger.debug("calling resolve_state_groups from get_current_state")
-        ret = await self.resolve_state_groups_for_events(room_id, latest_event_ids)
-        state = ret.state
-
-        if event_type:
-            event_id = state.get((event_type, state_key))
-            event = None
-            if event_id:
-                event = await self.store.get_event(event_id, allow_none=True)
-            return event
-
-        state_map = await self.store.get_events(
-            list(state.values()), get_prev_content=False
-        )
-        return {
-            key: state_map[e_id] for key, e_id in state.items() if e_id in state_map
-        }
 
     async def get_current_state_ids(
         self, room_id: str, latest_event_ids: Optional[Collection[str]] = None
