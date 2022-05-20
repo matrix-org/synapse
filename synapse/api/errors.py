@@ -17,6 +17,7 @@
 
 import logging
 import typing
+from enum import Enum
 from http import HTTPStatus
 from typing import Any, Dict, List, Optional, Union
 
@@ -30,7 +31,17 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class Codes:
+class Code(str, Enum):
+    """
+    All known error codes, as an enum of strings.
+    """
+
+    def __str__(self) -> str:
+        return self.value
+
+    def __repr__(self) -> str:
+        return repr(self.value)
+
     UNRECOGNIZED = "M_UNRECOGNIZED"
     UNAUTHORIZED = "M_UNAUTHORIZED"
     FORBIDDEN = "M_FORBIDDEN"
@@ -80,6 +91,11 @@ class Codes:
     UNABLE_TO_GRANT_JOIN = "M_UNABLE_TO_GRANT_JOIN"
 
     UNREDACTED_CONTENT_DELETED = "FI.MAU.MSC2815_UNREDACTED_CONTENT_DELETED"
+
+
+# `Codes` used to be a namespace for codes. This is now replaced
+# with the enum `Code` but we maintain it for backwards compatibility.
+Codes = Code
 
 
 class CodeMessageException(RuntimeError):
@@ -265,7 +281,9 @@ class UnrecognizedRequestError(SynapseError):
     """An error indicating we don't understand the request you're trying to make"""
 
     def __init__(
-        self, msg: str = "Unrecognized request", errcode: str = Codes.UNRECOGNIZED
+        self,
+        msg: str = "Unrecognized request",
+        errcode: str = Codes.UNRECOGNIZED,
     ):
         super().__init__(400, msg, errcode)
 
