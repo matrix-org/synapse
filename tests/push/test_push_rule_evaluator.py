@@ -332,18 +332,25 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         }
         self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))
 
-        # Check just sender.
+        # Check just sender, this fails since rel_type is required.
         condition = {
             "kind": "org.matrix.msc3772.relation_match",
             "sender": "@user:test",
         }
-        self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))
-        condition = {
-            "kind": "org.matrix.msc3772.relation_match",
-            "sender": "@other:test",
-        }
         self.assertFalse(evaluator.matches(condition, "@user:test", "foo"))
 
-        # Check glob.
-        condition = {"kind": "org.matrix.msc3772.relation_match", "sender": "@*:test"}
+        # Check sender glob.
+        condition = {
+            "kind": "org.matrix.msc3772.relation_match",
+            "rel_type": "m.annotation",
+            "sender": "@*:test",
+        }
+        self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))
+
+        # Check event type glob.
+        condition = {
+            "kind": "org.matrix.msc3772.relation_match",
+            "rel_type": "m.annotation",
+            "event_type": "*.reaction",
+        }
         self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))

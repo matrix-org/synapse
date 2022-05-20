@@ -280,7 +280,11 @@ class PushRuleEvaluatorForEvent:
         Returns:
              True if the condition matches the event, False otherwise.
         """
-        rel_type_pattern = condition.get("rel_type")
+        rel_type = condition.get("rel_type")
+        if not rel_type:
+            logger.warning("relation_match condition missing rel_type")
+            return False
+
         sender_pattern = condition.get("sender")
         if sender_pattern is None:
             sender_type = condition.get("sender_type")
@@ -288,13 +292,9 @@ class PushRuleEvaluatorForEvent:
                 sender_pattern = user_id
         type_pattern = condition.get("type")
 
-        if not rel_type_pattern and not sender_pattern and not type_pattern:
-            logger.warning("relation_match condition with nothing to match")
-            return False
-
         # If any other relations matches, return True.
         for relation in self._relations:
-            if rel_type_pattern and not _glob_matches(rel_type_pattern, relation[0]):
+            if rel_type != relation[0]:
                 continue
             if sender_pattern and not _glob_matches(sender_pattern, relation[1]):
                 continue
