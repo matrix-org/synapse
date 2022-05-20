@@ -209,7 +209,8 @@ class BulkPushRuleEvaluator:
         rules_by_user = await self._get_rules_for_event(event, context)
         actions_by_user: Dict[str, List[Union[dict, str]]] = {}
 
-        room_members = await self.store.get_joined_users_from_context(event, context)
+        # FIXME!!!
+        # room_members = await self.store.get_joined_users_from_context(event, context)
 
         room_member_count = await self.store.get_number_joined_users_in_room(
             event.room_id
@@ -238,9 +239,10 @@ class BulkPushRuleEvaluator:
                 continue
 
             display_name = None
-            profile_info = room_members.get(uid)
-            if profile_info:
-                display_name = profile_info.display_name
+            # FIXME!!!
+            # profile_info = room_members.get(uid)
+            # if profile_info:
+            #     display_name = profile_info.display_name
 
             if not display_name:
                 # Handle the case where we are pushing a membership event to
