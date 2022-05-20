@@ -218,6 +218,20 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             "get_current_state_ids", _get_current_state_ids_txn
         )
 
+    async def get_current_state(self, room_id: str) -> StateMap[EventBase]:
+        """Same as `get_current_state_ids` but also fetches the events"""
+        state_map_ids = await self.get_current_state_ids(room_id)
+
+        event_map = await self.get_events(list(state_map_ids.values()))
+
+        state_map = {}
+        for key, event_id in state_map_ids.items():
+            event = event_map.get(event_id)
+            if event:
+                state_map[key] = event
+
+        return state_map
+
     # FIXME: how should this be cached?
     async def get_filtered_current_state_ids(
         self, room_id: str, state_filter: Optional[StateFilter] = None
@@ -268,6 +282,22 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         return await self.db_pool.runInteraction(
             "get_filtered_current_state_ids", _get_filtered_current_state_ids_txn
         )
+
+    async def get_filtered_current_state(
+        self, room_id: str, state_filter: Optional[StateFilter] = None
+    ) -> StateMap[EventBase]:
+        """Same as `get_filtered_current_state_ids` but also fetches the events"""
+        state_map_ids = await self.get_filtered_current_state_ids(room_id, state_filter)
+
+        event_map = await self.get_events(list(state_map_ids.values()))
+
+        state_map = {}
+        for key, event_id in state_map_ids.items():
+            event = event_map.get(event_id)
+            if event:
+                state_map[key] = event
+
+        return state_map
 
     async def get_current_state_event(
         self, room_id: str, event_type: str, state_key: str
