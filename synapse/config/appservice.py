@@ -34,7 +34,7 @@ class AppServiceConfig(Config):
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.app_service_config_files = config.get("app_service_config_files", [])
         self.track_appservice_user_ips = config.get("track_appservice_user_ips", False)
-        self.appservice_max_backoff = config.get("appservice_max_backoff", None)
+        self.appservice_max_backoff_s = config.get("appservice_max_backoff_s", None)
 
     def generate_config_section(cls, **kwargs: Any) -> str:
         return """\
@@ -56,7 +56,7 @@ class AppServiceConfig(Config):
         #
         # Regardless of this setting, the delay will never be longer than 512 seconds (about 8.5 minutes).
         #
-        #appservice_max_backoff: 60
+        #appservice_max_backoff_s: 60
         """
 
 

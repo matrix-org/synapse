@@ -1601,7 +1601,7 @@ room_prejoin_state:
 #
 # Regardless of this setting, the delay will never be longer than 512 seconds (about 8.5 minutes).
 #
-#appservice_max_backoff: 60
+#appservice_max_backoff_s: 60
 
 
 # a secret which is used to sign access tokens. If none is specified,

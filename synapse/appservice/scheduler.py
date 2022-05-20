@@ -445,7 +445,7 @@ class _TransactionController:
             self.as_api,
             service,
             self.on_recovered,
-            self.as_config.appservice_max_backoff,
+            self.as_config.appservice_max_backoff_s,
         )
         self.recoverers[service.id] = recoverer
         recoverer.recover()
@@ -467,7 +467,7 @@ class _Recoverer:
         as_api (synapse.appservice.api.ApplicationServiceApi):
         service (synapse.appservice.ApplicationService): the service we are managing
         callback (callable[_Recoverer]): called once the service recovers.
-        max_backoff (int|None): maximum interval between retries
+        max_backoff_s (int|None): maximum interval between retries
     """
 
     def __init__(
@@ -477,7 +477,7 @@ class _Recoverer:
         as_api: ApplicationServiceApi,
         service: ApplicationService,
         callback: Callable[["_Recoverer"], Awaitable[None]],
-        max_backoff: Optional[int],
+        max_backoff_s: Optional[int],
     ):
         self.clock = clock
         self.store = store
@@ -485,7 +485,7 @@ class _Recoverer:
         self.service = service
         self.callback = callback
         self.backoff_counter = 1
-        self.max_backoff = max_backoff
+        self.max_backoff_s = max_backoff_s
 
     def recover(self) -> None:
         def _retry() -> None:
@@ -494,8 +494,8 @@ class _Recoverer:
             )
 
         delay = 2**self.backoff_counter
-        if self.max_backoff is not None and delay > self.max_backoff:
-            delay = self.max_backoff
+        if self.max_backoff_s is not None and delay > self.max_backoff_s:
+            delay = self.max_backoff_s
         logger.info("Scheduling retries on %s in %fs", self.service.id, delay)
         self.clock.call_later(delay, _retry)
 

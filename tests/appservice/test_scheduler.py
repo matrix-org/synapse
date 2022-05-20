@@ -154,7 +154,7 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
             store=self.store,
             service=self.service,
             callback=self.callback,
-            max_backoff=None,
+            max_backoff_s=None,
         )
 
     def test_recover_single_txn(self):
