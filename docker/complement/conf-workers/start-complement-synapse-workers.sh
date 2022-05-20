@@ -39,6 +39,12 @@ export SYNAPSE_WORKER_TYPES="\
     appservice, \
     pusher"
 
+# Add Complement's appservice registration directory, if there is one
+# (It can be absent when there are no application services in this test!)
+if [ -d /complement/appservice ]; then
+    export SYNAPSE_AS_REGISTRATION_DIR=/complement/appservice
+fi
+
 # Run the script that writes the necessary config files and starts supervisord, which in turn
 # starts everything else
 exec /configure_workers_and_start.py
