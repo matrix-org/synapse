@@ -131,22 +131,19 @@ class StateHandler:
         self._storage = hs.get_storage()
 
     async def get_current_state_ids(
-        self, room_id: str, latest_event_ids: Optional[Collection[str]] = None
+        self,
+        room_id: str,
+        latest_event_ids: Collection[str],
     ) -> StateMap[str]:
         """Get the current state, or the state at a set of events, for a room
 
         Args:
             room_id:
-            latest_event_ids: if given, the forward extremities to resolve. If
-                None, we look them up from the database (via a cache).
+            latest_event_ids: The forward extremities to resolve.
 
         Returns:
             the state dict, mapping from (event_type, state_key) -> event_id
         """
-        if not latest_event_ids:
-            latest_event_ids = await self.store.get_latest_event_ids_in_room(room_id)
-        assert latest_event_ids is not None
-
         logger.debug("calling resolve_state_groups from get_current_state_ids")
         ret = await self.resolve_state_groups_for_events(room_id, latest_event_ids)
         return ret.state
