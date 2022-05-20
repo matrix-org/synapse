@@ -20,16 +20,7 @@ import itertools
 import logging
 from enum import Enum
 from http import HTTPStatus
-from typing import (
-    TYPE_CHECKING,
-    Collection,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Tuple,
-    Union,
-)
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
 
 import attr
 from signedjson.key import decode_verify_key_bytes
