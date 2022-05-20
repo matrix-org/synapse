@@ -41,7 +41,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
 CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
     ["synapse.events.EventBase"],
     Awaitable[
