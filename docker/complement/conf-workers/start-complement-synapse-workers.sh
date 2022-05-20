@@ -36,6 +36,21 @@ export SYNAPSE_WORKER_TYPES="\
     appservice, \
     pusher"
 
+
+# Generate a TLS key, then generate a certificate by having Complement's CA sign it
+# Note that both the key and certificate are in PEM format (not DER).
+openssl genrsa -out /conf/server.tls.key 2048
+
+openssl req -new -key /conf/server.tls.key -out /conf/server.tls.csr \
+  -subj "/CN=${SERVER_NAME}"
+
+openssl x509 -req -in /conf/server.tls.csr \
+  -CA /complement/ca/ca.crt -CAkey /complement/ca/ca.key -set_serial 1 \
+  -out /conf/server.tls.crt
+
+export SYNAPSE_TLS_CERT=/conf/server.tls.crt
+export SYNAPSE_TLS_KEY=/conf/server.tls.key
+
 # Run the script that writes the necessary config files and starts supervisord, which in turn
 # starts everything else
 exec /configure_workers_and_start.py
