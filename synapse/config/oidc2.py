@@ -101,12 +101,25 @@ class OIDCProviderModel(BaseModel):
     scopes: Tuple[StrictStr, ...] = ("openid",)
 
     # the oauth2 authorization endpoint. Required if discovery is disabled.
-    # TODO: required if discovery is disabled
     authorization_endpoint: Optional[StrictStr]
 
     # the oauth2 token endpoint. Required if discovery is disabled.
-    # TODO: required if discovery is disabled
     token_endpoint: Optional[StrictStr]
+
+    # Normally, validators aren't run when fields don't have a value provided.
+    # Using validate=True ensures we run the validator even in that situation.
+    @validator("authorization_endpoint", "token_endpoint", always=True)
+    def endpoints_required_if_discovery_disabled(
+        cls: Type["OIDCProviderModel"],
+        endpoint_url: Optional[str],
+        values: Mapping[str, Any],
+        field: ModelField,
+    ) -> Optional[str]:
+        # `if "discover" in values means: don't run our checks if "discover" didn't
+        # pass validation. (NB: validation order is the field definition order)
+        if "discover" in values and not values["discover"] and endpoint_url is None:
+            raise ValueError(f"{field.name} is required if discovery is disabled")
+        return endpoint_url
 
     # the OIDC userinfo endpoint. Required if discovery is disabled and the
     # "openid" scope is not requested.

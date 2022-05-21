@@ -4,6 +4,7 @@ from unittest import TestCase
 
 import yaml
 from pydantic import ValidationError
+from parameterized import parameterized
 
 from synapse.config.oidc2 import (
     OIDCProviderModel,
@@ -29,6 +30,7 @@ client_secret_jwt_key:
 client_auth_method: "client_secret_post"
 scopes: ["name", "email", "openid"]
 authorization_endpoint: https://appleid.apple.com/auth/authorize?response_mode=form_post
+token_endpoint: https://appleid.apple.com/dummy_url_here
 user_mapping_provider:
   config:
     email_template: "{{ user.email }}"
@@ -253,3 +255,35 @@ class PydanticOIDCTestCase(TestCase):
         del self.config["scopes"]
         model = OIDCProviderModel.parse_obj(self.config)
         self.assertEqual(model.scopes, ("openid",))
+
+    @parameterized.expand(["authorization_endpoint", "token_endpoint"])
+    def test_endpoints_required_when_discovery_disabled(self, key: str) -> None:
+        # Test that this field is required if discovery is disabled
+        self.config["discover"] = False
+        with self.assertRaises(ValidationError):
+            self.config[key] = None
+            OIDCProviderModel.parse_obj(self.config)
+        with self.assertRaises(ValidationError):
+            del self.config[key]
+            OIDCProviderModel.parse_obj(self.config)
+        # We don't validate that the endpoint is a sensible URL; anything str will do
+        self.config[key] = "blahblah"
+        OIDCProviderModel.parse_obj(self.config)
+
+        def check_all_cases_pass():
+            self.config[key] = None
+            OIDCProviderModel.parse_obj(self.config)
+
+            del self.config[key]
+            OIDCProviderModel.parse_obj(self.config)
+
+            self.config[key] = "blahblah"
+            OIDCProviderModel.parse_obj(self.config)
+
+        # With discovery enabled, all three cases are accepted.
+        self.config["discover"] = True
+        check_all_cases_pass()
+
+        # If not specified, discovery is also on by default.
+        del self.config["discover"]
+        check_all_cases_pass()
