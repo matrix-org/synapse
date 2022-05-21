@@ -1,11 +1,14 @@
 from enum import Enum
 
-from typing import TYPE_CHECKING, Any, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional, Tuple, Type
 
-from pydantic import BaseModel, StrictBool, StrictStr, constr
+from pydantic import BaseModel, StrictBool, StrictStr, constr, validator
 
 # Ugly workaround for https://github.com/samuelcolvin/pydantic/issues/156. Mypy doesn't
 # consider expressions like `constr(...)` to be valid types.
+from pydantic.fields import ModelField
+
+from synapse.util.stringutils import parse_and_validate_mxc_uri
 
 if TYPE_CHECKING:
     IDP_ID_TYPE = str
@@ -60,8 +63,12 @@ class OIDCProviderModel(BaseModel):
     idp_name: StrictStr
 
     # Optional MXC URI for icon for this IdP.
-    # TODO: validate that this is an MXC URI.
     idp_icon: Optional[StrictStr]
+
+    @validator("idp_icon")
+    def idp_icon_is_an_mxc_url(cls: Type["OIDCProviderModel"], value: str) -> str:
+        parse_and_validate_mxc_uri(value)
+        return value
 
     # Optional brand identifier for this IdP.
     idp_brand: Optional[StrictStr]

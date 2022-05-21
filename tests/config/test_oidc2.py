@@ -103,7 +103,9 @@ class PydanticOIDCTestCase(TestCase):
             # And while we're at it, check that we spot errors in both fields
             reported_bad_fields = {item["loc"] for item in e.exception.errors()}
             expected_bad_fields = {("idp_id",), ("idp_name",)}
-            self.assertEqual(reported_bad_fields, expected_bad_fields, e.exception.errors())
+            self.assertEqual(
+                reported_bad_fields, expected_bad_fields, e.exception.errors()
+            )
 
     def test_issuer(self) -> None:
         """Example of a StrictStr field without a default."""
@@ -146,6 +148,19 @@ class PydanticOIDCTestCase(TestCase):
         self.config["idp_brand"] = None
         model = OIDCProviderModel.parse_obj(self.config)
         self.assertIsNone(model.idp_brand)
+
+    def test_idp_icon(self) -> None:
+        # Test that bad types are rejected, even with our validator in place
+        for bad_value in None, {}, [], 123, 45.6:
+            with self.assertRaises(ValidationError):
+                self.config["idp_icon"] = bad_value
+                OIDCProviderModel.parse_obj(self.config)
+
+        # Test that bad strings are rejected by our validator
+        for bad_value in "", "notaurl", "https://example.com", "mxc://mxc://mxc://":
+            with self.assertRaises(ValidationError):
+                self.config["idp_icon"] = bad_value
+                OIDCProviderModel.parse_obj(self.config)
 
     def test_discover(self) -> None:
         """Example of a StrictBool field with a default."""
