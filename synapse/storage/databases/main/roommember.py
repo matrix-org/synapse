@@ -887,6 +887,29 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return True
 
+    async def get_current_hosts_in_room(self, room_id: str) -> Set[str]:
+        """Get current hosts in room."""
+
+        if isinstance(self.database_engine, Sqlite3Engine):
+            users = await self.get_users_in_room(room_id)
+            return {get_domain_from_id(u) for u in users}
+
+        def get_current_hosts_in_room_txn(txn: LoggingTransaction) -> Set[str]:
+            sql = """
+                SELECT DISTINCT substring(state_key FROM '@[^:]*:(.*)$')
+                FROM current_state_events
+                WHERE
+                    type = 'm.room.member'
+                    AND membership = 'join'
+                    AND room_id = ?
+            """
+            txn.execute(sql, (room_id,))
+            return set(txn)
+
+        return await self.db_pool.runInteraction(
+            "get_current_hosts_in_room", get_current_hosts_in_room_txn
+        )
+
     async def get_joined_hosts(
         self, room_id: str, state_entry: "_StateCacheEntry"
     ) -> FrozenSet[str]:
