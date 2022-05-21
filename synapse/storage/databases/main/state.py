@@ -16,6 +16,8 @@ import collections.abc
 import logging
 from typing import TYPE_CHECKING, Collection, Dict, Iterable, Optional, Set, Tuple
 
+import attr
+
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import NotFoundError, UnsupportedRoomVersionError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
@@ -26,6 +28,7 @@ from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
     LoggingTransaction,
+    make_in_list_sql_clause,
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
@@ -41,6 +44,15 @@ logger = logging.getLogger(__name__)
 
 
 MAX_STATE_DELTA_HOPS = 100
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class EventMetadata:
+    """Returned by `get_metadata_for_events`"""
+
+    room_id: str
+    event_type: str
+    state_key: Optional[str]
 
 
 def _retrieve_and_check_room_version(room_id: str, room_version_id: str) -> RoomVersion:
@@ -132,6 +144,36 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             raise NotFoundError("Could not find room_version for %s" % (room_id,))
 
         return room_version
+
+    async def get_metadata_for_events(
+        self, event_ids: Collection[str]
+    ) -> Dict[str, EventMetadata]:
+        """Get some metadata (room_id, type, state_key) for the given events."""
+
+        clause, args = make_in_list_sql_clause(
+            self.database_engine, "e.event_id", event_ids
+        )
+
+        sql = f"""
+            SELECT e.event_id, e.room_id, e.type, e.state_key FROM events AS e
+            LEFT JOIN state_events USING (event_id)
+            WHERE {clause}
+        """
+
+        def get_metadata_for_events_txn(
+            txn: LoggingTransaction,
+        ) -> Dict[str, EventMetadata]:
+            txn.execute(sql, args)
+            return {
+                event_id: EventMetadata(
+                    room_id=room_id, event_type=event_type, state_key=state_key
+                )
+                for event_id, room_id, event_type, state_key in txn
+            }
+
+        return await self.db_pool.runInteraction(
+            "get_metadata_for_events", get_metadata_for_events_txn
+        )
 
     async def get_room_predecessor(self, room_id: str) -> Optional[JsonMapping]:
         """Get the predecessor of an upgraded room if it exists.
