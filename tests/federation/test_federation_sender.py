@@ -30,15 +30,15 @@ from tests.unittest import HomeserverTestCase, override_config
 
 class FederationSenderReceiptsTestCases(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
-        mock_state_handler = Mock(spec=["get_current_hosts_in_room"])
-        # Ensure a new Awaitable is created for each call.
-        mock_state_handler.get_current_hosts_in_room.return_value = make_awaitable(
-            ["test", "host2"]
-        )
-        return self.setup_test_homeserver(
-            state_handler=mock_state_handler,
+        hs = self.setup_test_homeserver(
             federation_transport_client=Mock(spec=["send_transaction"]),
         )
+
+        hs.get_datastores().main.get_current_hosts_in_room = Mock(
+            return_value=make_awaitable(["test", "host2"])
+        )
+
+        return hs
 
     @override_config({"send_federation": True})
     def test_send_receipts(self):
