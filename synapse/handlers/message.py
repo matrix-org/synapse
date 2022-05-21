@@ -1021,8 +1021,25 @@ class EventCreationHandler:
             #
             # TODO(faster_joins): figure out how this works, and make sure that the
             #   old state is complete.
-            old_state = await self.store.get_events_as_list(state_event_ids)
-            context = await self.state.compute_event_context(event, old_state=old_state)
+            metadata = await self.store.get_metadata_for_events(state_event_ids)
+
+            state_map = {}
+            for state_id in state_event_ids:
+                data = metadata.get(state_id)
+                if data is None:
+                    raise Exception("State event not persisted %s", state_id)
+
+                if data.state_key is None:
+                    raise Exception(
+                        "Trying to set non-state event as state: %s", state_id
+                    )
+
+                state_map[(data.event_type, data.state_key)] = state_id
+
+            context = await self.state.compute_event_context(
+                event,
+                state_ids_before_event=state_map,
+            )
         else:
             context = await self.state.compute_event_context(event)
 
