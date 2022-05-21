@@ -30,6 +30,7 @@
         - [SSO Mapping Providers](sso_mapping_providers.md)
       - [Password Auth Providers](password_auth_providers.md)
       - [JSON Web Tokens](jwt.md)
+      - [JSON Web Tokens (as external_id)](sso_jwt.md)
       - [Refresh Tokens](usage/configuration/user_authentication/refresh_tokens.md)
     - [Registration Captcha](CAPTCHA_SETUP.md)
     - [Application Services](application_services.md)

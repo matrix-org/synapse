@@ -2712,6 +2712,17 @@ Options for each entry include:
    you are connecting to a provider that is not OpenID Connect compliant.
    Defaults to false. Avoid this in production.
 
+* `sso_jwt_enabled`: Defaults to true. This allows a client to log in by
+  presenting a JWT token acquired from "somewhere else" (not synapse's SSO
+  flow). If set to false, such login attempts will be rejected.
+  See [JWT Login Type (as external_id)](../../sso_jwt.md) for further
+  details.
+
+* `standalone_jwt_audience`: Relates to the
+  ["JWT as external_id"](../../sso_jwt.md) login flow. If this flow is
+  enabled for this provider, then each JWT will be checked if it contains
+  this string in its `aud` claims.
+
 * `user_profile_method`: Whether to fetch the user profile from the userinfo
    endpoint, or to rely on the data returned in the id_token from the `token_endpoint`.
    Valid values are: `auto` or `userinfo_endpoint`.
