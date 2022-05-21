@@ -1,0 +1,2 @@
+Fixed a bug where device list updates over federation would fail if they
+were not a list. Contributed by Carl Bordum Hansen.
