@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Set, Tup
 import attr
 from prometheus_client import Counter
 
+from twisted.python import failure
+
 from synapse.api.constants import EventTypes, Membership, ReceiptTypes
 from synapse.api.filtering import FilterCollection
 from synapse.api.presence import UserPresenceState
@@ -643,6 +645,13 @@ class SyncHandler:
             event: event of interest
             state_filter: The state filter used to fetch state from the database.
         """
+        f = failure.Failure()
+        logger.info(
+            "SYNC get_state_after_event in room %s",
+            event.room_id,
+            exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+        )
+
         state_ids = await self.state_store.get_state_ids_for_event(
             event.event_id, state_filter=state_filter or StateFilter.all()
         )
