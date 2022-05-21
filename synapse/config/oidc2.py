@@ -54,11 +54,9 @@ class OIDCProviderModel(BaseModel):
 
     # a unique identifier for this identity provider. Used in the 'user_external_ids'
     # table, as well as the query/path parameter used in the login protocol.
-    # TODO: this is optional in the old-style config, defaulting to "oidc".
     idp_id: IDP_ID_TYPE
 
     # user-facing name for this identity provider.
-    # TODO: this is optional in the old-style config, defaulting to "OIDC".
     idp_name: StrictStr
 
     # Optional MXC URI for icon for this IdP.
@@ -134,3 +132,8 @@ class OIDCProviderModel(BaseModel):
 
     # required attributes to require in userinfo to allow login/registration
     attribute_requirements: Tuple[Any, ...] = ()  # TODO SsoAttributeRequirement] = ()
+
+
+class LegacyOIDCProviderModel(OIDCProviderModel):
+    idp_id: IDP_ID_TYPE = "oidc"
+    idp_name: StrictStr = "OIDC"

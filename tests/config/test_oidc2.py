@@ -1,12 +1,15 @@
 from copy import deepcopy
 from typing import Any, Dict
+from unittest import TestCase
 
 import yaml
 from pydantic import ValidationError
 
-from synapse.config.oidc2 import OIDCProviderModel, ClientAuthMethods
-
-from tests.unittest import TestCase
+from synapse.config.oidc2 import (
+    OIDCProviderModel,
+    ClientAuthMethods,
+    LegacyOIDCProviderModel,
+)
 
 SAMPLE_CONFIG = yaml.safe_load(
     """
@@ -79,6 +82,28 @@ class PydanticOIDCTestCase(TestCase):
         with self.assertRaises(ValidationError) as e:
             self.config["idp_id"] = "$" * 500
             OIDCProviderModel.parse_obj(self.config)
+
+    def test_legacy_model(self) -> None:
+        # Check that parsing the sample config doesn't raise an error.
+        LegacyOIDCProviderModel.parse_obj(self.config)
+
+        # Check we have default values for the attributes which have a legacy fallback
+        del self.config["idp_id"]
+        del self.config["idp_name"]
+        model = LegacyOIDCProviderModel.parse_obj(self.config)
+        self.assertEqual(model.idp_id, "oidc")
+        self.assertEqual(model.idp_name, "OIDC")
+
+        # Check we still reject bad types
+        for bad_value in 123, [], {}, None:
+            with self.assertRaises(ValidationError) as e:
+                self.config["idp_id"] = bad_value
+                self.config["idp_name"] = bad_value
+                LegacyOIDCProviderModel.parse_obj(self.config)
+            # And while we're at it, check that we spot errors in both fields
+            reported_bad_fields = {item["loc"] for item in e.exception.errors()}
+            expected_bad_fields = {("idp_id",), ("idp_name",)}
+            self.assertEqual(reported_bad_fields, expected_bad_fields, e.exception.errors())
 
     def test_issuer(self) -> None:
         """Example of a StrictStr field without a default."""
