@@ -59,6 +59,20 @@ class OIDCProviderModel(BaseModel):
     # table, as well as the query/path parameter used in the login protocol.
     idp_id: IDP_ID_TYPE
 
+    @validator("idp_id")
+    def ensure_idp_id_prefix(cls: Type[BaseModel], idp_id: str) -> str:
+        """Prefix the given IDP with a prefix specific to the SSO mechanism, to avoid
+        clashes with other mechs (such as SAML, CAS).
+
+        We allow "oidc" as an exception so that people migrating from old-style
+        "oidc_config" format (which has long used "oidc" as its idp_id) can migrate to
+        a new-style "oidc_providers" entry without changing the idp_id for their provider
+        (and thereby invalidating their user_external_ids data).
+        """
+        if idp_id != "oidc":
+            return "oidc-" + idp_id
+        return idp_id
+
     # user-facing name for this identity provider.
     idp_name: StrictStr
 
