@@ -36,6 +36,11 @@ LEGACY_USER_MAPPING_PROVIDER = "synapse.handlers.oidc_handler.JinjaOidcMappingPr
 class OIDCConfig(Config):
     section = "oidc"
 
+    def __init__(self, *args: Any):
+        super().__init__(*args)
+
+        self._sso_jwt_enabled = False
+
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.oidc_providers = tuple(_parse_oidc_provider_configs(config))
         if not self.oidc_providers:
