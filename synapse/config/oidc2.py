@@ -1,15 +1,13 @@
 from enum import Enum
-
-from typing import TYPE_CHECKING, Any, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Tuple
 
 from pydantic import BaseModel, StrictBool, StrictStr, constr, validator
-
-# Ugly workaround for https://github.com/samuelcolvin/pydantic/issues/156. Mypy doesn't
-# consider expressions like `constr(...)` to be valid types.
 from pydantic.fields import ModelField
 
 from synapse.util.stringutils import parse_and_validate_mxc_uri
 
+# Ugly workaround for https://github.com/samuelcolvin/pydantic/issues/156. Mypy doesn't
+# consider expressions like `constr(...)` to be valid types.
 if TYPE_CHECKING:
     IDP_ID_TYPE = str
     IDP_BRAND_TYPE = str
@@ -26,6 +24,7 @@ else:
         max_length=255,
         regex="^[a-z][a-z0-9_.-]*$",  # noqa: F722
     )
+
 
 # the following list of enum members is the same as the keys of
 # authlib.oauth2.auth.ClientAuth.DEFAULT_AUTH_METHODS. We inline it
@@ -60,7 +59,7 @@ class OIDCProviderModel(BaseModel):
     idp_id: IDP_ID_TYPE
 
     @validator("idp_id")
-    def ensure_idp_id_prefix(cls: Type[BaseModel], idp_id: str) -> str:
+    def ensure_idp_id_prefix(cls, idp_id: str) -> str:
         """Prefix the given IDP with a prefix specific to the SSO mechanism, to avoid
         clashes with other mechs (such as SAML, CAS).
 
@@ -80,9 +79,9 @@ class OIDCProviderModel(BaseModel):
     idp_icon: Optional[StrictStr]
 
     @validator("idp_icon")
-    def idp_icon_is_an_mxc_url(cls: Type["OIDCProviderModel"], value: str) -> str:
-        parse_and_validate_mxc_uri(value)
-        return value
+    def idp_icon_is_an_mxc_url(cls, idp_icon: str) -> str:
+        parse_and_validate_mxc_uri(idp_icon)
+        return idp_icon
 
     # Optional brand identifier for this IdP.
     idp_brand: Optional[StrictStr]
@@ -124,7 +123,7 @@ class OIDCProviderModel(BaseModel):
     # Using validate=True ensures we run the validator even in that situation.
     @validator("authorization_endpoint", "token_endpoint", always=True)
     def endpoints_required_if_discovery_disabled(
-        cls: Type["OIDCProviderModel"],
+        cls,
         endpoint_url: Optional[str],
         values: Mapping[str, Any],
         field: ModelField,

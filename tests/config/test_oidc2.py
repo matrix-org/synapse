@@ -3,13 +3,13 @@ from typing import Any, Dict
 from unittest import TestCase
 
 import yaml
-from pydantic import ValidationError
 from parameterized import parameterized
+from pydantic import ValidationError
 
 from synapse.config.oidc2 import (
-    OIDCProviderModel,
     ClientAuthMethods,
     LegacyOIDCProviderModel,
+    OIDCProviderModel,
 )
 
 SAMPLE_CONFIG = yaml.safe_load(
@@ -62,9 +62,9 @@ class PydanticOIDCTestCase(TestCase):
             OIDCProviderModel.parse_obj(self.config)
 
         # Enforce that idp_id is a string.
-        for bad_vlaue in 123, None, ["a"], {"a": "b"}:
-            with self.assertRaises(ValidationError) as e:
-                self.config["idp_id"] = bad_vlaue
+        for bad_value in 123, None, ["a"], {"a": "b"}:
+            with self.assertRaises(ValidationError):
+                self.config["idp_id"] = bad_value
                 OIDCProviderModel.parse_obj(self.config)
 
         # Enforce a length between 1 and 250.
@@ -81,7 +81,7 @@ class PydanticOIDCTestCase(TestCase):
             OIDCProviderModel.parse_obj(self.config)
 
         # What happens with a really long string of prohibited characters?
-        with self.assertRaises(ValidationError) as e:
+        with self.assertRaises(ValidationError):
             self.config["idp_id"] = "$" * 500
             OIDCProviderModel.parse_obj(self.config)
 
@@ -153,6 +153,7 @@ class PydanticOIDCTestCase(TestCase):
 
     def test_idp_icon(self) -> None:
         # Test that bad types are rejected, even with our validator in place
+        bad_value: object
         for bad_value in None, {}, [], 123, 45.6:
             with self.assertRaises(ValidationError):
                 self.config["idp_icon"] = bad_value
