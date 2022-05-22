@@ -34,7 +34,7 @@ except ImportError:
 try:
     import jaeger_client
 except ImportError:
-    jaeger_client = None  # type: ignore
+    jaeger_client = None
 
 from tests.unittest import TestCase
 
@@ -43,7 +43,7 @@ class LogContextScopeManagerTestCase(TestCase):
     if LogContextScopeManager is None:
         skip = "Requires opentracing"  # type: ignore[unreachable]
     if jaeger_client is None:
-        skip = "Requires jaeger_client"  # type: ignore[unreachable]
+        skip = "Requires jaeger_client"
 
     def setUp(self) -> None:
         # since this is a unit test, we don't really want to mess around with the
