@@ -292,3 +292,44 @@ class PydanticOIDCTestCase(TestCase):
         # If not specified, discovery is also on by default.
         del self.config["discover"]
         check_all_cases_pass()
+
+    def test_userinfo_endpoint(self) -> None:
+        """Example of a more fiddly validator"""
+        # This field is required if discovery is disabled and the openid scope
+        # not requested.
+        self.assertNotIn("userinfo_endpoint", self.config)
+        with self.assertRaises(ValidationError):
+            self.config["discover"] = False
+            self.config["scopes"] = ()
+            OIDCProviderModel.parse_obj(self.config)
+
+        # Still an error even if other scopes are provided
+        with self.assertRaises(ValidationError):
+            self.config["discover"] = False
+            self.config["scopes"] = ("potato", "tomato")
+            OIDCProviderModel.parse_obj(self.config)
+
+        # Passing an explicit None for userinfo_endpoint should also be an error.
+        with self.assertRaises(ValidationError):
+            self.config["discover"] = False
+            self.config["scopes"] = ()
+            self.config["userinfo_endpoint"] = None
+            OIDCProviderModel.parse_obj(self.config)
+
+        # No error if we enable discovery.
+        self.config["discover"] = True
+        self.config["scopes"] = ()
+        self.config["userinfo_endpoint"] = None
+        OIDCProviderModel.parse_obj(self.config)
+
+        # No error if we enable the openid scope.
+        self.config["discover"] = False
+        self.config["scopes"] = ("openid",)
+        self.config["userinfo_endpoint"] = None
+        OIDCProviderModel.parse_obj(self.config)
+
+        # No error if we don't specify scopes. (They default to `("openid", )`)
+        self.config["discover"] = False
+        del self.config["scopes"]
+        self.config["userinfo_endpoint"] = None
+        OIDCProviderModel.parse_obj(self.config)

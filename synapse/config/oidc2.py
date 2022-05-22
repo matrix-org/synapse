@@ -136,13 +136,49 @@ class OIDCProviderModel(BaseModel):
 
     # the OIDC userinfo endpoint. Required if discovery is disabled and the
     # "openid" scope is not requested.
-    # TODO: required if discovery is disabled and the openid scope isn't requested
     userinfo_endpoint: Optional[StrictStr]
+
+    @validator("userinfo_endpoint", always=True)
+    def userinfo_endpoint_required_without_discovery_and_without_openid_scope(
+        cls, userinfo_endpoint: Optional[str], values: Mapping[str, object]
+    ) -> Optional[str]:
+        discovery_disabled = "discover" in values and not values["discover"]
+        openid_scope_not_requested = (
+            "scopes" in values and "openid" not in values["scopes"]
+        )
+        if (
+            discovery_disabled
+            and openid_scope_not_requested
+            and userinfo_endpoint is None
+        ):
+            raise ValueError(
+                "userinfo_requirement is required if discovery is disabled and"
+                "the 'openid' scope is not requested"
+            )
+        return userinfo_endpoint
 
     # URI where to fetch the JWKS. Required if discovery is disabled and the
     # "openid" scope is used.
-    # TODO: required if discovery is disabled and the openid scope IS requested
     jwks_uri: Optional[StrictStr]
+
+    @validator("jwks_uri", always=True)
+    def jwks_uri_required_without_discovery_but_with_openid_scope(
+        cls, jwks_uri: Optional[str], values: Mapping[str, object]
+    ) -> Optional[str]:
+        discovery_disabled = "discover" in values and not values["discover"]
+        openid_scope_requested = (
+            "scopes" in values and "openid" in values["scopes"]
+        )
+        if (
+            discovery_disabled
+            and openid_scope_requested
+            and jwks_uri is None
+        ):
+            raise ValueError(
+                "jwks_uri is required if discovery is disabled and"
+                "the 'openid' scope is not requested"
+            )
+        return jwks_uri
 
     # Whether to skip metadata verification
     skip_verification: StrictBool = False
