@@ -678,19 +678,19 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     )
     async def get_mutual_rooms_between_users(
         self, user_ids: FrozenSet[str], cache_context: _CacheContext
-    ) -> Set[str]:
+    ) -> FrozenSet[str]:
         """Returns the set of rooms that all users in user_ids share"""
-        shared_room_ids = None
+        shared_room_ids: Optional[FrozenSet[str]] = None
         for user_id in user_ids:
             room_ids = await self.get_rooms_for_user(
                 user_id, on_invalidate=cache_context.invalidate
             )
-            if shared_room_ids is None:
-                shared_room_ids = room_ids
-            else:
+            if shared_room_ids is not None:
                 shared_room_ids &= room_ids
+            else:
+                shared_room_ids = room_ids
 
-        return shared_room_ids or set()
+        return shared_room_ids or frozenset()
 
     async def get_joined_users_from_context(
         self, event: EventBase, context: EventContext
