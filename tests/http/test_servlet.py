@@ -60,7 +60,9 @@ class TestServletUtils(unittest.TestCase):
         with self.assertRaises(SynapseError):
             parse_json_value_from_request(make_request(b""))
 
-        result3 = parse_json_value_from_request(make_request(b""), allow_empty_body=True)
+        result3 = parse_json_value_from_request(
+            make_request(b""), allow_empty_body=True
+        )
         self.assertIsNone(result3)
 
         # Invalid UTF-8.

@@ -39,7 +39,7 @@ class EventSigningTestCase(unittest.TestCase):
         # NB: `signedjson` expects `nacl.signing.SigningKey` instances which have been
         # monkeypatched to include new `alg` and `version` attributes. This is captured
         # by the `signedjson.types.SigningKey` protocol.
-        self.signing_key: signedjson.types.SigningKey = nacl.signing.SigningKey(
+        self.signing_key: signedjson.types.SigningKey = nacl.signing.SigningKey(  # type: ignore[assignment]
             SIGNING_KEY_SEED
         )
         self.signing_key.alg = KEY_ALG
