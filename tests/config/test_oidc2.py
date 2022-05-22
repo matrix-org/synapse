@@ -90,6 +90,7 @@ class PydanticOIDCTestCase(TestCase):
             OIDCProviderModel.parse_obj(self.config)
 
     def test_legacy_model(self) -> None:
+        """Example of widening a field's type in a subclass."""
         # Check that parsing the sample config doesn't raise an error.
         LegacyOIDCProviderModel.parse_obj(self.config)
 
@@ -156,6 +157,7 @@ class PydanticOIDCTestCase(TestCase):
         self.assertIsNone(model.idp_brand)
 
     def test_idp_icon(self) -> None:
+        """Example of a field with a custom validator."""
         # Test that bad types are rejected, even with our validator in place
         bad_value: object
         for bad_value in None, {}, [], 123, 45.6:
@@ -263,6 +265,7 @@ class PydanticOIDCTestCase(TestCase):
 
     @parameterized.expand(["authorization_endpoint", "token_endpoint"])
     def test_endpoints_required_when_discovery_disabled(self, key: str) -> None:
+        """Example of a validator that applies to multiple fields."""
         # Test that this field is required if discovery is disabled
         self.config["discover"] = False
         with self.assertRaises(ValidationError):
