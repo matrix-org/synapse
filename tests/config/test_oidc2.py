@@ -14,12 +14,12 @@ from synapse.config.oidc2 import (
 
 SAMPLE_CONFIG = yaml.safe_load(
     """
-idp_id: apple
-idp_name: Apple
-idp_icon: "mxc://matrix.org/blahblahblah"
-idp_brand: "apple"
-issuer: "https://appleid.apple.com"
-client_id: "org.matrix.synapse.sso.service"
+idp_id: my_idp
+idp_name: My OpenID provider
+idp_icon: "mxc://example.com/blahblahblah"
+idp_brand: "brandy"
+issuer: "https://accountns.exeample.com"
+client_id: "provided-by-your-issuer"
 client_secret_jwt_key:
   key: DUMMY_PRIVATE_KEY
   jwt_header:
@@ -29,13 +29,17 @@ client_secret_jwt_key:
     iss: issuer456
 client_auth_method: "client_secret_post"
 scopes: ["name", "email", "openid"]
-authorization_endpoint: https://appleid.apple.com/auth/authorize?response_mode=form_post
-token_endpoint: https://appleid.apple.com/dummy_url_here
+authorization_endpoint: https://example.com/auth/authorize?response_mode=form_post
+token_endpoint: https://id.example.com/dummy_url_here
+jwks_uri: "https://accounts.example.com/.well-known/jwks.json"
 user_mapping_provider:
   config:
     email_template: "{{ user.email }}"
     localpart_template: "{{ user.email|localpart_from_email }}"
     confirm_localpart: true
+attribute_requirements:
+  - attribute: userGroup
+    value: "synapseUsers"
 """
 )
 
