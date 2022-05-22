@@ -60,6 +60,7 @@ class SSOAttributeRequirement(BaseModel):
 class ClientSecretJWTKey(BaseModel):
     class Config:
         extra = "forbid"
+
     # a pem-encoded signing key
     # TODO: how should we handle key_file?
     key: StrictStr
@@ -70,7 +71,6 @@ class ClientSecretJWTKey(BaseModel):
 
     # properties to include in the JWT payload.
     jwt_payload: Mapping[str, str] = {}
-
 
 
 class OIDCProviderModel(BaseModel):
@@ -171,7 +171,7 @@ class OIDCProviderModel(BaseModel):
 
     @validator("userinfo_endpoint", always=True)
     def userinfo_endpoint_required_without_discovery_and_without_openid_scope(
-        cls, userinfo_endpoint: Optional[str], values: Mapping[str, object]
+        cls, userinfo_endpoint: Optional[str], values: Mapping[str, Any]
     ) -> Optional[str]:
         discovery_disabled = "discover" in values and not values["discover"]
         openid_scope_not_requested = (
@@ -194,7 +194,7 @@ class OIDCProviderModel(BaseModel):
 
     @validator("jwks_uri", always=True)
     def jwks_uri_required_without_discovery_but_with_openid_scope(
-        cls, jwks_uri: Optional[str], values: Mapping[str, object]
+        cls, jwks_uri: Optional[str], values: Mapping[str, Any]
     ) -> Optional[str]:
         discovery_disabled = "discover" in values and not values["discover"]
         openid_scope_requested = "scopes" in values and "openid" in values["scopes"]

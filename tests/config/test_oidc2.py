@@ -345,7 +345,8 @@ class PydanticOIDCTestCase(TestCase):
             len(model.attribute_requirements), 1, model.attribute_requirements
         )
 
-        # Bad tGypes should be rejected
+        # Bad types should be rejected
+        bad_value: object
         for bad_value in 123, 456.0, False, None, {}, ["hello"]:
             with self.assertRaises(ValidationError):
                 self.config["attribute_requirements"] = bad_value
