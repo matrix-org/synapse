@@ -57,6 +57,22 @@ class SSOAttributeRequirement(BaseModel):
     value: StrictStr
 
 
+class ClientSecretJWTKey(BaseModel):
+    class Config:
+        extra = "forbid"
+    # a pem-encoded signing key
+    # TODO: how should we handle key_file?
+    key: StrictStr
+
+    # properties to include in the JWT header
+    # TODO: validator should enforce that jwt_header contains an 'alg'.
+    jwt_header: Mapping[str, str]
+
+    # properties to include in the JWT payload.
+    jwt_payload: Mapping[str, str] = {}
+
+
+
 class OIDCProviderModel(BaseModel):
     """
     Notes on Pydantic:
@@ -115,9 +131,11 @@ class OIDCProviderModel(BaseModel):
 
     # key to use to construct a JWT to use as a client secret. May be `None` if
     # `client_secret` is set.
-    # TODO
-    client_secret_jwt_key: Optional[Any]  # OidcProviderClientSecretJwtKey]
+    # TODO: test that ClientSecretJWTKey is being parsed correctly
+    client_secret_jwt_key: Optional[ClientSecretJWTKey]
 
+    # TODO: what is the precise relationship between client_auth_method, client_secret
+    # and client_secret_jwt_key? Is there anything we should enforce with a validator?
     # auth method to use when exchanging the token.
     # Valid values are 'client_secret_basic', 'client_secret_post' and
     # 'none'.
