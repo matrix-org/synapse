@@ -44,6 +44,19 @@ class UserProfileMethod(str, Enum):
     userinfo_endpoint = "userinfo_endpoint"
 
 
+class SSOAttributeRequirement(BaseModel):
+    class Config:
+        # Complain if someone provides a field that's not one of those listed here.
+        # Pydantic suggests making your own BaseModel subclass if you want to do this,
+        # see https://pydantic-docs.helpmanual.io/usage/model_config/#change-behaviour-globally
+        extra = "forbid"
+
+    attribute: StrictStr
+    # Note: a comment in config/oidc.py suggests that `value` may be optional. But
+    # The JSON schema seems to forbid this.
+    value: StrictStr
+
+
 class OIDCProviderModel(BaseModel):
     """
     Notes on Pydantic:
@@ -166,14 +179,8 @@ class OIDCProviderModel(BaseModel):
         cls, jwks_uri: Optional[str], values: Mapping[str, object]
     ) -> Optional[str]:
         discovery_disabled = "discover" in values and not values["discover"]
-        openid_scope_requested = (
-            "scopes" in values and "openid" in values["scopes"]
-        )
-        if (
-            discovery_disabled
-            and openid_scope_requested
-            and jwks_uri is None
-        ):
+        openid_scope_requested = "scopes" in values and "openid" in values["scopes"]
+        if discovery_disabled and openid_scope_requested and jwks_uri is None:
             raise ValueError(
                 "jwks_uri is required if discovery is disabled and"
                 "the 'openid' scope is not requested"
@@ -192,7 +199,7 @@ class OIDCProviderModel(BaseModel):
     allow_existing_users: StrictBool = False
 
     # the class of the user mapping provider
-    # TODO
+    # TODO there was logic for this
     user_mapping_provider_class: Any  # TODO: Type
 
     # the config of the user mapping provider
@@ -200,9 +207,16 @@ class OIDCProviderModel(BaseModel):
     user_mapping_provider_config: Any
 
     # required attributes to require in userinfo to allow login/registration
-    attribute_requirements: Tuple[Any, ...] = ()  # TODO SsoAttributeRequirement] = ()
+    # TODO: wouldn't this be better expressed as a Mapping[str, str]?
+    attribute_requirements: Tuple[SSOAttributeRequirement, ...] = ()
 
 
 class LegacyOIDCProviderModel(OIDCProviderModel):
+    # These fields could be omitted in the old scheme.
     idp_id: IDP_ID_TYPE = "oidc"
     idp_name: StrictStr = "OIDC"
+
+
+# TODO
+# top-level config: check we don't have any duplicate idp_ids now
+# compute callback url

@@ -336,3 +336,69 @@ class PydanticOIDCTestCase(TestCase):
         del self.config["scopes"]
         self.config["userinfo_endpoint"] = None
         OIDCProviderModel.parse_obj(self.config)
+
+    def test_attribute_requirements(self):
+        # Example of a field involving a nested model
+        model = OIDCProviderModel.parse_obj(self.config)
+        self.assertIsInstance(model.attribute_requirements, tuple)
+        self.assertEqual(
+            len(model.attribute_requirements), 1, model.attribute_requirements
+        )
+
+        # Bad tGypes should be rejected
+        for bad_value in 123, 456.0, False, None, {}, ["hello"]:
+            with self.assertRaises(ValidationError):
+                self.config["attribute_requirements"] = bad_value
+                OIDCProviderModel.parse_obj(self.config)
+
+        # An empty list of requirements is okay, ...
+        self.config["attribute_requirements"] = []
+        OIDCProviderModel.parse_obj(self.config)
+
+        # ...as is an omitted list of requirements...
+        del self.config["attribute_requirements"]
+        OIDCProviderModel.parse_obj(self.config)
+
+        # ...but not an explicit None.
+        with self.assertRaises(ValidationError):
+            self.config["attribute_requirements"] = None
+            OIDCProviderModel.parse_obj(self.config)
+
+        # Multiple requirements are fine.
+        self.config["attribute_requirements"] = [{"attribute": "k", "value": "v"}] * 3
+        model = OIDCProviderModel.parse_obj(self.config)
+        self.assertEqual(
+            len(model.attribute_requirements), 3, model.attribute_requirements
+        )
+
+        # The submodel's field types should be enforced too.
+        with self.assertRaises(ValidationError):
+            self.config["attribute_requirements"] = [{"attribute": "key", "value": 123}]
+            OIDCProviderModel.parse_obj(self.config)
+        with self.assertRaises(ValidationError):
+            self.config["attribute_requirements"] = [{"attribute": 123, "value": "val"}]
+            OIDCProviderModel.parse_obj(self.config)
+        with self.assertRaises(ValidationError):
+            self.config["attribute_requirements"] = [{"attribute": "a", "value": ["b"]}]
+            OIDCProviderModel.parse_obj(self.config)
+        with self.assertRaises(ValidationError):
+            self.config["attribute_requirements"] = [{"attribute": "a", "value": None}]
+            OIDCProviderModel.parse_obj(self.config)
+
+        # Missing fields in the submodel are an error.
+        with self.assertRaises(ValidationError):
+            self.config["attribute_requirements"] = [{"attribute": "a"}]
+            OIDCProviderModel.parse_obj(self.config)
+        with self.assertRaises(ValidationError):
+            self.config["attribute_requirements"] = [{"value": "v"}]
+            OIDCProviderModel.parse_obj(self.config)
+        with self.assertRaises(ValidationError):
+            self.config["attribute_requirements"] = [{}]
+            OIDCProviderModel.parse_obj(self.config)
+
+        # Extra fields in the submodel are an error.
+        with self.assertRaises(ValidationError):
+            self.config["attribute_requirements"] = [
+                {"attribute": "a", "value": "v", "answer": "forty-two"}
+            ]
+            OIDCProviderModel.parse_obj(self.config)
