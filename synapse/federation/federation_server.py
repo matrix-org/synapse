@@ -1039,6 +1039,33 @@ class FederationServer(FederationBase):
                 pdu.room_id, room_version, lock, origin, pdu
             )
 
+    async def _get_next_valid_staged_event_for_room(
+        self, room_id: str, room_version: RoomVersion
+    ) -> Optional[Tuple[str, EventBase]]:
+        """Return the first non-spam event from staging queue."""
+
+        while True:
+            # We need to do this check outside the lock to avoid a race between
+            # a new event being inserted by another instance and it attempting
+            # to acquire the lock.
+            next = await self.store.get_next_staged_event_for_room(
+                room_id, room_version
+            )
+
+            if next is None:
+                return None
+
+            origin, event = next
+
+            if await self._spam_checker.should_drop_federated_event(event):
+                logger.warning(
+                    "Staged federated event contains spam, dropping %s",
+                    event.event_id,
+                )
+                continue
+
+            return next
+
     @wrap_as_background_process("_process_incoming_pdus_in_room_inner")
     async def _process_incoming_pdus_in_room_inner(
         self,
@@ -1116,30 +1143,14 @@ class FederationServer(FederationBase):
                         (self._clock.time_msec() - received_ts) / 1000
                     )
 
-            while True:
-                # We need to do this check outside the lock to avoid a race between
-                # a new event being inserted by another instance and it attempting
-                # to acquire the lock.
-                next = await self.store.get_next_staged_event_for_room(
-                    room_id, room_version
-                )
-
-                if next is None:
-                    break
-
-                origin, event = next
-
-                if await self._spam_checker.should_drop_federated_event(event):
-                    logger.warning(
-                        "Staged federated event contains spam, dropping %s",
-                        event.event_id,
-                    )
-                    continue
-
-                break
+            next = await self._get_next_valid_staged_event_for_room(
+                room_id, room_version
+            )
 
             if not next:
                 break
+
+            origin, event = next
 
             # Prune the event queue if it's getting large.
             #
