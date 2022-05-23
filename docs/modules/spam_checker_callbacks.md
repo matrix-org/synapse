@@ -249,6 +249,24 @@ callback returns `False`, Synapse falls through to the next one. The value of th
 callback that does not return `False` will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.
 
+### `should_drop_federated_event`
+
+_First introduced in Synapse v1.60.0_
+
+```python
+async def should_drop_federated_event(event: "synapse.events.EventBase") -> bool
+```
+
+Called when checking whether a remote server can federate an event with us. **Returning
+`True` from this function will silently drop a federated event and split-brain our view
+of a room's DAG, and thus you shouldn't use this callback unless you know what you are
+doing.**
+
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `False`, Synapse falls through to the next one. The value of the first
+callback that does not return `False` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
+
 ## Example
 
 The example below is a module that implements the spam checker callback
