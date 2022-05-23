@@ -11377,6 +11377,18 @@ whether the given file should be excluded from the homeserver's media store. Ret
 callback returns <code>False</code>, Synapse falls through to the next one. The value of the first
 callback that does not return <code>False</code> will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.</p>
+<h3 id="should_drop_federated_event"><a class="header" href="#should_drop_federated_event"><code>should_drop_federated_event</code></a></h3>
+<p><em>First introduced in Synapse v1.60.0</em></p>
+<pre><code class="language-python">async def should_drop_federated_event(event: &quot;synapse.events.EventBase&quot;) -&gt; bool
+</code></pre>
+<p>Called when checking whether a remote server can federate an event with us. <strong>Returning
+<code>True</code> from this function will silently drop a federated event and split-brain our view
+of a room's DAG, and thus you shouldn't use this callback unless you know what you are
+doing.</strong></p>
+<p>If multiple modules implement this callback, they will be considered in order. If a
+callback returns <code>False</code>, Synapse falls through to the next one. The value of the first
+callback that does not return <code>False</code> will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.</p>
 <h2 id="example"><a class="header" href="#example">Example</a></h2>
 <p>The example below is a module that implements the spam checker callback
 <code>check_event_for_spam</code> to deny any message sent by users whose Matrix user IDs are
