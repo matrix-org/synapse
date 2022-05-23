@@ -23,6 +23,9 @@
 #         below. Leave empty for no workers, or set to '*' for all possible workers.
 #   * SYNAPSE_AS_REGISTRATION_DIR: If specified, a directory in which .yaml and .yml files
 #         will be treated as Application Service registration files.
+#   * SYNAPSE_TLS_CERT: Path to a TLS certificate in PEM format.
+#   * SYNAPSE_TLS_KEY: Path to a TLS key. If this and SYNAPSE_TLS_CERT are specified,
+#         Nginx will be configured to serve TLS on port 8448.
 #
 # NOTE: According to Complement's ENTRYPOINT expectations for a homeserver image (as defined
 # in the project's README), this script may be run multiple times, and functionality should
@@ -516,6 +519,8 @@ def generate_worker_files(
         "/etc/nginx/conf.d/matrix-synapse.conf",
         worker_locations=nginx_location_config,
         upstream_directives=nginx_upstream_config,
+        tls_cert_path=os.environ.get("SYNAPSE_TLS_CERT"),
+        tls_key_path=os.environ.get("SYNAPSE_TLS_KEY"),
     )
 
     # Supervisord config
