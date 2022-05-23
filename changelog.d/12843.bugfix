@@ -1,0 +1,1 @@
+Fix ambiguous column name that would prevent use of MSC2716 History Import when using Postgres as a database.
