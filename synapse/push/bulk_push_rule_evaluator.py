@@ -149,12 +149,10 @@ class BulkPushRuleEvaluator:
         if event.type == "m.room.member" and event.content["membership"] == "invite":
             invited = event.state_key
             if invited and self.hs.is_mine_id(invited):
-                has_pusher = await self.store.user_has_pusher(invited)
-                if has_pusher:
-                    rules_by_user = dict(rules_by_user)
-                    rules_by_user[invited] = await self.store.get_push_rules_for_user(
-                        invited
-                    )
+                rules_by_user = dict(rules_by_user)
+                rules_by_user[invited] = await self.store.get_push_rules_for_user(
+                    invited
+                )
 
         return rules_by_user
 
