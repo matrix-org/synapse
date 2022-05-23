@@ -1,0 +1,1 @@
+New error code "M_USER_ACCOUNT_SUSPENDED", as per MSC3823.
