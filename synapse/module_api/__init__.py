@@ -47,7 +47,7 @@ from synapse.events.spamcheck import (
     CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK,
     CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
     CHECK_USERNAME_FOR_SPAM_CALLBACK,
-    DROP_FEDERATED_EVENT_CALLBACK,
+    SHOULD_DROP_FEDERATED_EVENT_CALLBACK,
     USER_MAY_CREATE_ROOM_ALIAS_CALLBACK,
     USER_MAY_CREATE_ROOM_CALLBACK,
     USER_MAY_INVITE_CALLBACK,
@@ -235,7 +235,9 @@ class ModuleApi:
         self,
         *,
         check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
-        drop_federated_event: Optional[DROP_FEDERATED_EVENT_CALLBACK] = None,
+        should_drop_federated_event: Optional[
+            SHOULD_DROP_FEDERATED_EVENT_CALLBACK
+        ] = None,
         user_may_join_room: Optional[USER_MAY_JOIN_ROOM_CALLBACK] = None,
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
         user_may_send_3pid_invite: Optional[USER_MAY_SEND_3PID_INVITE_CALLBACK] = None,
@@ -256,7 +258,7 @@ class ModuleApi:
         """
         return self._spam_checker.register_callbacks(
             check_event_for_spam=check_event_for_spam,
-            drop_federated_event=drop_federated_event,
+            should_drop_federated_event=should_drop_federated_event,
             user_may_join_room=user_may_join_room,
             user_may_invite=user_may_invite,
             user_may_send_3pid_invite=user_may_send_3pid_invite,

@@ -249,12 +249,12 @@ callback returns `False`, Synapse falls through to the next one. The value of th
 callback that does not return `False` will be used. If this happens, Synapse will not call
 any of the subsequent implementations of this callback.
 
-### `drop_federated_event`
+### `should_drop_federated_event`
 
 _First introduced in Synapse v1.60.0_
 
 ```python
-async def drop_federated_event(event: "synapse.events.EventBase") -> bool
+async def should_drop_federated_event(event: "synapse.events.EventBase") -> bool
 ```
 
 Called when checking whether a remote server can federate an event with us. **Returning

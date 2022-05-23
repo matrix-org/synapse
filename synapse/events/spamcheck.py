@@ -44,7 +44,7 @@ CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
     ["synapse.events.EventBase"],
     Awaitable[Union[bool, str]],
 ]
-DROP_FEDERATED_EVENT_CALLBACK = Callable[
+SHOULD_DROP_FEDERATED_EVENT_CALLBACK = Callable[
     ["synapse.events.EventBase"],
     Awaitable[Union[bool, str]],
 ]
@@ -173,7 +173,9 @@ class SpamChecker:
         self.clock = hs.get_clock()
 
         self._check_event_for_spam_callbacks: List[CHECK_EVENT_FOR_SPAM_CALLBACK] = []
-        self._drop_federated_event_callbacks: List[DROP_FEDERATED_EVENT_CALLBACK] = []
+        self._should_drop_federated_event_callbacks: List[
+            SHOULD_DROP_FEDERATED_EVENT_CALLBACK
+        ] = []
         self._user_may_join_room_callbacks: List[USER_MAY_JOIN_ROOM_CALLBACK] = []
         self._user_may_invite_callbacks: List[USER_MAY_INVITE_CALLBACK] = []
         self._user_may_send_3pid_invite_callbacks: List[
@@ -197,7 +199,9 @@ class SpamChecker:
     def register_callbacks(
         self,
         check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
-        drop_federated_event: Optional[DROP_FEDERATED_EVENT_CALLBACK] = None,
+        should_drop_federated_event: Optional[
+            SHOULD_DROP_FEDERATED_EVENT_CALLBACK
+        ] = None,
         user_may_join_room: Optional[USER_MAY_JOIN_ROOM_CALLBACK] = None,
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
         user_may_send_3pid_invite: Optional[USER_MAY_SEND_3PID_INVITE_CALLBACK] = None,
@@ -216,8 +220,10 @@ class SpamChecker:
         if check_event_for_spam is not None:
             self._check_event_for_spam_callbacks.append(check_event_for_spam)
 
-        if drop_federated_event is not None:
-            self._drop_federated_event_callbacks.append(drop_federated_event)
+        if should_drop_federated_event is not None:
+            self._should_drop_federated_event_callbacks.append(
+                should_drop_federated_event
+            )
 
         if user_may_join_room is not None:
             self._user_may_join_room_callbacks.append(user_may_join_room)
@@ -278,7 +284,7 @@ class SpamChecker:
 
         return False
 
-    async def drop_federated_event(
+    async def should_drop_federated_event(
         self, event: "synapse.events.EventBase"
     ) -> Union[bool, str]:
         """Checks if a given federated event is considered "spammy" by this
@@ -293,7 +299,7 @@ class SpamChecker:
         Returns:
             True if the event should be silently dropped
         """
-        for callback in self._drop_federated_event_callbacks:
+        for callback in self._should_drop_federated_event_callbacks:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):

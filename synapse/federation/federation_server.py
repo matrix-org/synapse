@@ -1020,7 +1020,7 @@ class FederationServer(FederationBase):
         except SynapseError as e:
             raise FederationError("ERROR", e.code, e.msg, affected=pdu.event_id)
 
-        if await self._spam_checker.drop_federated_event(pdu):
+        if await self._spam_checker.should_drop_federated_event(pdu):
             logger.warning(
                 "Unstaged federated event contains spam, dropping %s", pdu.event_id
             )
@@ -1129,7 +1129,7 @@ class FederationServer(FederationBase):
 
                 origin, event = next
 
-                if await self._spam_checker.drop_federated_event(event):
+                if await self._spam_checker.should_drop_federated_event(event):
                     logger.warning(
                         "Staged federated event contains spam, dropping %s",
                         event.event_id,
