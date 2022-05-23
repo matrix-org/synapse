@@ -22,7 +22,7 @@ from synapse.events import EventBase
 from synapse.events.utils import prune_event
 from synapse.storage import Storage
 from synapse.storage.state import StateFilter
-from synapse.types import StateMap, get_domain_from_id, RetentionPolicy
+from synapse.types import RetentionPolicy, StateMap, get_domain_from_id
 
 logger = logging.getLogger(__name__)
 
