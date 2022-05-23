@@ -239,7 +239,7 @@ class PaginationHandler:
             # defined in the server's configuration, we can safely assume that's the
             # case and use it for this room.
             max_lifetime = (
-                retention_policy["max_lifetime"] or self._retention_default_max_lifetime
+                retention_policy.max_lifetime or self._retention_default_max_lifetime
             )
 
             # Cap the effective max_lifetime to be within the range allowed in the
