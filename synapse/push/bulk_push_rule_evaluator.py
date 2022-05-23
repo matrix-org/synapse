@@ -226,7 +226,7 @@ class BulkPushRuleEvaluator:
                 rel_types = set()
                 for rule in itertools.chain(*rules_by_user.values()):
                     # Skip disabled rules.
-                    if not rule.get("enabled"):
+                    if "enabled" in rule and not rule["enabled"]:
                         continue
 
                     for condition in rule["conditions"]:

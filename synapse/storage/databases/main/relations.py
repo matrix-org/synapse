@@ -796,7 +796,7 @@ class RelationsWorkerStore(SQLBaseStore):
                     The event type
         """
         rel_type_sql, rel_type_args = make_in_list_sql_clause(
-            self.database_engine, "rel_type", relation_types
+            self.database_engine, "relation_type", relation_types
         )
 
         sql = f"""
