@@ -79,7 +79,7 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
                 return SUCCESS_RESULT_LOCATION
             else:
                 self.fail("URL provided was invalid")
-                return []
+                raise RuntimeError("This should never be seen.")
 
         # We assign to a method, which mypy doesn't like.
         self.api.get_json = Mock(side_effect=get_json)  # type: ignore[assignment]
