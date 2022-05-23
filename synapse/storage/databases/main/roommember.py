@@ -904,7 +904,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                     AND room_id = ?
             """
             txn.execute(sql, (room_id,))
-            return set(txn)
+            return {d for d, in txn}
 
         return await self.db_pool.runInteraction(
             "get_current_hosts_in_room", get_current_hosts_in_room_txn
