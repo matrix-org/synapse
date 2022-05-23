@@ -29,12 +29,11 @@ from synapse.api.errors import (
     MissingClientTokenError,
 )
 from synapse.appservice import ApplicationService
-from synapse.events import EventBase
 from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import active_span, force_tracing, start_active_span
 from synapse.storage.databases.main.registration import TokenLookupResult
-from synapse.types import Requester, StateMap, UserID, create_requester
+from synapse.types import Requester, UserID, create_requester
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
 
@@ -78,7 +77,6 @@ class Auth:
         self,
         room_id: str,
         user_id: str,
-        current_state: Optional[StateMap[EventBase]] = None,
         allow_departed_users: bool = False,
     ) -> Tuple[str, Optional[str]]:
         """Check if the user is in the room, or was at some point.
