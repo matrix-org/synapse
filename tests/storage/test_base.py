@@ -60,7 +60,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         db = DatabasePool(Mock(), Mock(config=sqlite_config), fake_engine)
         db._db_pool = self.db_pool
 
-        self.datastore = SQLBaseStore(db, None, hs)
+        self.datastore = SQLBaseStore(db, None, hs)  # type: ignore[arg-type]
 
     @defer.inlineCallbacks
     def test_insert_1col(self):

@@ -1,0 +1,1 @@
+Fix invalid YAML syntax in the example documentation for the `url_preview_accept_language` config option.

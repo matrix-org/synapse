@@ -303,7 +303,10 @@ class RoomCreationHandler:
             context=tombstone_context,
         )
 
-        old_room_state = await tombstone_context.get_current_state_ids()
+        state_filter = StateFilter.from_types(
+            [(EventTypes.CanonicalAlias, ""), (EventTypes.PowerLevels, "")]
+        )
+        old_room_state = await tombstone_context.get_current_state_ids(state_filter)
 
         # We know the tombstone event isn't an outlier so it has current state.
         assert old_room_state is not None
@@ -427,7 +430,7 @@ class RoomCreationHandler:
             requester: the user requesting the upgrade
             old_room_id : the id of the room to be replaced
             new_room_id: the id to give the new room (should already have been
-                created with _gemerate_room_id())
+                created with _generate_room_id())
             new_room_version: the new room version to use
             tombstone_event_id: the ID of the tombstone event in the old room.
         """
@@ -469,14 +472,14 @@ class RoomCreationHandler:
             (EventTypes.PowerLevels, ""),
         ]
 
-        # If the old room was a space, copy over the room type and the rooms in
-        # the space.
-        if (
-            old_room_create_event.content.get(EventContentFields.ROOM_TYPE)
-            == RoomTypes.SPACE
-        ):
-            creation_content[EventContentFields.ROOM_TYPE] = RoomTypes.SPACE
-            types_to_copy.append((EventTypes.SpaceChild, None))
+        # Copy the room type as per MSC3818.
+        room_type = old_room_create_event.content.get(EventContentFields.ROOM_TYPE)
+        if room_type is not None:
+            creation_content[EventContentFields.ROOM_TYPE] = room_type
+
+            # If the old room was a space, copy over the rooms in the space.
+            if room_type == RoomTypes.SPACE:
+                types_to_copy.append((EventTypes.SpaceChild, None))
 
         old_room_state_ids = await self.store.get_filtered_current_state_ids(
             old_room_id, StateFilter.from_types(types_to_copy)

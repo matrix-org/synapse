@@ -23,6 +23,7 @@ from canonicaljson import encode_canonical_json
 
 from twisted.internet.interfaces import IDelayedCall
 
+import synapse
 from synapse import event_auth
 from synapse.api.constants import (
     EventContentFields,
@@ -634,7 +635,9 @@ class EventCreationHandler:
             # federation as well as those created locally. As of room v3, aliases events
             # can be created by users that are not in the room, therefore we have to
             # tolerate them in event_auth.check().
-            prev_state_ids = await context.get_prev_state_ids()
+            prev_state_ids = await context.get_prev_state_ids(
+                StateFilter.from_types([(EventTypes.Member, None)])
+            )
             prev_event_id = prev_state_ids.get((EventTypes.Member, event.sender))
             prev_event = (
                 await self.store.get_event(prev_event_id, allow_none=True)
@@ -761,7 +764,9 @@ class EventCreationHandler:
             # This can happen due to out of band memberships
             return None
 
-        prev_state_ids = await context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids(
+            StateFilter.from_types([(event.type, None)])
+        )
         prev_event_id = prev_state_ids.get((event.type, event.state_key))
         if not prev_event_id:
             return None
@@ -881,11 +886,11 @@ class EventCreationHandler:
                 event.sender,
             )
 
-            spam_error = await self.spam_checker.check_event_for_spam(event)
-            if spam_error:
-                if not isinstance(spam_error, str):
-                    spam_error = "Spam is not permitted here"
-                raise SynapseError(403, spam_error, Codes.FORBIDDEN)
+            spam_check = await self.spam_checker.check_event_for_spam(event)
+            if spam_check is not synapse.spam_checker_api.Allow.ALLOW:
+                raise SynapseError(
+                    403, "This message had been rejected as probable spam", spam_check
+                )
 
             ev = await self.handle_new_client_event(
                 requester=requester,
@@ -1547,7 +1552,11 @@ class EventCreationHandler:
                         "Redacting MSC2716 events is not supported in this room version",
                     )
 
-            prev_state_ids = await context.get_prev_state_ids()
+            event_types = event_auth.auth_types_for_event(event.room_version, event)
+            prev_state_ids = await context.get_prev_state_ids(
+                StateFilter.from_types(event_types)
+            )
+
             auth_events_ids = self._event_auth_handler.compute_auth_events(
                 event, prev_state_ids, for_verification=True
             )
