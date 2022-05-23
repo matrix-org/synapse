@@ -497,7 +497,7 @@ def generate_worker_files(
     if appservice_registration_dir:
         # Scan for all YAML files that should be application service registrations.
         appservice_registrations = [
-            str(reg_path.absolute())
+            str(reg_path.resolve())
             for reg_path in Path(appservice_registration_dir).iterdir()
             if reg_path.suffix.lower() in (".yaml", ".yml")
         ]
