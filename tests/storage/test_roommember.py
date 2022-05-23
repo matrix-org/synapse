@@ -34,7 +34,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: TestHomeServer) -> None:
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: TestHomeServer) -> None:  # type: ignore[override]
 
         # We can't test the RoomMemberStore on its own without the other event
         # storage logic
