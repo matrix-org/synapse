@@ -5,6 +5,12 @@ enable_registration: true
 enable_registration_without_verification: true
 bcrypt_rounds: 4
 
+## Registration ##
+
+# Needed by Complement to register admin users
+# DO NOT USE in a production configuration! This should be a random secret.
+registration_shared_secret: complement
+
 ## Federation ##
 
 # trust certs signed by Complement's CA
