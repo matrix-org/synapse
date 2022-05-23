@@ -21,7 +21,7 @@ import attr
 from prometheus_client import Counter
 
 from synapse.api.constants import EventTypes, Membership, RelationTypes
-from synapse.event_auth import get_user_power_level
+from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
@@ -32,6 +32,7 @@ from synapse.util.caches.descriptors import lru_cache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.metrics import measure_func
 
+from ..storage.state import StateFilter
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
 if TYPE_CHECKING:
@@ -172,8 +173,12 @@ class BulkPushRuleEvaluator:
     async def _get_power_levels_and_sender_level(
         self, event: EventBase, context: EventContext
     ) -> Tuple[dict, int]:
-        prev_state_ids = await context.get_prev_state_ids()
+        event_types = auth_types_for_event(event.room_version, event)
+        prev_state_ids = await context.get_prev_state_ids(
+            StateFilter.from_types(event_types)
+        )
         pl_event_id = prev_state_ids.get(POWER_KEY)
+
         if pl_event_id:
             # fastpath: if there's a power level event, that's all we need, and
             # not having a power level event is an extreme edge case

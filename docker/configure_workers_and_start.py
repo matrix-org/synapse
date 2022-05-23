@@ -21,6 +21,11 @@
 #   * SYNAPSE_REPORT_STATS: Whether to report stats.
 #   * SYNAPSE_WORKER_TYPES: A comma separated list of worker names as specified in WORKER_CONFIG
 #         below. Leave empty for no workers, or set to '*' for all possible workers.
+#   * SYNAPSE_AS_REGISTRATION_DIR: If specified, a directory in which .yaml and .yml files
+#         will be treated as Application Service registration files.
+#   * SYNAPSE_TLS_CERT: Path to a TLS certificate in PEM format.
+#   * SYNAPSE_TLS_KEY: Path to a TLS key. If this and SYNAPSE_TLS_CERT are specified,
+#         Nginx will be configured to serve TLS on port 8448.
 #
 # NOTE: According to Complement's ENTRYPOINT expectations for a homeserver image (as defined
 # in the project's README), this script may be run multiple times, and functionality should
@@ -29,6 +34,7 @@
 import os
 import subprocess
 import sys
+from pathlib import Path
 from typing import Any, Dict, List, Mapping, MutableMapping, NoReturn, Set
 
 import jinja2
@@ -488,11 +494,23 @@ def generate_worker_files(
     master_log_config = generate_worker_log_config(environ, "master", data_dir)
     shared_config["log_config"] = master_log_config
 
+    # Find application service registrations
+    appservice_registrations = None
+    appservice_registration_dir = os.environ.get("SYNAPSE_AS_REGISTRATION_DIR")
+    if appservice_registration_dir:
+        # Scan for all YAML files that should be application service registrations.
+        appservice_registrations = [
+            str(reg_path.resolve())
+            for reg_path in Path(appservice_registration_dir).iterdir()
+            if reg_path.suffix.lower() in (".yaml", ".yml")
+        ]
+
     # Shared homeserver config
     convert(
         "/conf/shared.yaml.j2",
         "/conf/workers/shared.yaml",
         shared_worker_config=yaml.dump(shared_config),
+        appservice_registrations=appservice_registrations,
     )
 
     # Nginx config
@@ -501,6 +519,8 @@ def generate_worker_files(
         "/etc/nginx/conf.d/matrix-synapse.conf",
         worker_locations=nginx_location_config,
         upstream_directives=nginx_upstream_config,
+        tls_cert_path=os.environ.get("SYNAPSE_TLS_CERT"),
+        tls_key_path=os.environ.get("SYNAPSE_TLS_KEY"),
     )
 
     # Supervisord config

@@ -1,0 +1,1 @@
+Fix a long-standing bug where finished log contexts would be re-started when failing to contact remote homeservers.

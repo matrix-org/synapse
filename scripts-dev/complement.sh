@@ -45,6 +45,8 @@ docker build -t matrixdotorg/synapse -f "docker/Dockerfile" .
 
 extra_test_args=()
 
+test_tags="synapse_blacklist,msc2716,msc3030"
+
 # If we're using workers, modify the docker files slightly.
 if [[ -n "$WORKERS" ]]; then
   # Build the workers docker image (from the base Synapse image).
@@ -65,6 +67,10 @@ if [[ -n "$WORKERS" ]]; then
 else
   export COMPLEMENT_BASE_IMAGE=complement-synapse
   COMPLEMENT_DOCKERFILE=Dockerfile
+
+  # We only test faster room joins on monoliths, because they are purposefully
+  # being developed without worker support to start with.
+  test_tags="$test_tags,faster_joins"
 fi
 
 # Build the Complement image from the Synapse image we just built.
@@ -73,4 +79,5 @@ docker build -t $COMPLEMENT_BASE_IMAGE -f "docker/complement/$COMPLEMENT_DOCKERF
 # Run the tests!
 echo "Images built; running complement"
 cd "$COMPLEMENT_DIR"
-go test -v -tags synapse_blacklist,msc2716,msc3030,faster_joins -count=1 "${extra_test_args[@]}" "$@" ./tests/...
+
+go test -v -tags $test_tags -count=1 "${extra_test_args[@]}" "$@" ./tests/...

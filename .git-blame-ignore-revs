@@ -6,3 +6,6 @@ aff1eb7c671b0a3813407321d2702ec46c71fa56
 
 # Update black to 20.8b1 (#9381).
 0a00b7ff14890987f09112a2ae696c61001e6cf1
+
+# Convert tests/rest/admin/test_room.py to unix file endings (#7953).
+c4268e3da64f1abb5b31deaeb5769adb6510c0a7
