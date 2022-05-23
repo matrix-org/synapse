@@ -12,27 +12,27 @@ The available spam checker callbacks are:
 
 _First introduced in Synapse v1.37.0_
 _Signature extended to support Allow and Code in Synapse v1.60.0_
-_Boolean return value deprecated in Synapse v1.60.0_
+_Boolean and string return value types deprecated in Synapse v1.60.0_
 
 ```python
-async def check_event_for_spam(event: "synapse.events.EventBase") -> Union[Allow, Code, DEPRECATED_STR, DEPRECATED_BOOL]
+async def check_event_for_spam(event: "synapse.module_api.EventBase") -> Union["synapse.module_api.Allow", "synapse.module_api.errors.Codes", str, bool]
 ```
 
 Called when receiving an event from a client or via federation. The callback must return either:
-  - `synapse.spam_checker_api.ALLOW`, to allow the operation. Other callbacks
+  - `synapse.module_api.Allow.ALLOW`, to allow the operation. Other callbacks
     may still decide to reject it.
-  - `synapse.api.errors.Code` to reject the operation with an error code. In case
-    of doubt, `Code.FORBIDDEN` is a good error code.
+  - `synapse.api.errors.Codes` to reject the operation with an error code. In case
+    of doubt, `synapse.api.errors.Code.FORBIDDEN` is a good error code.
   - (deprecated) a `str` to reject the operation and specify an error message. Note that clients
     typically will not localize the error message to the user's preferred locale.
   - (deprecated) on `False`, behave as `ALLOW`. Deprecated as confusing, as some
     callbacks in expect `True` to allow and others `True` to reject.
-  - (deprecated) on `True`, behave as `Code.FORBIDDEN`. Deprecated as confusing, as
+  - (deprecated) on `True`, behave as `synapse.api.errors.Code.FORBIDDEN`. Deprecated as confusing, as
     some callbacks in expect `True` to allow and others `True` to reject.
 
 If multiple modules implement this callback, they will be considered in order. If a
-callback returns `ALLOW`, Synapse falls through to the next one. The value of the
-first callback that does not return `ALLOW` will be used. If this happens, Synapse
+callback returns `synapse.module_api.Allow.ALLOW`, Synapse falls through to the next one. The value of the
+first callback that does not return `synapse.module_api.Allow.ALLOW` will be used. If this happens, Synapse
 will not call any of the subsequent implementations of this callback.
 
 ### `user_may_join_room`

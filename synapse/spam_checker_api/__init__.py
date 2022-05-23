@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from enum import Enum
-from typing import NewType, Union
+from typing import Union
 
 from synapse.api.errors import Codes
 
@@ -26,22 +26,12 @@ class RegistrationBehaviour(Enum):
     SHADOW_BAN = "shadow_ban"
     DENY = "deny"
 
+class Allow(Enum):
+    """
+    Singleton to allow events to pass through in SpamChecker APIs.
+    """
+    ALLOW = "allow"
 
-# Define a strongly-typed singleton value `ALLOW`.
-
-# Private NewType, to make sure that nobody outside this module
-# defines an instance of `Allow`.
-_Allow = NewType("_Allow", str)
-
-# Public NewType, to let the rest of the code mention type `Allow`.
-Allow = NewType("Allow", _Allow)
-
-ALLOW = Allow(_Allow("Allow"))
-"""
-Return this constant to allow a message to pass.
-
-This is the ONLY legal value of type `Allow`.
-"""
 
 Decision = Union[Allow, Codes]
 """

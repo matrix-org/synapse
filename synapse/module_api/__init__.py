@@ -35,6 +35,7 @@ from typing_extensions import ParamSpec
 from twisted.internet import defer
 from twisted.web.resource import Resource
 
+from synapse import spam_checker_api
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.events.presence_router import (
@@ -139,6 +140,9 @@ are loaded into Synapse.
 
 PRESENCE_ALL_USERS = PresenceRouter.ALL_USERS
 
+Allow = spam_checker_api.Allow
+# Singleton value used to mark a message as permitted.
+
 __all__ = [
     "errors",
     "make_deferred_yieldable",
@@ -146,6 +150,7 @@ __all__ = [
     "respond_with_html",
     "run_in_background",
     "cached",
+    "Allow",
     "UserID",
     "DatabasePool",
     "LoggingTransaction",
