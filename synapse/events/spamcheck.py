@@ -30,7 +30,7 @@ from typing import (
 from synapse.api.errors import Codes
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
-from synapse.spam_checker_api import ALLOW, Allow, Decision, RegistrationBehaviour
+from synapse.spam_checker_api import Allow, Decision, RegistrationBehaviour
 from synapse.types import RoomAlias, UserProfile
 from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 from synapse.util.metrics import Measure
@@ -278,7 +278,7 @@ class SpamChecker:
                 res: Union[
                     Decision, DEPRECATED_STR, DEPRECATED_BOOL
                 ] = await delay_cancellation(callback(event))
-                if res is False or res is ALLOW:
+                if res is False or res is Allow.ALLOW:
                     # This spam-checker accepts the event.
                     # Other spam-checkers may reject it, though.
                     continue
@@ -292,7 +292,7 @@ class SpamChecker:
                     return res
 
         # No spam-checker has rejected the event, let it pass.
-        return ALLOW
+        return Allow.ALLOW
 
     async def user_may_join_room(
         self, user_id: str, room_id: str, is_invited: bool

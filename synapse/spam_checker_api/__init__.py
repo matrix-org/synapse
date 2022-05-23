@@ -26,10 +26,12 @@ class RegistrationBehaviour(Enum):
     SHADOW_BAN = "shadow_ban"
     DENY = "deny"
 
+
 class Allow(Enum):
     """
     Singleton to allow events to pass through in SpamChecker APIs.
     """
+
     ALLOW = "allow"
 
 

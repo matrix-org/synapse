@@ -887,7 +887,7 @@ class EventCreationHandler:
             )
 
             spam_check = await self.spam_checker.check_event_for_spam(event)
-            if spam_check is not synapse.spam_checker_api.ALLOW:
+            if spam_check is not synapse.spam_checker_api.Allow.ALLOW:
                 raise SynapseError(
                     403, "This message had been rejected as probable spam", spam_check
                 )

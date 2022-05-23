@@ -101,7 +101,7 @@ class FederationBase:
 
         spam_check = await self.spam_checker.check_event_for_spam(pdu)
 
-        if spam_check is not synapse.spam_checker_api.ALLOW:
+        if spam_check is not synapse.spam_checker_api.Allow.ALLOW:
             logger.warning("Event contains spam, soft-failing %s", pdu.event_id)
             # we redact (to save disk space) as well as soft-failing (to stop
             # using the event in prev_events).
