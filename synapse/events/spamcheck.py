@@ -97,7 +97,6 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer") -> None:
     # which name appears in this set, we'll want to register it.
     spam_checker_methods = {
         "check_event_for_spam",
-        "drop_federated_event",
         "user_may_invite",
         "user_may_create_room",
         "user_may_create_room_alias",
