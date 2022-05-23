@@ -1694,6 +1694,27 @@ COMMIT;
 <p><a href="https://github.com/matrix-org/synapse/issues/11779#issuecomment-1131545970">This comment on issue 11779</a>
 has queries that can be used to check a database for this problem in advance.</p>
 </details>
+<h2 id="spamchecker-apis-check_event_for_spam-has-a-new-signature"><a class="header" href="#spamchecker-apis-check_event_for_spam-has-a-new-signature">SpamChecker API's <code>check_event_for_spam</code> has a new signature.</a></h2>
+<p>The previous signature has been deprecated.</p>
+<p>Whereas <code>check_event_for_spam</code> callbacks used to return <code>Union[str, bool]</code>, they should now return <code>Union[&quot;synapse.module_api.Allow&quot;, &quot;synapse.module_api.errors.Codes&quot;]</code>.</p>
+<p>This is part of an ongoing refactoring of the SpamChecker API to make it less ambiguous and more powerful.</p>
+<p>If your module implements <code>check_event_for_spam</code> as follows:</p>
+<pre><code class="language-python">async def check_event_for_spam(event):
+    if ...:
+        # Event is spam
+        return True
+    # Event is not spam
+    return False
+</code></pre>
+<p>you should rewrite it as follows:</p>
+<pre><code class="language-python">async def check_event_for_spam(event):
+    if ...:
+        # Event is spam, mark it as forbidden (you may use some more precise error
+        # code if it is useful).
+        return synapse.module_api.errors.Codes.FORBIDDEN
+    # Event is not spam, mark it as `ALLOW`.
+    return synapse.module_api.ALLOW
+</code></pre>
 <h1 id="upgrading-to-v1590"><a class="header" href="#upgrading-to-v1590">Upgrading to v1.59.0</a></h1>
 <h2 id="device-name-lookup-over-federation-has-been-disabled-by-default"><a class="header" href="#device-name-lookup-over-federation-has-been-disabled-by-default">Device name lookup over federation has been disabled by default</a></h2>
 <p>The names of user devices are no longer visible to users on other homeservers by default.
@@ -11203,21 +11224,28 @@ Synapse instances. Spam checker callbacks can be registered using the module API
 <h2 id="callbacks"><a class="header" href="#callbacks">Callbacks</a></h2>
 <p>The available spam checker callbacks are:</p>
 <h3 id="check_event_for_spam"><a class="header" href="#check_event_for_spam"><code>check_event_for_spam</code></a></h3>
-<p><em>First introduced in Synapse v1.37.0</em></p>
-<pre><code class="language-python">async def check_event_for_spam(event: &quot;synapse.events.EventBase&quot;) -&gt; Union[bool, str]
+<p><em>First introduced in Synapse v1.37.0</em>
+<em>Signature extended to support Allow and Code in Synapse v1.60.0</em>
+<em>Boolean and string return value types deprecated in Synapse v1.60.0</em></p>
+<pre><code class="language-python">async def check_event_for_spam(event: &quot;synapse.module_api.EventBase&quot;) -&gt; Union[&quot;synapse.module_api.ALLOW&quot;, &quot;synapse.module_api.error.Codes&quot;, str, bool]
 </code></pre>
-<p>Called when receiving an event from a client or via federation. The callback must return
-either:</p>
+<p>Called when receiving an event from a client or via federation. The callback must return either:</p>
 <ul>
-<li>an error message string, to indicate the event must be rejected because of spam and 
-give a rejection reason to forward to clients;</li>
-<li>the boolean <code>True</code>, to indicate that the event is spammy, but not provide further details; or</li>
-<li>the booelan <code>False</code>, to indicate that the event is not considered spammy.</li>
+<li><code>synapse.module_api.ALLOW</code>, to allow the operation. Other callbacks
+may still decide to reject it.</li>
+<li><code>synapse.api.Codes</code> to reject the operation with an error code. In case
+of doubt, <code>synapse.api.error.Codes.FORBIDDEN</code> is a good error code.</li>
+<li>(deprecated) a <code>str</code> to reject the operation and specify an error message. Note that clients
+typically will not localize the error message to the user's preferred locale.</li>
+<li>(deprecated) on <code>False</code>, behave as <code>ALLOW</code>. Deprecated as confusing, as some
+callbacks in expect <code>True</code> to allow and others <code>True</code> to reject.</li>
+<li>(deprecated) on <code>True</code>, behave as <code>synapse.api.error.Codes.FORBIDDEN</code>. Deprecated as confusing, as
+some callbacks in expect <code>True</code> to allow and others <code>True</code> to reject.</li>
 </ul>
 <p>If multiple modules implement this callback, they will be considered in order. If a
-callback returns <code>False</code>, Synapse falls through to the next one. The value of the first
-callback that does not return <code>False</code> will be used. If this happens, Synapse will not call
-any of the subsequent implementations of this callback.</p>
+callback returns <code>synapse.module_api.ALLOW</code>, Synapse falls through to the next one. The value of the
+first callback that does not return <code>synapse.module_api.ALLOW</code> will be used. If this happens, Synapse
+will not call any of the subsequent implementations of this callback.</p>
 <h3 id="user_may_join_room"><a class="header" href="#user_may_join_room"><code>user_may_join_room</code></a></h3>
 <p><em>First introduced in Synapse v1.37.0</em></p>
 <pre><code class="language-python">async def user_may_join_room(user: str, room: str, is_invited: bool) -&gt; bool
