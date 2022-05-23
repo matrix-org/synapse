@@ -27,6 +27,10 @@ class RegistrationBehaviour(Enum):
     DENY = "deny"
 
 
+# We define the following singleton enum rather than a string to be able to
+# write `Union[Allow, ..., str]` in some of the callbacks for the spam-checker
+# API, where the `str` is required to maintain backwards compatibility with
+# previous versions of the API.
 class Allow(Enum):
     """
     Singleton to allow events to pass through in SpamChecker APIs.

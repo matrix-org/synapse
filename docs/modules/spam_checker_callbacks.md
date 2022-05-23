@@ -15,19 +15,19 @@ _Signature extended to support Allow and Code in Synapse v1.60.0_
 _Boolean and string return value types deprecated in Synapse v1.60.0_
 
 ```python
-async def check_event_for_spam(event: "synapse.module_api.EventBase") -> Union["synapse.module_api.Allow", "synapse.module_api.Codes", str, bool]
+async def check_event_for_spam(event: "synapse.module_api.EventBase") -> Union["synapse.module_api.ALLOW", "synapse.module_api.error.Codes", str, bool]
 ```
 
 Called when receiving an event from a client or via federation. The callback must return either:
   - `synapse.module_api.ALLOW`, to allow the operation. Other callbacks
     may still decide to reject it.
   - `synapse.api.Codes` to reject the operation with an error code. In case
-    of doubt, `synapse.api.Codes.FORBIDDEN` is a good error code.
+    of doubt, `synapse.api.error.Codes.FORBIDDEN` is a good error code.
   - (deprecated) a `str` to reject the operation and specify an error message. Note that clients
     typically will not localize the error message to the user's preferred locale.
   - (deprecated) on `False`, behave as `ALLOW`. Deprecated as confusing, as some
     callbacks in expect `True` to allow and others `True` to reject.
-  - (deprecated) on `True`, behave as `synapse.api.Codes.FORBIDDEN`. Deprecated as confusing, as
+  - (deprecated) on `True`, behave as `synapse.api.error.Codes.FORBIDDEN`. Deprecated as confusing, as
     some callbacks in expect `True` to allow and others `True` to reject.
 
 If multiple modules implement this callback, they will be considered in order. If a

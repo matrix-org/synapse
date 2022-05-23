@@ -275,9 +275,9 @@ class SpamChecker:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                res: Union[
-                    Decision, DEPRECATED_STR, DEPRECATED_BOOL
-                ] = await delay_cancellation(callback(event))
+                res: Union[Decision, str, bool] = await delay_cancellation(
+                    callback(event)
+                )
                 if res is False or res is Allow.ALLOW:
                     # This spam-checker accepts the event.
                     # Other spam-checkers may reject it, though.
