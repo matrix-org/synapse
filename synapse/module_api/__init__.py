@@ -140,7 +140,7 @@ are loaded into Synapse.
 
 PRESENCE_ALL_USERS = PresenceRouter.ALL_USERS
 
-Allow = spam_checker_api.Allow
+ALLOW = spam_checker_api.Allow.ALLOW
 # Singleton value used to mark a message as permitted.
 
 __all__ = [

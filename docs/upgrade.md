@@ -204,7 +204,7 @@ async def check_event_for_spam(event):
         # Event is spam, mark it as forbidden (or some more precise error code).
         return synapse.module_api.errors.Codes.FORBIDDEN
     # Event is not spam, mark it as `ALLOW`.
-    return synapse.module_api.Allow.ALLOW
+    return synapse.module_api.ALLOW
 ```
 
 # Upgrading to v1.59.0

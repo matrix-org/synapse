@@ -19,7 +19,7 @@ async def check_event_for_spam(event: "synapse.module_api.EventBase") -> Union["
 ```
 
 Called when receiving an event from a client or via federation. The callback must return either:
-  - `synapse.module_api.Allow.ALLOW`, to allow the operation. Other callbacks
+  - `synapse.module_api.ALLOW`, to allow the operation. Other callbacks
     may still decide to reject it.
   - `synapse.api.errors.Codes` to reject the operation with an error code. In case
     of doubt, `synapse.api.errors.Code.FORBIDDEN` is a good error code.
@@ -31,8 +31,8 @@ Called when receiving an event from a client or via federation. The callback mus
     some callbacks in expect `True` to allow and others `True` to reject.
 
 If multiple modules implement this callback, they will be considered in order. If a
-callback returns `synapse.module_api.Allow.ALLOW`, Synapse falls through to the next one. The value of the
-first callback that does not return `synapse.module_api.Allow.ALLOW` will be used. If this happens, Synapse
+callback returns `synapse.module_api.ALLOW`, Synapse falls through to the next one. The value of the
+first callback that does not return `synapse.module_api.ALLOW` will be used. If this happens, Synapse
 will not call any of the subsequent implementations of this callback.
 
 ### `user_may_join_room`
