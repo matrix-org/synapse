@@ -1039,10 +1039,18 @@ class FederationServer(FederationBase):
                 pdu.room_id, room_version, lock, origin, pdu
             )
 
-    async def _get_next_valid_staged_event_for_room(
+    async def _get_next_nonspam_staged_event_for_room(
         self, room_id: str, room_version: RoomVersion
     ) -> Optional[Tuple[str, EventBase]]:
-        """Return the first non-spam event from staging queue."""
+        """Fetch the first non-spam event from staging queue.
+
+        Args:
+            room_id: the room to fetch the first non-spam event in.
+            room_version: the version of the room.
+
+        Returns:
+            The first non-spam event in that room.
+        """
 
         while True:
             # We need to do this check outside the lock to avoid a race between
@@ -1143,7 +1151,7 @@ class FederationServer(FederationBase):
                         (self._clock.time_msec() - received_ts) / 1000
                     )
 
-            next = await self._get_next_valid_staged_event_for_room(
+            next = await self._get_next_nonspam_staged_event_for_room(
                 room_id, room_version
             )
 
