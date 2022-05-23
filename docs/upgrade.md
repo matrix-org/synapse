@@ -185,7 +185,7 @@ Whereas `check_event_for_spam` callbacks used to return `Union[str, bool]`, they
 
 This is part of an ongoing refactoring of the SpamChecker API to make it less ambiguous and more powerful.
 
-If you previously had
+If your module implements `check_event_for_spam` as follows:
 
 ```python
 async def check_event_for_spam(event):
@@ -196,12 +196,13 @@ async def check_event_for_spam(event):
     return False
 ```
 
-you should now rather write
+you should rewrite it as follows:
 
 ```python
 async def check_event_for_spam(event):
     if ...:
-        # Event is spam, mark it as forbidden (or some more precise error code).
+        # Event is spam, mark it as forbidden (you may use some more precise error
+        # code if it is useful).
         return synapse.module_api.errors.Codes.FORBIDDEN
     # Event is not spam, mark it as `ALLOW`.
     return synapse.module_api.ALLOW

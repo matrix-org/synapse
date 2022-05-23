@@ -36,7 +36,7 @@ from twisted.internet import defer
 from twisted.web.resource import Resource
 
 from synapse import spam_checker_api
-from synapse.api.errors import SynapseError
+from synapse.api.errors import Codes, SynapseError
 from synapse.events import EventBase
 from synapse.events.presence_router import (
     GET_INTERESTED_USERS_CALLBACK,
@@ -151,6 +151,7 @@ __all__ = [
     "run_in_background",
     "cached",
     "Allow",
+    "Codes",
     "UserID",
     "DatabasePool",
     "LoggingTransaction",
