@@ -1,0 +1,1 @@
+Disable 'faster room join' Complement tests when testing against Synapse with workers.
