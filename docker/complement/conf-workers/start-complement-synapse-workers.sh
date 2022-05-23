@@ -36,6 +36,11 @@ export SYNAPSE_WORKER_TYPES="\
     appservice, \
     pusher"
 
+# Add Complement's appservice registration directory, if there is one
+# (It can be absent when there are no application services in this test!)
+if [ -d /complement/appservice ]; then
+    export SYNAPSE_AS_REGISTRATION_DIR=/complement/appservice
+fi
 
 # Generate a TLS key, then generate a certificate by having Complement's CA sign it
 # Note that both the key and certificate are in PEM format (not DER).
