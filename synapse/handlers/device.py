@@ -292,6 +292,18 @@ class DeviceHandler(DeviceWorkerHandler):
         # On start up check if there are any updates pending.
         hs.get_reactor().callWhenRunning(self._handle_new_device_update_async)
 
+        self._delete_stale_devices_after = hs.config.server.delete_stale_devices_after
+
+        if (
+            hs.config.worker.run_background_tasks
+            and self._delete_stale_devices_after is not None
+        ):
+            self.clock.looping_call(
+                run_as_background_process,
+                60 * 60 * 1000,
+                self._delete_old_devices,
+            )
+
     def _check_device_name_length(self, name: Optional[str]) -> None:
         """
         Checks whether a device name is longer than the maximum allowed length.
@@ -366,6 +378,18 @@ class DeviceHandler(DeviceWorkerHandler):
             attempts += 1
 
         raise errors.StoreError(500, "Couldn't generate a device ID.")
+
+    async def _delete_old_devices(self) -> None:
+        """Background task that deletes devices which haven't been accessed for more than
+        a configured time period.
+        """
+        now_ms = self.clock.time_msec()
+        devices = await self.store.get_devices_not_accessed_since(
+            now_ms - self._delete_stale_devices_after
+        )
+
+        for device in devices:
+            await self.delete_device(device["user_id"], device["device_id"])
 
     @trace
     async def delete_device(self, user_id: str, device_id: str) -> None:

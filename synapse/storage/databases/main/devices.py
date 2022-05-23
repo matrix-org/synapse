@@ -1153,6 +1153,30 @@ class DeviceWorkerStore(SQLBaseStore):
             _prune_txn,
         )
 
+    async def get_devices_not_accessed_since(self, since_ms: int) -> List[Dict[str, str]]:
+        """Retrieves a list of all devices that haven't been accessed since a given date.
+
+        Args:
+            since_ms: the timestamp to select on, every device which last access dates
+                from before that time is returned.
+
+        Returns:
+            A list of device IDs.
+        """
+
+        def get_devices_not_accessed_since_txn(txn: LoggingTransaction) -> List[Dict[str, str]]:
+            sql = """
+                SELECT user_id, device_id
+                FROM devices WHERE last_seen < ? AND hidden = FALSE
+            """
+            txn.execute(sql, (since_ms,))
+            return self.db_pool.cursor_to_dict(txn)
+
+        return await self.db_pool.runInteraction(
+            "get_devices_not_accessed_since",
+            get_devices_not_accessed_since_txn,
+        )
+
 
 class DeviceBackgroundUpdateStore(SQLBaseStore):
     def __init__(
