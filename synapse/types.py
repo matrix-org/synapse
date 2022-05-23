@@ -918,7 +918,7 @@ class UserProfile(TypedDict):
     avatar_url: Optional[str]
 
 
-@attr.s(auto_attribs=True, frozen=True)
+@attr.s(auto_attribs=True, frozen=True, slots=True)
 class RetentionPolicy:
     min_lifetime: Optional[int] = None
     max_lifetime: Optional[int] = None
