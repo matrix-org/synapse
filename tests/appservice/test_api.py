@@ -17,7 +17,6 @@ from unittest.mock import Mock
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.appservice import ApplicationService
-from synapse.appservice.api import ApplicationServiceApi
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
@@ -31,7 +30,7 @@ URL = "http://mytestservice"
 
 class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
-        self.api = ApplicationServiceApi(hs)
+        self.api = hs.get_application_service_api()
         self.service = ApplicationService(
             id="unique_identifier",
             sender="@as:test",
@@ -42,6 +41,10 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
         )
 
     def test_query_3pe_authenticates_token(self):
+        """
+        Tests that 3pe queries to the appservice are authenticated
+        with the appservice's token.
+        """
 
         SUCCESS_RESULT_USER = [
             {
@@ -69,7 +72,7 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
 
         async def get_json(url: str, args: Mapping[Any, Any]) -> List[JsonDict]:
             if not args.get(b"access_token"):
-                raise Exception("Access token not provided")
+                raise RuntimeError("Access token not provided")
 
             self.assertEqual(args.get(b"access_token"), TOKEN)
             self.request_url = url
@@ -78,8 +81,9 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
             elif url == URL_LOCATION:
                 return SUCCESS_RESULT_LOCATION
             else:
-                self.fail("URL provided was invalid")
-                raise RuntimeError("This should never be seen.")
+                raise RuntimeError(
+                    "URL provided was invalid. This should never be seen."
+                )
 
         # We assign to a method, which mypy doesn't like.
         self.api.get_json = Mock(side_effect=get_json)  # type: ignore[assignment]
