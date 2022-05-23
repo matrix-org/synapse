@@ -77,7 +77,9 @@ class OIDCConfig(Config):
     def sso_jwt_enabled(self) -> bool:
         return bool(self._sso_jwt_enabled)
 
-    def _check_if_sso_jwt_enabled(self, oidc_providers: Iterable["OidcProviderConfig"]) -> bool:
+    def _check_if_sso_jwt_enabled(
+        self, oidc_providers: Iterable["OidcProviderConfig"]
+    ) -> bool:
         # SSO JWT is enabled if there is at least one oidc_provider with sso_jwt_enabled
         for oidc in oidc_providers:
             if oidc.sso_jwt_enabled:
@@ -363,7 +365,7 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
         },
         "allow_existing_users": {"type": "boolean"},
         "sso_jwt_enabled": {"type": "boolean"},
-        "standalone_jwt_audience" : {"type": "string"},
+        "standalone_jwt_audience": {"type": "string"},
         "user_mapping_provider": {"type": ["object", "null"]},
         "attribute_requirements": {
             "type": "array",

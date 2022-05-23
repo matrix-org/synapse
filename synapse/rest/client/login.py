@@ -71,14 +71,14 @@ class LoginResponse(TypedDict, total=False):
 
 
 def extract_jwt_from_headers(request_headers: "Headers") -> Optional[str]:
-    if request_headers is None:
-        return None
-    if request_headers.hasHeader('Authorization'):
-        values: Sequence[AnyStr] = request_headers.getRawHeaders('Authorization')
-        for val in values:
-            # we simply take the first 'Authorization' header containing a Bearer token
-            if val.startswith('Bearer '):
-                return val[7:]
+    auth_headers = request_headers.getRawHeaders(b"Authorization")
+    bearer = b"Bearer "
+    if auth_headers:
+        for val in auth_headers:
+            # we take the first 'Authorization' header containing a Bearer token
+            if val.startswith(bearer):
+                token = val[len(bearer) :]
+                return token.decode("ascii")
     return None
 
 
@@ -217,8 +217,7 @@ class LoginRestServlet(RestServlet):
                     None, request.getClientAddress().host
                 )
                 result = await self._do_sso_jwt_login(
-                    login_submission,
-                    request.requestHeaders
+                    login_submission, request.requestHeaders
                 )
             elif (
                 self.jwt_enabled
@@ -460,10 +459,13 @@ class LoginRestServlet(RestServlet):
 
         oidc: OidcProvider = self.find_token_issuer(token)
         from authlib.jose import JoseError
+
         try:
             # Now that we know the issuer of the token (and loaded its config)
             # we can go and validate it
-            claims: "CodeIDToken" = await oidc.verified_claims_of_standalone_token(token)
+            claims: "CodeIDToken" = await oidc.verified_claims_of_standalone_token(
+                token
+            )
             if claims is None:
                 raise LoginError(403, "Invalid JWT", errcode=Codes.FORBIDDEN)
 
@@ -475,9 +477,15 @@ class LoginRestServlet(RestServlet):
             if sub is None:
                 raise LoginError(403, "Missing claim 'sub'", errcode=Codes.FORBIDDEN)
 
-            canonical_user_id: Optional[str] = await self.hs.get_datastores().main.get_user_by_external_id(iss, sub)
+            canonical_user_id: Optional[
+                str
+            ] = await self.hs.get_datastores().main.get_user_by_external_id(iss, sub)
             if canonical_user_id is None:
-                raise LoginError(403, "No account assigned to this JWT subject", errcode=Codes.FORBIDDEN)
+                raise LoginError(
+                    403,
+                    "No account assigned to this JWT subject",
+                    errcode=Codes.FORBIDDEN,
+                )
 
             result = await self._complete_login(
                 canonical_user_id,
@@ -487,9 +495,7 @@ class LoginRestServlet(RestServlet):
             )
             return result
         except JoseError as e:
-            raise LoginError(
-                401, e.description, errcode=Codes.UNAUTHORIZED
-            )
+            raise LoginError(401, e.description, errcode=Codes.UNAUTHORIZED)
 
     async def _do_jwt_login(
         self, login_submission: JsonDict, should_issue_refresh_token: bool = False
@@ -537,9 +543,11 @@ class LoginRestServlet(RestServlet):
         try:
             # don't try to validate the token; just unwrap and split it
             # we need to find out the issuer before we can check it
+            no_algorithm: Any = None
             jwt_content: Dict[str, Any] = jwt.api_jwt.decode_complete(
-                token, "", None, options={"verify_signature": False})
-            issuer: str = jwt_content['payload']['iss']
+                token, "", no_algorithm, options={"verify_signature": False}
+            )
+            issuer: str = jwt_content["payload"]["iss"]
         except KeyError:
             raise LoginError(403, "Invalid JWT", errcode=Codes.FORBIDDEN)
 
@@ -547,8 +555,8 @@ class LoginRestServlet(RestServlet):
         for idp in all_idps:
             if type(idp) == OidcProvider:
                 # noinspection PyTypeChecker
-                provider:OidcProvider = idp
-                idp_issuer:Optional[str] = provider.get_issuer()
+                provider: OidcProvider = idp
+                idp_issuer: Optional[str] = provider.get_issuer()
                 if idp_issuer is None:
                     # The config for this provider doesn't contain an issuer so we skip it
                     continue

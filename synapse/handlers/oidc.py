@@ -722,7 +722,7 @@ class OidcProvider:
 
         return claims
 
-    async def _parse_standalone_id_token(self, id_token: Optional[str]) -> Optional[CodeIDToken]:
+    async def _parse_standalone_id_token(self, id_token: str) -> Optional[CodeIDToken]:
         """Return an instance of UserInfo from to given ``id_token``.
 
         Args:
@@ -736,13 +736,11 @@ class OidcProvider:
             return None
 
         metadata = await self.load_metadata()
-        claims_params = {}
 
         alg_values = metadata.get("id_token_signing_alg_values_supported", ["RS256"])
         jwt = JsonWebToken(alg_values)
 
-        claim_options = {
-            "iss": {"values": [metadata["issuer"]]}}
+        claim_options = {"iss": {"value": metadata["issuer"]}}
         if not self._standalone_jwt_audience is None:
             claim_options["aud"] = {"value": self._standalone_jwt_audience}
 
@@ -757,7 +755,6 @@ class OidcProvider:
                 key=jwk_set,
                 claims_cls=CodeIDToken,
                 claims_options=claim_options,
-                claims_params=claims_params,
             )
         except ValueError:
             logger.info("Reloading JWKS after decode error")
@@ -767,7 +764,6 @@ class OidcProvider:
                 key=jwk_set,
                 claims_cls=CodeIDToken,
                 claims_options=claim_options,
-                claims_params=claims_params,
             )
 
         logger.debug("Decoded id_token JWT %r; validating", claims)
@@ -958,9 +954,7 @@ class OidcProvider:
             logger.exception("Could not map user")
             self._sso_handler.render_error(request, "mapping_error", str(e))
 
-    async def verified_claims_of_standalone_token(
-        self, token
-    ) -> CodeIDToken:
+    async def verified_claims_of_standalone_token(self, token: str) -> CodeIDToken:
         return await self._parse_standalone_id_token(token)
 
     async def _complete_oidc_login(

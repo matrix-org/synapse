@@ -1986,6 +1986,20 @@ saml2_config:
 #       match a pre-existing account instead of failing. This could be used if
 #       switching from password logins to OIDC. Defaults to false.
 #
+#   sso_jwt_enabled: by using the login flow org.matrix.login.sso_jwt it
+#       is possible to login with a JWT token that was acquired (from this
+#       provider) via another application. If this should be disallowed
+#       _for this oidc_provider_ then set this value to 'false'.
+#
+#       If not set this defaults to 'true'.
+#
+#   standalone_jwt_audience: if sso_jwt_enabled is 'true' (or not set)
+#       then we accept JWT token acquired via another application. In this case
+#       there's an additional check: the audience claim given in the token
+#       must contain this entry.
+#
+#       If there is no audience configured then this check is skipped.
+#
 #   user_mapping_provider: Configuration for how attributes returned from a OIDC
 #       provider are mapped onto a matrix user. This setting has the following
 #       sub-properties:
