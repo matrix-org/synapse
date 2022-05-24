@@ -174,7 +174,7 @@ class PushRulesWorkerStore(
                 "conditions",
                 "actions",
             ),
-            desc="get_push_rules_enabled_for_user",
+            desc="get_push_rules_for_user",
         )
 
         rows.sort(key=lambda row: (-int(row["priority_class"]), -int(row["priority"])))
