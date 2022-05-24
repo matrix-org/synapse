@@ -514,10 +514,7 @@ class FederationEventHandler:
             #
             # This is the same operation as we do when we receive a regular event
             # over federation.
-            state = await self._resolve_state_at_missing_prevs(destination, event)
-            state_ids = None
-            if state:
-                state_ids = {(e.type, e.state_key): e.event_id for e in state}
+            state_ids = await self._resolve_state_at_missing_prevs(destination, event)
 
             # build a new state group for it if need be
             context = await self._state_handler.compute_event_context(
@@ -772,13 +769,9 @@ class FederationEventHandler:
             return
 
         try:
-            state = await self._resolve_state_at_missing_prevs(origin, event)
+            state_ids = await self._resolve_state_at_missing_prevs(origin, event)
             # TODO(faster_joins): make sure that _resolve_state_at_missing_prevs does
             #   not return partial state
-
-            state_ids = None
-            if state:
-                state_ids = {(e.type, e.state_key): e.event_id for e in state}
 
             await self._process_received_pdu(
                 origin, event, state_ids=state_ids, backfilled=backfilled
@@ -791,7 +784,7 @@ class FederationEventHandler:
 
     async def _resolve_state_at_missing_prevs(
         self, dest: str, event: EventBase
-    ) -> Optional[Iterable[EventBase]]:
+    ) -> Optional[StateMap[str]]:
         """Calculate the state at an event with missing prev_events.
 
         This is used when we have pulled a batch of events from a remote server, and
@@ -818,8 +811,8 @@ class FederationEventHandler:
             event: an event to check for missing prevs.
 
         Returns:
-            if we already had all the prev events, `None`. Otherwise, returns a list of
-            the events in the state at `event`.
+            if we already had all the prev events, `None`. Otherwise, returns
+            the event ids of the state at `event`.
         """
         room_id = event.room_id
         event_id = event.event_id
@@ -880,19 +873,6 @@ class FederationEventHandler:
                 state_res_store=StateResolutionStore(self._store),
             )
 
-            # We need to give _process_received_pdu the actual state events
-            # rather than event ids, so generate that now.
-
-            # First though we need to fetch all the events that are in
-            # state_map, so we can build up the state below.
-            evs = await self._store.get_events(
-                list(state_map.values()),
-                get_prev_content=False,
-                redact_behaviour=EventRedactBehaviour.as_is,
-            )
-            event_map.update(evs)
-
-            state = [event_map[e] for e in state_map.values()]
         except Exception:
             logger.warning(
                 "Error attempting to resolve state at missing prev_events",
@@ -904,7 +884,7 @@ class FederationEventHandler:
                 "We can't get valid state history.",
                 affected=event_id,
             )
-        return state
+        return state_map
 
     async def _get_state_after_missing_prev_event(
         self,
