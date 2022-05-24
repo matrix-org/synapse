@@ -27,11 +27,13 @@ from typing import (
     Union,
 )
 
+from synapse.api.errors import Codes
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
-from synapse.spam_checker_api import RegistrationBehaviour
+from synapse.spam_checker_api import Allow, Decision, RegistrationBehaviour
 from synapse.types import RoomAlias, UserProfile
 from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
+from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
     import synapse.events
@@ -39,7 +41,21 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
+    ["synapse.events.EventBase"],
+    Awaitable[
+        Union[
+            Allow,
+            Codes,
+            # Deprecated
+            bool,
+            # Deprecated
+            str,
+        ]
+    ],
+]
+SHOULD_DROP_FEDERATED_EVENT_CALLBACK = Callable[
     ["synapse.events.EventBase"],
     Awaitable[Union[bool, str]],
 ]
@@ -162,8 +178,14 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer") -> None:
 
 
 class SpamChecker:
-    def __init__(self) -> None:
+    def __init__(self, hs: "synapse.server.HomeServer") -> None:
+        self.hs = hs
+        self.clock = hs.get_clock()
+
         self._check_event_for_spam_callbacks: List[CHECK_EVENT_FOR_SPAM_CALLBACK] = []
+        self._should_drop_federated_event_callbacks: List[
+            SHOULD_DROP_FEDERATED_EVENT_CALLBACK
+        ] = []
         self._user_may_join_room_callbacks: List[USER_MAY_JOIN_ROOM_CALLBACK] = []
         self._user_may_invite_callbacks: List[USER_MAY_INVITE_CALLBACK] = []
         self._user_may_send_3pid_invite_callbacks: List[
@@ -187,6 +209,9 @@ class SpamChecker:
     def register_callbacks(
         self,
         check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
+        should_drop_federated_event: Optional[
+            SHOULD_DROP_FEDERATED_EVENT_CALLBACK
+        ] = None,
         user_may_join_room: Optional[USER_MAY_JOIN_ROOM_CALLBACK] = None,
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
         user_may_send_3pid_invite: Optional[USER_MAY_SEND_3PID_INVITE_CALLBACK] = None,
@@ -204,6 +229,11 @@ class SpamChecker:
         """Register callbacks from module for each hook."""
         if check_event_for_spam is not None:
             self._check_event_for_spam_callbacks.append(check_event_for_spam)
+
+        if should_drop_federated_event is not None:
+            self._should_drop_federated_event_callbacks.append(
+                should_drop_federated_event
+            )
 
         if user_may_join_room is not None:
             self._user_may_join_room_callbacks.append(user_may_join_room)
@@ -240,7 +270,7 @@ class SpamChecker:
 
     async def check_event_for_spam(
         self, event: "synapse.events.EventBase"
-    ) -> Union[bool, str]:
+    ) -> Union[Decision, str]:
         """Checks if a given event is considered "spammy" by this server.
 
         If the server considers an event spammy, then it will be rejected if
@@ -251,11 +281,57 @@ class SpamChecker:
             event: the event to be checked
 
         Returns:
-            True or a string if the event is spammy. If a string is returned it
-            will be used as the error message returned to the user.
+            - on `ALLOW`, the event is considered good (non-spammy) and should
+                be let through. Other spamcheck filters may still reject it.
+            - on `Code`, the event is considered spammy and is rejected with a specific
+                error message/code.
+            - on `str`, the event is considered spammy and the string is used as error
+                message. This usage is generally discouraged as it doesn't support
+                internationalization.
         """
         for callback in self._check_event_for_spam_callbacks:
-            res: Union[bool, str] = await delay_cancellation(callback(event))
+            with Measure(
+                self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
+            ):
+                res: Union[Decision, str, bool] = await delay_cancellation(
+                    callback(event)
+                )
+                if res is False or res is Allow.ALLOW:
+                    # This spam-checker accepts the event.
+                    # Other spam-checkers may reject it, though.
+                    continue
+                elif res is True:
+                    # This spam-checker rejects the event with deprecated
+                    # return value `True`
+                    return Codes.FORBIDDEN
+                else:
+                    # This spam-checker rejects the event either with a `str`
+                    # or with a `Codes`. In either case, we stop here.
+                    return res
+
+        # No spam-checker has rejected the event, let it pass.
+        return Allow.ALLOW
+
+    async def should_drop_federated_event(
+        self, event: "synapse.events.EventBase"
+    ) -> Union[bool, str]:
+        """Checks if a given federated event is considered "spammy" by this
+        server.
+
+        If the server considers an event spammy, it will be silently dropped,
+        and in doing so will split-brain our view of the room's DAG.
+
+        Args:
+            event: the event to be checked
+
+        Returns:
+            True if the event should be silently dropped
+        """
+        for callback in self._should_drop_federated_event_callbacks:
+            with Measure(
+                self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
+            ):
+                res: Union[bool, str] = await delay_cancellation(callback(event))
             if res:
                 return res
 
@@ -276,9 +352,12 @@ class SpamChecker:
             Whether the user may join the room
         """
         for callback in self._user_may_join_room_callbacks:
-            may_join_room = await delay_cancellation(
-                callback(user_id, room_id, is_invited)
-            )
+            with Measure(
+                self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
+            ):
+                may_join_room = await delay_cancellation(
+                    callback(user_id, room_id, is_invited)
+                )
             if may_join_room is False:
                 return False
 
@@ -300,9 +379,12 @@ class SpamChecker:
             True if the user may send an invite, otherwise False
         """
         for callback in self._user_may_invite_callbacks:
-            may_invite = await delay_cancellation(
-                callback(inviter_userid, invitee_userid, room_id)
-            )
+            with Measure(
+                self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
+            ):
+                may_invite = await delay_cancellation(
+                    callback(inviter_userid, invitee_userid, room_id)
+                )
             if may_invite is False:
                 return False
 
@@ -328,9 +410,12 @@ class SpamChecker:
             True if the user may send the invite, otherwise False
         """
         for callback in self._user_may_send_3pid_invite_callbacks:
-            may_send_3pid_invite = await delay_cancellation(
-                callback(inviter_userid, medium, address, room_id)
-            )
+            with Measure(
+                self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
+            ):
+                may_send_3pid_invite = await delay_cancellation(
+                    callback(inviter_userid, medium, address, room_id)
+                )
             if may_send_3pid_invite is False:
                 return False
 
@@ -348,7 +433,10 @@ class SpamChecker:
             True if the user may create a room, otherwise False
         """
         for callback in self._user_may_create_room_callbacks:
-            may_create_room = await delay_cancellation(callback(userid))
+            with Measure(
+                self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
+            ):
+                may_create_room = await delay_cancellation(callback(userid))
             if may_create_room is False:
                 return False
 
@@ -369,9 +457,12 @@ class SpamChecker:
             True if the user may create a room alias, otherwise False
         """
         for callback in self._user_may_create_room_alias_callbacks:
-            may_create_room_alias = await delay_cancellation(
-                callback(userid, room_alias)
-            )
+            with Measure(
+                self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
+            ):
+                may_create_room_alias = await delay_cancellation(
+                    callback(userid, room_alias)
+                )
             if may_create_room_alias is False:
                 return False
 
@@ -390,7 +481,10 @@ class SpamChecker:
             True if the user may publish the room, otherwise False
         """
         for callback in self._user_may_publish_room_callbacks:
-            may_publish_room = await delay_cancellation(callback(userid, room_id))
+            with Measure(
+                self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
+            ):
+                may_publish_room = await delay_cancellation(callback(userid, room_id))
             if may_publish_room is False:
                 return False
 
@@ -412,9 +506,13 @@ class SpamChecker:
             True if the user is spammy.
         """
         for callback in self._check_username_for_spam_callbacks:
-            # Make a copy of the user profile object to ensure the spam checker cannot
-            # modify it.
-            if await delay_cancellation(callback(user_profile.copy())):
+            with Measure(
+                self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
+            ):
+                # Make a copy of the user profile object to ensure the spam checker cannot
+                # modify it.
+                res = await delay_cancellation(callback(user_profile.copy()))
+            if res:
                 return True
 
         return False
@@ -442,9 +540,12 @@ class SpamChecker:
         """
 
         for callback in self._check_registration_for_spam_callbacks:
-            behaviour = await delay_cancellation(
-                callback(email_threepid, username, request_info, auth_provider_id)
-            )
+            with Measure(
+                self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
+            ):
+                behaviour = await delay_cancellation(
+                    callback(email_threepid, username, request_info, auth_provider_id)
+                )
             assert isinstance(behaviour, RegistrationBehaviour)
             if behaviour != RegistrationBehaviour.ALLOW:
                 return behaviour
@@ -486,7 +587,10 @@ class SpamChecker:
         """
 
         for callback in self._check_media_file_for_spam_callbacks:
-            spam = await delay_cancellation(callback(file_wrapper, file_info))
+            with Measure(
+                self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
+            ):
+                spam = await delay_cancellation(callback(file_wrapper, file_info))
             if spam:
                 return True
 

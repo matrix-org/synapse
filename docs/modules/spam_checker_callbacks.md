@@ -11,22 +11,29 @@ The available spam checker callbacks are:
 ### `check_event_for_spam`
 
 _First introduced in Synapse v1.37.0_
+_Signature extended to support Allow and Code in Synapse v1.60.0_
+_Boolean and string return value types deprecated in Synapse v1.60.0_
 
 ```python
-async def check_event_for_spam(event: "synapse.events.EventBase") -> Union[bool, str]
+async def check_event_for_spam(event: "synapse.module_api.EventBase") -> Union["synapse.module_api.ALLOW", "synapse.module_api.error.Codes", str, bool]
 ```
 
-Called when receiving an event from a client or via federation. The callback must return
-either:
-- an error message string, to indicate the event must be rejected because of spam and 
-  give a rejection reason to forward to clients;
-- the boolean `True`, to indicate that the event is spammy, but not provide further details; or
-- the booelan `False`, to indicate that the event is not considered spammy.
+Called when receiving an event from a client or via federation. The callback must return either:
+  - `synapse.module_api.ALLOW`, to allow the operation. Other callbacks
+    may still decide to reject it.
+  - `synapse.api.Codes` to reject the operation with an error code. In case
+    of doubt, `synapse.api.error.Codes.FORBIDDEN` is a good error code.
+  - (deprecated) a `str` to reject the operation and specify an error message. Note that clients
+    typically will not localize the error message to the user's preferred locale.
+  - (deprecated) on `False`, behave as `ALLOW`. Deprecated as confusing, as some
+    callbacks in expect `True` to allow and others `True` to reject.
+  - (deprecated) on `True`, behave as `synapse.api.error.Codes.FORBIDDEN`. Deprecated as confusing, as
+    some callbacks in expect `True` to allow and others `True` to reject.
 
 If multiple modules implement this callback, they will be considered in order. If a
-callback returns `False`, Synapse falls through to the next one. The value of the first
-callback that does not return `False` will be used. If this happens, Synapse will not call
-any of the subsequent implementations of this callback.
+callback returns `synapse.module_api.ALLOW`, Synapse falls through to the next one. The value of the
+first callback that does not return `synapse.module_api.ALLOW` will be used. If this happens, Synapse
+will not call any of the subsequent implementations of this callback.
 
 ### `user_may_join_room`
 
@@ -243,6 +250,24 @@ async def check_media_file_for_spam(
 Called when storing a local or remote file. The module must return a `bool` indicating
 whether the given file should be excluded from the homeserver's media store. Return
 `True` to prevent this file from being stored; otherwise return `False`.
+
+If multiple modules implement this callback, they will be considered in order. If a
+callback returns `False`, Synapse falls through to the next one. The value of the first
+callback that does not return `False` will be used. If this happens, Synapse will not call
+any of the subsequent implementations of this callback.
+
+### `should_drop_federated_event`
+
+_First introduced in Synapse v1.60.0_
+
+```python
+async def should_drop_federated_event(event: "synapse.events.EventBase") -> bool
+```
+
+Called when checking whether a remote server can federate an event with us. **Returning
+`True` from this function will silently drop a federated event and split-brain our view
+of a room's DAG, and thus you shouldn't use this callback unless you know what you are
+doing.**
 
 If multiple modules implement this callback, they will be considered in order. If a
 callback returns `False`, Synapse falls through to the next one. The value of the first

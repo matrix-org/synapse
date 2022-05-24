@@ -410,7 +410,7 @@ class HttpPusher(Pusher):
         rejected = []
         if "rejected" in resp:
             rejected = resp["rejected"]
-        else:
+        if not rejected:
             self.badge_count_last_call = badge
         return rejected
 

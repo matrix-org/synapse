@@ -12,20 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from types import TracebackType
 from typing import (
     TYPE_CHECKING,
+    Any,
     AsyncContextManager,
     Awaitable,
     Callable,
     Dict,
     Iterable,
+    List,
     Optional,
+    Type,
 )
 
 import attr
 
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage.types import Connection
+from synapse.storage.types import Connection, Cursor
 from synapse.types import JsonDict
 from synapse.util import Clock, json_encoder
 
@@ -74,7 +78,12 @@ class _BackgroundUpdateContextManager:
 
         return self._update_duration_ms
 
-    async def __aexit__(self, *exc) -> None:
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc: Optional[BaseException],
+        tb: Optional[TracebackType],
+    ) -> None:
         pass
 
 
@@ -273,12 +282,20 @@ class BackgroundUpdater:
 
         self._running = True
 
+        back_to_back_failures = 0
+
         try:
             logger.info("Starting background schema updates")
             while self.enabled:
                 try:
                     result = await self.do_next_background_update(sleep)
+                    back_to_back_failures = 0
                 except Exception:
+                    back_to_back_failures += 1
+                    if back_to_back_failures >= 5:
+                        raise RuntimeError(
+                            "5 back-to-back background update failures; aborting."
+                        )
                     logger.exception("Error doing update")
                 else:
                     if result:
@@ -352,7 +369,7 @@ class BackgroundUpdater:
             True if we have finished running all the background updates, otherwise False
         """
 
-        def get_background_updates_txn(txn):
+        def get_background_updates_txn(txn: Cursor) -> List[Dict[str, Any]]:
             txn.execute(
                 """
                 SELECT update_name, depends_on FROM background_updates
@@ -469,7 +486,7 @@ class BackgroundUpdater:
         self,
         update_name: str,
         update_handler: Callable[[JsonDict, int], Awaitable[int]],
-    ):
+    ) -> None:
         """Register a handler for doing a background update.
 
         The handler should take two arguments:
@@ -518,6 +535,7 @@ class BackgroundUpdater:
         where_clause: Optional[str] = None,
         unique: bool = False,
         psql_only: bool = False,
+        replaces_index: Optional[str] = None,
     ) -> None:
         """Helper for store classes to do a background index addition
 
@@ -537,6 +555,8 @@ class BackgroundUpdater:
             unique: true to make a UNIQUE index
             psql_only: true to only create this index on psql databases (useful
                 for virtual sqlite tables)
+            replaces_index: The name of an index that this index replaces.
+                The named index will be dropped upon completion of the new index.
         """
 
         def create_index_psql(conn: Connection) -> None:
@@ -568,6 +588,12 @@ class BackgroundUpdater:
                 }
                 logger.debug("[SQL] %s", sql)
                 c.execute(sql)
+
+                if replaces_index is not None:
+                    # We drop the old index as the new index has now been created.
+                    sql = f"DROP INDEX IF EXISTS {replaces_index}"
+                    logger.debug("[SQL] %s", sql)
+                    c.execute(sql)
             finally:
                 conn.set_session(autocommit=False)  # type: ignore
 
@@ -596,6 +622,12 @@ class BackgroundUpdater:
             logger.debug("[SQL] %s", sql)
             c.execute(sql)
 
+            if replaces_index is not None:
+                # We drop the old index as the new index has now been created.
+                sql = f"DROP INDEX IF EXISTS {replaces_index}"
+                logger.debug("[SQL] %s", sql)
+                c.execute(sql)
+
         if isinstance(self.db_pool.engine, engines.PostgresEngine):
             runner: Optional[Callable[[Connection], None]] = create_index_psql
         elif psql_only:
@@ -603,7 +635,7 @@ class BackgroundUpdater:
         else:
             runner = create_index_sqlite
 
-        async def updater(progress, batch_size):
+        async def updater(progress: JsonDict, batch_size: int) -> int:
             if runner is not None:
                 logger.info("Adding index %s to %s", index_name, table)
                 await self.db_pool.runWithConnection(runner)

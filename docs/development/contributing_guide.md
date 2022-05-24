@@ -206,7 +206,32 @@ This means that we need to run our unit tests against PostgreSQL too. Our CI doe
 this automatically for pull requests and release candidates, but it's sometimes
 useful to reproduce this locally.
 
-To do so, [configure Postgres](../postgres.md) and run `trial` with the
+#### Using Docker
+
+The easiest way to do so is to run Postgres via a docker container. In one
+terminal:
+
+```shell
+docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgress -p 5432:5432 postgres:14
+```
+
+If you see an error like
+
+```
+docker: Error response from daemon: driver failed programming external connectivity on endpoint nice_ride (b57bbe2e251b70015518d00c9981e8cb8346b5c785250341a6c53e3c899875f1): Error starting userland proxy: listen tcp4 0.0.0.0:5432: bind: address already in use.
+```
+
+then something is already bound to port 5432. You're probably already running postgres locally.
+
+Once you have a postgres server running, invoke `trial` in a second terminal:
+
+```shell
+SYNAPSE_POSTGRES=1 SYNAPSE_POSTGRES_HOST=127.0.0.1 SYNAPSE_POSTGRES_USER=postgres SYNAPSE_POSTGRES_PASSWORD=mysecretpassword poetry run trial tests
+````
+
+#### Using an existing Postgres installation
+
+If you have postgres already installed on your system, you can run `trial` with the
 following environment variables matching your configuration:
 
 - `SYNAPSE_POSTGRES` to anything nonempty
@@ -229,8 +254,8 @@ You don't need to specify the host, user, port or password if your Postgres
 server is set to authenticate you over the UNIX socket (i.e. if the `psql` command
 works without further arguments).
 
-Your Postgres account needs to be able to create databases.
-
+Your Postgres account needs to be able to create databases; see the postgres
+docs for [`ALTER ROLE`](https://www.postgresql.org/docs/current/sql-alterrole.html).
 
 ## Run the integration tests ([Sytest](https://github.com/matrix-org/sytest)).
 
@@ -397,8 +422,8 @@ same lightweight approach that the Linux Kernel
 [submitting patches process](
 https://www.kernel.org/doc/html/latest/process/submitting-patches.html#sign-your-work-the-developer-s-certificate-of-origin>),
 [Docker](https://github.com/docker/docker/blob/master/CONTRIBUTING.md), and many other
-projects use: the DCO (Developer Certificate of Origin:
-http://developercertificate.org/). This is a simple declaration that you wrote
+projects use: the DCO ([Developer Certificate of Origin](http://developercertificate.org/)).
+This is a simple declaration that you wrote
 the contribution or otherwise have the right to contribute it to Matrix:
 
 ```

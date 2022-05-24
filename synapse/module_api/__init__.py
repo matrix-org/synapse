@@ -35,6 +35,7 @@ from typing_extensions import ParamSpec
 from twisted.internet import defer
 from twisted.web.resource import Resource
 
+from synapse import spam_checker_api
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.events.presence_router import (
@@ -47,6 +48,7 @@ from synapse.events.spamcheck import (
     CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK,
     CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
     CHECK_USERNAME_FOR_SPAM_CALLBACK,
+    SHOULD_DROP_FEDERATED_EVENT_CALLBACK,
     USER_MAY_CREATE_ROOM_ALIAS_CALLBACK,
     USER_MAY_CREATE_ROOM_CALLBACK,
     USER_MAY_INVITE_CALLBACK,
@@ -139,6 +141,9 @@ are loaded into Synapse.
 
 PRESENCE_ALL_USERS = PresenceRouter.ALL_USERS
 
+ALLOW = spam_checker_api.Allow.ALLOW
+# Singleton value used to mark a message as permitted.
+
 __all__ = [
     "errors",
     "make_deferred_yieldable",
@@ -146,6 +151,7 @@ __all__ = [
     "respond_with_html",
     "run_in_background",
     "cached",
+    "Allow",
     "UserID",
     "DatabasePool",
     "LoggingTransaction",
@@ -234,6 +240,9 @@ class ModuleApi:
         self,
         *,
         check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
+        should_drop_federated_event: Optional[
+            SHOULD_DROP_FEDERATED_EVENT_CALLBACK
+        ] = None,
         user_may_join_room: Optional[USER_MAY_JOIN_ROOM_CALLBACK] = None,
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
         user_may_send_3pid_invite: Optional[USER_MAY_SEND_3PID_INVITE_CALLBACK] = None,
@@ -254,6 +263,7 @@ class ModuleApi:
         """
         return self._spam_checker.register_callbacks(
             check_event_for_spam=check_event_for_spam,
+            should_drop_federated_event=should_drop_federated_event,
             user_may_join_room=user_may_join_room,
             user_may_invite=user_may_invite,
             user_may_send_3pid_invite=user_may_send_3pid_invite,

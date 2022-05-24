@@ -996,7 +996,7 @@ class ServerConfig(Config):
         #   federation: the server-server API (/_matrix/federation). Also implies
         #       'media', 'keys', 'openid'
         #
-        #   keys: the key discovery API (/_matrix/keys).
+        #   keys: the key discovery API (/_matrix/key).
         #
         #   media: the media API (/_matrix/media).
         #

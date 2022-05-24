@@ -23,6 +23,7 @@ from canonicaljson import encode_canonical_json
 
 from twisted.internet.interfaces import IDelayedCall
 
+import synapse
 from synapse import event_auth
 from synapse.api.constants import (
     EventContentFields,
@@ -44,7 +45,7 @@ from synapse.api.errors import (
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.api.urls import ConsentURIBuilder
 from synapse.event_auth import validate_event_for_room_version
-from synapse.events import EventBase
+from synapse.events import EventBase, relation_from_event
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
@@ -426,7 +427,7 @@ class EventCreationHandler:
         # This is to stop us from diverging history *too* much.
         self.limiter = Linearizer(max_count=5, name="room_event_creation_limit")
 
-        self.action_generator = hs.get_action_generator()
+        self._bulk_push_rule_evaluator = hs.get_bulk_push_rule_evaluator()
 
         self.spam_checker = hs.get_spam_checker()
         self.third_party_event_rules: "ThirdPartyEventRules" = (
@@ -634,7 +635,9 @@ class EventCreationHandler:
             # federation as well as those created locally. As of room v3, aliases events
             # can be created by users that are not in the room, therefore we have to
             # tolerate them in event_auth.check().
-            prev_state_ids = await context.get_prev_state_ids()
+            prev_state_ids = await context.get_prev_state_ids(
+                StateFilter.from_types([(EventTypes.Member, None)])
+            )
             prev_event_id = prev_state_ids.get((EventTypes.Member, event.sender))
             prev_event = (
                 await self.store.get_event(prev_event_id, allow_none=True)
@@ -757,7 +760,13 @@ class EventCreationHandler:
             The previous version of the event is returned, if it is found in the
             event context. Otherwise, None is returned.
         """
-        prev_state_ids = await context.get_prev_state_ids()
+        if event.internal_metadata.is_outlier():
+            # This can happen due to out of band memberships
+            return None
+
+        prev_state_ids = await context.get_prev_state_ids(
+            StateFilter.from_types([(event.type, None)])
+        )
         prev_event_id = prev_state_ids.get((event.type, event.state_key))
         if not prev_event_id:
             return None
@@ -877,11 +886,11 @@ class EventCreationHandler:
                 event.sender,
             )
 
-            spam_error = await self.spam_checker.check_event_for_spam(event)
-            if spam_error:
-                if not isinstance(spam_error, str):
-                    spam_error = "Spam is not permitted here"
-                raise SynapseError(403, spam_error, Codes.FORBIDDEN)
+            spam_check = await self.spam_checker.check_event_for_spam(event)
+            if spam_check is not synapse.spam_checker_api.Allow.ALLOW:
+                raise SynapseError(
+                    403, "This message had been rejected as probable spam", spam_check
+                )
 
             ev = await self.handle_new_client_event(
                 requester=requester,
@@ -1001,7 +1010,7 @@ class EventCreationHandler:
         # after it is created
         if builder.internal_metadata.outlier:
             event.internal_metadata.outlier = True
-            context = EventContext.for_outlier()
+            context = EventContext.for_outlier(self.storage)
         elif (
             event.type == EventTypes.MSC2716_INSERTION
             and state_event_ids
@@ -1056,20 +1065,11 @@ class EventCreationHandler:
             SynapseError if the event is invalid.
         """
 
-        relation = event.content.get("m.relates_to")
+        relation = relation_from_event(event)
         if not relation:
             return
 
-        relation_type = relation.get("rel_type")
-        if not relation_type:
-            return
-
-        # Ensure the parent is real.
-        relates_to = relation.get("event_id")
-        if not relates_to:
-            return
-
-        parent_event = await self.store.get_event(relates_to, allow_none=True)
+        parent_event = await self.store.get_event(relation.parent_id, allow_none=True)
         if parent_event:
             # And in the same room.
             if parent_event.room_id != event.room_id:
@@ -1078,28 +1078,31 @@ class EventCreationHandler:
         else:
             # There must be some reason that the client knows the event exists,
             # see if there are existing relations. If so, assume everything is fine.
-            if not await self.store.event_is_target_of_relation(relates_to):
+            if not await self.store.event_is_target_of_relation(relation.parent_id):
                 # Otherwise, the client can't know about the parent event!
                 raise SynapseError(400, "Can't send relation to unknown event")
 
         # If this event is an annotation then we check that that the sender
         # can't annotate the same way twice (e.g. stops users from liking an
         # event multiple times).
-        if relation_type == RelationTypes.ANNOTATION:
-            aggregation_key = relation["key"]
+        if relation.rel_type == RelationTypes.ANNOTATION:
+            aggregation_key = relation.aggregation_key
+
+            if aggregation_key is None:
+                raise SynapseError(400, "Missing aggregation key")
 
             if len(aggregation_key) > 500:
                 raise SynapseError(400, "Aggregation key is too long")
 
             already_exists = await self.store.has_user_annotated_event(
-                relates_to, event.type, aggregation_key, event.sender
+                relation.parent_id, event.type, aggregation_key, event.sender
             )
             if already_exists:
                 raise SynapseError(400, "Can't send same reaction twice")
 
         # Don't attempt to start a thread if the parent event is a relation.
-        elif relation_type == RelationTypes.THREAD:
-            if await self.store.event_includes_relation(relates_to):
+        elif relation.rel_type == RelationTypes.THREAD:
+            if await self.store.event_includes_relation(relation.parent_id):
                 raise SynapseError(
                     400, "Cannot start threads from an event with a relation"
                 )
@@ -1245,7 +1248,9 @@ class EventCreationHandler:
         # and `state_groups` because they have `prev_events` that aren't persisted yet
         # (historical messages persisted in reverse-chronological order).
         if not event.internal_metadata.is_historical():
-            await self.action_generator.handle_push_actions_for_event(event, context)
+            await self._bulk_push_rule_evaluator.action_for_event_by_user(
+                event, context
+            )
 
         try:
             # If we're a worker we need to hit out to the master.
@@ -1547,7 +1552,11 @@ class EventCreationHandler:
                         "Redacting MSC2716 events is not supported in this room version",
                     )
 
-            prev_state_ids = await context.get_prev_state_ids()
+            event_types = event_auth.auth_types_for_event(event.room_version, event)
+            prev_state_ids = await context.get_prev_state_ids(
+                StateFilter.from_types(event_types)
+            )
+
             auth_events_ids = self._event_auth_handler.compute_auth_events(
                 event, prev_state_ids, for_verification=True
             )
