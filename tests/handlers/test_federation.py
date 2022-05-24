@@ -278,7 +278,9 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
                 federation_event_handler._process_received_pdu(
                     self.OTHER_SERVER_NAME,
                     event,
-                    state={(e.type, e.state_key): e.event_id for e in current_state},
+                    state_ids={
+                        (e.type, e.state_key): e.event_id for e in current_state
+                    },
                 )
             )
 
