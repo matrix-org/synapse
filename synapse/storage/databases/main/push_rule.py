@@ -213,11 +213,7 @@ class PushRulesWorkerStore(
                 "have_push_rules_changed", have_push_rules_changed_txn
             )
 
-    @cachedList(
-        cached_method_name="get_push_rules_for_user",
-        list_name="user_ids",
-        num_args=1,
-    )
+    @cachedList(cached_method_name="get_push_rules_for_user", list_name="user_ids")
     async def bulk_get_push_rules(
         self, user_ids: Collection[str]
     ) -> Dict[str, List[JsonDict]]:
@@ -249,9 +245,7 @@ class PushRulesWorkerStore(
         return results
 
     @cachedList(
-        cached_method_name="get_push_rules_enabled_for_user",
-        list_name="user_ids",
-        num_args=1,
+        cached_method_name="get_push_rules_enabled_for_user", list_name="user_ids"
     )
     async def bulk_get_push_rules_enabled(
         self, user_ids: Collection[str]
