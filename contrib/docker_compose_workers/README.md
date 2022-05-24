@@ -1,6 +1,6 @@
 # Setting up Synapse with Workers using Docker Compose
 
-This section describes how deploy and manage Synapse and workers via [Docker Compose](https://docs.docker.com/compose/).
+This directory describes how deploy and manage Synapse and workers via [Docker Compose](https://docs.docker.com/compose/).
 
 Example worker configuration files can be found [here](workers).
 
