@@ -62,12 +62,72 @@ SHOULD_DROP_FEDERATED_EVENT_CALLBACK = Callable[
     ["synapse.events.EventBase"],
     Awaitable[Union[bool, str]],
 ]
-USER_MAY_JOIN_ROOM_CALLBACK = Callable[[str, str, bool], Awaitable[bool]]
-USER_MAY_INVITE_CALLBACK = Callable[[str, str, str], Awaitable[bool]]
-USER_MAY_SEND_3PID_INVITE_CALLBACK = Callable[[str, str, str, str], Awaitable[bool]]
-USER_MAY_CREATE_ROOM_CALLBACK = Callable[[str], Awaitable[bool]]
-USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[[str, RoomAlias], Awaitable[bool]]
-USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[[str, str], Awaitable[bool]]
+USER_MAY_JOIN_ROOM_CALLBACK = Callable[
+    [str, str, bool],
+    Awaitable[
+        Union[
+            Allow,
+            Codes,
+            # Deprecated
+            bool,
+        ]
+    ],
+]
+USER_MAY_INVITE_CALLBACK = Callable[
+    [str, str, str],
+    Awaitable[
+        Union[
+            Allow,
+            Codes,
+            # Deprecated
+            bool,
+        ]
+    ],
+]
+USER_MAY_SEND_3PID_INVITE_CALLBACK = Callable[
+    [str, str, str, str],
+    Awaitable[
+        Union[
+            Allow,
+            Codes,
+            # Deprecated
+            bool,
+        ]
+    ],
+]
+USER_MAY_CREATE_ROOM_CALLBACK = Callable[
+    [str],
+    Awaitable[
+        Union[
+            Allow,
+            Codes,
+            # Deprecated
+            bool,
+        ]
+    ],
+]
+USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[
+    [str, RoomAlias],
+    Awaitable[
+        Union[
+            Allow,
+            Codes,
+            # Deprecated
+            bool,
+        ]
+    ],
+]
+USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[
+    [str, str],
+    Awaitable[
+        Union[
+            Allow,
+            Codes,
+            # Deprecated
+            bool,
+        ]
+    ],
+]
 CHECK_USERNAME_FOR_SPAM_CALLBACK = Callable[[UserProfile], Awaitable[bool]]
 LEGACY_CHECK_REGISTRATION_FOR_SPAM_CALLBACK = Callable[
     [
@@ -88,7 +148,14 @@ CHECK_REGISTRATION_FOR_SPAM_CALLBACK = Callable[
 ]
 CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK = Callable[
     [ReadableFileWrapper, FileInfo],
-    Awaitable[bool],
+    Awaitable[
+        Union[
+            Allow,
+            Codes,
+            # Deprecated
+            bool,
+        ]
+    ],
 ]
 
 
@@ -352,7 +419,7 @@ class SpamChecker:
 
     async def user_may_join_room(
         self, user_id: str, room_id: str, is_invited: bool
-    ) -> bool:
+    ) -> Decision:
         """Checks if a given users is allowed to join a room.
         Not called when a user creates a room.
 
@@ -362,7 +429,7 @@ class SpamChecker:
             is_invited: Whether the user is invited into the room
 
         Returns:
-            Whether the user may join the room
+            ALLOW if the operation is permitted, Codes otherwise.
         """
         for callback in self._user_may_join_room_callbacks:
             with Measure(
@@ -371,17 +438,20 @@ class SpamChecker:
                 may_join_room = await delay_cancellation(
                     callback(user_id, room_id, is_invited)
                 )
-            if may_join_room is False:
-                return False
+            if may_join_room is True or may_join_room is Allow.ALLOW:
+                continue
+            elif may_join_room is False:
+                return Codes.FORBIDDEN
+            else:
+                return may_join_room
 
-        return True
+        # No spam-checker has rejected the request, let it pass.
+        return Allow.ALLOW
 
     async def user_may_invite(
         self, inviter_userid: str, invitee_userid: str, room_id: str
-    ) -> bool:
+    ) -> Decision:
         """Checks if a given user may send an invite
-
-        If this method returns false, the invite will be rejected.
 
         Args:
             inviter_userid: The user ID of the sender of the invitation
@@ -389,7 +459,7 @@ class SpamChecker:
             room_id: The room ID
 
         Returns:
-            True if the user may send an invite, otherwise False
+            ALLOW if the operation is permitted, Codes otherwise.
         """
         for callback in self._user_may_invite_callbacks:
             with Measure(
@@ -398,17 +468,20 @@ class SpamChecker:
                 may_invite = await delay_cancellation(
                     callback(inviter_userid, invitee_userid, room_id)
                 )
-            if may_invite is False:
-                return False
+            if may_invite is True or may_invite is Allow.ALLOW:
+                continue
+            elif may_invite is False:
+                return Codes.FORBIDDEN
+            else:
+                return may_invite
 
-        return True
+        # No spam-checker has rejected the request, let it pass.
+        return Allow.ALLOW
 
     async def user_may_send_3pid_invite(
         self, inviter_userid: str, medium: str, address: str, room_id: str
-    ) -> bool:
+    ) -> Decision:
         """Checks if a given user may invite a given threepid into the room
-
-        If this method returns false, the threepid invite will be rejected.
 
         Note that if the threepid is already associated with a Matrix user ID, Synapse
         will call user_may_invite with said user ID instead.
@@ -420,7 +493,7 @@ class SpamChecker:
             room_id: The room ID
 
         Returns:
-            True if the user may send the invite, otherwise False
+            ALLOW if the operation is permitted, Codes otherwise.
         """
         for callback in self._user_may_send_3pid_invite_callbacks:
             with Measure(
@@ -429,45 +502,44 @@ class SpamChecker:
                 may_send_3pid_invite = await delay_cancellation(
                     callback(inviter_userid, medium, address, room_id)
                 )
-            if may_send_3pid_invite is False:
-                return False
+            if may_send_3pid_invite is True or may_send_3pid_invite is Allow.ALLOW:
+                continue
+            elif may_send_3pid_invite is False:
+                return Codes.FORBIDDEN
+            else:
+                return may_send_3pid_invite
 
-        return True
+        return Allow.ALLOW
 
-    async def user_may_create_room(self, userid: str) -> bool:
+    async def user_may_create_room(self, userid: str) -> Decision:
         """Checks if a given user may create a room
-
-        If this method returns false, the creation request will be rejected.
 
         Args:
             userid: The ID of the user attempting to create a room
-
-        Returns:
-            True if the user may create a room, otherwise False
         """
         for callback in self._user_may_create_room_callbacks:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
                 may_create_room = await delay_cancellation(callback(userid))
-            if may_create_room is False:
-                return False
+            if may_create_room is True or may_create_room is Allow.ALLOW:
+                continue
+            elif may_create_room is False:
+                return Codes.FORBIDDEN
+            else:
+                return may_create_room
 
-        return True
+        return Allow.ALLOW
 
     async def user_may_create_room_alias(
         self, userid: str, room_alias: RoomAlias
-    ) -> bool:
+    ) -> Decision:
         """Checks if a given user may create a room alias
-
-        If this method returns false, the association request will be rejected.
 
         Args:
             userid: The ID of the user attempting to create a room alias
             room_alias: The alias to be created
 
-        Returns:
-            True if the user may create a room alias, otherwise False
         """
         for callback in self._user_may_create_room_alias_callbacks:
             with Measure(
@@ -476,32 +548,35 @@ class SpamChecker:
                 may_create_room_alias = await delay_cancellation(
                     callback(userid, room_alias)
                 )
-            if may_create_room_alias is False:
-                return False
+            if may_create_room_alias is True or may_create_room_alias is Allow.ALLOW:
+                continue
+            elif may_create_room_alias is False:
+                return Codes.FORBIDDEN
+            else:
+                return may_create_room_alias
 
-        return True
+        return Allow.ALLOW
 
-    async def user_may_publish_room(self, userid: str, room_id: str) -> bool:
+    async def user_may_publish_room(self, userid: str, room_id: str) -> Decision:
         """Checks if a given user may publish a room to the directory
-
-        If this method returns false, the publish request will be rejected.
 
         Args:
             userid: The user ID attempting to publish the room
             room_id: The ID of the room that would be published
-
-        Returns:
-            True if the user may publish the room, otherwise False
         """
         for callback in self._user_may_publish_room_callbacks:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
                 may_publish_room = await delay_cancellation(callback(userid, room_id))
-            if may_publish_room is False:
-                return False
+            if may_publish_room is True or may_publish_room is Allow.ALLOW:
+                continue
+            elif may_publish_room is False:
+                return Codes.FORBIDDEN
+            else:
+                return may_publish_room
 
-        return True
+        return Allow.ALLOW
 
     async def check_username_for_spam(self, user_profile: UserProfile) -> bool:
         """Checks if a user ID or display name are considered "spammy" by this server.
@@ -567,7 +642,7 @@ class SpamChecker:
 
     async def check_media_file_for_spam(
         self, file_wrapper: ReadableFileWrapper, file_info: FileInfo
-    ) -> bool:
+    ) -> Decision:
         """Checks if a piece of newly uploaded media should be blocked.
 
         This will be called for local uploads, downloads of remote media, each
@@ -580,23 +655,19 @@ class SpamChecker:
 
             async def check_media_file_for_spam(
                 self, file: ReadableFileWrapper, file_info: FileInfo
-            ) -> bool:
+            ) -> Decision:
                 buffer = BytesIO()
                 await file.write_chunks_to(buffer.write)
 
                 if buffer.getvalue() == b"Hello World":
-                    return True
+                    return ALLOW
 
-                return False
+                return Codes.FORBIDDEN
 
 
         Args:
             file: An object that allows reading the contents of the media.
             file_info: Metadata about the file.
-
-        Returns:
-            True if the media should be blocked or False if it should be
-            allowed.
         """
 
         for callback in self._check_media_file_for_spam_callbacks:
@@ -604,7 +675,11 @@ class SpamChecker:
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
                 spam = await delay_cancellation(callback(file_wrapper, file_info))
-            if spam:
-                return True
+            if spam is False or spam is Allow.ALLOW:
+                continue
+            elif spam is True:
+                return Codes.FORBIDDEN
+            else:
+                return spam
 
-        return False
+        return Allow.ALLOW

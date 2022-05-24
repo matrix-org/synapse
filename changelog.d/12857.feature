@@ -1,0 +1,1 @@
+Port spam-checker API callbacks `user_may_join_room`, `user_may_invite`, `user_may_send_3pid_invite`, `user_may_create_room`, `user_may_create_room_alias`, `user_may_publish_room`, `check_media_file_for_spam` to more powerful and less ambiguous `Union[Allow, Codes]`.
