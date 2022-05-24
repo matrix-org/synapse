@@ -1,6 +1,19 @@
 Synapse 1.60.0rc1 (2022-05-24)
 ==============================
 
+This release of Synapse adds a unique index to the `state_group_edges` table, in
+order to prevent accidentally introducing duplicate information (for example,
+because a database backup was restored multiple times). If your Synapse database
+already has duplicate rows in this table, this could fail with an error and
+require manual remediation.
+
+Additionally, the signature of the `check_event_for_spam` module callback has changed.
+The previous signature has been deprecated and remains working for now. Module authors
+should update their modules to use the new signature where possible.
+
+See [the upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1600)
+for more details.
+
 Features
 --------
 
@@ -13,7 +26,7 @@ Features
 - Update [MSC2716](https://github.com/matrix-org/matrix-spec-proposals/pull/2716) implementation to process marker events from the current state to avoid markers being lost in timeline gaps for federated servers which would cause the imported history to be undiscovered. ([\#12718](https://github.com/matrix-org/synapse/issues/12718))
 - Add a `drop_federated_event` callback to `SpamChecker` to disregard inbound federated events before they take up much processing power, in an emergency. ([\#12744](https://github.com/matrix-org/synapse/issues/12744))
 - Implement [MSC3818: Copy room type on upgrade](https://github.com/matrix-org/matrix-spec-proposals/pull/3818). ([\#12786](https://github.com/matrix-org/synapse/issues/12786), [\#12792](https://github.com/matrix-org/synapse/issues/12792))
-- Update to `check_event_for_spam`. Deprecate the current callback signature, replace it with a new signature that is both less ambiguous (replacing booleans with explicit allow/block) and more powerful (ability to return explicit error codes). ([\#12808](https://github.com/matrix-org/synapse/issues/12808))
+- Update to the `check_event_for_spam` module callback. Deprecate the current callback signature, replace it with a new signature that is both less ambiguous (replacing booleans with explicit allow/block) and more powerful (ability to return explicit error codes). ([\#12808](https://github.com/matrix-org/synapse/issues/12808))
 
 
 Bugfixes
@@ -46,7 +59,7 @@ Improved Documentation
 - Update the OpenID Connect example for Keycloak to be compatible with newer versions of Keycloak. Contributed by @nhh. ([\#12727](https://github.com/matrix-org/synapse/issues/12727))
 - Fix typo in server listener documentation. ([\#12742](https://github.com/matrix-org/synapse/issues/12742))
 - Link to the configuration manual from the welcome page of the documentation. ([\#12748](https://github.com/matrix-org/synapse/issues/12748))
-- Fix typo in 'run_background_tasks_on' option name in configuration manual documentation. ([\#12749](https://github.com/matrix-org/synapse/issues/12749))
+- Fix typo in `run_background_tasks_on` option name in configuration manual documentation. ([\#12749](https://github.com/matrix-org/synapse/issues/12749))
 - Add information regarding the `rc_invites` ratelimiting option to the configuration docs. ([\#12759](https://github.com/matrix-org/synapse/issues/12759))
 - Add documentation for cancellation of request processing. ([\#12761](https://github.com/matrix-org/synapse/issues/12761))
 - Recommend using docker to run tests against postgres. ([\#12765](https://github.com/matrix-org/synapse/issues/12765))
@@ -66,12 +79,9 @@ Internal Changes
 ----------------
 
 - Improve event caching mechanism to avoid having multiple copies of an event in memory at a time. ([\#10533](https://github.com/matrix-org/synapse/issues/10533))
-- Add some type hints to datastore. ([\#12477](https://github.com/matrix-org/synapse/issues/12477), [\#12717](https://github.com/matrix-org/synapse/issues/12717), [\#12753](https://github.com/matrix-org/synapse/issues/12753))
 - Preparation for faster-room-join work: return subsets of room state which we already have, immediately. ([\#12498](https://github.com/matrix-org/synapse/issues/12498))
-- Replace string literal instances of stream key types with typed constants. ([\#12567](https://github.com/matrix-org/synapse/issues/12567))
-- Add `@cancellable` decorator, for use on endpoint methods that can be cancelled when clients disconnect. ([\#12586](https://github.com/matrix-org/synapse/issues/12586))
-- Add ability to cancel disconnected requests to `SynapseRequest`. ([\#12588](https://github.com/matrix-org/synapse/issues/12588))
-- Add a helper class for testing request cancellation. ([\#12630](https://github.com/matrix-org/synapse/issues/12630))
+- Add `@cancellable` decorator, for use on endpoint methods that can be cancelled when clients disconnect. ([\#12586](https://github.com/matrix-org/synapse/issues/12586), [\#12588](https://github.com/matrix-org/synapse/issues/12588), [\#12630](https://github.com/matrix-org/synapse/issues/12630), [\#12694](https://github.com/matrix-org/synapse/issues/12694), [\#12698](https://github.com/matrix-org/synapse/issues/12698), [\#12699](https://github.com/matrix-org/synapse/issues/12699), [\#12700](https://github.com/matrix-org/synapse/issues/12700), [\#12705](https://github.com/matrix-org/synapse/issues/12705))
+- Enable cancellation of `GET /rooms/$room_id/members`, `GET /rooms/$room_id/state` and `GET /rooms/$room_id/state/$event_type/*` requests. ([\#12708](https://github.com/matrix-org/synapse/issues/12708))
 - Improve documentation of the `synapse.push` module. ([\#12676](https://github.com/matrix-org/synapse/issues/12676))
 - Refactor functions to on `PushRuleEvaluatorForEvent`. ([\#12677](https://github.com/matrix-org/synapse/issues/12677))
 - Preparation for database schema simplifications: stop writing to `event_reference_hashes`. ([\#12679](https://github.com/matrix-org/synapse/issues/12679))
@@ -79,20 +89,11 @@ Internal Changes
 - Refactor `EventContext` class. ([\#12689](https://github.com/matrix-org/synapse/issues/12689))
 - Remove an unneeded class in the push code. ([\#12691](https://github.com/matrix-org/synapse/issues/12691))
 - Consolidate parsing of relation information from events. ([\#12693](https://github.com/matrix-org/synapse/issues/12693))
-- Capture the `Deferred` for request cancellation in `_AsyncResource`. ([\#12694](https://github.com/matrix-org/synapse/issues/12694))
-- Fixes an incorrect type hint for `Filter._check_event_relations`. ([\#12695](https://github.com/matrix-org/synapse/issues/12695))
-- Respect the `@cancellable` flag for `DirectServe{Html,Json}Resource`s. ([\#12698](https://github.com/matrix-org/synapse/issues/12698))
-- Respect the `@cancellable` flag for `RestServlet`s and `BaseFederationServlet`s. ([\#12699](https://github.com/matrix-org/synapse/issues/12699))
-- Respect the `@cancellable` flag for `ReplicationEndpoint`s. ([\#12700](https://github.com/matrix-org/synapse/issues/12700))
 - Convert namespace class `Codes` into a string enum. ([\#12703](https://github.com/matrix-org/synapse/issues/12703))
-- Complain if a federation endpoint has the `@cancellable` flag, since some of the wrapper code may not handle cancellation correctly yet. ([\#12705](https://github.com/matrix-org/synapse/issues/12705))
-- Enable cancellation of `GET /rooms/$room_id/members`, `GET /rooms/$room_id/state` and `GET /rooms/$room_id/state/$event_type/*` requests. ([\#12708](https://github.com/matrix-org/synapse/issues/12708))
 - Optimize private read receipt filtering. ([\#12711](https://github.com/matrix-org/synapse/issues/12711))
-- Add type annotations to increase the number of modules passing `disallow-untyped-defs`. ([\#12716](https://github.com/matrix-org/synapse/issues/12716), [\#12726](https://github.com/matrix-org/synapse/issues/12726))
 - Drop the logging level of status messages for the URL preview cache expiry job from INFO to DEBUG. ([\#12720](https://github.com/matrix-org/synapse/issues/12720))
 - Downgrade some OIDC errors to warnings in the logs, to reduce the noise of Sentry reports. ([\#12723](https://github.com/matrix-org/synapse/issues/12723))
 - Update configs used by Complement to allow more invites/3PID validations during tests. ([\#12731](https://github.com/matrix-org/synapse/issues/12731))
-- Tidy up and type-hint the database engine modules. ([\#12734](https://github.com/matrix-org/synapse/issues/12734))
 - Fix a long-standing bug where the user directory background process would fail to make forward progress if a user included a null codepoint in their display name or avatar. ([\#12762](https://github.com/matrix-org/synapse/issues/12762))
 - Tweak the mypy plugin so that `@cached` can accept `on_invalidate=None`. ([\#12769](https://github.com/matrix-org/synapse/issues/12769))
 - Move methods that call `add_push_rule` to the `PushRuleStore` class. ([\#12772](https://github.com/matrix-org/synapse/issues/12772))
@@ -100,13 +101,12 @@ Internal Changes
 - Refactor `resolve_state_groups_for_events` to not pull out full state when no state resolution happens. ([\#12775](https://github.com/matrix-org/synapse/issues/12775))
 - Do not keep going if there are 5 back-to-back background update failures. ([\#12781](https://github.com/matrix-org/synapse/issues/12781))
 - Fix federation when using the demo scripts. ([\#12783](https://github.com/matrix-org/synapse/issues/12783))
-- The `hash_password` script now fails when it is called without specifying a config file. ([\#12789](https://github.com/matrix-org/synapse/issues/12789))
-- Simplify `disallow_untyped_defs` config in `mypy.ini`. ([\#12790](https://github.com/matrix-org/synapse/issues/12790))
+- The `hash_password` script now fails when it is called without specifying a config file. Contributed by @jae1911. ([\#12789](https://github.com/matrix-org/synapse/issues/12789))
+- Improve and fix type hints. ([\#12567](https://github.com/matrix-org/synapse/issues/12567), [\#12477](https://github.com/matrix-org/synapse/issues/12477), [\#12717](https://github.com/matrix-org/synapse/issues/12717), [\#12753](https://github.com/matrix-org/synapse/issues/12753), [\#12695](https://github.com/matrix-org/synapse/issues/12695), [\#12734](https://github.com/matrix-org/synapse/issues/12734), [\#12716](https://github.com/matrix-org/synapse/issues/12716), [\#12726](https://github.com/matrix-org/synapse/issues/12726), [\#12790](https://github.com/matrix-org/synapse/issues/12790), [\#12833](https://github.com/matrix-org/synapse/issues/12833))
 - Update EventContext `get_current_event_ids` and `get_prev_event_ids` to accept state filters and update calls where possible. ([\#12791](https://github.com/matrix-org/synapse/issues/12791))
 - Remove Caddy from the Synapse workers image used in Complement. ([\#12818](https://github.com/matrix-org/synapse/issues/12818))
 - Add Complement's shared registration secret to the Complement worker image. This fixes tests that depend on it. ([\#12819](https://github.com/matrix-org/synapse/issues/12819))
 - Support registering Application Services when running with workers under Complement. ([\#12826](https://github.com/matrix-org/synapse/issues/12826))
-- Add some type hints to test files. ([\#12833](https://github.com/matrix-org/synapse/issues/12833))
 - Disable 'faster room join' Complement tests when testing against Synapse with workers. ([\#12842](https://github.com/matrix-org/synapse/issues/12842))
 
 
