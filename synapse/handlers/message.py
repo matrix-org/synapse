@@ -1023,7 +1023,12 @@ class EventCreationHandler:
             # TODO(faster_joins): figure out how this works, and make sure that the
             #   old state is complete.
             old_state = await self.store.get_events_as_list(state_event_ids)
-            context = await self.state.compute_event_context(event, old_state=old_state)
+            context = await self.state.compute_event_context(
+                event,
+                state_ids_before_event={
+                    (e.type, e.state_key): e.event_id for e in old_state
+                },
+            )
         else:
             context = await self.state.compute_event_context(event)
 

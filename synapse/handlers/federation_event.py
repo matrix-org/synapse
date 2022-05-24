@@ -463,7 +463,9 @@ class FederationEventHandler:
         with nested_logging_context(suffix=event.event_id):
             context = await self._state_handler.compute_event_context(
                 event,
-                old_state=state,
+                state_ids_before_event={
+                    (e.type, e.state_key): e.event_id for e in state
+                },
                 partial_state=partial_state,
             )
 
@@ -513,11 +515,14 @@ class FederationEventHandler:
             # This is the same operation as we do when we receive a regular event
             # over federation.
             state = await self._resolve_state_at_missing_prevs(destination, event)
+            state_ids = None
+            if state:
+                state_ids = {(e.type, e.state_key): e.event_id for e in state}
 
             # build a new state group for it if need be
             context = await self._state_handler.compute_event_context(
                 event,
-                old_state=state,
+                state_ids_before_event=state_ids,
             )
             if context.partial_state:
                 # this can happen if some or all of the event's prev_events still have
@@ -1089,8 +1094,12 @@ class FederationEventHandler:
         assert not event.internal_metadata.outlier
 
         try:
+            state_ids = None
+            if state:
+                state_ids = {(e.type, e.state_key): e.event_id for e in state}
             context = await self._state_handler.compute_event_context(
-                event, old_state=state
+                event,
+                state_ids_before_event=state_ids,
             )
             context = await self._check_event_auth(
                 origin,

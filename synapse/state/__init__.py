@@ -261,7 +261,7 @@ class StateHandler:
     async def compute_event_context(
         self,
         event: EventBase,
-        old_state: Optional[Iterable[EventBase]] = None,
+        state_ids_before_event: Optional[StateMap[str]] = None,
         partial_state: bool = False,
     ) -> EventContext:
         """Build an EventContext structure for a non-outlier event.
@@ -273,12 +273,12 @@ class StateHandler:
 
         Args:
             event:
-            old_state: The state at the event if it can't be
-                calculated from existing events. This is normally only specified
-                when receiving an event from federation where we don't have the
-                prev events for, e.g. when backfilling.
-            partial_state: True if `old_state` is partial and omits non-critical
-                membership events
+            state_ids_before_event: The event ids of the state at the event if
+                it can't be calculated from existing events. This is normally
+                only specified when receiving an event from federation where we
+                don't have the prev events for, e.g. when backfilling.
+            partial_state: True if `state_ids_before_event` is partial and omits
+                non-critical membership events
         Returns:
             The event context.
         """
@@ -286,13 +286,11 @@ class StateHandler:
         assert not event.internal_metadata.is_outlier()
 
         #
-        # first of all, figure out the state before the event
+        # first of all, figure out the state before the event, unless we
+        # already have it.
         #
-        if old_state:
+        if state_ids_before_event:
             # if we're given the state before the event, then we use that
-            state_ids_before_event: StateMap[str] = {
-                (s.type, s.state_key): s.event_id for s in old_state
-            }
             state_group_before_event = None
             state_group_before_event_prev_group = None
             deltas_to_state_group_before_event = None
