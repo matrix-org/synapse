@@ -55,3 +55,14 @@ jobs:
           tags: "${{ steps.set-tag.outputs.tags }}"
           file: "docker/Dockerfile"
           platforms: linux/amd64,linux/arm64
+
+      - name: Build and push all platforms (pyston)
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          labels: "gitsha1=${{ github.sha }}"
+          tags: "${{ steps.set-tag.outputs.tags }}-pyston"
+          file: "docker/Dockerfile"
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            BASE_IMAGE=pyston/slim:2.3.3
