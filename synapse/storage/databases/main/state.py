@@ -182,7 +182,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         result_map: Dict[str, EventMetadata] = {}
         for batch_ids in batch_iter(event_ids, 1000):
-            return await self.db_pool.runInteraction(
+            result_map = await self.db_pool.runInteraction(
                 "get_metadata_for_events",
                 get_metadata_for_events_txn,
                 batch_ids=batch_ids,

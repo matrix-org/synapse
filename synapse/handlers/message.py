@@ -55,7 +55,14 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
-from synapse.types import Requester, RoomAlias, StreamToken, UserID, create_requester
+from synapse.types import (
+    MutableStateMap,
+    Requester,
+    RoomAlias,
+    StreamToken,
+    UserID,
+    create_requester,
+)
 from synapse.util import json_decoder, json_encoder, log_failure, unwrapFirstError
 from synapse.util.async_helpers import Linearizer, gather_results
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -1024,22 +1031,32 @@ class EventCreationHandler:
             #   old state is complete.
             metadata = await self.store.get_metadata_for_events(state_event_ids)
 
-            state_map = {}
+            state_map_for_event: MutableStateMap[str] = {}
             for state_id in state_event_ids:
                 data = metadata.get(state_id)
                 if data is None:
-                    raise Exception(f"State event {state_id} not persisted")
+                    # We're trying to persist a new historical batch of events
+                    # with the given state, e.g. via
+                    # `RoomBatchSendEventRestServlet`. The state can be inferred
+                    # by Synapse or set directly by the client.
+                    #
+                    # Either way, we should have persisted all the state before
+                    # getting here.
+                    raise Exception(
+                        f"State event {state_id} not found in DB,"
+                        " Synapse should have persisted it before using it."
+                    )
 
                 if data.state_key is None:
                     raise Exception(
                         f"Trying to set non-state event {state_id} as state"
                     )
 
-                state_map[(data.event_type, data.state_key)] = state_id
+                state_map_for_event[(data.event_type, data.state_key)] = state_id
 
             context = await self.state.compute_event_context(
                 event,
-                state_ids_before_event=state_map,
+                state_ids_before_event=state_map_for_event,
             )
         else:
             context = await self.state.compute_event_context(event)
