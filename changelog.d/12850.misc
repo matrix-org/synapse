@@ -1,1 +1,1 @@
-Create additional Dockerfile for a Pyston based environment.
+Update Dockerfile to allow switching base image to any debian-based python image, e.g pyston/slim.

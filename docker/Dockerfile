@@ -9,10 +9,12 @@
 #
 #    DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile .
 #
-# There is an optional PYTHON_VERSION build argument which sets the
-# version of python to build against: for example:
+# There is an optional BASE_IMAGE build argument which sets the
+# base image being used, this must be a debian derivative with
+# python already installed.
+# e.g pyston/slim:2.3.3 or docker.io/python:3.9-slim (default)
 #
-#    DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile --build-arg PYTHON_VERSION=3.10 .
+#    DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile --build-arg BASE_IMAGE=pyston/slim:2.3.3 .
 #
 
 # Irritatingly, there is no blessed guide on how to distribute an application with its
@@ -26,12 +28,12 @@
 
 
 
-ARG PYTHON_VERSION=3.9
+ARG BASE_IMAGE=docker.io/python:3.9-slim
 
 ###
-### Stage 0: generate requirements.txt
+### Stage 0: builder
 ###
-FROM docker.io/python:${PYTHON_VERSION}-slim as requirements
+FROM $BASE_IMAGE as builder
 
 # RUN --mount is specific to buildkit and is documented at
 # https://github.com/moby/buildkit/blob/master/frontend/dockerfile/docs/syntax.md#build-mounts-run---mount.
@@ -40,40 +42,8 @@ FROM docker.io/python:${PYTHON_VERSION}-slim as requirements
 RUN \
    --mount=type=cache,target=/var/cache/apt,sharing=locked \
    --mount=type=cache,target=/var/lib/apt,sharing=locked \
- apt-get update && apt-get install -y git \
-    && rm -rf /var/lib/apt/lists/*
-
-# We install poetry in its own build stage to avoid its dependencies conflicting with
-# synapse's dependencies.
-# We use a specific commit from poetry's master branch instead of our usual 1.1.12,
-# to incorporate fixes to some bugs in `poetry export`. This commit corresponds to
-#    https://github.com/python-poetry/poetry/pull/5156 and
-#    https://github.com/python-poetry/poetry/issues/5141 ;
-# without it, we generate a requirements.txt with incorrect environment markers,
-# which causes necessary packages to be omitted when we `pip install`.
-#
-# NB: In poetry 1.2 `poetry export` will be moved into a plugin; we'll need to also
-# pip install poetry-plugin-export (https://github.com/python-poetry/poetry-plugin-export).
-RUN --mount=type=cache,target=/root/.cache/pip \
-  pip install --user git+https://github.com/python-poetry/poetry.git@fb13b3a676f476177f7937ffa480ee5cff9a90a5
-
-WORKDIR /synapse
-
-# Copy just what we need to run `poetry export`...
-COPY pyproject.toml poetry.lock /synapse/
-
-RUN /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt
-
-###
-### Stage 1: builder
-###
-FROM docker.io/python:${PYTHON_VERSION}-slim as builder
-
-# install the OS build deps
-RUN \
-   --mount=type=cache,target=/var/cache/apt,sharing=locked \
-   --mount=type=cache,target=/var/lib/apt,sharing=locked \
  apt-get update && apt-get install -y \
+    git \
     build-essential \
     libffi-dev \
     libjpeg-dev \
@@ -87,28 +57,47 @@ RUN \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
+
+# We use a specific commit from poetry's master branch instead of our usual 1.1.12,
+# to incorporate fixes to some bugs in `poetry export`. This commit corresponds to
+#    https://github.com/python-poetry/poetry/pull/5156 and
+#    https://github.com/python-poetry/poetry/issues/5141 ;
+# without it, we generate a requirements.txt with incorrect environment markers,
+# which causes necessary packages to be omitted when we `pip install`.
+#
+# NB: In poetry 1.2 `poetry export` will be moved into a plugin; we'll need to also
+# pip install poetry-plugin-export (https://github.com/python-poetry/poetry-plugin-export).
+RUN --mount=type=cache,target=/root/.cache/pip \
+  pip install --prefix="/poetry" --no-warn-script-location \
+    "poetry-core==1.1.0a7" "git+https://github.com/python-poetry/poetry.git@fb13b3a676f476177f7937ffa480ee5cff9a90a5"
+
+WORKDIR /synapse
+
+# Copy just what we need to run `poetry export`...
+COPY pyproject.toml poetry.lock /synapse/
+
+RUN PYTHONPATH=$(echo /poetry/lib/*/site-packages/) /poetry/bin/poetry export --extras all -o /synapse/requirements.txt
+
 # To speed up rebuilds, install all of the dependencies before we copy over
 # the whole synapse project, so that this layer in the Docker cache can be
 # used while you develop on the source
 #
 # This is aiming at installing the `[tool.poetry.depdendencies]` from pyproject.toml.
-COPY --from=requirements /synapse/requirements.txt /synapse/
 RUN --mount=type=cache,target=/root/.cache/pip \
   pip install --prefix="/install" --no-deps --no-warn-script-location -r /synapse/requirements.txt
 
 # Copy over the rest of the synapse source code.
 COPY synapse /synapse/synapse/
 # ... and what we need to `pip install`.
-COPY pyproject.toml README.rst /synapse/
+COPY README.rst /synapse/
 
 # Install the synapse package itself.
 RUN pip install --prefix="/install" --no-deps --no-warn-script-location /synapse
 
 ###
-### Stage 2: runtime
+### Stage 1: runtime
 ###
-
-FROM docker.io/python:${PYTHON_VERSION}-slim
+FROM $BASE_IMAGE
 
 LABEL org.opencontainers.image.url='https://matrix.org/docs/projects/server/synapse'
 LABEL org.opencontainers.image.documentation='https://github.com/matrix-org/synapse/blob/master/docker/README.md'
@@ -130,7 +119,13 @@ RUN \
     openssl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /install /usr/local
+
+COPY --from=builder /install/bin /usr/local/bin
+# Copy the python site-packages into /install instead of /usr/local/lib as some environments use different paths
+# e.g pyston using /usr/lib, so we instead specify a PYTHONPATH environment variable to make everyone happy.
+COPY --from=builder /install/lib/*/site-packages /install
+ENV PYTHONPATH="/install"
+
 COPY ./docker/start.py /start.py
 COPY ./docker/conf /conf
 
