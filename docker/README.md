@@ -189,6 +189,12 @@ docker build -t matrixdotorg/synapse -f docker/Dockerfile .
 
 You can choose to build a different docker image by changing the value of the `-f` flag to
 point to another Dockerfile.
+If you would like to build the main Dockerfile with an alternative python interpreter, e.g
+Pyston, you can pass an alternative base image as a build argument, like so:
+
+```
+docker build -t matrixdotorg/synapse -f docker/Dockerfile --build-arg BASE_IMAGE=pyston/slim:2.3.3 .
+```
 
 ## Disabling the healthcheck
 
