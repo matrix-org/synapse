@@ -188,10 +188,10 @@ class PushRulesWorkerStore(
         results = await self.db_pool.simple_select_list(
             table="push_rules_enable",
             keyvalues={"user_name": user_id},
-            retcols=("user_name", "rule_id", "enabled"),
+            retcols=("rule_id", "enabled"),
             desc="get_push_rules_enabled_for_user",
         )
-        return {r["rule_id"]: False if r["enabled"] == 0 else True for r in results}
+        return {r["rule_id"]: bool(r["enabled"]) for r in results}
 
     async def have_push_rules_changed_for_user(
         self, user_id: str, last_id: int
