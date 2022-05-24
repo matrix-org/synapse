@@ -61,6 +61,11 @@ def _is_experimental_rule_enabled(
         and not experimental_config.msc3786_enabled
     ):
         return False
+    if (
+        rule_id == "global/underride/.org.matrix.msc3772.thread_reply"
+        and not experimental_config.msc3772_enabled
+    ):
+        return False
     return True
 
 
