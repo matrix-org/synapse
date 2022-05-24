@@ -292,7 +292,7 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
                 "_cache_key": "_room_server_acl",
             }
         ],
-        "actions": ["dont_notify"],
+        "actions": [],
     },
 ]
 
