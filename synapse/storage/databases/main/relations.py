@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import logging
-from collections import defaultdict
 from typing import (
     Collection,
     Dict,
@@ -810,7 +809,9 @@ class RelationsWorkerStore(SQLBaseStore):
             txn: LoggingTransaction,
         ) -> Dict[str, Set[Tuple[str, str]]]:
             txn.execute(sql, [event_id] + rel_type_args)
-            result = defaultdict(set)
+            result: Dict[str, Set[Tuple[str, str]]] = {
+                rel_type: set() for rel_type in relation_types
+            }
             for rel_type, sender, type in txn.fetchall():
                 result[rel_type].add((sender, type))
             return result
