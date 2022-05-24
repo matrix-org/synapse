@@ -21,14 +21,14 @@ RUN pg_ctlcluster 13 main start &&  su postgres -c "echo \
 
 # Modify the shared homeserver config with postgres support, certificate setup
 # and the disabling of rate-limiting
-COPY conf-workers/workers-shared.yaml /conf/workers/shared.yaml
+COPY conf/workers-shared.yaml /conf/workers/shared.yaml
 
 WORKDIR /data
 
-COPY conf-workers/postgres.supervisord.conf /etc/supervisor/conf.d/postgres.conf
+COPY conf/postgres.supervisord.conf /etc/supervisor/conf.d/postgres.conf
 
 # Copy the entrypoint
-COPY conf-workers/start-complement-synapse-workers.sh /
+COPY conf/start-complement-synapse-workers.sh /
 
 # Expose nginx's listener ports
 EXPOSE 8008 8448
