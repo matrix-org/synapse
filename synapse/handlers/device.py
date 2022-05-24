@@ -294,14 +294,15 @@ class DeviceHandler(DeviceWorkerHandler):
 
         self._delete_stale_devices_after = hs.config.server.delete_stale_devices_after
 
-        if (
-            hs.config.worker.run_background_tasks
-            and self._delete_stale_devices_after is not None
-        ):
+        # Ideally we would run this on a worker and condition this on the
+        # "run_background_tasks_on" setting, but this would mean making the notification
+        # of device list changes over federation work on workers, which is nontrivial.
+        if self._delete_stale_devices_after is not None:
             self.clock.looping_call(
                 run_as_background_process,
                 60 * 60 * 1000,
-                self._delete_old_devices,
+                "delete_stale_devices",
+                self._delete_stale_devices,
             )
 
     def _check_device_name_length(self, name: Optional[str]) -> None:
@@ -379,10 +380,12 @@ class DeviceHandler(DeviceWorkerHandler):
 
         raise errors.StoreError(500, "Couldn't generate a device ID.")
 
-    async def _delete_old_devices(self) -> None:
+    async def _delete_stale_devices(self) -> None:
         """Background task that deletes devices which haven't been accessed for more than
         a configured time period.
         """
+        # We should only be running this job if the config option is defined.
+        assert self._delete_stale_devices_after is not None
         now_ms = self.clock.time_msec()
         devices = await self.store.get_devices_not_accessed_since(
             now_ms - self._delete_stale_devices_after
@@ -713,7 +716,8 @@ class DeviceHandler(DeviceWorkerHandler):
                             )
                             # TODO: when called, this isn't in a logging context.
                             # This leads to log spam, sentry event spam, and massive
-                            # memory usage. See #12552.
+                            # memory usage.
+                            # See https://github.com/matrix-org/synapse/issues/12552.
                             # log_kv(
                             #     {"message": "sent device update to host", "host": host}
                             # )

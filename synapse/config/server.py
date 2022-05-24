@@ -684,7 +684,7 @@ class ServerConfig(Config):
         )
 
         if delete_stale_devices_after is not None:
-            self.delete_stale_devices_after = self.parse_duration(
+            self.delete_stale_devices_after: Optional[int] = self.parse_duration(
                 delete_stale_devices_after
             )
         else:
