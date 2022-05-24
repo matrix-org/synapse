@@ -1623,7 +1623,7 @@ class FederationEventHandler:
                     event.room_id,
                     room_version,
                     state_sets,
-                    event_map={},
+                    event_map=None,
                     state_res_store=StateResolutionStore(self._store),
                 )
             )

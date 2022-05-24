@@ -1028,11 +1028,11 @@ class EventCreationHandler:
             for state_id in state_event_ids:
                 data = metadata.get(state_id)
                 if data is None:
-                    raise Exception("State event not persisted %s", state_id)
+                    raise Exception(f"State event {state_id} not persisted")
 
                 if data.state_key is None:
                     raise Exception(
-                        "Trying to set non-state event as state: %s", state_id
+                        f"Trying to set non-state event {state_id} as state"
                     )
 
                 state_map[(data.event_type, data.state_key)] = state_id

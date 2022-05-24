@@ -273,10 +273,10 @@ class StateHandler:
 
         Args:
             event:
-            state_ids_before_event: The event ids of the state at the event if
+            state_ids_before_event: The event ids of the state before the event if
                 it can't be calculated from existing events. This is normally
                 only specified when receiving an event from federation where we
-                don't have the prev events for, e.g. when backfilling.
+                don't have the prev events, e.g. when backfilling.
             partial_state: True if `state_ids_before_event` is partial and omits
                 non-critical membership events
         Returns:
