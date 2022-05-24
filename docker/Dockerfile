@@ -10,8 +10,8 @@
 #    DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile .
 #
 # There is an optional BASE_IMAGE build argument which sets the
-# base image being used, this must be a debian derivative with
-# python already installed.
+# base image being used, this must be a debian bullseye derivative
+# image with python already installed and in the $PATH.
 # e.g pyston/slim:2.3.3 or docker.io/python:3.9-slim (default)
 #
 #    DOCKER_BUILDKIT=1 docker build -f docker/Dockerfile --build-arg BASE_IMAGE=pyston/slim:2.3.3 .
@@ -57,7 +57,8 @@ RUN \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-
+# We install poetry in its own prefix to avoid its dependencies conflicting with
+# synapse's dependencies.
 # We use a specific commit from poetry's master branch instead of our usual 1.1.12,
 # to incorporate fixes to some bugs in `poetry export`. This commit corresponds to
 #    https://github.com/python-poetry/poetry/pull/5156 and
