@@ -49,7 +49,7 @@ RUN \
 # NB: In poetry 1.2 `poetry export` will be moved into a plugin; we'll need to also
 # pip install poetry-plugin-export (https://github.com/python-poetry/poetry-plugin-export).
 RUN --mount=type=cache,target=/root/.cache/pip \
-  pip install --user "poetry==1.1.3"
+  pip install --user "poetry==1.1.13"
 
 WORKDIR /synapse
 
