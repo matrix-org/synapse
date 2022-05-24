@@ -281,7 +281,7 @@ def parse_html_description(tree: "etree.Element") -> Optional[str]:
 
 
 def _iterate_over_text(
-    tree: "etree.Element", *tags_to_ignore: Iterable[Union[str, "etree.Comment"]]
+    tree: "etree.Element", *tags_to_ignore: Union[str, "etree.Comment"]
 ) -> Generator[str, None, None]:
     """Iterate over the tree returning text nodes in a depth first fashion,
     skipping text nodes inside certain tags.
