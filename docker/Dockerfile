@@ -43,6 +43,8 @@ RUN \
  apt-get update && apt-get install -y git \
     && rm -rf /var/lib/apt/lists/*
 
+# We install poetry in its own build stage to avoid its dependencies conflicting with
+# synapse's dependencies.
 # We use a specific commit from poetry's master branch instead of our usual 1.1.12,
 # to incorporate fixes to some bugs in `poetry export`. This commit corresponds to
 #    https://github.com/python-poetry/poetry/pull/5156 and
