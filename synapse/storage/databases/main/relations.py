@@ -784,10 +784,11 @@ class RelationsWorkerStore(SQLBaseStore):
         """
         Fetch event metadata for events which related to the same event as the given event.
 
-        If the given event has no relation information, returns an empty set.
+        If the given event has no relation information, returns an empty dictionary.
 
         Args:
             event_id: The event ID which is targeted by relations.
+            relation_types: The relation types to check for mutual relations.
 
         Returns:
             A dictionary of relation type to:
