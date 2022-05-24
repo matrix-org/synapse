@@ -83,7 +83,8 @@ class Codes(str, Enum):
     # The account has been suspended on the server.
     # By opposition to `USER_DEACTIVATED`, this is a reversible measure
     # that can possibly be appealed and reverted.
-    USER_ACCOUNT_SUSPENDED = "M_USER_ACCOUNT_SUSPENDED"
+    # Part of MSC 3823.
+    USER_ACCOUNT_SUSPENDED = "M_ORG_MATRIX_MSC3823_USER_ACCOUNT_SUSPENDED"
 
     BAD_ALIAS = "M_BAD_ALIAS"
     # For restricted join rules.
