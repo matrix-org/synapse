@@ -45,7 +45,7 @@ docker build -t matrixdotorg/synapse -f "docker/Dockerfile" .
 
 extra_test_args=()
 
-test_tags="synapse_blacklist,msc2716,msc3030"
+test_tags="synapse_blacklist,msc2716,msc3030,msc3787"
 
 # If we're using workers, modify the docker files slightly.
 if [[ -n "$WORKERS" ]]; then
