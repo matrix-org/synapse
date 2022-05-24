@@ -1182,6 +1182,7 @@ class DeviceWorkerStore(SQLBaseStore):
             get_devices_not_accessed_since_txn,
         )
 
+
 class DeviceBackgroundUpdateStore(SQLBaseStore):
     def __init__(
         self,

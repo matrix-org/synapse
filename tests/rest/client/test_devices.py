@@ -171,7 +171,7 @@ class DevicesTestCase(unittest.HomeserverTestCase):
         sync.register_servlets,
     ]
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.handler = hs.get_device_handler()
 
     @unittest.override_config({"delete_stale_devices_after": 3600000})
