@@ -69,7 +69,6 @@ from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.client import (
     account_data,
     events,
-    groups,
     initial_sync,
     login,
     presence,
@@ -78,6 +77,7 @@ from synapse.rest.client import (
     read_marker,
     receipts,
     room,
+    room_batch,
     room_keys,
     sendtodevice,
     sync,
@@ -87,7 +87,7 @@ from synapse.rest.client import (
     voip,
 )
 from synapse.rest.client._base import client_patterns
-from synapse.rest.client.account import ThreepidRestServlet
+from synapse.rest.client.account import ThreepidRestServlet, WhoamiRestServlet
 from synapse.rest.client.devices import DevicesRestServlet
 from synapse.rest.client.keys import (
     KeyChangesServlet,
@@ -289,6 +289,7 @@ class GenericWorkerServer(HomeServer):
                     RegistrationTokenValidityRestServlet(self).register(resource)
                     login.register_servlets(self, resource)
                     ThreepidRestServlet(self).register(resource)
+                    WhoamiRestServlet(self).register(resource)
                     DevicesRestServlet(self).register(resource)
 
                     # Read-only
@@ -308,6 +309,7 @@ class GenericWorkerServer(HomeServer):
                     room.register_servlets(self, resource, is_worker=True)
                     room.register_deprecated_servlets(self, resource)
                     initial_sync.register_servlets(self, resource)
+                    room_batch.register_servlets(self, resource)
                     room_keys.register_servlets(self, resource)
                     tags.register_servlets(self, resource)
                     account_data.register_servlets(self, resource)
@@ -319,9 +321,6 @@ class GenericWorkerServer(HomeServer):
                     user_directory.register_servlets(self, resource)
 
                     presence.register_servlets(self, resource)
-
-                    if self.config.experimental.groups_enabled:
-                        groups.register_servlets(self, resource)
 
                     resources.update({CLIENT_API_PREFIX: resource})
 

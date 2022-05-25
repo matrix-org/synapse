@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import itertools
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import attr
 from prometheus_client import Counter
@@ -121,6 +122,9 @@ class BulkPushRuleEvaluator:
             resizable=False,
         )
 
+        # Whether to support MSC3772 is supported.
+        self._relations_match_enabled = self.hs.config.experimental.msc3772_enabled
+
     async def _get_rules_for_event(
         self, event: EventBase, context: EventContext
     ) -> Dict[str, List[Dict[str, Any]]]:
@@ -192,6 +196,60 @@ class BulkPushRuleEvaluator:
 
         return pl_event.content if pl_event else {}, sender_level
 
+    async def _get_mutual_relations(
+        self, event: EventBase, rules: Iterable[Dict[str, Any]]
+    ) -> Dict[str, Set[Tuple[str, str]]]:
+        """
+        Fetch event metadata for events which related to the same event as the given event.
+
+        If the given event has no relation information, returns an empty dictionary.
+
+        Args:
+            event_id: The event ID which is targeted by relations.
+            rules: The push rules which will be processed for this event.
+
+        Returns:
+            A dictionary of relation type to:
+                A set of tuples of:
+                    The sender
+                    The event type
+        """
+
+        # If the experimental feature is not enabled, skip fetching relations.
+        if not self._relations_match_enabled:
+            return {}
+
+        # If the event does not have a relation, then cannot have any mutual
+        # relations.
+        relation = relation_from_event(event)
+        if not relation:
+            return {}
+
+        # Pre-filter to figure out which relation types are interesting.
+        rel_types = set()
+        for rule in rules:
+            # Skip disabled rules.
+            if "enabled" in rule and not rule["enabled"]:
+                continue
+
+            for condition in rule["conditions"]:
+                if condition["kind"] != "org.matrix.msc3772.relation_match":
+                    continue
+
+                # rel_type is required.
+                rel_type = condition.get("rel_type")
+                if rel_type:
+                    rel_types.add(rel_type)
+
+        # If no valid rules were found, no mutual relations.
+        if not rel_types:
+            return {}
+
+        # If any valid rules were found, fetch the mutual relations.
+        return await self.store.get_mutual_event_relations(
+            relation.parent_id, rel_types
+        )
+
     @measure_func("action_for_event_by_user")
     async def action_for_event_by_user(
         self, event: EventBase, context: EventContext
@@ -216,8 +274,17 @@ class BulkPushRuleEvaluator:
             sender_power_level,
         ) = await self._get_power_levels_and_sender_level(event, context)
 
+        relations = await self._get_mutual_relations(
+            event, itertools.chain(*rules_by_user.values())
+        )
+
         evaluator = PushRuleEvaluatorForEvent(
-            event, len(room_members), sender_power_level, power_levels
+            event,
+            len(room_members),
+            sender_power_level,
+            power_levels,
+            relations,
+            self._relations_match_enabled,
         )
 
         # If the event is not a state event check if any users ignore the sender.

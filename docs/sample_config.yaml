@@ -2521,16 +2521,6 @@ push:
 #        "events_default": 1
 
 
-# Uncomment to allow non-server-admin users to create groups on this server
-#
-#enable_group_creation: true
-
-# If enabled, non server admins can only create groups with local parts
-# starting with this prefix
-#
-#group_creation_prefix: "unofficial_"
-
-
 
 # User Directory configuration
 #

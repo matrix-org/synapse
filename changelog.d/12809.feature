@@ -1,1 +1,0 @@
-Send `USER_IP` commands on a different Redis channel, in order to reduce traffic to workers that do not process these commands.
