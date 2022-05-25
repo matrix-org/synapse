@@ -1488,6 +1488,7 @@ class FederationHandler:
                 success = await self.store.clear_partial_state_room(room_id)
                 if success:
                     logger.info("State resync complete for %s", room_id)
+                    self.storage.state.notify_room_un_partial_stated(room_id)
 
                     # TODO(faster_joins) update room stats and user directory?
                     return

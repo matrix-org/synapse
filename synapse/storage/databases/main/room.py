@@ -1112,6 +1112,19 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             keyvalues={"room_id": room_id},
         )
 
+    async def is_room_got_partial_state(self, room_id: str) -> bool:
+        "Whether the given room only has partial state stored"
+
+        entry = await self.db_pool.simple_select_one_onecol(
+            table="partial_state_rooms",
+            keyvalues={"room_id": room_id},
+            retcol="room_id",
+            allow_none=True,
+            desc="is_room_got_partial_state",
+        )
+
+        return entry is not None
+
 
 class _BackgroundUpdates:
     REMOVE_TOMESTONED_ROOMS_BG_UPDATE = "remove_tombstoned_rooms_from_directory"

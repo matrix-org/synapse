@@ -34,7 +34,10 @@ from frozendict import frozendict
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.storage.util.partial_state_events_tracker import PartialStateEventsTracker
+from synapse.storage.util.partial_state_events_tracker import (
+    PartialCurrentStateTracker,
+    PartialStateEventsTracker,
+)
 from synapse.types import MutableStateMap, StateKey, StateMap
 
 if TYPE_CHECKING:
@@ -590,9 +593,17 @@ class StateStorage:
         self._is_mine_id = hs.is_mine_id
         self.stores = stores
         self._partial_state_events_tracker = PartialStateEventsTracker(stores.main)
+        self._partial_state_room_tracker = PartialCurrentStateTracker(stores.main)
 
     def notify_event_un_partial_stated(self, event_id: str) -> None:
         self._partial_state_events_tracker.notify_un_partial_stated(event_id)
+
+    def notify_room_un_partial_stated(self, room_id: str) -> None:
+        """Notify that the room no longer has any partial state.
+
+        Must be called after `clear_partial_state_room`
+        """
+        self._partial_state_room_tracker.notify_un_partial_stated(room_id)
 
     async def get_state_group_delta(
         self, state_group: int
@@ -911,6 +922,7 @@ class StateStorage:
         Returns:
             The current state of the room.
         """
+        await self._partial_state_room_tracker.await_full_state(room_id)
 
         return await self.stores.main.get_partial_current_state_ids(
             room_id, on_invalidate=on_invalidate
@@ -931,6 +943,9 @@ class StateStorage:
         Returns:
             Map from type/state_key to event ID.
         """
+        if not state_filter or state_filter.must_await_full_state(self._is_mine_id):
+            await self._partial_state_room_tracker.await_full_state(room_id)
+
         return await self.stores.main.get_partial_filtered_current_state_ids(
             room_id, state_filter
         )
@@ -985,6 +1000,8 @@ class StateStorage:
                - list of current_state_delta_stream rows. If it is empty, we are
                  up to date.
         """
+        # FIXME(faster room joins): what do we do here?
+
         return await self.stores.main.get_partial_current_state_deltas(
             prev_stream_id, max_stream_id
         )
