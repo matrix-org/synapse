@@ -1159,7 +1159,7 @@ class DeviceWorkerStore(SQLBaseStore):
         """Retrieves a list of all devices that haven't been accessed since a given date.
 
         Args:
-            since_ms: the timestamp to select on, every device which last access dates
+            since_ms: the timestamp to select on, every device with a last access date
                 from before that time is returned.
 
         Returns:
