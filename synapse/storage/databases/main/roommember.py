@@ -670,10 +670,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return user_who_share_room
 
-    @cached(
-        cache_context=True,
-        iterable=True,
-    )
+    @cached(cache_context=True, iterable=True)
     async def get_mutual_rooms_between_users(
         self, user_ids: FrozenSet[str], cache_context: _CacheContext
     ) -> FrozenSet[str]:
