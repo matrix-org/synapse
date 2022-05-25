@@ -269,30 +269,6 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             "get_filtered_current_state_ids", _get_filtered_current_state_ids_txn
         )
 
-    async def get_canonical_alias_for_room(self, room_id: str) -> Optional[str]:
-        """Get canonical alias for room, if any
-
-        Args:
-            room_id: The room ID
-
-        Returns:
-            The canonical alias, if any
-        """
-
-        state = await self.get_filtered_current_state_ids(
-            room_id, StateFilter.from_types([(EventTypes.CanonicalAlias, "")])
-        )
-
-        event_id = state.get((EventTypes.CanonicalAlias, ""))
-        if not event_id:
-            return None
-
-        event = await self.get_event(event_id, allow_none=True)
-        if not event:
-            return None
-
-        return event.content.get("canonical_alias")
-
     @cached(max_entries=50000)
     async def _get_state_group_for_event(self, event_id: str) -> Optional[int]:
         return await self.db_pool.simple_select_one_onecol(

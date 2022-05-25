@@ -15,6 +15,7 @@
 import logging
 from typing import (
     TYPE_CHECKING,
+    Any,
     Awaitable,
     Callable,
     Collection,
@@ -894,4 +895,90 @@ class StateStorage:
         """
         return await self.stores.state.store_state_group(
             event_id, room_id, prev_group, delta_ids, current_state_ids
+        )
+
+    async def get_current_state_ids(self, room_id: str) -> StateMap[str]:
+        """Get the current state event ids for a room based on the
+        current_state_events table.
+
+        Args:
+            room_id: The room to get the state IDs of.
+
+        Returns:
+            The current state of the room.
+        """
+
+        return await self.stores.main.get_current_state_ids(room_id)
+
+    async def get_filtered_current_state_ids(
+        self, room_id: str, state_filter: Optional[StateFilter] = None
+    ) -> StateMap[str]:
+        """Get the current state event of a given type for a room based on the
+        current_state_events table.  This may not be as up-to-date as the result
+        of doing a fresh state resolution as per state_handler.get_current_state
+
+        Args:
+            room_id
+            state_filter: The state filter used to fetch state
+                from the database.
+
+        Returns:
+            Map from type/state_key to event ID.
+        """
+        return await self.stores.main.get_filtered_current_state_ids(
+            room_id, state_filter
+        )
+
+    async def get_canonical_alias_for_room(self, room_id: str) -> Optional[str]:
+        """Get canonical alias for room, if any
+
+        Args:
+            room_id: The room ID
+
+        Returns:
+            The canonical alias, if any
+        """
+
+        state = await self.get_filtered_current_state_ids(
+            room_id, StateFilter.from_types([(EventTypes.CanonicalAlias, "")])
+        )
+
+        event_id = state.get((EventTypes.CanonicalAlias, ""))
+        if not event_id:
+            return None
+
+        event = await self.stores.main.get_event(event_id, allow_none=True)
+        if not event:
+            return None
+
+        return event.content.get("canonical_alias")
+
+    async def get_current_state_deltas(
+        self, prev_stream_id: int, max_stream_id: int
+    ) -> Tuple[int, List[Dict[str, Any]]]:
+        """Fetch a list of room state changes since the given stream id
+
+        Each entry in the result contains the following fields:
+            - stream_id (int)
+            - room_id (str)
+            - type (str): event type
+            - state_key (str):
+            - event_id (str|None): new event_id for this state key. None if the
+                state has been deleted.
+            - prev_event_id (str|None): previous event_id for this state key. None
+                if it's new state.
+
+        Args:
+            prev_stream_id: point to get changes since (exclusive)
+            max_stream_id: the point that we know has been correctly persisted
+               - ie, an upper limit to return changes from.
+
+        Returns:
+            A tuple consisting of:
+               - the stream id which these results go up to
+               - list of current_state_delta_stream rows. If it is empty, we are
+                 up to date.
+        """
+        return await self.stores.main.get_current_state_deltas(
+            prev_stream_id, max_stream_id
         )
