@@ -677,7 +677,14 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     async def get_mutual_rooms_between_users(
         self, user_ids: FrozenSet[str], cache_context: _CacheContext
     ) -> FrozenSet[str]:
-        """Returns the set of rooms that all users in `user_ids` share"""
+        """
+        Returns the set of rooms that all users in `user_ids` share.
+
+        Args:
+            user_ids: A frozen set of all users to investigate and return
+              overlapping joined rooms for.
+            cache_context
+        """
         shared_room_ids: Optional[FrozenSet[str]] = None
         for user_id in user_ids:
             room_ids = await self.get_rooms_for_user(
