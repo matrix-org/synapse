@@ -252,7 +252,7 @@ class SyncHandler:
         self.state = hs.get_state_handler()
         self.auth = hs.get_auth()
         self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self.state_storage = self.storage.state
 
         # TODO: flush cache entries on subsequent sync request.
         #    Once we get the next /sync request (ie, one with the same access token
@@ -643,7 +643,7 @@ class SyncHandler:
             event: event of interest
             state_filter: The state filter used to fetch state from the database.
         """
-        state_ids = await self.state_store.get_state_ids_for_event(
+        state_ids = await self.state_storage.get_state_ids_for_event(
             event.event_id, state_filter=state_filter or StateFilter.all()
         )
         if event.is_state():
@@ -723,7 +723,7 @@ class SyncHandler:
             return None
 
         last_event = last_events[-1]
-        state_ids = await self.state_store.get_state_ids_for_event(
+        state_ids = await self.state_storage.get_state_ids_for_event(
             last_event.event_id,
             state_filter=StateFilter.from_types(
                 [(EventTypes.Name, ""), (EventTypes.CanonicalAlias, "")]
@@ -901,11 +901,13 @@ class SyncHandler:
 
             if full_state:
                 if batch:
-                    current_state_ids = await self.state_store.get_state_ids_for_event(
-                        batch.events[-1].event_id, state_filter=state_filter
+                    current_state_ids = (
+                        await self.state_storage.get_state_ids_for_event(
+                            batch.events[-1].event_id, state_filter=state_filter
+                        )
                     )
 
-                    state_ids = await self.state_store.get_state_ids_for_event(
+                    state_ids = await self.state_storage.get_state_ids_for_event(
                         batch.events[0].event_id, state_filter=state_filter
                     )
 
@@ -926,7 +928,7 @@ class SyncHandler:
             elif batch.limited:
                 if batch:
                     state_at_timeline_start = (
-                        await self.state_store.get_state_ids_for_event(
+                        await self.state_storage.get_state_ids_for_event(
                             batch.events[0].event_id, state_filter=state_filter
                         )
                     )
@@ -960,8 +962,10 @@ class SyncHandler:
                 )
 
                 if batch:
-                    current_state_ids = await self.state_store.get_state_ids_for_event(
-                        batch.events[-1].event_id, state_filter=state_filter
+                    current_state_ids = (
+                        await self.state_storage.get_state_ids_for_event(
+                            batch.events[-1].event_id, state_filter=state_filter
+                        )
                     )
                 else:
                     # Its not clear how we get here, but empirically we do
@@ -991,7 +995,7 @@ class SyncHandler:
                         # So we fish out all the member events corresponding to the
                         # timeline here, and then dedupe any redundant ones below.
 
-                        state_ids = await self.state_store.get_state_ids_for_event(
+                        state_ids = await self.state_storage.get_state_ids_for_event(
                             batch.events[0].event_id,
                             # we only want members!
                             state_filter=StateFilter.from_types(
