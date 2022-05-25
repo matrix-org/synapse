@@ -228,7 +228,7 @@ class MessageHandler:
             )
 
             if membership == Membership.JOIN:
-                state_ids = await self.store.get_filtered_current_state_ids(
+                state_ids = await self.state_storage.get_filtered_current_state_ids(
                     room_id, state_filter=state_filter
                 )
                 room_state = await self.store.get_events(state_ids.values())

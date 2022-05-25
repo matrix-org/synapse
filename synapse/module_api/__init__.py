@@ -914,7 +914,7 @@ class ModuleApi:
                 The filtered state events in the room.
         """
         state_ids = yield defer.ensureDeferred(
-            self._store.get_filtered_current_state_ids(
+            self._storage.state.get_filtered_current_state_ids(
                 room_id=room_id, state_filter=StateFilter.from_types(types)
             )
         )
@@ -1293,7 +1293,7 @@ class ModuleApi:
             # If a filter was provided, turn it into a StateFilter and retrieve a filtered
             # view of the state.
             state_filter = StateFilter.from_types(event_filter)
-            state_ids = await self._store.get_filtered_current_state_ids(
+            state_ids = await self._storage.state.get_filtered_current_state_ids(
                 room_id,
                 state_filter,
             )
