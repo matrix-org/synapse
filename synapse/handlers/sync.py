@@ -166,16 +166,6 @@ class KnockedSyncResult:
         return True
 
 
-@attr.s(slots=True, frozen=True, auto_attribs=True)
-class GroupsSyncResult:
-    join: JsonDict
-    invite: JsonDict
-    leave: JsonDict
-
-    def __bool__(self) -> bool:
-        return bool(self.join or self.invite or self.leave)
-
-
 @attr.s(slots=True, auto_attribs=True)
 class _RoomChanges:
     """The set of room entries to include in the sync, plus the set of joined
@@ -206,7 +196,6 @@ class SyncResult:
             for this device
         device_unused_fallback_key_types: List of key types that have an unused fallback
             key
-        groups: Group updates, if any
     """
 
     next_batch: StreamToken
@@ -220,7 +209,6 @@ class SyncResult:
     device_lists: DeviceListUpdates
     device_one_time_keys_count: JsonDict
     device_unused_fallback_key_types: List[str]
-    groups: Optional[GroupsSyncResult]
 
     def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
@@ -236,7 +224,6 @@ class SyncResult:
             or self.account_data
             or self.to_device
             or self.device_lists
-            or self.groups
         )
 
 
@@ -1157,10 +1144,6 @@ class SyncHandler:
                 await self.store.get_e2e_unused_fallback_key_types(user_id, device_id)
             )
 
-        if self.hs_config.experimental.groups_enabled:
-            logger.debug("Fetching group data")
-            await self._generate_sync_entry_for_groups(sync_result_builder)
-
         num_events = 0
 
         # debug for https://github.com/matrix-org/synapse/issues/9424
@@ -1184,55 +1167,9 @@ class SyncHandler:
             archived=sync_result_builder.archived,
             to_device=sync_result_builder.to_device,
             device_lists=device_lists,
-            groups=sync_result_builder.groups,
             device_one_time_keys_count=one_time_key_counts,
             device_unused_fallback_key_types=unused_fallback_key_types,
             next_batch=sync_result_builder.now_token,
-        )
-
-    @measure_func("_generate_sync_entry_for_groups")
-    async def _generate_sync_entry_for_groups(
-        self, sync_result_builder: "SyncResultBuilder"
-    ) -> None:
-        user_id = sync_result_builder.sync_config.user.to_string()
-        since_token = sync_result_builder.since_token
-        now_token = sync_result_builder.now_token
-
-        if since_token and since_token.groups_key:
-            results = await self.store.get_groups_changes_for_user(
-                user_id, since_token.groups_key, now_token.groups_key
-            )
-        else:
-            results = await self.store.get_all_groups_for_user(
-                user_id, now_token.groups_key
-            )
-
-        invited = {}
-        joined = {}
-        left = {}
-        for result in results:
-            membership = result["membership"]
-            group_id = result["group_id"]
-            gtype = result["type"]
-            content = result["content"]
-
-            if membership == "join":
-                if gtype == "membership":
-                    # TODO: Add profile
-                    content.pop("membership", None)
-                    joined[group_id] = content["content"]
-                else:
-                    joined.setdefault(group_id, {})[gtype] = content
-            elif membership == "invite":
-                if gtype == "membership":
-                    content.pop("membership", None)
-                    invited[group_id] = content["content"]
-            else:
-                if gtype == "membership":
-                    left[group_id] = content["content"]
-
-        sync_result_builder.groups = GroupsSyncResult(
-            join=joined, invite=invited, leave=left
         )
 
     @measure_func("_generate_sync_entry_for_device_list")
@@ -2333,7 +2270,6 @@ class SyncResultBuilder:
         invited
         knocked
         archived
-        groups
         to_device
     """
 
@@ -2349,7 +2285,6 @@ class SyncResultBuilder:
     invited: List[InvitedSyncResult] = attr.Factory(list)
     knocked: List[KnockedSyncResult] = attr.Factory(list)
     archived: List[ArchivedSyncResult] = attr.Factory(list)
-    groups: Optional[GroupsSyncResult] = None
     to_device: List[JsonDict] = attr.Factory(list)
 
     def calculate_user_changes(self) -> Tuple[Set[str], Set[str]]:
