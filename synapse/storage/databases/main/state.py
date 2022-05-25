@@ -177,7 +177,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         Raises:
             NotFoundError if the room is unknown
         """
-        state_ids = await self.get_current_state_ids(room_id)
+        state_ids = await self.get_partial_current_state_ids(room_id)
 
         if not state_ids:
             raise NotFoundError(f"Current state for room {room_id} is empty")
@@ -193,9 +193,11 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         return create_event
 
     @cached(max_entries=100000, iterable=True)
-    async def get_current_state_ids(self, room_id: str) -> StateMap[str]:
+    async def get_partial_current_state_ids(self, room_id: str) -> StateMap[str]:
         """Get the current state event ids for a room based on the
         current_state_events table.
+
+        This may be the partial state if we're lazy joining the room.
 
         Args:
             room_id: The room to get the state IDs of.
@@ -215,7 +217,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             return {(intern_string(r[0]), intern_string(r[1])): r[2] for r in txn}
 
         return await self.db_pool.runInteraction(
-            "get_current_state_ids", _get_current_state_ids_txn
+            "get_partial_current_state_ids", _get_current_state_ids_txn
         )
 
     # FIXME: how should this be cached?
@@ -241,7 +243,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         if not where_clause:
             # We delegate to the cached version
-            return await self.get_current_state_ids(room_id)
+            return await self.get_partial_current_state_ids(room_id)
 
         def _get_filtered_current_state_ids_txn(
             txn: LoggingTransaction,

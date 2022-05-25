@@ -994,7 +994,7 @@ class EventsPersistenceStorage:
 
         Assumes that we are only persisting events for one room at a time.
         """
-        existing_state = await self.main_store.get_current_state_ids(room_id)
+        existing_state = await self.main_store.get_partial_current_state_ids(room_id)
 
         to_delete = [key for key in existing_state if key not in current_state]
 
@@ -1083,7 +1083,7 @@ class EventsPersistenceStorage:
         # The server will leave the room, so we go and find out which remote
         # users will still be joined when we leave.
         if current_state is None:
-            current_state = await self.main_store.get_current_state_ids(room_id)
+            current_state = await self.main_store.get_partial_current_state_ids(room_id)
             current_state = dict(current_state)
             for key in delta.to_delete:
                 current_state.pop(key, None)

@@ -237,7 +237,9 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         )
         current_state = self.get_success(
             self.store.get_events_as_list(
-                (self.get_success(self.store.get_current_state_ids(room_id))).values()
+                (
+                    self.get_success(self.store.get_partial_current_state_ids(room_id))
+                ).values()
             )
         )
 
@@ -506,7 +508,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         self.get_success(d)
 
         # sanity-check: the room should show that the new user is a member
-        r = self.get_success(self.store.get_current_state_ids(room_id))
+        r = self.get_success(self.store.get_partial_current_state_ids(room_id))
         self.assertEqual(r[(EventTypes.Member, other_user)], join_event.event_id)
 
         return join_event

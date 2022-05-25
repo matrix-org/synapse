@@ -91,7 +91,9 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             event_injection.inject_member_event(self.hs, room_id, OTHER_USER, "join")
         )
 
-        initial_state_map = self.get_success(main_store.get_current_state_ids(room_id))
+        initial_state_map = self.get_success(
+            main_store.get_partial_current_state_ids(room_id)
+        )
 
         auth_event_ids = [
             initial_state_map[("m.room.create", "")],

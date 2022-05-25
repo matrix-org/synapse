@@ -912,7 +912,7 @@ class StateStorage:
             The current state of the room.
         """
 
-        return await self.stores.main.get_current_state_ids(
+        return await self.stores.main.get_partial_current_state_ids(
             room_id, on_invalidate=on_invalidate
         )
 
