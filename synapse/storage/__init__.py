@@ -32,7 +32,7 @@ from synapse.storage.databases import Databases
 from synapse.storage.databases.main import DataStore
 from synapse.storage.persist_events import EventsPersistenceStorage
 from synapse.storage.purge_events import PurgeEventsStorage
-from synapse.storage.state import StateGroupStorage
+from synapse.storage.state import StateStorage
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -51,7 +51,7 @@ class Storage:
         self.main = stores.main
 
         self.purge_events = PurgeEventsStorage(hs, stores)
-        self.state = StateGroupStorage(hs, stores)
+        self.state = StateStorage(hs, stores)
 
         self.persistence = None
         if stores.persist_events:
