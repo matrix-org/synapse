@@ -78,6 +78,7 @@ from synapse.rest.client import (
     read_marker,
     receipts,
     room,
+    room_batch,
     room_keys,
     sendtodevice,
     sync,
@@ -309,6 +310,7 @@ class GenericWorkerServer(HomeServer):
                     room.register_servlets(self, resource, is_worker=True)
                     room.register_deprecated_servlets(self, resource)
                     initial_sync.register_servlets(self, resource)
+                    room_batch.register_servlets(self, resource)
                     room_keys.register_servlets(self, resource)
                     tags.register_servlets(self, resource)
                     account_data.register_servlets(self, resource)
