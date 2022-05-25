@@ -165,7 +165,7 @@ class DeviceWorkerHandler:
         possibly_changed = set(changed)
         possibly_left = set()
         for room_id in rooms_changed:
-            current_state_ids = await self.store.get_current_state_ids(room_id)
+            current_state_ids = await self.state_storage.get_current_state_ids(room_id)
 
             # The user may have left the room
             # TODO: Check if they actually did or if we were just invited.

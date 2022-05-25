@@ -897,18 +897,24 @@ class StateStorage:
             event_id, room_id, prev_group, delta_ids, current_state_ids
         )
 
-    async def get_current_state_ids(self, room_id: str) -> StateMap[str]:
+    async def get_current_state_ids(
+        self, room_id: str, on_invalidate: Optional[Callable[[], None]] = None
+    ) -> StateMap[str]:
         """Get the current state event ids for a room based on the
         current_state_events table.
 
         Args:
             room_id: The room to get the state IDs of.
+            on_invalidate: Callback for when the `get_current_state_ids` cache
+                for the room gets invalidated.
 
         Returns:
             The current state of the room.
         """
 
-        return await self.stores.main.get_current_state_ids(room_id)
+        return await self.stores.main.get_current_state_ids(
+            room_id, on_invalidate=on_invalidate
+        )
 
     async def get_filtered_current_state_ids(
         self, room_id: str, state_filter: Optional[StateFilter] = None

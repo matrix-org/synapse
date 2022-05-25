@@ -68,6 +68,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastores().main
+        self.storage = hs.get_storage()
         self.auth = hs.get_auth()
         self.state_handler = hs.get_state_handler()
         self.config = hs.config
@@ -994,7 +995,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # If the host is in the room, but not one of the authorised hosts
         # for restricted join rules, a remote join must be used.
         room_version = await self.store.get_room_version(room_id)
-        current_state_ids = await self.store.get_current_state_ids(room_id)
+        current_state_ids = await self.storage.state.get_current_state_ids(room_id)
 
         # If restricted join rules are not being used, a local join can always
         # be used.

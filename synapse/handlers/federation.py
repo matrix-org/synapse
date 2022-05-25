@@ -731,7 +731,7 @@ class FederationHandler:
         # Note that this requires the /send_join request to come back to the
         # same server.
         if room_version.msc3083_join_rules:
-            state_ids = await self.store.get_current_state_ids(room_id)
+            state_ids = await self.state_storage.get_current_state_ids(room_id)
             if await self._event_auth_handler.has_restricted_join_rules(
                 state_ids, room_version
             ):

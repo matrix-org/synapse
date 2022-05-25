@@ -196,6 +196,7 @@ class ModuleApi:
         self._store: Union[
             DataStore, "GenericWorkerSlavedStore"
         ] = hs.get_datastores().main
+        self._storage = hs.get_storage()
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
         self._server_name = hs.hostname
@@ -1301,7 +1302,7 @@ class ModuleApi:
             # to get_filtered_current_state_ids above, with `state_filter = StateFilter.all()`,
             # but get_filtered_current_state_ids isn't cached and `get_current_state_ids`
             # is, so using the latter when we can is better for perf.
-            state_ids = await self._store.get_current_state_ids(room_id)
+            state_ids = await self._storage.state.get_current_state_ids(room_id)
 
         state_events = await self._store.get_events(state_ids.values())
 
