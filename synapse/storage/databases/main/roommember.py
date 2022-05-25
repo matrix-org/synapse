@@ -671,15 +671,13 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return user_who_share_room
 
     @cached(
-        max_entries=500000,
         cache_context=True,
         iterable=True,
-        prune_unread_entries=False,
     )
     async def get_mutual_rooms_between_users(
         self, user_ids: FrozenSet[str], cache_context: _CacheContext
     ) -> FrozenSet[str]:
-        """Returns the set of rooms that all users in user_ids share"""
+        """Returns the set of rooms that all users in `user_ids` share"""
         shared_room_ids: Optional[FrozenSet[str]] = None
         for user_id in user_ids:
             room_ids = await self.get_rooms_for_user(
