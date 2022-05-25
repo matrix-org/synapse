@@ -763,6 +763,10 @@ class DeviceListUpdater:
         device_id = edu_content.pop("device_id")
         stream_id = str(edu_content.pop("stream_id"))  # They may come as ints
         prev_ids = edu_content.pop("prev_id", [])
+        if not isinstance(prev_ids, list):
+            raise SynapseError(
+                400, "Device list update had an invalid 'prev_ids' field"
+            )
         prev_ids = [str(p) for p in prev_ids]  # They may come as ints
 
         if get_domain_from_id(user_id) != origin:
