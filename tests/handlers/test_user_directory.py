@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Tuple, Union
+from typing import Tuple
 from unittest.mock import Mock, patch
 from urllib.parse import quote
 
@@ -19,12 +19,10 @@ from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
-from synapse.api.errors import Codes
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.appservice import ApplicationService
 from synapse.rest.client import login, register, room, user_directory
 from synapse.server import HomeServer
-from synapse.spam_checker_api import Allow
 from synapse.storage.roommember import ProfileInfo
 from synapse.types import create_requester
 from synapse.util import Clock
@@ -774,24 +772,11 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 1)
 
-        async def allow_all_deprecated(user_profile: ProfileInfo) -> bool:
-            # Allow all users, deprecated API.
+        async def allow_all(user_profile: ProfileInfo) -> bool:
+            # Allow all users.
             return False
 
-        # Configure a spam checker that does not filter any users (deprecated API).
-        spam_checker = self.hs.get_spam_checker()
-        spam_checker._check_username_for_spam_callbacks = [allow_all_deprecated]
-
-        async def allow_all(user_profile: ProfileInfo) -> Union[Allow, Codes]:
-            # Allow all users.
-            return Allow.ALLOW
-
-        # The results do not change:
-        # We get one search result when searching for user2 by user1.
-        s = self.get_success(self.handler.search_users(u1, "user2", 10))
-        self.assertEqual(len(s["results"]), 1)
-
-        # Configure a spam checker that does not filter any users (deprecated API).
+        # Configure a spam checker that does not filter any users.
         spam_checker = self.hs.get_spam_checker()
         spam_checker._check_username_for_spam_callbacks = [allow_all]
 
@@ -801,20 +786,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(s["results"]), 1)
 
         # Configure a spam checker that filters all users.
-        async def block_all_deprecated(user_profile: ProfileInfo) -> bool:
+        async def block_all(user_profile: ProfileInfo) -> bool:
             # All users are spammy.
             return True
-
-        spam_checker._check_username_for_spam_callbacks = [block_all_deprecated]
-
-        # User1 now gets no search results for any of the other users.
-        s = self.get_success(self.handler.search_users(u1, "user2", 10))
-        self.assertEqual(len(s["results"]), 0)
-
-        # Configure a spam checker that filters all users.
-        async def block_all(user_profile: ProfileInfo) -> Union[Allow, Codes]:
-            # All users are spammy.
-            return Codes.CONSENT_NOT_GIVEN
 
         spam_checker._check_username_for_spam_callbacks = [block_all]
 
