@@ -61,6 +61,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 MAX_DEVICE_DISPLAY_NAME_LEN = 100
+DELETE_STALE_DEVICES_INTERVAL_MS = 24 * 60 * 60 * 1000
 
 
 class DeviceWorkerHandler:
@@ -300,7 +301,7 @@ class DeviceHandler(DeviceWorkerHandler):
         if self._delete_stale_devices_after is not None:
             self.clock.looping_call(
                 run_as_background_process,
-                60 * 60 * 1000,
+                DELETE_STALE_DEVICES_INTERVAL_MS,
                 "delete_stale_devices",
                 self._delete_stale_devices,
             )
@@ -387,12 +388,14 @@ class DeviceHandler(DeviceWorkerHandler):
         # We should only be running this job if the config option is defined.
         assert self._delete_stale_devices_after is not None
         now_ms = self.clock.time_msec()
-        devices = await self.store.get_devices_not_accessed_since(
-            now_ms - self._delete_stale_devices_after
-        )
+        since_ms = now_ms - self._delete_stale_devices_after
+        devices = await self.store.get_devices_not_accessed_since(since_ms)
 
-        for device in devices:
-            await self.delete_device(device["user_id"], device["device_id"])
+        for user_id, user_devices in devices.items():
+            # The devices table can contain devices for remote users, and we don't want
+            # e.g. break encryption by accidentally removing them.
+            if self.hs.is_mine_id(user_id):
+                await self.delete_devices(user_id, user_devices)
 
     @trace
     async def delete_device(self, user_id: str, device_id: str) -> None:
