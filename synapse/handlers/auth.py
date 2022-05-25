@@ -13,12 +13,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import hashlib
 import logging
 import time
 import unicodedata
 import urllib.parse
-from binascii import crc32
+from binascii import crc32, hexlify, unhexlify
+import base58
 from http import HTTPStatus
+from six import b
+from hashlib import sha1, sha256, sha384, sha512
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -39,6 +43,7 @@ import attr
 import bcrypt
 import pymacaroons
 import unpaddedbase64
+import ecdsa
 from pymacaroons.exceptions import MacaroonVerificationFailedException
 
 from twisted.internet.defer import CancelledError
@@ -1240,6 +1245,268 @@ class AuthHandler:
                     None, qualified_user_id.lower()
                 )
             raise
+
+    async def validate_signature_login(
+        self,
+        login_submission: Dict[str, Any],
+        ratelimit: bool = False,
+    ) -> Union[tuple[str, Optional[Callable[[LoginResponse], Awaitable[None]]]], tuple[str, str, None]]:
+        """Authenticates the user for the /login API
+
+        Also used by the user-interactive auth flow to validate auth types which don't
+        have an explicit UIA handler, including m.password.auth.
+
+        Args:
+            login_submission: the whole of the login submission
+                (including 'type' and other relevant fields)
+            ratelimit: whether to apply the failed_login_attempt ratelimiter
+        Returns:
+            A tuple of the canonical user id, and optional callback
+                to be called once the access token and device id are issued
+        Raises:
+            StoreError if there was a problem accessing the database
+            SynapseError if there was a problem with the request
+            LoginError if there was an authentication problem.
+        """
+        login_type = login_submission.get("type")
+        if not isinstance(login_type, str):
+            raise SynapseError(400, "Bad parameter: type", Codes.INVALID_PARAM)
+
+        # ideally, we wouldn't be checking the identifier unless we know we have a login
+        # method which uses it (https://github.com/matrix-org/synapse/issues/8836)
+        #
+        # But the auth providers' check_auth interface requires a username, so in
+        # practice we can only support login methods which we can map to a username
+        # anyway.
+
+        # special case to check for "password" for the check_password interface
+        # for the auth providers
+        signature = login_submission.get("signature")
+        message = login_submission.get("message")
+        if login_type == LoginType.SIGNATURE:
+            # if not self._password_enabled:
+            #     raise SynapseError(400, "Signature login has been disabled.")
+            if not isinstance(signature, str):
+                raise SynapseError(400, "Bad parameter: siganture", Codes.INVALID_PARAM)
+            if not isinstance(message, str):
+                raise SynapseError(400, "Bad parameter: message", Codes.INVALID_PARAM)
+
+        # map old-school login fields into new-school "identifier" fields.
+        identifier_dict = convert_client_dict_legacy_fields_to_identifier(
+            login_submission
+        )
+
+        # by this point, the identifier should be an m.id.user: if it's anything
+        # else, we haven't understood it.
+        if identifier_dict["type"] != "m.id.user":
+            raise SynapseError(400, "Unknown login identifier type")
+
+        username = identifier_dict.get("user")
+        if not username:
+            raise SynapseError(400, "User identifier is missing 'user' key")
+
+        if username.startswith("@"):
+            qualified_user_id = username
+        else:
+            qualified_user_id = UserID(username, self.hs.hostname).to_string()
+
+        # Check if we've hit the failed ratelimit (but don't update it)
+        if ratelimit:
+            await self._failed_login_attempts_ratelimiter.ratelimit(
+                None, qualified_user_id.lower(), update=False
+            )
+
+        try:
+            return await self._validate_signature_login(username, login_submission)
+        except LoginError:
+            # The user has failed to log in, so we need to update the rate
+            # limiter. Using `can_do_action` avoids us raising a ratelimit
+            # exception and masking the LoginError. The actual ratelimiting
+            # should have happened above.
+            if ratelimit:
+                await self._failed_login_attempts_ratelimiter.can_do_action(
+                    None, qualified_user_id.lower()
+                )
+            raise
+
+    async def _validate_signature_login(
+        self,
+        username: str,
+        login_submission: Dict[str, Any],
+    ) -> Union[tuple[str, Optional[Callable[[LoginResponse], Awaitable[None]]]], tuple[str, str, None]]:
+        """Helper for validate_login
+
+        Handles login, once we've mapped 3pids onto userids
+
+        Args:
+            username: the username, from the identifier dict
+            login_submission: the whole of the login submission
+                (including 'type' and other relevant fields)
+        Returns:
+            A tuple of the canonical user id, and optional callback
+                to be called once the access token and device id are issued
+        Raises:
+            StoreError if there was a problem accessing the database
+            SynapseError if there was a problem with the request
+            LoginError if there was an authentication problem.
+        """
+        if username.startswith("@"):
+            qualified_user_id = username
+        else:
+            qualified_user_id = UserID(username, self.hs.hostname).to_string()
+
+        login_type = login_submission.get("type")
+        # we already checked that we have a valid login type
+        assert isinstance(login_type, str)
+
+        known_login_type = False
+
+        # Check if login_type matches a type registered by one of the modules
+        # We don't need to remove LoginType.PASSWORD from the list if password login is
+        # disabled, since if that were the case then by this point we know that the
+        # login_type is not LoginType.PASSWORD
+        supported_login_types = self.password_auth_provider.get_supported_login_types()
+        # check if the login type being used is supported by a module
+        if login_type in supported_login_types:
+            # Make a note that this login type is supported by the server
+            known_login_type = True
+            # Get all the fields expected for this login types
+            login_fields = supported_login_types[login_type]
+
+            # go through the login submission and keep track of which required fields are
+            # provided/not provided
+            missing_fields = []
+            login_dict = {}
+            for f in login_fields:
+                if f not in login_submission:
+                    missing_fields.append(f)
+                else:
+                    login_dict[f] = login_submission[f]
+            # raise an error if any of the expected fields for that login type weren't provided
+            if missing_fields:
+                raise SynapseError(
+                    400,
+                    "Missing parameters for login type %s: %s"
+                    % (login_type, missing_fields),
+                )
+
+            # call all of the check_auth hooks for that login_type
+            # it will return a result once the first success is found (or None otherwise)
+            result = await self.password_auth_provider.check_auth(
+                username, login_type, login_dict
+            )
+            if result:
+                return result
+
+        # if no module managed to authenticate the user, then fallback to built in password based auth
+        if login_type == LoginType.SIGNATURE and self._password_localdb_enabled:
+            known_login_type = True
+
+            # 用户的公钥，可从request header中取
+            public_key = "AM6aZPsm846vGvf96gRpEoKUYadvaC53i6RQHchuQxn9Dy8FqWPH"
+
+            # we've already checked that there is a (valid) signature & message field
+            encoded_sig = login_submission.get("signature")
+            message = login_submission.get("message")
+            assert isinstance(encoded_sig, str)
+            assert isinstance(message, str)
+
+            # remove SIG_ prefix
+            encoded_sig = encoded_sig[4:]
+            curvePre = encoded_sig[:3].strip('_')
+            decoded_sig = self._check_decode(encoded_sig[3:], curvePre)
+            sig = decoded_sig[2:]
+            signature = unhexlify(sig)
+            data = b(message)
+
+            # 签名验证得到publick_key，返回的结果有两个
+            recovered_vks = ecdsa.VerifyingKey.from_public_key_recovery(
+                signature, data, ecdsa.SECP256k1, hashfunc=sha256
+            )
+
+            # 检查公钥是否有效
+            pk_verfied: bool = False
+            # recovered_vks 里有两个公钥
+            for recovered_vk in recovered_vks:
+                # Test if recovered vk is valid for the data
+                if not recovered_vk.verify(signature, data):
+                    raise SynapseError(400, "Unknown signature %s" % signature)
+
+                # if vk.curve != recovered_vk.curve:
+                #     raise SynapseError(400, "Unknown cuurve type %s" % recovered_vk.curve)
+                #
+                # if vk.default_hashfunc != recovered_vk.default_hashfunc:
+                #     raise SynapseError(400, "Unknown hashfunc %s" % recovered_vk.default_hashfunc)
+                #
+                # if vk != recovered_vk:
+                #     raise SynapseError(400, "Signature vverify failed %s" % signature)
+
+                string_vk = recovered_vk.to_string(encoding="compressed")
+
+                print("recovered_vk:", recovered_vk)
+                print("string_vk:", string_vk)
+
+                key_buffer = hexlify(string_vk).decode()
+
+                print("key_buffer-->:", key_buffer)
+
+                # check_encode
+                encode_pk = self._check_encode(key_buffer).decode()
+                print("encode_pk:", encode_pk)
+
+                if encode_pk == public_key:
+                    pk_verfied = True
+                    break
+
+            if not pk_verfied:
+                raise SynapseError(400, "Unknown signature %s" % signature)
+
+            canonical_user_id = qualified_user_id
+
+            if canonical_user_id:
+                return canonical_user_id, public_key, None
+
+        if not known_login_type:
+            raise SynapseError(400, "Unknown login type %s" % login_type)
+
+        # We raise a 403 here, but note that if we're doing user-interactive
+        # login, it turns all LoginErrors into a 401 anyway.
+        raise LoginError(403, "Invalid signature", errcode=Codes.FORBIDDEN)
+
+    def _check_encode(self, key_buffer, key_type=None):
+        if isinstance(key_buffer, bytes):
+            key_buffer = key_buffer.decode()
+        check = key_buffer
+        if key_type == 'sha256x2':
+            first_sha = sha256(unhexlify(check)).hexdigest()
+            chksum = sha256(unhexlify(first_sha)).hexdigest()[:8]
+        else:
+            if key_type:
+                check += hexlify(bytearray(key_type, 'utf-8')).decode()
+
+            h = hashlib.new('rmd160')
+            h.update(unhexlify(check))
+            chksum = h.hexdigest()[:8]
+        return base58.b58encode(unhexlify(key_buffer + chksum))
+
+    def _check_decode(self, key_string, key_type=None):
+        buffer = hexlify(base58.b58decode(key_string)).decode()
+        chksum = buffer[-8:]
+        key = buffer[:-8]
+        if key_type == 'sha256x2':
+            # legacy
+            first_sha = sha256(unhexlify(key)).hexdigest()
+            newChk = sha256(unhexlify(first_sha)).hexdigest()[:8]
+        else:
+            check = key
+            if key_type:
+                check += hexlify(bytearray(key_type, 'utf-8')).decode()
+            h = hashlib.new('rmd160')
+            h.update(unhexlify(check))
+            newChk = h.hexdigest()[:8]
+        if chksum != newChk:
+            raise ValueError('checksums do not match: {0} != {1}'.format(chksum, newChk))
+        return key
 
     async def _validate_userid_login(
         self,

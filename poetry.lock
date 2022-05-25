@@ -42,6 +42,17 @@ six = "*"
 visualize = ["graphviz (>0.5.1)", "Twisted (>=16.1.1)"]
 
 [[package]]
+name = "base58"
+version = "2.1.1"
+description = "Base58 and Base58Check implementation."
+category = "main"
+optional = false
+python-versions = ">=3.5"
+
+[package.extras]
+tests = ["mypy", "PyHamcrest (>=2.0.2)", "pytest (>=4.6)", "pytest-benchmark", "pytest-cov", "pytest-flake8"]
+
+[[package]]
 name = "bcrypt"
 version = "3.2.0"
 description = "Modern password hashing for your software and your servers"
@@ -92,6 +103,14 @@ python-versions = ">=3.6"
 packaging = "*"
 six = ">=1.9.0"
 webencodings = "*"
+
+[[package]]
+name = "by"
+version = "0.0.2"
+description = "selection tools"
+category = "main"
+optional = false
+python-versions = "*"
 
 [[package]]
 name = "canonicaljson"
@@ -237,6 +256,21 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [[package]]
+name = "ecdsa"
+version = "0.17.0"
+description = "ECDSA cryptographic signature library (pure python)"
+category = "main"
+optional = false
+python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
+
+[package.dependencies]
+six = ">=1.9.0"
+
+[package.extras]
+gmpy = ["gmpy"]
+gmpy2 = ["gmpy2"]
+
+[[package]]
 name = "elementpath"
 version = "2.5.0"
 description = "XPath 1.0/2.0 parsers and selectors for ElementTree and lxml"
@@ -246,6 +280,17 @@ python-versions = ">=3.7"
 
 [package.extras]
 dev = ["tox", "coverage", "lxml", "xmlschema (>=1.8.0)", "sphinx", "memory-profiler", "flake8", "mypy (==0.910)"]
+
+[[package]]
+name = "eospy"
+version = "0.0.2"
+description = "Python library of the EOS.IO project."
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+requests = "*"
 
 [[package]]
 name = "flake8"
@@ -1071,6 +1116,14 @@ idna = ["idna"]
 tests = ["coverage[toml] (>=5.0.2)", "pytest"]
 
 [[package]]
+name = "sha256"
+version = "0.3"
+description = "sha256 library with midstate"
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "signedjson"
 version = "1.1.4"
 description = "Sign JSON with Ed25519 signatures"
@@ -1563,7 +1616,7 @@ url_preview = ["lxml"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7.1"
-content-hash = "d39d5ac5d51c014581186b7691999b861058b569084c525523baf70b77f292b1"
+content-hash = "ac43d7a0e61fd50466b1091bbe23ddd7ca450ab8ec13e265eb654c70cb4118dc"
 
 [metadata.files]
 attrs = [
@@ -1577,6 +1630,10 @@ authlib = [
 automat = [
     {file = "Automat-20.2.0-py2.py3-none-any.whl", hash = "sha256:b6feb6455337df834f6c9962d6ccf771515b7d939bca142b29c20c2376bc6111"},
     {file = "Automat-20.2.0.tar.gz", hash = "sha256:7979803c74610e11ef0c0d68a2942b152df52da55336e0c9d58daf1831cbdf33"},
+]
+base58 = [
+    {file = "base58-2.1.1-py3-none-any.whl", hash = "sha256:11a36f4d3ce51dfc1043f3218591ac4eb1ceb172919cebe05b52a5bcc8d245c2"},
+    {file = "base58-2.1.1.tar.gz", hash = "sha256:c5d0cb3f5b6e81e8e35da5754388ddcc6d0d14b6c6a132cb93d69ed580a7278c"},
 ]
 bcrypt = [
     {file = "bcrypt-3.2.0-cp36-abi3-macosx_10_10_universal2.whl", hash = "sha256:b589229207630484aefe5899122fb938a5b017b0f4349f769b8c13e78d99a8fd"},
@@ -1618,6 +1675,10 @@ black = [
 bleach = [
     {file = "bleach-4.1.0-py2.py3-none-any.whl", hash = "sha256:4d2651ab93271d1129ac9cbc679f524565cc8a1b791909c4a51eac4446a15994"},
     {file = "bleach-4.1.0.tar.gz", hash = "sha256:0900d8b37eba61a802ee40ac0061f8c2b5dee29c1927dd1d233e075ebf5a71da"},
+]
+by = [
+    {file = "by-0.0.2-py3-none-any.whl", hash = "sha256:8c74cff47a82d51203d0e91684ac12aafe8b327ea9cb23f5ba903e428a899865"},
+    {file = "by-0.0.2.tar.gz", hash = "sha256:5fd096eefca3e8b69c74e5ff9db29dfcacec1fccfdeb48949a9716391878744f"},
 ]
 canonicaljson = [
     {file = "canonicaljson-1.6.0-py3-none-any.whl", hash = "sha256:7230c2a2a3db07874f622af84effe41a655e07bf23734830e18a454e65d5b998"},
@@ -1736,9 +1797,16 @@ docutils = [
     {file = "docutils-0.18.1-py2.py3-none-any.whl", hash = "sha256:23010f129180089fbcd3bc08cfefccb3b890b0050e1ca00c867036e9d161b98c"},
     {file = "docutils-0.18.1.tar.gz", hash = "sha256:679987caf361a7539d76e584cbeddc311e3aee937877c87346f31debc63e9d06"},
 ]
+ecdsa = [
+    {file = "ecdsa-0.17.0-py2.py3-none-any.whl", hash = "sha256:5cf31d5b33743abe0dfc28999036c849a69d548f994b535e527ee3cb7f3ef676"},
+    {file = "ecdsa-0.17.0.tar.gz", hash = "sha256:b9f500bb439e4153d0330610f5d26baaf18d17b8ced1bc54410d189385ea68aa"},
+]
 elementpath = [
     {file = "elementpath-2.5.0-py3-none-any.whl", hash = "sha256:2a432775e37a19e4362443078130a7dbfc457d7d093cd421c03958d9034cc08b"},
     {file = "elementpath-2.5.0.tar.gz", hash = "sha256:3a27aaf3399929fccda013899cb76d3ff111734abf4281e5f9d3721ba0b9ffa3"},
+]
+eospy = [
+    {file = "eospy-0.0.2.tar.gz", hash = "sha256:38f4d28af929c1f3b47b848b7bd47d2da79564385af6cb07b802c0c614a59bbd"},
 ]
 flake8 = [
     {file = "flake8-4.0.1-py2.py3-none-any.whl", hash = "sha256:479b1304f72536a55948cb40a32dce8bb0ffe3501e26eaf292c7e60eb5e0428d"},
@@ -2396,6 +2464,9 @@ sentry-sdk = [
 service-identity = [
     {file = "service-identity-21.1.0.tar.gz", hash = "sha256:6e6c6086ca271dc11b033d17c3a8bea9f24ebff920c587da090afc9519419d34"},
     {file = "service_identity-21.1.0-py2.py3-none-any.whl", hash = "sha256:f0b0caac3d40627c3c04d7a51b6e06721857a0e10a8775f2d1d7e72901b3a7db"},
+]
+sha256 = [
+    {file = "sha256-0.3.tar.gz", hash = "sha256:7bf2d287c2df10af1b7e6830340beeb1a79edc0433740f2e4fc68d8c1d06ab95"},
 ]
 signedjson = [
     {file = "signedjson-1.1.4-py3-none-any.whl", hash = "sha256:45569ec54241c65d2403fe3faf7169be5322547706a231e884ca2b427f23d228"},

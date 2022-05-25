@@ -182,6 +182,11 @@ hiredis = { version = "*", optional = true }
 Pympler = { version = "*", optional = true }
 parameterized = { version = ">=0.7.4", optional = true }
 idna = { version = ">=2.5", optional = true }
+ecdsa = "^0.17.0"
+by = "^0.0.2"
+base58 = "^2.1.1"
+eospy = "^0.0.2"
+sha256 = "^0.3"
 
 [tool.poetry.extras]
 # NB: Packages that should be part of `pip install matrix-synapse[all]` need to be specified

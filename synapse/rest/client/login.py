@@ -71,6 +71,7 @@ class LoginRestServlet(RestServlet):
     JWT_TYPE = "org.matrix.login.jwt"
     APPSERVICE_TYPE = "m.login.application_service"
     REFRESH_TOKEN_PARAM = "refresh_token"
+    SIGNATURE_TYPE = "m.login.signature"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -203,6 +204,14 @@ class LoginRestServlet(RestServlet):
                     login_submission,
                     should_issue_refresh_token=should_issue_refresh_token,
                 )
+            elif login_submission["type"] == LoginRestServlet.SIGNATURE_TYPE:
+                await self._address_ratelimiter.ratelimit(
+                    None, request.getClientAddress().host
+                )
+                result = await self._do_signature_login(
+                    login_submission,
+                    should_issue_refresh_token=should_issue_refresh_token,
+                )
             else:
                 await self._address_ratelimiter.ratelimit(
                     None, request.getClientAddress().host
@@ -284,6 +293,51 @@ class LoginRestServlet(RestServlet):
         canonical_user_id, callback = await self.auth_handler.validate_login(
             login_submission, ratelimit=True
         )
+        result = await self._complete_login(
+            canonical_user_id,
+            login_submission,
+            callback,
+            should_issue_refresh_token=should_issue_refresh_token,
+        )
+        return result
+
+    async def _do_signature_login(
+        self, login_submission: JsonDict, should_issue_refresh_token: bool = False
+    ) -> LoginResponse:
+        """Handle blockchain signature login
+
+        Args:
+            login_submission:
+            should_issue_refresh_token: True if this login should issue
+                a refresh token alongside the access token.
+
+        Returns:
+            HTTP response
+        """
+        # Log the request we got, but only certain fields to minimise the chance of
+        # logging someone's password (even if they accidentally put it in the wrong
+        # field)
+        logger.info(
+            "Got login request with identifier: %r, medium: %r, address: %r, user: %r",
+            login_submission.get("identifier"),
+            login_submission.get("medium"),
+            login_submission.get("address"),
+            login_submission.get("user"),
+            login_submission.get("message"),
+            login_submission.get("signature"),
+        )
+
+        canonical_user_id, public_key, callback = await self.auth_handler.validate_signature_login(
+            login_submission, ratelimit=True
+        )
+
+        canonical_uid = await self.auth_handler.check_user_exists(canonical_user_id)
+        if not canonical_uid:
+            await self.registration_handler.register_user(
+                localpart=UserID.from_string(canonical_uid).localpart,
+                password_hash=public_key
+            )
+
         result = await self._complete_login(
             canonical_user_id,
             login_submission,
