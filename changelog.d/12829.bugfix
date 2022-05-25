@@ -1,2 +1,1 @@
-Fixed a bug where device list updates over federation would fail if they
-were not a list. Contributed by Carl Bordum Hansen.
+Fix a bug where we did not correctly handle invalid device list updates over federation. Contributed by Carl Bordum Hansen.
