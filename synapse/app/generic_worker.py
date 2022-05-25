@@ -87,7 +87,7 @@ from synapse.rest.client import (
     voip,
 )
 from synapse.rest.client._base import client_patterns
-from synapse.rest.client.account import ThreepidRestServlet
+from synapse.rest.client.account import ThreepidRestServlet, WhoamiRestServlet
 from synapse.rest.client.devices import DevicesRestServlet
 from synapse.rest.client.keys import (
     KeyChangesServlet,
@@ -289,6 +289,7 @@ class GenericWorkerServer(HomeServer):
                     RegistrationTokenValidityRestServlet(self).register(resource)
                     login.register_servlets(self, resource)
                     ThreepidRestServlet(self).register(resource)
+                    WhoamiRestServlet(self).register(resource)
                     DevicesRestServlet(self).register(resource)
 
                     # Read-only
