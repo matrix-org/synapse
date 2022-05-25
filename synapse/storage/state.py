@@ -985,6 +985,6 @@ class StateStorage:
                - list of current_state_delta_stream rows. If it is empty, we are
                  up to date.
         """
-        return await self.stores.main.get_current_state_deltas(
+        return await self.stores.main.get_partial_current_state_deltas(
             prev_stream_id, max_stream_id
         )

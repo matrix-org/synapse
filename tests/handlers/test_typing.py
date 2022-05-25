@@ -145,7 +145,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.datastore.get_current_state_deltas = Mock(return_value=(0, None))
+        self.datastore.get_partial_current_state_deltas = Mock(return_value=(0, None))
 
         self.datastore.get_to_device_stream_token = lambda: 0
         self.datastore.get_new_device_msgs_for_remote = (
