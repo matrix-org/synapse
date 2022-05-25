@@ -26,6 +26,7 @@ from typing import (
     MutableMapping,
     NoReturn,
     Optional,
+    Protocol,
     Set,
     Tuple,
     Type,
@@ -75,6 +76,46 @@ JsonDict = Dict[str, Any]
 JsonMapping = Mapping[str, Any]
 # A JSON-serialisable object.
 JsonSerializable = object
+
+
+if TYPE_CHECKING:
+    # This is a very hacky way to have a strongly-typed JSON object
+    # that doesn't stop short at Dict[str, Any].
+    # https://github.com/python/typing/issues/182#issuecomment-899624078
+
+    StrictJson = ...
+
+    class StrictJsonArray(List[StrictJson], Protocol):  # type: ignore
+        __class__: Type[List[StrictJson]]  # type: ignore
+
+    class StrictJsonDict(Dict[str, StrictJson], Protocol):  # type: ignore
+        __class__: Type[Dict[str, StrictJson]]  # type: ignore
+
+    StrictJson = Union[None, float, str, StrictJsonArray, StrictJsonDict]  # type: ignore[assignment]
+else:
+    # We need some types for runtime.
+    StrictJson = Union[None, float, str, List[Any], Dict[str, Any]]
+    StrictJsonDict = Dict[str, StrictJson]
+
+
+if TYPE_CHECKING:
+    # Analogous to StrictJson, this is a version that uses entirely frozen data.
+
+    StrictFrozenJson = ...
+
+    class StrictFrozenJsonArray(Tuple[StrictFrozenJson, ...], Protocol):  # type: ignore
+        __class__: Type[Tuple[StrictFrozenJson, ...]]  # type: ignore
+
+    class StrictFrozenJsonDict(frozendict[str, StrictFrozenJson], Protocol):  # type: ignore
+        __class__: Type[frozendict[str, StrictFrozenJson]]  # type: ignore
+
+    StrictFrozenJson = Union[  # type: ignore[assignment]
+        None, float, str, StrictFrozenJsonArray, StrictFrozenJsonDict
+    ]
+else:
+    # We need some types for runtime.
+    StrictFrozenJson = Union[None, float, str, Tuple[Any, ...], frozendict[str, Any]]
+    StrictFrozenJsonDict = frozendict[str, StrictFrozenJson]
 
 
 # Note that this seems to require inheriting *directly* from Interface in order
