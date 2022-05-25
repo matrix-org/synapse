@@ -77,6 +77,25 @@ JsonMapping = Mapping[str, Any]
 JsonSerializable = object
 
 
+# Mypy doesn't support recursive type definitions, so unroll one manually a few
+# times. This makes this alias not entirely general-purpose, but it can be
+# used for some basic sanity checking in e.g. module API return values.
+# Bottom out at `object` so that the caller knows they aren't getting any more
+# checking; they can always use casts if necessary.
+_FrozenJson1 = Union[str, int, float, None, frozendict[str, object], Tuple[object, ...]]
+_FrozenJson2 = Union[
+    str, int, float, None, frozendict[str, _FrozenJson1], Tuple[_FrozenJson1, ...]
+]
+_FrozenJson3 = Union[
+    str, int, float, None, frozendict[str, _FrozenJson2], Tuple[_FrozenJson2, ...]
+]
+
+# FrozenJson supports JSON-like data, but only using frozen data structures.
+# (frozendicts instead of dicts and tuples instead of lists)
+FrozenJson = _FrozenJson3
+FrozenJsonDict = frozendict[str, _FrozenJson3]
+
+
 # Note that this seems to require inheriting *directly* from Interface in order
 # for mypy-zope to realize it is an interface.
 class ISynapseReactor(
