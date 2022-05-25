@@ -931,7 +931,7 @@ class StateStorage:
         Returns:
             Map from type/state_key to event ID.
         """
-        return await self.stores.main.get_filtered_current_state_ids(
+        return await self.stores.main.get_partial_filtered_current_state_ids(
             room_id, state_filter
         )
 
