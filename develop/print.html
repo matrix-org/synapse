@@ -9118,7 +9118,7 @@ loggers:
 </code></pre>
 <p>The above logging config will set Synapse as 'INFO' logging level by default,
 with the SQL layer at 'WARNING', and will log to a file, stored as JSON.</p>
-<p>It is also possible to figure Synapse to log to a remote endpoint by using the
+<p>It is also possible to configure Synapse to log to a remote endpoint by using the
 <code>synapse.logging.RemoteHandler</code> class included with Synapse. It takes the
 following arguments:</p>
 <ul>
@@ -11051,7 +11051,7 @@ policy's <code>max_lifetime</code> is greater than a week.</li>
 <p>Note that this example is tailored to show different configurations and
 features slightly more jobs than it's probably necessary (in practice, a
 server admin would probably consider it better to replace the two last
-jobs with one that runs once a day and handles rooms which which
+jobs with one that runs once a day and handles rooms which
 policy's <code>max_lifetime</code> is greater than 3 days).</p>
 <p>Keep in mind, when configuring these jobs, that a purge job can become
 quite heavy on the server if it targets many rooms, therefore prefer
@@ -12182,7 +12182,7 @@ changes to the database should now be made by the module using the module API cl
 use the new <code>modules</code> section in Synapse's configuration file (see <a href="modules/index.html#using-modules">this section</a>
 for more info).</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="scaling-synapse-via-workers"><a class="header" href="#scaling-synapse-via-workers">Scaling synapse via workers</a></h1>
-<p>For small instances it recommended to run Synapse in the default monolith mode.
+<p>For small instances it is recommended to run Synapse in the default monolith mode.
 For larger instances where performance is a concern it can be helpful to split
 out functionality into multiple separate python processes. These processes are
 called 'workers', and are (eventually) intended to scale horizontally
