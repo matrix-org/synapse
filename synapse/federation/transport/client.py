@@ -1425,6 +1425,9 @@ class _StateParser(ByteParser[StateRequestResponse]):
 
     CONTENT_TYPE = "application/json"
 
+    # As with /send_join, /state responses can be huge.
+    MAX_RESPONSE_SIZE = 500 * 1024 * 1024
+
     def __init__(self, room_version: RoomVersion):
         self._response = StateRequestResponse([], [])
         self._room_version = room_version
