@@ -154,7 +154,7 @@ class PartialCurrentStateTracker:
     async def await_full_state(self, room_id: str) -> None:
         # We add the deferred immediately so that the DB call to check for
         # partial state doesn't race when we unpartial the room.
-        d = Deferred[None]()
+        d: Deferred[None] = Deferred()
         self._observers.setdefault(room_id, set()).add(d)
 
         try:
