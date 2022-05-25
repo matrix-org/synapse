@@ -1,1 +1,1 @@
-Remove Mutual Rooms (MSC2666) endpoint dependency on the User Directory.
+Remove Mutual Rooms ([MSC2666](https://github.com/matrix-org/matrix-spec-proposals/pull/2666)) endpoint dependency on the User Directory.
