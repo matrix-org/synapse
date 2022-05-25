@@ -82,18 +82,26 @@ JsonSerializable = object
 # used for some basic sanity checking in e.g. module API return values.
 # Bottom out at `object` so that the caller knows they aren't getting any more
 # checking; they can always use casts if necessary.
-_FrozenJson1 = Union[str, int, float, None, frozendict[str, object], Tuple[object, ...]]
+
+_FrozenJson1 = Union[
+    str, int, float, None, "frozendict[str, object]", Tuple[object, ...]
+]
 _FrozenJson2 = Union[
-    str, int, float, None, frozendict[str, _FrozenJson1], Tuple[_FrozenJson1, ...]
+    str, int, float, None, "frozendict[str, _FrozenJson1]", Tuple[_FrozenJson1, ...]
 ]
 _FrozenJson3 = Union[
-    str, int, float, None, frozendict[str, _FrozenJson2], Tuple[_FrozenJson2, ...]
+    str, int, float, None, "frozendict[str, _FrozenJson2]", Tuple[_FrozenJson2, ...]
 ]
 
 # FrozenJson supports JSON-like data, but only using frozen data structures.
 # (frozendicts instead of dicts and tuples instead of lists)
 FrozenJson = _FrozenJson3
-FrozenJsonDict = frozendict[str, _FrozenJson3]
+if TYPE_CHECKING:
+    # frozendict isn't subscriptable.
+
+    FrozenJsonDict = frozendict[str, _FrozenJson3]
+else:
+    FrozenJsonDict = frozendict[str, Any]
 
 
 # Note that this seems to require inheriting *directly* from Interface in order
