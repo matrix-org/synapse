@@ -202,6 +202,7 @@ class MessageSearchTest(HomeserverTestCase):
 
     PHRASE = "the quick brown fox jumps over the lazy dog"
     COMMON_CASES = [
+        # (query, whether PHRASE contains query)
         ("nope", False),
         ("brown", True),
         ("quick brown", True),
