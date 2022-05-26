@@ -464,10 +464,6 @@ class UserDirectoryHandler(StateDeltasHandler):
 
         prev_name = prev_event.content.get("displayname")
         new_name = event.content.get("displayname")
-
-        # Replace any NULL characters in the name as these cannot be stored in the database
-        new_name = new_name.replace("\x00", "\uFFFD")
-
         # If the new name is an unexpected form, do not update the directory.
         if not isinstance(new_name, str):
             new_name = prev_name
