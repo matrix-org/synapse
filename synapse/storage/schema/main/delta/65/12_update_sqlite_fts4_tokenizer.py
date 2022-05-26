@@ -19,16 +19,17 @@ def update_event_search_to_use_porter_stemmer(cur, database_engine):
     # Upgrade the event_search table to use the porter tokenizer
     if isinstance(database_engine, Sqlite3Engine):
         cur.execute("DROP TABLE event_search")
-        cur.execute("""CREATE VIRTUAL TABLE event_search
-                       USING fts4 (tokenize=porter, event_id, room_id, sender, key, value )""")        
-    
+        cur.execute(
+            """CREATE VIRTUAL TABLE event_search
+                       USING fts4 (tokenize=porter, event_id, room_id, sender, key, value )"""
+        )
+
     # TODO: we just dropped the table .. do we need to do stuff to ensure its repopulated?
 
 
 def run_create(cur, database_engine, *args, **kwargs):
     update_event_search_to_use_porter_stemmer(cur, database_engine)
-  
+
 
 def run_upgrade(cur, database_engine, *args, **kwargs):
     pass
-
