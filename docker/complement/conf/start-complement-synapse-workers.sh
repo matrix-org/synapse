@@ -4,6 +4,10 @@
 
 set -e
 
+echo "Complement Synapse launcher"
+echo "  Args: $@"
+echo "  Env: SYNAPSE_COMPLEMENT_DATABASE=$SYNAPSE_COMPLEMENT_DATABASE SYNAPSE_COMPLEMENT_USE_WORKERS=$SYNAPSE_COMPLEMENT_USE_WORKERS"
+
 function log {
     d=$(date +"%Y-%m-%d %H:%M:%S,%3N")
     echo "$d $@"
@@ -15,26 +19,53 @@ export SYNAPSE_SERVER_NAME=${SERVER_NAME}
 # No need to report stats here
 export SYNAPSE_REPORT_STATS=no
 
-# Set postgres authentication details which will be placed in the homeserver config file
-export POSTGRES_PASSWORD=somesecret
-export POSTGRES_USER=postgres
-export POSTGRES_HOST=localhost
 
-# Specify the workers to test with
-export SYNAPSE_WORKER_TYPES="\
-    event_persister, \
-    event_persister, \
-    background_worker, \
-    frontend_proxy, \
-    event_creator, \
-    user_dir, \
-    media_repository, \
-    federation_inbound, \
-    federation_reader, \
-    federation_sender, \
-    synchrotron, \
-    appservice, \
-    pusher"
+case "$SYNAPSE_COMPLEMENT_DATABASE" in
+  postgres)
+    # Set postgres authentication details which will be placed in the homeserver config file
+    export POSTGRES_PASSWORD=somesecret
+    export POSTGRES_USER=postgres
+    export POSTGRES_HOST=localhost
+    export START_POSTGRES=true
+    ;;
+
+  sqlite)
+    # Prevent Postgres from starting up as we don't need it to
+    export START_POSTGRES=false
+    ;;
+
+  *)
+    echo "Unknown Synapse database: SYNAPSE_COMPLEMENT_DATABASE=$SYNAPSE_COMPLEMENT_DATABASE"
+    exit 1
+    ;;
+esac
+
+
+if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
+  # Specify the workers to test with
+  export SYNAPSE_WORKER_TYPES="\
+      event_persister, \
+      event_persister, \
+      background_worker, \
+      frontend_proxy, \
+      event_creator, \
+      user_dir, \
+      media_repository, \
+      federation_inbound, \
+      federation_reader, \
+      federation_sender, \
+      synchrotron, \
+      appservice, \
+      pusher"
+
+  export START_REDIS=true
+else
+  # Empty string here means 'main process only'
+  export SYNAPSE_WORKER_TYPES=""
+  # No sense starting Redis as we won't need it or use it
+  export START_REDIS=false
+fi
+
 
 # Add Complement's appservice registration directory, if there is one
 # (It can be absent when there are no application services in this test!)
