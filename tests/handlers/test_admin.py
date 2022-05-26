@@ -15,11 +15,15 @@
 from collections import Counter
 from unittest.mock import Mock
 
+from twisted.test.proto_helpers import MemoryReactor
+
 import synapse.rest.admin
 import synapse.storage
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.room_versions import RoomVersions
 from synapse.rest.client import knock, login, room
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 
@@ -32,7 +36,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         knock.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.admin_handler = hs.get_admin_handler()
 
         self.user1 = self.register_user("user1", "password")
@@ -41,7 +45,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         self.user2 = self.register_user("user2", "password")
         self.token2 = self.login("user2", "password")
 
-    def test_single_public_joined_room(self):
+    def test_single_public_joined_room(self) -> None:
         """Test that we write *all* events for a public room"""
         room_id = self.helper.create_room_as(
             self.user1, tok=self.token1, is_public=True
@@ -74,7 +78,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         self.assertEqual(counter[(EventTypes.Member, self.user1)], 1)
         self.assertEqual(counter[(EventTypes.Member, self.user2)], 1)
 
-    def test_single_private_joined_room(self):
+    def test_single_private_joined_room(self) -> None:
         """Tests that we correctly write state when we can't see all events in
         a room.
         """
@@ -112,7 +116,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         self.assertEqual(counter[(EventTypes.Member, self.user1)], 1)
         self.assertEqual(counter[(EventTypes.Member, self.user2)], 1)
 
-    def test_single_left_room(self):
+    def test_single_left_room(self) -> None:
         """Tests that we don't see events in the room after we leave."""
         room_id = self.helper.create_room_as(self.user1, tok=self.token1)
         self.helper.send(room_id, body="Hello!", tok=self.token1)
@@ -144,7 +148,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         self.assertEqual(counter[(EventTypes.Member, self.user1)], 1)
         self.assertEqual(counter[(EventTypes.Member, self.user2)], 2)
 
-    def test_single_left_rejoined_private_room(self):
+    def test_single_left_rejoined_private_room(self) -> None:
         """Tests that see the correct events in private rooms when we
         repeatedly join and leave.
         """
@@ -185,7 +189,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         self.assertEqual(counter[(EventTypes.Member, self.user1)], 1)
         self.assertEqual(counter[(EventTypes.Member, self.user2)], 3)
 
-    def test_invite(self):
+    def test_invite(self) -> None:
         """Tests that pending invites get handled correctly."""
         room_id = self.helper.create_room_as(self.user1, tok=self.token1)
         self.helper.send(room_id, body="Hello!", tok=self.token1)
@@ -204,7 +208,7 @@ class ExfiltrateData(unittest.HomeserverTestCase):
         self.assertEqual(args[1].content["membership"], "invite")
         self.assertTrue(args[2])  # Assert there is at least one bit of state
 
-    def test_knock(self):
+    def test_knock(self) -> None:
         """Tests that knock get handled correctly."""
         # create a knockable v7 room
         room_id = self.helper.create_room_as(

@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from collections import defaultdict
+from typing import Any, Dict, List, Optional, Set, Tuple
 
+from twisted.internet.address import IPv4Address
 from twisted.internet.protocol import Protocol
 from twisted.web.resource import Resource
 
@@ -31,6 +33,7 @@ from synapse.server import HomeServer
 
 from tests import unittest
 from tests.server import FakeTransport
+from tests.utils import USE_POSTGRES_FOR_TESTS
 
 try:
     import hiredis
@@ -53,7 +56,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         server_factory = ReplicationStreamProtocolFactory(hs)
         self.streamer = hs.get_replication_streamer()
         self.server: ServerReplicationStreamProtocol = server_factory.buildProtocol(
-            None
+            IPv4Address("TCP", "127.0.0.1", 0)
         )
 
         # Make a new HomeServer object for the worker
@@ -67,7 +70,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
 
         # Since we use sqlite in memory databases we need to make sure the
         # databases objects are the same.
-        self.worker_hs.get_datastore().db_pool = hs.get_datastore().db_pool
+        self.worker_hs.get_datastores().main.db_pool = hs.get_datastores().main.db_pool
 
         # Normally we'd pass in the handler to `setup_test_homeserver`, which would
         # eventually hit "Install @cache_in_self attributes" in tests/utils.py.
@@ -153,10 +156,12 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         self.assertEqual(port, 8765)
 
         # Set up client side protocol
-        client_protocol = client_factory.buildProtocol(None)
+        client_address = IPv4Address("TCP", "127.0.0.1", 1234)
+        client_protocol = client_factory.buildProtocol(("127.0.0.1", 1234))
 
         # Set up the server side protocol
-        channel = self.site.buildProtocol(None)
+        server_address = IPv4Address("TCP", host, port)
+        channel = self.site.buildProtocol((host, port))
 
         # hook into the channel's request factory so that we can keep a record
         # of the requests
@@ -172,12 +177,12 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
 
         # Connect client to server and vice versa.
         client_to_server_transport = FakeTransport(
-            channel, self.reactor, client_protocol
+            channel, self.reactor, client_protocol, server_address, client_address
         )
         client_protocol.makeConnection(client_to_server_transport)
 
         server_to_client_transport = FakeTransport(
-            client_protocol, self.reactor, channel
+            client_protocol, self.reactor, channel, client_address, server_address
         )
         channel.makeConnection(server_to_client_transport)
 
@@ -205,7 +210,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         path: bytes = request.path  # type: ignore
         self.assertRegex(
             path,
-            br"^/_synapse/replication/get_repl_stream_updates/%s/[^/]+$"
+            rb"^/_synapse/replication/get_repl_stream_updates/%s/[^/]+$"
             % (stream_name.encode("ascii"),),
         )
 
@@ -232,7 +237,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         # We may have an attempt to connect to redis for the external cache already.
         self.connect_any_redis_attempts()
 
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         self.database_pool = store.db_pool
 
         self.reactor.lookups["testserv"] = "1.2.3.4"
@@ -250,7 +255,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
                 self.connect_any_redis_attempts,
             )
 
-            self.hs.get_tcp_replication().start_replication(self.hs)
+            self.hs.get_replication_command_handler().start_replication(self.hs)
 
         # When we see a connection attempt to the master replication listener we
         # automatically set up the connection. This is so that tests don't
@@ -331,7 +336,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
                 lambda: self._handle_http_replication_attempt(worker_hs, port),
             )
 
-        store = worker_hs.get_datastore()
+        store = worker_hs.get_datastores().main
         store.db_pool._db_pool = self.database_pool._db_pool
 
         # Set up TCP replication between master and the new worker if we don't
@@ -345,7 +350,9 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
                 self.clock,
                 repl_handler,
             )
-            server = self.server_factory.buildProtocol(None)
+            server = self.server_factory.buildProtocol(
+                IPv4Address("TCP", "127.0.0.1", 0)
+            )
 
             client_transport = FakeTransport(server, self.reactor)
             client.makeConnection(client_transport)
@@ -372,7 +379,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         )
 
         if worker_hs.config.redis.redis_enabled:
-            worker_hs.get_tcp_replication().start_replication(worker_hs)
+            worker_hs.get_replication_command_handler().start_replication(worker_hs)
 
         return worker_hs
 
@@ -403,19 +410,21 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         self.assertEqual(port, repl_port)
 
         # Set up client side protocol
-        client_protocol = client_factory.buildProtocol(None)
+        client_address = IPv4Address("TCP", "127.0.0.1", 1234)
+        client_protocol = client_factory.buildProtocol(("127.0.0.1", 1234))
 
         # Set up the server side protocol
-        channel = self._hs_to_site[hs].buildProtocol(None)
+        server_address = IPv4Address("TCP", host, port)
+        channel = self._hs_to_site[hs].buildProtocol((host, port))
 
         # Connect client to server and vice versa.
         client_to_server_transport = FakeTransport(
-            channel, self.reactor, client_protocol
+            channel, self.reactor, client_protocol, server_address, client_address
         )
         client_protocol.makeConnection(client_to_server_transport)
 
         server_to_client_transport = FakeTransport(
-            client_protocol, self.reactor, channel
+            client_protocol, self.reactor, channel, client_address, server_address
         )
         channel.makeConnection(server_to_client_transport)
 
@@ -468,22 +477,25 @@ class FakeRedisPubSubServer:
     """A fake Redis server for pub/sub."""
 
     def __init__(self):
-        self._subscribers = set()
+        self._subscribers_by_channel: Dict[
+            bytes, Set["FakeRedisPubSubProtocol"]
+        ] = defaultdict(set)
 
-    def add_subscriber(self, conn):
+    def add_subscriber(self, conn, channel: bytes):
         """A connection has called SUBSCRIBE"""
-        self._subscribers.add(conn)
+        self._subscribers_by_channel[channel].add(conn)
 
     def remove_subscriber(self, conn):
-        """A connection has called UNSUBSCRIBE"""
-        self._subscribers.discard(conn)
+        """A connection has lost connection"""
+        for subscribers in self._subscribers_by_channel.values():
+            subscribers.discard(conn)
 
-    def publish(self, conn, channel, msg) -> int:
+    def publish(self, conn, channel: bytes, msg) -> int:
         """A connection want to publish a message to subscribers."""
-        for sub in self._subscribers:
+        for sub in self._subscribers_by_channel[channel]:
             sub.send(["message", channel, msg])
 
-        return len(self._subscribers)
+        return len(self._subscribers_by_channel)
 
     def buildProtocol(self, addr):
         return FakeRedisPubSubProtocol(self)
@@ -524,9 +536,10 @@ class FakeRedisPubSubProtocol(Protocol):
             num_subscribers = self._server.publish(self, channel, message)
             self.send(num_subscribers)
         elif command == b"SUBSCRIBE":
-            (channel,) = args
-            self._server.add_subscriber(self)
-            self.send(["subscribe", channel, 1])
+            for idx, channel in enumerate(args):
+                num_channels = idx + 1
+                self._server.add_subscriber(self, channel)
+                self.send(["subscribe", channel, num_channels])
 
         # Since we use SET/GET to cache things we can safely no-op them.
         elif command == b"SET":
@@ -569,3 +582,27 @@ class FakeRedisPubSubProtocol(Protocol):
 
     def connectionLost(self, reason):
         self._server.remove_subscriber(self)
+
+
+class RedisMultiWorkerStreamTestCase(BaseMultiWorkerStreamTestCase):
+    """
+    A test case that enables Redis, providing a fake Redis server.
+    """
+
+    if not hiredis:
+        skip = "Requires hiredis"
+
+    if not USE_POSTGRES_FOR_TESTS:
+        # Redis replication only takes place on Postgres
+        skip = "Requires Postgres"
+
+    def default_config(self) -> Dict[str, Any]:
+        """
+        Overrides the default config to enable Redis.
+        Even if the test only uses make_worker_hs, the main process needs Redis
+        enabled otherwise it won't create a Fake Redis server to listen on the
+        Redis port and accept fake TCP connections.
+        """
+        base = super().default_config()
+        base["redis"] = {"enabled": True}
+        return base

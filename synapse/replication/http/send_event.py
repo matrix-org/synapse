@@ -13,18 +13,22 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Tuple
+
+from twisted.web.server import Request
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.events import make_event_from_dict
+from synapse.events import EventBase, make_event_from_dict
 from synapse.events.snapshot import EventContext
+from synapse.http.server import HttpServer
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
-from synapse.types import Requester, UserID
+from synapse.types import JsonDict, Requester, UserID
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+    from synapse.storage.databases.main import DataStore
 
 logger = logging.getLogger(__name__)
 
@@ -65,23 +69,29 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
         self.clock = hs.get_clock()
 
     @staticmethod
-    async def _serialize_payload(
-        event_id, store, event, context, requester, ratelimit, extra_users
-    ):
+    async def _serialize_payload(  # type: ignore[override]
+        event_id: str,
+        store: "DataStore",
+        event: EventBase,
+        context: EventContext,
+        requester: Requester,
+        ratelimit: bool,
+        extra_users: List[UserID],
+    ) -> JsonDict:
         """
         Args:
-            event_id (str)
-            store (DataStore)
-            requester (Requester)
-            event (FrozenEvent)
-            context (EventContext)
-            ratelimit (bool)
-            extra_users (list(UserID)): Any extra users to notify about event
+            event_id
+            store
+            requester
+            event
+            context
+            ratelimit
+            extra_users: Any extra users to notify about event
         """
         serialized_context = await context.serialize(event, store)
 
@@ -100,7 +110,9 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
 
         return payload
 
-    async def _handle_request(self, request, event_id):
+    async def _handle_request(  # type: ignore[override]
+        self, request: Request, event_id: str
+    ) -> Tuple[int, JsonDict]:
         with Measure(self.clock, "repl_send_event_parse"):
             content = parse_json_object_from_request(request)
 
@@ -120,8 +132,6 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             ratelimit = content["ratelimit"]
             extra_users = [UserID.from_string(u) for u in content["extra_users"]]
 
-        request.requester = requester
-
         logger.info(
             "Got event to send with ID: %s into room: %s", event.event_id, event.room_id
         )
@@ -139,5 +149,5 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
         )
 
 
-def register_servlets(hs: "HomeServer", http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ReplicationSendEventRestServlet(hs).register(http_server)

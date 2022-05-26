@@ -28,11 +28,11 @@ from typing import (
     Type,
     TypeVar,
     Union,
-    cast,
 )
 
 from prometheus_client import Metric
 from prometheus_client.core import REGISTRY, Counter, Gauge
+from typing_extensions import ParamSpec
 
 from twisted.internet import defer
 
@@ -46,6 +46,7 @@ from synapse.logging.opentracing import (
     noop_context_manager,
     start_active_span,
 )
+from synapse.metrics._types import Collector
 
 if TYPE_CHECKING:
     import resource
@@ -127,7 +128,7 @@ _background_processes_active_since_last_scrape: "Set[_BackgroundProcess]" = set(
 _bg_metrics_lock = threading.Lock()
 
 
-class _Collector:
+class _Collector(Collector):
     """A custom metrics collector for the background process metrics.
 
     Ensures that all of the metrics are up-to-date with any in-flight processes
@@ -255,24 +256,48 @@ def run_as_background_process(
         return defer.ensureDeferred(run())
 
 
-F = TypeVar("F", bound=Callable[..., Awaitable[Optional[Any]]])
+P = ParamSpec("P")
 
 
-def wrap_as_background_process(desc: str) -> Callable[[F], F]:
-    """Decorator that wraps a function that gets called as a background
-    process.
+def wrap_as_background_process(
+    desc: str,
+) -> Callable[
+    [Callable[P, Awaitable[Optional[R]]]],
+    Callable[P, "defer.Deferred[Optional[R]]"],
+]:
+    """Decorator that wraps an asynchronous function `func`, returning a synchronous
+    decorated function. Calling the decorated version runs `func` as a background
+    process, forwarding all arguments verbatim.
 
-    Equivalent to calling the function with `run_as_background_process`
+    That is,
+
+        @wrap_as_background_process
+        def func(*args): ...
+        func(1, 2, third=3)
+
+    is equivalent to:
+
+        def func(*args): ...
+        run_as_background_process(func, 1, 2, third=3)
+
+    The former can be convenient if `func` needs to be run as a background process in
+    multiple places.
     """
 
-    def wrap_as_background_process_inner(func: F) -> F:
+    def wrap_as_background_process_inner(
+        func: Callable[P, Awaitable[Optional[R]]]
+    ) -> Callable[P, "defer.Deferred[Optional[R]]"]:
         @wraps(func)
         def wrap_as_background_process_inner_2(
-            *args: Any, **kwargs: Any
+            *args: P.args, **kwargs: P.kwargs
         ) -> "defer.Deferred[Optional[R]]":
-            return run_as_background_process(desc, func, *args, **kwargs)
+            # type-ignore: mypy is confusing kwargs with the bg_start_span kwarg.
+            #     Argument 4 to "run_as_background_process" has incompatible type
+            #     "**P.kwargs"; expected "bool"
+            # See https://github.com/python/mypy/issues/8862
+            return run_as_background_process(desc, func, *args, **kwargs)  # type: ignore[arg-type]
 
-        return cast(F, wrap_as_background_process_inner_2)
+        return wrap_as_background_process_inner_2
 
     return wrap_as_background_process_inner
 

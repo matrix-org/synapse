@@ -44,7 +44,7 @@ class DeviceRestServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.is_mine = hs.is_mine
 
     async def on_GET(
@@ -113,7 +113,7 @@ class DevicesRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.is_mine = hs.is_mine
 
     async def on_GET(
@@ -144,7 +144,7 @@ class DeleteDevicesRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self.auth = hs.get_auth()
         self.device_handler = hs.get_device_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.is_mine = hs.is_mine
 
     async def on_POST(

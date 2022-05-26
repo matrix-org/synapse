@@ -1,1 +1,0 @@
-Fix an error in to get federation status of a destination server even if no error has occurred. This admin API was new introduced in Synapse 1.49.0.

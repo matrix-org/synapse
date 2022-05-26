@@ -102,13 +102,13 @@ class EmailPusherTests(HomeserverTestCase):
 
         # Register the pusher
         user_tuple = self.get_success(
-            self.hs.get_datastore().get_user_by_access_token(self.access_token)
+            self.hs.get_datastores().main.get_user_by_access_token(self.access_token)
         )
         self.token_id = user_tuple.token_id
 
         # We need to add email to account before we can create a pusher.
         self.get_success(
-            hs.get_datastore().user_add_threepid(
+            hs.get_datastores().main.user_add_threepid(
                 self.user_id, "email", "a@example.com", 0, 0
             )
         )
@@ -128,7 +128,7 @@ class EmailPusherTests(HomeserverTestCase):
         )
 
         self.auth_handler = hs.get_auth_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     def test_need_validated_email(self):
         """Test that we can only add an email pusher if the user has validated
@@ -375,7 +375,7 @@ class EmailPusherTests(HomeserverTestCase):
 
         # check that the pusher for that email address has been deleted
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by({"user_name": self.user_id})
+            self.hs.get_datastores().main.get_pushers_by({"user_name": self.user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 0)
@@ -388,14 +388,14 @@ class EmailPusherTests(HomeserverTestCase):
         # This resembles the old behaviour, which the background update below is intended
         # to clean up.
         self.get_success(
-            self.hs.get_datastore().user_delete_threepid(
+            self.hs.get_datastores().main.user_delete_threepid(
                 self.user_id, "email", "a@example.com"
             )
         )
 
         # Run the "remove_deleted_email_pushers" background job
         self.get_success(
-            self.hs.get_datastore().db_pool.simple_insert(
+            self.hs.get_datastores().main.db_pool.simple_insert(
                 table="background_updates",
                 values={
                     "update_name": "remove_deleted_email_pushers",
@@ -406,14 +406,14 @@ class EmailPusherTests(HomeserverTestCase):
         )
 
         # ... and tell the DataStore that it hasn't finished all updates yet
-        self.hs.get_datastore().db_pool.updates._all_done = False
+        self.hs.get_datastores().main.db_pool.updates._all_done = False
 
         # Now let's actually drive the updates to completion
         self.wait_for_background_updates()
 
         # Check that all pushers with unlinked addresses were deleted
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by({"user_name": self.user_id})
+            self.hs.get_datastores().main.get_pushers_by({"user_name": self.user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 0)
@@ -428,7 +428,7 @@ class EmailPusherTests(HomeserverTestCase):
         """
         # Get the stream ordering before it gets sent
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by({"user_name": self.user_id})
+            self.hs.get_datastores().main.get_pushers_by({"user_name": self.user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
@@ -439,7 +439,7 @@ class EmailPusherTests(HomeserverTestCase):
 
         # It hasn't succeeded yet, so the stream ordering shouldn't have moved
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by({"user_name": self.user_id})
+            self.hs.get_datastores().main.get_pushers_by({"user_name": self.user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
@@ -458,7 +458,7 @@ class EmailPusherTests(HomeserverTestCase):
 
         # The stream ordering has increased
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by({"user_name": self.user_id})
+            self.hs.get_datastores().main.get_pushers_by({"user_name": self.user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)

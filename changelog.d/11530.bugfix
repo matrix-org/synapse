@@ -1,2 +1,0 @@
-Fix a long-standing issue which could cause Synapse to incorrectly accept data in the unsigned field of events
-received over federation.

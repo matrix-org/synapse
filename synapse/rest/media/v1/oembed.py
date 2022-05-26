@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
 class OEmbedResult:
     # The Open Graph result (converted from the oEmbed result).
     open_graph_result: JsonDict
+    # The author_name of the oEmbed result
+    author_name: Optional[str]
     # Number of milliseconds to cache the content, according to the oEmbed response.
     #
     # This will be None if no cache-age is provided in the oEmbed response (or
@@ -154,10 +156,11 @@ class OEmbedProvider:
                 "og:url": url,
             }
 
-            # Use either title or author's name as the title.
-            title = oembed.get("title") or oembed.get("author_name")
+            title = oembed.get("title")
             if title:
                 open_graph_response["og:title"] = title
+
+            author_name = oembed.get("author_name")
 
             # Use the provider name and as the site.
             provider_name = oembed.get("provider_name")
@@ -193,9 +196,10 @@ class OEmbedProvider:
             # Trap any exception and let the code follow as usual.
             logger.warning("Error parsing oEmbed metadata from %s: %r", url, e)
             open_graph_response = {}
+            author_name = None
             cache_age = None
 
-        return OEmbedResult(open_graph_response, cache_age)
+        return OEmbedResult(open_graph_response, author_name, cache_age)
 
 
 def _fetch_urls(tree: "etree.Element", tag_name: str) -> List[str]:

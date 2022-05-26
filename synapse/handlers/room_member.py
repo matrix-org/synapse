@@ -38,6 +38,7 @@ from synapse.event_auth import get_named_level, get_power_level_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
+from synapse.storage.state import StateFilter
 from synapse.types import (
     JsonDict,
     Requester,
@@ -66,7 +67,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.state_handler = hs.get_state_handler()
         self.config = hs.config
@@ -82,6 +83,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.event_auth_handler = hs.get_event_auth_handler()
 
         self.member_linearizer: Linearizer = Linearizer(name="member")
+        self.member_as_limiter = Linearizer(max_count=10, name="member_as_limiter")
 
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
@@ -114,6 +116,13 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             clock=self.clock,
             rate_hz=hs.config.ratelimiting.rc_invites_per_user.per_second,
             burst_count=hs.config.ratelimiting.rc_invites_per_user.burst_count,
+        )
+
+        self._third_party_invite_limiter = Ratelimiter(
+            store=self.store,
+            clock=self.clock,
+            rate_hz=hs.config.ratelimiting.rc_third_party_invite.per_second,
+            burst_count=hs.config.ratelimiting.rc_third_party_invite.burst_count,
         )
 
         self.request_ratelimiter = hs.get_request_ratelimiter()
@@ -261,8 +270,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         target: UserID,
         room_id: str,
         membership: str,
-        prev_event_ids: List[str],
-        auth_event_ids: Optional[List[str]] = None,
+        allow_no_prev_events: bool = False,
+        prev_event_ids: Optional[List[str]] = None,
+        state_event_ids: Optional[List[str]] = None,
         txn_id: Optional[str] = None,
         ratelimit: bool = True,
         content: Optional[dict] = None,
@@ -279,12 +289,20 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             target:
             room_id:
             membership:
-            prev_event_ids: The event IDs to use as the prev events
 
-            auth_event_ids:
-                The event ids to use as the auth_events for the new event.
-                Should normally be left as None, which will cause them to be calculated
-                based on the room state at the prev_events.
+            allow_no_prev_events: Whether to allow this event to be created an empty
+                list of prev_events. Normally this is prohibited just because most
+                events should have a prev_event and we should only use this in special
+                cases like MSC2716.
+            prev_event_ids: The event IDs to use as the prev events
+            state_event_ids:
+                The full state at a given event. This is used particularly by the MSC2716
+                /batch_send endpoint. One use case is the historical `state_events_at_start`;
+                since each is marked as an `outlier`, the `EventContext.for_outlier()` won't
+                have any `state_ids` set and therefore can't derive any state even though the
+                prev_events are set so we need to set them ourself via this argument.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
 
             txn_id:
             ratelimit:
@@ -337,14 +355,17 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 "membership": membership,
             },
             txn_id=txn_id,
+            allow_no_prev_events=allow_no_prev_events,
             prev_event_ids=prev_event_ids,
-            auth_event_ids=auth_event_ids,
+            state_event_ids=state_event_ids,
             require_consent=require_consent,
             outlier=outlier,
             historical=historical,
         )
 
-        prev_state_ids = await context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids(
+            StateFilter.from_types([(EventTypes.Member, None)])
+        )
 
         prev_member_event_id = prev_state_ids.get((EventTypes.Member, user_id), None)
 
@@ -439,8 +460,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         require_consent: bool = True,
         outlier: bool = False,
         historical: bool = False,
+        allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
-        auth_event_ids: Optional[List[str]] = None,
+        state_event_ids: Optional[List[str]] = None,
     ) -> Tuple[str, int]:
         """Update a user's membership in a room.
 
@@ -463,11 +485,19 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             historical: Indicates whether the message is being inserted
                 back in time around some existing events. This is used to skip
                 a few checks and mark the event as backfilled.
+            allow_no_prev_events: Whether to allow this event to be created an empty
+                list of prev_events. Normally this is prohibited just because most
+                events should have a prev_event and we should only use this in special
+                cases like MSC2716.
             prev_event_ids: The event IDs to use as the prev events
-            auth_event_ids:
-                The event ids to use as the auth_events for the new event.
-                Should normally be left as None, which will cause them to be calculated
-                based on the room state at the prev_events.
+            state_event_ids:
+                The full state at a given event. This is used particularly by the MSC2716
+                /batch_send endpoint. One use case is the historical `state_events_at_start`;
+                since each is marked as an `outlier`, the `EventContext.for_outlier()` won't
+                have any `state_ids` set and therefore can't derive any state even though the
+                prev_events are set so we need to set them ourself via this argument.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -482,24 +512,32 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         key = (room_id,)
 
-        with (await self.member_linearizer.queue(key)):
-            result = await self.update_membership_locked(
-                requester,
-                target,
-                room_id,
-                action,
-                txn_id=txn_id,
-                remote_room_hosts=remote_room_hosts,
-                third_party_signed=third_party_signed,
-                ratelimit=ratelimit,
-                content=content,
-                new_room=new_room,
-                require_consent=require_consent,
-                outlier=outlier,
-                historical=historical,
-                prev_event_ids=prev_event_ids,
-                auth_event_ids=auth_event_ids,
-            )
+        as_id = object()
+        if requester.app_service:
+            as_id = requester.app_service.id
+
+        # We first linearise by the application service (to try to limit concurrent joins
+        # by application services), and then by room ID.
+        async with self.member_as_limiter.queue(as_id):
+            async with self.member_linearizer.queue(key):
+                result = await self.update_membership_locked(
+                    requester,
+                    target,
+                    room_id,
+                    action,
+                    txn_id=txn_id,
+                    remote_room_hosts=remote_room_hosts,
+                    third_party_signed=third_party_signed,
+                    ratelimit=ratelimit,
+                    content=content,
+                    new_room=new_room,
+                    require_consent=require_consent,
+                    outlier=outlier,
+                    historical=historical,
+                    allow_no_prev_events=allow_no_prev_events,
+                    prev_event_ids=prev_event_ids,
+                    state_event_ids=state_event_ids,
+                )
 
         return result
 
@@ -518,8 +556,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         require_consent: bool = True,
         outlier: bool = False,
         historical: bool = False,
+        allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
-        auth_event_ids: Optional[List[str]] = None,
+        state_event_ids: Optional[List[str]] = None,
     ) -> Tuple[str, int]:
         """Helper for update_membership.
 
@@ -544,11 +583,19 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             historical: Indicates whether the message is being inserted
                 back in time around some existing events. This is used to skip
                 a few checks and mark the event as backfilled.
+            allow_no_prev_events: Whether to allow this event to be created an empty
+                list of prev_events. Normally this is prohibited just because most
+                events should have a prev_event and we should only use this in special
+                cases like MSC2716.
             prev_event_ids: The event IDs to use as the prev events
-            auth_event_ids:
-                The event ids to use as the auth_events for the new event.
-                Should normally be left as None, which will cause them to be calculated
-                based on the room state at the prev_events.
+            state_event_ids:
+                The full state at a given event. This is used particularly by the MSC2716
+                /batch_send endpoint. One use case is the historical `state_events_at_start`;
+                since each is marked as an `outlier`, the `EventContext.for_outlier()` won't
+                have any `state_ids` set and therefore can't derive any state even though the
+                prev_events are set so we need to set them ourself via this argument.
+                This should normally be left as None, which will cause the auth_event_ids
+                to be calculated based on the room state at the prev_events.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -589,6 +636,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 f"Avatar URL is too long (max {MAX_AVATAR_URL_LEN})",
                 errcode=Codes.BAD_JSON,
             )
+
+        if "avatar_url" in content:
+            if not await self.profile_handler.check_avatar_size_and_mime_type(
+                content["avatar_url"],
+            ):
+                raise SynapseError(403, "This avatar is not allowed", Codes.FORBIDDEN)
 
         # The event content should *not* include the authorising user as
         # it won't be properly signed. Strip it out since it might come
@@ -667,8 +720,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 membership=effective_membership_state,
                 txn_id=txn_id,
                 ratelimit=ratelimit,
+                allow_no_prev_events=allow_no_prev_events,
                 prev_event_ids=prev_event_ids,
-                auth_event_ids=auth_event_ids,
+                state_event_ids=state_event_ids,
                 content=content,
                 require_consent=require_consent,
                 outlier=outlier,
@@ -892,7 +946,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             txn_id=txn_id,
             ratelimit=ratelimit,
             prev_event_ids=latest_event_ids,
-            auth_event_ids=auth_event_ids,
+            state_event_ids=state_event_ids,
             content=content,
             require_consent=require_consent,
             outlier=outlier,
@@ -1027,17 +1081,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # Transfer alias mappings in the room directory
         await self.store.update_aliases_for_room(old_room_id, room_id)
 
-        # Check if any groups we own contain the predecessor room
-        local_group_ids = await self.store.get_local_groups_for_room(old_room_id)
-        for group_id in local_group_ids:
-            # Add new the new room to those groups
-            await self.store.add_room_to_group(
-                group_id, room_id, old_room is not None and old_room["is_public"]
-            )
-
-            # Remove the old room from those groups
-            await self.store.remove_room_from_group(group_id, old_room_id)
-
     async def copy_user_state_on_room_upgrade(
         self, old_room_id: str, new_room_id: str, user_ids: Iterable[str]
     ) -> None:
@@ -1109,7 +1152,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         else:
             requester = types.create_requester(target_user)
 
-        prev_state_ids = await context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids(
+            StateFilter.from_types([(EventTypes.GuestAccess, None)])
+        )
         if event.membership == Membership.JOIN:
             if requester.is_guest:
                 guest_can_join = await self._can_guest_join(prev_state_ids)
@@ -1289,7 +1334,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         # We need to rate limit *before* we send out any 3PID invites, so we
         # can't just rely on the standard ratelimiting of events.
-        await self.request_ratelimiter.ratelimit(requester)
+        await self._third_party_invite_limiter.ratelimit(requester)
 
         can_invite = await self.third_party_event_rules.check_threepid_can_be_invited(
             medium, address, room_id
@@ -1697,8 +1742,8 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             txn_id=txn_id,
             prev_event_ids=prev_event_ids,
             auth_event_ids=auth_event_ids,
+            outlier=True,
         )
-        event.internal_metadata.outlier = True
         event.internal_metadata.out_of_band_membership = True
 
         result_event = await self.event_creation_handler.handle_new_client_event(

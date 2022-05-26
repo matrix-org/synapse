@@ -46,7 +46,9 @@ class PushersRestServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         user = requester.user
 
-        pushers = await self.hs.get_datastore().get_pushers_by_user_id(user.to_string())
+        pushers = await self.hs.get_datastores().main.get_pushers_by_user_id(
+            user.to_string()
+        )
 
         filtered_pushers = [p.as_dict() for p in pushers]
 

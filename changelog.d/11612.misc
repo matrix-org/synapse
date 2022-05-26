@@ -1,1 +1,0 @@
-Avoid database access in the JSON serialization process.

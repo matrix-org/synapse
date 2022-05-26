@@ -112,7 +112,7 @@ class BackgroundUpdateStartJobRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self._auth = hs.get_auth()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self._auth, request)
@@ -123,34 +123,25 @@ class BackgroundUpdateStartJobRestServlet(RestServlet):
         job_name = body["job_name"]
 
         if job_name == "populate_stats_process_rooms":
-            jobs = [
-                {
-                    "update_name": "populate_stats_process_rooms",
-                    "progress_json": "{}",
-                },
-            ]
+            jobs = [("populate_stats_process_rooms", "{}", "")]
         elif job_name == "regenerate_directory":
             jobs = [
-                {
-                    "update_name": "populate_user_directory_createtables",
-                    "progress_json": "{}",
-                    "depends_on": "",
-                },
-                {
-                    "update_name": "populate_user_directory_process_rooms",
-                    "progress_json": "{}",
-                    "depends_on": "populate_user_directory_createtables",
-                },
-                {
-                    "update_name": "populate_user_directory_process_users",
-                    "progress_json": "{}",
-                    "depends_on": "populate_user_directory_process_rooms",
-                },
-                {
-                    "update_name": "populate_user_directory_cleanup",
-                    "progress_json": "{}",
-                    "depends_on": "populate_user_directory_process_users",
-                },
+                ("populate_user_directory_createtables", "{}", ""),
+                (
+                    "populate_user_directory_process_rooms",
+                    "{}",
+                    "populate_user_directory_createtables",
+                ),
+                (
+                    "populate_user_directory_process_users",
+                    "{}",
+                    "populate_user_directory_process_rooms",
+                ),
+                (
+                    "populate_user_directory_cleanup",
+                    "{}",
+                    "populate_user_directory_process_users",
+                ),
             ]
         else:
             raise SynapseError(HTTPStatus.BAD_REQUEST, "Invalid job_name")
@@ -158,6 +149,7 @@ class BackgroundUpdateStartJobRestServlet(RestServlet):
         try:
             await self._store.db_pool.simple_insert_many(
                 table="background_updates",
+                keys=("update_name", "progress_json", "depends_on"),
                 values=jobs,
                 desc=f"admin_api_run_{job_name}",
             )

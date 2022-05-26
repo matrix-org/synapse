@@ -561,6 +561,54 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             "get_destinations_paginate_txn", get_destinations_paginate_txn
         )
 
+    async def get_destination_rooms_paginate(
+        self, destination: str, start: int, limit: int, direction: str = "f"
+    ) -> Tuple[List[JsonDict], int]:
+        """Function to retrieve a paginated list of destination's rooms.
+        This will return a json list of rooms and the
+        total number of rooms.
+
+        Args:
+            destination: the destination to query
+            start: start number to begin the query from
+            limit: number of rows to retrieve
+            direction: sort ascending or descending by room_id
+        Returns:
+            A tuple of a dict of rooms and a count of total rooms.
+        """
+
+        def get_destination_rooms_paginate_txn(
+            txn: LoggingTransaction,
+        ) -> Tuple[List[JsonDict], int]:
+
+            if direction == "b":
+                order = "DESC"
+            else:
+                order = "ASC"
+
+            sql = """
+                SELECT COUNT(*) as total_rooms
+                FROM destination_rooms
+                WHERE destination = ?
+                """
+            txn.execute(sql, [destination])
+            count = cast(Tuple[int], txn.fetchone())[0]
+
+            rooms = self.db_pool.simple_select_list_paginate_txn(
+                txn=txn,
+                table="destination_rooms",
+                orderby="room_id",
+                start=start,
+                limit=limit,
+                retcols=("room_id", "stream_ordering"),
+                order_direction=order,
+            )
+            return rooms, count
+
+        return await self.db_pool.runInteraction(
+            "get_destination_rooms_paginate_txn", get_destination_rooms_paginate_txn
+        )
+
     async def is_destination_known(self, destination: str) -> bool:
         """Check if a destination is known to the server."""
         result = await self.db_pool.simple_select_one_onecol(

@@ -15,24 +15,30 @@
 import functools
 import logging
 import re
-from typing import Any, Awaitable, Callable, Optional, Tuple, cast
+import time
+from http import HTTPStatus
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Optional, Tuple, cast
 
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.urls import FEDERATION_V1_PREFIX
-from synapse.http.server import HttpServer, ServletCallback
+from synapse.http.server import HttpServer, ServletCallback, is_method_cancellable
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import run_in_background
 from synapse.logging.opentracing import (
+    active_span,
     set_tag,
     span_context_from_request,
+    start_active_span,
     start_active_span_follows_from,
     whitelisted_homeserver,
 )
-from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import parse_and_validate_server_name
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +52,11 @@ class NoAuthenticationError(AuthenticationError):
 
 
 class Authenticator:
-    def __init__(self, hs: HomeServer):
+    def __init__(self, hs: "HomeServer"):
         self._clock = hs.get_clock()
         self.keyring = hs.get_keyring()
         self.server_name = hs.hostname
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.federation_domain_whitelist = (
             hs.config.federation.federation_domain_whitelist
         )
@@ -58,7 +64,7 @@ class Authenticator:
 
         self.replication_client = None
         if hs.config.worker.worker_app:
-            self.replication_client = hs.get_tcp_replication()
+            self.replication_client = hs.get_replication_command_handler()
 
     # A method just so we can pass 'self' as the authenticator to the Servlets
     async def authenticate_request(
@@ -81,15 +87,24 @@ class Authenticator:
 
         if not auth_headers:
             raise NoAuthenticationError(
-                401, "Missing Authorization headers", Codes.UNAUTHORIZED
+                HTTPStatus.UNAUTHORIZED,
+                "Missing Authorization headers",
+                Codes.UNAUTHORIZED,
             )
 
         for auth in auth_headers:
             if auth.startswith(b"X-Matrix"):
-                (origin, key, sig) = _parse_auth_header(auth)
+                (origin, key, sig, destination) = _parse_auth_header(auth)
                 json_request["origin"] = origin
                 json_request["signatures"].setdefault(origin, {})[key] = sig
 
+                # if the origin_server sent a destination along it needs to match our own server_name
+                if destination is not None and destination != self.server_name:
+                    raise AuthenticationError(
+                        HTTPStatus.UNAUTHORIZED,
+                        "Destination mismatch in auth header",
+                        Codes.UNAUTHORIZED,
+                    )
         if (
             self.federation_domain_whitelist is not None
             and origin not in self.federation_domain_whitelist
@@ -98,7 +113,9 @@ class Authenticator:
 
         if origin is None or not json_request["signatures"]:
             raise NoAuthenticationError(
-                401, "Missing Authorization headers", Codes.UNAUTHORIZED
+                HTTPStatus.UNAUTHORIZED,
+                "Missing Authorization headers",
+                Codes.UNAUTHORIZED,
             )
 
         await self.keyring.verify_json_for_server(
@@ -114,11 +131,11 @@ class Authenticator:
         # alive
         retry_timings = await self.store.get_destination_retry_timings(origin)
         if retry_timings and retry_timings.retry_last_ts:
-            run_in_background(self._reset_retry_timings, origin)
+            run_in_background(self.reset_retry_timings, origin)
 
         return origin
 
-    async def _reset_retry_timings(self, origin: str) -> None:
+    async def reset_retry_timings(self, origin: str) -> None:
         try:
             logger.info("Marking origin %r as up", origin)
             await self.store.set_destination_retry_timings(origin, None, 0, 0)
@@ -137,13 +154,14 @@ class Authenticator:
             logger.exception("Error resetting retry timings on %s", origin)
 
 
-def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str]:
+def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str, Optional[str]]:
     """Parse an X-Matrix auth header
 
     Args:
         header_bytes: header value
 
     Returns:
+        origin, key id, signature, destination.
         origin, key id, signature.
 
     Raises:
@@ -151,12 +169,16 @@ def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str]:
     """
     try:
         header_str = header_bytes.decode("utf-8")
-        params = header_str.split(" ")[1].split(",")
-        param_dict = {k: v for k, v in (kv.split("=", maxsplit=1) for kv in params)}
+        params = re.split(" +", header_str)[1].split(",")
+        param_dict: Dict[str, str] = {
+            k.lower(): v for k, v in [param.split("=", maxsplit=1) for param in params]
+        }
 
         def strip_quotes(value: str) -> str:
             if value.startswith('"'):
-                return value[1:-1]
+                return re.sub(
+                    "\\\\(.)", lambda matchobj: matchobj.group(1), value[1:-1]
+                )
             else:
                 return value
 
@@ -167,7 +189,15 @@ def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str]:
 
         key = strip_quotes(param_dict["key"])
         sig = strip_quotes(param_dict["sig"])
-        return origin, key, sig
+
+        # get the destination server_name from the auth header if it exists
+        destination = param_dict.get("destination")
+        if destination is not None:
+            destination = strip_quotes(destination)
+        else:
+            destination = None
+
+        return origin, key, sig, destination
     except Exception as e:
         logger.warning(
             "Error parsing auth header '%s': %s",
@@ -175,7 +205,7 @@ def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str]:
             e,
         )
         raise AuthenticationError(
-            400, "Malformed Authorization header", Codes.UNAUTHORIZED
+            HTTPStatus.BAD_REQUEST, "Malformed Authorization header", Codes.UNAUTHORIZED
         )
 
 
@@ -227,7 +257,7 @@ class BaseFederationServlet:
 
     def __init__(
         self,
-        hs: HomeServer,
+        hs: "HomeServer",
         authenticator: Authenticator,
         ratelimiter: FederationRateLimiter,
         server_name: str,
@@ -263,9 +293,10 @@ class BaseFederationServlet:
                 content = parse_json_object_from_request(request)
 
             try:
-                origin: Optional[str] = await authenticator.authenticate_request(
-                    request, content
-                )
+                with start_active_span("authenticate_request"):
+                    origin: Optional[str] = await authenticator.authenticate_request(
+                        request, content
+                    )
             except NoAuthenticationError:
                 origin = None
                 if self.REQUIRE_AUTH:
@@ -280,32 +311,57 @@ class BaseFederationServlet:
             # update the active opentracing span with the authenticated entity
             set_tag("authenticated_entity", origin)
 
-            # if the origin is authenticated and whitelisted, link to its span context
+            # if the origin is authenticated and whitelisted, use its span context
+            # as the parent.
             context = None
             if origin and whitelisted_homeserver(origin):
                 context = span_context_from_request(request)
 
-            scope = start_active_span_follows_from(
-                "incoming-federation-request", contexts=(context,) if context else ()
-            )
+            if context:
+                servlet_span = active_span()
+                # a scope which uses the origin's context as a parent
+                processing_start_time = time.time()
+                scope = start_active_span_follows_from(
+                    "incoming-federation-request",
+                    child_of=context,
+                    contexts=(servlet_span,),
+                    start_time=processing_start_time,
+                )
 
-            with scope:
-                if origin and self.RATELIMIT:
-                    with ratelimiter.ratelimit(origin) as d:
-                        await d
-                        if request._disconnected:
-                            logger.warning(
-                                "client disconnected before we started processing "
-                                "request"
+            else:
+                # just use our context as a parent
+                scope = start_active_span(
+                    "incoming-federation-request",
+                )
+
+            try:
+                with scope:
+                    if origin and self.RATELIMIT:
+                        with ratelimiter.ratelimit(origin) as d:
+                            await d
+                            if request._disconnected:
+                                logger.warning(
+                                    "client disconnected before we started processing "
+                                    "request"
+                                )
+                                return None
+                            response = await func(
+                                origin, content, request.args, *args, **kwargs
                             )
-                            return None
+                    else:
                         response = await func(
                             origin, content, request.args, *args, **kwargs
                         )
-                else:
-                    response = await func(
-                        origin, content, request.args, *args, **kwargs
+            finally:
+                # if we used the origin's context as the parent, add a new span using
+                # the servlet span as a parent, so that we have a link
+                if context:
+                    scope2 = start_active_span_follows_from(
+                        "process-federation_request",
+                        contexts=(scope.span,),
+                        start_time=processing_start_time,
                     )
+                    scope2.close()
 
             return response
 
@@ -318,6 +374,17 @@ class BaseFederationServlet:
             code = getattr(self, "on_%s" % (method), None)
             if code is None:
                 continue
+
+            if is_method_cancellable(code):
+                # The wrapper added by `self._wrap` will inherit the cancellable flag,
+                # but the wrapper itself does not support cancellation yet.
+                # Once resolved, the cancellation tests in
+                # `tests/federation/transport/server/test__base.py` can be re-enabled.
+                raise Exception(
+                    f"{self.__class__.__name__}.on_{method} has been marked as "
+                    "cancellable, but federation servlets do not support cancellation "
+                    "yet."
+                )
 
             server.register_paths(
                 method,

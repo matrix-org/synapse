@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from twisted.web.server import Request
 
+from synapse.http.server import HttpServer
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.replication.http._base import ReplicationEndpoint
@@ -49,11 +50,11 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.federation_handler = hs.get_federation_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
 
     @staticmethod
-    async def _serialize_payload(  # type: ignore
+    async def _serialize_payload(  # type: ignore[override]
         requester: Requester,
         room_id: str,
         user_id: str,
@@ -77,7 +78,7 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
             "content": content,
         }
 
-    async def _handle_request(  # type: ignore
+    async def _handle_request(  # type: ignore[override]
         self, request: SynapseRequest, room_id: str, user_id: str
     ) -> Tuple[int, JsonDict]:
         content = parse_json_object_from_request(request)
@@ -118,17 +119,17 @@ class ReplicationRemoteKnockRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.federation_handler = hs.get_federation_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
 
     @staticmethod
-    async def _serialize_payload(  # type: ignore
+    async def _serialize_payload(  # type: ignore[override]
         requester: Requester,
         room_id: str,
         user_id: str,
         remote_room_hosts: List[str],
         content: JsonDict,
-    ):
+    ) -> JsonDict:
         """
         Args:
             requester: The user making the request, according to the access token.
@@ -143,12 +144,12 @@ class ReplicationRemoteKnockRestServlet(ReplicationEndpoint):
             "content": content,
         }
 
-    async def _handle_request(  # type: ignore
+    async def _handle_request(  # type: ignore[override]
         self,
         request: SynapseRequest,
         room_id: str,
         user_id: str,
-    ):
+    ) -> Tuple[int, JsonDict]:
         content = parse_json_object_from_request(request)
 
         remote_room_hosts = content["remote_room_hosts"]
@@ -187,12 +188,12 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.member_handler = hs.get_room_member_handler()
 
     @staticmethod
-    async def _serialize_payload(  # type: ignore
+    async def _serialize_payload(  # type: ignore[override]
         invite_event_id: str,
         txn_id: Optional[str],
         requester: Requester,
@@ -215,7 +216,7 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
             "content": content,
         }
 
-    async def _handle_request(  # type: ignore
+    async def _handle_request(  # type: ignore[override]
         self, request: SynapseRequest, invite_event_id: str
     ) -> Tuple[int, JsonDict]:
         content = parse_json_object_from_request(request)
@@ -257,17 +258,17 @@ class ReplicationRemoteRescindKnockRestServlet(ReplicationEndpoint):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.member_handler = hs.get_room_member_handler()
 
     @staticmethod
-    async def _serialize_payload(  # type: ignore
+    async def _serialize_payload(  # type: ignore[override]
         knock_event_id: str,
         txn_id: Optional[str],
         requester: Requester,
         content: JsonDict,
-    ):
+    ) -> JsonDict:
         """
         Args:
             knock_event_id: The ID of the knock to be rescinded.
@@ -281,11 +282,11 @@ class ReplicationRemoteRescindKnockRestServlet(ReplicationEndpoint):
             "content": content,
         }
 
-    async def _handle_request(  # type: ignore
+    async def _handle_request(  # type: ignore[override]
         self,
         request: SynapseRequest,
         knock_event_id: str,
-    ):
+    ) -> Tuple[int, JsonDict]:
         content = parse_json_object_from_request(request)
 
         txn_id = content["txn_id"]
@@ -324,12 +325,12 @@ class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
         super().__init__(hs)
 
         self.registeration_handler = hs.get_registration_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.distributor = hs.get_distributor()
 
     @staticmethod
-    async def _serialize_payload(  # type: ignore
+    async def _serialize_payload(  # type: ignore[override]
         room_id: str, user_id: str, change: str
     ) -> JsonDict:
         """
@@ -345,7 +346,7 @@ class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
 
         return {}
 
-    async def _handle_request(  # type: ignore
+    async def _handle_request(  # type: ignore[override]
         self, request: Request, room_id: str, user_id: str, change: str
     ) -> Tuple[int, JsonDict]:
         logger.info("user membership change: %s in %s", user_id, room_id)
@@ -360,7 +361,7 @@ class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
         return 200, {}
 
 
-def register_servlets(hs: "HomeServer", http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ReplicationRemoteJoinRestServlet(hs).register(http_server)
     ReplicationRemoteRejectInviteRestServlet(hs).register(http_server)
     ReplicationUserJoinedLeftRoomRestServlet(hs).register(http_server)

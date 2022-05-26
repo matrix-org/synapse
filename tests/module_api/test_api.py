@@ -19,8 +19,9 @@ from synapse.api.constants import EduTypes, EventTypes
 from synapse.events import EventBase
 from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
+from synapse.handlers.push_rules import InvalidRuleException
 from synapse.rest import admin
-from synapse.rest.client import login, presence, profile, room
+from synapse.rest.client import login, notifications, presence, profile, room
 from synapse.types import create_requester
 
 from tests.events.test_presence_router import send_presence_update, sync_presence
@@ -38,10 +39,11 @@ class ModuleApiTestCase(HomeserverTestCase):
         room.register_servlets,
         presence.register_servlets,
         profile.register_servlets,
+        notifications.register_servlets,
     ]
 
     def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastore()
+        self.store = homeserver.get_datastores().main
         self.module_api = homeserver.get_module_api()
         self.event_creation_handler = homeserver.get_event_creation_handler()
         self.sync_handler = homeserver.get_sync_handler()
@@ -85,6 +87,28 @@ class ModuleApiTestCase(HomeserverTestCase):
         # Check that the displayname was assigned
         displayname = self.get_success(self.store.get_profile_displayname("bob"))
         self.assertEqual(displayname, "Bobberino")
+
+    def test_can_register_admin_user(self):
+        user_id = self.register_user(
+            "bob_module_admin", "1234", displayname="Bobberino Admin", admin=True
+        )
+
+        found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
+        self.assertEqual(found_user.user_id.to_string(), user_id)
+        self.assertIdentical(found_user.is_admin, True)
+
+    def test_can_set_admin(self):
+        user_id = self.register_user(
+            "alice_wants_admin",
+            "1234",
+            displayname="Alice Powerhungry",
+            admin=False,
+        )
+
+        self.get_success(self.module_api.set_user_admin(user_id, True))
+        found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
+        self.assertEqual(found_user.user_id.to_string(), user_id)
+        self.assertIdentical(found_user.is_admin, True)
 
     def test_get_userinfo_by_id(self):
         user_id = self.register_user("alice", "1234")
@@ -268,7 +292,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         # Create a user and room to play with
         user_id = self.register_user("kermit", "monkey")
         tok = self.login("kermit", "monkey")
-        room_id = self.helper.create_room_as(user_id, tok=tok)
+        room_id = self.helper.create_room_as(user_id, tok=tok, is_public=False)
 
         # The room should not currently be in the public rooms directory
         is_in_public_rooms = self.get_success(
@@ -530,6 +554,86 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertEqual(state[("org.matrix.test", "")].sender, user_id)
         self.assertEqual(state[("org.matrix.test", "")].state_key, "")
         self.assertEqual(state[("org.matrix.test", "")].content, {})
+
+    def test_set_push_rules_action(self) -> None:
+        """Test that a module can change the actions of an existing push rule for a user."""
+
+        # Create a room with 2 users in it. Push rules must not match if the user is the
+        # event's sender, so we need one user to send messages and one user to receive
+        # notifications.
+        user_id = self.register_user("user", "password")
+        tok = self.login("user", "password")
+
+        room_id = self.helper.create_room_as(user_id, is_public=True, tok=tok)
+
+        user_id2 = self.register_user("user2", "password")
+        tok2 = self.login("user2", "password")
+        self.helper.join(room_id, user_id2, tok=tok2)
+
+        # Register a 3rd user and join them to the room, so that we don't accidentally
+        # trigger 1:1 push rules.
+        user_id3 = self.register_user("user3", "password")
+        tok3 = self.login("user3", "password")
+        self.helper.join(room_id, user_id3, tok=tok3)
+
+        # Send a message as the second user and check that it notifies.
+        res = self.helper.send(room_id=room_id, body="here's a message", tok=tok2)
+        event_id = res["event_id"]
+
+        channel = self.make_request(
+            "GET",
+            "/notifications",
+            access_token=tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self.assertEqual(len(channel.json_body["notifications"]), 1, channel.json_body)
+        self.assertEqual(
+            channel.json_body["notifications"][0]["event"]["event_id"],
+            event_id,
+            channel.json_body,
+        )
+
+        # Change the .m.rule.message actions to not notify on new messages.
+        self.get_success(
+            defer.ensureDeferred(
+                self.module_api.set_push_rule_action(
+                    user_id=user_id,
+                    scope="global",
+                    kind="underride",
+                    rule_id=".m.rule.message",
+                    actions=["dont_notify"],
+                )
+            )
+        )
+
+        # Send another message as the second user and check that the number of
+        # notifications didn't change.
+        self.helper.send(room_id=room_id, body="here's another message", tok=tok2)
+
+        channel = self.make_request(
+            "GET",
+            "/notifications?from=",
+            access_token=tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(len(channel.json_body["notifications"]), 1, channel.json_body)
+
+    def test_check_push_rules_actions(self) -> None:
+        """Test that modules can check whether a list of push rules actions are spec
+        compliant.
+        """
+        with self.assertRaises(InvalidRuleException):
+            self.module_api.check_push_rule_actions(["foo"])
+
+        with self.assertRaises(InvalidRuleException):
+            self.module_api.check_push_rule_actions({"foo": "bar"})
+
+        self.module_api.check_push_rule_actions(["notify"])
+
+        self.module_api.check_push_rule_actions(
+            [{"set_tweak": "sound", "value": "default"}]
+        )
 
 
 class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):

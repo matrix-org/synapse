@@ -92,12 +92,20 @@ class AccountDetailsResource(DirectServeHtmlResource):
             self._sso_handler.render_error(request, "bad_session", e.msg, code=e.code)
             return
 
+        # The configuration might mandate going through this step to validate an
+        # automatically generated localpart, so session.chosen_localpart might already
+        # be set.
+        localpart = ""
+        if session.chosen_localpart is not None:
+            localpart = session.chosen_localpart
+
         idp_id = session.auth_provider_id
         template_params = {
             "idp": self._sso_handler.get_identity_providers()[idp_id],
             "user_attributes": {
                 "display_name": session.display_name,
                 "emails": session.emails,
+                "localpart": localpart,
             },
         }
 

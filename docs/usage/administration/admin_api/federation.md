@@ -86,7 +86,7 @@ The following fields are returned in the JSON response body:
 - `next_token`: string representing a positive integer - Indication for pagination. See above.
 - `total` - integer - Total number of destinations.
 
-# Destination Details API
+## Destination Details API
 
 This API gets the retry timing info for a specific remote server.
 
@@ -108,7 +108,105 @@ A response body like the following is returned:
 }
 ```
 
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `destination` - Name of the remote server.
+
 **Response**
 
 The response fields are the same like in the `destinations` array in
 [List of destinations](#list-of-destinations) response.
+
+## Destination rooms
+
+This API gets the rooms that federate with a specific remote server.
+
+The API is:
+
+```
+GET /_synapse/admin/v1/federation/destinations/<destination>/rooms
+```
+
+A response body like the following is returned:
+
+```json
+{
+   "rooms":[
+      {
+         "room_id": "!OGEhHVWSdvArJzumhm:matrix.org",
+         "stream_ordering": 8326
+      },
+      {
+         "room_id": "!xYvNcQPhnkrdUmYczI:matrix.org",
+         "stream_ordering": 93534
+      }
+   ],
+   "total": 2
+}
+```
+
+To paginate, check for `next_token` and if present, call the endpoint again
+with `from` set to the value of `next_token`. This will return a new page.
+
+If the endpoint does not return a `next_token` then there are no more destinations
+to paginate through.
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `destination` - Name of the remote server.
+
+The following query parameters are available:
+
+- `from` - Offset in the returned list. Defaults to `0`.
+- `limit` - Maximum amount of destinations to return. Defaults to `100`.
+- `dir` - Direction of room order by `room_id`. Either `f` for forwards or `b` for
+  backwards. Defaults to `f`.
+
+**Response**
+
+The following fields are returned in the JSON response body:
+
+- `rooms` - An array of objects, each containing information about a room.
+  Room objects contain the following fields:
+  - `room_id` - string - The ID of the room.
+  - `stream_ordering` - integer -  The stream ordering of the most recent
+    successfully-sent [PDU](understanding_synapse_through_grafana_graphs.md#federation)
+    to this destination in this room.
+- `next_token`: string representing a positive integer - Indication for pagination. See above.
+- `total` - integer - Total number of destinations.
+
+## Reset connection timeout
+
+Synapse makes federation requests to other homeservers. If a federation request fails,
+Synapse will mark the destination homeserver as offline, preventing any future requests
+to that server for a "cooldown" period. This period grows over time if the server
+continues to fail its responses
+([exponential backoff](https://en.wikipedia.org/wiki/Exponential_backoff)).
+
+Admins can cancel the cooldown period with this API.
+
+This API resets the retry timing for a specific remote server and tries to connect to
+the remote server again. It does not wait for the next `retry_interval`.
+The connection must have previously run into an error and `retry_last_ts`
+([Destination Details API](#destination-details-api)) must not be equal to `0`.
+
+The connection attempt is carried out in the background and can take a while
+even if the API already returns the http status 200.
+
+The API is:
+
+```
+POST /_synapse/admin/v1/federation/destinations/<destination>/reset_connection
+
+{}
+```
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- `destination` - Name of the remote server.

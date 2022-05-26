@@ -1,1 +1,0 @@
-Fix a long-standing bug where Synapse wouldn't cache a response indicating that a remote user has no devices.

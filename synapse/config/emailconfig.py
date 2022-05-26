@@ -19,8 +19,11 @@ import email.utils
 import logging
 import os
 from enum import Enum
+from typing import Any
 
 import attr
+
+from synapse.types import JsonDict
 
 from ._base import Config, ConfigError
 
@@ -55,25 +58,25 @@ https://matrix-org.github.io/synapse/latest/templates.html
 ---------------------------------------------------------------------------------------"""
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class EmailSubjectConfig:
-    message_from_person_in_room = attr.ib(type=str)
-    message_from_person = attr.ib(type=str)
-    messages_from_person = attr.ib(type=str)
-    messages_in_room = attr.ib(type=str)
-    messages_in_room_and_others = attr.ib(type=str)
-    messages_from_person_and_others = attr.ib(type=str)
-    invite_from_person = attr.ib(type=str)
-    invite_from_person_to_room = attr.ib(type=str)
-    invite_from_person_to_space = attr.ib(type=str)
-    password_reset = attr.ib(type=str)
-    email_validation = attr.ib(type=str)
+    message_from_person_in_room: str
+    message_from_person: str
+    messages_from_person: str
+    messages_in_room: str
+    messages_in_room_and_others: str
+    messages_from_person_and_others: str
+    invite_from_person: str
+    invite_from_person_to_room: str
+    invite_from_person_to_space: str
+    password_reset: str
+    email_validation: str
 
 
 class EmailConfig(Config):
     section = "email"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         # TODO: We should separate better the email configuration from the notification
         # and account validity config.
 
@@ -354,7 +357,7 @@ class EmailConfig(Config):
                     path=("email", "invite_client_location"),
                 )
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return (
             """\
         # Configuration for sending emails from Synapse.

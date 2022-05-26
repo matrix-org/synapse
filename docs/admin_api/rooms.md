@@ -1,23 +1,11 @@
-# Contents
-- [List Room API](#list-room-api)
-- [Room Details API](#room-details-api)
-- [Room Members API](#room-members-api)
-- [Room State API](#room-state-api)
-- [Block Room API](#block-room-api)
-- [Delete Room API](#delete-room-api)
-  * [Version 1 (old version)](#version-1-old-version)
-  * [Version 2 (new version)](#version-2-new-version)
-  * [Status of deleting rooms](#status-of-deleting-rooms)
-  * [Undoing room shutdowns](#undoing-room-shutdowns)
-- [Make Room Admin API](#make-room-admin-api)
-- [Forward Extremities Admin API](#forward-extremities-admin-api)
-- [Event Context API](#event-context-api)
-
 # List Room API
 
 The List Room admin API allows server admins to get a list of rooms on their
 server. There are various parameters available that allow for filtering and
 sorting the returned list. This API supports pagination.
+
+To use it, you will need to authenticate by providing an `access_token`
+for a server admin: see [Admin API](../usage/administration/admin_api).
 
 **Parameters**
 
@@ -492,9 +480,6 @@ several minutes or longer.
 
 The local server will only have the power to move local user and room aliases to
 the new room. Users on other servers will be unaffected.
-
-To use it, you will need to authenticate by providing an ``access_token`` for a
-server admin: see [Admin API](../usage/administration/admin_api).
 
 ## Version 1 (old version)
 

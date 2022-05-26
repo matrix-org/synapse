@@ -35,3 +35,8 @@ See [the TCP replication documentation](tcp_replication.md).
 There are read-only version of the synapse storage layer in
 `synapse/replication/slave/storage` that use the response of the
 replication API to invalidate their caches.
+
+### The TCP Replication Module
+Information about how the tcp replication module is structured, including how
+the classes interact, can be found in
+`synapse/replication/tcp/__init__.py`

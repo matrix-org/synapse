@@ -112,10 +112,8 @@ class DirectoryWorkerStore(CacheInvalidationWorkerStore):
             self.db_pool.simple_insert_many_txn(
                 txn,
                 table="room_alias_servers",
-                values=[
-                    {"room_alias": room_alias.to_string(), "server": server}
-                    for server in servers
-                ],
+                keys=("room_alias", "server"),
+                values=[(room_alias.to_string(), server) for server in servers],
             )
 
             self._invalidate_cache_and_stream(

@@ -37,9 +37,13 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.logging.opentracing import log_kv, set_tag, trace
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import (
+    run_as_background_process,
+    wrap_as_background_process,
+)
 from synapse.types import (
     JsonDict,
+    StreamKeyType,
     StreamToken,
     UserID,
     get_domain_from_id,
@@ -63,10 +67,10 @@ class DeviceWorkerHandler:
     def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
-        self.state_store = hs.get_storage().state
+        self.state_storage = hs.get_storage().state
         self._auth_handler = hs.get_auth_handler()
         self.server_name = hs.hostname
 
@@ -199,7 +203,9 @@ class DeviceWorkerHandler:
                 continue
 
             # mapping from event_id -> state_dict
-            prev_state_ids = await self.state_store.get_state_ids_for_events(event_ids)
+            prev_state_ids = await self.state_storage.get_state_ids_for_events(
+                event_ids
+            )
 
             # Check if we've joined the room? If so we just blindly add all the users to
             # the "possibly changed" users.
@@ -277,6 +283,16 @@ class DeviceHandler(DeviceWorkerHandler):
         )
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
+
+        # Whether `_handle_new_device_update_async` is currently processing.
+        self._handle_new_device_update_is_processing = False
+
+        # If a new device update may have happened while the loop was
+        # processing.
+        self._handle_new_device_update_new_data = False
+
+        # On start up check if there are any updates pending.
+        hs.get_reactor().callWhenRunning(self._handle_new_device_update_async)
 
     def _check_device_name_length(self, name: Optional[str]) -> None:
         """
@@ -371,7 +387,6 @@ class DeviceHandler(DeviceWorkerHandler):
                 log_kv(
                     {"reason": "User doesn't have device id.", "device_id": device_id}
                 )
-                pass
             else:
                 raise
 
@@ -414,7 +429,6 @@ class DeviceHandler(DeviceWorkerHandler):
                 # no match
                 set_tag("error", True)
                 set_tag("reason", "User doesn't have that device id.")
-                pass
             else:
                 raise
 
@@ -471,19 +485,12 @@ class DeviceHandler(DeviceWorkerHandler):
             # No changes to notify about, so this is a no-op.
             return
 
-        users_who_share_room = await self.store.get_users_who_share_room_with_user(
-            user_id
-        )
-
-        hosts: Set[str] = set()
-        if self.hs.is_mine_id(user_id):
-            hosts.update(get_domain_from_id(u) for u in users_who_share_room)
-            hosts.discard(self.server_name)
-
-        set_tag("target_hosts", hosts)
+        room_ids = await self.store.get_rooms_for_user(user_id)
 
         position = await self.store.add_device_change_to_streams(
-            user_id, device_ids, list(hosts)
+            user_id,
+            device_ids,
+            room_ids=room_ids,
         )
 
         if not position:
@@ -495,21 +502,15 @@ class DeviceHandler(DeviceWorkerHandler):
                 "Notifying about update %r/%r, ID: %r", user_id, device_id, position
             )
 
-        room_ids = await self.store.get_rooms_for_user(user_id)
-
         # specify the user ID too since the user should always get their own device list
         # updates, even if they aren't in any rooms.
         self.notifier.on_new_event(
-            "device_list_key", position, users=[user_id], rooms=room_ids
+            StreamKeyType.DEVICE_LIST, position, users={user_id}, rooms=room_ids
         )
 
-        if hosts:
-            logger.info(
-                "Sending device list update notif for %r to: %r", user_id, hosts
-            )
-            for host in hosts:
-                self.federation_sender.send_device_messages(host)
-                log_kv({"message": "sent device update to host", "host": host})
+        # We may need to do some processing asynchronously for local user IDs.
+        if self.hs.is_mine_id(user_id):
+            self._handle_new_device_update_async()
 
     async def notify_user_signature_update(
         self, from_user_id: str, user_ids: List[str]
@@ -525,7 +526,9 @@ class DeviceHandler(DeviceWorkerHandler):
             from_user_id, user_ids
         )
 
-        self.notifier.on_new_event("device_list_key", position, users=[from_user_id])
+        self.notifier.on_new_event(
+            StreamKeyType.DEVICE_LIST, position, users=[from_user_id]
+        )
 
     async def user_left_room(self, user: UserID, room_id: str) -> None:
         user_id = user.to_string()
@@ -618,6 +621,92 @@ class DeviceHandler(DeviceWorkerHandler):
 
         return {"success": True}
 
+    @wrap_as_background_process("_handle_new_device_update_async")
+    async def _handle_new_device_update_async(self) -> None:
+        """Called when we have a new local device list update that we need to
+        send out over federation.
+
+        This happens in the background so as not to block the original request
+        that generated the device update.
+        """
+        if self._handle_new_device_update_is_processing:
+            self._handle_new_device_update_new_data = True
+            return
+
+        self._handle_new_device_update_is_processing = True
+
+        # The stream ID we processed previous iteration (if any), and the set of
+        # hosts we've already poked about for this update. This is so that we
+        # don't poke the same remote server about the same update repeatedly.
+        current_stream_id = None
+        hosts_already_sent_to: Set[str] = set()
+
+        try:
+            while True:
+                self._handle_new_device_update_new_data = False
+                rows = await self.store.get_uncoverted_outbound_room_pokes()
+                if not rows:
+                    # If the DB returned nothing then there is nothing left to
+                    # do, *unless* a new device list update happened during the
+                    # DB query.
+                    if self._handle_new_device_update_new_data:
+                        continue
+                    else:
+                        return
+
+                for user_id, device_id, room_id, stream_id, opentracing_context in rows:
+                    hosts = set()
+
+                    # Ignore any users that aren't ours
+                    if self.hs.is_mine_id(user_id):
+                        joined_user_ids = await self.store.get_users_in_room(room_id)
+                        hosts = {get_domain_from_id(u) for u in joined_user_ids}
+                        hosts.discard(self.server_name)
+
+                    # Check if we've already sent this update to some hosts
+                    if current_stream_id == stream_id:
+                        hosts -= hosts_already_sent_to
+
+                    await self.store.add_device_list_outbound_pokes(
+                        user_id=user_id,
+                        device_id=device_id,
+                        room_id=room_id,
+                        stream_id=stream_id,
+                        hosts=hosts,
+                        context=opentracing_context,
+                    )
+
+                    # Notify replication that we've updated the device list stream.
+                    self.notifier.notify_replication()
+
+                    if hosts:
+                        logger.info(
+                            "Sending device list update notif for %r to: %r",
+                            user_id,
+                            hosts,
+                        )
+                        for host in hosts:
+                            self.federation_sender.send_device_messages(
+                                host, immediate=False
+                            )
+                            # TODO: when called, this isn't in a logging context.
+                            # This leads to log spam, sentry event spam, and massive
+                            # memory usage. See #12552.
+                            # log_kv(
+                            #     {"message": "sent device update to host", "host": host}
+                            # )
+
+                    if current_stream_id != stream_id:
+                        # Clear the set of hosts we've already sent to as we're
+                        # processing a new update.
+                        hosts_already_sent_to.clear()
+
+                    hosts_already_sent_to.update(hosts)
+                    current_stream_id = stream_id
+
+        finally:
+            self._handle_new_device_update_is_processing = False
+
 
 def _update_device_from_client_ips(
     device: JsonDict, client_ips: Mapping[Tuple[str, str], Mapping[str, Any]]
@@ -630,7 +719,7 @@ class DeviceListUpdater:
     "Handles incoming device list updates from federation and updates the DB"
 
     def __init__(self, hs: "HomeServer", device_handler: DeviceHandler):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.federation = hs.get_federation_client()
         self.clock = hs.get_clock()
         self.device_handler = device_handler
@@ -676,6 +765,10 @@ class DeviceListUpdater:
         device_id = edu_content.pop("device_id")
         stream_id = str(edu_content.pop("stream_id"))  # They may come as ints
         prev_ids = edu_content.pop("prev_id", [])
+        if not isinstance(prev_ids, list):
+            raise SynapseError(
+                400, "Device list update had an invalid 'prev_ids' field"
+            )
         prev_ids = [str(p) for p in prev_ids]  # They may come as ints
 
         if get_domain_from_id(user_id) != origin:
@@ -729,7 +822,7 @@ class DeviceListUpdater:
     async def _handle_device_updates(self, user_id: str) -> None:
         "Actually handle pending updates."
 
-        with (await self._remote_edu_linearizer.queue(user_id)):
+        async with self._remote_edu_linearizer.queue(user_id):
             pending_updates = self._pending_updates.pop(user_id, [])
             if not pending_updates:
                 # This can happen since we batch updates

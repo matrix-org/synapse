@@ -17,6 +17,7 @@
 
 import logging
 import typing
+from enum import Enum
 from http import HTTPStatus
 from typing import Any, Dict, List, Optional, Union
 
@@ -30,7 +31,11 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class Codes:
+class Codes(str, Enum):
+    """
+    All known error codes, as an enum of strings.
+    """
+
     UNRECOGNIZED = "M_UNRECOGNIZED"
     UNAUTHORIZED = "M_UNAUTHORIZED"
     FORBIDDEN = "M_FORBIDDEN"
@@ -78,6 +83,8 @@ class Codes:
     # For restricted join rules.
     UNABLE_AUTHORISE_JOIN = "M_UNABLE_TO_AUTHORISE_JOIN"
     UNABLE_TO_GRANT_JOIN = "M_UNABLE_TO_GRANT_JOIN"
+
+    UNREDACTED_CONTENT_DELETED = "FI.MAU.MSC2815_UNREDACTED_CONTENT_DELETED"
 
 
 class CodeMessageException(RuntimeError):
@@ -406,6 +413,9 @@ class RoomKeysVersionError(SynapseError):
         super().__init__(403, "Wrong room_keys version", Codes.WRONG_ROOM_KEYS_VERSION)
         self.current_version = current_version
 
+    def error_dict(self) -> "JsonDict":
+        return cs_error(self.msg, self.errcode, current_version=self.current_version)
+
 
 class UnsupportedRoomVersionError(SynapseError):
     """The client's request to create a room used a room version that the server does
@@ -478,6 +488,22 @@ class RequestSendFailed(RuntimeError):
         )
         self.inner_exception = inner_exception
         self.can_retry = can_retry
+
+
+class UnredactedContentDeletedError(SynapseError):
+    def __init__(self, content_keep_ms: Optional[int] = None):
+        super().__init__(
+            404,
+            "The content for that event has already been erased from the database",
+            errcode=Codes.UNREDACTED_CONTENT_DELETED,
+        )
+        self.content_keep_ms = content_keep_ms
+
+    def error_dict(self) -> "JsonDict":
+        extra = {}
+        if self.content_keep_ms is not None:
+            extra = {"fi.mau.msc2815.content_keep_ms": self.content_keep_ms}
+        return cs_error(self.msg, self.errcode, **extra)
 
 
 def cs_error(msg: str, code: str = Codes.UNKNOWN, **kwargs: Any) -> "JsonDict":

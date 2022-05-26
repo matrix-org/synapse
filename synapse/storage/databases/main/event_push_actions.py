@@ -875,14 +875,21 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         self.db_pool.simple_insert_many_txn(
             txn,
             table="event_push_summary",
+            keys=(
+                "user_id",
+                "room_id",
+                "notif_count",
+                "unread_count",
+                "stream_ordering",
+            ),
             values=[
-                {
-                    "user_id": user_id,
-                    "room_id": room_id,
-                    "notif_count": summary.notif_count,
-                    "unread_count": summary.unread_count,
-                    "stream_ordering": summary.stream_ordering,
-                }
+                (
+                    user_id,
+                    room_id,
+                    summary.notif_count,
+                    summary.unread_count,
+                    summary.stream_ordering,
+                )
                 for ((user_id, room_id), summary) in summaries.items()
                 if summary.old_user_id is None
             ],
@@ -931,7 +938,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         users can still get a list of recent highlights.
 
         Args:
-            txn: The transcation
+            txn: The transaction
             room_id: Room ID to delete from
             user_id: user ID to delete for
             stream_ordering: The lowest stream ordering which will

@@ -60,7 +60,7 @@ class Auth:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.state = hs.get_state_handler()
         self._account_validity_handler = hs.get_account_validity_handler()
 
@@ -71,6 +71,7 @@ class Auth:
         self._auth_blocking = AuthBlocking(self.hs)
 
         self._track_appservice_user_ips = hs.config.appservice.track_appservice_user_ips
+        self._track_puppeted_user_ips = hs.config.api.track_puppeted_user_ips
         self._macaroon_secret_key = hs.config.key.macaroon_secret_key
         self._force_tracing_for_users = hs.config.tracing.force_tracing_for_users
 
@@ -186,7 +187,7 @@ class Auth:
         Once get_user_by_req has set up the opentracing span, this does the actual work.
         """
         try:
-            ip_addr = request.getClientIP()
+            ip_addr = request.getClientAddress().host
             user_agent = get_request_user_agent(request)
 
             access_token = self.get_access_token_from_request(request)
@@ -246,6 +247,18 @@ class Auth:
                     user_agent=user_agent,
                     device_id=device_id,
                 )
+                # Track also the puppeted user client IP if enabled and the user is puppeting
+                if (
+                    user_info.user_id != user_info.token_owner
+                    and self._track_puppeted_user_ips
+                ):
+                    await self.store.insert_client_ip(
+                        user_id=user_info.user_id,
+                        access_token=access_token,
+                        ip=ip_addr,
+                        user_agent=user_agent,
+                        device_id=device_id,
+                    )
 
             if is_guest and not allow_guest:
                 raise AuthError(
@@ -343,7 +356,7 @@ class Auth:
             return None, None, None
 
         if app_service.ip_range_whitelist:
-            ip_address = IPAddress(request.getClientIP())
+            ip_address = IPAddress(request.getClientAddress().host)
             if ip_address not in app_service.ip_range_whitelist:
                 return None, None, None
 
@@ -404,7 +417,8 @@ class Auth:
         """
 
         if rights == "access":
-            # first look in the database
+            # First look in the database to see if the access token is present
+            # as an opaque token.
             r = await self.store.get_user_by_access_token(token)
             if r:
                 valid_until_ms = r.valid_until_ms
@@ -421,7 +435,8 @@ class Auth:
 
                 return r
 
-        # otherwise it needs to be a valid macaroon
+        # If the token isn't found in the database, then it could still be a
+        # macaroon, so we check that here.
         try:
             user_id, guest = self._parse_and_validate_macaroon(token, rights)
 
@@ -469,8 +484,12 @@ class Auth:
             TypeError,
             ValueError,
         ) as e:
-            logger.warning("Invalid macaroon in auth: %s %s", type(e), e)
-            raise InvalidClientTokenError("Invalid macaroon passed.")
+            logger.warning(
+                "Invalid access token in auth: %s %s.",
+                type(e),
+                e,
+            )
+            raise InvalidClientTokenError("Invalid access token passed.")
 
     def _parse_and_validate_macaroon(
         self, token: str, rights: str = "access"
@@ -491,10 +510,7 @@ class Auth:
         try:
             macaroon = pymacaroons.Macaroon.deserialize(token)
         except Exception:  # deserialize can throw more-or-less anything
-            # doesn't look like a macaroon: treat it as an opaque token which
-            # must be in the database.
-            # TODO: it would be nice to get rid of this, but apparently some
-            # people use access tokens which aren't macaroons
+            # The access token doesn't look like a macaroon.
             raise _InvalidMacaroonException()
 
         try:

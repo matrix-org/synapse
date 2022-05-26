@@ -86,7 +86,7 @@ class LoginDict(TypedDict):
 
 class RegistrationHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.hs = hs
         self.auth = hs.get_auth()
@@ -132,6 +132,7 @@ class RegistrationHandler:
         localpart: str,
         guest_access_token: Optional[str] = None,
         assigned_user_id: Optional[str] = None,
+        inhibit_user_in_use_error: bool = False,
     ) -> None:
         if types.contains_invalid_mxid_characters(localpart):
             raise SynapseError(
@@ -171,21 +172,22 @@ class RegistrationHandler:
 
         users = await self.store.get_users_by_id_case_insensitive(user_id)
         if users:
-            if not guest_access_token:
+            if not inhibit_user_in_use_error and not guest_access_token:
                 raise SynapseError(
                     400, "User ID already taken.", errcode=Codes.USER_IN_USE
                 )
-            user_data = await self.auth.get_user_by_access_token(guest_access_token)
-            if (
-                not user_data.is_guest
-                or UserID.from_string(user_data.user_id).localpart != localpart
-            ):
-                raise AuthError(
-                    403,
-                    "Cannot register taken user ID without valid guest "
-                    "credentials for that user.",
-                    errcode=Codes.FORBIDDEN,
-                )
+            if guest_access_token:
+                user_data = await self.auth.get_user_by_access_token(guest_access_token)
+                if (
+                    not user_data.is_guest
+                    or UserID.from_string(user_data.user_id).localpart != localpart
+                ):
+                    raise AuthError(
+                        403,
+                        "Cannot register taken user ID without valid guest "
+                        "credentials for that user.",
+                        errcode=Codes.FORBIDDEN,
+                    )
 
         if guest_access_token is None:
             try:
@@ -318,12 +320,12 @@ class RegistrationHandler:
                 if fail_count > 10:
                     raise SynapseError(500, "Unable to find a suitable guest user ID")
 
-                localpart = await self.store.generate_user_id()
-                user = UserID(localpart, self.hs.hostname)
+                generated_localpart = await self.store.generate_user_id()
+                user = UserID(generated_localpart, self.hs.hostname)
                 user_id = user.to_string()
                 self.check_user_id_not_appservice_exclusive(user_id)
                 if generate_display_name:
-                    default_display_name = localpart
+                    default_display_name = generated_localpart
                 try:
                     await self.register_with_store(
                         user_id=user_id,

@@ -28,7 +28,7 @@ room_key: RoomKey = {
 class E2eRoomKeysHandlerTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver("server", federation_http_client=None)
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         return hs
 
     def test_room_keys_version_delete(self):

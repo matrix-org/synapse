@@ -17,7 +17,7 @@ from tests.unittest import HomeserverTestCase
 
 class EndToEndKeyStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     def test_key_without_device_name(self):
         now = 1470174257070

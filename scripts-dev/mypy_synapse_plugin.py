@@ -16,12 +16,12 @@
 can crop up, e.g the cache descriptors.
 """
 
-from typing import Callable, Optional
+from typing import Callable, Optional, Type
 
 from mypy.nodes import ARG_NAMED_OPT
 from mypy.plugin import MethodSigContext, Plugin
 from mypy.typeops import bind_self
-from mypy.types import CallableType, NoneType
+from mypy.types import CallableType, NoneType, UnionType
 
 
 class SynapsePlugin(Plugin):
@@ -72,13 +72,20 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
 
     # Third, we add an optional "on_invalidate" argument.
     #
-    # This is a callable which accepts no input and returns nothing.
-    calltyp = CallableType(
-        arg_types=[],
-        arg_kinds=[],
-        arg_names=[],
-        ret_type=NoneType(),
-        fallback=ctx.api.named_generic_type("builtins.function", []),
+    # This is a either
+    # - a callable which accepts no input and returns nothing, or
+    # - None.
+    calltyp = UnionType(
+        [
+            NoneType(),
+            CallableType(
+                arg_types=[],
+                arg_kinds=[],
+                arg_names=[],
+                ret_type=NoneType(),
+                fallback=ctx.api.named_generic_type("builtins.function", []),
+            ),
+        ]
     )
 
     arg_types.append(calltyp)
@@ -94,8 +101,8 @@ def cached_function_method_signature(ctx: MethodSigContext) -> CallableType:
     return signature
 
 
-def plugin(version: str):
-    # This is the entry point of the plugin, and let's us deal with the fact
+def plugin(version: str) -> Type[SynapsePlugin]:
+    # This is the entry point of the plugin, and lets us deal with the fact
     # that the mypy plugin interface is *not* stable by looking at the version
     # string.
     #

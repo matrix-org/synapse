@@ -31,28 +31,29 @@ Anything that requires modifying the device list [#7721](https://github.com/matr
 Put the below in a new file at /etc/matrix-synapse/conf.d/sbc.yaml to override the defaults in homeserver.yaml.
 
 ```
-# Set to false to disable presence tracking on this homeserver.
+# Disable presence tracking, which is currently fairly resource intensive
+# More info: https://github.com/matrix-org/synapse/issues/9478
 use_presence: false
 
-# When this is enabled, the room "complexity" will be checked before a user
-# joins a new remote room. If it is above the complexity limit, the server will
-# disallow joining, or will instantly leave.
+# Set a small complexity limit, preventing users from joining large rooms
+# which may be resource-intensive to remain a part of.
+#
+# Note that this will not prevent users from joining smaller rooms that
+# eventually become complex.
 limit_remote_rooms:
-  # Uncomment to enable room complexity checking.
-  #enabled: true
+  enabled: true
   complexity: 3.0
 
 # Database configuration
 database:
+  # Use postgres for the best performance
   name: psycopg2
   args:
     user: matrix-synapse
-    # Generate a long, secure one with a password manager
+    # Generate a long, secure password using a password manager
     password: hunter2
     database: matrix-synapse
     host: localhost
-    cp_min: 5
-    cp_max: 10
 ```
 
 Currently the complexity is measured by [current_state_events / 500](https://github.com/matrix-org/synapse/blob/v1.20.1/synapse/storage/databases/main/events_worker.py#L986). You can find join times and your most complex rooms like this:

@@ -43,7 +43,7 @@ class EventAuthHandler:
 
     def __init__(self, hs: "HomeServer"):
         self._clock = hs.get_clock()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._server_name = hs.hostname
 
     async def check_auth_rules_from_context(
@@ -241,7 +241,15 @@ class EventAuthHandler:
 
         # If the join rule is not restricted, this doesn't apply.
         join_rules_event = await self._store.get_event(join_rules_event_id)
-        return join_rules_event.content.get("join_rule") == JoinRules.RESTRICTED
+        content_join_rule = join_rules_event.content.get("join_rule")
+        if content_join_rule == JoinRules.RESTRICTED:
+            return True
+
+        # also check for MSC3787 behaviour
+        if room_version.msc3787_knock_restricted_join_rule:
+            return content_join_rule == JoinRules.KNOCK_RESTRICTED
+
+        return False
 
     async def get_rooms_that_allow_join(
         self, state_ids: StateMap[str]

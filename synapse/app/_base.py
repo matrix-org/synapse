@@ -16,7 +16,6 @@ import atexit
 import gc
 import logging
 import os
-import platform
 import signal
 import socket
 import sys
@@ -38,6 +37,8 @@ from typing import (
 )
 
 from cryptography.utils import CryptographyDeprecationWarning
+from matrix_common.versionstring import get_distribution_version_string
+from typing_extensions import ParamSpec
 
 import twisted
 from twisted.internet import defer, error, reactor as _reactor
@@ -48,10 +49,12 @@ from twisted.logger import LoggingFile, LogLevel
 from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.python.threadpool import ThreadPool
 
-import synapse
+import synapse.util.caches
 from synapse.api.constants import MAX_PDU_SIZE
 from synapse.app import check_bind_error
 from synapse.app.phone_stats_home import start_phone_stats_home
+from synapse.config import ConfigError
+from synapse.config._base import format_config_error
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import ManholeConfig
 from synapse.crypto import context_factory
@@ -60,7 +63,8 @@ from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.logging.context import PreserveLoggingContext
-from synapse.metrics import register_threadpool
+from synapse.logging.opentracing import init_tracer
+from synapse.metrics import install_gc_manager, register_threadpool
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.metrics.jemalloc import setup_jemalloc_stats
 from synapse.types import ISynapseReactor
@@ -68,7 +72,6 @@ from synapse.util.caches.lrucache import setup_expire_lru_cache_entries
 from synapse.util.daemonize import daemonize_process
 from synapse.util.gai_resolver import GAIResolver
 from synapse.util.rlimit import change_resource_limit
-from synapse.util.versionstring import get_version_string
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -82,11 +85,12 @@ logger = logging.getLogger(__name__)
 
 # list of tuples of function, args list, kwargs dict
 _sighup_callbacks: List[
-    Tuple[Callable[..., None], Tuple[Any, ...], Dict[str, Any]]
+    Tuple[Callable[..., None], Tuple[object, ...], Dict[str, object]]
 ] = []
+P = ParamSpec("P")
 
 
-def register_sighup(func: Callable[..., None], *args: Any, **kwargs: Any) -> None:
+def register_sighup(func: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None:
     """
     Register a function to be called when a SIGHUP occurs.
 
@@ -94,7 +98,9 @@ def register_sighup(func: Callable[..., None], *args: Any, **kwargs: Any) -> Non
         func: Function to be called when sent a SIGHUP signal.
         *args, **kwargs: args and kwargs to be passed to the target function.
     """
-    _sighup_callbacks.append((func, args, kwargs))
+    # This type-ignore should be redundant once we use a mypy release with
+    # https://github.com/python/mypy/pull/12668.
+    _sighup_callbacks.append((func, args, kwargs))  # type: ignore[arg-type]
 
 
 def start_worker_reactor(
@@ -131,7 +137,7 @@ def start_reactor(
     appname: str,
     soft_file_limit: int,
     gc_thresholds: Optional[Tuple[int, int, int]],
-    pid_file: str,
+    pid_file: Optional[str],
     daemonize: bool,
     print_pidfile: bool,
     logger: logging.Logger,
@@ -159,6 +165,7 @@ def start_reactor(
         change_resource_limit(soft_file_limit)
         if gc_thresholds:
             gc.set_threshold(*gc_thresholds)
+        install_gc_manager()
         run_command()
 
     # make sure that we run the reactor with the sentinel log context,
@@ -171,6 +178,8 @@ def start_reactor(
     # appearing to go backwards.
     with PreserveLoggingContext():
         if daemonize:
+            assert pid_file is not None
+
             if print_pidfile:
                 print(pid_file)
 
@@ -212,7 +221,9 @@ def redirect_stdio_to_logs() -> None:
     print("Redirected stdout/stderr to logs")
 
 
-def register_start(cb: Callable[..., Awaitable], *args: Any, **kwargs: Any) -> None:
+def register_start(
+    cb: Callable[P, Awaitable], *args: P.args, **kwargs: P.kwargs
+) -> None:
     """Register a callback with the reactor, to be called once it is running
 
     This can be used to initialise parts of the system which require an asynchronous
@@ -424,18 +435,23 @@ async def start(hs: "HomeServer") -> None:
         signal.signal(signal.SIGHUP, run_sighup)
 
         register_sighup(refresh_certificate, hs)
+        register_sighup(reload_cache_config, hs.config)
+
+    # Apply the cache config.
+    hs.config.caches.resize_all_caches()
 
     # Load the certificate from disk.
     refresh_certificate(hs)
 
     # Start the tracer
-    synapse.logging.opentracing.init_tracer(hs)  # type: ignore[attr-defined] # noqa
+    init_tracer(hs)  # noqa
 
     # Instantiate the modules so they can register their web resources to the module API
     # before we start the listeners.
     module_api = hs.get_module_api()
     for module, config in hs.config.modules.loaded_modules:
-        module(config=config, api=module_api)
+        m = module(config=config, api=module_api)
+        logger.info("Loaded module %s", m)
 
     load_legacy_spam_checkers(hs)
     load_legacy_third_party_event_rules(hs)
@@ -447,7 +463,7 @@ async def start(hs: "HomeServer") -> None:
 
     # It is now safe to start your Synapse.
     hs.start_listening()
-    hs.get_datastore().db_pool.start_profiling()
+    hs.get_datastores().main.db_pool.start_profiling()
     hs.get_pusherpool().start()
 
     # Log when we start the shut down process.
@@ -467,16 +483,51 @@ async def start(hs: "HomeServer") -> None:
     # everything currently allocated are things that will be used for the
     # rest of time. Doing so means less work each GC (hopefully).
     #
-    # This only works on Python 3.7
-    if platform.python_implementation() == "CPython" and sys.version_info >= (3, 7):
+    # PyPy does not (yet?) implement gc.freeze()
+    if hasattr(gc, "freeze"):
         gc.collect()
         gc.freeze()
 
-    # Speed up shutdowns by freezing all allocated objects. This moves everything
-    # into the permanent generation and excludes them from the final GC.
-    # Unfortunately only works on Python 3.7
-    if platform.python_implementation() == "CPython" and sys.version_info >= (3, 7):
+        # Speed up shutdowns by freezing all allocated objects. This moves everything
+        # into the permanent generation and excludes them from the final GC.
         atexit.register(gc.freeze)
+
+
+def reload_cache_config(config: HomeServerConfig) -> None:
+    """Reload cache config from disk and immediately apply it.resize caches accordingly.
+
+    If the config is invalid, a `ConfigError` is logged and no changes are made.
+
+    Otherwise, this:
+        - replaces the `caches` section on the given `config` object,
+        - resizes all caches according to the new cache factors, and
+
+    Note that the following cache config keys are read, but not applied:
+        - event_cache_size: used to set a max_size and _original_max_size on
+              EventsWorkerStore._get_event_cache when it is created. We'd have to update
+              the _original_max_size (and maybe
+        - sync_response_cache_duration: would have to update the timeout_sec attribute on
+              HomeServer ->  SyncHandler -> ResponseCache.
+        - track_memory_usage. This affects synapse.util.caches.TRACK_MEMORY_USAGE which
+              influences Synapse's self-reported metrics.
+
+    Also, the HTTPConnectionPool in SimpleHTTPClient sets its maxPersistentPerHost
+    parameter based on the global_factor. This won't be applied on a config reload.
+    """
+    try:
+        previous_cache_config = config.reload_config_section("caches")
+    except ConfigError as e:
+        logger.warning("Failed to reload cache config")
+        for f in format_config_error(e):
+            logger.warning(f)
+    else:
+        logger.debug(
+            "New cache config. Was:\n %s\nNow:\n",
+            previous_cache_config.__dict__,
+            config.caches.__dict__,
+        )
+        synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage
+        config.caches.resize_all_caches()
 
 
 def setup_sentry(hs: "HomeServer") -> None:
@@ -488,7 +539,8 @@ def setup_sentry(hs: "HomeServer") -> None:
     import sentry_sdk
 
     sentry_sdk.init(
-        dsn=hs.config.metrics.sentry_dsn, release=get_version_string(synapse)
+        dsn=hs.config.metrics.sentry_dsn,
+        release=get_distribution_version_string("matrix-synapse"),
     )
 
     # We set some default tags that give some context to this instance

@@ -247,11 +247,11 @@ try:
         class BaseReporter:  # type: ignore[no-redef]
             pass
 
-    @attr.s(slots=True, frozen=True)
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
     class _WrappedRustReporter(BaseReporter):
         """Wrap the reporter to ensure `report_span` never throws."""
 
-        _reporter = attr.ib(type=Reporter, default=attr.Factory(Reporter))
+        _reporter: Reporter = attr.Factory(Reporter)
 
         def set_process(self, *args, **kwargs):
             return self._reporter.set_process(*args, **kwargs)
@@ -288,6 +288,9 @@ class SynapseTags:
 
     # Uniqueish ID of a database transaction
     DB_TXN_ID = "db.txn_id"
+
+    # The name of the external cache
+    CACHE_NAME = "cache.name"
 
 
 class SynapseBaggage:
@@ -443,10 +446,14 @@ def start_active_span(
     start_time=None,
     ignore_active_span=False,
     finish_on_close=True,
+    *,
+    tracer=None,
 ):
-    """Starts an active opentracing span. Note, the scope doesn't become active
-    until it has been entered, however, the span starts from the time this
-    message is called.
+    """Starts an active opentracing span.
+
+    Records the start time for the span, and sets it as the "active span" in the
+    scope manager.
+
     Args:
         See opentracing.tracer
     Returns:
@@ -456,7 +463,11 @@ def start_active_span(
     if opentracing is None:
         return noop_context_manager()  # type: ignore[unreachable]
 
-    return opentracing.tracer.start_active_span(
+    if tracer is None:
+        # use the global tracer by default
+        tracer = opentracing.tracer
+
+    return tracer.start_active_span(
         operation_name,
         child_of=child_of,
         references=references,
@@ -468,21 +479,42 @@ def start_active_span(
 
 
 def start_active_span_follows_from(
-    operation_name: str, contexts: Collection, inherit_force_tracing=False
+    operation_name: str,
+    contexts: Collection,
+    child_of=None,
+    start_time: Optional[float] = None,
+    *,
+    inherit_force_tracing=False,
+    tracer=None,
 ):
     """Starts an active opentracing span, with additional references to previous spans
 
     Args:
         operation_name: name of the operation represented by the new span
         contexts: the previous spans to inherit from
+
+        child_of: optionally override the parent span. If unset, the currently active
+           span will be the parent. (If there is no currently active span, the first
+           span in `contexts` will be the parent.)
+
+        start_time: optional override for the start time of the created span. Seconds
+            since the epoch.
+
         inherit_force_tracing: if set, and any of the previous contexts have had tracing
            forced, the new span will also have tracing forced.
+        tracer: override the opentracing tracer. By default the global tracer is used.
     """
     if opentracing is None:
         return noop_context_manager()  # type: ignore[unreachable]
 
     references = [opentracing.follows_from(context) for context in contexts]
-    scope = start_active_span(operation_name, references=references)
+    scope = start_active_span(
+        operation_name,
+        child_of=child_of,
+        references=references,
+        start_time=start_time,
+        tracer=tracer,
+    )
 
     if inherit_force_tracing and any(
         is_context_forced_tracing(ctx) for ctx in contexts
@@ -852,7 +884,7 @@ def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
         tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
         tags.HTTP_METHOD: request.get_method(),
         tags.HTTP_URL: request.get_redacted_uri(),
-        tags.PEER_HOST_IPV6: request.getClientIP(),
+        tags.PEER_HOST_IPV6: request.getClientAddress().host,
     }
 
     request_name = request.request_metrics.name

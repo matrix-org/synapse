@@ -29,7 +29,6 @@ import warnings
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
-    Any,
     Awaitable,
     Callable,
     Optional,
@@ -41,7 +40,7 @@ from typing import (
 )
 
 import attr
-from typing_extensions import Literal
+from typing_extensions import Literal, ParamSpec
 
 from twisted.internet import defer, threads
 from twisted.python.threadpool import ThreadPool
@@ -193,7 +192,7 @@ class ContextResourceUsage:
         return res
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class ContextRequest:
     """
     A bundle of attributes from the SynapseRequest object.
@@ -205,15 +204,15 @@ class ContextRequest:
       their children.
     """
 
-    request_id = attr.ib(type=str)
-    ip_address = attr.ib(type=str)
-    site_tag = attr.ib(type=str)
-    requester = attr.ib(type=Optional[str])
-    authenticated_entity = attr.ib(type=Optional[str])
-    method = attr.ib(type=str)
-    url = attr.ib(type=str)
-    protocol = attr.ib(type=str)
-    user_agent = attr.ib(type=str)
+    request_id: str
+    ip_address: str
+    site_tag: str
+    requester: Optional[str]
+    authenticated_entity: Optional[str]
+    method: str
+    url: str
+    protocol: str
+    user_agent: str
 
 
 LoggingContextOrSentinel = Union["LoggingContext", "_Sentinel"]
@@ -719,32 +718,38 @@ def nested_logging_context(suffix: str) -> LoggingContext:
     )
 
 
+P = ParamSpec("P")
 R = TypeVar("R")
+
+
+async def _unwrap_awaitable(awaitable: Awaitable[R]) -> R:
+    """Unwraps an arbitrary awaitable by awaiting it."""
+    return await awaitable
 
 
 @overload
 def preserve_fn(  # type: ignore[misc]
-    f: Callable[..., Awaitable[R]],
-) -> Callable[..., "defer.Deferred[R]"]:
+    f: Callable[P, Awaitable[R]],
+) -> Callable[P, "defer.Deferred[R]"]:
     # The `type: ignore[misc]` above suppresses
     # "Overloaded function signatures 1 and 2 overlap with incompatible return types"
     ...
 
 
 @overload
-def preserve_fn(f: Callable[..., R]) -> Callable[..., "defer.Deferred[R]"]:
+def preserve_fn(f: Callable[P, R]) -> Callable[P, "defer.Deferred[R]"]:
     ...
 
 
 def preserve_fn(
     f: Union[
-        Callable[..., R],
-        Callable[..., Awaitable[R]],
+        Callable[P, R],
+        Callable[P, Awaitable[R]],
     ]
-) -> Callable[..., "defer.Deferred[R]"]:
+) -> Callable[P, "defer.Deferred[R]"]:
     """Function decorator which wraps the function with run_in_background"""
 
-    def g(*args: Any, **kwargs: Any) -> "defer.Deferred[R]":
+    def g(*args: P.args, **kwargs: P.kwargs) -> "defer.Deferred[R]":
         return run_in_background(f, *args, **kwargs)
 
     return g
@@ -752,7 +757,7 @@ def preserve_fn(
 
 @overload
 def run_in_background(  # type: ignore[misc]
-    f: Callable[..., Awaitable[R]], *args: Any, **kwargs: Any
+    f: Callable[P, Awaitable[R]], *args: P.args, **kwargs: P.kwargs
 ) -> "defer.Deferred[R]":
     # The `type: ignore[misc]` above suppresses
     # "Overloaded function signatures 1 and 2 overlap with incompatible return types"
@@ -761,18 +766,22 @@ def run_in_background(  # type: ignore[misc]
 
 @overload
 def run_in_background(
-    f: Callable[..., R], *args: Any, **kwargs: Any
+    f: Callable[P, R], *args: P.args, **kwargs: P.kwargs
 ) -> "defer.Deferred[R]":
     ...
 
 
-def run_in_background(
+def run_in_background(  # type: ignore[misc]
+    # The `type: ignore[misc]` above suppresses
+    # "Overloaded function implementation does not accept all possible arguments of signature 1"
+    # "Overloaded function implementation does not accept all possible arguments of signature 2"
+    # which seems like a bug in mypy.
     f: Union[
-        Callable[..., R],
-        Callable[..., Awaitable[R]],
+        Callable[P, R],
+        Callable[P, Awaitable[R]],
     ],
-    *args: Any,
-    **kwargs: Any,
+    *args: P.args,
+    **kwargs: P.kwargs,
 ) -> "defer.Deferred[R]":
     """Calls a function, ensuring that the current context is restored after
     return from the function, and that the sentinel context is set once the
@@ -798,17 +807,20 @@ def run_in_background(
         # by synchronous exceptions, so let's turn them into Failures.
         return defer.fail()
 
+    # `res` may be a coroutine, `Deferred`, some other kind of awaitable, or a plain
+    # value. Convert it to a `Deferred`.
     if isinstance(res, typing.Coroutine):
+        # Wrap the coroutine in a `Deferred`.
         res = defer.ensureDeferred(res)
-
-    # At this point we should have a Deferred, if not then f was a synchronous
-    # function, wrap it in a Deferred for consistency.
-    if not isinstance(res, defer.Deferred):
-        # `res` is not a `Deferred` and not a `Coroutine`.
-        # There are no other types of `Awaitable`s we expect to encounter in Synapse.
-        assert not isinstance(res, Awaitable)
-
-        return defer.succeed(res)
+    elif isinstance(res, defer.Deferred):
+        pass
+    elif isinstance(res, Awaitable):
+        # `res` is probably some kind of completed awaitable, such as a `DoneAwaitable`
+        # or `Future` from `make_awaitable`.
+        res = defer.ensureDeferred(_unwrap_awaitable(res))
+    else:
+        # `res` is a plain value. Wrap it in a `Deferred`.
+        res = defer.succeed(res)
 
     if res.called and not res.paused:
         # The function should have maintained the logcontext, so we can
@@ -872,7 +884,7 @@ def _set_context_cb(result: ResultT, context: LoggingContext) -> ResultT:
 
 
 def defer_to_thread(
-    reactor: "ISynapseReactor", f: Callable[..., R], *args: Any, **kwargs: Any
+    reactor: "ISynapseReactor", f: Callable[P, R], *args: P.args, **kwargs: P.kwargs
 ) -> "defer.Deferred[R]":
     """
     Calls the function `f` using a thread from the reactor's default threadpool and
@@ -908,9 +920,9 @@ def defer_to_thread(
 def defer_to_threadpool(
     reactor: "ISynapseReactor",
     threadpool: ThreadPool,
-    f: Callable[..., R],
-    *args: Any,
-    **kwargs: Any,
+    f: Callable[P, R],
+    *args: P.args,
+    **kwargs: P.kwargs,
 ) -> "defer.Deferred[R]":
     """
     A wrapper for twisted.internet.threads.deferToThreadpool, which handles

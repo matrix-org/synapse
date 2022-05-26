@@ -14,9 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import synapse.api.errors
-import synapse.handlers.device
-import synapse.storage
+from typing import Optional
+
+from twisted.test.proto_helpers import MemoryReactor
+
+from synapse.api.errors import NotFoundError, SynapseError
+from synapse.handlers.device import MAX_DEVICE_DISPLAY_NAME_LEN
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 
@@ -25,28 +30,27 @@ user2 = "@theresa:bbb"
 
 
 class DeviceTestCase(unittest.HomeserverTestCase):
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         hs = self.setup_test_homeserver("server", federation_http_client=None)
         self.handler = hs.get_device_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         return hs
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         # These tests assume that it starts 1000 seconds in.
         self.reactor.advance(1000)
 
-    def test_device_is_created_with_invalid_name(self):
+    def test_device_is_created_with_invalid_name(self) -> None:
         self.get_failure(
             self.handler.check_device_registered(
                 user_id="@boris:foo",
                 device_id="foo",
-                initial_device_display_name="a"
-                * (synapse.handlers.device.MAX_DEVICE_DISPLAY_NAME_LEN + 1),
+                initial_device_display_name="a" * (MAX_DEVICE_DISPLAY_NAME_LEN + 1),
             ),
-            synapse.api.errors.SynapseError,
+            SynapseError,
         )
 
-    def test_device_is_created_if_doesnt_exist(self):
+    def test_device_is_created_if_doesnt_exist(self) -> None:
         res = self.get_success(
             self.handler.check_device_registered(
                 user_id="@boris:foo",
@@ -59,7 +63,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         dev = self.get_success(self.handler.store.get_device("@boris:foo", "fco"))
         self.assertEqual(dev["display_name"], "display name")
 
-    def test_device_is_preserved_if_exists(self):
+    def test_device_is_preserved_if_exists(self) -> None:
         res1 = self.get_success(
             self.handler.check_device_registered(
                 user_id="@boris:foo",
@@ -81,7 +85,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         dev = self.get_success(self.handler.store.get_device("@boris:foo", "fco"))
         self.assertEqual(dev["display_name"], "display name")
 
-    def test_device_id_is_made_up_if_unspecified(self):
+    def test_device_id_is_made_up_if_unspecified(self) -> None:
         device_id = self.get_success(
             self.handler.check_device_registered(
                 user_id="@theresa:foo",
@@ -93,7 +97,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         dev = self.get_success(self.handler.store.get_device("@theresa:foo", device_id))
         self.assertEqual(dev["display_name"], "display")
 
-    def test_get_devices_by_user(self):
+    def test_get_devices_by_user(self) -> None:
         self._record_users()
 
         res = self.get_success(self.handler.get_devices_by_user(user1))
@@ -131,7 +135,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
             device_map["abc"],
         )
 
-    def test_get_device(self):
+    def test_get_device(self) -> None:
         self._record_users()
 
         res = self.get_success(self.handler.get_device(user1, "abc"))
@@ -146,21 +150,19 @@ class DeviceTestCase(unittest.HomeserverTestCase):
             res,
         )
 
-    def test_delete_device(self):
+    def test_delete_device(self) -> None:
         self._record_users()
 
         # delete the device
         self.get_success(self.handler.delete_device(user1, "abc"))
 
         # check the device was deleted
-        self.get_failure(
-            self.handler.get_device(user1, "abc"), synapse.api.errors.NotFoundError
-        )
+        self.get_failure(self.handler.get_device(user1, "abc"), NotFoundError)
 
         # we'd like to check the access token was invalidated, but that's a
         # bit of a PITA.
 
-    def test_delete_device_and_device_inbox(self):
+    def test_delete_device_and_device_inbox(self) -> None:
         self._record_users()
 
         # add an device_inbox
@@ -191,7 +193,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         )
         self.assertIsNone(res)
 
-    def test_update_device(self):
+    def test_update_device(self) -> None:
         self._record_users()
 
         update = {"display_name": "new display"}
@@ -200,32 +202,29 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         res = self.get_success(self.handler.get_device(user1, "abc"))
         self.assertEqual(res["display_name"], "new display")
 
-    def test_update_device_too_long_display_name(self):
+    def test_update_device_too_long_display_name(self) -> None:
         """Update a device with a display name that is invalid (too long)."""
         self._record_users()
 
         # Request to update a device display name with a new value that is longer than allowed.
-        update = {
-            "display_name": "a"
-            * (synapse.handlers.device.MAX_DEVICE_DISPLAY_NAME_LEN + 1)
-        }
+        update = {"display_name": "a" * (MAX_DEVICE_DISPLAY_NAME_LEN + 1)}
         self.get_failure(
             self.handler.update_device(user1, "abc", update),
-            synapse.api.errors.SynapseError,
+            SynapseError,
         )
 
         # Ensure the display name was not updated.
         res = self.get_success(self.handler.get_device(user1, "abc"))
         self.assertEqual(res["display_name"], "display 2")
 
-    def test_update_unknown_device(self):
+    def test_update_unknown_device(self) -> None:
         update = {"display_name": "new_display"}
         self.get_failure(
             self.handler.update_device("user_id", "unknown_device_id", update),
-            synapse.api.errors.NotFoundError,
+            NotFoundError,
         )
 
-    def _record_users(self):
+    def _record_users(self) -> None:
         # check this works for both devices which have a recorded client_ip,
         # and those which don't.
         self._record_user(user1, "xyz", "display 0")
@@ -238,8 +237,13 @@ class DeviceTestCase(unittest.HomeserverTestCase):
         self.reactor.advance(10000)
 
     def _record_user(
-        self, user_id, device_id, display_name, access_token=None, ip=None
-    ):
+        self,
+        user_id: str,
+        device_id: str,
+        display_name: str,
+        access_token: Optional[str] = None,
+        ip: Optional[str] = None,
+    ) -> None:
         device_id = self.get_success(
             self.handler.check_device_registered(
                 user_id=user_id,
@@ -248,7 +252,7 @@ class DeviceTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        if ip is not None:
+        if access_token is not None and ip is not None:
             self.get_success(
                 self.store.insert_client_ip(
                     user_id, access_token, ip, "user_agent", device_id
@@ -258,15 +262,15 @@ class DeviceTestCase(unittest.HomeserverTestCase):
 
 
 class DehydrationTestCase(unittest.HomeserverTestCase):
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
         hs = self.setup_test_homeserver("server", federation_http_client=None)
         self.handler = hs.get_device_handler()
         self.registration = hs.get_registration_handler()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         return hs
 
-    def test_dehydrate_and_rehydrate_device(self):
+    def test_dehydrate_and_rehydrate_device(self) -> None:
         user_id = "@boris:dehydration"
 
         self.get_success(self.store.register_user(user_id, "foobar"))
@@ -303,7 +307,7 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
                 access_token=access_token,
                 device_id="not the right device ID",
             ),
-            synapse.api.errors.NotFoundError,
+            NotFoundError,
         )
 
         # dehydrating the right devices should succeed and change our device ID
@@ -331,7 +335,7 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         # make sure that the device ID that we were initially assigned no longer exists
         self.get_failure(
             self.handler.get_device(user_id, device_id),
-            synapse.api.errors.NotFoundError,
+            NotFoundError,
         )
 
         # make sure that there's no device available for dehydrating now

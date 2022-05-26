@@ -42,7 +42,7 @@ class AccountDataServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.handler = hs.get_account_data_handler()
 
     async def on_PUT(
@@ -66,7 +66,7 @@ class AccountDataServlet(RestServlet):
             raise AuthError(403, "Cannot get account data for other users.")
 
         event = await self.store.get_global_account_data_by_type_for_user(
-            account_data_type, user_id
+            user_id, account_data_type
         )
 
         if event is None:
@@ -90,7 +90,7 @@ class RoomAccountDataServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.handler = hs.get_account_data_handler()
 
     async def on_PUT(

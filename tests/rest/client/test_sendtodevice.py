@@ -26,7 +26,7 @@ class SendToDeviceTestCase(HomeserverTestCase):
         sync.register_servlets,
     ]
 
-    def test_user_to_user(self):
+    def test_user_to_user(self) -> None:
         """A to-device message from one user to another should get delivered"""
 
         user1 = self.register_user("u1", "pass")
@@ -73,7 +73,7 @@ class SendToDeviceTestCase(HomeserverTestCase):
         self.assertEqual(channel.json_body.get("to_device", {}).get("events", []), [])
 
     @override_config({"rc_key_requests": {"per_second": 10, "burst_count": 2}})
-    def test_local_room_key_request(self):
+    def test_local_room_key_request(self) -> None:
         """m.room_key_request has special-casing; test from local user"""
         user1 = self.register_user("u1", "pass")
         user1_tok = self.login("u1", "pass", "d1")
@@ -128,7 +128,7 @@ class SendToDeviceTestCase(HomeserverTestCase):
         )
 
     @override_config({"rc_key_requests": {"per_second": 10, "burst_count": 2}})
-    def test_remote_room_key_request(self):
+    def test_remote_room_key_request(self) -> None:
         """m.room_key_request has special-casing; test from remote user"""
         user2 = self.register_user("u2", "pass")
         user2_tok = self.login("u2", "pass", "d2")
@@ -198,3 +198,43 @@ class SendToDeviceTestCase(HomeserverTestCase):
                 "content": {"idx": 3},
             },
         )
+
+    def test_limited_sync(self) -> None:
+        """If a limited sync for to-devices happens the next /sync should respond immediately."""
+
+        self.register_user("u1", "pass")
+        user1_tok = self.login("u1", "pass", "d1")
+
+        user2 = self.register_user("u2", "pass")
+        user2_tok = self.login("u2", "pass", "d2")
+
+        # Do an initial sync
+        channel = self.make_request("GET", "/sync", access_token=user2_tok)
+        self.assertEqual(channel.code, 200, channel.result)
+        sync_token = channel.json_body["next_batch"]
+
+        # Send 150 to-device messages. We limit to 100 in `/sync`
+        for i in range(150):
+            test_msg = {"foo": "bar"}
+            chan = self.make_request(
+                "PUT",
+                f"/_matrix/client/r0/sendToDevice/m.test/1234-{i}",
+                content={"messages": {user2: {"d2": test_msg}}},
+                access_token=user1_tok,
+            )
+            self.assertEqual(chan.code, 200, chan.result)
+
+        channel = self.make_request(
+            "GET", f"/sync?since={sync_token}&timeout=300000", access_token=user2_tok
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+        messages = channel.json_body.get("to_device", {}).get("events", [])
+        self.assertEqual(len(messages), 100)
+        sync_token = channel.json_body["next_batch"]
+
+        channel = self.make_request(
+            "GET", f"/sync?since={sync_token}&timeout=300000", access_token=user2_tok
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+        messages = channel.json_body.get("to_device", {}).get("events", [])
+        self.assertEqual(len(messages), 50)

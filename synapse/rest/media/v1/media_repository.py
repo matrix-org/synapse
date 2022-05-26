@@ -75,7 +75,7 @@ class MediaRepository:
         self.client = hs.get_federation_http_client()
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.max_upload_size = hs.config.media.max_upload_size
         self.max_image_pixels = hs.config.media.max_image_pixels
 
@@ -258,7 +258,7 @@ class MediaRepository:
         # We linearize here to ensure that we don't try and download remote
         # media multiple times concurrently
         key = (server_name, media_id)
-        with (await self.remote_media_linearizer.queue(key)):
+        async with self.remote_media_linearizer.queue(key):
             responder, media_info = await self._get_remote_media_impl(
                 server_name, media_id
             )
@@ -294,7 +294,7 @@ class MediaRepository:
         # We linearize here to ensure that we don't try and download remote
         # media multiple times concurrently
         key = (server_name, media_id)
-        with (await self.remote_media_linearizer.queue(key)):
+        async with self.remote_media_linearizer.queue(key):
             responder, media_info = await self._get_remote_media_impl(
                 server_name, media_id
             )
@@ -850,7 +850,7 @@ class MediaRepository:
 
             # TODO: Should we delete from the backup store
 
-            with (await self.remote_media_linearizer.queue(key)):
+            async with self.remote_media_linearizer.queue(key):
                 full_path = self.filepaths.remote_media_filepath(origin, file_id)
                 try:
                     os.remove(full_path)

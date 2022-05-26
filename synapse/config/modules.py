@@ -14,13 +14,14 @@
 from typing import Any, Dict, List, Tuple
 
 from synapse.config._base import Config, ConfigError
+from synapse.types import JsonDict
 from synapse.util.module_loader import load_module
 
 
 class ModulesConfig(Config):
     section = "modules"
 
-    def read_config(self, config: dict, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.loaded_modules: List[Tuple[Any, Dict]] = []
 
         configured_modules = config.get("modules") or []
@@ -31,7 +32,7 @@ class ModulesConfig(Config):
 
             self.loaded_modules.append(load_module(module, config_path))
 
-    def generate_config_section(self, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """
             ## Modules ##
 
@@ -41,9 +42,9 @@ class ModulesConfig(Config):
             # documentation on how to configure or create custom modules for Synapse.
             #
             modules:
-                # - module: my_super_module.MySuperClass
-                #   config:
-                #       do_thing: true
-                # - module: my_other_super_module.SomeClass
-                #   config: {}
+              #- module: my_super_module.MySuperClass
+              #  config:
+              #    do_thing: true
+              #- module: my_other_super_module.SomeClass
+              #  config: {}
             """
