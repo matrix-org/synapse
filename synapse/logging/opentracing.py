@@ -371,13 +371,6 @@ def ensure_active_span(message, ret=None):
     return ensure_active_span_inner_1
 
 
-@contextlib.contextmanager
-def noop_context_manager(*args, **kwargs):
-    """Does exactly what it says on the tin"""
-    # TODO: replace with contextlib.nullcontext once we drop support for Python 3.6
-    yield
-
-
 # Setup
 
 
@@ -472,11 +465,11 @@ def start_active_span(
     Args:
         See opentracing.tracer
     Returns:
-        scope (Scope) or noop_context_manager
+        scope (Scope) or contextlib.nullcontext
     """
 
     if opentracing is None:
-        return noop_context_manager()  # type: ignore[unreachable]
+        return contextlib.nullcontext()  # type: ignore[unreachable]
 
     if tracer is None:
         # use the global tracer by default
@@ -520,7 +513,7 @@ def start_active_span_follows_from(
         tracer: override the opentracing tracer. By default the global tracer is used.
     """
     if opentracing is None:
-        return noop_context_manager()  # type: ignore[unreachable]
+        return contextlib.nullcontext()  # type: ignore[unreachable]
 
     references = [opentracing.follows_from(context) for context in contexts]
     scope = start_active_span(
@@ -560,7 +553,7 @@ def start_active_span_from_edu(
     references = references or []
 
     if opentracing is None:
-        return noop_context_manager()  # type: ignore[unreachable]
+        return contextlib.nullcontext()  # type: ignore[unreachable]
 
     carrier = json_decoder.decode(edu_content.get("context", "{}")).get(
         "opentracing", {}
