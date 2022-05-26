@@ -26,6 +26,7 @@ from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.constants import (
+    EduTypes,
     EventContentFields,
     EventTypes,
     Membership,
@@ -1412,7 +1413,7 @@ class RoomInitialSyncTestCase(RoomBase):
             e["content"]["user_id"]: e for e in channel.json_body["presence"]
         }
         self.assertTrue(self.user_id in presence_by_user)
-        self.assertEqual("m.presence", presence_by_user[self.user_id]["type"])
+        self.assertEqual(EduTypes.PRESENCE, presence_by_user[self.user_id]["type"])
 
 
 class RoomMessageListTestCase(RoomBase):

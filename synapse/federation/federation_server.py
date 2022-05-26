@@ -1353,7 +1353,7 @@ class FederationHandlerRegistry:
         self._edu_type_to_instance[edu_type] = instance_names
 
     async def on_edu(self, edu_type: str, origin: str, content: dict) -> None:
-        if not self.config.server.use_presence and edu_type == EduTypes.Presence:
+        if not self.config.server.use_presence and edu_type == EduTypes.PRESENCE:
             return
 
         # Check if we have a handler on this instance
