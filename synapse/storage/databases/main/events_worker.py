@@ -1361,10 +1361,10 @@ class EventsWorkerStore(SQLBaseStore):
         # we break it down. However, each batch requires its own index scan, so we make
         # the batches as big as possible.
 
-        results = set()
+        results: Set[str] = set()
         for chunk in batch_iter(event_ids, 500):
             r = await self._have_seen_events_dict(
-                (room_id, event_id) for event_id in chunk
+                [(room_id, event_id) for event_id in chunk]
             )
             results.update(eid for ((_rid, eid), have_event) in r.items() if have_event)
 
