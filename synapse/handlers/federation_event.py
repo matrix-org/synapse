@@ -99,7 +99,7 @@ class FederationEventHandler:
     def __init__(self, hs: "HomeServer"):
         self._store = hs.get_datastores().main
         self._storage = hs.get_storage()
-        self._state_store = self._storage.state
+        self._state_storage = self._storage.state
 
         self._state_handler = hs.get_state_handler()
         self._event_creation_handler = hs.get_event_creation_handler()
@@ -535,7 +535,7 @@ class FederationEventHandler:
                 )
                 return
             await self._store.update_state_for_partial_state_event(event, context)
-            self._state_store.notify_event_un_partial_stated(event.event_id)
+            self._state_storage.notify_event_un_partial_stated(event.event_id)
 
     async def backfill(
         self, dest: str, room_id: str, limit: int, extremities: Collection[str]
@@ -835,7 +835,7 @@ class FederationEventHandler:
 
         try:
             # Get the state of the events we know about
-            ours = await self._state_store.get_state_groups_ids(room_id, seen)
+            ours = await self._state_storage.get_state_groups_ids(room_id, seen)
 
             # state_maps is a list of mappings from (type, state_key) to event_id
             state_maps: List[StateMap[str]] = list(ours.values())
@@ -1613,7 +1613,7 @@ class FederationEventHandler:
             # given state at the event. This should correctly handle cases
             # like bans, especially with state res v2.
 
-            state_sets_d = await self._state_store.get_state_groups_ids(
+            state_sets_d = await self._state_storage.get_state_groups_ids(
                 event.room_id, extrem_ids
             )
             state_sets: List[StateMap[str]] = list(state_sets_d.values())
@@ -1885,7 +1885,7 @@ class FederationEventHandler:
 
         # create a new state group as a delta from the existing one.
         prev_group = context.state_group
-        state_group = await self._state_store.store_state_group(
+        state_group = await self._state_storage.store_state_group(
             event.event_id,
             event.room_id,
             prev_group=prev_group,

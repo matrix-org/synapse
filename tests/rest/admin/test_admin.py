@@ -14,7 +14,6 @@
 
 import urllib.parse
 from http import HTTPStatus
-from typing import List
 
 from parameterized import parameterized
 
@@ -23,7 +22,7 @@ from twisted.test.proto_helpers import MemoryReactor
 import synapse.rest.admin
 from synapse.http.server import JsonResource
 from synapse.rest.admin import VersionServlet
-from synapse.rest.client import groups, login, room
+from synapse.rest.client import login, room
 from synapse.server import HomeServer
 from synapse.util import Clock
 
@@ -47,93 +46,6 @@ class VersionTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             {"server_version", "python_version"}, set(channel.json_body.keys())
         )
-
-
-class DeleteGroupTestCase(unittest.HomeserverTestCase):
-    servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
-        login.register_servlets,
-        groups.register_servlets,
-    ]
-
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.admin_user = self.register_user("admin", "pass", admin=True)
-        self.admin_user_tok = self.login("admin", "pass")
-
-        self.other_user = self.register_user("user", "pass")
-        self.other_user_token = self.login("user", "pass")
-
-    @unittest.override_config({"experimental_features": {"groups_enabled": True}})
-    def test_delete_group(self) -> None:
-        # Create a new group
-        channel = self.make_request(
-            "POST",
-            b"/create_group",
-            access_token=self.admin_user_tok,
-            content={"localpart": "test"},
-        )
-
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
-
-        group_id = channel.json_body["group_id"]
-
-        self._check_group(group_id, expect_code=HTTPStatus.OK)
-
-        # Invite/join another user
-
-        url = "/groups/%s/admin/users/invite/%s" % (group_id, self.other_user)
-        channel = self.make_request(
-            "PUT", url.encode("ascii"), access_token=self.admin_user_tok, content={}
-        )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
-
-        url = "/groups/%s/self/accept_invite" % (group_id,)
-        channel = self.make_request(
-            "PUT", url.encode("ascii"), access_token=self.other_user_token, content={}
-        )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
-
-        # Check other user knows they're in the group
-        self.assertIn(group_id, self._get_groups_user_is_in(self.admin_user_tok))
-        self.assertIn(group_id, self._get_groups_user_is_in(self.other_user_token))
-
-        # Now delete the group
-        url = "/_synapse/admin/v1/delete_group/" + group_id
-        channel = self.make_request(
-            "POST",
-            url.encode("ascii"),
-            access_token=self.admin_user_tok,
-            content={"localpart": "test"},
-        )
-
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
-
-        # Check group returns HTTPStatus.NOT_FOUND
-        self._check_group(group_id, expect_code=HTTPStatus.NOT_FOUND)
-
-        # Check users don't think they're in the group
-        self.assertNotIn(group_id, self._get_groups_user_is_in(self.admin_user_tok))
-        self.assertNotIn(group_id, self._get_groups_user_is_in(self.other_user_token))
-
-    def _check_group(self, group_id: str, expect_code: int) -> None:
-        """Assert that trying to fetch the given group results in the given
-        HTTP status code
-        """
-
-        url = "/groups/%s/profile" % (group_id,)
-        channel = self.make_request(
-            "GET", url.encode("ascii"), access_token=self.admin_user_tok
-        )
-
-        self.assertEqual(expect_code, channel.code, msg=channel.json_body)
-
-    def _get_groups_user_is_in(self, access_token: str) -> List[str]:
-        """Returns the list of groups the user is in (given their access token)"""
-        channel = self.make_request("GET", b"/joined_groups", access_token=access_token)
-
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
-
-        return channel.json_body["groups"]
 
 
 class QuarantineMediaTestCase(unittest.HomeserverTestCase):
