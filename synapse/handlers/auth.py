@@ -711,7 +711,7 @@ class AuthHandler:
             return res
 
         # fall back to the v1 login flow
-        canonical_id, _ = await self.validate_login(authdict)
+        canonical_id, _ = await self.validate_login(authdict, is_reauth=True)
         return canonical_id
 
     def _get_params_recaptcha(self) -> dict:
@@ -1101,6 +1101,7 @@ class AuthHandler:
         self,
         login_submission: Dict[str, Any],
         ratelimit: bool = False,
+        is_reauth: bool = False,
     ) -> Tuple[str, Optional[Callable[["LoginResponse"], Awaitable[None]]]]:
         """Authenticates the user for the /login API
 
@@ -1111,6 +1112,9 @@ class AuthHandler:
             login_submission: the whole of the login submission
                 (including 'type' and other relevant fields)
             ratelimit: whether to apply the failed_login_attempt ratelimiter
+            is_reauth: whether this is part of a User-Interactive Authorisation
+                flow to reauthenticate for a privileged action (rather than a
+                new login)
         Returns:
             A tuple of the canonical user id, and optional callback
                 to be called once the access token and device id are issued
@@ -1133,8 +1137,14 @@ class AuthHandler:
         # special case to check for "password" for the check_password interface
         # for the auth providers
         password = login_submission.get("password")
+
         if login_type == LoginType.PASSWORD:
-            if not self._password_enabled_for_login:
+            if is_reauth:
+                passwords_allowed_here = self._password_enabled_for_reauth
+            else:
+                passwords_allowed_here = self._password_enabled_for_login
+
+            if not passwords_allowed_here:
                 raise SynapseError(400, "Password login has been disabled.")
             if not isinstance(password, str):
                 raise SynapseError(400, "Bad parameter: password", Codes.INVALID_PARAM)
