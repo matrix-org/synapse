@@ -761,22 +761,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
             now - event_ts,
         )
 
-        await self.insert_graph_receipt(room_id, receipt_type, user_id, event_ids, data)
-
-        max_persisted_id = self._receipts_id_gen.get_current_token()
-
-        return stream_id, max_persisted_id
-
-    async def insert_graph_receipt(
-        self,
-        room_id: str,
-        receipt_type: str,
-        user_id: str,
-        event_ids: List[str],
-        data: JsonDict,
-    ) -> None:
-        assert self._can_write_to_receipts
-
         await self.db_pool.runInteraction(
             "insert_graph_receipt",
             self._insert_graph_receipt_txn,
@@ -786,6 +770,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
             event_ids,
             data,
         )
+
+        max_persisted_id = self._receipts_id_gen.get_current_token()
+
+        return stream_id, max_persisted_id
 
     def _insert_graph_receipt_txn(
         self,
