@@ -109,13 +109,7 @@ class ReceiptsHandler:
         max_batch_id: Optional[int] = None
 
         for receipt in receipts:
-            res = await self.store.insert_receipt(
-                receipt.room_id,
-                receipt.receipt_type,
-                receipt.user_id,
-                receipt.event_ids,
-                receipt.data,
-            )
+            res = await self.store.insert_receipt(receipt)
 
             if not res:
                 # res will be None if this receipt is 'old'
