@@ -378,7 +378,7 @@ def generate_worker_files(
 
     # Read the desired worker configuration from the environment
     worker_types_env = environ.get("SYNAPSE_WORKER_TYPES")
-    if worker_types_env is None:
+    if worker_types_env is None or worker_types_env.strip() == "":
         # No workers, just the main process
         worker_types = []
     else:
@@ -511,6 +511,7 @@ def generate_worker_files(
         "/conf/workers/shared.yaml",
         shared_worker_config=yaml.dump(shared_config),
         appservice_registrations=appservice_registrations,
+        enable_redis=len(worker_types) > 0,
     )
 
     # Nginx config
