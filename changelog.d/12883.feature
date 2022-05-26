@@ -1,0 +1,1 @@
+Add an option allowing users to use their password to log in or reauthenticate even though password authentication is disabled.
