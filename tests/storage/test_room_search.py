@@ -247,7 +247,7 @@ class MessageSearchTest(HomeserverTestCase):
         This test is skipped unless the postgres instance supports websearch_to_tsquery.
         """
 
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         if not isinstance(store.database_engine, PostgresEngine):
             raise SkipTest("Test only applies when postgres is used as the database")
 
@@ -274,7 +274,7 @@ class MessageSearchTest(HomeserverTestCase):
         supported by the current postgres version.
         """
 
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         if not isinstance(store.database_engine, PostgresEngine):
             raise SkipTest("Test only applies when postgres is used as the database")
 
@@ -299,7 +299,7 @@ class MessageSearchTest(HomeserverTestCase):
         """
         Test sqlite searching for phrases.
         """
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         if not isinstance(store.database_engine, Sqlite3Engine):
             raise SkipTest("Test only applies when sqlite is used as the database")
 
