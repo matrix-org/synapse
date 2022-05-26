@@ -822,14 +822,28 @@ class ThirdPartyInstanceID:
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
-class ReadReceipt:
-    """Information about a read-receipt"""
+class Receipt:
+    """Information about a receipt"""
 
     room_id: str
     receipt_type: str
     user_id: str
-    event_ids: List[str]
     data: JsonDict
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class ReadReceipt(Receipt):
+    """Information about a read-receipt"""
+
+    event_ids: List[str]
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class RangedReadReceipt(Receipt):
+    """Information about a ranged read-receipt"""
+
+    start_event_id: str
+    end_event_id: str
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
