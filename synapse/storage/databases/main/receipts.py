@@ -597,7 +597,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         return super().process_replication_rows(stream_name, instance_name, token, rows)
 
-    def insert_linearized_receipt_txn(
+    def _insert_linearized_receipt_txn(
         self,
         txn: LoggingTransaction,
         room_id: str,
@@ -740,7 +740,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         async with self._receipts_id_gen.get_next() as stream_id:  # type: ignore[attr-defined]
             event_ts = await self.db_pool.runInteraction(
                 "insert_linearized_receipt",
-                self.insert_linearized_receipt_txn,
+                self._insert_linearized_receipt_txn,
                 room_id,
                 receipt_type,
                 user_id,
@@ -779,7 +779,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         await self.db_pool.runInteraction(
             "insert_graph_receipt",
-            self.insert_graph_receipt_txn,
+            self._insert_graph_receipt_txn,
             room_id,
             receipt_type,
             user_id,
@@ -787,7 +787,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             data,
         )
 
-    def insert_graph_receipt_txn(
+    def _insert_graph_receipt_txn(
         self,
         txn: LoggingTransaction,
         room_id: str,
