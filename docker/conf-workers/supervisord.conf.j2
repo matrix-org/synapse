@@ -28,6 +28,11 @@ stderr_logfile_maxbytes=0
 username=redis
 autorestart=true
 
+# Only start Redis if START_REDIS is true.
+# (This is only used in the Complement image to allow disabling Redis when
+# workers aren't being used.)
+autostart=%(ENV_START_REDIS)s
+
 [program:synapse_main]
 command=/usr/local/bin/prefix-log /usr/local/bin/python -m synapse.app.homeserver --config-path="{{ main_config_path }}" --config-path=/conf/workers/shared.yaml
 priority=10

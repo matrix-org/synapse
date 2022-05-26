@@ -26,6 +26,11 @@ COPY ./docker/prefix-log /usr/local/bin/
 # Expose nginx listener port
 EXPOSE 8080/tcp
 
+# Default to starting Redis.
+# (This environment variable is only used in the Complement image to disable
+# Redis when workers aren't being used)
+ENV START_REDIS=true
+
 # A script to read environment variables and create the necessary
 # files to run the desired worker configuration. Will start supervisord.
 COPY ./docker/configure_workers_and_start.py /configure_workers_and_start.py
