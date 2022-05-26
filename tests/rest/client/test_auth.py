@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
 from http import HTTPStatus
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -23,7 +22,6 @@ from twisted.web.resource import Resource
 import synapse.rest.admin
 from synapse.api.constants import LoginType
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
-from synapse.rest import admin
 from synapse.rest.client import account, auth, devices, login, logout, register
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.server import HomeServer
@@ -35,7 +33,7 @@ from tests import unittest
 from tests.handlers.test_oidc import HAS_OIDC
 from tests.rest.client.utils import TEST_OIDC_CONFIG
 from tests.server import FakeChannel
-from tests.unittest import HomeserverTestCase, override_config, skip_unless
+from tests.unittest import override_config, skip_unless
 
 
 class DummyRecaptchaChecker(UserInteractiveAuthChecker):
@@ -1081,28 +1079,3 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
         # and no refresh token
         self.assertEqual(_table_length("access_tokens"), 0)
         self.assertEqual(_table_length("refresh_tokens"), 0)
-
-
-class PasswordReauthTestCase(HomeserverTestCase):
-    servlets = [admin.register_servlets, login.register_servlets]
-
-    @override_config({"password_config": {"enabled": "only_for_reauth"}})
-    def test_password_reauth_succeeds_with_setting(self) -> None:
-        """
-        A user can re-authenticate using a previously-set password if
-        'only_for_reauth' is set.
-        """
-        user_id = self.register_user("christina", "verysecret")
-        self.login(user_id, "verysecret")
-
-    @override_config({"password_config": {"enabled": False}})
-    def test_password_reauth_fails_if_disabled(self) -> None:
-        user_id = self.register_user("christina", "verysecret")
-
-        body = {"type": "m.login.password", "user": user_id, "password": "verysecret"}
-        channel = self.make_request(
-            "POST",
-            "/_matrix/client/r0/login",
-            json.dumps(body).encode("utf8"),
-        )
-        self.assertEqual(channel.code, 400, channel.result)
