@@ -28,6 +28,7 @@ from typing import (
     cast,
 )
 
+from synapse.api.constants import EduTypes
 from synapse.api.errors import Codes, StoreError
 from synapse.logging.opentracing import (
     get_active_span_text_map,
@@ -419,7 +420,7 @@ class DeviceWorkerStore(SQLBaseStore):
         # Add the updated cross-signing keys to the results list
         for user_id, result in cross_signing_keys_by_user.items():
             result["user_id"] = user_id
-            results.append(("m.signing_key_update", result))
+            results.append((EduTypes.SIGNING_KEY_UPDATE, result))
             # also send the unstable version
             # FIXME: remove this when enough servers have upgraded
             #        and remove the length budgeting above.
@@ -545,7 +546,7 @@ class DeviceWorkerStore(SQLBaseStore):
                 else:
                     result["deleted"] = True
 
-                results.append(("m.device_list_update", result))
+                results.append((EduTypes.DEVICE_LIST_UPDATE, result))
 
         return results
 

@@ -593,7 +593,7 @@ class PerDestinationQueue:
             Edu(
                 origin=self._server_name,
                 destination=self._destination,
-                edu_type="m.direct_to_device",
+                edu_type=EduTypes.DIRECT_TO_DEVICE,
                 content=content,
             )
             for content in contents

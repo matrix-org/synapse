@@ -28,7 +28,7 @@ from typing import (
 )
 
 from synapse.api import errors
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EduTypes, EventTypes
 from synapse.api.errors import (
     Codes,
     FederationDeniedError,
@@ -279,7 +279,8 @@ class DeviceHandler(DeviceWorkerHandler):
         federation_registry = hs.get_federation_registry()
 
         federation_registry.register_edu_handler(
-            "m.device_list_update", self.device_list_updater.incoming_device_list_update
+            EduTypes.DEVICE_LIST_UPDATE,
+            self.device_list_updater.incoming_device_list_update,
         )
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
