@@ -2296,11 +2296,9 @@ class PersistEventsStore:
         self.db_pool.simple_insert_many_txn(
             txn,
             table="event_edges",
-            keys=("event_id", "prev_event_id", "room_id", "is_state"),
+            keys=("event_id", "prev_event_id"),
             values=[
-                (ev.event_id, e_id, ev.room_id, False)
-                for ev in events
-                for e_id in ev.prev_event_ids()
+                (ev.event_id, e_id) for ev in events for e_id in ev.prev_event_ids()
             ],
         )
 
