@@ -686,6 +686,29 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         return rx_ts
 
+    def _graph_to_linear(
+        self, txn: LoggingTransaction, room_id: str, event_ids: List[str]
+    ) -> str:
+        # TODO: Make this better.
+        clause, args = make_in_list_sql_clause(
+            self.database_engine, "event_id", event_ids
+        )
+
+        sql = """
+            SELECT event_id WHERE room_id = ? AND stream_ordering IN (
+                SELECT max(stream_ordering) WHERE %s
+            )
+        """ % (
+            clause,
+        )
+
+        txn.execute(sql, [room_id] + list(args))
+        rows = txn.fetchall()
+        if rows:
+            return rows[0][0]
+        else:
+            raise RuntimeError("Unrecognized event_ids: %r" % (event_ids,))
+
     async def insert_receipt(
         self,
         room_id: str,
@@ -712,29 +735,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
             linearized_event_id = event_ids[0]
         else:
             # we need to points in graph -> linearized form.
-            # TODO: Make this better.
-            def graph_to_linear(txn: LoggingTransaction) -> str:
-                clause, args = make_in_list_sql_clause(
-                    self.database_engine, "event_id", event_ids
-                )
-
-                sql = """
-                    SELECT event_id WHERE room_id = ? AND stream_ordering IN (
-                        SELECT max(stream_ordering) WHERE %s
-                    )
-                """ % (
-                    clause,
-                )
-
-                txn.execute(sql, [room_id] + list(args))
-                rows = txn.fetchall()
-                if rows:
-                    return rows[0][0]
-                else:
-                    raise RuntimeError("Unrecognized event_ids: %r" % (event_ids,))
-
             linearized_event_id = await self.db_pool.runInteraction(
-                "insert_receipt_conv", graph_to_linear
+                "insert_receipt_conv", self._graph_to_linear, room_id, event_ids
             )
 
         async with self._receipts_id_gen.get_next() as stream_id:  # type: ignore[attr-defined]
