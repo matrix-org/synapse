@@ -71,7 +71,7 @@ class ReadMarkerRestServlet(RestServlet):
                 room_id,
                 ReceiptTypes.READ,
                 user_id=requester.user.to_string(),
-                event_id=read_event_id,
+                end_event_id=read_event_id,
             )
 
         read_private_event_id = body.get(ReceiptTypes.READ_PRIVATE, None)
@@ -80,7 +80,7 @@ class ReadMarkerRestServlet(RestServlet):
                 room_id,
                 ReceiptTypes.READ_PRIVATE,
                 user_id=requester.user.to_string(),
-                event_id=read_private_event_id,
+                end_event_id=read_private_event_id,
             )
 
         read_marker_event_id = body.get(ReceiptTypes.FULLY_READ, None)

@@ -42,7 +42,7 @@ from synapse.storage.util.id_generators import (
     MultiWriterIdGenerator,
     StreamIdGenerator,
 )
-from synapse.types import JsonDict, ReadReceipt
+from synapse.types import JsonDict, RangedReadReceipt, ReadReceipt, Receipt
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.stream_change_cache import StreamChangeCache
@@ -725,7 +725,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         else:
             raise RuntimeError("Unrecognized event_ids: %r" % (event_ids,))
 
-    async def insert_receipt(self, receipt: ReadReceipt) -> Optional[Tuple[int, int]]:
+    async def insert_receipt(self, receipt: Receipt) -> Optional[Tuple[int, int]]:
         """Insert a receipt, either from local client or remote server.
 
         Automatically does conversion between linearized and graph
@@ -737,19 +737,25 @@ class ReceiptsWorkerStore(SQLBaseStore):
         """
         assert self._can_write_to_receipts
 
-        if not receipt.event_ids:
-            return None
+        if isinstance(receipt, ReadReceipt):
+            event_ids = receipt.event_ids
+            if not event_ids:
+                return None
 
-        if len(receipt.event_ids) == 1:
-            linearized_event_id = receipt.event_ids[0]
+            if len(event_ids) == 1:
+                linearized_event_id = event_ids[0]
+            else:
+                # we need to points in graph -> linearized form.
+                linearized_event_id = await self.db_pool.runInteraction(
+                    "insert_receipt_conv",
+                    self._graph_to_linear,
+                    receipt.room_id,
+                    event_ids,
+                )
+        elif isinstance(receipt, RangedReadReceipt):
+            linearized_event_id = receipt.end_event_id
         else:
-            # we need to points in graph -> linearized form.
-            linearized_event_id = await self.db_pool.runInteraction(
-                "insert_receipt_conv",
-                self._graph_to_linear,
-                receipt.room_id,
-                receipt.event_ids,
-            )
+            raise ValueError("Unexpected receipt type: %s", type(receipt))
 
         async with self._receipts_id_gen.get_next() as stream_id:  # type: ignore[attr-defined]
             event_ts = await self.db_pool.runInteraction(
@@ -779,15 +785,16 @@ class ReceiptsWorkerStore(SQLBaseStore):
             now - event_ts,
         )
 
-        await self.db_pool.runInteraction(
-            "insert_graph_receipt",
-            self._insert_graph_receipt_txn,
-            receipt.room_id,
-            receipt.receipt_type,
-            receipt.user_id,
-            receipt.event_ids,
-            receipt.data,
-        )
+        # XXX These aren't really used right now, go away.
+        # await self.db_pool.runInteraction(
+        #     "insert_graph_receipt",
+        #     self._insert_graph_receipt_txn,
+        #     room_id,
+        #     receipt_type,
+        #     user_id,
+        #     event_ids,
+        #     data,
+        # )
 
         max_persisted_id = self._receipts_id_gen.get_current_token()
 

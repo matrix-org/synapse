@@ -19,7 +19,9 @@ from synapse.appservice import ApplicationService
 from synapse.streams import EventSource
 from synapse.types import (
     JsonDict,
+    RangedReadReceipt,
     ReadReceipt,
+    Receipt,
     StreamKeyType,
     UserID,
     get_domain_from_id,
@@ -65,7 +67,7 @@ class ReceiptsHandler:
 
     async def _received_remote_receipt(self, origin: str, content: JsonDict) -> None:
         """Called when we receive an EDU of type m.receipt from a remote HS."""
-        receipts = []
+        receipts: List[Receipt] = []
         for room_id, room_values in content.items():
             # If we're not in the room just ditch the event entirely. This is
             # probably an old server that has come back and thinks we're still in
@@ -103,7 +105,7 @@ class ReceiptsHandler:
 
         await self._handle_new_receipts(receipts)
 
-    async def _handle_new_receipts(self, receipts: List[ReadReceipt]) -> bool:
+    async def _handle_new_receipts(self, receipts: List[Receipt]) -> bool:
         """Takes a list of receipts, stores them and informs the notifier."""
         min_batch_id: Optional[int] = None
         max_batch_id: Optional[int] = None
@@ -140,24 +142,45 @@ class ReceiptsHandler:
         return True
 
     async def received_client_receipt(
-        self, room_id: str, receipt_type: str, user_id: str, event_id: str
+        self,
+        room_id: str,
+        receipt_type: str,
+        user_id: str,
+        end_event_id: str,
+        start_event_id: Optional[str] = None,
     ) -> None:
         """Called when a client tells us a local user has read up to the given
         event_id in the room.
         """
-        receipt = ReadReceipt(
-            room_id=room_id,
-            receipt_type=receipt_type,
-            user_id=user_id,
-            event_ids=[event_id],
-            data={"ts": int(self.clock.time_msec())},
-        )
+
+        if start_event_id:
+            receipt: Receipt = RangedReadReceipt(
+                room_id=room_id,
+                receipt_type=receipt_type,
+                user_id=user_id,
+                start_event_id=start_event_id,
+                end_event_id=end_event_id,
+                data={"ts": int(self.clock.time_msec())},
+            )
+        else:
+            receipt = ReadReceipt(
+                room_id=room_id,
+                receipt_type=receipt_type,
+                user_id=user_id,
+                event_ids=[end_event_id],
+                data={"ts": int(self.clock.time_msec())},
+            )
 
         is_new = await self._handle_new_receipts([receipt])
         if not is_new:
             return
 
-        if self.federation_sender and receipt_type != ReceiptTypes.READ_PRIVATE:
+        # XXX How to handle this for a ranged read receipt.
+        if (
+            isinstance(receipt, ReadReceipt)
+            and self.federation_sender
+            and receipt_type != ReceiptTypes.READ_PRIVATE
+        ):
             await self.federation_sender.send_read_receipt(receipt)
 
 

@@ -80,7 +80,7 @@ class ReceiptRestServlet(RestServlet):
                 room_id,
                 receipt_type,
                 user_id=requester.user.to_string(),
-                event_id=event_id,
+                end_event_id=event_id,
             )
 
         return 200, {}
