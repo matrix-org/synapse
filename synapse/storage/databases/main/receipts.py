@@ -689,6 +689,21 @@ class ReceiptsWorkerStore(SQLBaseStore):
     def _graph_to_linear(
         self, txn: LoggingTransaction, room_id: str, event_ids: List[str]
     ) -> str:
+        """
+        Generate a linearized event from a list of events (i.e. a list of forward
+        extremities in the room).
+
+        This should allow for calculation of the correct read receipt even if
+        servers have different event ordering.
+
+        Args:
+            txn: The transaction
+            room_id: The room ID the events are in.
+            event_ids: The list of event IDs to linearize.
+
+        Returns:
+            The linearized event ID.
+        """
         # TODO: Make this better.
         clause, args = make_in_list_sql_clause(
             self.database_engine, "event_id", event_ids
