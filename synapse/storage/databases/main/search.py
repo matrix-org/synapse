@@ -14,7 +14,6 @@
 
 import logging
 import re
-
 from typing import TYPE_CHECKING, Any, Collection, Iterable, List, Optional, Set, Tuple
 
 import attr
