@@ -601,7 +601,7 @@ class StateStorage:
     def notify_room_un_partial_stated(self, room_id: str) -> None:
         """Notify that the room no longer has any partial state.
 
-        Must be called after `clear_partial_state_room`
+        Must be called after `DataStore.clear_partial_state_room`
         """
         self._partial_state_room_tracker.notify_un_partial_stated(room_id)
 
@@ -1000,7 +1000,7 @@ class StateStorage:
                - list of current_state_delta_stream rows. If it is empty, we are
                  up to date.
         """
-        # FIXME(faster room joins): what do we do here?
+        # FIXME(faster_joins): what do we do here?
 
         return await self.stores.main.get_partial_current_state_deltas(
             prev_stream_id, max_stream_id
