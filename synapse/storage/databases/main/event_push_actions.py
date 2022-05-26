@@ -927,8 +927,13 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             (rotate_to_stream_ordering,),
         )
 
-    def _remove_old_push_actions_before_txn(
-        self, txn: LoggingTransaction, room_id: str, user_id: str, stream_ordering: int
+    def _remove_old_push_actions_txn(
+        self,
+        txn: LoggingTransaction,
+        room_id: str,
+        user_id: str,
+        end_stream_ordering: int,
+        start_stream_ordering: Optional[int],
     ) -> None:
         """
         Purges old push actions for a user and room before a given
@@ -957,20 +962,33 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         # Instead, we look up the stream ordering for the last event in that
         # room received before the threshold time and delete event_push_actions
         # in the room with a stream_odering before that.
-        txn.execute(
-            "DELETE FROM event_push_actions "
-            " WHERE user_id = ? AND room_id = ? AND "
-            " stream_ordering <= ?"
-            " AND ((stream_ordering < ? AND highlight = 1) or highlight = 0)",
-            (user_id, room_id, stream_ordering, self.stream_ordering_month_ago),
-        )
+        if start_stream_ordering is None:
+            stream_ordering_clause = "stream_ordering <= ?"
+            stream_ordering_args: Tuple[int, ...] = (end_stream_ordering,)
+        else:
+            stream_ordering_clause = "stream_ordering >= ? AND stream_ordering <= ?"
+            stream_ordering_args = (start_stream_ordering, end_stream_ordering)
 
         txn.execute(
-            """
+            f"""
+            DELETE FROM event_push_actions
+            WHERE user_id = ? AND room_id = ?
+            AND ((stream_ordering < ? AND highlight = 1) or highlight = 0)
+            AND {stream_ordering_clause}
+            """,
+            (user_id, room_id, self.stream_ordering_month_ago) + stream_ordering_args,
+        )
+
+        # XXX What to do about these summaries? They're currently updated daily.
+        #     Deleting a chunk of them if any region overlaps seems suspect.
+        #     Maybe we can do a daily update to limit the damage? That would not
+        #     give true unread status per event, however.
+        txn.execute(
+            f"""
             DELETE FROM event_push_summary
-            WHERE room_id = ? AND user_id = ? AND stream_ordering <= ?
+            WHERE room_id = ? AND user_id = ? AND {stream_ordering_clause}
         """,
-            (room_id, user_id, stream_ordering),
+            (room_id, user_id) + stream_ordering_args,
         )
 
 

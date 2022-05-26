@@ -672,13 +672,20 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         # When updating a local users read receipt, remove any push actions
         # which resulted from the receipt's event and all earlier events.
+        #
+        # XXX Can the stream orderings from local users not be known? Maybe if
+        #     events are purged (retention?)
+        #
+        # XXX Do we need to differentiate between an unbounded start
+        #     (start_event_id == None) vs. being unable to find the event
+        #     (start_stream_ordering == None)?
         if (
             self.hs.is_mine_id(user_id)
             and receipt_type in (ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE)
-            and end_stream_ordering is not None
+            and (start_stream_ordering is not None or end_stream_ordering is not None)
         ):
-            self._remove_old_push_actions_before_txn(  # type: ignore[attr-defined]
-                txn, room_id=room_id, user_id=user_id, stream_ordering=end_stream_ordering
+            self._remove_old_push_actions_txn(  # type: ignore[attr-defined]
+                txn, room_id, user_id, end_stream_ordering, start_stream_ordering
             )
 
         return rx_ts
