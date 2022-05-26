@@ -170,14 +170,18 @@ import re
 from functools import wraps
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     Collection,
     Dict,
+    Generator,
+    Iterable,
     List,
     Optional,
     Pattern,
     Type,
     TypeVar,
+    Union,
 )
 
 import attr
@@ -374,7 +378,7 @@ def ensure_active_span(message, ret=None):
 # Setup
 
 
-def init_tracer(hs: "HomeServer"):
+def init_tracer(hs: "HomeServer") -> None:
     """Set the whitelists and initialise the JaegerClient tracer"""
     global opentracing
     if not hs.config.tracing.opentracer_enabled:
@@ -416,11 +420,11 @@ def init_tracer(hs: "HomeServer"):
 
 
 @only_if_tracing
-def set_homeserver_whitelist(homeserver_whitelist):
+def set_homeserver_whitelist(homeserver_whitelist: Iterable[str]) -> None:
     """Sets the homeserver whitelist
 
     Args:
-        homeserver_whitelist (Iterable[str]): regex of whitelisted homeservers
+        homeserver_whitelist: regexes specifying whitelisted homeservers
     """
     global _homeserver_whitelist
     if homeserver_whitelist:
@@ -431,15 +435,15 @@ def set_homeserver_whitelist(homeserver_whitelist):
 
 
 @only_if_tracing
-def whitelisted_homeserver(destination):
+def whitelisted_homeserver(destination: str) -> bool:
     """Checks if a destination matches the whitelist
 
     Args:
-        destination (str)
+        destination
     """
 
     if _homeserver_whitelist:
-        return _homeserver_whitelist.match(destination)
+        return _homeserver_whitelist.match(destination) is not None
     return False
 
 
@@ -586,27 +590,27 @@ def start_active_span_from_edu(
 
 # Opentracing setters for tags, logs, etc
 @only_if_tracing
-def active_span():
+def active_span() -> Optional["opentracing.Span"]:
     """Get the currently active span, if any"""
     return opentracing.tracer.active_span
 
 
 @ensure_active_span("set a tag")
-def set_tag(key, value):
+def set_tag(key: str, value: Union[str, bool, int, float]) -> None:
     """Sets a tag on the active span"""
     assert opentracing.tracer.active_span is not None
     opentracing.tracer.active_span.set_tag(key, value)
 
 
 @ensure_active_span("log")
-def log_kv(key_values, timestamp=None):
+def log_kv(key_values: Dict[str, Any], timestamp=None) -> None:
     """Log to the active span"""
     assert opentracing.tracer.active_span is not None
     opentracing.tracer.active_span.log_kv(key_values, timestamp)
 
 
 @ensure_active_span("set the traces operation name")
-def set_operation_name(operation_name):
+def set_operation_name(operation_name: str) -> None:
     """Sets the operation name of the active span"""
     assert opentracing.tracer.active_span is not None
     opentracing.tracer.active_span.set_operation_name(operation_name)
@@ -758,21 +762,21 @@ def span_context_from_request(request: Request) -> "Optional[opentracing.SpanCon
 
 
 @only_if_tracing
-def span_context_from_string(carrier):
+def span_context_from_string(carrier: str) -> Optional["opentracing.SpanContext"]:
     """
     Returns:
         The active span context decoded from a string.
     """
-    carrier = json_decoder.decode(carrier)
-    return opentracing.tracer.extract(opentracing.Format.TEXT_MAP, carrier)
+    payload: Dict[str, str] = json_decoder.decode(carrier)
+    return opentracing.tracer.extract(opentracing.Format.TEXT_MAP, payload)
 
 
 @only_if_tracing
-def extract_text_map(carrier):
+def extract_text_map(carrier: Dict[str, str]) -> Optional["opentracing.SpanContext"]:
     """
     Wrapper method for opentracing's tracer.extract for TEXT_MAP.
     Args:
-        carrier (dict): a dict possibly containing a span context.
+        carrier: a dict possibly containing a span context.
 
     Returns:
         The active span context extracted from carrier.
@@ -851,7 +855,7 @@ def trace(func=None, opname=None):
         return decorator
 
 
-def tag_args(func):
+def tag_args(func: Callable[P, R]) -> Callable[P, R]:
     """
     Tags all of the args to the active span.
     """
@@ -860,11 +864,11 @@ def tag_args(func):
         return func
 
     @wraps(func)
-    def _tag_args_inner(*args, **kwargs):
+    def _tag_args_inner(*args: P.args, **kwargs: P.kwargs) -> R:
         argspec = inspect.getfullargspec(func)
         for i, arg in enumerate(argspec.args[1:]):
-            set_tag("ARG_" + arg, args[i])
-        set_tag("args", args[len(argspec.args) :])
+            set_tag("ARG_" + arg, args[i])  # type: ignore[index]
+        set_tag("args", args[len(argspec.args) :])  # type: ignore[index]
         set_tag("kwargs", kwargs)
         return func(*args, **kwargs)
 
@@ -872,7 +876,9 @@ def tag_args(func):
 
 
 @contextlib.contextmanager
-def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
+def trace_servlet(
+    request: "SynapseRequest", extract_context: bool = False
+) -> Generator[None, None, None]:
     """Returns a context manager which traces a request. It starts a span
     with some servlet specific tags such as the request metrics name and
     request information.
