@@ -85,7 +85,7 @@ class FilteringTestCase(unittest.HomeserverTestCase):
                         "org.matrix.not_labels": ["#work"],
                     },
                     "ephemeral": {
-                        "types": ["m.receipt", EduTypes.TYPING],
+                        "types": [EduTypes.RECEIPT, EduTypes.TYPING],
                         "not_rooms": ["!726s6s6q:example.com"],
                         "not_senders": ["@spam:example.com"],
                     },

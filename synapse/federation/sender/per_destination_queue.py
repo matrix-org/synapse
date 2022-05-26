@@ -543,7 +543,7 @@ class PerDestinationQueue:
         edu = Edu(
             origin=self._server_name,
             destination=self._destination,
-            edu_type="m.receipt",
+            edu_type=EduTypes.RECEIPT,
             content=self._pending_rrs,
         )
         self._pending_rrs = {}

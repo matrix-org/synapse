@@ -139,6 +139,7 @@ class DeviceKeyAlgorithms:
 class EduTypes:
     PRESENCE: Final = "m.presence"
     TYPING: Final = "m.typing"
+    RECEIPT: Final = "m.receipt"
 
 
 class RejectedReason:

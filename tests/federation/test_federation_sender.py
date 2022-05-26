@@ -19,7 +19,7 @@ from signedjson.types import BaseKey, SigningKey
 
 from twisted.internet import defer
 
-from synapse.api.constants import RoomEncryptionAlgorithms
+from synapse.api.constants import EduTypes, RoomEncryptionAlgorithms
 from synapse.rest import admin
 from synapse.rest.client import login
 from synapse.types import JsonDict, ReadReceipt
@@ -63,7 +63,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             data["edus"],
             [
                 {
-                    "edu_type": "m.receipt",
+                    "edu_type": EduTypes.RECEIPT,
                     "content": {
                         "room_id": {
                             "m.read": {
@@ -103,7 +103,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             data["edus"],
             [
                 {
-                    "edu_type": "m.receipt",
+                    "edu_type": EduTypes.RECEIPT,
                     "content": {
                         "room_id": {
                             "m.read": {
@@ -138,7 +138,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             data["edus"],
             [
                 {
-                    "edu_type": "m.receipt",
+                    "edu_type": EduTypes.RECEIPT,
                     "content": {
                         "room_id": {
                             "m.read": {
