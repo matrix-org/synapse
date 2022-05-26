@@ -303,7 +303,10 @@ class RoomCreationHandler:
             context=tombstone_context,
         )
 
-        old_room_state = await tombstone_context.get_current_state_ids()
+        state_filter = StateFilter.from_types(
+            [(EventTypes.CanonicalAlias, ""), (EventTypes.PowerLevels, "")]
+        )
+        old_room_state = await tombstone_context.get_current_state_ids(state_filter)
 
         # We know the tombstone event isn't an outlier so it has current state.
         assert old_room_state is not None
@@ -1190,7 +1193,7 @@ class RoomContextHandler:
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self.state_storage = self.storage.state
         self._relations_handler = hs.get_relations_handler()
 
     async def get_event_context(
@@ -1290,7 +1293,7 @@ class RoomContextHandler:
         # first? Shouldn't we be consistent with /sync?
         # https://github.com/matrix-org/matrix-doc/issues/687
 
-        state = await self.state_store.get_state_for_events(
+        state = await self.state_storage.get_state_for_events(
             [last_event_id], state_filter=state_filter
         )
 

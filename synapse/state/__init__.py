@@ -127,7 +127,7 @@ class StateHandler:
     def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
         self.store = hs.get_datastores().main
-        self.state_store = hs.get_storage().state
+        self.state_storage = hs.get_storage().state
         self.hs = hs
         self._state_resolution_handler = hs.get_state_resolution_handler()
         self._storage = hs.get_storage()
@@ -339,7 +339,7 @@ class StateHandler:
         #
 
         if not state_group_before_event:
-            state_group_before_event = await self.state_store.store_state_group(
+            state_group_before_event = await self.state_storage.store_state_group(
                 event.event_id,
                 event.room_id,
                 prev_group=state_group_before_event_prev_group,
@@ -384,7 +384,7 @@ class StateHandler:
         state_ids_after_event[key] = event.event_id
         delta_ids = {key: event.event_id}
 
-        state_group_after_event = await self.state_store.store_state_group(
+        state_group_after_event = await self.state_storage.store_state_group(
             event.event_id,
             event.room_id,
             prev_group=state_group_before_event,
@@ -418,7 +418,7 @@ class StateHandler:
         """
         logger.debug("resolve_state_groups event_ids %s", event_ids)
 
-        state_groups = await self.state_store.get_state_group_for_events(event_ids)
+        state_groups = await self.state_storage.get_state_group_for_events(event_ids)
 
         state_group_ids = state_groups.values()
 
@@ -426,8 +426,8 @@ class StateHandler:
         state_group_ids_set = set(state_group_ids)
         if len(state_group_ids_set) == 1:
             (state_group_id,) = state_group_ids_set
-            state = await self.state_store.get_state_for_groups(state_group_ids_set)
-            prev_group, delta_ids = await self.state_store.get_state_group_delta(
+            state = await self.state_storage.get_state_for_groups(state_group_ids_set)
+            prev_group, delta_ids = await self.state_storage.get_state_group_delta(
                 state_group_id
             )
             return _StateCacheEntry(
@@ -441,7 +441,7 @@ class StateHandler:
 
         room_version = await self.store.get_room_version_id(room_id)
 
-        state_to_resolve = await self.state_store.get_state_for_groups(
+        state_to_resolve = await self.state_storage.get_state_for_groups(
             state_group_ids_set
         )
 
