@@ -14,20 +14,41 @@
 from synapse.storage.engines import Sqlite3Engine
 
 
-def update_event_search_to_use_porter_stemmer(cur, database_engine):
-    # Upgrade the event_search table to use the porter tokenizer
-    if isinstance(database_engine, Sqlite3Engine):
-        cur.execute("DROP TABLE event_search")
-        cur.execute(
-            """CREATE VIRTUAL TABLE event_search
-                       USING fts4 (tokenize=porter, event_id, room_id, sender, key, value )"""
-        )
-
-    # TODO: we just dropped the table .. do we need to do stuff to ensure its repopulated?
-
-
 def run_create(cur, database_engine, *args, **kwargs):
-    update_event_search_to_use_porter_stemmer(cur, database_engine)
+    # Upgrade the event_search table to use the porter tokenizer if it isn't already
+    if isinstance(database_engine, Sqlite3Engine):        
+        cur.execute("SELECT sql FROM sqlite_master WHERE name='event_search'")
+        sql = cur.fetchone()
+        if sql is None:
+            raise Exception("The event_search table doesn't exist")
+        if "tokenize=porter" not in sql[0]:
+            cur.execute("DROP TABLE event_search")
+            cur.execute("""CREATE VIRTUAL TABLE event_search
+                           USING fts4 (tokenize=porter, event_id, room_id, sender, key, value )""")
+
+            # Run a background job to re-populate the event_search table.
+            cur.execute("SELECT MIN(stream_ordering) FROM events")
+            rows = cur.fetchall()
+            min_stream_id = rows[0][0]
+
+            cur.execute("SELECT MAX(stream_ordering) FROM events")
+            rows = cur.fetchall()
+            max_stream_id = rows[0][0]
+
+            if min_stream_id is not None and max_stream_id is not None:
+                progress = {
+                    "target_min_stream_id_inclusive": min_stream_id,
+                    "max_stream_id_exclusive": max_stream_id + 1,
+                    "rows_inserted": 0,
+                }
+                progress_json = json.dumps(progress)
+
+                sql = (
+                    "INSERT into background_updates (update_name, progress_json)"
+                    " VALUES (?, ?)"
+                )
+
+                cur.execute(sql, ("event_search", progress_json))
 
 
 def run_upgrade(cur, database_engine, *args, **kwargs):
