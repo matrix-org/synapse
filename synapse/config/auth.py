@@ -30,13 +30,16 @@ class AuthConfig(Config):
             password_config = {}
 
         passwords_enabled = password_config.get("enabled", True)
-        self.password_enabled = passwords_enabled
         # 'only_for_reauth' allows users who have previously set a password to use it,
         # even though passwords would otherwise be disabled.
-        self.password_enabled_for_reauth = passwords_enabled == "only_for_reauth"
+        passwords_for_reauth_only = passwords_enabled == "only_for_reauth"
 
-        if self.password_enabled_for_reauth:
-            self.password_enabled = False
+        self.password_enabled_for_login = (
+            passwords_enabled and not passwords_for_reauth_only
+        )
+        self.password_enabled_for_reauth = (
+            passwords_for_reauth_only or passwords_enabled
+        )
 
         self.password_localdb_enabled = password_config.get("localdb_enabled", True)
         self.password_pepper = password_config.get("pepper", "")
