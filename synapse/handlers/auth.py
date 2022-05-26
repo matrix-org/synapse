@@ -211,6 +211,7 @@ class AuthHandler:
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.macaroon_gen = hs.get_macaroon_generator()
         self._password_enabled = hs.config.auth.password_enabled
+        self._password_enabled_for_reauth = hs.config.auth.password_enabled_for_reauth
         self._password_localdb_enabled = hs.config.auth.password_localdb_enabled
         self._third_party_rules = hs.get_third_party_event_rules()
 
@@ -393,7 +394,9 @@ class AuthHandler:
 
         # if the HS supports password auth, and the user has a non-null password, we
         # support password auth
-        if self._password_localdb_enabled and self._password_enabled:
+        if self._password_localdb_enabled and (
+            self._password_enabled or self._password_enabled_for_reauth
+        ):
             lookupres = await self._find_user_id_and_pwd_hash(user.to_string())
             if lookupres:
                 _, password_hash = lookupres
@@ -1133,7 +1136,7 @@ class AuthHandler:
         # for the auth providers
         password = login_submission.get("password")
         if login_type == LoginType.PASSWORD:
-            if not self._password_enabled:
+            if not self._password_enabled and not self._password_enabled_for_reauth:
                 raise SynapseError(400, "Password login has been disabled.")
             if not isinstance(password, str):
                 raise SynapseError(400, "Bad parameter: password", Codes.INVALID_PARAM)
