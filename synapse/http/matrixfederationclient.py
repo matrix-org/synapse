@@ -92,9 +92,6 @@ incoming_responses_counter = Counter(
     "synapse_http_matrixfederationclient_responses", "", ["method", "code"]
 )
 
-# a federation response can be rather large (eg a big state_ids is 50M or so), so we
-# need a generous limit here.
-MAX_RESPONSE_SIZE = 100 * 1024 * 1024
 
 MAX_LONG_RETRIES = 10
 MAX_SHORT_RETRIES = 3
@@ -115,6 +112,11 @@ class ByteParser(ByteWriteable, Generic[T], abc.ABC):
     """The expected content type of the response, e.g. `application/json`. If
     the content type doesn't match we fail the request.
     """
+
+    # a federation response can be rather large (eg a big state_ids is 50M or so), so we
+    # need a generous limit here.
+    MAX_RESPONSE_SIZE: int = 100 * 1024 * 1024
+    """The largest response this parser will accept."""
 
     @abc.abstractmethod
     def finish(self) -> T:
@@ -203,7 +205,6 @@ async def _handle_response(
     response: IResponse,
     start_ms: int,
     parser: ByteParser[T],
-    max_response_size: Optional[int] = None,
 ) -> T:
     """
     Reads the body of a response with a timeout and sends it to a parser
@@ -215,15 +216,12 @@ async def _handle_response(
         response: response to the request
         start_ms: Timestamp when request was made
         parser: The parser for the response
-        max_response_size: The maximum size to read from the response, if None
-            uses the default.
 
     Returns:
         The parsed response
     """
 
-    if max_response_size is None:
-        max_response_size = MAX_RESPONSE_SIZE
+    max_response_size = parser.MAX_RESPONSE_SIZE
 
     try:
         check_content_type_is(response.headers, parser.CONTENT_TYPE)
@@ -240,7 +238,7 @@ async def _handle_response(
             "{%s} [%s] JSON response exceeded max size %i - %s %s",
             request.txn_id,
             request.destination,
-            MAX_RESPONSE_SIZE,
+            max_response_size,
             request.method,
             request.uri.decode("ascii"),
         )
@@ -772,7 +770,6 @@ class MatrixFederationHttpClient:
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Literal[None] = None,
-        max_response_size: Optional[int] = None,
     ) -> Union[JsonDict, list]:
         ...
 
@@ -790,7 +787,6 @@ class MatrixFederationHttpClient:
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Optional[ByteParser[T]] = None,
-        max_response_size: Optional[int] = None,
     ) -> T:
         ...
 
@@ -807,7 +803,6 @@ class MatrixFederationHttpClient:
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Optional[ByteParser] = None,
-        max_response_size: Optional[int] = None,
     ):
         """Sends the specified json data using PUT
 
@@ -843,8 +838,6 @@ class MatrixFederationHttpClient:
                 enabled.
             parser: The parser to use to decode the response. Defaults to
                 parsing as JSON.
-            max_response_size: The maximum size to read from the response, if None
-                uses the default.
 
         Returns:
             Succeeds when we get a 2xx HTTP response. The
@@ -895,7 +888,6 @@ class MatrixFederationHttpClient:
             response,
             start_ms,
             parser=parser,
-            max_response_size=max_response_size,
         )
 
         return body
@@ -984,7 +976,6 @@ class MatrixFederationHttpClient:
         ignore_backoff: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Literal[None] = None,
-        max_response_size: Optional[int] = None,
     ) -> Union[JsonDict, list]:
         ...
 
@@ -999,7 +990,6 @@ class MatrixFederationHttpClient:
         ignore_backoff: bool = ...,
         try_trailing_slash_on_400: bool = ...,
         parser: ByteParser[T] = ...,
-        max_response_size: Optional[int] = ...,
     ) -> T:
         ...
 
@@ -1013,7 +1003,6 @@ class MatrixFederationHttpClient:
         ignore_backoff: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Optional[ByteParser] = None,
-        max_response_size: Optional[int] = None,
     ):
         """GETs some json from the given host homeserver and path
 
@@ -1042,9 +1031,6 @@ class MatrixFederationHttpClient:
 
             parser: The parser to use to decode the response. Defaults to
                 parsing as JSON.
-
-            max_response_size: The maximum size to read from the response. If None,
-                uses the default.
 
         Returns:
             Succeeds when we get a 2xx HTTP response. The
@@ -1090,7 +1076,6 @@ class MatrixFederationHttpClient:
             response,
             start_ms,
             parser=parser,
-            max_response_size=max_response_size,
         )
 
         return body

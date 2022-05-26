@@ -1,1 +1,0 @@
-Update EventContext `get_current_event_ids` and `get_prev_event_ids` to accept state filters and update calls where possible.

@@ -70,7 +70,7 @@ class DeviceWorkerHandler:
         self.store = hs.get_datastores().main
         self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
-        self.state_store = hs.get_storage().state
+        self.state_storage = hs.get_storage().state
         self._auth_handler = hs.get_auth_handler()
         self.server_name = hs.hostname
 
@@ -203,7 +203,9 @@ class DeviceWorkerHandler:
                 continue
 
             # mapping from event_id -> state_dict
-            prev_state_ids = await self.state_store.get_state_ids_for_events(event_ids)
+            prev_state_ids = await self.state_storage.get_state_ids_for_events(
+                event_ids
+            )
 
             # Check if we've joined the room? If so we just blindly add all the users to
             # the "possibly changed" users.
@@ -763,6 +765,10 @@ class DeviceListUpdater:
         device_id = edu_content.pop("device_id")
         stream_id = str(edu_content.pop("stream_id"))  # They may come as ints
         prev_ids = edu_content.pop("prev_id", [])
+        if not isinstance(prev_ids, list):
+            raise SynapseError(
+                400, "Device list update had an invalid 'prev_ids' field"
+            )
         prev_ids = [str(p) for p in prev_ids]  # They may come as ints
 
         if get_domain_from_id(user_id) != origin:

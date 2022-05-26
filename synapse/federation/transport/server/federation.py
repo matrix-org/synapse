@@ -650,10 +650,6 @@ class FederationRoomHierarchyServlet(BaseFederationServlet):
         )
 
 
-class FederationRoomHierarchyUnstableServlet(FederationRoomHierarchyServlet):
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc2946"
-
-
 class RoomComplexityServlet(BaseFederationServlet):
     """
     Indicates to other servers how complex (and therefore likely
@@ -752,7 +748,6 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationVersionServlet,
     RoomComplexityServlet,
     FederationRoomHierarchyServlet,
-    FederationRoomHierarchyUnstableServlet,
     FederationV1SendKnockServlet,
     FederationMakeKnockServlet,
     FederationAccountStatusServlet,

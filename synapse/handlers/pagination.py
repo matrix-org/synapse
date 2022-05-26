@@ -130,7 +130,7 @@ class PaginationHandler:
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self.state_storage = self.storage.state
         self.clock = hs.get_clock()
         self._server_name = hs.hostname
         self._room_shutdown_handler = hs.get_room_shutdown_handler()
@@ -239,7 +239,7 @@ class PaginationHandler:
             # defined in the server's configuration, we can safely assume that's the
             # case and use it for this room.
             max_lifetime = (
-                retention_policy["max_lifetime"] or self._retention_default_max_lifetime
+                retention_policy.max_lifetime or self._retention_default_max_lifetime
             )
 
             # Cap the effective max_lifetime to be within the range allowed in the
@@ -539,7 +539,7 @@ class PaginationHandler:
                 (EventTypes.Member, event.sender) for event in events
             )
 
-            state_ids = await self.state_store.get_state_ids_for_event(
+            state_ids = await self.state_storage.get_state_ids_for_event(
                 events[0].event_id, state_filter=state_filter
             )
 

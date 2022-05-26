@@ -31,7 +31,7 @@ class AdminHandler:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self.state_storage = self.storage.state
 
     async def get_whois(self, user: UserID) -> JsonDict:
         connections = []
@@ -233,7 +233,7 @@ class AdminHandler:
             for event_id in extremities:
                 if not event_to_unseen_prevs[event_id]:
                     continue
-                state = await self.state_store.get_state_for_event(event_id)
+                state = await self.state_storage.get_state_for_event(event_id)
                 writer.write_state(room_id, event_id, state)
 
         return writer.finished()
