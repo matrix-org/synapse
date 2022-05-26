@@ -380,7 +380,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         def f(txn: LoggingTransaction) -> List[Dict[str, Any]]:
             if from_key:
                 sql = """
-                    SELECT * FROM receipts_linearized WHERE
+                    SELECT * FROM receipts_ranged WHERE
                     stream_id > ? AND stream_id <= ? AND
                 """
                 clause, args = make_in_list_sql_clause(
@@ -390,7 +390,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 txn.execute(sql + clause, [from_key, to_key] + list(args))
             else:
                 sql = """
-                    SELECT * FROM receipts_linearized WHERE
+                    SELECT * FROM receipts_ranged WHERE
                     stream_id <= ? AND
                 """
 
@@ -417,10 +417,11 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
             # The content is of the form:
             # {"$foo:bar": { "read": { "@user:host": <receipt> }, .. }, .. }
-            event_entry = room_event["content"].setdefault(row["event_id"], {})
+            event_entry = room_event["content"].setdefault(row["end_event_id"], {})
             receipt_type = event_entry.setdefault(row["receipt_type"], {})
 
             receipt_type[row["user_id"]] = db_to_json(row["data"])
+            receipt_type[row["user_id"]]["start_event_id"] = row["start_event_id"]
 
         results = {
             room_id: [results[room_id]] if room_id in results else []
