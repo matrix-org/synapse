@@ -168,9 +168,20 @@ import inspect
 import logging
 import re
 from functools import wraps
-from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Pattern, Type
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Collection,
+    Dict,
+    List,
+    Optional,
+    Pattern,
+    Type,
+    TypeVar,
+)
 
 import attr
+from typing_extensions import ParamSpec
 
 from twisted.internet import defer
 from twisted.web.http import Request
@@ -307,15 +318,19 @@ _homeserver_whitelist: Optional[Pattern[str]] = None
 Sentinel = object()
 
 
-def only_if_tracing(func):
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def only_if_tracing(func: Callable[P, R]) -> Callable[P, Optional[R]]:
     """Executes the function only if we're tracing. Otherwise returns None."""
 
     @wraps(func)
-    def _only_if_tracing_inner(*args, **kwargs):
+    def _only_if_tracing_inner(*args: P.args, **kwargs: P.kwargs) -> Optional[R]:
         if opentracing:
             return func(*args, **kwargs)
         else:
-            return
+            return None
 
     return _only_if_tracing_inner
 
