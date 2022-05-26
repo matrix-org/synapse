@@ -136,7 +136,9 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
                 at or before this point
 
         Returns:
-            A list of tuples (appservice_id, user_id)
+            A list of tuples (appservice_id, user_id). "native" is emitted as the
+            appservice for users that don't come from appservices (i.e. native Matrix
+            users).
 
         """
         if start_timestamp is not None and end_timestamp is not None:
