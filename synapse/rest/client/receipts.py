@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from synapse.api.constants import ReceiptTypes
 from synapse.api.errors import SynapseError
@@ -34,7 +34,8 @@ class ReceiptRestServlet(RestServlet):
     PATTERNS = client_patterns(
         "/rooms/(?P<room_id>[^/]*)"
         "/receipt/(?P<receipt_type>[^/]*)"
-        "/(?P<event_id>[^/]*)$"
+        "/(?P<end_event_id>[^/]*)"
+        "(/(?P<start_event_id>[^/]*))?$"
     )
 
     def __init__(self, hs: "HomeServer"):
@@ -46,7 +47,12 @@ class ReceiptRestServlet(RestServlet):
         self.presence_handler = hs.get_presence_handler()
 
     async def on_POST(
-        self, request: SynapseRequest, room_id: str, receipt_type: str, event_id: str
+        self,
+        request: SynapseRequest,
+        room_id: str,
+        receipt_type: str,
+        end_event_id: str,
+        start_event_id: Optional[str] = None,
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
@@ -73,14 +79,15 @@ class ReceiptRestServlet(RestServlet):
             await self.read_marker_handler.received_client_read_marker(
                 room_id,
                 user_id=requester.user.to_string(),
-                event_id=event_id,
+                event_id=end_event_id,
             )
         else:
             await self.receipts_handler.received_client_receipt(
                 room_id,
                 receipt_type,
                 user_id=requester.user.to_string(),
-                end_event_id=event_id,
+                end_event_id=end_event_id,
+                start_event_id=start_event_id,
             )
 
         return 200, {}
