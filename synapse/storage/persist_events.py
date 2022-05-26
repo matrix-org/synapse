@@ -313,7 +313,7 @@ class EventsPersistenceStorage:
             List of events persisted, the current position room stream position.
             The list of events persisted may not be the same as those passed in
             if they were deduplicated due to an event already existing that
-            matched the transcation ID; the existing event is returned in such
+            matched the transaction ID; the existing event is returned in such
             a case.
         """
         partitioned: Dict[str, List[Tuple[EventBase, EventContext]]] = {}
