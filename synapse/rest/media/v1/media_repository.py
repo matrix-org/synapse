@@ -866,9 +866,6 @@ class MediaRepository:
         """
         Purge old local and remote media according to the media retention rules
         defined in the homeserver config.
-
-        Raises:
-            ...
         """
         # Purge remote media
         if self._media_retention_remote_media_lifetime_ms is not None:
