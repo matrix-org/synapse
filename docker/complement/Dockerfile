@@ -38,3 +38,11 @@ ENTRYPOINT ["/start-complement-synapse-workers.sh"]
 # Update the healthcheck to have a shorter check interval
 HEALTHCHECK --start-period=5s --interval=1s --timeout=1s \
     CMD /bin/sh /healthcheck.sh
+
+# TODO Ideally we should be able to pass env vars straight in via Complement
+# but for now we burn them in to the image.
+# See https://github.com/matrix-org/complement/issues/6.
+ARG use_workers=true
+ENV SYNAPSE_COMPLEMENT_USE_WORKERS $use_workers
+ARG database=postgres
+ENV SYNAPSE_COMPLEMENT_DATABASE $database

@@ -46,9 +46,6 @@ docker build -t matrixdotorg/synapse -f "docker/Dockerfile" .
 # Build the workers docker image (from the base Synapse image we just built).
 docker build -t matrixdotorg/synapse-workers -f "docker/Dockerfile-workers" .
 
-# Build the Complement image (from the worker Synapse image we just built).
-docker build -t complement-synapse -f "docker/complement/Dockerfile" "docker/complement"
-
 export COMPLEMENT_BASE_IMAGE=complement-synapse
 
 extra_test_args=()
@@ -57,7 +54,7 @@ test_tags="synapse_blacklist,msc2716,msc3030"
 
 if [[ -n "$WORKERS" ]]; then
   # Use workers.
-  export SYNAPSE_COMPLEMENT_USE_WORKERS=1
+  export SYNAPSE_COMPLEMENT_USE_WORKERS=true
 
   # Workers can only use Postgres as a database.
   export SYNAPSE_COMPLEMENT_DATABASE=postgres
@@ -72,6 +69,7 @@ if [[ -n "$WORKERS" ]]; then
   # ... and it takes longer than 10m to run the whole suite.
   extra_test_args+=("-timeout=60m")
 else
+  export SYNAPSE_COMPLEMENT_USE_WORKERS=
   if [[ -n "$POSTGRES" ]]; then
     export SYNAPSE_COMPLEMENT_DATABASE=postgres
   else
@@ -82,6 +80,16 @@ else
   # being developed without worker support to start with.
   test_tags="$test_tags,faster_joins"
 fi
+
+# TODO Since we can't pass env vars through Complement
+# (see https://github.com/matrix-org/complement/issues/6),
+# we burn them in to the image for now.
+
+# Build the Complement image (from the worker Synapse image we just built).
+docker build -t complement-synapse \
+  --build-arg "use_workers=$SYNAPSE_COMPLEMENT_USE_WORKERS" \
+  --build-arg "database=$SYNAPSE_COMPLEMENT_DATABASE" \
+  -f "docker/complement/Dockerfile" "docker/complement"
 
 
 # Run the tests!
