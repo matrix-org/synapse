@@ -210,7 +210,7 @@ class AuthHandler:
 
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.macaroon_gen = hs.get_macaroon_generator()
-        self._password_enabled = hs.config.auth.password_enabled
+        self._password_enabled_for_login = hs.config.auth.password_enabled_for_login
         self._password_enabled_for_reauth = hs.config.auth.password_enabled_for_reauth
         self._password_localdb_enabled = hs.config.auth.password_localdb_enabled
         self._third_party_rules = hs.get_third_party_event_rules()
@@ -388,15 +388,13 @@ class AuthHandler:
         return params, session_id
 
     async def _get_available_ui_auth_types(self, user: UserID) -> Iterable[str]:
-        """Get a list of the authentication types this user can use"""
+        """Get a list of the user-interactive authentication types this user can use."""
 
         ui_auth_types = set()
 
         # if the HS supports password auth, and the user has a non-null password, we
         # support password auth
-        if self._password_localdb_enabled and (
-            self._password_enabled or self._password_enabled_for_reauth
-        ):
+        if self._password_localdb_enabled and self._password_enabled_for_reauth:
             lookupres = await self._find_user_id_and_pwd_hash(user.to_string())
             if lookupres:
                 _, password_hash = lookupres
@@ -405,7 +403,7 @@ class AuthHandler:
 
         # also allow auth from password providers
         for t in self.password_auth_provider.get_supported_login_types().keys():
-            if t == LoginType.PASSWORD and not self._password_enabled:
+            if t == LoginType.PASSWORD and not self._password_enabled_for_reauth:
                 continue
             ui_auth_types.add(t)
 
@@ -1067,7 +1065,7 @@ class AuthHandler:
         Returns:
             Whether users on this server are allowed to change or set a password
         """
-        return self._password_enabled and self._password_localdb_enabled
+        return self._password_enabled_for_login and self._password_localdb_enabled
 
     def get_supported_login_types(self) -> Iterable[str]:
         """Get a the login types supported for the /login API
@@ -1092,9 +1090,9 @@ class AuthHandler:
         # that comes first, where it's present.
         if LoginType.PASSWORD in types:
             types.remove(LoginType.PASSWORD)
-            if self._password_enabled:
+            if self._password_enabled_for_login:
                 types.insert(0, LoginType.PASSWORD)
-        elif self._password_localdb_enabled and self._password_enabled:
+        elif self._password_localdb_enabled and self._password_enabled_for_login:
             types.insert(0, LoginType.PASSWORD)
 
         return types
@@ -1136,7 +1134,7 @@ class AuthHandler:
         # for the auth providers
         password = login_submission.get("password")
         if login_type == LoginType.PASSWORD:
-            if not self._password_enabled and not self._password_enabled_for_reauth:
+            if not self._password_enabled_for_login:
                 raise SynapseError(400, "Password login has been disabled.")
             if not isinstance(password, str):
                 raise SynapseError(400, "Bad parameter: password", Codes.INVALID_PARAM)
