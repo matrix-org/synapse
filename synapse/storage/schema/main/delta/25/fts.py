@@ -37,7 +37,7 @@ CREATE INDEX event_search_ev_ridx ON event_search(room_id);
 
 SQLITE_TABLE = (
     "CREATE VIRTUAL TABLE event_search"
-    " USING fts4 (tokenize=porter, event_id, room_id, sender, key, value )"
+    " USING fts4 ( event_id, room_id, sender, key, value )"
 )
 
 
