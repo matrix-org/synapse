@@ -57,7 +57,9 @@ class AuthConfig(Config):
     def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         password_config:
-           # Uncomment to disable password login
+           # Uncomment to disable password login.
+           # Set to `only_for_reauth` to permit reauthentication for users that
+           # have passwords and are already logged in.
            #
            #enabled: false
 
