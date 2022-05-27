@@ -673,8 +673,11 @@ class ReceiptsWorkerStore(SQLBaseStore):
             lock=False,
         )
 
+        # When updating a local users read receipt, remove any push actions
+        # which resulted from the receipt's event and all earlier events.
         if (
-            receipt_type in (ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE)
+            self.hs.is_mine_id(user_id)
+            and receipt_type in (ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE)
             and stream_ordering is not None
         ):
             self._remove_old_push_actions_before_txn(  # type: ignore[attr-defined]

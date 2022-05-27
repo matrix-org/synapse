@@ -1057,7 +1057,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             INNER JOIN batch_events AS c
             ON i.next_batch_id = c.batch_id
             /* Get the depth of the batch start event from the events table */
-            INNER JOIN events AS e USING (event_id)
+            INNER JOIN events AS e ON c.event_id = e.event_id
             /* Find an insertion event which matches the given event_id */
             WHERE i.event_id = ?
             LIMIT ?

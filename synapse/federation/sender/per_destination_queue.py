@@ -223,7 +223,7 @@ class PerDestinationQueue:
         """Marks that the destination has new data to send, without starting a
         new transaction.
 
-        If a transaction loop is already in progress then a new transcation will
+        If a transaction loop is already in progress then a new transaction will
         be attempted when the current one finishes.
         """
 
