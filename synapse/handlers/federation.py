@@ -555,8 +555,8 @@ class FederationHandler:
                 run_as_background_process(
                     desc="sync_partial_state_room",
                     func=self._sync_partial_state_room,
-                    destination=origin,
-                    destinations=ret.servers_in_room,
+                    initial_destination=origin,
+                    other_destinations=ret.servers_in_room,
                     room_id=room_id,
                 )
 
