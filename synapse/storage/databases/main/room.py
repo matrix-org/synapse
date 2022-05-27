@@ -1100,9 +1100,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         for row in rows:
             room_id = row["room_id"]
             server_name = row["server_name"]
-            if room_id not in room_servers:
-                room_servers[room_id] = []
-            room_servers[room_id].append(server_name)
+            room_servers.setdefault(room_id, []).append(server_name)
 
         return room_servers
 
