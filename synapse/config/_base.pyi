@@ -32,7 +32,6 @@ from synapse.config import (
     emailconfig,
     experimental,
     federation,
-    groups,
     jwt,
     key,
     logger,
@@ -107,7 +106,6 @@ class RootConfig:
     push: push.PushConfig
     spamchecker: spam_checker.SpamCheckerConfig
     room: room.RoomConfig
-    groups: groups.GroupsConfig
     userdirectory: user_directory.UserDirectoryConfig
     consent: consent.ConsentConfig
     stats: stats.StatsConfig

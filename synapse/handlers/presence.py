@@ -49,7 +49,7 @@ from prometheus_client import Counter
 from typing_extensions import ContextManager
 
 import synapse.metrics
-from synapse.api.constants import EventTypes, Membership, PresenceState
+from synapse.api.constants import EduTypes, EventTypes, Membership, PresenceState
 from synapse.api.errors import SynapseError
 from synapse.api.presence import UserPresenceState
 from synapse.appservice import ApplicationService
@@ -394,7 +394,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
 
         # Route presence EDUs to the right worker
         hs.get_federation_registry().register_instances_for_edu(
-            "m.presence",
+            EduTypes.PRESENCE,
             hs.config.worker.writers.presence,
         )
 
@@ -649,7 +649,9 @@ class PresenceHandler(BasePresenceHandler):
 
         federation_registry = hs.get_federation_registry()
 
-        federation_registry.register_edu_handler("m.presence", self.incoming_presence)
+        federation_registry.register_edu_handler(
+            EduTypes.PRESENCE, self.incoming_presence
+        )
 
         LaterGauge(
             "synapse_handlers_presence_user_to_current_state_size",

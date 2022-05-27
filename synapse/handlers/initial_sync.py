@@ -274,7 +274,7 @@ class InitialSyncHandler:
             "rooms": rooms_ret,
             "presence": [
                 {
-                    "type": "m.presence",
+                    "type": EduTypes.PRESENCE,
                     "content": format_user_presence_state(event, now),
                 }
                 for event in presence
@@ -439,7 +439,7 @@ class InitialSyncHandler:
 
             return [
                 {
-                    "type": EduTypes.Presence,
+                    "type": EduTypes.PRESENCE,
                     "content": format_user_presence_state(s, time_now),
                 }
                 for s in states

@@ -1429,6 +1429,26 @@ class ModuleApi:
             user_id, spec, {"actions": actions}
         )
 
+    async def get_monthly_active_users_by_service(
+        self, start_timestamp: Optional[int] = None, end_timestamp: Optional[int] = None
+    ) -> List[Tuple[str, str]]:
+        """Generates list of monthly active users and their services.
+        Please see corresponding storage docstring for more details.
+
+        Arguments:
+            start_timestamp: If specified, only include users that were first active
+                at or after this point
+            end_timestamp: If specified, only include users that were first active
+                at or before this point
+
+        Returns:
+            A list of tuples (appservice_id, user_id)
+
+        """
+        return await self._store.get_monthly_active_users_by_service(
+            start_timestamp, end_timestamp
+        )
+
 
 class PublicRoomListManager:
     """Contains methods for adding to, removing from and querying whether a room
