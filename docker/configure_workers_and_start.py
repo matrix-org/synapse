@@ -405,7 +405,6 @@ def generate_worker_files(
 
     # For each worker type specified by the user, create config values
     for worker_type in worker_types:
-        startup_config: Dict[str, Any] = {}
         worker_type = worker_type.strip()
 
         worker_config = WORKERS_CONFIG.get(worker_type)
@@ -535,7 +534,7 @@ def generate_worker_files(
         "/conf/supervisord.conf.j2",
         "/etc/supervisor/supervisord.conf",
         main_config_path=config_path,
-        #worker_config=supervisord_config,
+        # worker_config=supervisord_config,
         worker_config="",
     )
 

@@ -31,7 +31,7 @@ import sys
 #     synapse.app.generic_worker [args..] -- \
 #   ...
 #     synapse.app.generic_worker [args..]
-from typing import Callable, List, Any
+from typing import Any, Callable, List
 
 from twisted.internet.main import installReactor
 
@@ -54,10 +54,13 @@ class ProxiedReactor:
         return getattr(self.___reactor_target, attr_name)
 
 
-def _worker_entrypoint(func: Callable[[], None], proxy_reactor: ProxiedReactor, args: List[str]) -> None:
+def _worker_entrypoint(
+    func: Callable[[], None], proxy_reactor: ProxiedReactor, args: List[str]
+) -> None:
     sys.argv = args
 
     from twisted.internet.epollreactor import EPollReactor
+
     proxy_reactor.___install(EPollReactor())
     func()
 
@@ -98,8 +101,19 @@ def main() -> None:
     # try to create a schema version table and some will crash out.
     # HACK
     from synapse._scripts import update_synapse_database
+
     update_proc = multiprocessing.Process(
-        target=_worker_entrypoint, args=(update_synapse_database.main, proxy_reactor, ["update_synapse_database", "--database-config", db_config_path, "--run-background-updates"])
+        target=_worker_entrypoint,
+        args=(
+            update_synapse_database.main,
+            proxy_reactor,
+            [
+                "update_synapse_database",
+                "--database-config",
+                db_config_path,
+                "--run-background-updates",
+            ],
+        ),
     )
     print("===== PREPARING DATABASE =====", file=sys.stderr)
     update_proc.start()
