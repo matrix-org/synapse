@@ -72,17 +72,13 @@ class FederationBase:
         Returns:
               * the original event if the checks pass
               * a redacted version of the event (if the signature
-                matched but the hash did not)
+                matched but the hash did not). In this case a warning will be logged.
 
         Raises:
-              SynapseError if the signature check failed.
+          InvalidEventSignatureError if the signature check failed. Nothing
+             will be logged in this case.
         """
-        try:
-            await _check_sigs_on_pdu(self.keyring, room_version, pdu)
-        except InvalidEventSignatureError as e:
-            errmsg = f"event id {pdu.event_id}: {e}"
-            logger.warning("%s", errmsg)
-            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
+        await _check_sigs_on_pdu(self.keyring, room_version, pdu)
 
         if not check_event_content_hash(pdu):
             # let's try to distinguish between failures because the event was

@@ -54,7 +54,11 @@ from synapse.api.room_versions import (
     RoomVersions,
 )
 from synapse.events import EventBase, builder
-from synapse.federation.federation_base import FederationBase, event_from_pdu_json
+from synapse.federation.federation_base import (
+    FederationBase,
+    InvalidEventSignatureError,
+    event_from_pdu_json,
+)
 from synapse.federation.transport.client import SendJoinResponse
 from synapse.http.types import QueryParams
 from synapse.types import JsonDict, UserID, get_domain_from_id
@@ -319,7 +323,13 @@ class FederationClient(FederationBase):
             pdu = pdu_list[0]
 
             # Check signatures are correct.
-            signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
+            try:
+                signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
+            except InvalidEventSignatureError as e:
+                errmsg = f"event id {pdu.event_id}: {e}"
+                logger.warning("%s", errmsg)
+                raise SynapseError(403, errmsg, Codes.FORBIDDEN)
+
             return signed_pdu
 
         return None
@@ -552,19 +562,23 @@ class FederationClient(FederationBase):
 
         Returns:
             The PDU (possibly redacted) if it has valid signatures and hashes.
+            None if no valid copy could be found.
         """
 
-        res = None
         try:
-            res = await self._check_sigs_and_hash(room_version, pdu)
-        except SynapseError:
-            pass
-
-        if not res:
-            # Check local db.
-            res = await self.store.get_event(
-                pdu.event_id, allow_rejected=True, allow_none=True
+            return await self._check_sigs_and_hash(room_version, pdu)
+        except InvalidEventSignatureError as e:
+            logger.warning(
+                "Signature on retrieved event %s was invalid (%s). "
+                "Checking local store/orgin server",
+                pdu.event_id,
+                e,
             )
+
+        # Check local db.
+        res = await self.store.get_event(
+            pdu.event_id, allow_rejected=True, allow_none=True
+        )
 
         pdu_origin = get_domain_from_id(pdu.sender)
         if not res and pdu_origin != origin:
@@ -1040,9 +1054,14 @@ class FederationClient(FederationBase):
         pdu = event_from_pdu_json(pdu_dict, room_version)
 
         # Check signatures are correct.
-        pdu = await self._check_sigs_and_hash(room_version, pdu)
+        try:
+            pdu = await self._check_sigs_and_hash(room_version, pdu)
+        except InvalidEventSignatureError as e:
+            errmsg = f"event id {pdu.event_id}: {e}"
+            logger.warning("%s", errmsg)
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
 
-        # FIXME: We should handle signature failures more gracefully.
+            # FIXME: We should handle signature failures more gracefully.
 
         return pdu
 

@@ -48,7 +48,11 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.crypto.event_signing import compute_event_signature
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
-from synapse.federation.federation_base import FederationBase, event_from_pdu_json
+from synapse.federation.federation_base import (
+    FederationBase,
+    InvalidEventSignatureError,
+    event_from_pdu_json,
+)
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
 from synapse.http.servlet import assert_params_in_dict
@@ -632,7 +636,12 @@ class FederationServer(FederationBase):
         pdu = event_from_pdu_json(content, room_version)
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, pdu.room_id)
-        pdu = await self._check_sigs_and_hash(room_version, pdu)
+        try:
+            pdu = await self._check_sigs_and_hash(room_version, pdu)
+        except InvalidEventSignatureError as e:
+            errmsg = f"event id {pdu.event_id}: {e}"
+            logger.warning("%s", errmsg)
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
         ret_pdu = await self.handler.on_invite_request(origin, pdu, room_version)
         time_now = self._clock.time_msec()
         return {"event": ret_pdu.get_pdu_json(time_now)}
@@ -865,7 +874,12 @@ class FederationServer(FederationBase):
                 )
             )
 
-        event = await self._check_sigs_and_hash(room_version, event)
+        try:
+            event = await self._check_sigs_and_hash(room_version, event)
+        except InvalidEventSignatureError as e:
+            errmsg = f"event id {event.event_id}: {e}"
+            logger.warning("%s", errmsg)
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
 
         return await self._federation_event_handler.on_send_membership_event(
             origin, event
@@ -1017,8 +1031,9 @@ class FederationServer(FederationBase):
         # Check signature.
         try:
             pdu = await self._check_sigs_and_hash(room_version, pdu)
-        except SynapseError as e:
-            raise FederationError("ERROR", e.code, e.msg, affected=pdu.event_id)
+        except InvalidEventSignatureError as e:
+            logger.warning("event id %s: %s", pdu.event_id, e)
+            raise FederationError("ERROR", 403, str(e), affected=pdu.event_id)
 
         if await self._spam_checker.should_drop_federated_event(pdu):
             logger.warning(
