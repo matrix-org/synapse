@@ -1534,7 +1534,7 @@ class FederationHandler:
                 allow_rejected=True,
             )
             for event in events:
-                for attempt in range(len(destinations)):
+                for attempt in itertools.count():
                     try:
                         await self._federation_event_handler.update_state_for_partial_state_event(
                             destination, event
