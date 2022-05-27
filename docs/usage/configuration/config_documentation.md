@@ -2930,6 +2930,9 @@ Use this setting to enable password-based logins.
 
 This setting has the following sub-options:
 * `enabled`: Defaults to true.
+   Set to false to disable password authentication.
+   Set to `only_for_reauth` to allow users with existing passwords to use them
+   to log in and reauthenticate, whilst preventing new users from setting passwords.
 * `localdb_enabled`: Set to false to disable authentication against the local password
    database. This is ignored if `enabled` is false, and is only useful
    if you have other `password_providers`. Defaults to true. 
@@ -3143,25 +3146,6 @@ will also not affect rooms created by other servers.
 Example configuration:
 ```yaml
 encryption_enabled_by_default_for_room_type: invite
-```
----
-Config option: `enable_group_creation`
-
-Set to true to allow non-server-admin users to create groups on this server
-
-Example configuration:
-```yaml
-enable_group_creation: true
-```
----
-Config option: `group_creation_prefix`
-
-If enabled/present, non-server admins can only create groups with local parts
-starting with this prefix.
-
-Example configuration:
-```yaml
-group_creation_prefix: "unofficial_"
 ```
 ---
 Config option: `user_directory`

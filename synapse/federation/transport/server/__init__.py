@@ -27,10 +27,6 @@ from synapse.federation.transport.server.federation import (
     FederationAccountStatusServlet,
     FederationTimestampLookupServlet,
 )
-from synapse.federation.transport.server.groups_local import GROUP_LOCAL_SERVLET_CLASSES
-from synapse.federation.transport.server.groups_server import (
-    GROUP_SERVER_SERVLET_CLASSES,
-)
 from synapse.http.server import HttpServer, JsonResource
 from synapse.http.servlet import (
     parse_boolean_from_args,
@@ -199,38 +195,6 @@ class PublicRoomList(BaseFederationServlet):
         return 200, data
 
 
-class FederationGroupsRenewAttestaionServlet(BaseFederationServlet):
-    """A group or user's server renews their attestation"""
-
-    PATH = "/groups/(?P<group_id>[^/]*)/renew_attestation/(?P<user_id>[^/]*)"
-
-    def __init__(
-        self,
-        hs: "HomeServer",
-        authenticator: Authenticator,
-        ratelimiter: FederationRateLimiter,
-        server_name: str,
-    ):
-        super().__init__(hs, authenticator, ratelimiter, server_name)
-        self.handler = hs.get_groups_attestation_renewer()
-
-    async def on_POST(
-        self,
-        origin: str,
-        content: JsonDict,
-        query: Dict[bytes, List[bytes]],
-        group_id: str,
-        user_id: str,
-    ) -> Tuple[int, JsonDict]:
-        # We don't need to check auth here as we check the attestation signatures
-
-        new_content = await self.handler.on_renew_attestation(
-            group_id, user_id, content
-        )
-
-        return 200, new_content
-
-
 class OpenIdUserInfo(BaseFederationServlet):
     """
     Exchange a bearer token for information about a user.
@@ -292,15 +256,8 @@ class OpenIdUserInfo(BaseFederationServlet):
 SERVLET_GROUPS: Dict[str, Iterable[Type[BaseFederationServlet]]] = {
     "federation": FEDERATION_SERVLET_CLASSES,
     "room_list": (PublicRoomList,),
-    "group_server": GROUP_SERVER_SERVLET_CLASSES,
-    "group_local": GROUP_LOCAL_SERVLET_CLASSES,
-    "group_attestation": (FederationGroupsRenewAttestaionServlet,),
     "openid": (OpenIdUserInfo,),
 }
-
-DEFAULT_SERVLET_GROUPS = ("federation", "room_list", "openid")
-
-GROUP_SERVLET_GROUPS = ("group_server", "group_local", "group_attestation")
 
 
 def register_servlets(
@@ -324,10 +281,7 @@ def register_servlets(
             Defaults to ``DEFAULT_SERVLET_GROUPS``.
     """
     if not servlet_groups:
-        servlet_groups = DEFAULT_SERVLET_GROUPS
-        # Only allow the groups servlets if the deprecated groups feature is enabled.
-        if hs.config.experimental.groups_enabled:
-            servlet_groups = servlet_groups + GROUP_SERVLET_GROUPS
+        servlet_groups = SERVLET_GROUPS.keys()
 
     for servlet_group in servlet_groups:
         # Skip unknown servlet groups.

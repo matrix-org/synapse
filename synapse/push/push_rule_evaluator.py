@@ -15,7 +15,7 @@
 
 import logging
 import re
-from typing import Any, Dict, List, Mapping, Optional, Pattern, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Pattern, Set, Tuple, Union
 
 from matrix_common.regex import glob_to_regex, to_word_pattern
 
@@ -120,11 +120,15 @@ class PushRuleEvaluatorForEvent:
         room_member_count: int,
         sender_power_level: int,
         power_levels: Dict[str, Union[int, Dict[str, int]]],
+        relations: Dict[str, Set[Tuple[str, str]]],
+        relations_match_enabled: bool,
     ):
         self._event = event
         self._room_member_count = room_member_count
         self._sender_power_level = sender_power_level
         self._power_levels = power_levels
+        self._relations = relations
+        self._relations_match_enabled = relations_match_enabled
 
         # Maps strings of e.g. 'content.body' -> event["content"]["body"]
         self._value_cache = _flatten_dict(event)
@@ -188,7 +192,16 @@ class PushRuleEvaluatorForEvent:
             return _sender_notification_permission(
                 self._event, condition, self._sender_power_level, self._power_levels
             )
+        elif (
+            condition["kind"] == "org.matrix.msc3772.relation_match"
+            and self._relations_match_enabled
+        ):
+            return self._relation_match(condition, user_id)
         else:
+            # XXX This looks incorrect -- we have reached an unknown condition
+            #     kind and are unconditionally returning that it matches. Note
+            #     that it seems possible to provide a condition to the /pushrules
+            #     endpoint with an unknown kind, see _rule_tuple_from_request_object.
             return True
 
     def _event_match(self, condition: dict, user_id: str) -> bool:
@@ -255,6 +268,41 @@ class PushRuleEvaluatorForEvent:
             regex_cache[(display_name, False, True)] = r
 
         return bool(r.search(body))
+
+    def _relation_match(self, condition: dict, user_id: str) -> bool:
+        """
+        Check an "relation_match" push rule condition.
+
+        Args:
+            condition: The "event_match" push rule condition to match.
+            user_id: The user's MXID.
+
+        Returns:
+             True if the condition matches the event, False otherwise.
+        """
+        rel_type = condition.get("rel_type")
+        if not rel_type:
+            logger.warning("relation_match condition missing rel_type")
+            return False
+
+        sender_pattern = condition.get("sender")
+        if sender_pattern is None:
+            sender_type = condition.get("sender_type")
+            if sender_type == "user_id":
+                sender_pattern = user_id
+        type_pattern = condition.get("type")
+
+        # If any other relations matches, return True.
+        for sender, event_type in self._relations.get(rel_type, ()):
+            if sender_pattern and not _glob_matches(sender_pattern, sender):
+                continue
+            if type_pattern and not _glob_matches(type_pattern, event_type):
+                continue
+            # All values must have matched.
+            return True
+
+        # No relations matched.
+        return False
 
 
 # Caches (string, is_glob, word_boundary) -> regex for push. See _glob_matches

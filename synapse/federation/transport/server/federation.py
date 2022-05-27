@@ -27,6 +27,7 @@ from typing import (
 from matrix_common.versionstring import get_distribution_version_string
 from typing_extensions import Literal
 
+from synapse.api.constants import EduTypes
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import FEDERATION_UNSTABLE_PREFIX, FEDERATION_V2_PREFIX
@@ -108,7 +109,10 @@ class FederationSendServlet(BaseFederationServerServlet):
             )
 
             if issue_8631_logger.isEnabledFor(logging.DEBUG):
-                DEVICE_UPDATE_EDUS = ["m.device_list_update", "m.signing_key_update"]
+                DEVICE_UPDATE_EDUS = [
+                    EduTypes.DEVICE_LIST_UPDATE,
+                    EduTypes.SIGNING_KEY_UPDATE,
+                ]
                 device_list_updates = [
                     edu.get("content", {})
                     for edu in transaction_data.get("edus", [])
@@ -650,10 +654,6 @@ class FederationRoomHierarchyServlet(BaseFederationServlet):
         )
 
 
-class FederationRoomHierarchyUnstableServlet(FederationRoomHierarchyServlet):
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc2946"
-
-
 class RoomComplexityServlet(BaseFederationServlet):
     """
     Indicates to other servers how complex (and therefore likely
@@ -752,7 +752,6 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationVersionServlet,
     RoomComplexityServlet,
     FederationRoomHierarchyServlet,
-    FederationRoomHierarchyUnstableServlet,
     FederationV1SendKnockServlet,
     FederationMakeKnockServlet,
     FederationAccountStatusServlet,

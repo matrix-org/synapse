@@ -64,6 +64,7 @@ from synapse.replication.http.federation import (
     ReplicationStoreRoomOnOutlierMembershipRestServlet,
 )
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
+from synapse.storage.state import StateFilter
 from synapse.types import JsonDict, StateMap, get_domain_from_id
 from synapse.util.async_helpers import Linearizer
 from synapse.util.retryutils import NotRetryingDestination
@@ -135,7 +136,7 @@ class FederationHandler:
 
         self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self.state_storage = self.storage.state
         self.federation_client = hs.get_federation_client()
         self.state_handler = hs.get_state_handler()
         self.server_name = hs.hostname
@@ -562,8 +563,8 @@ class FederationHandler:
                 run_as_background_process(
                     desc="sync_partial_state_room",
                     func=self._sync_partial_state_room,
-                    destination=origin,
-                    destinations=ret.servers_in_room,
+                    initial_destination=origin,
+                    other_destinations=ret.servers_in_room,
                     room_id=room_id,
                 )
 
@@ -1045,7 +1046,9 @@ class FederationHandler:
         if event.internal_metadata.outlier:
             raise NotFoundError("State not known at event %s" % (event_id,))
 
-        state_groups = await self.state_store.get_state_groups_ids(room_id, [event_id])
+        state_groups = await self.state_storage.get_state_groups_ids(
+            room_id, [event_id]
+        )
 
         # get_state_groups_ids should return exactly one result
         assert len(state_groups) == 1
@@ -1278,7 +1281,9 @@ class FederationHandler:
             event.content["third_party_invite"]["signed"]["token"],
         )
         original_invite = None
-        prev_state_ids = await context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids(
+            StateFilter.from_types([(EventTypes.ThirdPartyInvite, None)])
+        )
         original_invite_id = prev_state_ids.get(key)
         if original_invite_id:
             original_invite = await self.store.get_event(
@@ -1327,7 +1332,9 @@ class FederationHandler:
         signed = event.content["third_party_invite"]["signed"]
         token = signed["token"]
 
-        prev_state_ids = await context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids(
+            StateFilter.from_types([(EventTypes.ThirdPartyInvite, None)])
+        )
         invite_event_id = prev_state_ids.get((EventTypes.ThirdPartyInvite, token))
 
         invite_event = None
@@ -1476,16 +1483,16 @@ class FederationHandler:
 
     async def _sync_partial_state_room(
         self,
-        destination: Optional[str],
-        destinations: Collection[str],
+        initial_destination: Optional[str],
+        other_destinations: Collection[str],
         room_id: str,
     ) -> None:
         """Background process to resync the state of a partial-state room
 
         Args:
-            destination: the initial homeserver to pull the state from
-            destinations: other homeservers to try to pull the state from, if
-                `destination` is unavailable
+            initial_destination: the initial homeserver to pull the state from
+            other_destinations: other homeservers to try to pull the state from, if
+                `initial_destination` is unavailable
             room_id: room to be resynced
         """
         assert not self.config.worker.worker_app
@@ -1497,18 +1504,29 @@ class FederationHandler:
         # TODO(faster_joins): what happens if we leave the room during a resync? if we
         #   really leave, that might mean we have difficulty getting the room state over
         #   federation.
+        #
+        # TODO(faster_joins): we need some way of prioritising which homeservers in
+        #   `other_destinations` to try first, otherwise we'll spend ages trying dead
+        #   homeservers for large rooms.
+
+        if initial_destination is None and len(other_destinations) == 0:
+            raise ValueError(
+                f"Cannot resync state of {room_id}: no destinations provided"
+            )
 
         # Make an infinite iterator of destinations to try. Once we find a working
         # destination, we'll stick with it until it flakes.
-        if destination is not None:
-            # Move `destination` to the front of the list.
-            destinations = list(destinations)
-            if destination in destinations:
-                destinations.remove(destination)
-            destinations = [destination] + destinations
-        destination_iter = itertools.cycle(destinations)
+        if initial_destination is not None:
+            # Move `initial_destination` to the front of the list.
+            destinations = list(other_destinations)
+            if initial_destination in destinations:
+                destinations.remove(initial_destination)
+            destinations = [initial_destination] + destinations
+            destination_iter = itertools.cycle(destinations)
+        else:
+            destination_iter = itertools.cycle(other_destinations)
 
-        # `destination` is now the current remote homeserver we're pulling from.
+        # `destination` is the current remote homeserver we're pulling from.
         destination = next(destination_iter)
         logger.info("Syncing state for room %s via %s", room_id, destination)
 
@@ -1545,7 +1563,7 @@ class FederationHandler:
                 allow_rejected=True,
             )
             for event in events:
-                for attempt in range(len(destinations)):
+                for attempt in itertools.count():
                     try:
                         await self._federation_event_handler.update_state_for_partial_state_event(
                             destination, event
@@ -1554,6 +1572,11 @@ class FederationHandler:
                     except FederationError as e:
                         if attempt == len(destinations) - 1:
                             # We have tried every remote server for this event. Give up.
+                            # TODO(faster_joins) giving up isn't the right thing to do
+                            #   if there's a temporary network outage. retrying
+                            #   indefinitely is also not the right thing to do if we can
+                            #   reach all homeservers and they all claim they don't have
+                            #   the state we want.
                             logger.error(
                                 "Failed to get state for %s at %s from %s because %s, "
                                 "giving up!",
