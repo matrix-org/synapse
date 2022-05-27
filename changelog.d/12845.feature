@@ -1,0 +1,1 @@
+Support the new error code "M_ORG_MATRIX_MSC3823_USER_ACCOUNT_SUSPENDED" from [MSC3823](https://github.com/matrix-org/matrix-spec-proposals/pull/3823).

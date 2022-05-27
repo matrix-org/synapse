@@ -79,6 +79,13 @@ class Codes(str, Enum):
     WEAK_PASSWORD = "M_WEAK_PASSWORD"
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
+
+    # The account has been suspended on the server.
+    # By opposition to `USER_DEACTIVATED`, this is a reversible measure
+    # that can possibly be appealed and reverted.
+    # Part of MSC3823.
+    USER_ACCOUNT_SUSPENDED = "M_ORG_MATRIX_MSC3823_USER_ACCOUNT_SUSPENDED"
+
     BAD_ALIAS = "M_BAD_ALIAS"
     # For restricted join rules.
     UNABLE_AUTHORISE_JOIN = "M_UNABLE_TO_AUTHORISE_JOIN"
