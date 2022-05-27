@@ -909,46 +909,38 @@ class StateStorage:
         )
 
     async def get_current_state_ids(
-        self, room_id: str, on_invalidate: Optional[Callable[[], None]] = None
+        self,
+        room_id: str,
+        state_filter: Optional[StateFilter] = None,
+        on_invalidate: Optional[Callable[[], None]] = None,
     ) -> StateMap[str]:
         """Get the current state event ids for a room based on the
         current_state_events table.
 
+        If a state filter is given (that is not `StateFilter.all()`) the query
+        result is *not* cached.
+
         Args:
-            room_id: The room to get the state IDs of.
+            room_id: The room to get the state IDs of. state_filter: The state
+            filter used to fetch state from the
+                database.
             on_invalidate: Callback for when the `get_current_state_ids` cache
                 for the room gets invalidated.
 
         Returns:
             The current state of the room.
         """
-        await self._partial_state_room_tracker.await_full_state(room_id)
-
-        return await self.stores.main.get_partial_current_state_ids(
-            room_id, on_invalidate=on_invalidate
-        )
-
-    async def get_filtered_current_state_ids(
-        self, room_id: str, state_filter: Optional[StateFilter] = None
-    ) -> StateMap[str]:
-        """Get the current state event of a given type for a room based on the
-        current_state_events table.  This may not be as up-to-date as the result
-        of doing a fresh state resolution as per state_handler.get_current_state
-
-        Args:
-            room_id
-            state_filter: The state filter used to fetch state
-                from the database.
-
-        Returns:
-            Map from type/state_key to event ID.
-        """
         if not state_filter or state_filter.must_await_full_state(self._is_mine_id):
             await self._partial_state_room_tracker.await_full_state(room_id)
 
-        return await self.stores.main.get_partial_filtered_current_state_ids(
-            room_id, state_filter
-        )
+        if state_filter and not state_filter.is_full():
+            return await self.stores.main.get_partial_filtered_current_state_ids(
+                room_id, state_filter
+            )
+        else:
+            return await self.stores.main.get_partial_current_state_ids(
+                room_id, on_invalidate=on_invalidate
+            )
 
     async def get_canonical_alias_for_room(self, room_id: str) -> Optional[str]:
         """Get canonical alias for room, if any
@@ -960,7 +952,7 @@ class StateStorage:
             The canonical alias, if any
         """
 
-        state = await self.get_filtered_current_state_ids(
+        state = await self.get_current_state_ids(
             room_id, StateFilter.from_types([(EventTypes.CanonicalAlias, "")])
         )
 

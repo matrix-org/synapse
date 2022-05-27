@@ -482,7 +482,7 @@ class RoomCreationHandler:
             if room_type == RoomTypes.SPACE:
                 types_to_copy.append((EventTypes.SpaceChild, None))
 
-        old_room_state_ids = await self._storage.state.get_filtered_current_state_ids(
+        old_room_state_ids = await self._storage.state.get_current_state_ids(
             old_room_id, StateFilter.from_types(types_to_copy)
         )
         # map from event_id to BaseEvent
@@ -560,10 +560,8 @@ class RoomCreationHandler:
         )
 
         # Transfer membership events
-        old_room_member_state_ids = (
-            await self._storage.state.get_filtered_current_state_ids(
-                old_room_id, StateFilter.from_types([(EventTypes.Member, None)])
-            )
+        old_room_member_state_ids = await self._storage.state.get_current_state_ids(
+            old_room_id, StateFilter.from_types([(EventTypes.Member, None)])
         )
 
         # map from event_id to BaseEvent
