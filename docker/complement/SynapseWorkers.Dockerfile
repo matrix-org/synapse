@@ -26,6 +26,9 @@ COPY conf-workers/workers-shared.yaml /conf/workers/shared.yaml
 WORKDIR /data
 
 COPY conf-workers/postgres.supervisord.conf /etc/supervisor/conf.d/postgres.conf
+COPY conf-workers/synapse_forking.supervisord.conf.j2 /conf/
+
+COPY conf/log_config.yaml.j2 /conf/
 
 # Copy the entrypoint
 COPY conf-workers/start-complement-synapse-workers.sh /

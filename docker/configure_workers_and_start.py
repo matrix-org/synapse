@@ -401,8 +401,11 @@ def generate_worker_files(
     # which exists even if no workers do.
     healthcheck_urls = ["http://localhost:8080/health"]
 
+    worker_configs: List[Dict[str, Any]] = []
+
     # For each worker type specified by the user, create config values
     for worker_type in worker_types:
+        startup_config: Dict[str, Any] = {}
         worker_type = worker_type.strip()
 
         worker_config = WORKERS_CONFIG.get(worker_type)
@@ -437,6 +440,8 @@ def generate_worker_files(
 
         # Enable the worker in supervisord
         supervisord_config += SUPERVISORD_PROCESS_CONFIG_BLOCK.format_map(worker_config)
+
+        worker_configs.append(worker_config)
 
         # Add nginx location blocks for this worker's endpoints (if any are defined)
         for pattern in worker_config["endpoint_patterns"]:
@@ -530,7 +535,15 @@ def generate_worker_files(
         "/conf/supervisord.conf.j2",
         "/etc/supervisor/supervisord.conf",
         main_config_path=config_path,
-        worker_config=supervisord_config,
+        #worker_config=supervisord_config,
+        worker_config="",
+    )
+
+    convert(
+        "/conf/synapse_forking.supervisord.conf.j2",
+        "/etc/supervisor/conf.d/synapse_forking.supervisor.conf",
+        worker_configs=worker_configs,
+        main_config_path=config_path,
     )
 
     # healthcheck config
@@ -562,7 +575,7 @@ def generate_worker_log_config(
     # Render and write the file
     log_config_filepath = "/conf/workers/{name}.log.config".format(name=worker_name)
     convert(
-        "/conf/log.config",
+        "/conf/log_config.yaml.j2",
         log_config_filepath,
         worker_name=worker_name,
         **extra_log_template_args,

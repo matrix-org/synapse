@@ -31,22 +31,54 @@ import sys
 #     synapse.app.generic_worker [args..] -- \
 #   ...
 #     synapse.app.generic_worker [args..]
-from typing import Callable, List
+from typing import Callable, List, Any
+
+from twisted.internet.main import installReactor
 
 
-def _worker_entrypoint(func: Callable[[], None], args: List[str]) -> None:
+class ProxiedReactor:
+    """
+    Global state is horrible. Use this proxy reactor so we can 'reinstall'
+    the reactor by changing the target of the proxy.
+    """
+
+    def __init__(self):
+        self.___reactor_target = None
+
+    def ___install(self, new_reactor):
+        self.___reactor_target = new_reactor
+
+    def __getattr__(self, attr_name: str) -> Any:
+        if attr_name == "___install":
+            return self.___install
+        return getattr(self.___reactor_target, attr_name)
+
+
+def _worker_entrypoint(func: Callable[[], None], proxy_reactor: ProxiedReactor, args: List[str]) -> None:
     sys.argv = args
+
+    from twisted.internet.epollreactor import EPollReactor
+    proxy_reactor.___install(EPollReactor())
     func()
 
 
 def main() -> None:
     # Split up the arguments into each workers' arguments
+    # Strip out any newlines.
+    # HACK
+    db_config_path = sys.argv[1]
+    args = [arg.replace("\n", "") for arg in sys.argv[2:]]
     args_by_worker: List[List[str]] = [
         list(args)
-        for cond, args in itertools.groupby(sys.argv[1:], lambda ele: ele != "--")
-        if cond
+        for cond, args in itertools.groupby(args, lambda ele: ele != "--")
+        if cond and args
     ]
-    print(args_by_worker)
+
+    # Prevent Twisted from installing a shared reactor that all the workers will
+    # pick up.
+    proxy_reactor = ProxiedReactor()
+    installReactor(proxy_reactor)
+
     # Import the entrypoints for all the workers
     worker_functions = []
     for worker_args in args_by_worker:
@@ -61,10 +93,24 @@ def main() -> None:
     # which *can* use fork() on Unix platforms.
     # Now we fork our process!
 
+    # TODO Can we do this better?
+    # We need to prepare the database first as otherwise all the workers will
+    # try to create a schema version table and some will crash out.
+    # HACK
+    from synapse._scripts import update_synapse_database
+    update_proc = multiprocessing.Process(
+        target=_worker_entrypoint, args=(update_synapse_database.main, proxy_reactor, ["update_synapse_database", "--database-config", db_config_path, "--run-background-updates"])
+    )
+    print("===== PREPARING DATABASE =====", file=sys.stderr)
+    update_proc.start()
+    print("JNG UPROC", file=sys.stderr)
+    update_proc.join()
+    print("===== PREPARED DATABASE =====", file=sys.stderr)
+
     processes = []
     for (func, worker_args) in zip(worker_functions, args_by_worker):
         process = multiprocessing.Process(
-            target=_worker_entrypoint, args=(func, worker_args)
+            target=_worker_entrypoint, args=(func, proxy_reactor, worker_args)
         )
         process.start()
         processes.append(process)

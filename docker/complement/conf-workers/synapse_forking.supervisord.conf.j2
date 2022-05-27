@@ -1,0 +1,26 @@
+[program:synapse_forking]
+# TODO prefix-log will be no good. We'll have to hack around ourselves.
+command=/usr/local/bin/prefix-log /usr/local/bin/python -m synapse.app._complement_fork_starter /data/homeserver.yaml \
+{%- for worker_config in worker_configs %}
+    -- \
+    {{ worker_config.app }}
+    --config-path="{{ worker_config.config_path }}" \
+    --config-path=/conf/workers/shared.yaml \
+    --config-path=/conf/workers/{{ worker_config.name }}.yaml \
+{%- endfor %}
+    -- \
+    synapse.app.homeserver \
+    --config-path="{{ main_config_path }}" \
+    --config-path=/conf/workers/shared.yaml
+
+autorestart=unexpected
+priority=500
+exitcodes=0
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+
+# Required because the forking launcher creates subprocesses but doesn't
+# handle signals for us.
+stopasgroup=true
