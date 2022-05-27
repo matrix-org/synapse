@@ -137,7 +137,13 @@ class DeviceKeyAlgorithms:
 
 
 class EduTypes:
-    Presence: Final = "m.presence"
+    PRESENCE: Final = "m.presence"
+    TYPING: Final = "m.typing"
+    RECEIPT: Final = "m.receipt"
+    DEVICE_LIST_UPDATE: Final = "m.device_list_update"
+    SIGNING_KEY_UPDATE: Final = "m.signing_key_update"
+    UNSTABLE_SIGNING_KEY_UPDATE: Final = "org.matrix.signing_key_update"
+    DIRECT_TO_DEVICE: Final = "m.direct_to_device"
 
 
 class RejectedReason:

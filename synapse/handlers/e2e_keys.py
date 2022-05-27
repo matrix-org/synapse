@@ -25,6 +25,7 @@ from unpaddedbase64 import decode_base64
 
 from twisted.internet import defer
 
+from synapse.api.constants import EduTypes
 from synapse.api.errors import CodeMessageException, Codes, NotFoundError, SynapseError
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import log_kv, set_tag, tag_args, trace
@@ -66,13 +67,13 @@ class E2eKeysHandler:
             # Only register this edu handler on master as it requires writing
             # device updates to the db
             federation_registry.register_edu_handler(
-                "m.signing_key_update",
+                EduTypes.SIGNING_KEY_UPDATE,
                 self._edu_updater.incoming_signing_key_update,
             )
             # also handle the unstable version
             # FIXME: remove this when enough servers have upgraded
             federation_registry.register_edu_handler(
-                "org.matrix.signing_key_update",
+                EduTypes.UNSTABLE_SIGNING_KEY_UPDATE,
                 self._edu_updater.incoming_signing_key_update,
             )
 

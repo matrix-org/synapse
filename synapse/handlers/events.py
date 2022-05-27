@@ -113,7 +113,7 @@ class EventStreamHandler:
                     states = await presence_handler.get_states(users)
                     to_add.extend(
                         {
-                            "type": EduTypes.Presence,
+                            "type": EduTypes.PRESENCE,
                             "content": format_user_presence_state(state, time_now),
                         }
                         for state in states
