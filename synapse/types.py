@@ -639,7 +639,7 @@ class StreamToken:
         6. `push_rules_key`: `541479`
         7. `to_device_key`: `274711`
         8. `device_list_key`: `265584`
-        9. `groups_key`: `1`
+        9. `groups_key`: `1` (note that this key is now unused)
 
     You can see how many of these keys correspond to the various
     fields in a "/sync" response:
