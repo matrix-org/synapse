@@ -33,7 +33,7 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, HistoryVisibility, Membership
+from synapse.api.constants import EduTypes, EventTypes, HistoryVisibility, Membership
 from synapse.api.errors import AuthError
 from synapse.events import EventBase
 from synapse.handlers.presence import format_user_presence_state
@@ -46,6 +46,7 @@ from synapse.types import (
     JsonDict,
     PersistedEventPosition,
     RoomStreamToken,
+    StreamKeyType,
     StreamToken,
     UserID,
 )
@@ -370,7 +371,7 @@ class Notifier:
 
         if users or rooms:
             self.on_new_event(
-                "room_key",
+                StreamKeyType.ROOM,
                 max_room_stream_token,
                 users=users,
                 rooms=rooms,
@@ -440,7 +441,7 @@ class Notifier:
             for room in rooms:
                 user_streams |= self.room_to_user_streams.get(room, set())
 
-            if stream_key == "to_device_key":
+            if stream_key == StreamKeyType.TO_DEVICE:
                 issue9533_logger.debug(
                     "to-device messages stream id %s, awaking streams for %s",
                     new_token,
@@ -631,7 +632,7 @@ class Notifier:
                     now = self.clock.time_msec()
                     new_events[:] = [
                         {
-                            "type": "m.presence",
+                            "type": EduTypes.PRESENCE,
                             "content": format_user_presence_state(event, now),
                         }
                         for event in new_events

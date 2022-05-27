@@ -114,7 +114,7 @@ class Mailer:
 
         self.send_email_handler = hs.get_send_email_handler()
         self.store = self.hs.get_datastores().main
-        self.state_store = self.hs.get_storage().state
+        self.state_storage = self.hs.get_storage().state
         self.macaroon_gen = self.hs.get_macaroon_generator()
         self.state_handler = self.hs.get_state_handler()
         self.storage = hs.get_storage()
@@ -494,7 +494,7 @@ class Mailer:
             )
         else:
             # Attempt to check the historical state for the room.
-            historical_state = await self.state_store.get_state_for_event(
+            historical_state = await self.state_storage.get_state_for_event(
                 event.event_id, StateFilter.from_types((type_state_key,))
             )
             sender_state_event = historical_state.get(type_state_key)
@@ -767,7 +767,7 @@ class Mailer:
                 member_event_ids.append(sender_state_event_id)
             else:
                 # Attempt to check the historical state for the room.
-                historical_state = await self.state_store.get_state_for_event(
+                historical_state = await self.state_storage.get_state_for_event(
                     event_id, StateFilter.from_types((type_state_key,))
                 )
                 sender_state_event = historical_state.get(type_state_key)

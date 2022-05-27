@@ -49,7 +49,7 @@ from prometheus_client import Counter
 from typing_extensions import ContextManager
 
 import synapse.metrics
-from synapse.api.constants import EventTypes, Membership, PresenceState
+from synapse.api.constants import EduTypes, EventTypes, Membership, PresenceState
 from synapse.api.errors import SynapseError
 from synapse.api.presence import UserPresenceState
 from synapse.appservice import ApplicationService
@@ -66,7 +66,7 @@ from synapse.replication.tcp.commands import ClearUserSyncsCommand
 from synapse.replication.tcp.streams import PresenceFederationStream, PresenceStream
 from synapse.storage.databases.main import DataStore
 from synapse.streams import EventSource
-from synapse.types import JsonDict, UserID, get_domain_from_id
+from synapse.types import JsonDict, StreamKeyType, UserID, get_domain_from_id
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.metrics import Measure
@@ -394,7 +394,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
 
         # Route presence EDUs to the right worker
         hs.get_federation_registry().register_instances_for_edu(
-            "m.presence",
+            EduTypes.PRESENCE,
             hs.config.worker.writers.presence,
         )
 
@@ -522,7 +522,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         room_ids_to_states, users_to_states = parties
 
         self.notifier.on_new_event(
-            "presence_key",
+            StreamKeyType.PRESENCE,
             stream_id,
             rooms=room_ids_to_states.keys(),
             users=users_to_states.keys(),
@@ -649,7 +649,9 @@ class PresenceHandler(BasePresenceHandler):
 
         federation_registry = hs.get_federation_registry()
 
-        federation_registry.register_edu_handler("m.presence", self.incoming_presence)
+        federation_registry.register_edu_handler(
+            EduTypes.PRESENCE, self.incoming_presence
+        )
 
         LaterGauge(
             "synapse_handlers_presence_user_to_current_state_size",
@@ -1145,7 +1147,7 @@ class PresenceHandler(BasePresenceHandler):
         room_ids_to_states, users_to_states = parties
 
         self.notifier.on_new_event(
-            "presence_key",
+            StreamKeyType.PRESENCE,
             stream_id,
             rooms=room_ids_to_states.keys(),
             users=[UserID.from_string(u) for u in users_to_states],

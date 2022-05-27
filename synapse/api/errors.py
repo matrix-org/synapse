@@ -17,6 +17,7 @@
 
 import logging
 import typing
+from enum import Enum
 from http import HTTPStatus
 from typing import Any, Dict, List, Optional, Union
 
@@ -30,7 +31,11 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class Codes:
+class Codes(str, Enum):
+    """
+    All known error codes, as an enum of strings.
+    """
+
     UNRECOGNIZED = "M_UNRECOGNIZED"
     UNAUTHORIZED = "M_UNAUTHORIZED"
     FORBIDDEN = "M_FORBIDDEN"
@@ -74,6 +79,13 @@ class Codes:
     WEAK_PASSWORD = "M_WEAK_PASSWORD"
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
+
+    # The account has been suspended on the server.
+    # By opposition to `USER_DEACTIVATED`, this is a reversible measure
+    # that can possibly be appealed and reverted.
+    # Part of MSC3823.
+    USER_ACCOUNT_SUSPENDED = "M_ORG_MATRIX_MSC3823_USER_ACCOUNT_SUSPENDED"
+
     BAD_ALIAS = "M_BAD_ALIAS"
     # For restricted join rules.
     UNABLE_AUTHORISE_JOIN = "M_UNABLE_TO_AUTHORISE_JOIN"

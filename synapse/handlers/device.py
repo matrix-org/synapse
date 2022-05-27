@@ -28,7 +28,7 @@ from typing import (
 )
 
 from synapse.api import errors
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EduTypes, EventTypes
 from synapse.api.errors import (
     Codes,
     FederationDeniedError,
@@ -43,6 +43,7 @@ from synapse.metrics.background_process_metrics import (
 )
 from synapse.types import (
     JsonDict,
+    StreamKeyType,
     StreamToken,
     UserID,
     get_domain_from_id,
@@ -69,7 +70,7 @@ class DeviceWorkerHandler:
         self.store = hs.get_datastores().main
         self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
-        self.state_store = hs.get_storage().state
+        self.state_storage = hs.get_storage().state
         self._auth_handler = hs.get_auth_handler()
         self.server_name = hs.hostname
 
@@ -202,7 +203,9 @@ class DeviceWorkerHandler:
                 continue
 
             # mapping from event_id -> state_dict
-            prev_state_ids = await self.state_store.get_state_ids_for_events(event_ids)
+            prev_state_ids = await self.state_storage.get_state_ids_for_events(
+                event_ids
+            )
 
             # Check if we've joined the room? If so we just blindly add all the users to
             # the "possibly changed" users.
@@ -276,7 +279,8 @@ class DeviceHandler(DeviceWorkerHandler):
         federation_registry = hs.get_federation_registry()
 
         federation_registry.register_edu_handler(
-            "m.device_list_update", self.device_list_updater.incoming_device_list_update
+            EduTypes.DEVICE_LIST_UPDATE,
+            self.device_list_updater.incoming_device_list_update,
         )
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
@@ -502,7 +506,7 @@ class DeviceHandler(DeviceWorkerHandler):
         # specify the user ID too since the user should always get their own device list
         # updates, even if they aren't in any rooms.
         self.notifier.on_new_event(
-            "device_list_key", position, users={user_id}, rooms=room_ids
+            StreamKeyType.DEVICE_LIST, position, users={user_id}, rooms=room_ids
         )
 
         # We may need to do some processing asynchronously for local user IDs.
@@ -523,7 +527,9 @@ class DeviceHandler(DeviceWorkerHandler):
             from_user_id, user_ids
         )
 
-        self.notifier.on_new_event("device_list_key", position, users=[from_user_id])
+        self.notifier.on_new_event(
+            StreamKeyType.DEVICE_LIST, position, users=[from_user_id]
+        )
 
     async def user_left_room(self, user: UserID, room_id: str) -> None:
         user_id = user.to_string()
@@ -760,6 +766,10 @@ class DeviceListUpdater:
         device_id = edu_content.pop("device_id")
         stream_id = str(edu_content.pop("stream_id"))  # They may come as ints
         prev_ids = edu_content.pop("prev_id", [])
+        if not isinstance(prev_ids, list):
+            raise SynapseError(
+                400, "Device list update had an invalid 'prev_ids' field"
+            )
         prev_ids = [str(p) for p in prev_ids]  # They may come as ints
 
         if get_domain_from_id(user_id) != origin:

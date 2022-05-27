@@ -30,6 +30,7 @@ from synapse.types import (
     Requester,
     RoomStreamToken,
     StateMap,
+    StreamKeyType,
     StreamToken,
     UserID,
 )
@@ -67,7 +68,7 @@ class InitialSyncHandler:
         ] = ResponseCache(hs.get_clock(), "initial_sync_cache")
         self._event_serializer = hs.get_event_client_serializer()
         self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self.state_storage = self.storage.state
 
     async def snapshot_all_rooms(
         self,
@@ -143,7 +144,7 @@ class InitialSyncHandler:
             to_key=int(now_token.receipt_key),
         )
         if self.hs.config.experimental.msc2285_enabled:
-            receipt = ReceiptEventSource.filter_out_private(receipt, user_id)
+            receipt = ReceiptEventSource.filter_out_private_receipts(receipt, user_id)
 
         tags_by_room = await self.store.get_tags_for_user(user_id)
 
@@ -197,7 +198,7 @@ class InitialSyncHandler:
                         event.stream_ordering,
                     )
                     deferred_room_state = run_in_background(
-                        self.state_store.get_state_for_events, [event.event_id]
+                        self.state_storage.get_state_for_events, [event.event_id]
                     ).addCallback(
                         lambda states: cast(StateMap[EventBase], states[event.event_id])
                     )
@@ -220,8 +221,10 @@ class InitialSyncHandler:
                     self.storage, user_id, messages
                 )
 
-                start_token = now_token.copy_and_replace("room_key", token)
-                end_token = now_token.copy_and_replace("room_key", room_end_token)
+                start_token = now_token.copy_and_replace(StreamKeyType.ROOM, token)
+                end_token = now_token.copy_and_replace(
+                    StreamKeyType.ROOM, room_end_token
+                )
                 time_now = self.clock.time_msec()
 
                 d["messages"] = {
@@ -271,7 +274,7 @@ class InitialSyncHandler:
             "rooms": rooms_ret,
             "presence": [
                 {
-                    "type": "m.presence",
+                    "type": EduTypes.PRESENCE,
                     "content": format_user_presence_state(event, now),
                 }
                 for event in presence
@@ -352,7 +355,7 @@ class InitialSyncHandler:
         member_event_id: str,
         is_peeking: bool,
     ) -> JsonDict:
-        room_state = await self.state_store.get_state_for_event(member_event_id)
+        room_state = await self.state_storage.get_state_for_event(member_event_id)
 
         limit = pagin_config.limit if pagin_config else None
         if limit is None:
@@ -369,8 +372,8 @@ class InitialSyncHandler:
             self.storage, user_id, messages, is_peeking=is_peeking
         )
 
-        start_token = StreamToken.START.copy_and_replace("room_key", token)
-        end_token = StreamToken.START.copy_and_replace("room_key", stream_token)
+        start_token = StreamToken.START.copy_and_replace(StreamKeyType.ROOM, token)
+        end_token = StreamToken.START.copy_and_replace(StreamKeyType.ROOM, stream_token)
 
         time_now = self.clock.time_msec()
 
@@ -436,7 +439,7 @@ class InitialSyncHandler:
 
             return [
                 {
-                    "type": EduTypes.Presence,
+                    "type": EduTypes.PRESENCE,
                     "content": format_user_presence_state(s, time_now),
                 }
                 for s in states
@@ -449,7 +452,9 @@ class InitialSyncHandler:
             if not receipts:
                 return []
             if self.hs.config.experimental.msc2285_enabled:
-                receipts = ReceiptEventSource.filter_out_private(receipts, user_id)
+                receipts = ReceiptEventSource.filter_out_private_receipts(
+                    receipts, user_id
+                )
             return receipts
 
         presence, receipts, (messages, token) = await make_deferred_yieldable(
@@ -472,7 +477,7 @@ class InitialSyncHandler:
             self.storage, user_id, messages, is_peeking=is_peeking
         )
 
-        start_token = now_token.copy_and_replace("room_key", token)
+        start_token = now_token.copy_and_replace(StreamKeyType.ROOM, token)
         end_token = now_token
 
         time_now = self.clock.time_msec()

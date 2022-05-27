@@ -562,8 +562,13 @@ class RoomSummaryHandler:
         if join_rules_event_id:
             join_rules_event = await self._store.get_event(join_rules_event_id)
             join_rule = join_rules_event.content.get("join_rule")
-            if join_rule == JoinRules.PUBLIC or (
-                room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
+            if (
+                join_rule == JoinRules.PUBLIC
+                or (room_version.msc2403_knocking and join_rule == JoinRules.KNOCK)
+                or (
+                    room_version.msc3787_knock_restricted_join_rule
+                    and join_rule == JoinRules.KNOCK_RESTRICTED
+                )
             ):
                 return True
 
@@ -657,7 +662,8 @@ class RoomSummaryHandler:
         # The API doesn't return the room version so assume that a
         # join rule of knock is valid.
         if (
-            room.get("join_rules") in (JoinRules.PUBLIC, JoinRules.KNOCK)
+            room.get("join_rule")
+            in (JoinRules.PUBLIC, JoinRules.KNOCK, JoinRules.KNOCK_RESTRICTED)
             or room.get("world_readable") is True
         ):
             return True
@@ -708,9 +714,6 @@ class RoomSummaryHandler:
             "canonical_alias": stats["canonical_alias"],
             "num_joined_members": stats["joined_members"],
             "avatar_url": stats["avatar"],
-            # plural join_rules is a documentation error but kept for historical
-            # purposes. Should match /publicRooms.
-            "join_rules": stats["join_rules"],
             "join_rule": stats["join_rules"],
             "world_readable": (
                 stats["history_visibility"] == HistoryVisibility.WORLD_READABLE

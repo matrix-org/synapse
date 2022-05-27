@@ -27,7 +27,7 @@ from synapse.handlers.room import ShutdownRoomResponse
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
-from synapse.types import JsonDict, Requester
+from synapse.types import JsonDict, Requester, StreamKeyType
 from synapse.util.async_helpers import ReadWriteLock
 from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
@@ -130,7 +130,7 @@ class PaginationHandler:
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self.state_storage = self.storage.state
         self.clock = hs.get_clock()
         self._server_name = hs.hostname
         self._room_shutdown_handler = hs.get_room_shutdown_handler()
@@ -239,7 +239,7 @@ class PaginationHandler:
             # defined in the server's configuration, we can safely assume that's the
             # case and use it for this room.
             max_lifetime = (
-                retention_policy["max_lifetime"] or self._retention_default_max_lifetime
+                retention_policy.max_lifetime or self._retention_default_max_lifetime
             )
 
             # Cap the effective max_lifetime to be within the range allowed in the
@@ -491,7 +491,7 @@ class PaginationHandler:
 
                     if leave_token.topological < curr_topo:
                         from_token = from_token.copy_and_replace(
-                            "room_key", leave_token
+                            StreamKeyType.ROOM, leave_token
                         )
 
                 await self.hs.get_federation_handler().maybe_backfill(
@@ -513,7 +513,7 @@ class PaginationHandler:
                 event_filter=event_filter,
             )
 
-            next_token = from_token.copy_and_replace("room_key", next_key)
+            next_token = from_token.copy_and_replace(StreamKeyType.ROOM, next_key)
 
         if events:
             if event_filter:
@@ -539,7 +539,7 @@ class PaginationHandler:
                 (EventTypes.Member, event.sender) for event in events
             )
 
-            state_ids = await self.state_store.get_state_ids_for_event(
+            state_ids = await self.state_storage.get_state_ids_for_event(
                 events[0].event_id, state_filter=state_filter
             )
 

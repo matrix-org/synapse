@@ -23,7 +23,7 @@ from synapse.replication.http.account_data import (
     ReplicationUserAccountDataRestServlet,
 )
 from synapse.streams import EventSource
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, StreamKeyType, UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -105,7 +105,7 @@ class AccountDataHandler:
             )
 
             self._notifier.on_new_event(
-                "account_data_key", max_stream_id, users=[user_id]
+                StreamKeyType.ACCOUNT_DATA, max_stream_id, users=[user_id]
             )
 
             await self._notify_modules(user_id, room_id, account_data_type, content)
@@ -141,7 +141,7 @@ class AccountDataHandler:
             )
 
             self._notifier.on_new_event(
-                "account_data_key", max_stream_id, users=[user_id]
+                StreamKeyType.ACCOUNT_DATA, max_stream_id, users=[user_id]
             )
 
             await self._notify_modules(user_id, None, account_data_type, content)
@@ -176,7 +176,7 @@ class AccountDataHandler:
             )
 
             self._notifier.on_new_event(
-                "account_data_key", max_stream_id, users=[user_id]
+                StreamKeyType.ACCOUNT_DATA, max_stream_id, users=[user_id]
             )
             return max_stream_id
         else:
@@ -201,7 +201,7 @@ class AccountDataHandler:
             )
 
             self._notifier.on_new_event(
-                "account_data_key", max_stream_id, users=[user_id]
+                StreamKeyType.ACCOUNT_DATA, max_stream_id, users=[user_id]
             )
             return max_stream_id
         else:

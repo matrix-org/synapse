@@ -743,14 +743,17 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         """
 
         def _f(txn: LoggingTransaction) -> Optional[Tuple[int, int, str]]:
-            sql = (
-                "SELECT stream_ordering, topological_ordering, event_id"
-                " FROM events"
-                " WHERE room_id = ? AND stream_ordering <= ?"
-                " AND NOT outlier"
-                " ORDER BY stream_ordering DESC"
-                " LIMIT 1"
-            )
+            sql = """
+                SELECT stream_ordering, topological_ordering, event_id
+                FROM events
+                LEFT JOIN rejections USING (event_id)
+                WHERE room_id = ?
+                    AND stream_ordering <= ?
+                    AND NOT outlier
+                    AND rejections.event_id IS NULL
+                ORDER BY stream_ordering DESC
+                LIMIT 1
+            """
             txn.execute(sql, (room_id, stream_ordering))
             return cast(Optional[Tuple[int, int, str]], txn.fetchone())
 

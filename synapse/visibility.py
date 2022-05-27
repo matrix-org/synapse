@@ -22,7 +22,7 @@ from synapse.events import EventBase
 from synapse.events.utils import prune_event
 from synapse.storage import Storage
 from synapse.storage.state import StateFilter
-from synapse.types import StateMap, get_domain_from_id
+from synapse.types import RetentionPolicy, StateMap, get_domain_from_id
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ async def filter_events_for_client(
 
     if filter_send_to_client:
         room_ids = {e.room_id for e in events}
-        retention_policies = {}
+        retention_policies: Dict[str, RetentionPolicy] = {}
 
         for room_id in room_ids:
             retention_policies[
@@ -137,7 +137,7 @@ async def filter_events_for_client(
             # events.
             if not event.is_state():
                 retention_policy = retention_policies[event.room_id]
-                max_lifetime = retention_policy.get("max_lifetime")
+                max_lifetime = retention_policy.max_lifetime
 
                 if max_lifetime is not None:
                     oldest_allowed_ts = storage.main.clock.time_msec() - max_lifetime

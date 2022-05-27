@@ -24,7 +24,7 @@ from synapse.api.errors import NotFoundError, SynapseError
 from synapse.api.filtering import Filter
 from synapse.events import EventBase
 from synapse.storage.state import StateFilter
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, StreamKeyType, UserID
 from synapse.visibility import filter_events_for_client
 
 if TYPE_CHECKING:
@@ -56,7 +56,7 @@ class SearchHandler:
         self._event_serializer = hs.get_event_client_serializer()
         self._relations_handler = hs.get_relations_handler()
         self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self.state_storage = self.storage.state
         self.auth = hs.get_auth()
 
     async def get_old_rooms_from_upgraded_room(self, room_id: str) -> Iterable[str]:
@@ -655,11 +655,11 @@ class SearchHandler:
                 "events_before": events_before,
                 "events_after": events_after,
                 "start": await now_token.copy_and_replace(
-                    "room_key", res.start
+                    StreamKeyType.ROOM, res.start
                 ).to_string(self.store),
-                "end": await now_token.copy_and_replace("room_key", res.end).to_string(
-                    self.store
-                ),
+                "end": await now_token.copy_and_replace(
+                    StreamKeyType.ROOM, res.end
+                ).to_string(self.store),
             }
 
             if include_profile:
@@ -677,7 +677,7 @@ class SearchHandler:
                     [(EventTypes.Member, sender) for sender in senders]
                 )
 
-                state = await self.state_store.get_state_for_event(
+                state = await self.state_storage.get_state_for_event(
                     last_event_id, state_filter
                 )
 
