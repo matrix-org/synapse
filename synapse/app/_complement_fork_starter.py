@@ -11,11 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import importlib
-import itertools
-import multiprocessing
-import sys
-
+#
+#
+#
 # This script is intended for test purposes only (within Complement).
 # It spawns multiple workers, whilst only going through the code loading process
 # once.
@@ -31,6 +29,10 @@ import sys
 #     synapse.app.generic_worker [args..] -- \
 #   ...
 #     synapse.app.generic_worker [args..]
+import importlib
+import itertools
+import multiprocessing
+import sys
 from typing import Any, Callable, List
 
 from twisted.internet.main import installReactor
@@ -42,10 +44,10 @@ class ProxiedReactor:
     the reactor by changing the target of the proxy.
     """
 
-    def __init__(self):
-        self.___reactor_target = None
+    def __init__(self) -> None:
+        self.___reactor_target: Any = None
 
-    def ___install(self, new_reactor):
+    def ___install(self, new_reactor: Any) -> None:
         self.___reactor_target = new_reactor
 
     def __getattr__(self, attr_name: str) -> Any:
