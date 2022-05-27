@@ -1461,16 +1461,16 @@ class FederationHandler:
 
     async def _sync_partial_state_room(
         self,
-        destination: Optional[str],
-        destinations: Collection[str],
+        initial_destination: Optional[str],
+        other_destinations: Collection[str],
         room_id: str,
     ) -> None:
         """Background process to resync the state of a partial-state room
 
         Args:
-            destination: the initial homeserver to pull the state from
-            destinations: other homeservers to try to pull the state from, if
-                `destination` is unavailable
+            initial_destination: the initial homeserver to pull the state from
+            other_destinations: other homeservers to try to pull the state from, if
+                `initial_destination` is unavailable
             room_id: room to be resynced
         """
 
@@ -1484,15 +1484,17 @@ class FederationHandler:
 
         # Make an infinite iterator of destinations to try. Once we find a working
         # destination, we'll stick with it until it flakes.
-        if destination is not None:
-            # Move `destination` to the front of the list.
-            destinations = list(destinations)
-            if destination in destinations:
-                destinations.remove(destination)
-            destinations = [destination] + destinations
-        destination_iter = itertools.cycle(destinations)
+        if initial_destination is not None:
+            # Move `initial_destination` to the front of the list.
+            destinations = list(other_destinations)
+            if initial_destination in destinations:
+                destinations.remove(initial_destination)
+            destinations = [initial_destination] + destinations
+            destination_iter = itertools.cycle(destinations)
+        else:
+            destination_iter = itertools.cycle(other_destinations)
 
-        # `destination` is now the current remote homeserver we're pulling from.
+        # `destination` is the current remote homeserver we're pulling from.
         destination = next(destination_iter)
         logger.info("Syncing state for room %s via %s", room_id, destination)
 
