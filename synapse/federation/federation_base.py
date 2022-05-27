@@ -97,7 +97,7 @@ class FederationBase:
             if set(redacted_event.keys()) == set(pdu.keys()) and set(
                 redacted_event.content.keys()
             ) == set(pdu.content.keys()):
-                logger.info(
+                logger.debug(
                     "Event %s seems to have been redacted; using our redacted copy",
                     pdu.event_id,
                 )
