@@ -16,15 +16,17 @@ from synapse.storage.engines import Sqlite3Engine
 
 def run_create(cur, database_engine, *args, **kwargs):
     # Upgrade the event_search table to use the porter tokenizer if it isn't already
-    if isinstance(database_engine, Sqlite3Engine):        
+    if isinstance(database_engine, Sqlite3Engine):
         cur.execute("SELECT sql FROM sqlite_master WHERE name='event_search'")
         sql = cur.fetchone()
         if sql is None:
             raise Exception("The event_search table doesn't exist")
         if "tokenize=porter" not in sql[0]:
             cur.execute("DROP TABLE event_search")
-            cur.execute("""CREATE VIRTUAL TABLE event_search
-                           USING fts4 (tokenize=porter, event_id, room_id, sender, key, value )""")
+            cur.execute(
+                """CREATE VIRTUAL TABLE event_search
+                           USING fts4 (tokenize=porter, event_id, room_id, sender, key, value )"""
+            )
 
             # Run a background job to re-populate the event_search table.
             cur.execute("SELECT MIN(stream_ordering) FROM events")
