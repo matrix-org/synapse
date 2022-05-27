@@ -389,13 +389,10 @@ class DeviceHandler(DeviceWorkerHandler):
         assert self._delete_stale_devices_after is not None
         now_ms = self.clock.time_msec()
         since_ms = now_ms - self._delete_stale_devices_after
-        devices = await self.store.get_devices_not_accessed_since(since_ms)
+        devices = await self.store.get_local_devices_not_accessed_since(since_ms)
 
         for user_id, user_devices in devices.items():
-            # The devices table can contain devices for remote users, and we don't want
-            # e.g. break encryption by accidentally removing them.
-            if self.hs.is_mine_id(user_id):
-                await self.delete_devices(user_id, user_devices)
+            await self.delete_devices(user_id, user_devices)
 
     @trace
     async def delete_device(self, user_id: str, device_id: str) -> None:
