@@ -1092,7 +1092,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
         rows = await self.db_pool.simple_select_list(
             "partial_state_rooms_servers",
-            keyvalues={},
+            keyvalues=None,
             retcols=("room_id", "server_name"),
             desc="get_partial_state_rooms",
         )
