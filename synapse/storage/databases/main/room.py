@@ -1112,7 +1112,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             keyvalues={"room_id": room_id},
         )
 
-    async def is_room_got_partial_state(self, room_id: str) -> bool:
+    async def has_room_only_got_partial_state(self, room_id: str) -> bool:
         "Whether the given room only has partial state stored"
 
         entry = await self.db_pool.simple_select_one_onecol(
@@ -1120,7 +1120,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             keyvalues={"room_id": room_id},
             retcol="room_id",
             allow_none=True,
-            desc="is_room_got_partial_state",
+            desc="has_room_only_got_partial_state",
         )
 
         return entry is not None
