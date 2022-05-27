@@ -575,6 +575,18 @@ Example configuration:
 dummy_events_threshold: 5
 ```
 ---
+Config option `delete_stale_devices_after`
+
+An optional duration. If set, Synapse will run a daily background task to log out and
+delete any device that hasn't been accessed for more than the specified amount of time.
+
+Defaults to no duration, which means devices are never pruned.
+
+Example configuration:
+```yaml
+delete_stale_devices_after: 1y
+```
+
 ## Homeserver blocking ##
 Useful options for Synapse admins.
 
