@@ -1156,7 +1156,7 @@ class DeviceWorkerStore(SQLBaseStore):
     async def get_devices_not_accessed_since(
         self, since_ms: int
     ) -> Dict[str, List[str]]:
-        """Retrieves a list of all devices that haven't been accessed since a given date.
+        """Retrieves devices that haven't been accessed since a given date.
 
         Args:
             since_ms: the timestamp to select on, every device with a last access date
@@ -1185,9 +1185,8 @@ class DeviceWorkerStore(SQLBaseStore):
 
         devices: Dict[str, List[str]] = {}
         for row in rows:
-            user_devices = devices.get(row["user_id"], [])
+            user_devices = devices.setdefault(row["user_id"], [])
             user_devices.append(row["device_id"])
-            devices[row["user_id"]] = user_devices
 
         return devices
 
