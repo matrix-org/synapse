@@ -1481,6 +1481,10 @@ class FederationHandler:
         # TODO(faster_joins): what happens if we leave the room during a resync? if we
         #   really leave, that might mean we have difficulty getting the room state over
         #   federation.
+        #
+        # TODO(faster_joins): we need some way of prioritising which homeservers in
+        #   `other_destinations` to try first, otherwise we'll spend ages trying dead
+        #   homeservers for large rooms.
 
         if initial_destination is None and len(other_destinations) == 0:
             raise ValueError(f"Cannot resync state of {room_id}: no destinations provided")
@@ -1543,6 +1547,11 @@ class FederationHandler:
                     except FederationError as e:
                         if attempt == len(destinations) - 1:
                             # We have tried every remote server for this event. Give up.
+                            # TODO(faster_joins) giving up isn't the right thing to do
+                            #   if there's a temporary network outage. retrying
+                            #   indefinitely is also not the right thing to do if we can
+                            #   reach all homeservers and they all claim they don't have
+                            #   the state we want.
                             logger.error(
                                 "Failed to get state for %s at %s from %s because %s, "
                                 "giving up!",
