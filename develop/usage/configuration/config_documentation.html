@@ -624,6 +624,13 @@ The default value is 10.</p>
 <pre><code class="language-yaml">dummy_events_threshold: 5
 </code></pre>
 <hr />
+<p>Config option <code>delete_stale_devices_after</code></p>
+<p>An optional duration. If set, Synapse will run a daily background task to log out and
+delete any device that hasn't been accessed for more than the specified amount of time.</p>
+<p>Defaults to no duration, which means devices are never pruned.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">delete_stale_devices_after: 1y
+</code></pre>
 <h2 id="homeserver-blocking"><a class="header" href="#homeserver-blocking">Homeserver blocking</a></h2>
 <p>Useful options for Synapse admins.</p>
 <hr />
