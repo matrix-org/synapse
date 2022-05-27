@@ -1487,7 +1487,9 @@ class FederationHandler:
         #   homeservers for large rooms.
 
         if initial_destination is None and len(other_destinations) == 0:
-            raise ValueError(f"Cannot resync state of {room_id}: no destinations provided")
+            raise ValueError(
+                f"Cannot resync state of {room_id}: no destinations provided"
+            )
 
         # Make an infinite iterator of destinations to try. Once we find a working
         # destination, we'll stick with it until it flakes.
