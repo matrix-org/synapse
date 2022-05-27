@@ -2930,6 +2930,9 @@ Use this setting to enable password-based logins.
 
 This setting has the following sub-options:
 * `enabled`: Defaults to true.
+   Set to false to disable password authentication.
+   Set to `only_for_reauth` to allow users with existing passwords to use them
+   to log in and reauthenticate, whilst preventing new users from setting passwords.
 * `localdb_enabled`: Set to false to disable authentication against the local password
    database. This is ignored if `enabled` is false, and is only useful
    if you have other `password_providers`. Defaults to true. 
