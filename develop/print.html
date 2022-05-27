@@ -5549,7 +5549,10 @@ validation will fail without configuring audiences.</li>
 <p>Use this setting to enable password-based logins. </p>
 <p>This setting has the following sub-options:</p>
 <ul>
-<li><code>enabled</code>: Defaults to true.</li>
+<li><code>enabled</code>: Defaults to true.
+Set to false to disable password authentication.
+Set to <code>only_for_reauth</code> to allow users with existing passwords to use them
+to log in and reauthenticate, whilst preventing new users from setting passwords.</li>
 <li><code>localdb_enabled</code>: Set to false to disable authentication against the local password
 database. This is ignored if <code>enabled</code> is false, and is only useful
 if you have other <code>password_providers</code>. Defaults to true. </li>
@@ -8336,7 +8339,9 @@ sso:
 
 
 password_config:
-   # Uncomment to disable password login
+   # Uncomment to disable password login.
+   # Set to `only_for_reauth` to permit reauthentication for users that
+   # have passwords and are already logged in.
    #
    #enabled: false
 
