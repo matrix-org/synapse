@@ -1363,7 +1363,7 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
     def __init__(self, room_version: RoomVersion, v1_api: bool):
         self._response = SendJoinResponse([], [], event_dict={})
         self._room_version = room_version
-        self._coros = []
+        self._coros: List[Generator[None, bytes, None]] = []
 
         # The V1 API has the shape of `[200, {...}]`, which we handle by
         # prefixing with `item.*`.
@@ -1411,6 +1411,9 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
         return len(data)
 
     def finish(self) -> SendJoinResponse:
+        for c in self._coros:
+            c.close()
+
         if self._response.event_dict:
             self._response.event = make_event_from_dict(
                 self._response.event_dict, self._room_version
@@ -1430,7 +1433,7 @@ class _StateParser(ByteParser[StateRequestResponse]):
     def __init__(self, room_version: RoomVersion):
         self._response = StateRequestResponse([], [])
         self._room_version = room_version
-        self._coros = [
+        self._coros: List[Generator[None, bytes, None]] = [
             ijson.items_coro(
                 _event_list_parser(room_version, self._response.state),
                 "pdus.item",
@@ -1449,4 +1452,6 @@ class _StateParser(ByteParser[StateRequestResponse]):
         return len(data)
 
     def finish(self) -> StateRequestResponse:
+        for c in self._coros:
+            c.close()
         return self._response
