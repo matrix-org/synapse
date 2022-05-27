@@ -1,0 +1,1 @@
+Explicitly close `ijson` coroutines once we are done with them, instead of leaving the garbage collector to close them.
