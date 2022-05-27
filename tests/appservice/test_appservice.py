@@ -23,7 +23,7 @@ from tests.test_utils import simple_async_mock
 
 
 def _regex(regex: str, exclusive: bool = True) -> Namespace:
-    return Namespace(exclusive, None, re.compile(regex))
+    return Namespace(exclusive, re.compile(regex))
 
 
 class ApplicationServiceTestCase(unittest.TestCase):

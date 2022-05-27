@@ -270,9 +270,7 @@ class UnrecognizedRequestError(SynapseError):
     """An error indicating we don't understand the request you're trying to make"""
 
     def __init__(
-        self,
-        msg: str = "Unrecognized request",
-        errcode: str = Codes.UNRECOGNIZED,
+        self, msg: str = "Unrecognized request", errcode: str = Codes.UNRECOGNIZED
     ):
         super().__init__(400, msg, errcode)
 

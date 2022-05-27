@@ -45,7 +45,7 @@ from synapse.storage.database import (
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.types import Cursor
 from synapse.storage.util.id_generators import IdGenerator
-from synapse.types import JsonDict, ThirdPartyInstanceID
+from synapse.types import JsonDict, RetentionPolicy, ThirdPartyInstanceID
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 from synapse.util.stringutils import MXC_REGEX
@@ -233,24 +233,23 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                     UNION SELECT room_id from appservice_room_list
             """
 
-            sql = """
+            sql = f"""
                 SELECT
                     COUNT(*)
                 FROM (
-                    %(published_sql)s
+                    {published_sql}
                 ) published
                 INNER JOIN room_stats_state USING (room_id)
                 INNER JOIN room_stats_current USING (room_id)
                 WHERE
                     (
-                        join_rules = 'public' OR join_rules = '%(knock_join_rule)s'
+                        join_rules = '{JoinRules.PUBLIC}'
+                        OR join_rules = '{JoinRules.KNOCK}'
+                        OR join_rules = '{JoinRules.KNOCK_RESTRICTED}'
                         OR history_visibility = 'world_readable'
                     )
                     AND joined_members > 0
-            """ % {
-                "published_sql": published_sql,
-                "knock_join_rule": JoinRules.KNOCK,
-            }
+            """
 
             txn.execute(sql, query_args)
             return cast(Tuple[int], txn.fetchone())[0]
@@ -369,29 +368,29 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         if where_clauses:
             where_clause = " AND " + " AND ".join(where_clauses)
 
-        sql = """
+        dir = "DESC" if forwards else "ASC"
+        sql = f"""
             SELECT
                 room_id, name, topic, canonical_alias, joined_members,
                 avatar, history_visibility, guest_access, join_rules
             FROM (
-                %(published_sql)s
+                {published_sql}
             ) published
             INNER JOIN room_stats_state USING (room_id)
             INNER JOIN room_stats_current USING (room_id)
             WHERE
                 (
-                    join_rules = 'public' OR join_rules = '%(knock_join_rule)s'
+                    join_rules = '{JoinRules.PUBLIC}'
+                    OR join_rules = '{JoinRules.KNOCK}'
+                    OR join_rules = '{JoinRules.KNOCK_RESTRICTED}'
                     OR history_visibility = 'world_readable'
                 )
                 AND joined_members > 0
-                %(where_clause)s
-            ORDER BY joined_members %(dir)s, room_id %(dir)s
-        """ % {
-            "published_sql": published_sql,
-            "where_clause": where_clause,
-            "dir": "DESC" if forwards else "ASC",
-            "knock_join_rule": JoinRules.KNOCK,
-        }
+                {where_clause}
+            ORDER BY
+                joined_members {dir},
+                room_id {dir}
+        """
 
         if limit is not None:
             query_args.append(limit)
@@ -699,7 +698,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         await self.db_pool.runInteraction("delete_ratelimit", delete_ratelimit_txn)
 
     @cached()
-    async def get_retention_policy_for_room(self, room_id: str) -> Dict[str, int]:
+    async def get_retention_policy_for_room(self, room_id: str) -> RetentionPolicy:
         """Get the retention policy for a given room.
 
         If no retention policy has been found for this room, returns a policy defined
@@ -707,12 +706,20 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         the 'max_lifetime' if no default policy has been defined in the server's
         configuration).
 
+        If support for retention policies is disabled, a policy with a 'min_lifetime' and
+        'max_lifetime' of None is returned.
+
         Args:
             room_id: The ID of the room to get the retention policy of.
 
         Returns:
             A dict containing "min_lifetime" and "max_lifetime" for this room.
         """
+        # If the room retention feature is disabled, return a policy with no minimum nor
+        # maximum. This prevents incorrectly filtering out events when sending to
+        # the client.
+        if not self.config.retention.retention_enabled:
+            return RetentionPolicy()
 
         def get_retention_policy_for_room_txn(
             txn: LoggingTransaction,
@@ -736,10 +743,10 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         # If we don't know this room ID, ret will be None, in this case return the default
         # policy.
         if not ret:
-            return {
-                "min_lifetime": self.config.retention.retention_default_min_lifetime,
-                "max_lifetime": self.config.retention.retention_default_max_lifetime,
-            }
+            return RetentionPolicy(
+                min_lifetime=self.config.retention.retention_default_min_lifetime,
+                max_lifetime=self.config.retention.retention_default_max_lifetime,
+            )
 
         min_lifetime = ret[0]["min_lifetime"]
         max_lifetime = ret[0]["max_lifetime"]
@@ -754,10 +761,10 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         if max_lifetime is None:
             max_lifetime = self.config.retention.retention_default_max_lifetime
 
-        return {
-            "min_lifetime": min_lifetime,
-            "max_lifetime": max_lifetime,
-        }
+        return RetentionPolicy(
+            min_lifetime=min_lifetime,
+            max_lifetime=max_lifetime,
+        )
 
     async def get_media_mxcs_in_room(self, room_id: str) -> Tuple[List[str], List[str]]:
         """Retrieves all the local and remote media MXC URIs in a given room
@@ -994,7 +1001,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
     async def get_rooms_for_retention_period_in_range(
         self, min_ms: Optional[int], max_ms: Optional[int], include_null: bool = False
-    ) -> Dict[str, Dict[str, Optional[int]]]:
+    ) -> Dict[str, RetentionPolicy]:
         """Retrieves all of the rooms within the given retention range.
 
         Optionally includes the rooms which don't have a retention policy.
@@ -1016,7 +1023,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
         def get_rooms_for_retention_period_in_range_txn(
             txn: LoggingTransaction,
-        ) -> Dict[str, Dict[str, Optional[int]]]:
+        ) -> Dict[str, RetentionPolicy]:
             range_conditions = []
             args = []
 
@@ -1047,10 +1054,10 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             rooms_dict = {}
 
             for row in rows:
-                rooms_dict[row["room_id"]] = {
-                    "min_lifetime": row["min_lifetime"],
-                    "max_lifetime": row["max_lifetime"],
-                }
+                rooms_dict[row["room_id"]] = RetentionPolicy(
+                    min_lifetime=row["min_lifetime"],
+                    max_lifetime=row["max_lifetime"],
+                )
 
             if include_null:
                 # If required, do a second query that retrieves all of the rooms we know
@@ -1065,10 +1072,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 # policy in its state), add it with a null policy.
                 for row in rows:
                     if row["room_id"] not in rooms_dict:
-                        rooms_dict[row["room_id"]] = {
-                            "min_lifetime": None,
-                            "max_lifetime": None,
-                        }
+                        rooms_dict[row["room_id"]] = RetentionPolicy()
 
             return rooms_dict
 
