@@ -168,6 +168,9 @@ class FederationHandler:
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
 
+        # if this is the main process, fire off a background process to resume
+        # any partial-state-resync operations which were in flight when we
+        # were shut down.
         if not hs.config.worker.worker_app:
             run_as_background_process(
                 "resume_sync_partial_state_room", self._resume_sync_partial_state_room
