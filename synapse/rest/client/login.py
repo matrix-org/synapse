@@ -14,10 +14,10 @@
 
 import logging
 import random
-import re
 import string
 import time
-from re import fullmatch
+import re
+from re import match
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -343,12 +343,13 @@ class LoginRestServlet(RestServlet):
         )
 
         # 先验证签名的message是否在redis中，是否过期
-        message_ts = login_submission.get("timestamp")
+        # message_ts = login_submission.get("timestamp")
         req_message = login_submission.get("message")
         if not isinstance(req_message, str):
             raise SynapseError(400, "Bad parameter: message", Codes.INVALID_PARAM)
 
-        cache_message = self._external_cache.get(self._cache_name, message_ts)
+        nonce_str = req_message.split(':')[1]
+        cache_message = await self._external_cache.get(self._cache_name, nonce_str)
         if cache_message is None:
             raise SynapseError(400, "Wallet sign message is invalid, Please log in again.")
 
@@ -367,7 +368,6 @@ class LoginRestServlet(RestServlet):
 
         # user是amax链账号，验证下
 
-
         # 调chain.get_accountn方法拿用户信息
         account = self.client.get_account(username)
         if account is None:
@@ -383,8 +383,8 @@ class LoginRestServlet(RestServlet):
             raise SynapseError(400, "Get user_publickey failed")
 
         # 验证是否是amax链的公钥
-        match = fullmatch(r'AM', username)
-        if match is None:
+        matched = match('AM', user_publickey)
+        if matched is None:
             raise SynapseError(400, "Parsed user_publickey is invalid")
 
         canonical_user_id, callback = await self.auth_handler.validate_signature_login(
@@ -725,20 +725,21 @@ class RandomStrServlet(RestServlet):
         self._external_cache = hs.get_external_cache()
         self._cache_name = 'cache_sign_msg'
 
-    def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         ns = time.time_ns()
         rand_str = ''.join(random.sample(string.ascii_letters + string.digits + str(ns), 32))
 
         message = "Welcome to AMAX-IM! sign nonce:{s}".format(s=rand_str)
 
         # message to redis, expiry_ms: 60000
-        key = str(ns)
-        expiry_ms = 60000
-        self._external_cache.set(self._cache_name, key, message, expiry_ms)
+        key = rand_str
+        # test
+        expiry_ms = 3000000
+        await self._external_cache.set(self._cache_name, key, message, expiry_ms)
 
         response: Dict[str, Union[str, int]] = {
             "message": message,
-            "timestamp": key
+            # "timestamp": key
         }
 
         return 200, response

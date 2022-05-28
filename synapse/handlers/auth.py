@@ -1368,38 +1368,38 @@ class AuthHandler:
         # We don't need to remove LoginType.PASSWORD from the list if password login is
         # disabled, since if that were the case then by this point we know that the
         # login_type is not LoginType.PASSWORD
-        supported_login_types = self.password_auth_provider.get_supported_login_types()
-        # check if the login type being used is supported by a module
-        if login_type in supported_login_types:
-            # Make a note that this login type is supported by the server
-            known_login_type = True
-            # Get all the fields expected for this login types
-            login_fields = supported_login_types[login_type]
-
-            # go through the login submission and keep track of which required fields are
-            # provided/not provided
-            missing_fields = []
-            login_dict = {}
-            for f in login_fields:
-                if f not in login_submission:
-                    missing_fields.append(f)
-                else:
-                    login_dict[f] = login_submission[f]
-            # raise an error if any of the expected fields for that login type weren't provided
-            if missing_fields:
-                raise SynapseError(
-                    400,
-                    "Missing parameters for login type %s: %s"
-                    % (login_type, missing_fields),
-                )
-
-            # call all of the check_auth hooks for that login_type
-            # it will return a result once the first success is found (or None otherwise)
-            result = await self.password_auth_provider.check_auth(
-                username, login_type, login_dict
-            )
-            if result:
-                return result
+        # supported_login_types = self.password_auth_provider.get_supported_login_types()
+        # # check if the login type being used is supported by a module
+        # if login_type in supported_login_types:
+        #     # Make a note that this login type is supported by the server
+        #     known_login_type = True
+        #     # Get all the fields expected for this login types
+        #     login_fields = supported_login_types[login_type]
+        #
+        #     # go through the login submission and keep track of which required fields are
+        #     # provided/not provided
+        #     missing_fields = []
+        #     login_dict = {}
+        #     for f in login_fields:
+        #         if f not in login_submission:
+        #             missing_fields.append(f)
+        #         else:
+        #             login_dict[f] = login_submission[f]
+        #     # raise an error if any of the expected fields for that login type weren't provided
+        #     if missing_fields:
+        #         raise SynapseError(
+        #             400,
+        #             "Missing parameters for login type %s: %s"
+        #             % (login_type, missing_fields),
+        #         )
+        #
+        #     # call all of the check_auth hooks for that login_type
+        #     # it will return a result once the first success is found (or None otherwise)
+        #     result = await self.password_auth_provider.check_auth(
+        #         username, login_type, login_dict
+        #     )
+        #     if result:
+        #         return result
 
         # if no module managed to authenticate the user, then fallback to built in password based auth
         if login_type == LoginType.SIGNATURE and self._password_localdb_enabled:
