@@ -162,16 +162,7 @@ async def filter_events_for_client(
         state = event_id_to_state[event.event_id]
 
         # get the room_visibility at the time of the event.
-        visibility_event = state.get(_HISTORY_VIS_KEY, None)
-        if visibility_event:
-            visibility = visibility_event.content.get(
-                "history_visibility", HistoryVisibility.SHARED
-            )
-        else:
-            visibility = HistoryVisibility.SHARED
-
-        if visibility not in VISIBILITY_PRIORITY:
-            visibility = HistoryVisibility.SHARED
+        visibility = get_effective_room_visibility_from_state(state)
 
         # Always allow history visibility events on boundaries. This is done
         # by setting the effective visibility to the least restrictive
@@ -265,6 +256,23 @@ async def filter_events_for_client(
 
     # Turn it into a list and remove None entries before returning.
     return [ev for ev in filtered_events if ev]
+
+
+def get_effective_room_visibility_from_state(state: StateMap[EventBase]) -> str:
+    """Get the actual history vis, from a state map including the history_visibility event
+
+    Handles missing and invalid history visibility events.
+    """
+    visibility_event = state.get(_HISTORY_VIS_KEY, None)
+    if not visibility_event:
+        return HistoryVisibility.SHARED
+
+    visibility = visibility_event.content.get(
+        "history_visibility", HistoryVisibility.SHARED
+    )
+    if visibility not in VISIBILITY_PRIORITY:
+        visibility = HistoryVisibility.SHARED
+    return visibility
 
 
 async def filter_events_for_server(
