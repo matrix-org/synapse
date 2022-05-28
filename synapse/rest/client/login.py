@@ -122,8 +122,9 @@ class LoginRestServlet(RestServlet):
             burst_count=self.hs.config.ratelimiting.rc_login_account.burst_count,
         )
 
-        # 后面改成从配置中读取
-        self.client = eospy.api.ChainApi(['http://139.224.250.244:18888/'], 10)
+        # self.client = eospy.api.ChainApi(['http://139.224.250.244:18888/'], 10)
+        self.amax_rpc = hs.config.server.amax_rpc_url
+        self.amax_client = eospy.api.ChainApi([self.amax_rpc], 10)
         # redis
         self._external_cache = hs.get_external_cache()
         self._cache_name = 'cache_sign_msg'
@@ -369,7 +370,7 @@ class LoginRestServlet(RestServlet):
         # user是amax链账号，验证下
 
         # 调chain.get_accountn方法拿用户信息
-        account = self.client.get_account(username)
+        account = self.amax_client.get_account(username)
         if account is None:
             raise SynapseError(400, "Get user accoount failed")
         permissions = account.get('permissions')
