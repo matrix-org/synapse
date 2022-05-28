@@ -527,7 +527,6 @@ class PaginationHandler:
             return {
                 "chunk": [],
                 "start": await from_token.to_string(self.store),
-                "end": await next_token.to_string(self.store),
             }
 
         state = None
