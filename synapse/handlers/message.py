@@ -184,16 +184,18 @@ class MessageHandler:
         state_filter = state_filter or StateFilter.all()
 
         if at_token:
-            last_event = await self.store.get_last_event_in_room_before_stream_ordering(
-                room_id,
-                end_token=at_token.room_key,
+            last_event_id = (
+                await self.store.get_last_event_in_room_before_stream_ordering(
+                    room_id,
+                    end_token=at_token.room_key,
+                )
             )
 
-            if not last_event:
+            if not last_event_id:
                 raise NotFoundError("Can't find event for token %s" % (at_token,))
 
             if not await self._user_can_see_state_at_event(
-                user_id, room_id, last_event.event_id
+                user_id, room_id, last_event_id
             ):
                 raise AuthError(
                     403,

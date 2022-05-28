@@ -665,14 +665,14 @@ class SyncHandler:
         # FIXME: This gets the state at the latest event before the stream ordering,
         # which might not be the same as the "current state" of the room at the time
         # of the stream token if there were multiple forward extremities at the time.
-        last_event = await self.store.get_last_event_in_room_before_stream_ordering(
+        last_event_id = await self.store.get_last_event_in_room_before_stream_ordering(
             room_id,
             end_token=stream_position.room_key,
         )
 
-        if last_event:
+        if last_event_id:
             state = await self.get_state_after_event(
-                last_event.event_id, state_filter=state_filter or StateFilter.all()
+                last_event_id, state_filter=state_filter or StateFilter.all()
             )
 
         else:
