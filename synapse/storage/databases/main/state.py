@@ -54,6 +54,7 @@ class EventMetadata:
     room_id: str
     event_type: str
     state_key: Optional[str]
+    rejection_reason: Optional[str]
 
 
 def _retrieve_and_check_room_version(room_id: str, room_version_id: str) -> RoomVersion:
@@ -167,17 +168,22 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             )
 
             sql = f"""
-                SELECT e.event_id, e.room_id, e.type, se.state_key FROM events AS e
+                SELECT e.event_id, e.room_id, e.type, se.state_key, r.reason
+                FROM events AS e
                 LEFT JOIN state_events se USING (event_id)
+                LEFT JOIN rejections r USING (event_id)
                 WHERE {clause}
             """
 
             txn.execute(sql, args)
             return {
                 event_id: EventMetadata(
-                    room_id=room_id, event_type=event_type, state_key=state_key
+                    room_id=room_id,
+                    event_type=event_type,
+                    state_key=state_key,
+                    rejection_reason=rejection_reason,
                 )
-                for event_id, room_id, event_type, state_key in txn
+                for event_id, room_id, event_type, state_key, rejection_reason in txn
             }
 
         result_map: Dict[str, EventMetadata] = {}
