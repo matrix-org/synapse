@@ -113,7 +113,6 @@ unpaddedbase64 = ">=2.1.0"
 canonicaljson = ">=1.4.0"
 # we use the type definitions added in signedjson 1.1.
 signedjson = ">=1.1.0"
-PyNaCl = ">=1.2.1"
 # validating SSL certs for IP addresses requires service_identity 18.1.
 service-identity = ">=18.1.0"
 # Twisted 18.9 introduces some logger improvements that the structured
