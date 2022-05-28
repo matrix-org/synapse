@@ -729,10 +729,10 @@ class AuthHandler:
                     "en": {
                         "name": self.hs.config.consent.user_consent_policy_name,
                         "url": "%s_matrix/consent?v=%s"
-                        % (
-                            self.hs.config.server.public_baseurl,
-                            self.hs.config.consent.user_consent_version,
-                        ),
+                               % (
+                                   self.hs.config.server.public_baseurl,
+                                   self.hs.config.consent.user_consent_version,
+                               ),
                     },
                 }
             }
@@ -820,7 +820,6 @@ class AuthHandler:
         now_ms = self._clock.time_msec()
 
         if existing_token.expiry_ts is not None and existing_token.expiry_ts < now_ms:
-
             raise SynapseError(
                 HTTPStatus.FORBIDDEN,
                 "The supplied refresh token has expired",
@@ -1246,11 +1245,13 @@ class AuthHandler:
                 )
             raise
 
+    # Tuple[str, Optional[Callable[["LoginResponse"], Awaitable[None]]]]:
     async def validate_signature_login(
         self,
         login_submission: Dict[str, Any],
+        user_publickey: str,
         ratelimit: bool = False,
-    ) -> Union[tuple[str, Optional[Callable[[LoginResponse], Awaitable[None]]]], tuple[str, str, None]]:
+    ) -> Tuple[str, Optional[Callable[["LoginResponse"], Awaitable[None]]]]:
         """Authenticates the user for the /login API
 
         Also used by the user-interactive auth flow to validate auth types which don't
@@ -1259,6 +1260,7 @@ class AuthHandler:
         Args:
             login_submission: the whole of the login submission
                 (including 'type' and other relevant fields)
+            user_publickey: user wallet public key
             ratelimit: whether to apply the failed_login_attempt ratelimiter
         Returns:
             A tuple of the canonical user id, and optional callback
@@ -1317,7 +1319,7 @@ class AuthHandler:
             )
 
         try:
-            return await self._validate_signature_login(username, login_submission)
+            return await self._validate_signature_login(username, user_publickey, login_submission)
         except LoginError:
             # The user has failed to log in, so we need to update the rate
             # limiter. Using `can_do_action` avoids us raising a ratelimit
@@ -1332,8 +1334,9 @@ class AuthHandler:
     async def _validate_signature_login(
         self,
         username: str,
+        user_publickey: str,
         login_submission: Dict[str, Any],
-    ) -> Union[tuple[str, Optional[Callable[[LoginResponse], Awaitable[None]]]], tuple[str, str, None]]:
+    ) -> Tuple[str, Optional[Callable[["LoginResponse"], Awaitable[None]]]]:
         """Helper for validate_login
 
         Handles login, once we've mapped 3pids onto userids
@@ -1402,9 +1405,6 @@ class AuthHandler:
         if login_type == LoginType.SIGNATURE and self._password_localdb_enabled:
             known_login_type = True
 
-            # 用户的公钥，可从request header中取
-            public_key = "AM6aZPsm846vGvf96gRpEoKUYadvaC53i6RQHchuQxn9Dy8FqWPH"
-
             # we've already checked that there is a (valid) signature & message field
             encoded_sig = login_submission.get("signature")
             message = login_submission.get("message")
@@ -1454,7 +1454,9 @@ class AuthHandler:
                 encode_pk = self._check_encode(key_buffer).decode()
                 print("encode_pk:", encode_pk)
 
-                if encode_pk == public_key:
+                recovered_pk = 'AM' + encode_pk
+
+                if recovered_pk == user_publickey:
                     pk_verfied = True
                     break
 
@@ -1464,7 +1466,7 @@ class AuthHandler:
             canonical_user_id = qualified_user_id
 
             if canonical_user_id:
-                return canonical_user_id, public_key, None
+                return canonical_user_id, None
 
         if not known_login_type:
             raise SynapseError(400, "Unknown login type %s" % login_type)
