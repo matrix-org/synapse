@@ -43,13 +43,13 @@ class RedisConfig(Config):
         redis:
           # Uncomment the below to enable Redis support.
           #
-          #enabled: true
+          enabled: true
 
           # Optional host and port to use to connect to redis. Defaults to
           # localhost and 6379
           #
-          #host: localhost
-          #port: 6379
+          host: localhost
+          port: 6379
 
           # Optional password if configured on the Redis instance
           #
