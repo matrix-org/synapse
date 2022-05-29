@@ -1,0 +1,1 @@
+Remove contributed `kick_users.py` script. This is broken under Python 3, and is not added to the environment when `pip install`ing Synapse.
