@@ -177,11 +177,11 @@ has queries that can be used to check a database for this problem in advance.
 
 </details>
 
-## SpamChecker API's `check_event_for_spam` has a new signature.
+## New signature for the spam checker callback `check_event_for_spam`
 
 The previous signature has been deprecated.
 
-Whereas `check_event_for_spam` callbacks used to return `Union[str, bool]`, they should now return `Union["synapse.module_api.Allow", "synapse.module_api.errors.Codes"]`.
+Whereas `check_event_for_spam` callbacks used to return `Union[str, bool]`, they should now return `Union["synapse.module_api.ALLOW", "synapse.module_api.errors.Codes"]`.
 
 This is part of an ongoing refactoring of the SpamChecker API to make it less ambiguous and more powerful.
 
