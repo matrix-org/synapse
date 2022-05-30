@@ -727,8 +727,7 @@ class RandomStrServlet(RestServlet):
         self._cache_name = 'cache_sign_msg'
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        ns = time.time_ns()
-        rand_str = ''.join(random.sample(string.ascii_letters + string.digits + str(ns), 32))
+        rand_str = ''.join(random.sample(string.ascii_letters + string.digits, 32))
 
         message = "Welcome to AMAX-IM! sign nonce:{s}".format(s=rand_str)
 
