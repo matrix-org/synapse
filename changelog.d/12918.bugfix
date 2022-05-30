@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.60.0rc1 that would prevent importing the `Allow` type from `synapse.module_api`.
