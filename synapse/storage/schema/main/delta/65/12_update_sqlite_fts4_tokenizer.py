@@ -27,7 +27,7 @@ def run_create(cur, database_engine, *args, **kwargs):
             cur.execute("DROP TABLE event_search")
             cur.execute(
                 "CREATE VIRTUAL TABLE event_search"
-                "USING fts4 (tokenize=porter, event_id, room_id, sender, key, value )"
+                " USING fts4 (tokenize=porter, event_id, room_id, sender, key, value )"
             )
 
             # Run a background job to re-populate the event_search table.
