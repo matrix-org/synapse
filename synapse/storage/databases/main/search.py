@@ -15,7 +15,6 @@
 import logging
 import re
 from dataclasses import dataclass
-from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -896,7 +895,7 @@ def _tokens_to_sqlite_match_query(tokens: TokenList) -> str:
     Ref: https://www.sqlite.org/fts3.html#full_text_index_queries
     """
     match_query = []
-    for i, token in enumerate(tokens):
+    for token in tokens:
         if isinstance(token, str):
             match_query.append(token)
             match_query.append(" ")
