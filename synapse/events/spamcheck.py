@@ -292,7 +292,7 @@ class SpamChecker:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                res: Union[str, bool] = await delay_cancellation(callback(event))
+                res = await delay_cancellation(callback(event))
                 if res is False or res == self.NOT_SPAM:
                     # This spam-checker accepts the event.
                     # Other spam-checkers may reject it, though.
@@ -304,6 +304,16 @@ class SpamChecker:
                 else:
                     # This spam-checker rejects the event either with a `str`
                     # or with a `Codes`. In either case, we stop here.
+                    if not isinstance(res, str):
+                        # Make sure we give the SynapseError a string as the error
+                        # message.
+                        # mypy complains that we can't reach this code because of the
+                        # return type in CHECK_EVENT_FOR_SPAM_CALLBACK, but we don't know
+                        # for sure that the module actually returns it.
+                        res = (  # type: ignore[unreachable]
+                            "This message has been rejected as probable spam"
+                        )
+
                     return res
 
         # No spam-checker has rejected the event, let it pass.
