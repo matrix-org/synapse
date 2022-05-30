@@ -20,7 +20,7 @@ from typing_extensions import Final
 from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.events import EventBase
 from synapse.events.utils import prune_event
-from synapse.storage import Storage
+from synapse.storage import StorageControllers
 from synapse.storage.state import StateFilter
 from synapse.types import RetentionPolicy, StateMap, get_domain_from_id
 
@@ -47,7 +47,7 @@ _HISTORY_VIS_KEY: Final[Tuple[str, str]] = (EventTypes.RoomHistoryVisibility, ""
 
 
 async def filter_events_for_client(
-    storage: Storage,
+    storage: StorageControllers,
     user_id: str,
     events: List[EventBase],
     is_peeking: bool = False,
@@ -268,7 +268,7 @@ async def filter_events_for_client(
 
 
 async def filter_events_for_server(
-    storage: Storage,
+    storage: StorageControllers,
     server_name: str,
     events: List[EventBase],
     redact: bool = True,
@@ -360,7 +360,7 @@ async def filter_events_for_server(
 
 
 async def _event_to_history_vis(
-    storage: Storage, events: Collection[EventBase]
+    storage: StorageControllers, events: Collection[EventBase]
 ) -> Dict[str, str]:
     """Get the history visibility at each of the given events
 
@@ -407,7 +407,7 @@ async def _event_to_history_vis(
 
 
 async def _event_to_memberships(
-    storage: Storage, events: Collection[EventBase], server_name: str
+    storage: StorageControllers, events: Collection[EventBase], server_name: str
 ) -> Dict[str, StateMap[EventBase]]:
     """Get the remote membership list at each of the given events
 

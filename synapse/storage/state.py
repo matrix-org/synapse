@@ -580,7 +580,7 @@ _ALL_NON_MEMBER_STATE_FILTER = StateFilter(
 _NONE_STATE_FILTER = StateFilter(types=frozendict(), include_others=False)
 
 
-class StateGroupStorage:
+class StateGroupStorageController:
     """High level interface to fetching state for event."""
 
     def __init__(self, hs: "HomeServer", stores: "Databases"):
