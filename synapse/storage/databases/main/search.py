@@ -14,7 +14,19 @@
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Collection, Iterable, List, Optional, Set, Tuple
+from dataclasses import dataclass
+from enum import Enum
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Collection,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 
 import attr
 
@@ -779,11 +791,131 @@ def _to_postgres_options(options_dict: JsonDict) -> str:
     return "'%s'" % (",".join("%s=%s" % (k, v) for k, v in options_dict.items()),)
 
 
-def _parse_query_for_sqlite(search_term: str) -> str:
-    """Takes a plain unicode string from the user and converts it into a form
-    that can be passed to sqllite's matchinfo().
+@dataclass
+class Phrase:
+    phrase: List[str]
+
+
+class Not:
+    pass
+
+
+class Or:
+    pass
+
+
+class And:
+    pass
+
+
+class LParen:
+    pass
+
+
+class RParen:
+    pass
+
+
+Token = Union[str, Phrase, Not, Or, And, LParen, RParen]
+TokenList = List[Token]
+
+
+def _tokenize_query(query: str) -> TokenList:
+    tokens = []
+    words = query.split(" ")
+    i = 0
+    while i < len(words):
+        word = words[i]
+        i = i + 1
+        if word[0] == '"':
+            phrase = [word[1:]]
+            while i < len(words):
+                word = words[i]
+                i = i + 1
+                if word[-1] == '"':
+                    phrase.append(word[:-1])
+                    break
+                else:
+                    phrase.append(word)
+            tokens.append(Phrase(phrase))
+        elif word[0] == "-":
+            tokens.append(Not())
+            tokens.append(word[1:])
+        elif word.lower() == "or":
+            tokens.append(Or())
+        elif word.lower() == "and":
+            tokens.append(And())
+        elif word == "(":
+            tokens.append(LParen())
+        elif word == ")":
+            tokens.append(RParen())
+        else:
+            tokens.append(word)
+    return tokens
+
+
+def _tokens_to_tsquery(tokens: TokenList) -> str:
     """
-    return search_term
+    Convert the list of tokens to a string suitable for passing to postgresql's to_tsquery
+
+    Ref: https://www.postgresql.org/docs/current/textsearch-controls.html
+    """
+
+    tsquery = []
+    for i, token in enumerate(tokens):
+        if isinstance(token, str):
+            tsquery.append(token)
+        elif isinstance(token, Phrase):
+            tsquery.append(" ( " + " <-> ".join(token.phrase) + " ) ")
+        elif isinstance(token, Not):
+            tsquery.append("!")
+        elif isinstance(token, Or):
+            tsquery.append(" | ")
+        elif isinstance(token, And):
+            tsquery.append(" & ")
+        elif isinstance(token, LParen):
+            tsquery.append(" ( ")
+        elif isinstance(token, RParen):
+            tsquery.append(" ) ")
+        else:
+            raise Exception("unknown token " + token)
+        if (
+            i != len(tokens) - 1
+            and isinstance(token, (str, Phrase))
+            and not isinstance(tokens[i + 1], (Or, And, RParen))
+        ):
+            tsquery.append(" & ")
+    return "".join(tsquery)
+
+
+def _tokens_to_sqlite_match_query(tokens: TokenList) -> str:
+    """
+    Convert the list of tokens to a string suitable for passing to sqlite's MATCH.
+    Assume sqlite was compiled with enhanced query syntax.
+
+    Ref: https://www.sqlite.org/fts3.html#full_text_index_queries
+    """
+    match_query = []
+    for i, token in enumerate(tokens):
+        if isinstance(token, str):
+            match_query.append(token)
+            match_query.append(" ")
+        elif isinstance(token, Phrase):
+            match_query.append(' "' + " ".join(token.phrase) + '" ')
+        elif isinstance(token, Not):
+            match_query.append("NOT ")
+        elif isinstance(token, Or):
+            match_query.append("OR ")
+        elif isinstance(token, And):
+            match_query.append("AND ")
+        elif isinstance(token, LParen):
+            match_query.append("( ")
+        elif isinstance(token, RParen):
+            match_query.append(") ")
+        else:
+            raise Exception("unknown token " + str(token))
+
+    return "".join(match_query)
 
 
 def _parse_query_for_pgsql(search_term: str, engine: PostgresEngine) -> Tuple[str, str]:
@@ -800,4 +932,11 @@ def _parse_query_for_pgsql(search_term: str, engine: PostgresEngine) -> Tuple[st
     if engine.supports_websearch_to_tsquery:
         return search_term, "websearch_to_tsquery"
     else:
-        return search_term, "plainto_tsquery"
+        return _tokens_to_tsquery(_tokenize_query(search_term)), "to_tsquery"
+
+
+def _parse_query_for_sqlite(search_term: str) -> str:
+    """Takes a plain unicode string from the user and converts it into a form
+    that can be passed to sqllite's matchinfo().
+    """
+    return _tokens_to_sqlite_match_query(_tokenize_query(search_term))

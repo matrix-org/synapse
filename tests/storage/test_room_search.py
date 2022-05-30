@@ -201,14 +201,24 @@ class MessageSearchTest(HomeserverTestCase):
     ]
 
     PHRASE = "the quick brown fox jumps over the lazy dog"
+
+    # (query, whether PHRASE contains query)
     COMMON_CASES = [
-        # (query, whether PHRASE contains query)
         ("nope", False),
         ("brown", True),
         ("quick brown", True),
         ("brown quick", True),
-        ("jump", True),  # tests stemming
+        ("jump", True),
         ("brown nope", False),
+        ('"brown quick"', False),
+        ('"jumps over"', True),
+        ('"quick fox"', False),
+        ("nope OR doublenope", False),
+        ("furphy OR fox", True),
+        ("fox -nope", True),
+        ("fox -brown", False),
+        ("fox AND ( brown OR nope )", True),
+        ("fox AND ( nope OR doublenope )", False),
     ]
 
     def setUp(self):
@@ -227,20 +237,40 @@ class MessageSearchTest(HomeserverTestCase):
         self, store: DataStore, cases: List[Tuple[str, bool]]
     ) -> None:
         # Run all the test cases versus search_msgs
-        for query, has_results in cases:
+        for query, expect_to_contain in cases:
             result = self.get_success(
                 store.search_msgs([self.room_id], query, ["content.body"])
             )
-            self.assertEquals(result["count"], 1 if has_results else 0, query)
-            self.assertEquals(len(result["results"]), 1 if has_results else 0, query)
+            self.assertEquals(
+                result["count"],
+                1 if expect_to_contain else 0,
+                f"expected '{query}' to match '{self.PHRASE}'"
+                if expect_to_contain
+                else f"'{query}' unexpectedly matched '{self.PHRASE}'",
+            )
+            self.assertEquals(
+                len(result["results"]),
+                1 if expect_to_contain else 0,
+                "results array length should match count",
+            )
 
         # Run them again versus search_rooms
-        for query, has_results in cases:
+        for query, expect_to_contain in cases:
             result = self.get_success(
                 store.search_rooms([self.room_id], query, ["content.body"], 10)
             )
-            self.assertEquals(result["count"], 1 if has_results else 0, query)
-            self.assertEquals(len(result["results"]), 1 if has_results else 0, query)
+            self.assertEquals(
+                result["count"],
+                1 if expect_to_contain else 0,
+                f"expected '{query}' to match '{self.PHRASE}'"
+                if expect_to_contain
+                else f"'{query}' unexpectedly matched '{self.PHRASE}'",
+            )
+            self.assertEquals(
+                len(result["results"]),
+                1 if expect_to_contain else 0,
+                "results array length should match count",
+            )
 
     def test_postgres_web_search_for_phrase(self):
         """
@@ -257,17 +287,7 @@ class MessageSearchTest(HomeserverTestCase):
                 "Test only applies when postgres supporting websearch_to_tsquery is used as the database"
             )
 
-        cases = self.COMMON_CASES + [
-            ('"brown quick"', False),
-            ('"jumps over"', True),
-            ('"quick fox"', False),
-            ("furphy OR fox", True),
-            ("nope OR doublenope", False),
-            ("-fox", False),
-            ("-nope", True),
-        ]
-
-        self._check_test_cases(store, cases)
+        self._check_test_cases(store, self.COMMON_CASES)
 
     def test_postgres_non_web_search_for_phrase(self):
         """
@@ -279,22 +299,13 @@ class MessageSearchTest(HomeserverTestCase):
         if not isinstance(store.database_engine, PostgresEngine):
             raise SkipTest("Test only applies when postgres is used as the database")
 
-        cases = self.COMMON_CASES + [
-            (
-                "furphy OR fox",
-                False,
-            ),  # syntax not supported, OR will be ignored as it'll be between &
-            ('"jumps over"', True),  # syntax not supported, quotes are ignored
-            ("-nope", False),  # syntax not supported, - will be ignored
-        ]
-
         # Patch supports_websearch_to_tsquery to always return False to ensure we're testing the plainto_tsquery path.
         with patch(
             "synapse.storage.engines.postgres.PostgresEngine.supports_websearch_to_tsquery",
             new_callable=PropertyMock,
         ) as supports_websearch_to_tsquery:
             supports_websearch_to_tsquery.return_value = False
-            self._check_test_cases(store, cases)
+            self._check_test_cases(store, self.COMMON_CASES)
 
     def test_sqlite_search(self):
         """
@@ -304,11 +315,4 @@ class MessageSearchTest(HomeserverTestCase):
         if not isinstance(store.database_engine, Sqlite3Engine):
             raise SkipTest("Test only applies when sqlite is used as the database")
 
-        cases = self.COMMON_CASES + [
-            ("furphy OR fox", True),  # sqllite supports OR
-            ('"jumps over"', True),
-            ('"quick fox"', False),  # syntax supports quotes
-            ("fox NOT nope", True),  # sqllite supports NOT
-        ]
-
-        self._check_test_cases(store, cases)
+        self._check_test_cases(store, self.COMMON_CASES)
