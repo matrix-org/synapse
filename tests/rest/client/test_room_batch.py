@@ -88,7 +88,7 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.clock = clock
-        self.storage = hs.get_storage()
+        self.storage_controllers = hs.get_storage_controllers()
 
         self.virtual_user_id, _ = self.register_appservice_user(
             "as_user_potato", self.appservice.token
@@ -168,7 +168,9 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
 
         # Fetch the state_groups
         state_group_map = self.get_success(
-            self.storage.state.get_state_groups_ids(room_id, historical_event_ids)
+            self.storage_controllers.state.get_state_groups_ids(
+                room_id, historical_event_ids
+            )
         )
 
         # We expect all of the historical events to be using the same state_group

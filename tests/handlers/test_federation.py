@@ -50,7 +50,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         hs = self.setup_test_homeserver(federation_http_client=None)
         self.handler = hs.get_federation_handler()
         self.store = hs.get_datastores().main
-        self.state_storage_controller = hs.get_storage().state
+        self.state_storage_controller = hs.get_storage_controllers().state
         self._event_auth_handler = hs.get_event_auth_handler()
         return hs
 

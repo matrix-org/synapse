@@ -125,7 +125,7 @@ class FederationHandler:
         self.hs = hs
 
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
+        self.storage = hs.get_storage_controllers()
         self.state_storage_controller = self.storage.state
         self.federation_client = hs.get_federation_client()
         self.state_handler = hs.get_state_handler()

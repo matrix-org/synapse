@@ -31,7 +31,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
 
     def prepare(self, reactor, clock, homeserver):
         self.state = self.hs.get_state_handler()
-        self.persistence = self.hs.get_storage().persistence
+        self.persistence = self.hs.get_storage_controllers().persistence
         self.store = self.hs.get_datastores().main
 
         self.register_user("user", "pass")
@@ -353,7 +353,7 @@ class InvalideUsersInRoomCacheTestCase(HomeserverTestCase):
 
     def prepare(self, reactor, clock, homeserver):
         self.state = self.hs.get_state_handler()
-        self.persistence = self.hs.get_storage().persistence
+        self.persistence = self.hs.get_storage_controllers().persistence
         self.store = self.hs.get_datastores().main
 
     def test_remote_user_rooms_cache_invalidated(self):

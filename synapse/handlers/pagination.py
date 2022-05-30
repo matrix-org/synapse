@@ -129,7 +129,7 @@ class PaginationHandler:
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
+        self.storage_controllers = hs.get_storage_controllers()
         self.state_storage_controller = self.storage_controllers.state
         self.clock = hs.get_clock()
         self._server_name = hs.hostname
@@ -352,7 +352,7 @@ class PaginationHandler:
         self._purges_in_progress_by_room.add(room_id)
         try:
             async with self.pagination_lock.write(room_id):
-                await self.storage.purge_events.purge_history(
+                await self.storage_controllers.purge_events.purge_history(
                     room_id, token, delete_local_events
                 )
             logger.info("[purge] complete")
@@ -414,7 +414,7 @@ class PaginationHandler:
                 if joined:
                     raise SynapseError(400, "Users are still joined to this room")
 
-            await self.storage.purge_events.purge_room(room_id)
+            await self.storage_controllers.purge_events.purge_room(room_id)
 
     async def get_messages(
         self,
@@ -520,7 +520,10 @@ class PaginationHandler:
                 events = await event_filter.filter(events)
 
             events = await filter_events_for_client(
-                self.storage, user_id, events, is_peeking=(member_event_id is None)
+                self.storage_controllers,
+                user_id,
+                events,
+                is_peeking=(member_event_id is None),
             )
 
         if not events:
@@ -653,7 +656,7 @@ class PaginationHandler:
                                 400, "Users are still joined to this room"
                             )
 
-                    await self.storage.purge_events.purge_room(room_id)
+                    await self.storage_controllers.purge_events.purge_room(room_id)
 
             logger.info("complete")
             self._delete_by_id[delete_id].status = DeleteStatus.STATUS_COMPLETE

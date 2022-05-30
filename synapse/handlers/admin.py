@@ -30,8 +30,8 @@ logger = logging.getLogger(__name__)
 class AdminHandler:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
-        self.state_storage_controller = self.storage.state
+        self.storage_controllers = hs.get_storage_controllers()
+        self.state_storage_controller = self.storage_controllers.state
 
     async def get_whois(self, user: UserID) -> JsonDict:
         connections = []
@@ -197,7 +197,9 @@ class AdminHandler:
 
                 from_key = events[-1].internal_metadata.after
 
-                events = await filter_events_for_client(self.storage, user_id, events)
+                events = await filter_events_for_client(
+                    self.storage_controllers, user_id, events
+                )
 
                 writer.write_events(room_id, events)
 

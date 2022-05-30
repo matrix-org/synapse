@@ -127,10 +127,10 @@ class StateHandler:
     def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
         self.store = hs.get_datastores().main
-        self.state_storage_controller = hs.get_storage().state
+        self.state_storage_controller = hs.get_storage_controllers().state
         self.hs = hs
         self._state_resolution_handler = hs.get_state_resolution_handler()
-        self._storage = hs.get_storage()
+        self._storage_controllers = hs.get_storage_controllers()
 
     @overload
     async def get_current_state(
@@ -361,7 +361,7 @@ class StateHandler:
 
         if not event.is_state():
             return EventContext.with_state(
-                storage=self._storage,
+                storage=self._storage_controllers,
                 state_group_before_event=state_group_before_event,
                 state_group=state_group_before_event,
                 state_delta_due_to_event={},
@@ -393,7 +393,7 @@ class StateHandler:
         )
 
         return EventContext.with_state(
-            storage=self._storage,
+            storage=self._storage_controllers,
             state_group=state_group_after_event,
             state_group_before_event=state_group_before_event,
             state_delta_due_to_event=delta_ids,

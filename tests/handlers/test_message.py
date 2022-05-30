@@ -37,7 +37,9 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.handler = self.hs.get_event_creation_handler()
-        self.persist_event_storage_controller = self.hs.get_storage().persistence
+        self.persist_event_storage_controller = (
+            self.hs.get_storage_controllers().persistence
+        )
 
         self.user_id = self.register_user("tester", "foobar")
         self.access_token = self.login("tester", "foobar")

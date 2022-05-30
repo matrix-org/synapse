@@ -221,7 +221,7 @@ class Notifier:
         self.room_to_user_streams: Dict[str, Set[_NotifierUserStream]] = {}
 
         self.hs = hs
-        self.storage = hs.get_storage()
+        self.storage_controllers = hs.get_storage_controllers()
         self.event_sources = hs.get_event_sources()
         self.store = hs.get_datastores().main
         self.pending_new_room_events: List[_PendingRoomEventEntry] = []
@@ -623,7 +623,7 @@ class Notifier:
 
                 if name == "room":
                     new_events = await filter_events_for_client(
-                        self.storage,
+                        self.storage_controllers,
                         user.to_string(),
                         new_events,
                         is_peeking=is_peeking,

@@ -31,7 +31,9 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
     def prepare(self, reactor, clock, homeserver):
         super().prepare(reactor, clock, homeserver)
         self.room_creator = homeserver.get_room_creation_handler()
-        self.persist_event_storage_controller = self.hs.get_storage().persistence
+        self.persist_event_storage_controller = (
+            self.hs.get_storage_controllers().persistence
+        )
 
         # Create a test user
         self.ourUser = UserID.from_string(OUR_USER_ID)

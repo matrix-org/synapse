@@ -139,7 +139,7 @@ class EventStreamHandler:
 class EventHandler:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
+        self.storage = hs.get_storage_controllers()
 
     async def get_event(
         self,

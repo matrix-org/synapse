@@ -84,8 +84,8 @@ class MessageHandler:
         self.clock = hs.get_clock()
         self.state = hs.get_state_handler()
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
-        self.state_storage_controller = self.storage.state
+        self.storage_controllers = hs.get_storage_controllers()
+        self.state_storage_controller = self.storage_controllers.state
         self._event_serializer = hs.get_event_client_serializer()
         self._ephemeral_events_enabled = hs.config.server.enable_ephemeral_messages
 
@@ -206,7 +206,7 @@ class MessageHandler:
             is_peeking = not joined
 
             visible_events = await filter_events_for_client(
-                self.storage,
+                self.storage_controllers,
                 user_id,
                 [last_event],
                 filter_send_to_client=False,
@@ -406,7 +406,7 @@ class EventCreationHandler:
         self.auth = hs.get_auth()
         self._event_auth_handler = hs.get_event_auth_handler()
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
+        self.storage_controllers = hs.get_storage_controllers()
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()
         self.validator = EventValidator()
@@ -1021,7 +1021,7 @@ class EventCreationHandler:
         # after it is created
         if builder.internal_metadata.outlier:
             event.internal_metadata.outlier = True
-            context = EventContext.for_outlier(self.storage)
+            context = EventContext.for_outlier(self.storage_controllers)
         elif (
             event.type == EventTypes.MSC2716_INSERTION
             and state_event_ids
@@ -1434,7 +1434,7 @@ class EventCreationHandler:
         """
         extra_users = extra_users or []
 
-        assert self.storage.persistence is not None
+        assert self.storage_controllers.persistence is not None
         assert self._events_shard_config.should_handle(
             self._instance_name, event.room_id
         )
@@ -1668,7 +1668,7 @@ class EventCreationHandler:
             event,
             event_pos,
             max_stream_token,
-        ) = await self.storage.persistence.persist_event(
+        ) = await self.storage_controllers.persistence.persist_event(
             event, context=context, backfilled=backfilled
         )
 

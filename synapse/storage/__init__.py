@@ -41,8 +41,8 @@ if TYPE_CHECKING:
 __all__ = ["Databases", "DataStore"]
 
 
-class Storage:
-    """The high level interfaces for talking to various storage layers."""
+class StorageControllers:
+    """The high level interfaces for talking to various storage controller layers."""
 
     def __init__(self, hs: "HomeServer", stores: Databases):
         # We include the main data store here mainly so that we don't have to

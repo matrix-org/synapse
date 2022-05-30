@@ -55,8 +55,8 @@ class SearchHandler:
         self.hs = hs
         self._event_serializer = hs.get_event_client_serializer()
         self._relations_handler = hs.get_relations_handler()
-        self.storage = hs.get_storage()
-        self.state_storage_controller = self.storage.state
+        self.storage_controllers = hs.get_storage_controllers()
+        self.state_storage_controller = self.storage_controllers.state
         self.auth = hs.get_auth()
 
     async def get_old_rooms_from_upgraded_room(self, room_id: str) -> Iterable[str]:
@@ -460,7 +460,7 @@ class SearchHandler:
         filtered_events = await search_filter.filter([r["event"] for r in results])
 
         events = await filter_events_for_client(
-            self.storage, user.to_string(), filtered_events
+            self.storage_controllers, user.to_string(), filtered_events
         )
 
         events.sort(key=lambda e: -rank_map[e.event_id])
@@ -559,7 +559,7 @@ class SearchHandler:
             filtered_events = await search_filter.filter([r["event"] for r in results])
 
             events = await filter_events_for_client(
-                self.storage, user.to_string(), filtered_events
+                self.storage_controllers, user.to_string(), filtered_events
             )
 
             room_events.extend(events)
@@ -644,11 +644,11 @@ class SearchHandler:
             )
 
             events_before = await filter_events_for_client(
-                self.storage, user.to_string(), res.events_before
+                self.storage_controllers, user.to_string(), res.events_before
             )
 
             events_after = await filter_events_for_client(
-                self.storage, user.to_string(), res.events_after
+                self.storage_controllers, user.to_string(), res.events_after
             )
 
             context: JsonDict = {

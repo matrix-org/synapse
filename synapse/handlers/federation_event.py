@@ -98,8 +98,8 @@ class FederationEventHandler:
 
     def __init__(self, hs: "HomeServer"):
         self._store = hs.get_datastores().main
-        self._storage = hs.get_storage()
-        self._state_storage_controller = self._storage.state
+        self._storage_controllers = hs.get_storage_controllers()
+        self._state_storage_controller = self._storage_controllers.state
 
         self._state_handler = hs.get_state_handler()
         self._event_creation_handler = hs.get_event_creation_handler()
@@ -1440,7 +1440,7 @@ class FederationEventHandler:
                 # we're not bothering about room state, so flag the event as an outlier.
                 event.internal_metadata.outlier = True
 
-                context = EventContext.for_outlier(self._storage)
+                context = EventContext.for_outlier(self._storage_controllers)
                 try:
                     validate_event_for_room_version(room_version_obj, event)
                     check_auth_rules_for_event(room_version_obj, event, auth)
@@ -1898,7 +1898,7 @@ class FederationEventHandler:
         )
 
         return EventContext.with_state(
-            storage=self._storage,
+            storage=self._storage_controllers,
             state_group=state_group,
             state_group_before_event=context.state_group_before_event,
             state_delta_due_to_event=state_updates,
@@ -1988,11 +1988,14 @@ class FederationEventHandler:
                 )
             return result["max_stream_id"]
         else:
-            assert self._storage.persistence
+            assert self._storage_controllers.persistence
 
             # Note that this returns the events that were persisted, which may not be
             # the same as were passed in if some were deduplicated due to transaction IDs.
-            events, max_stream_token = await self._storage.persistence.persist_events(
+            (
+                events,
+                max_stream_token,
+            ) = await self._storage_controllers.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
             )
 

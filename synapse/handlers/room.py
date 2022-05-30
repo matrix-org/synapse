@@ -1192,7 +1192,7 @@ class RoomContextHandler:
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
+        self.storage_controllers = hs.get_storage_controllers()
         self.state_storage_controller = self.storage_controllers.state
         self._relations_handler = hs.get_relations_handler()
 
@@ -1236,7 +1236,10 @@ class RoomContextHandler:
             if use_admin_priviledge:
                 return events
             return await filter_events_for_client(
-                self.storage, user.to_string(), events, is_peeking=is_peeking
+                self.storage_controllers,
+                user.to_string(),
+                events,
+                is_peeking=is_peeking,
             )
 
         event = await self.store.get_event(

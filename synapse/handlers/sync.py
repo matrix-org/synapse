@@ -238,8 +238,8 @@ class SyncHandler:
         self.clock = hs.get_clock()
         self.state = hs.get_state_handler()
         self.auth = hs.get_auth()
-        self.storage = hs.get_storage()
-        self.state_storage_controller = self.storage.state
+        self.storage_controllers = hs.get_storage_controllers()
+        self.state_storage_controller = self.storage_controllers.state
 
         # TODO: flush cache entries on subsequent sync request.
         #    Once we get the next /sync request (ie, one with the same access token
@@ -512,7 +512,7 @@ class SyncHandler:
                     current_state_ids = frozenset(current_state_ids_map.values())
 
                 recents = await filter_events_for_client(
-                    self.storage,
+                    self.storage_controllers,
                     sync_config.user.to_string(),
                     recents,
                     always_include_ids=current_state_ids,
@@ -580,7 +580,7 @@ class SyncHandler:
                     current_state_ids = frozenset(current_state_ids_map.values())
 
                 loaded_recents = await filter_events_for_client(
-                    self.storage,
+                    self.storage_controllers,
                     sync_config.user.to_string(),
                     loaded_recents,
                     always_include_ids=current_state_ids,

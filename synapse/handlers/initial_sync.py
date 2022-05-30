@@ -67,8 +67,8 @@ class InitialSyncHandler:
             ]
         ] = ResponseCache(hs.get_clock(), "initial_sync_cache")
         self._event_serializer = hs.get_event_client_serializer()
-        self.storage = hs.get_storage()
-        self.state_storage_controller = self.storage.state
+        self.storage_controllers = hs.get_storage_controllers()
+        self.state_storage_controller = self.storage_controllers.state
 
     async def snapshot_all_rooms(
         self,
@@ -219,7 +219,7 @@ class InitialSyncHandler:
                 ).addErrback(unwrapFirstError)
 
                 messages = await filter_events_for_client(
-                    self.storage, user_id, messages
+                    self.storage_controllers, user_id, messages
                 )
 
                 start_token = now_token.copy_and_replace(StreamKeyType.ROOM, token)
@@ -372,7 +372,7 @@ class InitialSyncHandler:
         )
 
         messages = await filter_events_for_client(
-            self.storage, user_id, messages, is_peeking=is_peeking
+            self.storage_controllers, user_id, messages, is_peeking=is_peeking
         )
 
         start_token = StreamToken.START.copy_and_replace(StreamKeyType.ROOM, token)
@@ -477,7 +477,7 @@ class InitialSyncHandler:
         )
 
         messages = await filter_events_for_client(
-            self.storage, user_id, messages, is_peeking=is_peeking
+            self.storage_controllers, user_id, messages, is_peeking=is_peeking
         )
 
         start_token = now_token.copy_and_replace(StreamKeyType.ROOM, token)
