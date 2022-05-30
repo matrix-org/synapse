@@ -47,11 +47,8 @@ CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
     Awaitable[
         Union[
             str,
-            Codes,
             # Deprecated
             bool,
-            # Deprecated
-            str,
         ]
     ],
 ]
@@ -272,7 +269,7 @@ class SpamChecker:
 
     async def check_event_for_spam(
         self, event: "synapse.events.EventBase"
-    ) -> Union[Codes, str]:
+    ) -> Union[str]:
         """Checks if a given event is considered "spammy" by this server.
 
         If the server considers an event spammy, then it will be rejected if
@@ -295,7 +292,7 @@ class SpamChecker:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                res: Union[Codes, str, bool] = await delay_cancellation(callback(event))
+                res: Union[str, bool] = await delay_cancellation(callback(event))
                 if res is False or res == self.NOT_SPAM:
                     # This spam-checker accepts the event.
                     # Other spam-checkers may reject it, though.
