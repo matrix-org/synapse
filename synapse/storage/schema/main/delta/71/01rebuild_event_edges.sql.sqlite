@@ -45,7 +45,3 @@ CREATE UNIQUE INDEX event_edges_event_id_prev_event_id_idx
   ON event_edges (event_id, prev_event_id);
 
 CREATE INDEX ev_edges_prev_id ON event_edges (prev_event_id);
-
-
-
-
