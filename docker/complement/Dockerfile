@@ -28,12 +28,12 @@ WORKDIR /data
 COPY conf/postgres.supervisord.conf /etc/supervisor/conf.d/postgres.conf
 
 # Copy the entrypoint
-COPY conf/start-complement-synapse-workers.sh /
+COPY conf/start_for_complement.sh /
 
 # Expose nginx's listener ports
 EXPOSE 8008 8448
 
-ENTRYPOINT ["/start-complement-synapse-workers.sh"]
+ENTRYPOINT ["/start_for_complement.sh"]
 
 # Update the healthcheck to have a shorter check interval
 HEALTHCHECK --start-period=5s --interval=1s --timeout=1s \
