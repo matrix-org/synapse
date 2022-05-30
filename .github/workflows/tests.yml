@@ -93,11 +93,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           extras: ${{ matrix.extras }}
+      - name: Install Coverage.py
+        run: pip install coverage
       - name: Await PostgreSQL
         if: ${{ matrix.postgres-version }}
         timeout-minutes: 2
         run: until pg_isready -h localhost; do sleep 1; done
-      - run: poetry run trial --jobs=2 tests
+      - run: coverage run --branch --source=synapse poetry run trial --jobs=2 tests
         env:
           SYNAPSE_POSTGRES: ${{ matrix.database == 'postgres' || '' }}
           SYNAPSE_POSTGRES_HOST: localhost
@@ -115,6 +117,12 @@ jobs:
           -exec cat {} \;
           -exec echo "::endgroup::" \;
           || true
+      - name: Upload coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-${{ matrix.postgres-version }}-${{ matrix.database }}-${{ matrix.postgres-version }}
+          path: .coverage*
+          retention-days: 1
 
   trial-olddeps:
     # Note: sqlite only; no postgres
@@ -360,7 +368,29 @@ jobs:
         shell: bash
         name: Run Complement Tests
 
-  # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
+      # a job which combines the coverage reports from all trials runs, ready for upload to SonarQube.
+  coverage:
+    needs: trial
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/download-artifact@v3
+        with:
+          path: .
+      - name: Install Coverage.py
+        run: pip install coverage
+      - name: Combine coverage reports
+        run: coverage combine
+      - name: Write coverage to XML
+        run: coverage xml -i -o coverage/coverage.xml
+      - name: Upload combined coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-combined
+          path: coverage
+          retention-days: 1
+
+      # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
   tests-done:
     if: ${{ always() }}
     needs:
@@ -374,6 +404,7 @@ jobs:
       - export-data
       - portdb
       - complement
+      - coverage
     runs-on: ubuntu-latest
     steps:
       - uses: matrix-org/done-action@v2
