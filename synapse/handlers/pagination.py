@@ -515,8 +515,10 @@ class PaginationHandler:
 
             next_token = from_token.copy_and_replace(StreamKeyType.ROOM, next_key)
 
-        # if no events are returned from pagination
-        # do not return end - there's no need for further queries
+        # if no events are returned from pagination, that implies
+        # we have reached the end of the available events.
+        # In that case we do not return end, to tell the client
+        # there is no need for further queries.
         if not events:
             return {
                 "chunk": [],
