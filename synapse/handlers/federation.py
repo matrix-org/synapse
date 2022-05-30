@@ -126,7 +126,7 @@ class FederationHandler:
 
         self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
-        self.state_storage = self.storage.state
+        self.state_storage_controller = self.storage.state
         self.federation_client = hs.get_federation_client()
         self.state_handler = hs.get_state_handler()
         self.server_name = hs.hostname
@@ -1027,7 +1027,7 @@ class FederationHandler:
         if event.internal_metadata.outlier:
             raise NotFoundError("State not known at event %s" % (event_id,))
 
-        state_groups = await self.state_storage.get_state_groups_ids(
+        state_groups = await self.state_storage_controller.get_state_groups_ids(
             room_id, [event_id]
         )
 

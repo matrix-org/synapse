@@ -56,7 +56,7 @@ class SearchHandler:
         self._event_serializer = hs.get_event_client_serializer()
         self._relations_handler = hs.get_relations_handler()
         self.storage = hs.get_storage()
-        self.state_storage = self.storage.state
+        self.state_storage_controller = self.storage.state
         self.auth = hs.get_auth()
 
     async def get_old_rooms_from_upgraded_room(self, room_id: str) -> Iterable[str]:
@@ -677,7 +677,7 @@ class SearchHandler:
                     [(EventTypes.Member, sender) for sender in senders]
                 )
 
-                state = await self.state_storage.get_state_for_event(
+                state = await self.state_storage_controller.get_state_for_event(
                     last_event_id, state_filter
                 )
 

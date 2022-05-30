@@ -17,7 +17,7 @@ class RoomBatchHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastores().main
-        self.state_storage = hs.get_storage().state
+        self.state_storage_controller = hs.get_storage().state
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
@@ -141,7 +141,7 @@ class RoomBatchHandler:
         ) = await self.store.get_max_depth_of(event_ids)
         # mapping from (type, state_key) -> state_event_id
         assert most_recent_event_id is not None
-        prev_state_map = await self.state_storage.get_state_ids_for_event(
+        prev_state_map = await self.state_storage_controller.get_state_ids_for_event(
             most_recent_event_id
         )
         # List of state event ID's

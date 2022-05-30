@@ -31,7 +31,7 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
     def prepare(self, reactor, clock, homeserver):
         super().prepare(reactor, clock, homeserver)
         self.room_creator = homeserver.get_room_creation_handler()
-        self.persist_event_storage = self.hs.get_storage().persistence
+        self.persist_event_storage_controller = self.hs.get_storage().persistence
 
         # Create a test user
         self.ourUser = UserID.from_string(OUR_USER_ID)
@@ -61,7 +61,9 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
             )
         )
         self.get_success(
-            self.persist_event_storage.persist_event(memberEvent, memberEventContext)
+            self.persist_event_storage_controller.persist_event(
+                memberEvent, memberEventContext
+            )
         )
 
         # Join the second user to the second room
@@ -76,7 +78,9 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
             )
         )
         self.get_success(
-            self.persist_event_storage.persist_event(memberEvent, memberEventContext)
+            self.persist_event_storage_controller.persist_event(
+                memberEvent, memberEventContext
+            )
         )
 
     def test_return_empty_with_no_data(self):

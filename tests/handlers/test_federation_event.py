@@ -70,7 +70,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
     ) -> None:
         OTHER_USER = f"@user:{self.OTHER_SERVER_NAME}"
         main_store = self.hs.get_datastores().main
-        state_storage = self.hs.get_storage().state
+        state_storage_controller = self.hs.get_storage().state
 
         # create the room
         user_id = self.register_user("kermit", "test")
@@ -216,7 +216,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
 
         # check that the state at that event is as expected
         state = self.get_success(
-            state_storage.get_state_ids_for_event(pulled_event.event_id)
+            state_storage_controller.get_state_ids_for_event(pulled_event.event_id)
         )
         expected_state = {
             (e.type, e.state_key): e.event_id for e in state_at_prev_event

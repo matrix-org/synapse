@@ -130,7 +130,7 @@ class PaginationHandler:
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
-        self.state_storage = self.storage.state
+        self.state_storage_controller = self.storage_controllers.state
         self.clock = hs.get_clock()
         self._server_name = hs.hostname
         self._room_shutdown_handler = hs.get_room_shutdown_handler()
@@ -539,7 +539,7 @@ class PaginationHandler:
                 (EventTypes.Member, event.sender) for event in events
             )
 
-            state_ids = await self.state_storage.get_state_ids_for_event(
+            state_ids = await self.state_storage_controller.get_state_ids_for_event(
                 events[0].event_id, state_filter=state_filter
             )
 

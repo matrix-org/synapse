@@ -85,7 +85,7 @@ class MessageHandler:
         self.state = hs.get_state_handler()
         self.store = hs.get_datastores().main
         self.storage = hs.get_storage()
-        self.state_storage = self.storage.state
+        self.state_storage_controller = self.storage.state
         self._event_serializer = hs.get_event_client_serializer()
         self._ephemeral_events_enabled = hs.config.server.enable_ephemeral_messages
 
@@ -132,7 +132,7 @@ class MessageHandler:
             assert (
                 membership_event_id is not None
             ), "check_user_in_room_or_world_readable returned invalid data"
-            room_state = await self.state_storage.get_state_for_events(
+            room_state = await self.state_storage_controller.get_state_for_events(
                 [membership_event_id], StateFilter.from_types([key])
             )
             data = room_state[membership_event_id].get(key)
@@ -193,7 +193,7 @@ class MessageHandler:
 
             # check whether the user is in the room at that time to determine
             # whether they should be treated as peeking.
-            state_map = await self.state_storage.get_state_for_event(
+            state_map = await self.state_storage_controller.get_state_for_event(
                 last_event.event_id,
                 StateFilter.from_types([(EventTypes.Member, user_id)]),
             )
@@ -214,8 +214,10 @@ class MessageHandler:
             )
 
             if visible_events:
-                room_state_events = await self.state_storage.get_state_for_events(
-                    [last_event.event_id], state_filter=state_filter
+                room_state_events = (
+                    await self.state_storage_controller.get_state_for_events(
+                        [last_event.event_id], state_filter=state_filter
+                    )
                 )
                 room_state: Mapping[Any, EventBase] = room_state_events[
                     last_event.event_id
@@ -244,8 +246,10 @@ class MessageHandler:
                 assert (
                     membership_event_id is not None
                 ), "check_user_in_room_or_world_readable returned invalid data"
-                room_state_events = await self.state_storage.get_state_for_events(
-                    [membership_event_id], state_filter=state_filter
+                room_state_events = (
+                    await self.state_storage_controller.get_state_for_events(
+                        [membership_event_id], state_filter=state_filter
+                    )
                 )
                 room_state = room_state_events[membership_event_id]
 
