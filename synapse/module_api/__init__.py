@@ -151,7 +151,7 @@ __all__ = [
     "respond_with_html",
     "run_in_background",
     "cached",
-    "Allow",
+    "ALLOW",
     "UserID",
     "DatabasePool",
     "LoggingTransaction",
