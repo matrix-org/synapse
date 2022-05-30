@@ -377,8 +377,8 @@ def generate_worker_files(
     nginx_locations = {}
 
     # Read the desired worker configuration from the environment
-    worker_types_env = environ.get("SYNAPSE_WORKER_TYPES")
-    if worker_types_env is None or worker_types_env.strip() == "":
+    worker_types_env = environ.get("SYNAPSE_WORKER_TYPES", "").strip()
+    if not worker_types_env:
         # No workers, just the main process
         worker_types = []
     else:
