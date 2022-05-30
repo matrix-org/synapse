@@ -820,6 +820,17 @@ TokenList = List[Token]
 
 
 def _tokenize_query(query: str) -> TokenList:
+    """
+    Convert the user-supplied `query` into a TokenList, which can be translated into
+    some DB-specific syntax.
+
+    The following constructs are supported:
+
+    - phrase queries using "double quotes"
+    - case-insensitive or and and operators, with parentheses to change operator precedence
+    - unary hyphen to denote NOT e.g. 'include -exclude'
+
+    """
     tokens: TokenList = []
     words = query.split(" ")
     i = 0
@@ -881,6 +892,7 @@ def _tokens_to_tsquery(tokens: TokenList) -> str:
             tsquery.append(" ) ")
         else:
             raise Exception("unknown token " + token)
+
         if (
             i != len(tokens) - 1
             and isinstance(token, (str, Phrase))
