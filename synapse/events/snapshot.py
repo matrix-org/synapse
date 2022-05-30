@@ -22,7 +22,7 @@ from synapse.events import EventBase
 from synapse.types import JsonDict, StateMap
 
 if TYPE_CHECKING:
-    from synapse.storage import StorageControllers
+    from synapse.storage.controllers import StorageControllers
     from synapse.storage.databases.main import DataStore
     from synapse.storage.state import StateFilter
 

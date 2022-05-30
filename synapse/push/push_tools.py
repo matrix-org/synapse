@@ -16,7 +16,7 @@ from typing import Dict
 from synapse.api.constants import ReceiptTypes
 from synapse.events import EventBase
 from synapse.push.presentable_names import calculate_room_name, name_from_member_event
-from synapse.storage import StorageControllers
+from synapse.storage.controllers import StorageControllers
 from synapse.storage.databases.main import DataStore
 
 

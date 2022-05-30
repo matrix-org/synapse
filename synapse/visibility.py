@@ -20,7 +20,7 @@ from typing_extensions import Final
 from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.events import EventBase
 from synapse.events.utils import prune_event
-from synapse.storage import StorageControllers
+from synapse.storage.controllers import StorageControllers
 from synapse.storage.state import StateFilter
 from synapse.types import RetentionPolicy, StateMap, get_domain_from_id
 
