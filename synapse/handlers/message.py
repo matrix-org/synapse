@@ -900,13 +900,13 @@ class EventCreationHandler:
                 if isinstance(spam_check_result, Codes):
                     raise SynapseError(
                         403,
-                        "This message had been rejected as probable spam",
+                        "This message has been rejected as probable spam",
                         spam_check_result,
                     )
 
                 if not isinstance(spam_check_result, str):
                     # Make sure we give the SynapseError a string as the error message.
-                    spam_check_result = "This message had been rejected as probable spam"
+                    spam_check_result = "This message has been rejected as probable spam"
 
                 raise SynapseError(
                     403,
