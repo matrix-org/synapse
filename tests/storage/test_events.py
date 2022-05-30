@@ -31,7 +31,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
 
     def prepare(self, reactor, clock, homeserver):
         self.state = self.hs.get_state_handler()
-        self.persistence = self.hs.get_storage_controllers().persistence
+        self._persistence = self.hs.get_storage_controllers().persistence
         self.store = self.hs.get_datastores().main
 
         self.register_user("user", "pass")
@@ -71,7 +71,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
         context = self.get_success(
             self.state.compute_event_context(event, state_ids_before_event=state)
         )
-        self.get_success(self.persistence.persist_event(event, context))
+        self.get_success(self._persistence.persist_event(event, context))
 
     def assert_extremities(self, expected_extremities):
         """Assert the current extremities for the room"""
@@ -148,7 +148,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
             )
         )
 
-        self.get_success(self.persistence.persist_event(remote_event_2, context))
+        self.get_success(self._persistence.persist_event(remote_event_2, context))
 
         # Check that we haven't dropped the old extremity.
         self.assert_extremities([self.remote_event_1.event_id, remote_event_2.event_id])
@@ -353,7 +353,7 @@ class InvalideUsersInRoomCacheTestCase(HomeserverTestCase):
 
     def prepare(self, reactor, clock, homeserver):
         self.state = self.hs.get_state_handler()
-        self.persistence = self.hs.get_storage_controllers().persistence
+        self._persistence = self.hs.get_storage_controllers().persistence
         self.store = self.hs.get_datastores().main
 
     def test_remote_user_rooms_cache_invalidated(self):
@@ -390,7 +390,7 @@ class InvalideUsersInRoomCacheTestCase(HomeserverTestCase):
         )
 
         context = self.get_success(self.state.compute_event_context(remote_event_1))
-        self.get_success(self.persistence.persist_event(remote_event_1, context))
+        self.get_success(self._persistence.persist_event(remote_event_1, context))
 
         # Call `get_rooms_for_user` to add the remote user to the cache
         rooms = self.get_success(self.store.get_rooms_for_user(remote_user))
@@ -437,7 +437,7 @@ class InvalideUsersInRoomCacheTestCase(HomeserverTestCase):
         )
 
         context = self.get_success(self.state.compute_event_context(remote_event_1))
-        self.get_success(self.persistence.persist_event(remote_event_1, context))
+        self.get_success(self._persistence.persist_event(remote_event_1, context))
 
         # Call `get_users_in_room` to add the remote user to the cache
         users = self.get_success(self.store.get_users_in_room(room_id))

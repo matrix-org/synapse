@@ -34,7 +34,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         super(FilterEventsForServerTestCase, self).setUp()
         self.event_creation_handler = self.hs.get_event_creation_handler()
         self.event_builder_factory = self.hs.get_event_builder_factory()
-        self.storage_controllers = self.hs.get_storage_controllers()
+        self._storage_controllers = self.hs.get_storage_controllers()
 
         self.get_success(create_room(self.hs, TEST_ROOM_ID, "@someone:ROOM"))
 
@@ -61,7 +61,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
 
         filtered = self.get_success(
             filter_events_for_server(
-                self.storage_controllers, "test_server", events_to_filter
+                self._storage_controllers, "test_server", events_to_filter
             )
         )
 
@@ -83,7 +83,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             self.get_success(
                 filter_events_for_server(
-                    self.storage_controllers, "remote_hs", [outlier]
+                    self._storage_controllers, "remote_hs", [outlier]
                 )
             ),
             [outlier],
@@ -94,7 +94,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
 
         filtered = self.get_success(
             filter_events_for_server(
-                self.storage_controllers, "remote_hs", [outlier, evt]
+                self._storage_controllers, "remote_hs", [outlier, evt]
             )
         )
         self.assertEqual(len(filtered), 2, f"expected 2 results, got: {filtered}")
@@ -106,7 +106,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         # be redacted)
         filtered = self.get_success(
             filter_events_for_server(
-                self.storage_controllers, "other_server", [outlier, evt]
+                self._storage_controllers, "other_server", [outlier, evt]
             )
         )
         self.assertEqual(filtered[0], outlier)
@@ -141,7 +141,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         # ... and the filtering happens.
         filtered = self.get_success(
             filter_events_for_server(
-                self.storage_controllers, "test_server", events_to_filter
+                self._storage_controllers, "test_server", events_to_filter
             )
         )
 
@@ -179,7 +179,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
             self.event_creation_handler.create_new_client_event(builder)
         )
         self.get_success(
-            self.storage_controllers.persistence.persist_event(event, context)
+            self._storage_controllers.persistence.persist_event(event, context)
         )
         return event
 
@@ -207,7 +207,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         )
 
         self.get_success(
-            self.storage_controllers.persistence.persist_event(event, context)
+            self._storage_controllers.persistence.persist_event(event, context)
         )
         return event
 
@@ -231,7 +231,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         )
 
         self.get_success(
-            self.storage_controllers.persistence.persist_event(event, context)
+            self._storage_controllers.persistence.persist_event(event, context)
         )
         return event
 
@@ -250,8 +250,8 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         event = self.get_success(builder.build(prev_event_ids=[], auth_event_ids=[]))
         event.internal_metadata.outlier = True
         self.get_success(
-            self.storage_controllers.persistence.persist_event(
-                event, EventContext.for_outlier(self.storage_controllers)
+            self._storage_controllers.persistence.persist_event(
+                event, EventContext.for_outlier(self._storage_controllers)
             )
         )
         return event

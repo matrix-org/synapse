@@ -1192,8 +1192,8 @@ class RoomContextHandler:
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
-        self.storage_controllers = hs.get_storage_controllers()
-        self.state_storage_controller = self.storage_controllers.state
+        self._storage_controllers = hs.get_storage_controllers()
+        self._state_storage_controller = self._storage_controllers.state
         self._relations_handler = hs.get_relations_handler()
 
     async def get_event_context(
@@ -1236,7 +1236,7 @@ class RoomContextHandler:
             if use_admin_priviledge:
                 return events
             return await filter_events_for_client(
-                self.storage_controllers,
+                self._storage_controllers,
                 user.to_string(),
                 events,
                 is_peeking=is_peeking,
@@ -1296,7 +1296,7 @@ class RoomContextHandler:
         # first? Shouldn't we be consistent with /sync?
         # https://github.com/matrix-org/matrix-doc/issues/687
 
-        state = await self.state_storage_controller.get_state_for_events(
+        state = await self._state_storage_controller.get_state_for_events(
             [last_event_id], state_filter=state_filter
         )
 

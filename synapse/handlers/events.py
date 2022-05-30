@@ -139,7 +139,7 @@ class EventStreamHandler:
 class EventHandler:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
-        self.storage_controllers = hs.get_storage_controllers()
+        self._storage_controllers = hs.get_storage_controllers()
 
     async def get_event(
         self,
@@ -177,7 +177,7 @@ class EventHandler:
         is_peeking = user.to_string() not in users
 
         filtered = await filter_events_for_client(
-            self.storage_controllers, user.to_string(), [event], is_peeking=is_peeking
+            self._storage_controllers, user.to_string(), [event], is_peeking=is_peeking
         )
 
         if not filtered:

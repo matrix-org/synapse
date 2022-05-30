@@ -129,8 +129,8 @@ class PaginationHandler:
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
-        self.storage_controllers = hs.get_storage_controllers()
-        self.state_storage_controller = self.storage_controllers.state
+        self._storage_controllers = hs.get_storage_controllers()
+        self._state_storage_controller = self._storage_controllers.state
         self.clock = hs.get_clock()
         self._server_name = hs.hostname
         self._room_shutdown_handler = hs.get_room_shutdown_handler()
@@ -352,7 +352,7 @@ class PaginationHandler:
         self._purges_in_progress_by_room.add(room_id)
         try:
             async with self.pagination_lock.write(room_id):
-                await self.storage_controllers.purge_events.purge_history(
+                await self._storage_controllers.purge_events.purge_history(
                     room_id, token, delete_local_events
                 )
             logger.info("[purge] complete")
@@ -414,7 +414,7 @@ class PaginationHandler:
                 if joined:
                     raise SynapseError(400, "Users are still joined to this room")
 
-            await self.storage_controllers.purge_events.purge_room(room_id)
+            await self._storage_controllers.purge_events.purge_room(room_id)
 
     async def get_messages(
         self,
@@ -520,7 +520,7 @@ class PaginationHandler:
                 events = await event_filter.filter(events)
 
             events = await filter_events_for_client(
-                self.storage_controllers,
+                self._storage_controllers,
                 user_id,
                 events,
                 is_peeking=(member_event_id is None),
@@ -542,7 +542,7 @@ class PaginationHandler:
                 (EventTypes.Member, event.sender) for event in events
             )
 
-            state_ids = await self.state_storage_controller.get_state_ids_for_event(
+            state_ids = await self._state_storage_controller.get_state_ids_for_event(
                 events[0].event_id, state_filter=state_filter
             )
 
@@ -656,7 +656,7 @@ class PaginationHandler:
                                 400, "Users are still joined to this room"
                             )
 
-                    await self.storage_controllers.purge_events.purge_room(room_id)
+                    await self._storage_controllers.purge_events.purge_room(room_id)
 
             logger.info("complete")
             self._delete_by_id[delete_id].status = DeleteStatus.STATUS_COMPLETE

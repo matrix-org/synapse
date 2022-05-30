@@ -31,7 +31,7 @@ class PurgeTests(HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.user_id)
 
         self.store = hs.get_datastores().main
-        self.storage_controllers = self.hs.get_storage_controllers()
+        self._storage_controllers = self.hs.get_storage_controllers()
 
     def test_purge_history(self):
         """
@@ -51,7 +51,7 @@ class PurgeTests(HomeserverTestCase):
 
         # Purge everything before this topological token
         self.get_success(
-            self.storage_controllers.purge_events.purge_history(
+            self._storage_controllers.purge_events.purge_history(
                 self.room_id, token_str, True
             )
         )
@@ -81,7 +81,7 @@ class PurgeTests(HomeserverTestCase):
 
         # Purge everything before this topological token
         f = self.get_failure(
-            self.storage_controllers.purge_events.purge_history(
+            self._storage_controllers.purge_events.purge_history(
                 self.room_id, event, True
             ),
             SynapseError,
@@ -109,7 +109,9 @@ class PurgeTests(HomeserverTestCase):
         self.assertIsNotNone(create_event)
 
         # Purge everything before this topological token
-        self.get_success(self.storage_controllers.purge_events.purge_room(self.room_id))
+        self.get_success(
+            self._storage_controllers.purge_events.purge_room(self.room_id)
+        )
 
         # The events aren't found.
         self.store._invalidate_get_event_cache(create_event.event_id)

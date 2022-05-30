@@ -114,10 +114,10 @@ class Mailer:
 
         self.send_email_handler = hs.get_send_email_handler()
         self.store = self.hs.get_datastores().main
-        self.state_storage_controller = self.hs.get_storage_controllers().state
+        self._state_storage_controller = self.hs.get_storage_controllers().state
         self.macaroon_gen = self.hs.get_macaroon_generator()
         self.state_handler = self.hs.get_state_handler()
-        self.storage_controllers = hs.get_storage_controllers()
+        self._storage_controllers = hs.get_storage_controllers()
         self.app_name = app_name
         self.email_subjects: EmailSubjectConfig = hs.config.email.email_subjects
 
@@ -456,7 +456,7 @@ class Mailer:
         }
 
         the_events = await filter_events_for_client(
-            self.storage_controllers, user_id, results.events_before
+            self._storage_controllers, user_id, results.events_before
         )
         the_events.append(notif_event)
 
@@ -494,7 +494,7 @@ class Mailer:
             )
         else:
             # Attempt to check the historical state for the room.
-            historical_state = await self.state_storage_controller.get_state_for_event(
+            historical_state = await self._state_storage_controller.get_state_for_event(
                 event.event_id, StateFilter.from_types((type_state_key,))
             )
             sender_state_event = historical_state.get(type_state_key)
@@ -768,7 +768,7 @@ class Mailer:
             else:
                 # Attempt to check the historical state for the room.
                 historical_state = (
-                    await self.state_storage_controller.get_state_for_event(
+                    await self._state_storage_controller.get_state_for_event(
                         event_id, StateFilter.from_types((type_state_key,))
                     )
                 )
