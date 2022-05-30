@@ -21,6 +21,7 @@ from typing import (
     Awaitable,
     Callable,
     Collection,
+    Dict,
     List,
     Optional,
     Tuple,
@@ -41,13 +42,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
 CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
     ["synapse.events.EventBase"],
     Awaitable[
         Union[
             Allow,
             Codes,
+            # Highly experimental, not officially part of the spamchecker API, may
+            # disappear without warning depending on the results of ongoing
+            # experiments.
+            # Use this to return additional information as part of an error.
+            Tuple[Codes, Dict],
             # Deprecated
             bool,
             # Deprecated
@@ -270,7 +275,7 @@ class SpamChecker:
 
     async def check_event_for_spam(
         self, event: "synapse.events.EventBase"
-    ) -> Union[Decision, str]:
+    ) -> Union[Decision, Tuple[Codes, Dict], str]:
         """Checks if a given event is considered "spammy" by this server.
 
         If the server considers an event spammy, then it will be rejected if
@@ -293,9 +298,9 @@ class SpamChecker:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                res: Union[Decision, str, bool] = await delay_cancellation(
-                    callback(event)
-                )
+                res: Union[
+                    Decision, Tuple[Codes, Dict], str, bool
+                ] = await delay_cancellation(callback(event))
                 if res is False or res is Allow.ALLOW:
                     # This spam-checker accepts the event.
                     # Other spam-checkers may reject it, though.
@@ -305,8 +310,9 @@ class SpamChecker:
                     # return value `True`
                     return Codes.FORBIDDEN
                 else:
-                    # This spam-checker rejects the event either with a `str`
-                    # or with a `Codes`. In either case, we stop here.
+                    # This spam-checker rejects the event either with a `str`,
+                    # with a `Codes` or with a `Tuple[Codes, Dict]`. In either
+                    # case, we stop here.
                     return res
 
         # No spam-checker has rejected the event, let it pass.

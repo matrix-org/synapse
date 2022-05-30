@@ -729,49 +729,6 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         users.update(rows)
         return list(users)
 
-    async def get_mutual_rooms_for_users(
-        self, user_id: str, other_user_id: str
-    ) -> Set[str]:
-        """
-        Returns the rooms that a local user shares with another local or remote user.
-
-        Args:
-            user_id: The MXID of a local user
-            other_user_id: The MXID of the other user
-
-        Returns:
-            A set of room ID's that the users share.
-        """
-
-        def _get_mutual_rooms_for_users_txn(
-            txn: LoggingTransaction,
-        ) -> List[Dict[str, str]]:
-            txn.execute(
-                """
-                SELECT p1.room_id
-                FROM users_in_public_rooms as p1
-                INNER JOIN users_in_public_rooms as p2
-                    ON p1.room_id = p2.room_id
-                    AND p1.user_id = ?
-                    AND p2.user_id = ?
-                UNION
-                SELECT room_id
-                FROM users_who_share_private_rooms
-                WHERE
-                    user_id = ?
-                    AND other_user_id = ?
-                """,
-                (user_id, other_user_id, user_id, other_user_id),
-            )
-            rows = self.db_pool.cursor_to_dict(txn)
-            return rows
-
-        rows = await self.db_pool.runInteraction(
-            "get_mutual_rooms_for_users", _get_mutual_rooms_for_users_txn
-        )
-
-        return {row["room_id"] for row in rows}
-
     async def get_user_directory_stream_pos(self) -> Optional[int]:
         """
         Get the stream ID of the user directory stream.

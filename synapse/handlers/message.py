@@ -895,6 +895,21 @@ class EventCreationHandler:
 
             spam_check = await self.spam_checker.check_event_for_spam(event)
             if spam_check is not synapse.spam_checker_api.Allow.ALLOW:
+                if isinstance(spam_check, tuple):
+                    try:
+                        [code, dict] = spam_check
+                        raise SynapseError(
+                            403,
+                            "This message had been rejected as probable spam",
+                            code,
+                            dict,
+                        )
+                    except ValueError:
+                        logger.error(
+                            "Spam-check module returned invalid error value. Expecting [code, dict], got %s",
+                            spam_check,
+                        )
+                        spam_check = Codes.FORBIDDEN
                 raise SynapseError(
                     403, "This message had been rejected as probable spam", spam_check
                 )
