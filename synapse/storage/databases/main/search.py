@@ -820,7 +820,7 @@ TokenList = List[Token]
 
 
 def _tokenize_query(query: str) -> TokenList:
-    tokens = []
+    tokens: TokenList = []
     words = query.split(" ")
     i = 0
     while i < len(words):
