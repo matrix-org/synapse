@@ -35,7 +35,6 @@ from typing_extensions import ParamSpec
 from twisted.internet import defer
 from twisted.web.resource import Resource
 
-from synapse import spam_checker_api
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.events.presence_router import (
@@ -101,6 +100,7 @@ from synapse.logging.context import (
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client.login import LoginResponse
+from synapse.spam_checker_api import Allow
 from synapse.storage import DataStore
 from synapse.storage.background_updates import (
     DEFAULT_BATCH_SIZE_CALLBACK,
@@ -141,7 +141,7 @@ are loaded into Synapse.
 
 PRESENCE_ALL_USERS = PresenceRouter.ALL_USERS
 
-ALLOW = spam_checker_api.Allow.ALLOW
+ALLOW = Allow.ALLOW
 # Singleton value used to mark a message as permitted.
 
 __all__ = [
