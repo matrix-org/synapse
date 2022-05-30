@@ -1,0 +1,1 @@
+Remove PyNaCl occurrences directly used in Synapse code.
