@@ -18,12 +18,12 @@ _Changed in Synapse v1.60.0: `synapse.module_api.NOT_SPAM` and `synapse.module_a
 async def check_event_for_spam(event: "synapse.module_api.EventBase") -> Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", str, bool]
 ```
 
-Called when receiving an event from a client or via federation. The callback must return either:
+Called when receiving an event from a client or via federation. The callback must return one of:
   - `synapse.module_api.NOT_SPAM`, to allow the operation. Other callbacks may still 
     decide to reject it.
   - `synapse.module_api.errors.Codes` to reject the operation with an error code. In case
     of doubt, `synapse.module_api.errors.Codes.FORBIDDEN` is a good error code.
-  - (deprecated) a `str` to reject the operation and specify an error message. Note that clients
+  - (deprecated) a non-`Codes` `str` to reject the operation and specify an error message. Note that clients
     typically will not localize the error message to the user's preferred locale.
   - (deprecated) `False`, which is the same as returning `synapse.module_api.NOT_SPAM`.
   - (deprecated) `True`, which is the same as returning `synapse.module_api.errors.Codes.FORBIDDEN`.
