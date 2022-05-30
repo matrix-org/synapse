@@ -20,7 +20,9 @@ databases). The `DatabasePool` class represents connections to a single physical
 database. The `databases` are classes that talk directly to a `DatabasePool`
 instance and have associated schemas, background updates, etc. On top of those
 there are classes that provide high level interfaces that combine calls to
-multiple `databases`.
+multiple `databases`, called storage controllers and are located in the
+`controller` module. These are bundled into a single `StorageControllers` class
+for ease of use and exposed via `HomeServer.get_storage_controllers()`.
 
 There are also schemas that get applied to every database, regardless of the
 data stores associated with them (e.g. the schema version tables), which are
