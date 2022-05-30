@@ -1383,6 +1383,11 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 return False
 
             # if that was the final batch, we validate the foreign key.
+            #
+            # The constraint should have been in place and enforced for new rows since
+            # before we started deleting invalid rows, so there's no chance for any
+            # invalid rows to have snuck in the meantime. In other words, this really
+            # ought to succeed.
             logger.info("cleaned up event_edges; enabling foreign key")
             txn.execute(
                 "ALTER TABLE event_edges VALIDATE CONSTRAINT event_edges_event_id_fkey"
