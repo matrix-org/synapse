@@ -1,0 +1,1 @@
+demo: check if we are in a virtualenv before overriding PYTHONPATH.
