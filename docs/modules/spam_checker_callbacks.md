@@ -12,26 +12,27 @@ The available spam checker callbacks are:
 
 _First introduced in Synapse v1.37.0_
 
-_Changed in Synapse v1.60.0: `synapse.module_api.ALLOW` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean or a string is now deprecated._ 
+_Changed in Synapse v1.60.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean or a string is now deprecated._ 
 
 ```python
-async def check_event_for_spam(event: "synapse.module_api.EventBase") -> Union["synapse.module_api.ALLOW", "synapse.module_api.errors.Codes", str, bool]
+async def check_event_for_spam(event: "synapse.module_api.EventBase") -> Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", str, bool]
 ```
 
 Called when receiving an event from a client or via federation. The callback must return either:
-  - `synapse.module_api.ALLOW`, to allow the operation. Other callbacks
-    may still decide to reject it.
+  - `synapse.module_api.NOT_SPAM`, to allow the operation. Other callbacks may still 
+    decide to reject it.
   - `synapse.module_api.errors.Codes` to reject the operation with an error code. In case
     of doubt, `synapse.module_api.errors.Codes.FORBIDDEN` is a good error code.
   - (deprecated) a `str` to reject the operation and specify an error message. Note that clients
     typically will not localize the error message to the user's preferred locale.
-  - (deprecated) `False`, which is the same as returning `synapse.module_api.ALLOW`.
+  - (deprecated) `False`, which is the same as returning `synapse.module_api.NOT_SPAM`.
   - (deprecated) `True`, which is the same as returning `synapse.module_api.errors.Codes.FORBIDDEN`.
 
 If multiple modules implement this callback, they will be considered in order. If a
-callback returns `synapse.module_api.ALLOW`, Synapse falls through to the next one. The value of the
-first callback that does not return `synapse.module_api.ALLOW` will be used. If this happens, Synapse
-will not call any of the subsequent implementations of this callback.
+callback returns `synapse.module_api.NOT_SPAM`, Synapse falls through to the next one.
+The value of the first callback that does not return `synapse.module_api.NOT_SPAM` will
+be used. If this happens, Synapse will not call any of the subsequent implementations of
+this callback.
 
 ### `user_may_join_room`
 

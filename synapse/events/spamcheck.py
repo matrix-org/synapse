@@ -30,7 +30,7 @@ from typing import (
 from synapse.api.errors import Codes
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
-from synapse.spam_checker_api import Allow, Decision, RegistrationBehaviour
+from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import RoomAlias, UserProfile
 from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 from synapse.util.metrics import Measure
@@ -46,7 +46,7 @@ CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
     ["synapse.events.EventBase"],
     Awaitable[
         Union[
-            Allow,
+            str,
             Codes,
             # Deprecated
             bool,
@@ -178,6 +178,8 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer") -> None:
 
 
 class SpamChecker:
+    NOT_SPAM = "NOT_SPAM"
+
     def __init__(self, hs: "synapse.server.HomeServer") -> None:
         self.hs = hs
         self.clock = hs.get_clock()
@@ -270,7 +272,7 @@ class SpamChecker:
 
     async def check_event_for_spam(
         self, event: "synapse.events.EventBase"
-    ) -> Union[Decision, str]:
+    ) -> Union[Codes, str]:
         """Checks if a given event is considered "spammy" by this server.
 
         If the server considers an event spammy, then it will be rejected if
@@ -281,22 +283,20 @@ class SpamChecker:
             event: the event to be checked
 
         Returns:
-            - on `ALLOW`, the event is considered good (non-spammy) and should
-                be let through. Other spamcheck filters may still reject it.
-            - on `Code`, the event is considered spammy and is rejected with a specific
+            - `NOT_SPAM` if the event is considered good (non-spammy) and should be let
+                through. Other spamcheck filters may still reject it.
+            - A `Code` if the event is considered spammy and is rejected with a specific
                 error message/code.
-            - on `str`, the event is considered spammy and the string is used as error
-                message. This usage is generally discouraged as it doesn't support
-                internationalization.
+            - A string that isn't `NOT_SPAM` if the event is considered spammy and the
+                string should be used as the client-facing error message. This usage is
+                generally discouraged as it doesn't support internationalization.
         """
         for callback in self._check_event_for_spam_callbacks:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                res: Union[Decision, str, bool] = await delay_cancellation(
-                    callback(event)
-                )
-                if res is False or res is Allow.ALLOW:
+                res: Union[Codes, str, bool] = await delay_cancellation(callback(event))
+                if res is False or res == self.NOT_SPAM:
                     # This spam-checker accepts the event.
                     # Other spam-checkers may reject it, though.
                     continue
@@ -310,7 +310,7 @@ class SpamChecker:
                     return res
 
         # No spam-checker has rejected the event, let it pass.
-        return Allow.ALLOW
+        return self.NOT_SPAM
 
     async def should_drop_federated_event(
         self, event: "synapse.events.EventBase"

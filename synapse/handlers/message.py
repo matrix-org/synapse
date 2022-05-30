@@ -23,7 +23,6 @@ from canonicaljson import encode_canonical_json
 
 from twisted.internet.interfaces import IDelayedCall
 
-import synapse
 from synapse import event_auth
 from synapse.api.constants import (
     EventContentFields,
@@ -886,10 +885,21 @@ class EventCreationHandler:
                 event.sender,
             )
 
-            spam_check = await self.spam_checker.check_event_for_spam(event)
-            if spam_check is not synapse.spam_checker_api.Allow.ALLOW:
+            spam_check_result = await self.spam_checker.check_event_for_spam(event)
+            if isinstance(spam_check_result, Codes):
                 raise SynapseError(
-                    403, "This message had been rejected as probable spam", spam_check
+                    403,
+                    "This message had been rejected as probable spam",
+                    spam_check_result,
+                )
+            elif (
+                isinstance(spam_check_result, str)
+                and spam_check_result != self.spam_checker.NOT_SPAM
+            ):
+                raise SynapseError(
+                    403,
+                    spam_check_result,
+                    Codes.FORBIDDEN,
                 )
 
             ev = await self.handle_new_client_event(

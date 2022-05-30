@@ -54,6 +54,7 @@ from synapse.events.spamcheck import (
     USER_MAY_JOIN_ROOM_CALLBACK,
     USER_MAY_PUBLISH_ROOM_CALLBACK,
     USER_MAY_SEND_3PID_INVITE_CALLBACK,
+    SpamChecker,
 )
 from synapse.events.third_party_rules import (
     CHECK_CAN_DEACTIVATE_USER_CALLBACK,
@@ -100,7 +101,6 @@ from synapse.logging.context import (
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.client.login import LoginResponse
-from synapse.spam_checker_api import Allow
 from synapse.storage import DataStore
 from synapse.storage.background_updates import (
     DEFAULT_BATCH_SIZE_CALLBACK,
@@ -140,9 +140,7 @@ are loaded into Synapse.
 """
 
 PRESENCE_ALL_USERS = PresenceRouter.ALL_USERS
-
-ALLOW = Allow.ALLOW
-# Singleton value used to mark a message as permitted.
+NOT_SPAM = SpamChecker.NOT_SPAM
 
 __all__ = [
     "errors",
@@ -151,7 +149,7 @@ __all__ = [
     "respond_with_html",
     "run_in_background",
     "cached",
-    "ALLOW",
+    "NOT_SPAM",
     "UserID",
     "DatabasePool",
     "LoggingTransaction",
