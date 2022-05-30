@@ -1,1 +1,0 @@
-Experimental: expand `check_event_for_spam` with ability to return additional fields.
