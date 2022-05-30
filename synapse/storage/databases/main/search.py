@@ -825,17 +825,19 @@ def _tokenize_query(query: str) -> TokenList:
     i = 0
     while i < len(words):
         word = words[i]
-        i = i + 1
         if word[0] == '"':
-            phrase = [word[1:]]
-            while i < len(words):
-                word = words[i]
-                i = i + 1
-                if word[-1] == '"':
-                    phrase.append(word[:-1])
+            phrase_word = word[1:]
+            phrase = []
+            while True:
+                if phrase_word[-1] == '"':
+                    phrase.append(phrase_word[:-1])
                     break
                 else:
-                    phrase.append(word)
+                    phrase.append(phrase_word)
+                i = i + 1
+                if i == len(words):
+                    break
+                phrase_word = words[i]
             tokens.append(Phrase(phrase))
         elif word[0] == "-":
             tokens.append(Not())
@@ -850,6 +852,7 @@ def _tokenize_query(query: str) -> TokenList:
             tokens.append(RParen())
         else:
             tokens.append(word)
+        i = i + 1
     return tokens
 
 

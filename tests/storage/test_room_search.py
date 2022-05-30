@@ -219,6 +219,9 @@ class MessageSearchTest(HomeserverTestCase):
         ("fox -brown", False),
         ("fox AND ( brown OR nope )", True),
         ("fox AND ( nope OR doublenope )", False),
+        ('"fox" quick', True),
+        ('"fox quick', False),
+        ('"quick brown', True),
     ]
 
     def setUp(self):
