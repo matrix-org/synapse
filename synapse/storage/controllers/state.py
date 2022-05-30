@@ -30,7 +30,6 @@ from synapse.storage.util.partial_state_events_tracker import PartialStateEvents
 from synapse.types import MutableStateMap, StateMap
 
 if TYPE_CHECKING:
-
     from synapse.server import HomeServer
     from synapse.storage.databases import Databases
 
