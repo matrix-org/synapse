@@ -1149,7 +1149,10 @@ class ModuleApi:
             )
 
     async def sleep(self, seconds: float) -> None:
-        """Sleeps for the given number of seconds."""
+        """Sleeps for the given number of seconds.
+
+        Added in Synapse v1.49.0.
+        """
 
         await self._clock.sleep(seconds)
 
@@ -1434,6 +1437,8 @@ class ModuleApi:
     ) -> List[Tuple[str, str]]:
         """Generates list of monthly active users and their services.
         Please see corresponding storage docstring for more details.
+
+        Added in Synapse v1.61.0.
 
         Arguments:
             start_timestamp: If specified, only include users that were first active
