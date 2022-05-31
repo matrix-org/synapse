@@ -199,7 +199,7 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
                         channel = make_request()
                         request = channel.request
 
-                        if request_number == 0:
+                        if request_number == 1:
                             self.assertFalse(
                                 respond_mock.called,
                                 "Request finished before we could disconnect - ensure "
