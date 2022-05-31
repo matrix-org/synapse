@@ -1,9 +1,14 @@
 #!/bin/bash
+#
+# Fetches a version of complement which best matches the current build.
+#
+# The tarball is unpacked into `./complement`.
 
+set -e
 mkdir -p complement
-# Attempt to use the version of complement which best matches the current
-# build. Depending on whether this is a PR or release, etc. we need to
-# use different fallbacks.
+
+# Pick an appropriate version of complement. Depending on whether this is a PR or release,
+# etc. we need to use different fallbacks:
 #
 # 1. First check if there's a similarly named branch (GITHUB_HEAD_REF
 #    for pull requests, otherwise GITHUB_REF).
