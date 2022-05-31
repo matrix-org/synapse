@@ -320,16 +320,6 @@ jobs:
 
           # Test with workers
           - workers: workers
-            regex: 'A-Ea-e'
-
-          - workers: workers
-            regex: 'F-Lf-l'
-
-          - workers: workers
-            regex: 'M-Qm-q'
-
-          - workers: workers
-            regex: 'R-Zr-z'
 
     steps:
       # The path is set via a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on the path to run Complement.
@@ -377,7 +367,7 @@ jobs:
 
       - run: |
           set -o pipefail
-          WORKERS=${{ matrix.workers && 1 }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json ${{ matrix.regex && format('-run Test[{0}]', matrix.regex) || '' }} 2>&1 | gotestfmt
+          WORKERS=${{ matrix.workers && 1 }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | gotestfmt
         shell: bash
         name: Run Complement Tests
 
