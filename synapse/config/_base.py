@@ -18,6 +18,7 @@ import argparse
 import errno
 import logging
 import os
+import re
 from collections import OrderedDict
 from hashlib import sha256
 from textwrap import dedent
@@ -472,7 +473,7 @@ class RootConfig:
             The yaml config file
         """
 
-        return CONFIG_FILE_HEADER + "\n\n".join(
+        conf = CONFIG_FILE_HEADER + "\n".join(
             dedent(conf)
             for conf in self.invoke_all(
                 "generate_config_section",
@@ -487,6 +488,8 @@ class RootConfig:
                 tls_private_key_path=tls_private_key_path,
             ).values()
         )
+        conf = re.sub('\n{2,}', "\n", conf)
+        return conf
 
     @classmethod
     def load_config(
