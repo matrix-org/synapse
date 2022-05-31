@@ -1,0 +1,1 @@
+Reduce database load of `/sync` when presence is enabled.
