@@ -174,7 +174,7 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
         # Each element is a stringified stack trace.
         seen_awaits: Set[Tuple[str, ...]] = set()
 
-        self._log_for_request(
+        _log_for_request(
             0, f"Running _test_cancellation_at_every_await for {test_name}..."
         )
 
@@ -242,7 +242,7 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
                     # Disconnect the client and wait for the response.
                     request.connectionLost(reason=ConnectionDone())
 
-                    self._log_for_request(request_number, "--- disconnected ---")
+                    _log_for_request(request_number, "--- disconnected ---")
 
                     # We may need to pump the reactor to allow `delay_cancellation`s to
                     # finish.
@@ -353,8 +353,8 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
 
             awaits_seen += 1
 
-            stack = self._get_stack(skip_frames=1)
-            stack_hash = self._hash_stack(stack)
+            stack = _get_stack(skip_frames=1)
+            stack_hash = _hash_stack(stack)
 
             if stack_hash not in seen_awaits:
                 # Block at the current `await` onwards.
@@ -378,7 +378,7 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
                     new_deferred: "Deferred[T]" = Deferred()
                     to_unblock[new_deferred] = deferred.result
 
-                    self._log_await_stack(
+                    _log_await_stack(
                         stack, previous_stack, request_number, "force-blocked await"
                     )
                     previous_stack = stack
@@ -388,7 +388,7 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
                     # This `Deferred` does not have a result yet.
                     # The `await` will block normally, so we don't have to do
                     # anything.
-                    self._log_await_stack(
+                    _log_await_stack(
                         stack, previous_stack, request_number, "blocking await"
                     )
                     previous_stack = stack
@@ -397,127 +397,131 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
 
         return Deferred___next__, unblock_awaits, get_awaits_seen, has_seen_new_await
 
-    def _log_for_request(self, request_number: int, message: str) -> None:
-        """Logs a message for an iteration of `_test_cancellation_at_every_await`."""
-        # We want consistent alignment when logging stack traces, so ensure the
-        # logging context has a fixed width name.
-        with LoggingContext(name=f"request-{request_number:<2}"):
-            logger.info(message)
 
-    def _log_await_stack(
-        self,
-        stack: List[inspect.FrameInfo],
-        previous_stack: List[inspect.FrameInfo],
-        request_number: int,
-        note: str,
-    ) -> None:
-        """Logs the stack for an `await` in `_test_cancellation_at_every_await`.
+def _log_for_request(request_number: int, message: str) -> None:
+    """Logs a message for an iteration of `_test_cancellation_at_every_await`."""
+    # We want consistent alignment when logging stack traces, so ensure the logging
+    # context has a fixed width name.
+    with LoggingContext(name=f"request-{request_number:<2}"):
+        logger.info(message)
 
-        Only logs the part of the stack that has changed since the previous call.
 
-        Example output looks like:
-        ```
-        delay_cancellation:750 (synapse/util/async_helpers.py:750)
-            DatabasePool._runInteraction:768 (synapse/storage/database.py:768)
-                > *blocked on await* at DatabasePool.runWithConnection:891 (synapse/storage/database.py:891)
-        ```
+def _log_await_stack(
+    stack: List[inspect.FrameInfo],
+    previous_stack: List[inspect.FrameInfo],
+    request_number: int,
+    note: str,
+) -> None:
+    """Logs the stack for an `await` in `_test_cancellation_at_every_await`.
 
-        Args:
-            stack: The stack to log, as returned by `_get_stack()`.
-            previous_stack: The previous stack logged, with callers appearing before
-                callees.
-            request_number: The request number to log against.
-            note: A note to attach to the last stack frame, eg. "blocked on await".
-        """
-        for i, frame_info in enumerate(stack[:-1]):
-            # Skip any frames in common with the previous logging.
-            if i < len(previous_stack) and frame_info == previous_stack[i]:
-                continue
+    Only logs the part of the stack that has changed since the previous call.
 
-            frame = self._format_stack_frame(frame_info)
-            message = f"{'  ' * i}{frame}"
-            self._log_for_request(request_number, message)
+    Example output looks like:
+    ```
+    delay_cancellation:750 (synapse/util/async_helpers.py:750)
+        DatabasePool._runInteraction:768 (synapse/storage/database.py:768)
+            > *blocked on await* at DatabasePool.runWithConnection:891 (synapse/storage/database.py:891)
+    ```
 
-        # Always print the final frame with the `await`.
-        # If the frame with the `await` started another coroutine run, we may have
-        # already printed a deeper stack which includes our final frame. We want to
-        # log where all `await`s happen, so we reprint the frame in this case.
-        i = len(stack) - 1
-        frame_info = stack[i]
-        frame = self._format_stack_frame(frame_info)
-        message = f"{'  ' * i}> *{note}* at {frame}"
-        self._log_for_request(request_number, message)
+    Args:
+        stack: The stack to log, as returned by `_get_stack()`.
+        previous_stack: The previous stack logged, with callers appearing before
+            callees.
+        request_number: The request number to log against.
+        note: A note to attach to the last stack frame, eg. "blocked on await".
+    """
+    for i, frame_info in enumerate(stack[:-1]):
+        # Skip any frames in common with the previous logging.
+        if i < len(previous_stack) and frame_info == previous_stack[i]:
+            continue
 
-    def _format_stack_frame(self, frame_info: inspect.FrameInfo) -> str:
-        """Returns a string representation of a stack frame.
+        frame = _format_stack_frame(frame_info)
+        message = f"{'  ' * i}{frame}"
+        _log_for_request(request_number, message)
 
-        Used for debug logging.
+    # Always print the final frame with the `await`.
+    # If the frame with the `await` started another coroutine run, we may have already
+    # printed a deeper stack which includes our final frame. We want to log where all
+    # `await`s happen, so we reprint the frame in this case.
+    i = len(stack) - 1
+    frame_info = stack[i]
+    frame = _format_stack_frame(frame_info)
+    message = f"{'  ' * i}> *{note}* at {frame}"
+    _log_for_request(request_number, message)
 
-        Returns:
-            A string, formatted like
-            "JsonResource._async_render:559 (synapse/http/server.py:559)".
-        """
-        method_name = self._get_stack_frame_method_name(frame_info)
 
-        return (
-            f"{method_name}:{frame_info.lineno} "
-            f"({frame_info.filename}:{frame_info.lineno})"
-        )
+def _format_stack_frame(frame_info: inspect.FrameInfo) -> str:
+    """Returns a string representation of a stack frame.
 
-    def _get_stack(self, skip_frames: int) -> List[inspect.FrameInfo]:
-        """Captures the stack for a request.
+    Used for debug logging.
 
-        Skips any twisted frames and stops at `JsonResource.wrapped_async_request_handler`.
+    Returns:
+        A string, formatted like
+        "JsonResource._async_render:559 (synapse/http/server.py:559)".
+    """
+    method_name = _get_stack_frame_method_name(frame_info)
 
-        Used for debug logging.
+    return (
+        f"{method_name}:{frame_info.lineno} ({frame_info.filename}:{frame_info.lineno})"
+    )
 
-        Returns:
-            A list of `inspect.FrameInfo`s, with callers appearing before callees.
-        """
-        stack = []
 
-        skip_frames += 1  # Also skip `get_stack` itself.
+def _get_stack(skip_frames: int) -> List[inspect.FrameInfo]:
+    """Captures the stack for a request.
 
-        for frame_info in inspect.stack()[skip_frames:]:
-            # Skip any twisted `inlineCallbacks` gunk.
-            if "/twisted/" in frame_info.filename:
-                continue
+    Skips any twisted frames and stops at `JsonResource.wrapped_async_request_handler`.
 
-            # Exclude the reactor frame, upwards.
-            method_name = self._get_stack_frame_method_name(frame_info)
-            if method_name == "ThreadedMemoryReactorClock.advance":
-                break
+    Used for debug logging.
 
-            stack.append(frame_info)
+    Returns:
+        A list of `inspect.FrameInfo`s, with callers appearing before callees.
+    """
+    stack = []
 
-            # Stop at `JsonResource`'s `wrapped_async_request_handler`, which is the
-            # entry point for request handling.
-            if frame_info.function == "wrapped_async_request_handler":
-                break
+    skip_frames += 1  # Also skip `get_stack` itself.
 
-        return stack[::-1]
+    for frame_info in inspect.stack()[skip_frames:]:
+        # Skip any twisted `inlineCallbacks` gunk.
+        if "/twisted/" in frame_info.filename:
+            continue
 
-    def _get_stack_frame_method_name(self, frame_info: inspect.FrameInfo) -> str:
-        """Returns the name of a stack frame's method.
+        # Exclude the reactor frame, upwards.
+        method_name = _get_stack_frame_method_name(frame_info)
+        if method_name == "ThreadedMemoryReactorClock.advance":
+            break
 
-        eg. "JsonResource._async_render".
-        """
-        method_name = frame_info.function
+        stack.append(frame_info)
 
-        # Prefix the class name for instance methods.
-        frame_self = frame_info.frame.f_locals.get("self")
-        if frame_self:
-            method = getattr(frame_self, method_name, None)
-            if method:
-                method_name = method.__qualname__
-            else:
-                # We couldn't find the method on `self`.
-                # Make something up. It's useful to know which class "contains" a
-                # function anyway.
-                method_name = f"{type(frame_self).__name__} {method_name}"
+        # Stop at `JsonResource`'s `wrapped_async_request_handler`, which is the entry
+        # point for request handling.
+        if frame_info.function == "wrapped_async_request_handler":
+            break
 
-        return method_name
+    return stack[::-1]
 
-    def _hash_stack(self, stack: List[inspect.FrameInfo]):
-        """Turns a stack into a hashable value that can be put into a set."""
-        return tuple(self._format_stack_frame(frame) for frame in stack)
+
+def _get_stack_frame_method_name(frame_info: inspect.FrameInfo) -> str:
+    """Returns the name of a stack frame's method.
+
+    eg. "JsonResource._async_render".
+    """
+    method_name = frame_info.function
+
+    # Prefix the class name for instance methods.
+    frame_self = frame_info.frame.f_locals.get("self")
+    if frame_self:
+        method = getattr(frame_self, method_name, None)
+        if method:
+            method_name = method.__qualname__
+        else:
+            # We couldn't find the method on `self`.
+            # Make something up. It's useful to know which class "contains" a
+            # function anyway.
+            method_name = f"{type(frame_self).__name__} {method_name}"
+
+    return method_name
+
+
+def _hash_stack(stack: List[inspect.FrameInfo]):
+    """Turns a stack into a hashable value that can be put into a set."""
+    return tuple(_format_stack_frame(frame) for frame in stack)
