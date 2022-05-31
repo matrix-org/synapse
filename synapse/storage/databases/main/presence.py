@@ -292,11 +292,12 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
     async def _get_when_user_should_receive_full_presence(
         self, user_id: str
     ) -> Optional[int]:
-        """Get the presence token corresponding to the last full presence update for this user.
-       
-        If the user presents a sync token with a presence stream token at least as old as the result,
-        then we need to send them a full presence update.
-        
+        """Get the presence token corresponding to the last full presence update
+        for this user.
+
+        If the user presents a sync token with a presence stream token at least
+        as old as the result, then we need to send them a full presence update.
+
         If this user has never needed a full presence update, returns `None`.
         """
         return await self.db_pool.simple_select_one_onecol(
