@@ -23,7 +23,6 @@ from canonicaljson import encode_canonical_json
 
 from twisted.internet.interfaces import IDelayedCall
 
-import synapse
 from synapse import event_auth
 from synapse.api.constants import (
     EventContentFields,
@@ -897,11 +896,11 @@ class EventCreationHandler:
                 event.sender,
             )
 
-            spam_check = await self.spam_checker.check_event_for_spam(event)
-            if spam_check is not synapse.spam_checker_api.Allow.ALLOW:
-                if isinstance(spam_check, tuple):
+            spam_check_result = await self.spam_checker.check_event_for_spam(event)
+            if spam_check_result != self.spam_checker.NOT_SPAM:
+                if isinstance(spam_check_result, tuple):
                     try:
-                        [code, dict] = spam_check
+                        [code, dict] = spam_check_result
                         raise SynapseError(
                             403,
                             "This message had been rejected as probable spam",
@@ -911,11 +910,24 @@ class EventCreationHandler:
                     except ValueError:
                         logger.error(
                             "Spam-check module returned invalid error value. Expecting [code, dict], got %s",
-                            spam_check,
+                            spam_check_result,
                         )
-                        spam_check = Codes.FORBIDDEN
+                        spam_check_result = Codes.FORBIDDEN
+
+                if isinstance(spam_check_result, Codes):
+                    raise SynapseError(
+                        403,
+                        "This message has been rejected as probable spam",
+                        spam_check_result,
+                    )
+
+                # Backwards compatibility: if the return value is not an error code, it
+                # means the module returned an error message to be included in the
+                # SynapseError (which is now deprecated).
                 raise SynapseError(
-                    403, "This message had been rejected as probable spam", spam_check
+                    403,
+                    spam_check_result,
+                    Codes.FORBIDDEN,
                 )
 
             ev = await self.handle_new_client_event(
