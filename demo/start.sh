@@ -6,11 +6,12 @@ CWD=$(pwd)
 
 cd "$DIR/.." || exit
 
-PYTHONPATH=$(readlink -f "$(pwd)")
-export PYTHONPATH
-
-
-echo "$PYTHONPATH"
+# Do not override PYTHONPATH if we are in a virtual env
+if [ "$VIRTUAL_ENV" = "" ]; then
+    PYTHONPATH=$(readlink -f "$(pwd)")
+    export PYTHONPATH
+	echo "$PYTHONPATH"
+fi
 
 # Create servers which listen on HTTP at 808x and HTTPS at 848x.
 for port in 8080 8081 8082; do

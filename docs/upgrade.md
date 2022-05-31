@@ -177,11 +177,11 @@ has queries that can be used to check a database for this problem in advance.
 
 </details>
 
-## SpamChecker API's `check_event_for_spam` has a new signature.
+## New signature for the spam checker callback `check_event_for_spam`
 
 The previous signature has been deprecated.
 
-Whereas `check_event_for_spam` callbacks used to return `Union[str, bool]`, they should now return `Union["synapse.module_api.Allow", "synapse.module_api.errors.Codes"]`.
+Whereas `check_event_for_spam` callbacks used to return `Union[str, bool]`, they should now return `Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes"]`.
 
 This is part of an ongoing refactoring of the SpamChecker API to make it less ambiguous and more powerful.
 
@@ -204,8 +204,8 @@ async def check_event_for_spam(event):
         # Event is spam, mark it as forbidden (you may use some more precise error
         # code if it is useful).
         return synapse.module_api.errors.Codes.FORBIDDEN
-    # Event is not spam, mark it as `ALLOW`.
-    return synapse.module_api.ALLOW
+    # Event is not spam, mark it as such.
+    return synapse.module_api.NOT_SPAM
 ```
 
 # Upgrading to v1.59.0

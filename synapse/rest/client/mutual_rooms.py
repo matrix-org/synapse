@@ -42,21 +42,10 @@ class UserMutualRoomsServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
-        self.user_directory_search_enabled = (
-            hs.config.userdirectory.user_directory_search_enabled
-        )
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
-
-        if not self.user_directory_search_enabled:
-            raise SynapseError(
-                code=400,
-                msg="User directory searching is disabled. Cannot determine shared rooms.",
-                errcode=Codes.UNKNOWN,
-            )
-
         UserID.from_string(user_id)
 
         requester = await self.auth.get_user_by_req(request)
@@ -67,8 +56,8 @@ class UserMutualRoomsServlet(RestServlet):
                 errcode=Codes.FORBIDDEN,
             )
 
-        rooms = await self.store.get_mutual_rooms_for_users(
-            requester.user.to_string(), user_id
+        rooms = await self.store.get_mutual_rooms_between_users(
+            frozenset((requester.user.to_string(), user_id))
         )
 
         return 200, {"joined": list(rooms)}

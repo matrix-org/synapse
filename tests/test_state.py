@@ -179,12 +179,12 @@ class Graph:
 class StateTestCase(unittest.TestCase):
     def setUp(self):
         self.dummy_store = _DummyStore()
-        storage = Mock(main=self.dummy_store, state=self.dummy_store)
+        storage_controllers = Mock(main=self.dummy_store, state=self.dummy_store)
         hs = Mock(
             spec_set=[
                 "config",
                 "get_datastores",
-                "get_storage",
+                "get_storage_controllers",
                 "get_auth",
                 "get_state_handler",
                 "get_clock",
@@ -199,7 +199,7 @@ class StateTestCase(unittest.TestCase):
         hs.get_clock.return_value = MockClock()
         hs.get_auth.return_value = Auth(hs)
         hs.get_state_resolution_handler = lambda: StateResolutionHandler(hs)
-        hs.get_storage.return_value = storage
+        hs.get_storage_controllers.return_value = storage_controllers
 
         self.state = StateHandler(hs)
         self.event_id = 0

@@ -13,8 +13,13 @@
 # limitations under the License.
 from http import HTTPStatus
 
+from twisted.test.proto_helpers import MemoryReactor
+
+from synapse.api.errors import NotFoundError
 from synapse.rest import admin, devices, room, sync
 from synapse.rest.client import account, login, register
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 
@@ -157,3 +162,41 @@ class DeviceListsTestCase(unittest.HomeserverTestCase):
         self.assertNotIn(
             alice_user_id, changed_device_lists, bob_sync_channel.json_body
         )
+
+
+class DevicesTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets,
+        login.register_servlets,
+        sync.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.handler = hs.get_device_handler()
+
+    @unittest.override_config({"delete_stale_devices_after": 72000000})
+    def test_delete_stale_devices(self) -> None:
+        """Tests that stale devices are automatically removed after a set time of
+        inactivity.
+        The configuration is set to delete devices that haven't been used in the past 20h.
+        """
+        # Register a user and creates 2 devices for them.
+        user_id = self.register_user("user", "password")
+        tok1 = self.login("user", "password", device_id="abc")
+        tok2 = self.login("user", "password", device_id="def")
+
+        # Sync them so they have a last_seen value.
+        self.make_request("GET", "/sync", access_token=tok1)
+        self.make_request("GET", "/sync", access_token=tok2)
+
+        # Advance half a day and sync again with one of the devices, so that the next
+        # time the background job runs we don't delete this device (since it will look
+        # for devices that haven't been used for over an hour).
+        self.reactor.advance(43200)
+        self.make_request("GET", "/sync", access_token=tok1)
+
+        # Advance another half a day, and check that the device that has synced still
+        # exists but the one that hasn't has been removed.
+        self.reactor.advance(43200)
+        self.get_success(self.handler.get_device(user_id, "abc"))
+        self.get_failure(self.handler.get_device(user_id, "def"), NotFoundError)

@@ -1,3 +1,16 @@
+matrix-synapse-py3 (1.61.0~rc1+nmu1) UNRELEASED; urgency=medium
+
+  * Non-maintainer upload.
+  * Remove unused `jitsimeetbridge` experiment from `contrib` directory.
+
+ -- Synapse Packaging team <packages@matrix.org>  Sun, 29 May 2022 14:44:45 +0100
+
+matrix-synapse-py3 (1.60.0) stable; urgency=medium
+
+  * New Synapse release 1.60.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 31 May 2022 13:41:22 +0100
+
 matrix-synapse-py3 (1.60.0~rc2) stable; urgency=medium
 
   * New Synapse release 1.60.0rc2.
