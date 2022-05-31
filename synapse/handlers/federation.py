@@ -169,6 +169,14 @@ class FederationHandler:
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
 
+        # if this is the main process, fire off a background process to resume
+        # any partial-state-resync operations which were in flight when we
+        # were shut down.
+        if not hs.config.worker.worker_app:
+            run_as_background_process(
+                "resume_sync_partial_state_room", self._resume_sync_partial_state_room
+            )
+
     async def maybe_backfill(
         self, room_id: str, current_depth: int, limit: int
     ) -> bool:
@@ -470,6 +478,8 @@ class FederationHandler:
         """
         # TODO: We should be able to call this on workers, but the upgrading of
         # room stuff after join currently doesn't work on workers.
+        # TODO: Before we relax this condition, we need to allow re-syncing of
+        # partial room state to happen on workers.
         assert self.config.worker.worker_app is None
 
         logger.debug("Joining %s to %s", joinee, room_id)
@@ -550,8 +560,6 @@ class FederationHandler:
             if ret.partial_state:
                 # Kick off the process of asynchronously fetching the state for this
                 # room.
-                #
-                # TODO(faster_joins): pick this up again on restart
                 run_as_background_process(
                     desc="sync_partial_state_room",
                     func=self._sync_partial_state_room,
@@ -1463,6 +1471,20 @@ class FederationHandler:
         # well.
         return None
 
+    async def _resume_sync_partial_state_room(self) -> None:
+        """Resumes resyncing of all partial-state rooms after a restart."""
+        assert not self.config.worker.worker_app
+
+        partial_state_rooms = await self.store.get_partial_state_rooms_and_servers()
+        for room_id, servers_in_room in partial_state_rooms.items():
+            run_as_background_process(
+                desc="sync_partial_state_room",
+                func=self._sync_partial_state_room,
+                initial_destination=None,
+                other_destinations=servers_in_room,
+                room_id=room_id,
+            )
+
     async def _sync_partial_state_room(
         self,
         initial_destination: Optional[str],
@@ -1477,6 +1499,7 @@ class FederationHandler:
                 `initial_destination` is unavailable
             room_id: room to be resynced
         """
+        assert not self.config.worker.worker_app
 
         # TODO(faster_joins): do we need to lock to avoid races? What happens if other
         #   worker processes kick off a resync in parallel? Perhaps we should just elect
