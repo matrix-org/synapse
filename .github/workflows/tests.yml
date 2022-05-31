@@ -379,6 +379,8 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           path: .
+      - name: Move coverage files to where Coverage.py expects
+        run: mv coverage*/.coverage* .
       - uses: matrix-org/setup-python-poetry@v1
       - name: Combine coverage reports
         run: poetry run coverage combine
