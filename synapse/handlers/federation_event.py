@@ -904,6 +904,10 @@ class FederationEventHandler:
 
         Returns:
             The event ids of the state *after* the given event.
+
+        Raises:
+            InvalidResponseError: if the remote homeserver's response contains fields
+                of the wrong type.
         """
         (
             state_event_ids,
