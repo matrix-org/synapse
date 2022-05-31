@@ -118,8 +118,7 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
         reactor: ThreadedMemoryReactorClock,
         make_request: Callable[[], FakeChannel],
         test_name: str,
-        expected_code: int = HTTPStatus.OK,
-    ) -> JsonDict:
+    ) -> FakeChannel:
         """Performs a request repeatedly, disconnecting at successive `await`s, until
         one completes.
 
@@ -137,7 +136,6 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
             * A request gets stuck, possibly due to a previous cancellation.
             * The request does not return a 499 when the client disconnects.
               This implies that a `CancelledError` was swallowed somewhere.
-            * The request does not return a 200 when allowed to run to completion.
 
         It is up to the caller to verify that the request returns the correct data when
         it finally runs to completion.
@@ -155,11 +153,10 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
             make_request: A function that initiates the request and returns a
                 `FakeChannel`.
             test_name: The name of the test, which will be logged.
-            expected_code: The expected status code for the final request that runs to
-                completion. Defaults to `200`.
 
         Returns:
-            The JSON response of the final request that runs to completion.
+            The `FakeChannel` object which stores the result of the final request that
+            runs to completion.
         """
         # To process a request, a coroutine run is created for the async method handling
         # the request. That method may then start other coroutine runs, wrapped in
@@ -236,8 +233,7 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
                         # the response.
                         reactor.advance(1.0)
 
-                        self.assertEqual(channel.code, expected_code)
-                        return channel.json_body
+                        return channel
 
                     # Disconnect the client and wait for the response.
                     request.connectionLost(reason=ConnectionDone())

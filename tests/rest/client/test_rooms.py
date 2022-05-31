@@ -485,7 +485,7 @@ class RoomStateTestCase(RoomBase, EndpointCancellationTestHelperMixin):
     def test_get_state_cancellation(self) -> None:
         """Test cancellation of a `/rooms/$room_id/state` request."""
         room_id = self.helper.create_room_as(self.user_id)
-        body = self._test_cancellation_at_every_await(
+        channel = self._test_cancellation_at_every_await(
             self.reactor,
             lambda: self.make_request(
                 "GET", "/rooms/%s/state" % room_id, await_result=False
@@ -493,8 +493,9 @@ class RoomStateTestCase(RoomBase, EndpointCancellationTestHelperMixin):
             test_name="test_state_cancellation",
         )
 
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
         self.assertCountEqual(
-            [state_event["type"] for state_event in body],
+            [state_event["type"] for state_event in channel.json_body],
             {
                 "m.room.create",
                 "m.room.power_levels",
@@ -507,7 +508,7 @@ class RoomStateTestCase(RoomBase, EndpointCancellationTestHelperMixin):
     def test_get_state_event_cancellation(self) -> None:
         """Test cancellation of a `/rooms/$room_id/state/$event_type` request."""
         room_id = self.helper.create_room_as(self.user_id)
-        body = self._test_cancellation_at_every_await(
+        channel = self._test_cancellation_at_every_await(
             self.reactor,
             lambda: self.make_request(
                 "GET",
@@ -517,7 +518,8 @@ class RoomStateTestCase(RoomBase, EndpointCancellationTestHelperMixin):
             test_name="test_state_cancellation",
         )
 
-        self.assertEqual(body, {"membership": "join"})
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(channel.json_body, {"membership": "join"})
 
 
 class RoomsMemberListTestCase(RoomBase, EndpointCancellationTestHelperMixin):
@@ -643,7 +645,7 @@ class RoomsMemberListTestCase(RoomBase, EndpointCancellationTestHelperMixin):
     def test_get_member_list_cancellation(self) -> None:
         """Test cancellation of a `/rooms/$room_id/members` request."""
         room_id = self.helper.create_room_as(self.user_id)
-        body = self._test_cancellation_at_every_await(
+        channel = self._test_cancellation_at_every_await(
             self.reactor,
             lambda: self.make_request(
                 "GET", "/rooms/%s/members" % room_id, await_result=False
@@ -651,7 +653,8 @@ class RoomsMemberListTestCase(RoomBase, EndpointCancellationTestHelperMixin):
             test_name="test_get_member_list_cancellation",
         )
 
-        self.assertEqual(len(body["chunk"]), 1)
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(len(channel.json_body["chunk"]), 1)
         self.assertLessEqual(
             {
                 "content": {"membership": "join"},
@@ -661,7 +664,7 @@ class RoomsMemberListTestCase(RoomBase, EndpointCancellationTestHelperMixin):
                 "type": "m.room.member",
                 "user_id": self.user_id,
             }.items(),
-            body["chunk"][0].items(),
+            channel.json_body["chunk"][0].items(),
         )
 
     def test_get_member_list_with_at_token_cancellation(self) -> None:
@@ -673,7 +676,7 @@ class RoomsMemberListTestCase(RoomBase, EndpointCancellationTestHelperMixin):
         self.assertEqual(200, channel.code)
         sync_token = channel.json_body["next_batch"]
 
-        body = self._test_cancellation_at_every_await(
+        channel = self._test_cancellation_at_every_await(
             self.reactor,
             lambda: self.make_request(
                 "GET",
@@ -683,7 +686,8 @@ class RoomsMemberListTestCase(RoomBase, EndpointCancellationTestHelperMixin):
             test_name="test_get_member_list_with_at_token_cancellation",
         )
 
-        self.assertEqual(len(body["chunk"]), 1)
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(len(channel.json_body["chunk"]), 1)
         self.assertLessEqual(
             {
                 "content": {"membership": "join"},
@@ -693,7 +697,7 @@ class RoomsMemberListTestCase(RoomBase, EndpointCancellationTestHelperMixin):
                 "type": "m.room.member",
                 "user_id": self.user_id,
             }.items(),
-            body["chunk"][0].items(),
+            channel.json_body["chunk"][0].items(),
         )
 
 
