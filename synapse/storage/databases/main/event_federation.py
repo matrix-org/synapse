@@ -1325,9 +1325,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
         while front and len(event_results) < limit:
             new_front = set()
             for event_id in front:
-                txn.execute(
-                    query, (event_id, limit - len(event_results))
-                )
+                txn.execute(query, (event_id, limit - len(event_results)))
 
                 new_results = {t[0] for t in txn} - seen_events
 
