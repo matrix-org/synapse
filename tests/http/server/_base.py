@@ -62,7 +62,7 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
         self.assertFalse(
             channel.is_finished(),
             "Request finished before we could disconnect - "
-            "was `await_result=False` passed to `make_request`?",
+            "ensure `await_result=False` is passed to `make_request`.",
         )
 
         # We're about to disconnect the request. This also disconnects the channel, so
