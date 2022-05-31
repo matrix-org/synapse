@@ -157,7 +157,12 @@ class LoginRestServlet(RestServlet):
         flows.extend({"type": t} for t in self.auth_handler.get_supported_login_types())
 
         # You can only login with app-service
-        flows.append({"type": LoginRestServlet.APPSERVICE_TYPE, "actions": [LoginRestServlet.ACTION_LOGIN]})
+        flows.append(
+            {
+                "type": LoginRestServlet.APPSERVICE_TYPE,
+                "actions": [LoginRestServlet.ACTION_LOGIN],
+            }
+        )
 
         actions: List[str] = [LoginRestServlet.ACTION_LOGIN]
         if self._registration_enabled:
@@ -165,7 +170,7 @@ class LoginRestServlet(RestServlet):
 
         # Set actions for all flows if not already specified
         for flow in flows:
-            if not "actions" in flow:
+            if "actions" not in flow:
                 flow["actions"] = actions
 
         return 200, {"flows": flows}
