@@ -1318,7 +1318,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         query = (
             "SELECT prev_event_id FROM event_edges "
-            "WHERE event_id = ? AND is_state = ? "
+            "WHERE event_id = ? AND NOT is_state "
             "LIMIT ?"
         )
 
@@ -1326,7 +1326,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             new_front = set()
             for event_id in front:
                 txn.execute(
-                    query, (room_id, event_id, False, limit - len(event_results))
+                    query, (event_id, limit - len(event_results))
                 )
 
                 new_results = {t[0] for t in txn} - seen_events
