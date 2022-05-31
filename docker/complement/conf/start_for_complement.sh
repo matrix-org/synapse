@@ -26,16 +26,18 @@ case "$SYNAPSE_COMPLEMENT_DATABASE" in
     export POSTGRES_PASSWORD=somesecret
     export POSTGRES_USER=postgres
     export POSTGRES_HOST=localhost
+
+    # configure supervisord to start postgres
     export START_POSTGRES=true
     ;;
 
   sqlite)
-    # Prevent Postgres from starting up as we don't need it to
+    # Configure supervisord not to start Postgres, as we don't need it
     export START_POSTGRES=false
     ;;
 
   *)
-    echo "Unknown Synapse database: SYNAPSE_COMPLEMENT_DATABASE=$SYNAPSE_COMPLEMENT_DATABASE"
+    echo "Unknown Synapse database: SYNAPSE_COMPLEMENT_DATABASE=$SYNAPSE_COMPLEMENT_DATABASE" >&2
     exit 1
     ;;
 esac

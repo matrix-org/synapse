@@ -1,4 +1,4 @@
-# This dockerfile builds on top of 'docker/Dockerfile-worker' in matrix-org/synapse
+# This dockerfile builds on top of 'docker/Dockerfile-workers' in matrix-org/synapse
 # by including a built-in postgres instance, as well as setting up the homeserver so
 # that it is ready for testing via Complement.
 #
@@ -20,7 +20,7 @@ RUN pg_ctlcluster 13 main start &&  su postgres -c "echo \
   LC_CTYPE='C' \
   template=template0;\" | psql" && pg_ctlcluster 13 main stop
 
-# Modify the shared homeserver config with postgres support, certificate setup
+# Replace the shared homeserver config to include postgres support, certificate setup
 # and the disabling of rate-limiting
 COPY conf/workers-shared.yaml /conf/workers/shared.yaml
 
