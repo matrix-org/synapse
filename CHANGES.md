@@ -1,4 +1,4 @@
-Synapse 1.60.0rc1 (2022-05-24)
+Synapse 1.60.0rc2 (2022-05-27)
 ==============================
 
 This release of Synapse adds a unique index to the `state_group_edges` table, in
@@ -13,6 +13,27 @@ should update their modules to use the new signature where possible.
 
 See [the upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1600)
 for more details.
+
+Features
+--------
+
+- Add an option allowing users to use their password to reauthenticate for privileged actions even though password login is disabled. ([\#12883](https://github.com/matrix-org/synapse/issues/12883))
+
+
+Bugfixes
+--------
+
+- Explicitly close `ijson` coroutines once we are done with them, instead of leaving the garbage collector to close them. ([\#12875](https://github.com/matrix-org/synapse/issues/12875))
+
+
+Internal Changes
+----------------
+
+- Improve URL previews by not including the content of media tags in the generated description. ([\#12887](https://github.com/matrix-org/synapse/issues/12887))
+
+
+Synapse 1.60.0rc1 (2022-05-24)
+==============================
 
 Features
 --------

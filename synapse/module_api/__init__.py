@@ -1149,7 +1149,10 @@ class ModuleApi:
             )
 
     async def sleep(self, seconds: float) -> None:
-        """Sleeps for the given number of seconds."""
+        """Sleeps for the given number of seconds.
+
+        Added in Synapse v1.49.0.
+        """
 
         await self._clock.sleep(seconds)
 
@@ -1427,6 +1430,28 @@ class ModuleApi:
         spec = RuleSpec(scope, kind, rule_id, "actions")
         await self._push_rules_handler.set_rule_attr(
             user_id, spec, {"actions": actions}
+        )
+
+    async def get_monthly_active_users_by_service(
+        self, start_timestamp: Optional[int] = None, end_timestamp: Optional[int] = None
+    ) -> List[Tuple[str, str]]:
+        """Generates list of monthly active users and their services.
+        Please see corresponding storage docstring for more details.
+
+        Added in Synapse v1.61.0.
+
+        Arguments:
+            start_timestamp: If specified, only include users that were first active
+                at or after this point
+            end_timestamp: If specified, only include users that were first active
+                at or before this point
+
+        Returns:
+            A list of tuples (appservice_id, user_id)
+
+        """
+        return await self._store.get_monthly_active_users_by_service(
+            start_timestamp, end_timestamp
         )
 
 

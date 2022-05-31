@@ -28,6 +28,7 @@ from typing import (
     cast,
 )
 
+from synapse.api.constants import EduTypes
 from synapse.api.errors import Codes, StoreError
 from synapse.logging.opentracing import (
     get_active_span_text_map,
@@ -419,7 +420,7 @@ class DeviceWorkerStore(SQLBaseStore):
         # Add the updated cross-signing keys to the results list
         for user_id, result in cross_signing_keys_by_user.items():
             result["user_id"] = user_id
-            results.append(("m.signing_key_update", result))
+            results.append((EduTypes.SIGNING_KEY_UPDATE, result))
             # also send the unstable version
             # FIXME: remove this when enough servers have upgraded
             #        and remove the length budgeting above.
@@ -545,7 +546,7 @@ class DeviceWorkerStore(SQLBaseStore):
                 else:
                     result["deleted"] = True
 
-                results.append(("m.device_list_update", result))
+                results.append((EduTypes.DEVICE_LIST_UPDATE, result))
 
         return results
 
@@ -1152,6 +1153,45 @@ class DeviceWorkerStore(SQLBaseStore):
             "_prune_old_outbound_device_pokes",
             _prune_txn,
         )
+
+    async def get_local_devices_not_accessed_since(
+        self, since_ms: int
+    ) -> Dict[str, List[str]]:
+        """Retrieves local devices that haven't been accessed since a given date.
+
+        Args:
+            since_ms: the timestamp to select on, every device with a last access date
+                from before that time is returned.
+
+        Returns:
+            A dictionary with an entry for each user with at least one device matching
+            the request, which value is a list of the device ID(s) for the corresponding
+            device(s).
+        """
+
+        def get_devices_not_accessed_since_txn(
+            txn: LoggingTransaction,
+        ) -> List[Dict[str, str]]:
+            sql = """
+                SELECT user_id, device_id
+                FROM devices WHERE last_seen < ? AND hidden = FALSE
+            """
+            txn.execute(sql, (since_ms,))
+            return self.db_pool.cursor_to_dict(txn)
+
+        rows = await self.db_pool.runInteraction(
+            "get_devices_not_accessed_since",
+            get_devices_not_accessed_since_txn,
+        )
+
+        devices: Dict[str, List[str]] = {}
+        for row in rows:
+            # Remote devices are never stale from our point of view.
+            if self.hs.is_mine_id(row["user_id"]):
+                user_devices = devices.setdefault(row["user_id"], [])
+                user_devices.append(row["device_id"])
+
+        return devices
 
 
 class DeviceBackgroundUpdateStore(SQLBaseStore):

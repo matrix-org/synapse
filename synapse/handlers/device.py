@@ -28,7 +28,7 @@ from typing import (
 )
 
 from synapse.api import errors
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EduTypes, EventTypes
 from synapse.api.errors import (
     Codes,
     FederationDeniedError,
@@ -61,6 +61,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 MAX_DEVICE_DISPLAY_NAME_LEN = 100
+DELETE_STALE_DEVICES_INTERVAL_MS = 24 * 60 * 60 * 1000
 
 
 class DeviceWorkerHandler:
@@ -279,7 +280,8 @@ class DeviceHandler(DeviceWorkerHandler):
         federation_registry = hs.get_federation_registry()
 
         federation_registry.register_edu_handler(
-            "m.device_list_update", self.device_list_updater.incoming_device_list_update
+            EduTypes.DEVICE_LIST_UPDATE,
+            self.device_list_updater.incoming_device_list_update,
         )
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
@@ -293,6 +295,19 @@ class DeviceHandler(DeviceWorkerHandler):
 
         # On start up check if there are any updates pending.
         hs.get_reactor().callWhenRunning(self._handle_new_device_update_async)
+
+        self._delete_stale_devices_after = hs.config.server.delete_stale_devices_after
+
+        # Ideally we would run this on a worker and condition this on the
+        # "run_background_tasks_on" setting, but this would mean making the notification
+        # of device list changes over federation work on workers, which is nontrivial.
+        if self._delete_stale_devices_after is not None:
+            self.clock.looping_call(
+                run_as_background_process,
+                DELETE_STALE_DEVICES_INTERVAL_MS,
+                "delete_stale_devices",
+                self._delete_stale_devices,
+            )
 
     def _check_device_name_length(self, name: Optional[str]) -> None:
         """
@@ -368,6 +383,19 @@ class DeviceHandler(DeviceWorkerHandler):
             attempts += 1
 
         raise errors.StoreError(500, "Couldn't generate a device ID.")
+
+    async def _delete_stale_devices(self) -> None:
+        """Background task that deletes devices which haven't been accessed for more than
+        a configured time period.
+        """
+        # We should only be running this job if the config option is defined.
+        assert self._delete_stale_devices_after is not None
+        now_ms = self.clock.time_msec()
+        since_ms = now_ms - self._delete_stale_devices_after
+        devices = await self.store.get_local_devices_not_accessed_since(since_ms)
+
+        for user_id, user_devices in devices.items():
+            await self.delete_devices(user_id, user_devices)
 
     @trace
     async def delete_device(self, user_id: str, device_id: str) -> None:
@@ -691,7 +719,8 @@ class DeviceHandler(DeviceWorkerHandler):
                             )
                             # TODO: when called, this isn't in a logging context.
                             # This leads to log spam, sentry event spam, and massive
-                            # memory usage. See #12552.
+                            # memory usage.
+                            # See https://github.com/matrix-org/synapse/issues/12552.
                             # log_kv(
                             #     {"message": "sent device update to host", "host": host}
                             # )

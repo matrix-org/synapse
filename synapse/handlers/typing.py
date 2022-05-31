@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
 
 import attr
 
+from synapse.api.constants import EduTypes
 from synapse.api.errors import AuthError, ShadowBanError, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.metrics.background_process_metrics import (
@@ -68,7 +69,7 @@ class FollowerTypingHandler:
 
         if hs.get_instance_name() not in hs.config.worker.writers.typing:
             hs.get_federation_registry().register_instances_for_edu(
-                "m.typing",
+                EduTypes.TYPING,
                 hs.config.worker.writers.typing,
             )
 
@@ -143,7 +144,7 @@ class FollowerTypingHandler:
                     logger.debug("sending typing update to %s", domain)
                     self.federation.build_and_send_edu(
                         destination=domain,
-                        edu_type="m.typing",
+                        edu_type=EduTypes.TYPING,
                         content={
                             "room_id": member.room_id,
                             "user_id": member.user_id,
@@ -218,7 +219,9 @@ class TypingWriterHandler(FollowerTypingHandler):
 
         self.hs = hs
 
-        hs.get_federation_registry().register_edu_handler("m.typing", self._recv_edu)
+        hs.get_federation_registry().register_edu_handler(
+            EduTypes.TYPING, self._recv_edu
+        )
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
 
@@ -458,7 +461,7 @@ class TypingNotificationEventSource(EventSource[int, JsonDict]):
     def _make_event_for(self, room_id: str) -> JsonDict:
         typing = self.get_typing_handler()._room_typing[room_id]
         return {
-            "type": "m.typing",
+            "type": EduTypes.TYPING,
             "room_id": room_id,
             "content": {"user_ids": list(typing)},
         }
