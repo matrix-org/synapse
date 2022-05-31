@@ -71,6 +71,8 @@ class LoginRestServlet(RestServlet):
     JWT_TYPE = "org.matrix.login.jwt"
     APPSERVICE_TYPE = "m.login.application_service"
     REFRESH_TOKEN_PARAM = "refresh_token"
+    ACTION_LOGIN = "login"
+    ACTION_REGISTER = "register"
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -114,6 +116,8 @@ class LoginRestServlet(RestServlet):
             burst_count=self.hs.config.ratelimiting.rc_login_account.burst_count,
         )
 
+        self._registration_enabled = hs.config.registration.enable_registration
+
         # ensure the CAS/SAML/OIDC handlers are loaded on this worker instance.
         # The reason for this is to ensure that the auth_provider_ids are registered
         # with SsoHandler, which in turn ensures that the login/registration prometheus
@@ -152,7 +156,17 @@ class LoginRestServlet(RestServlet):
 
         flows.extend({"type": t} for t in self.auth_handler.get_supported_login_types())
 
-        flows.append({"type": LoginRestServlet.APPSERVICE_TYPE})
+        # You can only login with app-service
+        flows.append({"type": LoginRestServlet.APPSERVICE_TYPE, "actions": [LoginRestServlet.ACTION_LOGIN]})
+
+        actions: List[str] = [LoginRestServlet.ACTION_LOGIN]
+        if self._registration_enabled:
+            actions.append(LoginRestServlet.ACTION_REGISTER)
+
+        # Set actions for all flows if not already specified
+        for flow in flows:
+            if not "actions" in flow:
+                flow["actions"] = actions
 
         return 200, {"flows": flows}
 
