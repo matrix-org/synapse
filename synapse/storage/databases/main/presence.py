@@ -282,14 +282,14 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
             True if the user should have full presence sent to them, False otherwise.
         """
 
-        token = await self._get_when_user_should_receive_full_presence(user_id)
+        token = await self._get_full_presence_stream_token_for_user(user_id)
         if token is None:
             return False
 
         return from_token <= token
 
     @cached()
-    async def _get_when_user_should_receive_full_presence(
+    async def _get_full_presence_stream_token_for_user(
         self, user_id: str
     ) -> Optional[int]:
         """Get the presence token corresponding to the last full presence update
@@ -305,7 +305,7 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
             keyvalues={"user_id": user_id},
             retcol="presence_stream_id",
             allow_none=True,
-            desc="_get_when_user_should_receive_full_presence",
+            desc="_get_full_presence_stream_token_for_user",
         )
 
     async def add_users_to_send_full_presence_to(self, user_ids: Iterable[str]) -> None:
