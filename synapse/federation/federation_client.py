@@ -405,6 +405,9 @@ class FederationClient(FederationBase):
 
         Returns:
             a tuple of (state event_ids, auth event_ids)
+
+        Raises:
+            InvalidResponseError: if fields in the response have the wrong type.
         """
         result = await self.transport_layer.get_room_state_ids(
             destination, room_id, event_id=event_id
@@ -416,7 +419,7 @@ class FederationClient(FederationBase):
         if not isinstance(state_event_ids, list) or not isinstance(
             auth_event_ids, list
         ):
-            raise Exception("invalid response from /state_ids")
+            raise InvalidResponseError("invalid response from /state_ids")
 
         return state_event_ids, auth_event_ids
 

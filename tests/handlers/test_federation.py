@@ -50,7 +50,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         hs = self.setup_test_homeserver(federation_http_client=None)
         self.handler = hs.get_federation_handler()
         self.store = hs.get_datastores().main
-        self.state_storage = hs.get_storage().state
+        self.state_storage_controller = hs.get_storage_controllers().state
         self._event_auth_handler = hs.get_event_auth_handler()
         return hs
 
@@ -338,7 +338,9 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         # mapping from (type, state_key) -> state_event_id
         assert most_recent_prev_event_id is not None
         prev_state_map = self.get_success(
-            self.state_storage.get_state_ids_for_event(most_recent_prev_event_id)
+            self.state_storage_controller.get_state_ids_for_event(
+                most_recent_prev_event_id
+            )
         )
         # List of state event ID's
         prev_state_ids = list(prev_state_map.values())

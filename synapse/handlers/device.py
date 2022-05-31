@@ -71,7 +71,7 @@ class DeviceWorkerHandler:
         self.store = hs.get_datastores().main
         self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
-        self.state_storage = hs.get_storage().state
+        self._state_storage = hs.get_storage_controllers().state
         self._auth_handler = hs.get_auth_handler()
         self.server_name = hs.hostname
 
@@ -204,7 +204,7 @@ class DeviceWorkerHandler:
                 continue
 
             # mapping from event_id -> state_dict
-            prev_state_ids = await self.state_storage.get_state_ids_for_events(
+            prev_state_ids = await self._state_storage.get_state_ids_for_events(
                 event_ids
             )
 
