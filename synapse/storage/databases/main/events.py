@@ -52,6 +52,7 @@ from synapse.storage.util.sequence import SequenceGenerator
 from synapse.types import JsonDict, StateMap, get_domain_from_id
 from synapse.util import json_encoder
 from synapse.util.iterutils import batch_iter, sorted_topologically
+from synapse.util.stringutils import non_null_str_or_none
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -1728,9 +1729,6 @@ class PersistEventsStore:
                 not affect the current local state.
         """
 
-        def non_null_str_or_none(val: Any) -> Optional[str]:
-            return val if isinstance(val, str) and "\u0000" not in val else None
-
         self.db_pool.simple_insert_many_txn(
             txn,
             table="room_memberships",
@@ -1828,6 +1826,10 @@ class PersistEventsStore:
         )
         txn.call_after(
             self.store.get_aggregation_groups_for_event.invalidate,
+            (relation.parent_id,),
+        )
+        txn.call_after(
+            self.store.get_mutual_event_relations_for_rel_type.invalidate,
             (relation.parent_id,),
         )
 
@@ -2005,6 +2007,11 @@ class PersistEventsStore:
             )
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_thread_participated, (redacted_relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn,
+                self.store.get_mutual_event_relations_for_rel_type,
+                (redacted_relates_to,),
             )
 
         self.db_pool.simple_delete_txn(

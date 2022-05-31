@@ -20,7 +20,7 @@ from unittest.mock import patch
 import jsonschema
 from frozendict import frozendict
 
-from synapse.api.constants import EventContentFields
+from synapse.api.constants import EduTypes, EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
 from synapse.events import make_event_from_dict
@@ -85,13 +85,13 @@ class FilteringTestCase(unittest.HomeserverTestCase):
                         "org.matrix.not_labels": ["#work"],
                     },
                     "ephemeral": {
-                        "types": ["m.receipt", "m.typing"],
+                        "types": [EduTypes.RECEIPT, EduTypes.TYPING],
                         "not_rooms": ["!726s6s6q:example.com"],
                         "not_senders": ["@spam:example.com"],
                     },
                 },
                 "presence": {
-                    "types": ["m.presence"],
+                    "types": [EduTypes.PRESENCE],
                     "not_senders": ["@alice:example.com"],
                 },
                 "event_format": "client",

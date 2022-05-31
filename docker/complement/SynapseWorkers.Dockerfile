@@ -6,12 +6,6 @@
 # https://github.com/matrix-org/synapse/blob/develop/docker/README-testing.md#testing-with-postgresql-and-single-or-multi-process-synapse
 FROM matrixdotorg/synapse-workers
 
-# Download a caddy server to stand in front of nginx and terminate TLS using Complement's
-# custom CA.
-# We include this near the top of the file in order to cache the result.
-RUN curl -OL "https://github.com/caddyserver/caddy/releases/download/v2.3.0/caddy_2.3.0_linux_amd64.tar.gz" && \
-  tar xzf caddy_2.3.0_linux_amd64.tar.gz && rm caddy_2.3.0_linux_amd64.tar.gz && mv caddy /root
-
 # Install postgresql
 RUN apt-get update && \
   DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y postgresql-13
@@ -31,16 +25,12 @@ COPY conf-workers/workers-shared.yaml /conf/workers/shared.yaml
 
 WORKDIR /data
 
-# Copy the caddy config
-COPY conf-workers/caddy.complement.json /root/caddy.json
-
 COPY conf-workers/postgres.supervisord.conf /etc/supervisor/conf.d/postgres.conf
-COPY conf-workers/caddy.supervisord.conf /etc/supervisor/conf.d/caddy.conf
 
 # Copy the entrypoint
 COPY conf-workers/start-complement-synapse-workers.sh /
 
-# Expose caddy's listener ports
+# Expose nginx's listener ports
 EXPOSE 8008 8448
 
 ENTRYPOINT ["/start-complement-synapse-workers.sh"]

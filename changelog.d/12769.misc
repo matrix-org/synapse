@@ -1,1 +1,0 @@
-Tweak the mypy plugin so that `@cached` can accept `on_invalidate=None`.

@@ -48,7 +48,11 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.crypto.event_signing import compute_event_signature
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
-from synapse.federation.federation_base import FederationBase, event_from_pdu_json
+from synapse.federation.federation_base import (
+    FederationBase,
+    InvalidEventSignatureError,
+    event_from_pdu_json,
+)
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
 from synapse.http.servlet import assert_params_in_dict
@@ -109,7 +113,7 @@ class FederationServer(FederationBase):
         super().__init__(hs)
 
         self.handler = hs.get_federation_handler()
-        self.storage = hs.get_storage()
+        self._spam_checker = hs.get_spam_checker()
         self._federation_event_handler = hs.get_federation_event_handler()
         self.state = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
@@ -631,7 +635,12 @@ class FederationServer(FederationBase):
         pdu = event_from_pdu_json(content, room_version)
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, pdu.room_id)
-        pdu = await self._check_sigs_and_hash(room_version, pdu)
+        try:
+            pdu = await self._check_sigs_and_hash(room_version, pdu)
+        except InvalidEventSignatureError as e:
+            errmsg = f"event id {pdu.event_id}: {e}"
+            logger.warning("%s", errmsg)
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
         ret_pdu = await self.handler.on_invite_request(origin, pdu, room_version)
         time_now = self._clock.time_msec()
         return {"event": ret_pdu.get_pdu_json(time_now)}
@@ -864,7 +873,12 @@ class FederationServer(FederationBase):
                 )
             )
 
-        event = await self._check_sigs_and_hash(room_version, event)
+        try:
+            event = await self._check_sigs_and_hash(room_version, event)
+        except InvalidEventSignatureError as e:
+            errmsg = f"event id {event.event_id}: {e}"
+            logger.warning("%s", errmsg)
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
 
         return await self._federation_event_handler.on_send_membership_event(
             origin, event
@@ -1016,8 +1030,15 @@ class FederationServer(FederationBase):
         # Check signature.
         try:
             pdu = await self._check_sigs_and_hash(room_version, pdu)
-        except SynapseError as e:
-            raise FederationError("ERROR", e.code, e.msg, affected=pdu.event_id)
+        except InvalidEventSignatureError as e:
+            logger.warning("event id %s: %s", pdu.event_id, e)
+            raise FederationError("ERROR", 403, str(e), affected=pdu.event_id)
+
+        if await self._spam_checker.should_drop_federated_event(pdu):
+            logger.warning(
+                "Unstaged federated event contains spam, dropping %s", pdu.event_id
+            )
+            return
 
         # Add the event to our staging area
         await self.store.insert_received_event_to_staging(origin, pdu)
@@ -1031,6 +1052,41 @@ class FederationServer(FederationBase):
             self._process_incoming_pdus_in_room_inner(
                 pdu.room_id, room_version, lock, origin, pdu
             )
+
+    async def _get_next_nonspam_staged_event_for_room(
+        self, room_id: str, room_version: RoomVersion
+    ) -> Optional[Tuple[str, EventBase]]:
+        """Fetch the first non-spam event from staging queue.
+
+        Args:
+            room_id: the room to fetch the first non-spam event in.
+            room_version: the version of the room.
+
+        Returns:
+            The first non-spam event in that room.
+        """
+
+        while True:
+            # We need to do this check outside the lock to avoid a race between
+            # a new event being inserted by another instance and it attempting
+            # to acquire the lock.
+            next = await self.store.get_next_staged_event_for_room(
+                room_id, room_version
+            )
+
+            if next is None:
+                return None
+
+            origin, event = next
+
+            if await self._spam_checker.should_drop_federated_event(event):
+                logger.warning(
+                    "Staged federated event contains spam, dropping %s",
+                    event.event_id,
+                )
+                continue
+
+            return next
 
     @wrap_as_background_process("_process_incoming_pdus_in_room_inner")
     async def _process_incoming_pdus_in_room_inner(
@@ -1109,12 +1165,10 @@ class FederationServer(FederationBase):
                         (self._clock.time_msec() - received_ts) / 1000
                     )
 
-            # We need to do this check outside the lock to avoid a race between
-            # a new event being inserted by another instance and it attempting
-            # to acquire the lock.
-            next = await self.store.get_next_staged_event_for_room(
+            next = await self._get_next_nonspam_staged_event_for_room(
                 room_id, room_version
             )
+
             if not next:
                 break
 
@@ -1313,7 +1367,7 @@ class FederationHandlerRegistry:
         self._edu_type_to_instance[edu_type] = instance_names
 
     async def on_edu(self, edu_type: str, origin: str, content: dict) -> None:
-        if not self.config.server.use_presence and edu_type == EduTypes.Presence:
+        if not self.config.server.use_presence and edu_type == EduTypes.PRESENCE:
             return
 
         # Check if we have a handler on this instance

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Set
+from typing import Any, List, Set
 
 from synapse.types import JsonDict
 from synapse.util.check_dependencies import DependencyException, check_requirements
@@ -49,7 +49,9 @@ class TracerConfig(Config):
 
         # The tracer is enabled so sanitize the config
 
-        self.opentracer_whitelist = opentracing_config.get("homeserver_whitelist", [])
+        self.opentracer_whitelist: List[str] = opentracing_config.get(
+            "homeserver_whitelist", []
+        )
         if not isinstance(self.opentracer_whitelist, list):
             raise ConfigError("Tracer homeserver_whitelist config is malformed")
 

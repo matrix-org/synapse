@@ -23,6 +23,14 @@ followed by a letter. Letters have the following meanings:
 For example, setting `redaction_retention_period: 5m` would remove redacted
 messages from the database after 5 minutes, rather than 5 months.
 
+In addition, configuration options referring to size use the following suffixes:
+
+* `M` = MiB, or 1,048,576 bytes
+* `K` = KiB, or 1024 bytes 
+
+For example, setting `max_avatar_size: 10M` means that Synapse will not accept files larger than 10,485,760 bytes
+for a user avatar. 
+
 ### YAML 
 The configuration file is a [YAML](https://yaml.org/) file, which means that certain syntax rules
 apply if you want your config file to be read properly. A few helpful things to know:
@@ -567,6 +575,18 @@ Example configuration:
 dummy_events_threshold: 5
 ```
 ---
+Config option `delete_stale_devices_after`
+
+An optional duration. If set, Synapse will run a daily background task to log out and
+delete any device that hasn't been accessed for more than the specified amount of time.
+
+Defaults to no duration, which means devices are never pruned.
+
+Example configuration:
+```yaml
+delete_stale_devices_after: 1y
+```
+
 ## Homeserver blocking ##
 Useful options for Synapse admins.
 
@@ -1122,14 +1142,19 @@ Caching can be configured through the following sub-options:
 * `cache_autotuning` and its sub-options `max_cache_memory_usage`, `target_cache_memory_usage`, and
    `min_cache_ttl` work in conjunction with each other to maintain a balance between cache memory 
    usage and cache entry availability. You must be using [jemalloc](https://github.com/matrix-org/synapse#help-synapse-is-slow-and-eats-all-my-ramcpu) 
-   to utilize this option, and all three of the options must be specified for this feature to work.
+   to utilize this option, and all three of the options must be specified for this feature to work. This option
+   defaults to off, enable it by providing values for the sub-options listed below. Please note that the feature will not work
+   and may cause unstable behavior (such as excessive emptying of caches or exceptions) if all of the values are not provided.
+   Please see the [Config Conventions](#config-conventions) for information on how to specify memory size and cache expiry
+   durations.
      * `max_cache_memory_usage` sets a ceiling on how much memory the cache can use before caches begin to be continuously evicted.
         They will continue to be evicted until the memory usage drops below the `target_memory_usage`, set in
-        the flag below, or until the `min_cache_ttl` is hit.
-     * `target_memory_usage` sets a rough target for the desired memory usage of the caches.
+        the setting below, or until the `min_cache_ttl` is hit. There is no default value for this option.
+     * `target_memory_usage` sets a rough target for the desired memory usage of the caches. There is no default value
+        for this option.
      * `min_cache_ttl` sets a limit under which newer cache entries are not evicted and is only applied when
         caches are actively being evicted/`max_cache_memory_usage` has been exceeded. This is to protect hot caches
-        from being emptied while Synapse is evicting due to memory.
+        from being emptied while Synapse is evicting due to memory. There is no default value for this option. 
 
 Example configuration:
 ```yaml
@@ -1194,7 +1219,7 @@ For more information on using Synapse with Postgres,
 see [here](../../postgres.md).
 
 Example SQLite configuration:
-```
+```yaml
 database:
   name: sqlite3
   args:
@@ -1202,7 +1227,7 @@ database:
 ```
 
 Example Postgres configuration:
-```
+```yaml
 database:
   name: psycopg2
   txn_limit: 10000
@@ -1357,6 +1382,20 @@ This option sets ratelimiting how often invites can be sent in a room or to a
 specific user. `per_room` defaults to `per_second: 0.3`, `burst_count: 10` and
 `per_user` defaults to `per_second: 0.003`, `burst_count: 5`. 
 
+Client requests that invite user(s) when [creating a
+room](https://spec.matrix.org/v1.2/client-server-api/#post_matrixclientv3createroom)
+will count against the `rc_invites.per_room` limit, whereas
+client requests to [invite a single user to a
+room](https://spec.matrix.org/v1.2/client-server-api/#post_matrixclientv3roomsroomidinvite)
+will count against both the `rc_invites.per_user` and `rc_invites.per_room` limits.
+
+Federation requests to invite a user will count against the `rc_invites.per_user`
+limit only, as Synapse presumes ratelimiting by room will be done by the sending server.
+
+The `rc_invites.per_user` limit applies to the *receiver* of the invite, rather than the
+sender, meaning that a `rc_invite.per_user.burst_count` of 5 mandates that a single user
+cannot *receive* more than a burst of 5 invites at a time.
+
 Example configuration:
 ```yaml
 rc_invites:
@@ -1420,7 +1459,7 @@ federation_rr_transactions_per_room_per_second: 40
 ```
 ---
 ## Media Store ##
-Config options relating to Synapse media store.
+Config options related to Synapse's media store.
 
 ---
 Config option: `enable_media_repo` 
@@ -1524,6 +1563,33 @@ thumbnail_sizes:
     height: 600
     method: scale
 ```
+---
+Config option: `media_retention`
+
+Controls whether local media and entries in the remote media cache
+(media that is downloaded from other homeservers) should be removed
+under certain conditions, typically for the purpose of saving space.
+
+Purging media files will be the carried out by the media worker
+(that is, the worker that has the `enable_media_repo` homeserver config
+option set to 'true'). This may be the main process.
+
+The `media_retention.local_media_lifetime` and
+`media_retention.remote_media_lifetime` config options control whether
+media will be purged if it has not been accessed in a given amount of
+time. Note that media is 'accessed' when loaded in a room in a client, or
+otherwise downloaded by a local or remote user. If the media has never
+been accessed, the media's creation time is used instead. Both thumbnails
+and the original media will be removed. If either of these options are unset,
+then media of that type will not be purged.
+
+Example configuration:
+```yaml
+media_retention:
+    local_media_lifetime: 90d
+    remote_media_lifetime: 14d
+```
+---
 Config option: `url_preview_enabled`
 
 This setting determines whether the preview URL API is enabled.
@@ -1665,10 +1731,10 @@ Defaults to "en".
 Example configuration:
 ```yaml
  url_preview_accept_language:
-   - en-UK
-   - en-US;q=0.9
-   - fr;q=0.8
-   - *;q=0.7
+   - 'en-UK'
+   - 'en-US;q=0.9'
+   - 'fr;q=0.8'
+   - '*;q=0.7'
 ```
 ----
 Config option: `oembed`
@@ -2903,6 +2969,9 @@ Use this setting to enable password-based logins.
 
 This setting has the following sub-options:
 * `enabled`: Defaults to true.
+   Set to false to disable password authentication.
+   Set to `only_for_reauth` to allow users with existing passwords to use them
+   to log in and reauthenticate, whilst preventing new users from setting passwords.
 * `localdb_enabled`: Set to false to disable authentication against the local password
    database. This is ignored if `enabled` is false, and is only useful
    if you have other `password_providers`. Defaults to true. 
@@ -3116,25 +3185,6 @@ will also not affect rooms created by other servers.
 Example configuration:
 ```yaml
 encryption_enabled_by_default_for_room_type: invite
-```
----
-Config option: `enable_group_creation`
-
-Set to true to allow non-server-admin users to create groups on this server
-
-Example configuration:
-```yaml
-enable_group_creation: true
-```
----
-Config option: `group_creation_prefix`
-
-If enabled/present, non-server admins can only create groups with local parts
-starting with this prefix.
-
-Example configuration:
-```yaml
-group_creation_prefix: "unofficial_"
 ```
 ---
 Config option: `user_directory`

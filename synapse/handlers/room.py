@@ -303,7 +303,10 @@ class RoomCreationHandler:
             context=tombstone_context,
         )
 
-        old_room_state = await tombstone_context.get_current_state_ids()
+        state_filter = StateFilter.from_types(
+            [(EventTypes.CanonicalAlias, ""), (EventTypes.PowerLevels, "")]
+        )
+        old_room_state = await tombstone_context.get_current_state_ids(state_filter)
 
         # We know the tombstone event isn't an outlier so it has current state.
         assert old_room_state is not None
@@ -427,7 +430,7 @@ class RoomCreationHandler:
             requester: the user requesting the upgrade
             old_room_id : the id of the room to be replaced
             new_room_id: the id to give the new room (should already have been
-                created with _gemerate_room_id())
+                created with _generate_room_id())
             new_room_version: the new room version to use
             tombstone_event_id: the ID of the tombstone event in the old room.
         """
@@ -469,14 +472,14 @@ class RoomCreationHandler:
             (EventTypes.PowerLevels, ""),
         ]
 
-        # If the old room was a space, copy over the room type and the rooms in
-        # the space.
-        if (
-            old_room_create_event.content.get(EventContentFields.ROOM_TYPE)
-            == RoomTypes.SPACE
-        ):
-            creation_content[EventContentFields.ROOM_TYPE] = RoomTypes.SPACE
-            types_to_copy.append((EventTypes.SpaceChild, None))
+        # Copy the room type as per MSC3818.
+        room_type = old_room_create_event.content.get(EventContentFields.ROOM_TYPE)
+        if room_type is not None:
+            creation_content[EventContentFields.ROOM_TYPE] = room_type
+
+            # If the old room was a space, copy over the rooms in the space.
+            if room_type == RoomTypes.SPACE:
+                types_to_copy.append((EventTypes.SpaceChild, None))
 
         old_room_state_ids = await self.store.get_filtered_current_state_ids(
             old_room_id, StateFilter.from_types(types_to_copy)
@@ -750,6 +753,21 @@ class RoomCreationHandler:
             for wchar in string.whitespace:
                 if wchar in config["room_alias_name"]:
                     raise SynapseError(400, "Invalid characters in room alias")
+
+            if ":" in config["room_alias_name"]:
+                # Prevent someone from trying to pass in a full alias here.
+                # Note that it's permissible for a room alias to have multiple
+                # hash symbols at the start (notably bridged over from IRC, too),
+                # but the first colon in the alias is defined to separate the local
+                # part from the server name.
+                # (remember server names can contain port numbers, also separated
+                # by a colon. But under no circumstances should the local part be
+                # allowed to contain a colon!)
+                raise SynapseError(
+                    400,
+                    "':' is not permitted in the room alias name. "
+                    "Please note this expects a local part — 'wombat', not '#wombat:example.com'.",
+                )
 
             room_alias = RoomAlias(config["room_alias_name"], self.hs.hostname)
             mapping = await self.store.get_association_from_room_alias(room_alias)
@@ -1174,8 +1192,8 @@ class RoomContextHandler:
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self._storage_controllers = hs.get_storage_controllers()
+        self._state_storage_controller = self._storage_controllers.state
         self._relations_handler = hs.get_relations_handler()
 
     async def get_event_context(
@@ -1218,7 +1236,10 @@ class RoomContextHandler:
             if use_admin_priviledge:
                 return events
             return await filter_events_for_client(
-                self.storage, user.to_string(), events, is_peeking=is_peeking
+                self._storage_controllers,
+                user.to_string(),
+                events,
+                is_peeking=is_peeking,
             )
 
         event = await self.store.get_event(
@@ -1275,7 +1296,7 @@ class RoomContextHandler:
         # first? Shouldn't we be consistent with /sync?
         # https://github.com/matrix-org/matrix-doc/issues/687
 
-        state = await self.state_store.get_state_for_events(
+        state = await self._state_storage_controller.get_state_for_events(
             [last_event_id], state_filter=state_filter
         )
 

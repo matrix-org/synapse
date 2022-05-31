@@ -1,1 +1,0 @@
-Fix poor database performance when reading the cache invalidation stream for large servers with lots of workers.

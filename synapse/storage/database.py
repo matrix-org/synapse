@@ -90,6 +90,8 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
     "device_lists_remote_extremeties": "device_lists_remote_extremeties_unique_idx",
     "device_lists_remote_cache": "device_lists_remote_cache_unique_idx",
     "event_search": "event_search_event_id_idx",
+    "local_media_repository_thumbnails": "local_media_repository_thumbnails_method_idx",
+    "remote_media_cache_thumbnails": "remote_media_repository_thumbnails_method_idx",
 }
 
 

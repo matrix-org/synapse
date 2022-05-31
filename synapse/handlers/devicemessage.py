@@ -15,7 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Any, Dict
 
-from synapse.api.constants import ToDeviceEventTypes
+from synapse.api.constants import EduTypes, ToDeviceEventTypes
 from synapse.api.errors import SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.logging.context import run_in_background
@@ -59,11 +59,11 @@ class DeviceMessageHandler:
         # to the appropriate worker.
         if hs.get_instance_name() in hs.config.worker.writers.to_device:
             hs.get_federation_registry().register_edu_handler(
-                "m.direct_to_device", self.on_direct_to_device_edu
+                EduTypes.DIRECT_TO_DEVICE, self.on_direct_to_device_edu
             )
         else:
             hs.get_federation_registry().register_instances_for_edu(
-                "m.direct_to_device",
+                EduTypes.DIRECT_TO_DEVICE,
                 hs.config.worker.writers.to_device,
             )
 
