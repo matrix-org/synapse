@@ -505,13 +505,15 @@ def generate_worker_files(
             if reg_path.suffix.lower() in (".yaml", ".yml")
         ]
 
+    enable_redis = len(worker_types) > 0
+
     # Shared homeserver config
     convert(
         "/conf/shared.yaml.j2",
         "/conf/workers/shared.yaml",
         shared_worker_config=yaml.dump(shared_config),
         appservice_registrations=appservice_registrations,
-        enable_redis=len(worker_types) > 0,
+        enable_redis=enable_redis,
     )
 
     # Nginx config
@@ -531,6 +533,7 @@ def generate_worker_files(
         "/etc/supervisor/supervisord.conf",
         main_config_path=config_path,
         worker_config=supervisord_config,
+        enable_redis=enable_redis,
     )
 
     # healthcheck config

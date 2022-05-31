@@ -57,13 +57,9 @@ if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
       synchrotron, \
       appservice, \
       pusher"
-
-  export START_REDIS=true
 else
   # Empty string here means 'main process only'
   export SYNAPSE_WORKER_TYPES=""
-  # No sense starting Redis as we won't need it or use it
-  export START_REDIS=false
 fi
 
 
