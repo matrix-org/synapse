@@ -505,6 +505,9 @@ class FederationEventHandler:
         Args:
             destination: server to request full state from
             event: partial-state event to be de-partial-stated
+
+        Raises:
+            FederationError if we fail to request state from the remote server.
         """
         logger.info("Updating state for %s", event.event_id)
         with nested_logging_context(suffix=event.event_id):
@@ -815,6 +818,10 @@ class FederationEventHandler:
         Returns:
             if we already had all the prev events, `None`. Otherwise, returns
             the event ids of the state at `event`.
+
+        Raises:
+            FederationError if we fail to get the state from the remote server after any
+                missing `prev_event`s.
         """
         room_id = event.room_id
         event_id = event.event_id
@@ -901,6 +908,10 @@ class FederationEventHandler:
 
         Returns:
             The event ids of the state *after* the given event.
+
+        Raises:
+            InvalidResponseError: if the remote homeserver's response contains fields
+                of the wrong type.
         """
         (
             state_event_ids,
