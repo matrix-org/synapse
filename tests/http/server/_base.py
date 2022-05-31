@@ -59,11 +59,11 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
                 expected_code = HTTPStatus.OK
 
         request = channel.request
-        self.assertFalse(
-            channel.is_finished(),
-            "Request finished before we could disconnect - "
-            "ensure `await_result=False` is passed to `make_request`.",
-        )
+        if channel.is_finished():
+            raise AssertionError(
+                "Request finished before we could disconnect - "
+                "ensure `await_result=False` is passed to `make_request`.",
+            )
 
         # We're about to disconnect the request. This also disconnects the channel, so
         # we have to rely on mocks to extract the response.
@@ -82,19 +82,30 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
             if expect_cancellation:
                 # An immediate cancellation is expected.
                 respond_mock.assert_called_once()
-                args, _kwargs = respond_mock.call_args
-                code, body = args[1], args[2]
-                self.assertEqual(code, expected_code)
-                self.assertEqual(request.code, expected_code)
-                self.assertEqual(body, expected_body)
             else:
                 respond_mock.assert_not_called()
 
                 # The handler is expected to run to completion.
                 reactor.advance(1.0)
                 respond_mock.assert_called_once()
-                args, _kwargs = respond_mock.call_args
-                code, body = args[1], args[2]
-                self.assertEqual(code, expected_code)
-                self.assertEqual(request.code, expected_code)
-                self.assertEqual(body, expected_body)
+
+            args, _kwargs = respond_mock.call_args
+            code, body = args[1], args[2]
+
+            if code != expected_code:
+                raise AssertionError(
+                    f"{code} != {expected_code} : "
+                    "Request did not finish with the expected status code."
+                )
+
+            if request.code != expected_code:
+                raise AssertionError(
+                    f"{request.code} != {expected_code} : "
+                    "Request did not finish with the expected status code."
+                )
+
+            if body != expected_body:
+                raise AssertionError(
+                    f"{body!r} != {expected_body!r} : "
+                    "Request did not finish with the expected status code."
+                )
