@@ -120,7 +120,7 @@ jobs:
       - name: Upload coverage
         uses: actions/upload-artifact@v3
         with:
-          name: coverage-${{ matrix.python-version }}-${{ matrix.database || 'sqlite' }}-${{ matrix.postgres-version || 'none' }}
+          name: coverage
           path: .coverage.*
           retention-days: 1
 
@@ -378,19 +378,18 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/download-artifact@v3
         with:
+          name: coverage
           path: .
-      - name: Move coverage files to where Coverage.py expects
-        run: mv coverage*/.coverage* .
       - uses: matrix-org/setup-python-poetry@v1
       - name: Combine coverage reports
         run: poetry run coverage combine
       - name: Write coverage to XML
-        run: poetry run coverage xml -i -o coverage/coverage.xml
+        run: poetry run coverage xml -i
       - name: Upload combined coverage
         uses: actions/upload-artifact@v3
         with:
           name: coverage
-          path: coverage
+          path: coverage.xml
           retention-days: 1
 
       # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
