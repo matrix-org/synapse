@@ -1928,23 +1928,6 @@ class EventsWorkerStore(SQLBaseStore):
                 LIMIT 1
             """
 
-            # Check to see whether the event in question is already referenced
-            # by another event. If we don't see any edges, we're next to a
-            # forward gap.
-            forward_edge_query = """
-                SELECT 1 FROM event_edges
-                /* Check to make sure the event referencing our event in question is not rejected */
-                LEFT JOIN rejections ON event_edges.event_id = rejections.event_id
-                WHERE
-                    event_edges.room_id = ?
-                    AND event_edges.prev_event_id = ?
-                    /* It's not a valid edge if the event referencing our event in
-                     * question is rejected.
-                     */
-                    AND rejections.event_id IS NULL
-                LIMIT 1
-            """
-
             # We consider any forward extremity as the latest in the room and
             # not a forward gap.
             #
@@ -1954,16 +1937,30 @@ class EventsWorkerStore(SQLBaseStore):
             # is useless. The new latest messages will just be federated as
             # usual.
             txn.execute(forward_extremity_query, (event.room_id, event.event_id))
-            forward_extremities = txn.fetchall()
-            if len(forward_extremities):
+            if txn.fetchone():
                 return False
+
+            # Check to see whether the event in question is already referenced
+            # by another event. If we don't see any edges, we're next to a
+            # forward gap.
+            forward_edge_query = """
+                SELECT 1 FROM event_edges
+                /* Check to make sure the event referencing our event in question is not rejected */
+                LEFT JOIN rejections ON event_edges.event_id = rejections.event_id
+                WHERE
+                    event_edges.prev_event_id = ?
+                    /* It's not a valid edge if the event referencing our event in
+                     * question is rejected.
+                     */
+                    AND rejections.event_id IS NULL
+                LIMIT 1
+            """
 
             # If there are no forward edges to the event in question (another
             # event hasn't referenced this event in their prev_events), then we
             # assume there is a forward gap in the history.
-            txn.execute(forward_edge_query, (event.room_id, event.event_id))
-            forward_edges = txn.fetchall()
-            if not len(forward_edges):
+            txn.execute(forward_edge_query, (event.event_id,))
+            if not txn.fetchone():
                 return True
 
             return False
