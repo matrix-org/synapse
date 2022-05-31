@@ -301,20 +301,20 @@ class SpamChecker:
                     # This spam-checker rejects the event with deprecated
                     # return value `True`
                     return Codes.FORBIDDEN
+                elif not isinstance(res, str):
+                    # mypy complains that we can't reach this code because of the
+                    # return type in CHECK_EVENT_FOR_SPAM_CALLBACK, but we don't know
+                    # for sure that the module actually returns it.
+                    logger.warning(  # type: ignore[unreachable]
+                        "Module returned invalid value, rejecting message as spam"
+                    )
+                    res = "This message has been rejected as probable spam"
                 else:
-                    # This spam-checker rejects the event either with a `str`
-                    # or with a `Codes`. In either case, we stop here.
-                    if not isinstance(res, str):
-                        # Make sure we give the SynapseError a string as the error
-                        # message.
-                        # mypy complains that we can't reach this code because of the
-                        # return type in CHECK_EVENT_FOR_SPAM_CALLBACK, but we don't know
-                        # for sure that the module actually returns it.
-                        res = (  # type: ignore[unreachable]
-                            "This message has been rejected as probable spam"
-                        )
+                    # The module rejected the event either with a `Codes`
+                    # or some other `str`. In either case, we stop here.
+                    pass
 
-                    return res
+                return res
 
         # No spam-checker has rejected the event, let it pass.
         return self.NOT_SPAM

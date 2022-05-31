@@ -887,11 +887,6 @@ class EventCreationHandler:
 
             spam_check_result = await self.spam_checker.check_event_for_spam(event)
             if spam_check_result != self.spam_checker.NOT_SPAM:
-                # We need to check whether the return value is an error code
-                # specifically for backwards compatibility, since values in Codes
-                # are also strings and this callback allows modules to return
-                # arbitrary strings to be used in SynapseErrors (which is now
-                # deprecated).
                 if isinstance(spam_check_result, Codes):
                     raise SynapseError(
                         403,
@@ -899,6 +894,9 @@ class EventCreationHandler:
                         spam_check_result,
                     )
 
+                # Backwards compatibility: if the return value is not an error code, it
+                # means the module returned an error message to be included in the
+                # SynapseError (which is now deprecated).
                 raise SynapseError(
                     403,
                     spam_check_result,
