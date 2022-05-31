@@ -91,7 +91,7 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
                 respond_mock.assert_not_called()
 
                 # The handler is expected to run to completion.
-                reactor.pump([1.0])
+                reactor.advance(1.0)
                 respond_mock.assert_called_once()
                 args, _kwargs = respond_mock.call_args
                 code, body = args[1], args[2]
