@@ -56,7 +56,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         super().__init__(hs)
 
         self.store = hs.get_datastores().main
-        self._storage = hs.get_storage()
+        self._storage_controllers = hs.get_storage_controllers()
         self.server_name = hs.hostname
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
@@ -175,7 +175,10 @@ class UserDirectoryHandler(StateDeltasHandler):
                 logger.debug(
                     "Processing user stats %s->%s", self.pos, room_max_stream_ordering
                 )
-                max_pos, deltas = await self._storage.state.get_current_state_deltas(
+                (
+                    max_pos,
+                    deltas,
+                ) = await self._storage_controllers.state.get_current_state_deltas(
                     self.pos, room_max_stream_ordering
                 )
 
