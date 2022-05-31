@@ -124,162 +124,157 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
                 self.assertEqual(request.code, expected_code)
                 self.assertEqual(body, expected_body)
 
-    @logcontext_clean
-    def _test_cancellation_at_every_await(
-        self,
-        reactor: ThreadedMemoryReactorClock,
-        make_request: Callable[[], FakeChannel],
-        test_name: str,
-    ) -> FakeChannel:
-        """Performs a request repeatedly, disconnecting at successive `await`s, until
-        one completes.
 
-        Fails if:
-            * A logging context is lost during cancellation.
-            * A logging context get restarted after it is marked as finished, eg. if
-              a request's logging context is used by some processing started by the
-              request, but the request neglects to cancel that processing or wait for it
-              to complete.
+@logcontext_clean
+def test_cancellation_at_every_await(
+    reactor: ThreadedMemoryReactorClock,
+    make_request: Callable[[], FakeChannel],
+    test_name: str,
+) -> FakeChannel:
+    """Performs a request repeatedly, disconnecting at successive `await`s, until
+    one completes.
 
-              Note that "Re-starting finished log context" errors get caught by twisted
-              and will manifest in a different logging context error at a later point.
-              When debugging logging context failures, setting a breakpoint in
-              `logcontext_error` can prove useful.
-            * A request gets stuck, possibly due to a previous cancellation.
-            * The request does not return a 499 when the client disconnects.
-              This implies that a `CancelledError` was swallowed somewhere.
+    Fails if:
+        * A logging context is lost during cancellation.
+        * A logging context get restarted after it is marked as finished, eg. if
+            a request's logging context is used by some processing started by the
+            request, but the request neglects to cancel that processing or wait for it
+            to complete.
 
-        It is up to the caller to verify that the request returns the correct data when
-        it finally runs to completion.
+            Note that "Re-starting finished log context" errors get caught by twisted
+            and will manifest in a different logging context error at a later point.
+            When debugging logging context failures, setting a breakpoint in
+            `logcontext_error` can prove useful.
+        * A request gets stuck, possibly due to a previous cancellation.
+        * The request does not return a 499 when the client disconnects.
+            This implies that a `CancelledError` was swallowed somewhere.
 
-        Note that this function can only cover a single code path and does not guarantee
-        that an endpoint is compatible with cancellation on every code path.
-        To allow inspection of the code path that is being tested, this function will
-        log the stack trace at every `await` that gets cancelled. To view these log
-        lines, `trial` can be run with the `SYNAPSE_TEST_LOG_LEVEL=INFO` environment
-        variable, which will include the log lines in `_trial_temp/test.log`.
-        Alternatively, `_log_for_request` can be modified to write to `sys.stdout`.
+    It is up to the caller to verify that the request returns the correct data when
+    it finally runs to completion.
 
-        Args:
-            reactor: The twisted reactor running the request handler.
-            make_request: A function that initiates the request and returns a
-                `FakeChannel`.
-            test_name: The name of the test, which will be logged.
+    Note that this function can only cover a single code path and does not guarantee
+    that an endpoint is compatible with cancellation on every code path.
+    To allow inspection of the code path that is being tested, this function will
+    log the stack trace at every `await` that gets cancelled. To view these log
+    lines, `trial` can be run with the `SYNAPSE_TEST_LOG_LEVEL=INFO` environment
+    variable, which will include the log lines in `_trial_temp/test.log`.
+    Alternatively, `_log_for_request` can be modified to write to `sys.stdout`.
 
-        Returns:
-            The `FakeChannel` object which stores the result of the final request that
-            runs to completion.
-        """
-        # To process a request, a coroutine run is created for the async method handling
-        # the request. That method may then start other coroutine runs, wrapped in
-        # `Deferred`s.
-        #
-        # We would like to trigger a cancellation at the first `await`, re-run the
-        # request and cancel at the second `await`, and so on. By patching
-        # `Deferred.__next__`, we can intercept `await`s, track which ones we have or
-        # have not seen, and force them to block when they wouldn't have.
+    Args:
+        reactor: The twisted reactor running the request handler.
+        make_request: A function that initiates the request and returns a
+            `FakeChannel`.
+        test_name: The name of the test, which will be logged.
 
-        # The set of previously seen `await`s.
-        # Each element is a stringified stack trace.
-        seen_awaits: Set[Tuple[str, ...]] = set()
+    Returns:
+        The `FakeChannel` object which stores the result of the final request that
+        runs to completion.
+    """
+    # To process a request, a coroutine run is created for the async method handling
+    # the request. That method may then start other coroutine runs, wrapped in
+    # `Deferred`s.
+    #
+    # We would like to trigger a cancellation at the first `await`, re-run the
+    # request and cancel at the second `await`, and so on. By patching
+    # `Deferred.__next__`, we can intercept `await`s, track which ones we have or
+    # have not seen, and force them to block when they wouldn't have.
 
-        _log_for_request(
-            0, f"Running _test_cancellation_at_every_await for {test_name}..."
-        )
+    # The set of previously seen `await`s.
+    # Each element is a stringified stack trace.
+    seen_awaits: Set[Tuple[str, ...]] = set()
 
-        for request_number in itertools.count(1):
-            deferred_patch = Deferred__next__Patch(seen_awaits, request_number)
+    _log_for_request(0, f"Running test_cancellation_at_every_await for {test_name}...")
 
-            try:
-                with mock.patch(
-                    "synapse.http.server.respond_with_json", wraps=respond_with_json
-                ) as respond_mock:
-                    with deferred_patch.patch():
-                        # Start the request.
-                        channel = make_request()
-                        request = channel.request
+    for request_number in itertools.count(1):
+        deferred_patch = Deferred__next__Patch(seen_awaits, request_number)
 
-                        if request_number == 1 and respond_mock.called:
-                            raise AssertionError(
-                                "Request finished before we could disconnect - ensure "
-                                "`await_result=False` is passed to `make_request`.",
-                            )
-                        else:
-                            # Requests after the first may be lucky enough to hit caches
-                            # all the way through and never have to block.
-                            pass
+        try:
+            with mock.patch(
+                "synapse.http.server.respond_with_json", wraps=respond_with_json
+            ) as respond_mock:
+                with deferred_patch.patch():
+                    # Start the request.
+                    channel = make_request()
+                    request = channel.request
 
-                        # Run the request until we see a new `await` which we have not
-                        # yet cancelled at, or it completes.
-                        while (
-                            not respond_mock.called
-                            and not deferred_patch.new_await_seen
-                        ):
-                            previous_awaits_seen = deferred_patch.awaits_seen
+                    if request_number == 1 and respond_mock.called:
+                        raise AssertionError(
+                            "Request finished before we could disconnect - ensure "
+                            "`await_result=False` is passed to `make_request`.",
+                        )
+                    else:
+                        # Requests after the first may be lucky enough to hit caches
+                        # all the way through and never have to block.
+                        pass
 
-                            reactor.advance(0.0)
+                    # Run the request until we see a new `await` which we have not
+                    # yet cancelled at, or it completes.
+                    while not respond_mock.called and not deferred_patch.new_await_seen:
+                        previous_awaits_seen = deferred_patch.awaits_seen
 
-                            if deferred_patch.awaits_seen == previous_awaits_seen:
-                                # We didn't see any progress. Try advancing the clock.
-                                reactor.advance(1.0)
-
-                            if deferred_patch.awaits_seen == previous_awaits_seen:
-                                # We still didn't see any progress. The request might be
-                                # stuck.
-                                raise AssertionError(
-                                    "Request appears to be stuck, possibly due to a "
-                                    "previous cancelled request"
-                                )
-
-                    if respond_mock.called:
-                        # The request ran to completion and we are done with testing it.
-
-                        # `respond_with_json` writes the response asynchronously, so we
-                        # might have to give the reactor a kick before the channel gets
-                        # the response.
-                        reactor.advance(1.0)
-
-                        return channel
-
-                    # Disconnect the client and wait for the response.
-                    request.connectionLost(reason=ConnectionDone())
-
-                    _log_for_request(request_number, "--- disconnected ---")
-
-                    # We may need to pump the reactor to allow `delay_cancellation`s to
-                    # finish.
-                    if not respond_mock.called:
                         reactor.advance(0.0)
 
-                    # Try advancing the clock if that didn't work.
-                    if not respond_mock.called:
-                        reactor.advance(1.0)
+                        if deferred_patch.awaits_seen == previous_awaits_seen:
+                            # We didn't see any progress. Try advancing the clock.
+                            reactor.advance(1.0)
 
-                    # Mark the request's logging context as finished. If it gets
-                    # activated again, an `AssertionError` will be raised. This
-                    # `AssertionError` will likely be caught by twisted and turned into
-                    # a `Failure`. Instead, a different `AssertionError` will be
-                    # observed when the logging context is deactivated, as it wouldn't
-                    # have tracked resource usage correctly.
-                    if isinstance(request, SynapseRequest) and request.logcontext:
-                        request.logcontext.finished = True
+                        if deferred_patch.awaits_seen == previous_awaits_seen:
+                            # We still didn't see any progress. The request might be
+                            # stuck.
+                            raise AssertionError(
+                                "Request appears to be stuck, possibly due to a "
+                                "previous cancelled request"
+                            )
 
-                    # Check that the request finished with a 499,
-                    # ie. the `CancelledError` wasn't swallowed.
-                    respond_mock.assert_called_once()
-                    args, _kwargs = respond_mock.call_args
-                    code = args[1]
+                if respond_mock.called:
+                    # The request ran to completion and we are done with testing it.
 
-                    if code != HTTP_STATUS_REQUEST_CANCELLED:
-                        raise AssertionError(
-                            f"{code} != {HTTP_STATUS_REQUEST_CANCELLED} : Cancelled "
-                            "request did not finish with the correct status code."
-                        )
-            finally:
-                # Unblock any processing that might be shared between requests.
-                deferred_patch.unblock_awaits()
+                    # `respond_with_json` writes the response asynchronously, so we
+                    # might have to give the reactor a kick before the channel gets
+                    # the response.
+                    reactor.advance(1.0)
 
-        assert False, "unreachable"  # noqa: B011
+                    return channel
+
+                # Disconnect the client and wait for the response.
+                request.connectionLost(reason=ConnectionDone())
+
+                _log_for_request(request_number, "--- disconnected ---")
+
+                # We may need to pump the reactor to allow `delay_cancellation`s to
+                # finish.
+                if not respond_mock.called:
+                    reactor.advance(0.0)
+
+                # Try advancing the clock if that didn't work.
+                if not respond_mock.called:
+                    reactor.advance(1.0)
+
+                # Mark the request's logging context as finished. If it gets
+                # activated again, an `AssertionError` will be raised. This
+                # `AssertionError` will likely be caught by twisted and turned into
+                # a `Failure`. Instead, a different `AssertionError` will be
+                # observed when the logging context is deactivated, as it wouldn't
+                # have tracked resource usage correctly.
+                if isinstance(request, SynapseRequest) and request.logcontext:
+                    request.logcontext.finished = True
+
+                # Check that the request finished with a 499,
+                # ie. the `CancelledError` wasn't swallowed.
+                respond_mock.assert_called_once()
+                args, _kwargs = respond_mock.call_args
+                code = args[1]
+
+                if code != HTTP_STATUS_REQUEST_CANCELLED:
+                    raise AssertionError(
+                        f"{code} != {HTTP_STATUS_REQUEST_CANCELLED} : Cancelled "
+                        "request did not finish with the correct status code."
+                    )
+        finally:
+            # Unblock any processing that might be shared between requests.
+            deferred_patch.unblock_awaits()
+
+    assert False, "unreachable"  # noqa: B011
 
 
 class Deferred__next__Patch:
@@ -407,7 +402,7 @@ class Deferred__next__Patch:
 
 
 def _log_for_request(request_number: int, message: str) -> None:
-    """Logs a message for an iteration of `_test_cancellation_at_every_await`."""
+    """Logs a message for an iteration of `test_cancellation_at_every_await`."""
     # We want consistent alignment when logging stack traces, so ensure the logging
     # context has a fixed width name.
     with LoggingContext(name=f"request-{request_number:<2}"):
@@ -420,7 +415,7 @@ def _log_await_stack(
     request_number: int,
     note: str,
 ) -> None:
-    """Logs the stack for an `await` in `_test_cancellation_at_every_await`.
+    """Logs the stack for an `await` in `test_cancellation_at_every_await`.
 
     Only logs the part of the stack that has changed since the previous call.
 

@@ -42,7 +42,7 @@ from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 from tests import unittest
-from tests.http.server._base import EndpointCancellationTestHelperMixin
+from tests.http.server._base import test_cancellation_at_every_await
 from tests.test_utils import make_awaitable
 
 PATH_PREFIX = b"/_matrix/client/api/v1"
@@ -477,7 +477,7 @@ class RoomPermissionsTestCase(RoomBase):
         )
 
 
-class RoomStateTestCase(RoomBase, EndpointCancellationTestHelperMixin):
+class RoomStateTestCase(RoomBase):
     """Tests /rooms/$room_id/state."""
 
     user_id = "@sid1:red"
@@ -485,7 +485,7 @@ class RoomStateTestCase(RoomBase, EndpointCancellationTestHelperMixin):
     def test_get_state_cancellation(self) -> None:
         """Test cancellation of a `/rooms/$room_id/state` request."""
         room_id = self.helper.create_room_as(self.user_id)
-        channel = self._test_cancellation_at_every_await(
+        channel = test_cancellation_at_every_await(
             self.reactor,
             lambda: self.make_request(
                 "GET", "/rooms/%s/state" % room_id, await_result=False
@@ -508,7 +508,7 @@ class RoomStateTestCase(RoomBase, EndpointCancellationTestHelperMixin):
     def test_get_state_event_cancellation(self) -> None:
         """Test cancellation of a `/rooms/$room_id/state/$event_type` request."""
         room_id = self.helper.create_room_as(self.user_id)
-        channel = self._test_cancellation_at_every_await(
+        channel = test_cancellation_at_every_await(
             self.reactor,
             lambda: self.make_request(
                 "GET",
@@ -522,7 +522,7 @@ class RoomStateTestCase(RoomBase, EndpointCancellationTestHelperMixin):
         self.assertEqual(channel.json_body, {"membership": "join"})
 
 
-class RoomsMemberListTestCase(RoomBase, EndpointCancellationTestHelperMixin):
+class RoomsMemberListTestCase(RoomBase):
     """Tests /rooms/$room_id/members/list REST events."""
 
     servlets = RoomBase.servlets + [sync.register_servlets]
@@ -645,7 +645,7 @@ class RoomsMemberListTestCase(RoomBase, EndpointCancellationTestHelperMixin):
     def test_get_member_list_cancellation(self) -> None:
         """Test cancellation of a `/rooms/$room_id/members` request."""
         room_id = self.helper.create_room_as(self.user_id)
-        channel = self._test_cancellation_at_every_await(
+        channel = test_cancellation_at_every_await(
             self.reactor,
             lambda: self.make_request(
                 "GET", "/rooms/%s/members" % room_id, await_result=False
@@ -676,7 +676,7 @@ class RoomsMemberListTestCase(RoomBase, EndpointCancellationTestHelperMixin):
         self.assertEqual(200, channel.code)
         sync_token = channel.json_body["next_batch"]
 
-        channel = self._test_cancellation_at_every_await(
+        channel = test_cancellation_at_every_await(
             self.reactor,
             lambda: self.make_request(
                 "GET",
