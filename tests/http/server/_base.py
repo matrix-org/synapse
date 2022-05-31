@@ -202,8 +202,8 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
                         if request_number == 0:
                             self.assertFalse(
                                 respond_mock.called,
-                                "Request finished before we could disconnect - "
-                                "was `await_result=False` passed to `make_request`?",
+                                "Request finished before we could disconnect - ensure "
+                                "`await_result=False` is passed to `make_request`.",
                             )
                         else:
                             # Requests after the first may be lucky enough to hit caches
