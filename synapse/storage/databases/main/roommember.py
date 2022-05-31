@@ -15,6 +15,7 @@
 import logging
 from typing import (
     TYPE_CHECKING,
+    Callable,
     Collection,
     Dict,
     FrozenSet,
@@ -634,7 +635,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
     async def get_rooms_for_user(
-        self, user_id: str, on_invalidate=None
+        self, user_id: str, on_invalidate: Optional[Callable[[], None]] = None
     ) -> FrozenSet[str]:
         """Returns a set of room_ids the user is currently joined to.
 
@@ -668,6 +669,30 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             user_who_share_room.update(user_ids)
 
         return user_who_share_room
+
+    @cached(cache_context=True, iterable=True)
+    async def get_mutual_rooms_between_users(
+        self, user_ids: FrozenSet[str], cache_context: _CacheContext
+    ) -> FrozenSet[str]:
+        """
+        Returns the set of rooms that all users in `user_ids` share.
+
+        Args:
+            user_ids: A frozen set of all users to investigate and return
+              overlapping joined rooms for.
+            cache_context
+        """
+        shared_room_ids: Optional[FrozenSet[str]] = None
+        for user_id in user_ids:
+            room_ids = await self.get_rooms_for_user(
+                user_id, on_invalidate=cache_context.invalidate
+            )
+            if shared_room_ids is not None:
+                shared_room_ids &= room_ids
+            else:
+                shared_room_ids = room_ids
+
+        return shared_room_ids or frozenset()
 
     async def get_joined_users_from_context(
         self, event: EventBase, context: EventContext

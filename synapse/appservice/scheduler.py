@@ -384,6 +384,11 @@ class _TransactionController:
             device_list_summary: The device list summary to include in the transaction.
         """
         try:
+            service_is_up = await self._is_service_up(service)
+            # Don't create empty txns when in recovery mode (ephemeral events are dropped)
+            if not service_is_up and not events:
+                return
+
             txn = await self.store.create_appservice_txn(
                 service=service,
                 events=events,
@@ -393,7 +398,6 @@ class _TransactionController:
                 unused_fallback_keys=unused_fallback_keys or {},
                 device_list_summary=device_list_summary or DeviceListUpdates(),
             )
-            service_is_up = await self._is_service_up(service)
             if service_is_up:
                 sent = await txn.send(self.as_api)
                 if sent:

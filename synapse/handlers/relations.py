@@ -60,7 +60,7 @@ class BundledAggregations:
 class RelationsHandler:
     def __init__(self, hs: "HomeServer"):
         self._main_store = hs.get_datastores().main
-        self._storage = hs.get_storage()
+        self._storage_controllers = hs.get_storage_controllers()
         self._auth = hs.get_auth()
         self._clock = hs.get_clock()
         self._event_handler = hs.get_event_handler()
@@ -134,7 +134,10 @@ class RelationsHandler:
         )
 
         events = await filter_events_for_client(
-            self._storage, user_id, events, is_peeking=(member_event_id is None)
+            self._storage_controllers,
+            user_id,
+            events,
+            is_peeking=(member_event_id is None),
         )
 
         now = self._clock.time_msec()

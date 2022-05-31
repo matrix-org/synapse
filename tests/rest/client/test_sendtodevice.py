@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.api.constants import EduTypes
 from synapse.rest import admin
 from synapse.rest.client import login, sendtodevice, sync
 
@@ -139,7 +140,7 @@ class SendToDeviceTestCase(HomeserverTestCase):
         for i in range(3):
             self.get_success(
                 federation_registry.on_edu(
-                    "m.direct_to_device",
+                    EduTypes.DIRECT_TO_DEVICE,
                     "remote_server",
                     {
                         "sender": "@user:remote_server",
@@ -172,7 +173,7 @@ class SendToDeviceTestCase(HomeserverTestCase):
         # and we can send more messages
         self.get_success(
             federation_registry.on_edu(
-                "m.direct_to_device",
+                EduTypes.DIRECT_TO_DEVICE,
                 "remote_server",
                 {
                     "sender": "@user:remote_server",

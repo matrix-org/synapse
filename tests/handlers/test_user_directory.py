@@ -954,7 +954,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         self.get_success(
-            self.hs.get_storage().persistence.persist_event(event, context)
+            self.hs.get_storage_controllers().persistence.persist_event(event, context)
         )
 
     def test_local_user_leaving_room_remains_in_user_directory(self) -> None:
@@ -1006,6 +1006,34 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(users, {alice, bob})
         self.assertEqual(in_public, {(bob, room1), (bob, room2)})
         self.assertEqual(in_private, set())
+
+    def test_ignore_display_names_with_null_codepoints(self) -> None:
+        MXC_DUMMY = "mxc://dummy"
+
+        # Alice creates a public room.
+        alice = self.register_user("alice", "pass")
+
+        # Alice has a user directory entry to start with.
+        self.assertIn(
+            alice,
+            self.get_success(self.user_dir_helper.get_profiles_in_user_directory()),
+        )
+
+        # Alice changes her name to include a null codepoint.
+        self.get_success(
+            self.hs.get_user_directory_handler().handle_local_profile_change(
+                alice,
+                ProfileInfo(
+                    display_name="abcd\u0000efgh",
+                    avatar_url=MXC_DUMMY,
+                ),
+            )
+        )
+        # Alice's profile should be updated with the new avatar, but no display name.
+        self.assertEqual(
+            self.get_success(self.user_dir_helper.get_profiles_in_user_directory()),
+            {alice: ProfileInfo(display_name=None, avatar_url=MXC_DUMMY)},
+        )
 
 
 class TestUserDirSearchDisabled(unittest.HomeserverTestCase):

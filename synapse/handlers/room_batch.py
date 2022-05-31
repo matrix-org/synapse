@@ -17,7 +17,7 @@ class RoomBatchHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastores().main
-        self.state_store = hs.get_storage().state
+        self._state_storage_controller = hs.get_storage_controllers().state
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
@@ -53,6 +53,7 @@ class RoomBatchHandler:
         # We want to use the successor event depth so they appear after `prev_event` because
         # it has a larger `depth` but before the successor event because the `stream_ordering`
         # is negative before the successor event.
+        assert most_recent_prev_event_id is not None
         successor_event_ids = await self.store.get_successor_events(
             most_recent_prev_event_id
         )
@@ -139,7 +140,8 @@ class RoomBatchHandler:
             _,
         ) = await self.store.get_max_depth_of(event_ids)
         # mapping from (type, state_key) -> state_event_id
-        prev_state_map = await self.state_store.get_state_ids_for_event(
+        assert most_recent_event_id is not None
+        prev_state_map = await self._state_storage_controller.get_state_ids_for_event(
             most_recent_event_id
         )
         # List of state event ID's

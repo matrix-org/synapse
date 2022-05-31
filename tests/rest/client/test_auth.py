@@ -195,7 +195,16 @@ class UIAuthTests(unittest.HomeserverTestCase):
         self.user_pass = "pass"
         self.user = self.register_user("test", self.user_pass)
         self.device_id = "dev1"
+
+        # Force-enable password login for just long enough to log in.
+        auth_handler = self.hs.get_auth_handler()
+        allow_auth_for_login = auth_handler._password_enabled_for_login
+        auth_handler._password_enabled_for_login = True
+
         self.user_tok = self.login("test", self.user_pass, self.device_id)
+
+        # Restore password login to however it was.
+        auth_handler._password_enabled_for_login = allow_auth_for_login
 
     def delete_device(
         self,
@@ -237,6 +246,38 @@ class UIAuthTests(unittest.HomeserverTestCase):
         """
         Test user interactive authentication outside of registration.
         """
+        # Attempt to delete this device.
+        # Returns a 401 as per the spec
+        channel = self.delete_device(
+            self.user_tok, self.device_id, HTTPStatus.UNAUTHORIZED
+        )
+
+        # Grab the session
+        session = channel.json_body["session"]
+        # Ensure that flows are what is expected.
+        self.assertIn({"stages": ["m.login.password"]}, channel.json_body["flows"])
+
+        # Make another request providing the UI auth flow.
+        self.delete_device(
+            self.user_tok,
+            self.device_id,
+            HTTPStatus.OK,
+            {
+                "auth": {
+                    "type": "m.login.password",
+                    "identifier": {"type": "m.id.user", "user": self.user},
+                    "password": self.user_pass,
+                    "session": session,
+                },
+            },
+        )
+
+    @override_config({"password_config": {"enabled": "only_for_reauth"}})
+    def test_ui_auth_with_passwords_for_reauth_only(self) -> None:
+        """
+        Test user interactive authentication outside of registration.
+        """
+
         # Attempt to delete this device.
         # Returns a 401 as per the spec
         channel = self.delete_device(

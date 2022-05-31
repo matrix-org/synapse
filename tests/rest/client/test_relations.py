@@ -998,7 +998,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations,
             )
 
-        self._test_bundled_aggregations(RelationTypes.ANNOTATION, assert_annotations, 7)
+        self._test_bundled_aggregations(RelationTypes.ANNOTATION, assert_annotations, 6)
 
     def test_annotation_to_annotation(self) -> None:
         """Any relation to an annotation should be ignored."""
@@ -1034,7 +1034,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations,
             )
 
-        self._test_bundled_aggregations(RelationTypes.REFERENCE, assert_annotations, 7)
+        self._test_bundled_aggregations(RelationTypes.REFERENCE, assert_annotations, 6)
 
     def test_thread(self) -> None:
         """
@@ -1078,7 +1078,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
 
         # The "user" sent the root event and is making queries for the bundled
         # aggregations: they have participated.
-        self._test_bundled_aggregations(RelationTypes.THREAD, _gen_assert(True), 9)
+        self._test_bundled_aggregations(RelationTypes.THREAD, _gen_assert(True), 8)
         # The "user2" sent replies in the thread and is making queries for the
         # bundled aggregations: they have participated.
         #
@@ -1139,7 +1139,7 @@ class BundledAggregationsTestCase(BaseRelationsTestCase):
                 bundled_aggregations["latest_event"].get("unsigned"),
             )
 
-        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 9)
+        self._test_bundled_aggregations(RelationTypes.THREAD, assert_thread, 8)
 
     def test_nested_thread(self) -> None:
         """

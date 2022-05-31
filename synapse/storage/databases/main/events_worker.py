@@ -1356,14 +1356,23 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             The set of events we have already seen.
         """
-        res = await self._have_seen_events_dict(
-            (room_id, event_id) for event_id in event_ids
-        )
-        return {eid for ((_rid, eid), have_event) in res.items() if have_event}
+
+        # @cachedList chomps lots of memory if you call it with a big list, so
+        # we break it down. However, each batch requires its own index scan, so we make
+        # the batches as big as possible.
+
+        results: Set[str] = set()
+        for chunk in batch_iter(event_ids, 500):
+            r = await self._have_seen_events_dict(
+                [(room_id, event_id) for event_id in chunk]
+            )
+            results.update(eid for ((_rid, eid), have_event) in r.items() if have_event)
+
+        return results
 
     @cachedList(cached_method_name="have_seen_event", list_name="keys")
     async def _have_seen_events_dict(
-        self, keys: Iterable[Tuple[str, str]]
+        self, keys: Collection[Tuple[str, str]]
     ) -> Dict[Tuple[str, str], bool]:
         """Helper for have_seen_events
 
@@ -1375,11 +1384,12 @@ class EventsWorkerStore(SQLBaseStore):
         cache_results = {
             (rid, eid) for (rid, eid) in keys if self._get_event_cache.contains((eid,))
         }
-        results = {x: True for x in cache_results}
+        results = dict.fromkeys(cache_results, True)
+        remaining = [k for k in keys if k not in cache_results]
+        if not remaining:
+            return results
 
-        def have_seen_events_txn(
-            txn: LoggingTransaction, chunk: Tuple[Tuple[str, str], ...]
-        ) -> None:
+        def have_seen_events_txn(txn: LoggingTransaction) -> None:
             # we deliberately do *not* query the database for room_id, to make the
             # query an index-only lookup on `events_event_id_key`.
             #
@@ -1387,21 +1397,17 @@ class EventsWorkerStore(SQLBaseStore):
 
             sql = "SELECT event_id FROM events AS e WHERE "
             clause, args = make_in_list_sql_clause(
-                txn.database_engine, "e.event_id", [eid for (_rid, eid) in chunk]
+                txn.database_engine, "e.event_id", [eid for (_rid, eid) in remaining]
             )
             txn.execute(sql + clause, args)
             found_events = {eid for eid, in txn}
 
-            # ... and then we can update the results for each row in the batch
-            results.update({(rid, eid): (eid in found_events) for (rid, eid) in chunk})
-
-        # each batch requires its own index scan, so we make the batches as big as
-        # possible.
-        for chunk in batch_iter((k for k in keys if k not in cache_results), 500):
-            await self.db_pool.runInteraction(
-                "have_seen_events", have_seen_events_txn, chunk
+            # ... and then we can update the results for each key
+            results.update(
+                {(rid, eid): (eid in found_events) for (rid, eid) in remaining}
             )
 
+        await self.db_pool.runInteraction("have_seen_events", have_seen_events_txn)
         return results
 
     @cached(max_entries=100000, tree=True)
@@ -1922,23 +1928,6 @@ class EventsWorkerStore(SQLBaseStore):
                 LIMIT 1
             """
 
-            # Check to see whether the event in question is already referenced
-            # by another event. If we don't see any edges, we're next to a
-            # forward gap.
-            forward_edge_query = """
-                SELECT 1 FROM event_edges
-                /* Check to make sure the event referencing our event in question is not rejected */
-                LEFT JOIN rejections ON event_edges.event_id = rejections.event_id
-                WHERE
-                    event_edges.room_id = ?
-                    AND event_edges.prev_event_id = ?
-                    /* It's not a valid edge if the event referencing our event in
-                     * question is rejected.
-                     */
-                    AND rejections.event_id IS NULL
-                LIMIT 1
-            """
-
             # We consider any forward extremity as the latest in the room and
             # not a forward gap.
             #
@@ -1948,16 +1937,30 @@ class EventsWorkerStore(SQLBaseStore):
             # is useless. The new latest messages will just be federated as
             # usual.
             txn.execute(forward_extremity_query, (event.room_id, event.event_id))
-            forward_extremities = txn.fetchall()
-            if len(forward_extremities):
+            if txn.fetchone():
                 return False
+
+            # Check to see whether the event in question is already referenced
+            # by another event. If we don't see any edges, we're next to a
+            # forward gap.
+            forward_edge_query = """
+                SELECT 1 FROM event_edges
+                /* Check to make sure the event referencing our event in question is not rejected */
+                LEFT JOIN rejections ON event_edges.event_id = rejections.event_id
+                WHERE
+                    event_edges.prev_event_id = ?
+                    /* It's not a valid edge if the event referencing our event in
+                     * question is rejected.
+                     */
+                    AND rejections.event_id IS NULL
+                LIMIT 1
+            """
 
             # If there are no forward edges to the event in question (another
             # event hasn't referenced this event in their prev_events), then we
             # assume there is a forward gap in the history.
-            txn.execute(forward_edge_query, (event.room_id, event.event_id))
-            forward_edges = txn.fetchall()
-            if not len(forward_edges):
+            txn.execute(forward_edge_query, (event.event_id,))
+            if not txn.fetchone():
                 return True
 
             return False
