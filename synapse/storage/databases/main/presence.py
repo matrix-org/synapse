@@ -335,7 +335,7 @@ class PresenceStore(PresenceBackgroundUpdateStore, CacheInvalidationWorkerStore)
             )
             for user_id in user_ids:
                 self._invalidate_cache_and_stream(
-                    txn, self._get_when_user_should_receive_full_presence, (user_id,)
+                    txn, self._get_full_presence_stream_token_for_user, (user_id,)
                 )
 
         return await self.db_pool.runInteraction(
