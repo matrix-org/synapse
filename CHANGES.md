@@ -1,5 +1,5 @@
-Synapse 1.60.0rc2 (2022-05-27)
-==============================
+Synapse 1.60.0 (2022-05-31)
+===========================
 
 This release of Synapse adds a unique index to the `state_group_edges` table, in
 order to prevent accidentally introducing duplicate information (for example,
@@ -13,6 +13,15 @@ should update their modules to use the new signature where possible.
 
 See [the upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1600)
 for more details.
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.60.0rc1 that would break some imports from `synapse.module_api`. ([\#12918](https://github.com/matrix-org/synapse/issues/12918))
+
+
+Synapse 1.60.0rc2 (2022-05-27)
+==============================
 
 Features
 --------
