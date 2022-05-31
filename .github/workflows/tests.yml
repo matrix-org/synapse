@@ -306,7 +306,8 @@ jobs:
       - run: .ci/scripts/test_synapse_port_db.sh
 
   complement:
-    if: ${{ !failure() && !cancelled() }}
+    # We only run the workers tests on `develop` for now, because they're too slow to wait for on PRs.
+    if: "${{ !failure() && !cancelled() && (!matrix.workers || (github.ref == 'refs/heads/develop')) }}"
     needs: linting-done
     runs-on: ubuntu-latest
 
