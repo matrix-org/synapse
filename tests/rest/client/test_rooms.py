@@ -42,7 +42,7 @@ from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 from tests import unittest
-from tests.http.server._base import test_cancellation_at_every_await
+from tests.http.server._base import make_request_with_cancellation_test
 from tests.test_utils import make_awaitable
 
 PATH_PREFIX = b"/_matrix/client/api/v1"
@@ -480,12 +480,12 @@ class RoomStateTestCase(RoomBase):
     def test_get_state_cancellation(self) -> None:
         """Test cancellation of a `/rooms/$room_id/state` request."""
         room_id = self.helper.create_room_as(self.user_id)
-        channel = test_cancellation_at_every_await(
+        channel = make_request_with_cancellation_test(
+            "test_state_cancellation",
             self.reactor,
-            lambda: self.make_request(
-                "GET", "/rooms/%s/state" % room_id, await_result=False
-            ),
-            test_name="test_state_cancellation",
+            self.site,
+            "GET",
+            "/rooms/%s/state" % room_id,
         )
 
         self.assertEqual(200, channel.code, msg=channel.result["body"])
@@ -503,14 +503,12 @@ class RoomStateTestCase(RoomBase):
     def test_get_state_event_cancellation(self) -> None:
         """Test cancellation of a `/rooms/$room_id/state/$event_type` request."""
         room_id = self.helper.create_room_as(self.user_id)
-        channel = test_cancellation_at_every_await(
+        channel = make_request_with_cancellation_test(
+            "test_state_cancellation",
             self.reactor,
-            lambda: self.make_request(
-                "GET",
-                "/rooms/%s/state/m.room.member/%s" % (room_id, self.user_id),
-                await_result=False,
-            ),
-            test_name="test_state_cancellation",
+            self.site,
+            "GET",
+            "/rooms/%s/state/m.room.member/%s" % (room_id, self.user_id),
         )
 
         self.assertEqual(200, channel.code, msg=channel.result["body"])
@@ -640,12 +638,12 @@ class RoomsMemberListTestCase(RoomBase):
     def test_get_member_list_cancellation(self) -> None:
         """Test cancellation of a `/rooms/$room_id/members` request."""
         room_id = self.helper.create_room_as(self.user_id)
-        channel = test_cancellation_at_every_await(
+        channel = make_request_with_cancellation_test(
+            "test_get_member_list_cancellation",
             self.reactor,
-            lambda: self.make_request(
-                "GET", "/rooms/%s/members" % room_id, await_result=False
-            ),
-            test_name="test_get_member_list_cancellation",
+            self.site,
+            "GET",
+            "/rooms/%s/members" % room_id,
         )
 
         self.assertEqual(200, channel.code, msg=channel.result["body"])
@@ -671,14 +669,12 @@ class RoomsMemberListTestCase(RoomBase):
         self.assertEqual(200, channel.code)
         sync_token = channel.json_body["next_batch"]
 
-        channel = test_cancellation_at_every_await(
+        channel = make_request_with_cancellation_test(
+            "test_get_member_list_with_at_token_cancellation",
             self.reactor,
-            lambda: self.make_request(
-                "GET",
-                "/rooms/%s/members?at=%s" % (room_id, sync_token),
-                await_result=False,
-            ),
-            test_name="test_get_member_list_with_at_token_cancellation",
+            self.site,
+            "GET",
+            "/rooms/%s/members?at=%s" % (room_id, sync_token),
         )
 
         self.assertEqual(200, channel.code, msg=channel.result["body"])

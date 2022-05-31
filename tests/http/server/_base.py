@@ -34,6 +34,7 @@ from unittest.mock import Mock
 from twisted.internet.defer import Deferred
 from twisted.internet.error import ConnectionDone
 from twisted.python.failure import Failure
+from twisted.web.server import Site
 
 from synapse.http.server import (
     HTTP_STATUS_REQUEST_CANCELLED,
@@ -45,7 +46,7 @@ from synapse.logging.context import LoggingContext, make_deferred_yieldable
 from synapse.types import JsonDict
 
 from tests import unittest
-from tests.server import FakeChannel, ThreadedMemoryReactorClock
+from tests.server import FakeChannel, ThreadedMemoryReactorClock, make_request
 from tests.unittest import logcontext_clean
 
 logger = logging.getLogger(__name__)
@@ -126,10 +127,13 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
 
 
 @logcontext_clean
-def test_cancellation_at_every_await(
-    reactor: ThreadedMemoryReactorClock,
-    make_request: Callable[[], FakeChannel],
+def make_request_with_cancellation_test(
     test_name: str,
+    reactor: ThreadedMemoryReactorClock,
+    site: Site,
+    method: str,
+    path: str,
+    content: Union[bytes, str, JsonDict] = b"",
 ) -> FakeChannel:
     """Performs a request repeatedly, disconnecting at successive `await`s, until
     one completes.
@@ -183,7 +187,9 @@ def test_cancellation_at_every_await(
     # Each element is a stringified stack trace.
     seen_awaits: Set[Tuple[str, ...]] = set()
 
-    _log_for_request(0, f"Running test_cancellation_at_every_await for {test_name}...")
+    _log_for_request(
+        0, f"Running make_request_with_cancellation_test for {test_name}..."
+    )
 
     for request_number in itertools.count(1):
         deferred_patch = Deferred__next__Patch(seen_awaits, request_number)
@@ -194,18 +200,10 @@ def test_cancellation_at_every_await(
             ) as respond_mock:
                 with deferred_patch.patch():
                     # Start the request.
-                    channel = make_request()
+                    channel = make_request(
+                        reactor, site, method, path, content, await_result=False
+                    )
                     request = channel.request
-
-                    if request_number == 1 and respond_mock.called:
-                        raise AssertionError(
-                            "Request finished before we could disconnect - ensure "
-                            "`await_result=False` is passed to `make_request`.",
-                        )
-                    else:
-                        # Requests after the first may be lucky enough to hit caches
-                        # all the way through and never have to block.
-                        pass
 
                     # Run the request until we see a new `await` which we have not
                     # yet cancelled at, or it completes.
@@ -402,7 +400,7 @@ class Deferred__next__Patch:
 
 
 def _log_for_request(request_number: int, message: str) -> None:
-    """Logs a message for an iteration of `test_cancellation_at_every_await`."""
+    """Logs a message for an iteration of `make_request_with_cancellation_test`."""
     # We want consistent alignment when logging stack traces, so ensure the logging
     # context has a fixed width name.
     with LoggingContext(name=f"request-{request_number:<2}"):
@@ -415,7 +413,7 @@ def _log_await_stack(
     request_number: int,
     note: str,
 ) -> None:
-    """Logs the stack for an `await` in `test_cancellation_at_every_await`.
+    """Logs the stack for an `await` in `make_request_with_cancellation_test`.
 
     Only logs the part of the stack that has changed since the previous call.
 
