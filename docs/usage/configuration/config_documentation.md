@@ -1827,6 +1827,16 @@ Example configuration:
 media_store_path: "DATADIR/media_store"
 ```
 ---
+### `unused_expiration_time`
+
+How long to wait in milliseconds before expiring created media IDs. Defaults to
+"24h"
+
+Example configuration:
+```yaml
+unused_expiration_time: "1h"
+```
+---
 ### `media_storage_providers`
 
 Media storage providers allow media to be stored in different

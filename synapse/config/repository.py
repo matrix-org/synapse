@@ -141,6 +141,10 @@ class ContentRepositoryConfig(Config):
             "prevent_media_downloads_from", []
         )
 
+        self.unused_expiration_time = self.parse_duration(
+            config.get("unused_expiration_time", "24h")
+        )
+
         self.media_store_path = self.ensure_directory(
             config.get("media_store_path", "media_store")
         )
