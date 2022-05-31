@@ -109,11 +109,12 @@ class FederationServer(FederationBase):
         super().__init__(hs)
 
         self.handler = hs.get_federation_handler()
-        self.storage = hs.get_storage()
         self._spam_checker = hs.get_spam_checker()
         self._federation_event_handler = hs.get_federation_event_handler()
         self.state = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
+
+        self._state_storage_controller = hs.get_storage_controllers().state
 
         self.device_handler = hs.get_device_handler()
 
@@ -1207,7 +1208,7 @@ class FederationServer(FederationBase):
         Raises:
             AuthError if the server does not match the ACL
         """
-        state_ids = await self.storage.state.get_current_state_ids(room_id)
+        state_ids = await self._state_storage_controller.get_current_state_ids(room_id)
         acl_event_id = state_ids.get((EventTypes.ServerACL, ""))
 
         if not acl_event_id:
@@ -1353,7 +1354,7 @@ class FederationHandlerRegistry:
         self._edu_type_to_instance[edu_type] = instance_names
 
     async def on_edu(self, edu_type: str, origin: str, content: dict) -> None:
-        if not self.config.server.use_presence and edu_type == EduTypes.Presence:
+        if not self.config.server.use_presence and edu_type == EduTypes.PRESENCE:
             return
 
         # Check if we have a handler on this instance

@@ -23,7 +23,6 @@ from canonicaljson import encode_canonical_json
 
 from twisted.internet.interfaces import IDelayedCall
 
-import synapse
 from synapse import event_auth
 from synapse.api.constants import (
     EventContentFields,
@@ -84,8 +83,8 @@ class MessageHandler:
         self.clock = hs.get_clock()
         self.state = hs.get_state_handler()
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
-        self.state_storage = self.storage.state
+        self._storage_controllers = hs.get_storage_controllers()
+        self._state_storage_controller = self._storage_controllers.state
         self._event_serializer = hs.get_event_client_serializer()
         self._ephemeral_events_enabled = hs.config.server.enable_ephemeral_messages
 
@@ -132,7 +131,7 @@ class MessageHandler:
             assert (
                 membership_event_id is not None
             ), "check_user_in_room_or_world_readable returned invalid data"
-            room_state = await self.state_storage.get_state_for_events(
+            room_state = await self._state_storage_controller.get_state_for_events(
                 [membership_event_id], StateFilter.from_types([key])
             )
             data = room_state[membership_event_id].get(key)
@@ -193,7 +192,7 @@ class MessageHandler:
 
             # check whether the user is in the room at that time to determine
             # whether they should be treated as peeking.
-            state_map = await self.state_storage.get_state_for_event(
+            state_map = await self._state_storage_controller.get_state_for_event(
                 last_event.event_id,
                 StateFilter.from_types([(EventTypes.Member, user_id)]),
             )
@@ -206,7 +205,7 @@ class MessageHandler:
             is_peeking = not joined
 
             visible_events = await filter_events_for_client(
-                self.storage,
+                self._storage_controllers,
                 user_id,
                 [last_event],
                 filter_send_to_client=False,
@@ -214,8 +213,10 @@ class MessageHandler:
             )
 
             if visible_events:
-                room_state_events = await self.state_storage.get_state_for_events(
-                    [last_event.event_id], state_filter=state_filter
+                room_state_events = (
+                    await self._state_storage_controller.get_state_for_events(
+                        [last_event.event_id], state_filter=state_filter
+                    )
                 )
                 room_state: Mapping[Any, EventBase] = room_state_events[
                     last_event.event_id
@@ -235,7 +236,7 @@ class MessageHandler:
             )
 
             if membership == Membership.JOIN:
-                state_ids = await self.state_storage.get_current_state_ids(
+                state_ids = await self._state_storage_controller.get_current_state_ids(
                     room_id, state_filter=state_filter
                 )
                 room_state = await self.store.get_events(state_ids.values())
@@ -244,8 +245,10 @@ class MessageHandler:
                 assert (
                     membership_event_id is not None
                 ), "check_user_in_room_or_world_readable returned invalid data"
-                room_state_events = await self.state_storage.get_state_for_events(
-                    [membership_event_id], state_filter=state_filter
+                room_state_events = (
+                    await self._state_storage_controller.get_state_for_events(
+                        [membership_event_id], state_filter=state_filter
+                    )
                 )
                 room_state = room_state_events[membership_event_id]
 
@@ -402,7 +405,7 @@ class EventCreationHandler:
         self.auth = hs.get_auth()
         self._event_auth_handler = hs.get_event_auth_handler()
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
+        self._storage_controllers = hs.get_storage_controllers()
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()
         self.validator = EventValidator()
@@ -893,10 +896,38 @@ class EventCreationHandler:
                 event.sender,
             )
 
-            spam_check = await self.spam_checker.check_event_for_spam(event)
-            if spam_check is not synapse.spam_checker_api.Allow.ALLOW:
+            spam_check_result = await self.spam_checker.check_event_for_spam(event)
+            if spam_check_result != self.spam_checker.NOT_SPAM:
+                if isinstance(spam_check_result, tuple):
+                    try:
+                        [code, dict] = spam_check_result
+                        raise SynapseError(
+                            403,
+                            "This message had been rejected as probable spam",
+                            code,
+                            dict,
+                        )
+                    except ValueError:
+                        logger.error(
+                            "Spam-check module returned invalid error value. Expecting [code, dict], got %s",
+                            spam_check_result,
+                        )
+                        spam_check_result = Codes.FORBIDDEN
+
+                if isinstance(spam_check_result, Codes):
+                    raise SynapseError(
+                        403,
+                        "This message has been rejected as probable spam",
+                        spam_check_result,
+                    )
+
+                # Backwards compatibility: if the return value is not an error code, it
+                # means the module returned an error message to be included in the
+                # SynapseError (which is now deprecated).
                 raise SynapseError(
-                    403, "This message had been rejected as probable spam", spam_check
+                    403,
+                    spam_check_result,
+                    Codes.FORBIDDEN,
                 )
 
             ev = await self.handle_new_client_event(
@@ -1017,7 +1048,7 @@ class EventCreationHandler:
         # after it is created
         if builder.internal_metadata.outlier:
             event.internal_metadata.outlier = True
-            context = EventContext.for_outlier(self.storage)
+            context = EventContext.for_outlier(self._storage_controllers)
         elif (
             event.type == EventTypes.MSC2716_INSERTION
             and state_event_ids
@@ -1430,7 +1461,7 @@ class EventCreationHandler:
         """
         extra_users = extra_users or []
 
-        assert self.storage.persistence is not None
+        assert self._storage_controllers.persistence is not None
         assert self._events_shard_config.should_handle(
             self._instance_name, event.room_id
         )
@@ -1664,7 +1695,7 @@ class EventCreationHandler:
             event,
             event_pos,
             max_stream_token,
-        ) = await self.storage.persistence.persist_event(
+        ) = await self._storage_controllers.persistence.persist_event(
             event, context=context, backfilled=backfilled
         )
 

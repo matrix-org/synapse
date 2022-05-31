@@ -22,6 +22,7 @@ from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 import synapse.storage
+from synapse.api.constants import EduTypes
 from synapse.appservice import (
     ApplicationService,
     TransactionOneTimeKeyCounts,
@@ -476,7 +477,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
 
         # Check that the ephemeral event is a read receipt with the expected structure
         latest_read_receipt = all_ephemeral_events[-1]
-        self.assertEqual(latest_read_receipt["type"], "m.receipt")
+        self.assertEqual(latest_read_receipt["type"], EduTypes.RECEIPT)
 
         event_id = list(latest_read_receipt["content"].keys())[0]
         self.assertEqual(

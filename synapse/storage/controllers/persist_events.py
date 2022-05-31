@@ -272,7 +272,7 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
             pass
 
 
-class EventsPersistenceStorage:
+class EventsPersistenceStorageController:
     """High level interface for handling persisting newly received events.
 
     Takes care of batching up events by room, and calculating the necessary

@@ -125,8 +125,8 @@ class FederationHandler:
         self.hs = hs
 
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
-        self.state_storage = self.storage.state
+        self._storage_controllers = hs.get_storage_controllers()
+        self._state_storage_controller = self._storage_controllers.state
         self.federation_client = hs.get_federation_client()
         self.state_handler = hs.get_state_handler()
         self.server_name = hs.hostname
@@ -324,7 +324,7 @@ class FederationHandler:
             # We set `check_history_visibility_only` as we might otherwise get false
             # positives from users having been erased.
             filtered_extremities = await filter_events_for_server(
-                self.storage,
+                self._storage_controllers,
                 self.server_name,
                 events_to_check,
                 redact=False,
@@ -660,7 +660,7 @@ class FederationHandler:
         # in the invitee's sync stream. It is stripped out for all other local users.
         event.unsigned["knock_room_state"] = stripped_room_state["knock_state_events"]
 
-        context = EventContext.for_outlier(self.storage)
+        context = EventContext.for_outlier(self._storage_controllers)
         stream_id = await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -731,7 +731,9 @@ class FederationHandler:
         # Note that this requires the /send_join request to come back to the
         # same server.
         if room_version.msc3083_join_rules:
-            state_ids = await self.state_storage.get_current_state_ids(room_id)
+            state_ids = await self._state_storage_controller.get_current_state_ids(
+                room_id
+            )
             if await self._event_auth_handler.has_restricted_join_rules(
                 state_ids, room_version
             ):
@@ -849,7 +851,7 @@ class FederationHandler:
             )
         )
 
-        context = EventContext.for_outlier(self.storage)
+        context = EventContext.for_outlier(self._storage_controllers)
         await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -878,7 +880,7 @@ class FederationHandler:
 
         await self.federation_client.send_leave(host_list, event)
 
-        context = EventContext.for_outlier(self.storage)
+        context = EventContext.for_outlier(self._storage_controllers)
         stream_id = await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -1027,7 +1029,7 @@ class FederationHandler:
         if event.internal_metadata.outlier:
             raise NotFoundError("State not known at event %s" % (event_id,))
 
-        state_groups = await self.state_storage.get_state_groups_ids(
+        state_groups = await self._state_storage_controller.get_state_groups_ids(
             room_id, [event_id]
         )
 
@@ -1078,7 +1080,9 @@ class FederationHandler:
             ],
         )
 
-        events = await filter_events_for_server(self.storage, origin, events)
+        events = await filter_events_for_server(
+            self._storage_controllers, origin, events
+        )
 
         return events
 
@@ -1109,7 +1113,9 @@ class FederationHandler:
             if not in_room:
                 raise AuthError(403, "Host not in room.")
 
-            events = await filter_events_for_server(self.storage, origin, [event])
+            events = await filter_events_for_server(
+                self._storage_controllers, origin, [event]
+            )
             event = events[0]
             return event
         else:
@@ -1138,7 +1144,7 @@ class FederationHandler:
         )
 
         missing_events = await filter_events_for_server(
-            self.storage, origin, missing_events
+            self._storage_controllers, origin, missing_events
         )
 
         return missing_events
@@ -1480,15 +1486,19 @@ class FederationHandler:
                 # clear the lazy-loading flag.
                 logger.info("Updating current state for %s", room_id)
                 assert (
-                    self.storage.persistence is not None
+                    self._storage_controllers.persistence is not None
                 ), "TODO(faster_joins): support for workers"
-                await self.storage.persistence.update_current_state(room_id)
+                await self._storage_controllers.persistence.update_current_state(
+                    room_id
+                )
 
                 logger.info("Clearing partial-state flag for %s", room_id)
                 success = await self.store.clear_partial_state_room(room_id)
                 if success:
                     logger.info("State resync complete for %s", room_id)
-                    self.storage.state.notify_room_un_partial_stated(room_id)
+                    self._storage_controllers.state.notify_room_un_partial_stated(
+                        room_id
+                    )
 
                     # TODO(faster_joins) update room stats and user directory?
                     return
