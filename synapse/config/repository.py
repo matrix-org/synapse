@@ -225,10 +225,6 @@ class ContentRepositoryConfig(Config):
 
         media_retention = config.get("media_retention") or {}
 
-        self.media_retention_purge_period = self.parse_duration(
-            media_retention.get("purge_period", "24h")
-        )
-
         self.media_retention_local_media_lifetime_ms = None
         local_media_lifetime = media_retention.get("local_media_lifetime")
         if local_media_lifetime is not None:
