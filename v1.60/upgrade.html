@@ -295,9 +295,9 @@ COMMIT;
 <p><a href="https://github.com/matrix-org/synapse/issues/11779#issuecomment-1131545970">This comment on issue 11779</a>
 has queries that can be used to check a database for this problem in advance.</p>
 </details>
-<h2 id="spamchecker-apis-check_event_for_spam-has-a-new-signature"><a class="header" href="#spamchecker-apis-check_event_for_spam-has-a-new-signature">SpamChecker API's <code>check_event_for_spam</code> has a new signature.</a></h2>
+<h2 id="new-signature-for-the-spam-checker-callback-check_event_for_spam"><a class="header" href="#new-signature-for-the-spam-checker-callback-check_event_for_spam">New signature for the spam checker callback <code>check_event_for_spam</code></a></h2>
 <p>The previous signature has been deprecated.</p>
-<p>Whereas <code>check_event_for_spam</code> callbacks used to return <code>Union[str, bool]</code>, they should now return <code>Union[&quot;synapse.module_api.Allow&quot;, &quot;synapse.module_api.errors.Codes&quot;]</code>.</p>
+<p>Whereas <code>check_event_for_spam</code> callbacks used to return <code>Union[str, bool]</code>, they should now return <code>Union[&quot;synapse.module_api.NOT_SPAM&quot;, &quot;synapse.module_api.errors.Codes&quot;]</code>.</p>
 <p>This is part of an ongoing refactoring of the SpamChecker API to make it less ambiguous and more powerful.</p>
 <p>If your module implements <code>check_event_for_spam</code> as follows:</p>
 <pre><code class="language-python">async def check_event_for_spam(event):
@@ -313,8 +313,8 @@ has queries that can be used to check a database for this problem in advance.</p
         # Event is spam, mark it as forbidden (you may use some more precise error
         # code if it is useful).
         return synapse.module_api.errors.Codes.FORBIDDEN
-    # Event is not spam, mark it as `ALLOW`.
-    return synapse.module_api.ALLOW
+    # Event is not spam, mark it as such.
+    return synapse.module_api.NOT_SPAM
 </code></pre>
 <h1 id="upgrading-to-v1590"><a class="header" href="#upgrading-to-v1590">Upgrading to v1.59.0</a></h1>
 <h2 id="device-name-lookup-over-federation-has-been-disabled-by-default"><a class="header" href="#device-name-lookup-over-federation-has-been-disabled-by-default">Device name lookup over federation has been disabled by default</a></h2>

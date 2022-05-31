@@ -153,28 +153,26 @@ Synapse instances. Spam checker callbacks can be registered using the module API
 <h2 id="callbacks"><a class="header" href="#callbacks">Callbacks</a></h2>
 <p>The available spam checker callbacks are:</p>
 <h3 id="check_event_for_spam"><a class="header" href="#check_event_for_spam"><code>check_event_for_spam</code></a></h3>
-<p><em>First introduced in Synapse v1.37.0</em>
-<em>Signature extended to support Allow and Code in Synapse v1.60.0</em>
-<em>Boolean and string return value types deprecated in Synapse v1.60.0</em></p>
-<pre><code class="language-python">async def check_event_for_spam(event: &quot;synapse.module_api.EventBase&quot;) -&gt; Union[&quot;synapse.module_api.ALLOW&quot;, &quot;synapse.module_api.error.Codes&quot;, str, bool]
+<p><em>First introduced in Synapse v1.37.0</em></p>
+<p><em>Changed in Synapse v1.60.0: <code>synapse.module_api.NOT_SPAM</code> and <code>synapse.module_api.errors.Codes</code> can be returned by this callback. Returning a boolean or a string is now deprecated.</em> </p>
+<pre><code class="language-python">async def check_event_for_spam(event: &quot;synapse.module_api.EventBase&quot;) -&gt; Union[&quot;synapse.module_api.NOT_SPAM&quot;, &quot;synapse.module_api.errors.Codes&quot;, str, bool]
 </code></pre>
-<p>Called when receiving an event from a client or via federation. The callback must return either:</p>
+<p>Called when receiving an event from a client or via federation. The callback must return one of:</p>
 <ul>
-<li><code>synapse.module_api.ALLOW</code>, to allow the operation. Other callbacks
-may still decide to reject it.</li>
-<li><code>synapse.api.Codes</code> to reject the operation with an error code. In case
-of doubt, <code>synapse.api.error.Codes.FORBIDDEN</code> is a good error code.</li>
-<li>(deprecated) a <code>str</code> to reject the operation and specify an error message. Note that clients
+<li><code>synapse.module_api.NOT_SPAM</code>, to allow the operation. Other callbacks may still 
+decide to reject it.</li>
+<li><code>synapse.module_api.errors.Codes</code> to reject the operation with an error code. In case
+of doubt, <code>synapse.module_api.errors.Codes.FORBIDDEN</code> is a good error code.</li>
+<li>(deprecated) a non-<code>Codes</code> <code>str</code> to reject the operation and specify an error message. Note that clients
 typically will not localize the error message to the user's preferred locale.</li>
-<li>(deprecated) on <code>False</code>, behave as <code>ALLOW</code>. Deprecated as confusing, as some
-callbacks in expect <code>True</code> to allow and others <code>True</code> to reject.</li>
-<li>(deprecated) on <code>True</code>, behave as <code>synapse.api.error.Codes.FORBIDDEN</code>. Deprecated as confusing, as
-some callbacks in expect <code>True</code> to allow and others <code>True</code> to reject.</li>
+<li>(deprecated) <code>False</code>, which is the same as returning <code>synapse.module_api.NOT_SPAM</code>.</li>
+<li>(deprecated) <code>True</code>, which is the same as returning <code>synapse.module_api.errors.Codes.FORBIDDEN</code>.</li>
 </ul>
 <p>If multiple modules implement this callback, they will be considered in order. If a
-callback returns <code>synapse.module_api.ALLOW</code>, Synapse falls through to the next one. The value of the
-first callback that does not return <code>synapse.module_api.ALLOW</code> will be used. If this happens, Synapse
-will not call any of the subsequent implementations of this callback.</p>
+callback returns <code>synapse.module_api.NOT_SPAM</code>, Synapse falls through to the next one.
+The value of the first callback that does not return <code>synapse.module_api.NOT_SPAM</code> will
+be used. If this happens, Synapse will not call any of the subsequent implementations of
+this callback.</p>
 <h3 id="user_may_join_room"><a class="header" href="#user_may_join_room"><code>user_may_join_room</code></a></h3>
 <p><em>First introduced in Synapse v1.37.0</em></p>
 <pre><code class="language-python">async def user_may_join_room(user: str, room: str, is_invited: bool) -&gt; bool
