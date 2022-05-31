@@ -238,36 +238,36 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
 
                         self.assertEqual(channel.code, expected_code)
                         return channel.json_body
-                    else:
-                        # Disconnect the client and wait for the response.
-                        request.connectionLost(reason=ConnectionDone())
 
-                        self._log_for_request(request_number, "--- disconnected ---")
+                    # Disconnect the client and wait for the response.
+                    request.connectionLost(reason=ConnectionDone())
 
-                        # We may need to pump the reactor to allow `delay_cancellation`s
-                        # to finish.
-                        if not respond_mock.called:
-                            reactor.advance(0.0)
+                    self._log_for_request(request_number, "--- disconnected ---")
 
-                        # Try advancing the clock if that didn't work.
-                        if not respond_mock.called:
-                            reactor.advance(1.0)
+                    # We may need to pump the reactor to allow `delay_cancellation`s to
+                    # finish.
+                    if not respond_mock.called:
+                        reactor.advance(0.0)
 
-                        # Mark the request's logging context as finished. If it gets
-                        # activated again, an `AssertionError` will be raised. This
-                        # `AssertionError` will likely be caught by twisted and turned
-                        # into a `Failure`. Instead, a different `AssertionError` will
-                        # be observed when the logging context is deactivated, as it
-                        # wouldn't have tracked resource usage correctly.
-                        if isinstance(request, SynapseRequest) and request.logcontext:
-                            request.logcontext.finished = True
+                    # Try advancing the clock if that didn't work.
+                    if not respond_mock.called:
+                        reactor.advance(1.0)
 
-                        # Check that the request finished with a 499,
-                        # ie. the `CancelledError` wasn't swallowed.
-                        respond_mock.assert_called_once()
-                        args, _kwargs = respond_mock.call_args
-                        code = args[1]
-                        self.assertEqual(code, HTTP_STATUS_REQUEST_CANCELLED)
+                    # Mark the request's logging context as finished. If it gets
+                    # activated again, an `AssertionError` will be raised. This
+                    # `AssertionError` will likely be caught by twisted and turned into
+                    # a `Failure`. Instead, a different `AssertionError` will be
+                    # observed when the logging context is deactivated, as it wouldn't
+                    # have tracked resource usage correctly.
+                    if isinstance(request, SynapseRequest) and request.logcontext:
+                        request.logcontext.finished = True
+
+                    # Check that the request finished with a 499,
+                    # ie. the `CancelledError` wasn't swallowed.
+                    respond_mock.assert_called_once()
+                    args, _kwargs = respond_mock.call_args
+                    code = args[1]
+                    self.assertEqual(code, HTTP_STATUS_REQUEST_CANCELLED)
             finally:
                 # Unblock any processing that might be shared between requests.
                 unblock_awaits()
