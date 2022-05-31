@@ -199,9 +199,8 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
                         channel = make_request()
                         request = channel.request
 
-                        if request_number == 1:
-                            self.assertFalse(
-                                respond_mock.called,
+                        if request_number == 1 and respond_mock.called:
+                            raise AssertionError(
                                 "Request finished before we could disconnect - ensure "
                                 "`await_result=False` is passed to `make_request`.",
                             )
@@ -227,9 +226,9 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
                             if deferred_patch.awaits_seen == previous_awaits_seen:
                                 # We still didn't see any progress. The request might be
                                 # stuck.
-                                self.fail(
-                                    "Request appears to be stuck, possibly due to "
-                                    "a previous cancelled request"
+                                raise AssertionError(
+                                    "Request appears to be stuck, possibly due to a "
+                                    "previous cancelled request"
                                 )
 
                     if respond_mock.called:
@@ -270,7 +269,12 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
                     respond_mock.assert_called_once()
                     args, _kwargs = respond_mock.call_args
                     code = args[1]
-                    self.assertEqual(code, HTTP_STATUS_REQUEST_CANCELLED)
+
+                    if code != HTTP_STATUS_REQUEST_CANCELLED:
+                        raise AssertionError(
+                            f"{code} != {HTTP_STATUS_REQUEST_CANCELLED} : Cancelled "
+                            "request did not finish with the correct status code."
+                        )
             finally:
                 # Unblock any processing that might be shared between requests.
                 deferred_patch.unblock_awaits()
