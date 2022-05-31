@@ -20,8 +20,9 @@ RUN pg_ctlcluster 13 main start &&  su postgres -c "echo \
   LC_CTYPE='C' \
   template=template0;\" | psql" && pg_ctlcluster 13 main stop
 
-# Replace the shared homeserver config to include postgres support, certificate setup
-# and the disabling of rate-limiting
+# Replace the shared homeserver config to disable rate-limiting,
+# set Complement's static shared secret, enable registration, amongst other
+# tweaks to get Synapse ready for testing.
 COPY conf/workers-shared.yaml /conf/workers/shared.yaml
 
 WORKDIR /data
