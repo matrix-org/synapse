@@ -1348,7 +1348,7 @@ into fewer transactions. Defaults to 50. </p>
 </code></pre>
 <hr />
 <h2 id="media-store"><a class="header" href="#media-store">Media Store</a></h2>
-<p>Config options relating to Synapse media store.</p>
+<p>Config options related to Synapse's media store.</p>
 <hr />
 <p>Config option: <code>enable_media_repo</code> </p>
 <p>Enable the media store service in the Synapse master. Defaults to true. 
@@ -1433,6 +1433,28 @@ from a precalculated list. Defaults to false. </p>
     height: 600
     method: scale
 </code></pre>
+<hr />
+<p>Config option: <code>media_retention</code></p>
+<p>Controls whether local media and entries in the remote media cache
+(media that is downloaded from other homeservers) should be removed
+under certain conditions, typically for the purpose of saving space.</p>
+<p>Purging media files will be the carried out by the media worker
+(that is, the worker that has the <code>enable_media_repo</code> homeserver config
+option set to 'true'). This may be the main process.</p>
+<p>The <code>media_retention.local_media_lifetime</code> and
+<code>media_retention.remote_media_lifetime</code> config options control whether
+media will be purged if it has not been accessed in a given amount of
+time. Note that media is 'accessed' when loaded in a room in a client, or
+otherwise downloaded by a local or remote user. If the media has never
+been accessed, the media's creation time is used instead. Both thumbnails
+and the original media will be removed. If either of these options are unset,
+then media of that type will not be purged.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">media_retention:
+    local_media_lifetime: 90d
+    remote_media_lifetime: 14d
+</code></pre>
+<hr />
 <p>Config option: <code>url_preview_enabled</code></p>
 <p>This setting determines whether the preview URL API is enabled.
 It is disabled by default. Set to true to enable. If enabled you must specify a
