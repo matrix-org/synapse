@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import synapse.api.errors
+from synapse.api.constants import EduTypes
 
 from tests.unittest import HomeserverTestCase
 
@@ -266,10 +267,12 @@ class DeviceStoreTestCase(HomeserverTestCase):
         # (This is a temporary arrangement for backwards compatibility!)
         self.assertEqual(len(device_updates), 2, device_updates)
         self.assertEqual(
-            device_updates[0][0], "m.signing_key_update", device_updates[0]
+            device_updates[0][0], EduTypes.SIGNING_KEY_UPDATE, device_updates[0]
         )
         self.assertEqual(
-            device_updates[1][0], "org.matrix.signing_key_update", device_updates[1]
+            device_updates[1][0],
+            EduTypes.UNSTABLE_SIGNING_KEY_UPDATE,
+            device_updates[1],
         )
 
         # Check there are no more device updates left.

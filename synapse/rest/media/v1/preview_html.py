@@ -246,7 +246,9 @@ def parse_html_description(tree: "etree.Element") -> Optional[str]:
 
     Grabs any text nodes which are inside the <body/> tag, unless they are within
     an HTML5 semantic markup tag (<header/>, <nav/>, <aside/>, <footer/>), or
-    if they are within a <script/> or <style/> tag.
+    if they are within a <script/>, <svg/> or <style/> tag, or if they are within
+    a tag whose content is usually only shown to old browsers
+    (<iframe/>, <video/>, <canvas/>, <picture/>).
 
     This is a very very very coarse approximation to a plain text render of the page.
 
@@ -268,6 +270,12 @@ def parse_html_description(tree: "etree.Element") -> Optional[str]:
         "script",
         "noscript",
         "style",
+        "svg",
+        "iframe",
+        "video",
+        "canvas",
+        "img",
+        "picture",
         etree.Comment,
     )
 

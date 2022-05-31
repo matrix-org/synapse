@@ -223,6 +223,7 @@ async def _handle_response(
 
     max_response_size = parser.MAX_RESPONSE_SIZE
 
+    finished = False
     try:
         check_content_type_is(response.headers, parser.CONTENT_TYPE)
 
@@ -231,6 +232,7 @@ async def _handle_response(
 
         length = await make_deferred_yieldable(d)
 
+        finished = True
         value = parser.finish()
     except BodyExceededMaxSize as e:
         # The response was too big.
@@ -281,6 +283,15 @@ async def _handle_response(
             e,
         )
         raise
+    finally:
+        if not finished:
+            # There was an exception and we didn't `finish()` the parse.
+            # Let the parser know that it can free up any resources.
+            try:
+                parser.finish()
+            except Exception:
+                # Ignore any additional exceptions.
+                pass
 
     time_taken_secs = reactor.seconds() - start_ms / 1000
 

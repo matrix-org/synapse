@@ -14,7 +14,7 @@
 import logging
 from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
-from synapse.api.constants import ReceiptTypes
+from synapse.api.constants import EduTypes, ReceiptTypes
 from synapse.appservice import ApplicationService
 from synapse.streams import EventSource
 from synapse.types import (
@@ -52,11 +52,11 @@ class ReceiptsHandler:
         # to the appropriate worker.
         if hs.get_instance_name() in hs.config.worker.writers.receipts:
             hs.get_federation_registry().register_edu_handler(
-                "m.receipt", self._received_remote_receipt
+                EduTypes.RECEIPT, self._received_remote_receipt
             )
         else:
             hs.get_federation_registry().register_instances_for_edu(
-                "m.receipt",
+                EduTypes.RECEIPT,
                 hs.config.worker.writers.receipts,
             )
 

@@ -16,7 +16,7 @@ import logging
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
-from synapse.api.constants import Membership, PresenceState
+from synapse.api.constants import EduTypes, Membership, PresenceState
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.api.filtering import FilterCollection
 from synapse.api.presence import UserPresenceState
@@ -305,7 +305,7 @@ class SyncRestServlet(RestServlet):
         return {
             "events": [
                 {
-                    "type": "m.presence",
+                    "type": EduTypes.PRESENCE,
                     "sender": event.user_id,
                     "content": format_user_presence_state(
                         event, time_now, include_user_id=False

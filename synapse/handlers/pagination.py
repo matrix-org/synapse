@@ -515,17 +515,28 @@ class PaginationHandler:
 
             next_token = from_token.copy_and_replace(StreamKeyType.ROOM, next_key)
 
-        if events:
-            if event_filter:
-                events = await event_filter.filter(events)
+        # if no events are returned from pagination, that implies
+        # we have reached the end of the available events.
+        # In that case we do not return end, to tell the client
+        # there is no need for further queries.
+        if not events:
+            return {
+                "chunk": [],
+                "start": await from_token.to_string(self.store),
+            }
 
-            events = await filter_events_for_client(
-                self._storage_controllers,
-                user_id,
-                events,
-                is_peeking=(member_event_id is None),
-            )
+        if event_filter:
+            events = await event_filter.filter(events)
 
+        events = await filter_events_for_client(
+            self._storage_controllers,
+            user_id,
+            events,
+            is_peeking=(member_event_id is None),
+        )
+
+        # if after the filter applied there are no more events
+        # return immediately - but there might be more in next_token batch
         if not events:
             return {
                 "chunk": [],
