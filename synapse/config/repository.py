@@ -117,6 +117,10 @@ class ContentRepositoryConfig(Config):
         self.max_image_pixels = self.parse_size(config.get("max_image_pixels", "32M"))
         self.max_spider_size = self.parse_size(config.get("max_spider_size", "10M"))
 
+        self.unused_expiration_time = self.parse_duration(
+            config.get("unused_expiration_time", "1m")
+        )
+
         self.media_store_path = self.ensure_directory(
             config.get("media_store_path", "media_store")
         )
@@ -291,6 +295,11 @@ class ContentRepositoryConfig(Config):
         # Maximum number of pixels that will be thumbnailed
         #
         #max_image_pixels: 32M
+
+        # How long to wait before expiring created media IDs when MSC2246 support is
+        # enabled.
+        #
+        #unused_expiration_time: 1m
 
         # Whether to generate new thumbnails on the fly to precisely match
         # the resolution requested by the client. If true then whenever

@@ -1038,6 +1038,11 @@ media_store_path: "DATADIR/media_store"
 #
 #max_image_pixels: 32M
 
+# How long to wait before expiring created media IDs when MSC2246 support is
+# enabled.
+#
+#unused_expiration_time: 1m
+
 # Whether to generate new thumbnails on the fly to precisely match
 # the resolution requested by the client. If true then whenever
 # a new resolution is requested by the client the server will
