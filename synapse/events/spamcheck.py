@@ -267,9 +267,7 @@ class SpamChecker:
         if check_media_file_for_spam is not None:
             self._check_media_file_for_spam_callbacks.append(check_media_file_for_spam)
 
-    async def check_event_for_spam(
-        self, event: "synapse.events.EventBase"
-    ) -> str:
+    async def check_event_for_spam(self, event: "synapse.events.EventBase") -> str:
         """Checks if a given event is considered "spammy" by this server.
 
         If the server considers an event spammy, then it will be rejected if
