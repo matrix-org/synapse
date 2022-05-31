@@ -306,8 +306,7 @@ jobs:
       - run: .ci/scripts/test_synapse_port_db.sh
 
   complement:
-    # We only run the workers tests on `develop` for now, because they're too slow to wait for on PRs.
-    if: "${{ !failure() && !cancelled() && (!matrix.workers || (github.ref == 'refs/heads/develop')) }}"
+    if: "${{ !failure() && !cancelled() }}"
     needs: linting-done
     runs-on: ubuntu-latest
 
@@ -318,6 +317,68 @@ jobs:
           # GHA requires all matrix configurations to have at least one value. We don't want to set one here though.
           - _: monolith
 
+    steps:
+      # The path is set via a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on the path to run Complement.
+      # See https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-system-path
+      - name: "Set Go Version"
+        run: |
+          # Add Go 1.17 to the PATH: see https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md#environment-variables-2
+          echo "$GOROOT_1_17_X64/bin" >> $GITHUB_PATH
+          # Add the Go path to the PATH: We need this so we can call gotestfmt
+          echo "~/go/bin" >> $GITHUB_PATH
+
+      - name: "Install Complement Dependencies"
+        run: |
+          sudo apt-get update && sudo apt-get install -y libolm3 libolm-dev
+          go get -v github.com/haveyoudebuggedit/gotestfmt/v2/cmd/gotestfmt@latest
+
+      - name: Run actions/checkout@v2 for synapse
+        uses: actions/checkout@v2
+        with:
+          path: synapse
+
+      # Attempt to check out the same branch of Complement as the PR. If it
+      # doesn't exist, fallback to HEAD.
+      - name: Checkout complement
+        shell: bash
+        run: |
+          mkdir -p complement
+          # Attempt to use the version of complement which best matches the current
+          # build. Depending on whether this is a PR or release, etc. we need to
+          # use different fallbacks.
+          #
+          # 1. First check if there's a similarly named branch (GITHUB_HEAD_REF
+          #    for pull requests, otherwise GITHUB_REF).
+          # 2. Attempt to use the base branch, e.g. when merging into release-vX.Y
+          #    (GITHUB_BASE_REF for pull requests).
+          # 3. Use the default complement branch ("HEAD").
+          for BRANCH_NAME in "$GITHUB_HEAD_REF" "$GITHUB_BASE_REF" "${GITHUB_REF#refs/heads/}" "HEAD"; do
+            # Skip empty branch names and merge commits.
+            if [[ -z "$BRANCH_NAME" || $BRANCH_NAME =~ ^refs/pull/.* ]]; then
+              continue
+            fi
+
+            (wget -O - "https://github.com/matrix-org/complement/archive/$BRANCH_NAME.tar.gz" | tar -xz --strip-components=1 -C complement) && break
+          done
+
+      - run: |
+          set -o pipefail
+          WORKERS=${{ matrix.workers && 1 }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | gotestfmt
+        shell: bash
+        name: Run Complement Tests
+
+  # We only run the workers tests on `develop` for now, because they're too slow to wait for on PRs.
+  # Sadly, you can't have an `if` condition on the value of a matrix, so this is a temporary, separate job for now.
+  # GitHub Actions doesn't support YAML anchors, so it's full-on duplication for now.
+  complement-developonly:
+    if: "${{ !failure() && !cancelled() && (github.ref == 'refs/heads/develop') }}"
+    needs: linting-done
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
           # Test with workers
           - workers: workers
 
