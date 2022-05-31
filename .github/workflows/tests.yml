@@ -121,7 +121,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: coverage-${{ matrix.python-version }}-${{ matrix.database || 'sqlite' }}-${{ matrix.postgres-version || 'none' }}
-          path: .coverage*
+          path: .coverage.*
           retention-days: 1
 
   trial-olddeps:
