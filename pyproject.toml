@@ -282,6 +282,7 @@ pygithub = "==1.55"
 twine = "*"
 # Towncrier min version comes from #3425. Rationale unclear.
 towncrier = ">=18.6.0rc1"
+coverage = "^6.4"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

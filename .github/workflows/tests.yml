@@ -95,8 +95,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           extras: ${{ matrix.extras }}
-      - name: Install Coverage.py
-        run: poetry add coverage
       - name: Await PostgreSQL
         if: ${{ matrix.postgres-version }}
         timeout-minutes: 2
@@ -122,7 +120,7 @@ jobs:
       - name: Upload coverage
         uses: actions/upload-artifact@v3
         with:
-          name: coverage-${{ matrix.postgres-version }}-${{ matrix.database }}-${{ matrix.postgres-version }}
+          name: coverage-${{ matrix.python-version }}-${{ matrix.database || 'sqlite' }}-${{ matrix.postgres-version || 'none' }}
           path: .coverage*
           retention-days: 1
 
@@ -381,8 +379,7 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           path: .
-      - name: Install Coverage.py
-        run: poetry add coverage
+      - uses: matrix-org/setup-python-poetry@v1
       - name: Combine coverage reports
         run: poetry run coverage combine
       - name: Write coverage to XML
