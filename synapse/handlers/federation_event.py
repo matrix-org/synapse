@@ -98,8 +98,8 @@ class FederationEventHandler:
 
     def __init__(self, hs: "HomeServer"):
         self._store = hs.get_datastores().main
-        self._storage = hs.get_storage()
-        self._state_storage = self._storage.state
+        self._storage_controllers = hs.get_storage_controllers()
+        self._state_storage_controller = self._storage_controllers.state
 
         self._state_handler = hs.get_state_handler()
         self._event_creation_handler = hs.get_event_creation_handler()
@@ -535,7 +535,9 @@ class FederationEventHandler:
                 )
                 return
             await self._store.update_state_for_partial_state_event(event, context)
-            self._state_storage.notify_event_un_partial_stated(event.event_id)
+            self._state_storage_controller.notify_event_un_partial_stated(
+                event.event_id
+            )
 
     async def backfill(
         self, dest: str, room_id: str, limit: int, extremities: Collection[str]
@@ -835,7 +837,9 @@ class FederationEventHandler:
 
         try:
             # Get the state of the events we know about
-            ours = await self._state_storage.get_state_groups_ids(room_id, seen)
+            ours = await self._state_storage_controller.get_state_groups_ids(
+                room_id, seen
+            )
 
             # state_maps is a list of mappings from (type, state_key) to event_id
             state_maps: List[StateMap[str]] = list(ours.values())
@@ -1436,7 +1440,7 @@ class FederationEventHandler:
                 # we're not bothering about room state, so flag the event as an outlier.
                 event.internal_metadata.outlier = True
 
-                context = EventContext.for_outlier(self._storage)
+                context = EventContext.for_outlier(self._storage_controllers)
                 try:
                     validate_event_for_room_version(room_version_obj, event)
                     check_auth_rules_for_event(room_version_obj, event, auth)
@@ -1613,7 +1617,7 @@ class FederationEventHandler:
             # given state at the event. This should correctly handle cases
             # like bans, especially with state res v2.
 
-            state_sets_d = await self._state_storage.get_state_groups_ids(
+            state_sets_d = await self._state_storage_controller.get_state_groups_ids(
                 event.room_id, extrem_ids
             )
             state_sets: List[StateMap[str]] = list(state_sets_d.values())
@@ -1885,7 +1889,7 @@ class FederationEventHandler:
 
         # create a new state group as a delta from the existing one.
         prev_group = context.state_group
-        state_group = await self._state_storage.store_state_group(
+        state_group = await self._state_storage_controller.store_state_group(
             event.event_id,
             event.room_id,
             prev_group=prev_group,
@@ -1894,7 +1898,7 @@ class FederationEventHandler:
         )
 
         return EventContext.with_state(
-            storage=self._storage,
+            storage=self._storage_controllers,
             state_group=state_group,
             state_group_before_event=context.state_group_before_event,
             state_delta_due_to_event=state_updates,
@@ -1984,11 +1988,14 @@ class FederationEventHandler:
                 )
             return result["max_stream_id"]
         else:
-            assert self._storage.persistence
+            assert self._storage_controllers.persistence
 
             # Note that this returns the events that were persisted, which may not be
             # the same as were passed in if some were deduplicated due to transaction IDs.
-            events, max_stream_token = await self._storage.persistence.persist_events(
+            (
+                events,
+                max_stream_token,
+            ) = await self._storage_controllers.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
             )
 

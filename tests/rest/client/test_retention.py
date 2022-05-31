@@ -130,7 +130,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         We do this by setting a very long time between purge jobs.
         """
         store = self.hs.get_datastores().main
-        storage = self.hs.get_storage()
+        storage_controllers = self.hs.get_storage_controllers()
         room_id = self.helper.create_room_as(self.user_id, tok=self.token)
 
         # Send a first event, which should be filtered out at the end of the test.
@@ -155,7 +155,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(2, len(events), "events retrieved from database")
         filtered_events = self.get_success(
-            filter_events_for_client(storage, self.user_id, events)
+            filter_events_for_client(storage_controllers, self.user_id, events)
         )
 
         # We should only get one event back.
