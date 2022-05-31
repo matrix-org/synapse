@@ -57,6 +57,8 @@ jobs:
     if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
     needs: linting-done
     runs-on: ubuntu-latest
+    env:
+      TOP: ${{ github.workspace }}
     strategy:
       matrix:
         python-version: ["3.7", "3.8", "3.9", "3.10"]
@@ -94,12 +96,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
           extras: ${{ matrix.extras }}
       - name: Install Coverage.py
-        run: pip install coverage
+        run: poetry add coverage
       - name: Await PostgreSQL
         if: ${{ matrix.postgres-version }}
         timeout-minutes: 2
         run: until pg_isready -h localhost; do sleep 1; done
-      - run: coverage run --branch --parallel-mode $(which trial) tests
+      - run: poetry run coverage run --branch --parallel-mode -m twisted.trial --jobs 2 tests
         env:
           SYNAPSE_POSTGRES: ${{ matrix.database == 'postgres' || '' }}
           SYNAPSE_POSTGRES_HOST: localhost
@@ -372,17 +374,19 @@ jobs:
   coverage:
     needs: trial
     runs-on: ubuntu-latest
+    env:
+      TOP: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v2
       - uses: actions/download-artifact@v3
         with:
           path: .
       - name: Install Coverage.py
-        run: pip install coverage
+        run: poetry add coverage
       - name: Combine coverage reports
-        run: coverage combine
+        run: poetry run coverage combine
       - name: Write coverage to XML
-        run: coverage xml -i -o coverage/coverage.xml
+        run: poetry run coverage xml -i -o coverage/coverage.xml
       - name: Upload combined coverage
         uses: actions/upload-artifact@v3
         with:
