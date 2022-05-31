@@ -215,11 +215,11 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
                         while not respond_mock.called and not has_seen_new_await():
                             previous_awaits_seen = get_awaits_seen()
 
-                            reactor.pump([0.0])
+                            reactor.advance(0.0)
 
                             if get_awaits_seen() == previous_awaits_seen:
                                 # We didn't see any progress. Try advancing the clock.
-                                reactor.pump([1.0])
+                                reactor.advance(1.0)
 
                             if get_awaits_seen() == previous_awaits_seen:
                                 # We still didn't see any progress. The request might be stuck.
@@ -234,7 +234,7 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
                         # `respond_with_json` writes the response asynchronously, so we
                         # might have to give the reactor a kick before the channel gets
                         # the response.
-                        reactor.pump([1.0])
+                        reactor.advance(1.0)
 
                         self.assertEqual(channel.code, expected_code)
                         return channel.json_body
@@ -247,11 +247,11 @@ class EndpointCancellationTestHelperMixin(unittest.TestCase):
                         # We may need to pump the reactor to allow `delay_cancellation`s
                         # to finish.
                         if not respond_mock.called:
-                            reactor.pump([0.0])
+                            reactor.advance(0.0)
 
                         # Try advancing the clock if that didn't work.
                         if not respond_mock.called:
-                            reactor.pump([1.0])
+                            reactor.advance(1.0)
 
                         # Mark the request's logging context as finished. If it gets
                         # activated again, an `AssertionError` will be raised. This
