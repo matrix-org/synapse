@@ -828,6 +828,7 @@ def _tokenize_query(query: str) -> TokenList:
 
     - phrase queries using "double quotes"
     - case-insensitive or and and operators, with parentheses to change operator precedence
+    - negation of a keyword via unary -
     - unary hyphen to denote NOT e.g. 'include -exclude'
 
     """
