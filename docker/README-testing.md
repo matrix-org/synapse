@@ -40,7 +40,7 @@ docker build -t matrixdotorg/synapse-workers -f docker/Dockerfile-workers .
 Finally, build the multi-purpose image for Complement, which is a layer over the workers image.
 
 ```sh
-docker build -t complement-synapse -f "docker/complement/Dockerfile" docker/complement
+docker build -t complement-synapse -f docker/complement/Dockerfile docker/complement
 ```
 
 This will build an image with the tag `complement-synapse`, which can be handed to
