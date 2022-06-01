@@ -165,10 +165,13 @@ def make_request_with_cancellation_test(
     Alternatively, `_log_for_request` can be modified to write to `sys.stdout`.
 
     Args:
-        reactor: The twisted reactor running the request handler.
-        make_request: A function that initiates the request and returns a
-            `FakeChannel`.
         test_name: The name of the test, which will be logged.
+        reactor: The twisted reactor running the request handler.
+        site: The twisted `Site` to use to render the request.
+        method: The HTTP request method ("verb").
+        path: The HTTP path, suitably URL encoded (e.g. escaped UTF-8 & spaces and
+            such).
+        content: The body of the request.
 
     Returns:
         The `FakeChannel` object which stores the result of the final request that
