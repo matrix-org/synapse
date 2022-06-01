@@ -55,4 +55,3 @@ class JWTConfig(Config):
             self.jwt_subject_claim = None
             self.jwt_issuer = None
             self.jwt_audiences = None
-

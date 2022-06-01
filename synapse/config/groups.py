@@ -25,4 +25,3 @@ class GroupsConfig(Config):
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.enable_group_creation = config.get("enable_group_creation", False)
         self.group_creation_prefix = config.get("group_creation_prefix", "")
-

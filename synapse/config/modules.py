@@ -31,4 +31,3 @@ class ModulesConfig(Config):
                 raise ConfigError("expected a mapping", config_path)
 
             self.loaded_modules.append(load_module(module, config_path))
-

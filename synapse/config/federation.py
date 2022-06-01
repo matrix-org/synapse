@@ -50,6 +50,4 @@ class FederationConfig(Config):
         )
 
 
-
-
 _METRICS_FOR_DOMAINS_SCHEMA = {"type": "array", "items": {"type": "string"}}

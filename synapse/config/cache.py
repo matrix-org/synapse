@@ -113,7 +113,6 @@ class CacheConfig(Config):
         with _CACHES_LOCK:
             _CACHES.clear()
 
-
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         """Populate this config object with values from `config`.
 

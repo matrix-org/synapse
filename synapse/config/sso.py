@@ -107,4 +107,3 @@ class SSOConfig(Config):
             self.root.server.public_baseurl + "_matrix/static/client/login"
         )
         self.sso_client_whitelist.append(login_fallback_url)
-

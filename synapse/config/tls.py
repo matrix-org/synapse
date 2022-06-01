@@ -166,7 +166,8 @@ class TlsConfig(Config):
             tls_certificate_path: "%(tls_certificate_path)s"
             tls_private_key_path: "%(tls_private_key_path)s"
             """
-            % locals())
+                % locals()
+            )
         else:
             return ""
 

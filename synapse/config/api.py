@@ -31,7 +31,6 @@ class ApiConfig(Config):
         self.room_prejoin_state = list(self._get_prejoin_state_types(config))
         self.track_puppeted_user_ips = config.get("track_puppeted_user_ips", False)
 
-
     def _get_prejoin_state_types(self, config: JsonDict) -> Iterable[str]:
         """Get the event types to include in the prejoin state
 

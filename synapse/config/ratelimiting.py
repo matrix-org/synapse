@@ -143,4 +143,3 @@ class RatelimitConfig(Config):
                 "burst_count": self.rc_message.burst_count,
             },
         )
-

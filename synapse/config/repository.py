@@ -19,7 +19,7 @@ from urllib.request import getproxies_environment  # type: ignore
 
 import attr
 
-from synapse.config.server import DEFAULT_IP_RANGE_BLACKLIST, generate_ip_set
+from synapse.config.server import generate_ip_set
 from synapse.types import JsonDict
 from synapse.util.check_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module

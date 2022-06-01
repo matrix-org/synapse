@@ -45,4 +45,3 @@ class CaptchaConfig(Config):
             "https://www.recaptcha.net/recaptcha/api/siteverify",
         )
         self.recaptcha_template = self.read_template("recaptcha.html")
-

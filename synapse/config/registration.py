@@ -203,7 +203,7 @@ class RegistrationConfig(Config):
         self, generate_secrets: bool = False, **kwargs: Any
     ) -> str:
         if generate_secrets:
-            registration_shared_secret = 'registration_shared_secret: %s' % (
+            registration_shared_secret = "registration_shared_secret: %s" % (
                 random_string_with_symbols(50),
             )
             return registration_shared_secret

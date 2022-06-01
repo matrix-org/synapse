@@ -357,6 +357,7 @@ class EmailConfig(Config):
                     path=("email", "invite_client_location"),
                 )
 
+
 class ThreepidBehaviour(Enum):
     """
     Enum to define the behaviour of Synapse with regards to when it contacts an identity

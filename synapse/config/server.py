@@ -16,7 +16,6 @@ import argparse
 import itertools
 import logging
 import os.path
-import re
 import urllib.parse
 from textwrap import indent
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union

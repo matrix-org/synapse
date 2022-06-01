@@ -143,6 +143,7 @@ class OembedConfig(Config):
         )
         return re.compile(pattern)
 
+
 _OEMBED_PROVIDER_SCHEMA = {
     "type": "array",
     "items": {

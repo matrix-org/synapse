@@ -125,7 +125,7 @@ CONFIG_FILE_HEADER = """\
 #
 # [1] https://docs.ansible.com/ansible/latest/reference_appendices/YAMLSyntax.html
 #
-# For more information on how to configure Synapse, including a complete accounting of 
+# For more information on how to configure Synapse, including a complete accounting of
 # each option, go to docs/usage/configuration/config_documentation.md
 """
 
@@ -488,7 +488,7 @@ class RootConfig:
                 tls_private_key_path=tls_private_key_path,
             ).values()
         )
-        conf = re.sub('\n{2,}', "\n", conf)
+        conf = re.sub("\n{2,}", "\n", conf)
         return conf
 
     @classmethod
