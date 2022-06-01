@@ -56,10 +56,11 @@ class OpenIdStore(SQLBaseStore):
             if not rows:
                 return None
             else:
-                userinfo_fields = None
                 userinfo_fields_str = rows[0][1]
                 if userinfo_fields_str:
                     userinfo_fields = userinfo_fields_str.split(",")
+                else:
+                    userinfo_fields = []
 
                 return rows[0][0], userinfo_fields
 
