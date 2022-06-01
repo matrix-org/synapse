@@ -179,7 +179,6 @@ def _load_appservice(
 
     return ApplicationService(
         token=as_info["as_token"],
-        hostname=hostname,
         url=as_info["url"],
         namespaces=as_info["namespaces"],
         hs_token=as_info["hs_token"],

@@ -468,7 +468,6 @@ class RoomCreationHandler:
             (EventTypes.RoomAvatar, ""),
             (EventTypes.RoomEncryption, ""),
             (EventTypes.ServerACL, ""),
-            (EventTypes.RelatedGroups, ""),
             (EventTypes.PowerLevels, ""),
         ]
 
