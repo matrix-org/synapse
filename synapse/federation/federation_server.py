@@ -976,9 +976,7 @@ class FederationServer(FederationBase):
 
         return {"events": [ev.get_pdu_json(time_now) for ev in missing_events]}
 
-    async def on_openid_userinfo(
-        self, token: str
-    ) -> Optional[Tuple[str, Optional[List[str]]]]:
+    async def on_openid_userinfo(self, token: str) -> Optional[Tuple[str, List[str]]]:
         ts_now_ms = self._clock.time_msec()
         return await self.store.get_user_id_and_userinfo_fields_for_open_id_token(
             token, ts_now_ms

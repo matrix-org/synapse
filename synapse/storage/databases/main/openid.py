@@ -41,10 +41,10 @@ class OpenIdStore(SQLBaseStore):
 
     async def get_user_id_and_userinfo_fields_for_open_id_token(
         self, token: str, ts_now_ms: int
-    ) -> Optional[Tuple[str, Optional[List[str]]]]:
+    ) -> Optional[Tuple[str, List[str]]]:
         def get_user_id_for_token_txn(
             txn: LoggingTransaction,
-        ) -> Optional[Tuple[str, Optional[List[str]]]]:
+        ) -> Optional[Tuple[str, List[str]]]:
             sql = (
                 "SELECT user_id, userinfo_fields FROM open_id_tokens"
                 " WHERE token = ? AND ? <= ts_valid_until_ms"

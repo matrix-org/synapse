@@ -255,25 +255,20 @@ class OpenIdUserInfo(BaseFederationServlet):
         user_id, userinfo_fields = token_info
         userinfo: JsonDict = {"sub": user_id}
 
-        if userinfo_fields:
-            if OpenIdUserInfoFields.DISPLAY_NAME in userinfo_fields:
-                localpart = UserID.from_string(user_id).localpart
-                userinfo[
-                    OpenIdUserInfoFields.DISPLAY_NAME
-                ] = await self.hs.get_datastores().main.get_profile_displayname(
-                    localpart
-                )
-            if OpenIdUserInfoFields.AVATAR_URL in userinfo_fields:
-                localpart = UserID.from_string(user_id).localpart
-                userinfo[
-                    OpenIdUserInfoFields.AVATAR_URL
-                ] = await self.hs.get_datastores().main.get_profile_avatar_url(
-                    localpart
-                )
-            if OpenIdUserInfoFields.ROOM_POWERLEVELS in userinfo_fields:
-                userinfo[
-                    OpenIdUserInfoFields.ROOM_POWERLEVELS
-                ] = await self._get_powerlevels(user_id)
+        if OpenIdUserInfoFields.DISPLAY_NAME in userinfo_fields:
+            localpart = UserID.from_string(user_id).localpart
+            userinfo[
+                OpenIdUserInfoFields.DISPLAY_NAME
+            ] = await self.hs.get_datastores().main.get_profile_displayname(localpart)
+        if OpenIdUserInfoFields.AVATAR_URL in userinfo_fields:
+            localpart = UserID.from_string(user_id).localpart
+            userinfo[
+                OpenIdUserInfoFields.AVATAR_URL
+            ] = await self.hs.get_datastores().main.get_profile_avatar_url(localpart)
+        if OpenIdUserInfoFields.ROOM_POWERLEVELS in userinfo_fields:
+            userinfo[
+                OpenIdUserInfoFields.ROOM_POWERLEVELS
+            ] = await self._get_powerlevels(user_id)
 
         return 200, userinfo
 
