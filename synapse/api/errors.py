@@ -84,7 +84,7 @@ class Codes(str, Enum):
     # By opposition to `USER_DEACTIVATED`, this is a reversible measure
     # that can possibly be appealed and reverted.
     # Part of MSC3823.
-    USER_ACCOUNT_SUSPENDED = "M_ORG_MATRIX_MSC3823_USER_ACCOUNT_SUSPENDED"
+    USER_ACCOUNT_SUSPENDED = "ORG.MATRIX.MSC3823.USER_ACCOUNT_SUSPENDED"
 
     BAD_ALIAS = "M_BAD_ALIAS"
     # For restricted join rules.
@@ -146,7 +146,13 @@ class SynapseError(CodeMessageException):
         errcode: Matrix error code e.g 'M_FORBIDDEN'
     """
 
-    def __init__(self, code: int, msg: str, errcode: str = Codes.UNKNOWN):
+    def __init__(
+        self,
+        code: int,
+        msg: str,
+        errcode: str = Codes.UNKNOWN,
+        additional_fields: Optional[Dict] = None,
+    ):
         """Constructs a synapse error.
 
         Args:
@@ -156,9 +162,13 @@ class SynapseError(CodeMessageException):
         """
         super().__init__(code, msg)
         self.errcode = errcode
+        if additional_fields is None:
+            self._additional_fields: Dict = {}
+        else:
+            self._additional_fields = dict(additional_fields)
 
     def error_dict(self) -> "JsonDict":
-        return cs_error(self.msg, self.errcode)
+        return cs_error(self.msg, self.errcode, **self._additional_fields)
 
 
 class InvalidAPICallError(SynapseError):
@@ -183,14 +193,7 @@ class ProxiedRequestError(SynapseError):
         errcode: str = Codes.UNKNOWN,
         additional_fields: Optional[Dict] = None,
     ):
-        super().__init__(code, msg, errcode)
-        if additional_fields is None:
-            self._additional_fields: Dict = {}
-        else:
-            self._additional_fields = dict(additional_fields)
-
-    def error_dict(self) -> "JsonDict":
-        return cs_error(self.msg, self.errcode, **self._additional_fields)
+        super().__init__(code, msg, errcode, additional_fields)
 
 
 class ConsentNotGivenError(SynapseError):

@@ -35,7 +35,6 @@ from typing_extensions import ParamSpec
 from twisted.internet import defer
 from twisted.web.resource import Resource
 
-from synapse import spam_checker_api
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.events.presence_router import (
@@ -55,6 +54,7 @@ from synapse.events.spamcheck import (
     USER_MAY_JOIN_ROOM_CALLBACK,
     USER_MAY_PUBLISH_ROOM_CALLBACK,
     USER_MAY_SEND_3PID_INVITE_CALLBACK,
+    SpamChecker,
 )
 from synapse.events.third_party_rules import (
     CHECK_CAN_DEACTIVATE_USER_CALLBACK,
@@ -140,9 +140,7 @@ are loaded into Synapse.
 """
 
 PRESENCE_ALL_USERS = PresenceRouter.ALL_USERS
-
-ALLOW = spam_checker_api.Allow.ALLOW
-# Singleton value used to mark a message as permitted.
+NOT_SPAM = SpamChecker.NOT_SPAM
 
 __all__ = [
     "errors",
@@ -151,7 +149,7 @@ __all__ = [
     "respond_with_html",
     "run_in_background",
     "cached",
-    "Allow",
+    "NOT_SPAM",
     "UserID",
     "DatabasePool",
     "LoggingTransaction",
@@ -1149,7 +1147,10 @@ class ModuleApi:
             )
 
     async def sleep(self, seconds: float) -> None:
-        """Sleeps for the given number of seconds."""
+        """Sleeps for the given number of seconds.
+
+        Added in Synapse v1.49.0.
+        """
 
         await self._clock.sleep(seconds)
 
@@ -1434,6 +1435,8 @@ class ModuleApi:
     ) -> List[Tuple[str, str]]:
         """Generates list of monthly active users and their services.
         Please see corresponding storage docstring for more details.
+
+        Added in Synapse v1.61.0.
 
         Arguments:
             start_timestamp: If specified, only include users that were first active
