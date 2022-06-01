@@ -283,6 +283,8 @@ class OpenIdUserInfo(BaseFederationServlet):
                 room_id=room.room_id, event_type=EventTypes.PowerLevels
             )
             if room_power_levels is not None:
+                # Copy the whole power levels state event. Strip all explicit power levels
+                # except those for user_id, as specified in MSC3356
                 stripped_content = copy.deepcopy(room_power_levels.content)
                 stripped_content["users"] = {
                     k: v for k, v in stripped_content["users"].items() if k == user_id
