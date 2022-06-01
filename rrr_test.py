@@ -74,6 +74,25 @@ def _sync_and_show(room_id):
     print()
     print()
 
+    return event_id
+
+
+def _send_event(room_id, body, prev_event_id = None):
+    args = {"prev_event_id": prev_event_id}
+
+    # Send a msg to the room.
+    result = requests.put(
+        f"{HOMESERVER}/_matrix/client/v3/rooms/{room_id}/send/m.room.message/msg{monotonic()}",
+        json={
+            "msgtype": "m.text",
+            "body": body,
+        },
+        params=args,
+        headers=USER_2_HEADERS,
+    )
+    _check_for_status(result)
+    return result.json()["event_id"]
+
 
 def main():
     # Create a new room as user 2, add a bunch of messages.
@@ -92,33 +111,32 @@ def main():
     _check_for_status(result)
 
     # Sync user 1.
-    _sync_and_show(room_id)
+    last_event_id = first_event_id = _sync_and_show(room_id)
 
     # User 2 sends some messages.
     event_ids = []
     with open("road_to_no_where.txt", "r") as f:
         count = 0
+        forks = 1
         for line in f.readlines():
             line = line.strip()
             if not line:
+                if forks < 3:
+                    last_event_id = first_event_id
+                    forks += 1
+                else:
+                    # Let the server figure it out.
+                    last_event_id = None
                 continue
 
             # Send a msg to the room.
-            result = requests.put(
-                f"{HOMESERVER}/_matrix/client/v3/rooms/{room_id}/send/m.room.message/msg{count}",
-                json={
-                    "msgtype": "m.text",
-                    "body": f"{count: >2}: {line}",
-                },
-                headers=USER_2_HEADERS,
-            )
-            _check_for_status(result)
-            event_ids.append(result.json()["event_id"])
+            last_event_id = _send_event(room_id, line, last_event_id)
+            event_ids.append(last_event_id)
             sleep(1)
 
             count += 1
 
-            if count == 17:  # End of second verse
+            if count == 20:  # End of second verse
                 break
 
     # User 2 sends a read receipt.
