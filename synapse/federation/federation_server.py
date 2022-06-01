@@ -118,6 +118,8 @@ class FederationServer(FederationBase):
         self.state = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
 
+        self._state_storage_controller = hs.get_storage_controllers().state
+
         self.device_handler = hs.get_device_handler()
 
         # Ensure the following handlers are loaded since they register callbacks
@@ -1221,7 +1223,7 @@ class FederationServer(FederationBase):
         Raises:
             AuthError if the server does not match the ACL
         """
-        state_ids = await self.store.get_current_state_ids(room_id)
+        state_ids = await self._state_storage_controller.get_current_state_ids(room_id)
         acl_event_id = state_ids.get((EventTypes.ServerACL, ""))
 
         if not acl_event_id:

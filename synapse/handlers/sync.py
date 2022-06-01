@@ -506,8 +506,10 @@ class SyncHandler:
                 # ensure that we always include current state in the timeline
                 current_state_ids: FrozenSet[str] = frozenset()
                 if any(e.is_state() for e in recents):
-                    current_state_ids_map = await self.store.get_current_state_ids(
-                        room_id
+                    current_state_ids_map = (
+                        await self._state_storage_controller.get_current_state_ids(
+                            room_id
+                        )
                     )
                     current_state_ids = frozenset(current_state_ids_map.values())
 
@@ -574,8 +576,11 @@ class SyncHandler:
                 # ensure that we always include current state in the timeline
                 current_state_ids = frozenset()
                 if any(e.is_state() for e in loaded_recents):
-                    current_state_ids_map = await self.store.get_current_state_ids(
-                        room_id
+                    # FIXME(faster_joins): We use the partial state here as
+                    # we don't want to block `/sync` on finishing a lazy join.
+                    # Is this the correct way of doing it?
+                    current_state_ids_map = (
+                        await self.store.get_partial_current_state_ids(room_id)
                     )
                     current_state_ids = frozenset(current_state_ids_map.values())
 
