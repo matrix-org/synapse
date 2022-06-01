@@ -17,6 +17,7 @@ from typing import Any, Callable, Optional, Union
 from unittest import mock
 
 from twisted.internet.error import ConnectionDone
+from twisted.test.proto_helpers import MemoryReactorClock
 
 from synapse.http.server import (
     HTTP_STATUS_REQUEST_CANCELLED,
@@ -25,11 +26,11 @@ from synapse.http.server import (
 )
 from synapse.types import JsonDict
 
-from tests.server import FakeChannel, ThreadedMemoryReactorClock
+from tests.server import FakeChannel
 
 
 def test_disconnect(
-    reactor: ThreadedMemoryReactorClock,
+    reactor: MemoryReactorClock,
     channel: FakeChannel,
     expect_cancellation: bool,
     expected_body: Union[bytes, JsonDict],
