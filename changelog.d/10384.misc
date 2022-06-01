@@ -1,1 +1,1 @@
-Add option to include additional fields in the OpenID user info (currently the user's display name and effective power levels).
+Add option to include additional fields in the OpenID user info, per [MSC3356](https://github.com/matrix-org/matrix-spec-proposals/pull/3356). Contributed by @jkanefendt.
