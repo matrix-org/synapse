@@ -19,7 +19,7 @@ from prometheus_client import Counter
 from twisted.internet import defer
 
 import synapse
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EduTypes, EventTypes
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
 from synapse.handlers.presence import format_user_presence_state
@@ -503,7 +503,7 @@ class ApplicationServicesHandler:
             time_now = self.clock.time_msec()
             events.extend(
                 {
-                    "type": "m.presence",
+                    "type": EduTypes.PRESENCE,
                     "sender": event.user_id,
                     "content": format_user_presence_state(
                         event, time_now, include_user_id=False

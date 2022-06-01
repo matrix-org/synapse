@@ -22,6 +22,7 @@ from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.constants import (
+    EduTypes,
     EventContentFields,
     EventTypes,
     ReceiptTypes,
@@ -504,7 +505,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
 
         # Checks if event is a read receipt
         def is_read_receipt(event: JsonDict) -> bool:
-            return event["type"] == "m.receipt"
+            return event["type"] == EduTypes.RECEIPT
 
         # Sync
         channel = self.make_request(

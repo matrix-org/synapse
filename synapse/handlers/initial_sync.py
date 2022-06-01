@@ -67,8 +67,8 @@ class InitialSyncHandler:
             ]
         ] = ResponseCache(hs.get_clock(), "initial_sync_cache")
         self._event_serializer = hs.get_event_client_serializer()
-        self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self._storage_controllers = hs.get_storage_controllers()
+        self._state_storage_controller = self._storage_controllers.state
 
     async def snapshot_all_rooms(
         self,
@@ -198,7 +198,8 @@ class InitialSyncHandler:
                         event.stream_ordering,
                     )
                     deferred_room_state = run_in_background(
-                        self.state_store.get_state_for_events, [event.event_id]
+                        self._state_storage_controller.get_state_for_events,
+                        [event.event_id],
                     ).addCallback(
                         lambda states: cast(StateMap[EventBase], states[event.event_id])
                     )
@@ -218,7 +219,7 @@ class InitialSyncHandler:
                 ).addErrback(unwrapFirstError)
 
                 messages = await filter_events_for_client(
-                    self.storage, user_id, messages
+                    self._storage_controllers, user_id, messages
                 )
 
                 start_token = now_token.copy_and_replace(StreamKeyType.ROOM, token)
@@ -274,7 +275,7 @@ class InitialSyncHandler:
             "rooms": rooms_ret,
             "presence": [
                 {
-                    "type": "m.presence",
+                    "type": EduTypes.PRESENCE,
                     "content": format_user_presence_state(event, now),
                 }
                 for event in presence
@@ -355,7 +356,9 @@ class InitialSyncHandler:
         member_event_id: str,
         is_peeking: bool,
     ) -> JsonDict:
-        room_state = await self.state_store.get_state_for_event(member_event_id)
+        room_state = await self._state_storage_controller.get_state_for_event(
+            member_event_id
+        )
 
         limit = pagin_config.limit if pagin_config else None
         if limit is None:
@@ -369,7 +372,7 @@ class InitialSyncHandler:
         )
 
         messages = await filter_events_for_client(
-            self.storage, user_id, messages, is_peeking=is_peeking
+            self._storage_controllers, user_id, messages, is_peeking=is_peeking
         )
 
         start_token = StreamToken.START.copy_and_replace(StreamKeyType.ROOM, token)
@@ -439,7 +442,7 @@ class InitialSyncHandler:
 
             return [
                 {
-                    "type": EduTypes.Presence,
+                    "type": EduTypes.PRESENCE,
                     "content": format_user_presence_state(s, time_now),
                 }
                 for s in states
@@ -474,7 +477,7 @@ class InitialSyncHandler:
         )
 
         messages = await filter_events_for_client(
-            self.storage, user_id, messages, is_peeking=is_peeking
+            self._storage_controllers, user_id, messages, is_peeking=is_peeking
         )
 
         start_token = now_token.copy_and_replace(StreamKeyType.ROOM, token)

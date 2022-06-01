@@ -15,7 +15,7 @@
 from copy import deepcopy
 from typing import List
 
-from synapse.api.constants import ReceiptTypes
+from synapse.api.constants import EduTypes, ReceiptTypes
 from synapse.types import JsonDict
 
 from tests import unittest
@@ -39,7 +39,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         }
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
             [],
@@ -64,7 +64,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
             [
@@ -79,7 +79,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         }
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
         )
@@ -105,7 +105,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
             [
@@ -120,7 +120,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         }
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
         )
@@ -140,7 +140,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
             [
@@ -155,7 +155,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
         )
@@ -174,7 +174,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 },
                 {
                     "content": {
@@ -187,7 +187,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 },
             ],
             [
@@ -202,7 +202,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         }
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
         )
@@ -224,7 +224,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 },
             ],
             [
@@ -237,7 +237,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 },
             ],
         )
@@ -266,7 +266,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         },
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
             [
@@ -291,7 +291,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                         }
                     },
                     "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": "m.receipt",
+                    "type": EduTypes.RECEIPT,
                 }
             ],
         )
@@ -310,7 +310,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                     }
                 },
                 "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                "type": "m.receipt",
+                "type": EduTypes.RECEIPT,
             }
         ]
         original_events = deepcopy(events)

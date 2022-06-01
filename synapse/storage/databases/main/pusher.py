@@ -91,12 +91,6 @@ class PusherWorkerStore(SQLBaseStore):
 
             yield PusherConfig(**r)
 
-    async def user_has_pusher(self, user_id: str) -> bool:
-        ret = await self.db_pool.simple_select_one_onecol(
-            "pushers", {"user_name": user_id}, "id", allow_none=True
-        )
-        return ret is not None
-
     async def get_pushers_by_app_id_and_pushkey(
         self, app_id: str, pushkey: str
     ) -> Iterator[PusherConfig]:
