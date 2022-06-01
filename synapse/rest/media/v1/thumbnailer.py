@@ -183,8 +183,16 @@ class Thumbnailer:
         return output_bytes_io
 
     def close(self) -> None:
+        """Closes the underlying image file.
+
+        Once closed no other functions can be called.
+
+        Can be called multiple times.
+        """
+
         if self._closed:
             return
+
         self._closed = True
 
         # Since we run this on the finalizer then we need to handle `__init__`
@@ -196,6 +204,9 @@ class Thumbnailer:
         image.close()
 
     def __enter__(self) -> "Thumbnailer":
+        """Make `Thumbnailer` a context manager that calls `close` on
+        `__exit__`.
+        """
         return self
 
     def __exit__(
