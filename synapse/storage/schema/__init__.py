@@ -77,10 +77,9 @@ Changes in SCHEMA_VERSION = 72:
 
 
 SCHEMA_COMPAT_VERSION = (
-    # We now assume that `device_lists_changes_in_room` has been filled out for
-    # recent device_list_updates.
-    # ... and that `application_services_state.last_txn` is not used.
-    69
+    # We no longer maintain `event_edges.room_id`, so synapses with SCHEMA_VERSION < 71
+    # will break.
+    71
 )
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
 
