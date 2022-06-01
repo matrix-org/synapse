@@ -71,7 +71,6 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
 
         self.appservice = ApplicationService(
             token="i_am_an_app_service",
-            hostname="test",
             id="1234",
             namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
             # Note: this user does not have to match the regex above
@@ -88,7 +87,7 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.clock = clock
-        self.storage = hs.get_storage()
+        self._storage_controllers = hs.get_storage_controllers()
 
         self.virtual_user_id, _ = self.register_appservice_user(
             "as_user_potato", self.appservice.token
@@ -168,7 +167,9 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
 
         # Fetch the state_groups
         state_group_map = self.get_success(
-            self.storage.state.get_state_groups_ids(room_id, historical_event_ids)
+            self._storage_controllers.state.get_state_groups_ids(
+                room_id, historical_event_ids
+            )
         )
 
         # We expect all of the historical events to be using the same state_group

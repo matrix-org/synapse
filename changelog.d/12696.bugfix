@@ -1,1 +1,0 @@
-Fix a long-standing bug where an empty room would be created when a user with an insufficient power level tried to upgrade a room.

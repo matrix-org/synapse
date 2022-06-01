@@ -21,12 +21,14 @@ from typing import (
     Awaitable,
     Callable,
     Collection,
+    Dict,
     List,
     Optional,
     Tuple,
     Union,
 )
 
+from synapse.api.errors import Codes
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
 from synapse.spam_checker_api import RegistrationBehaviour
@@ -41,6 +43,22 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
+    ["synapse.events.EventBase"],
+    Awaitable[
+        Union[
+            str,
+            Codes,
+            # Highly experimental, not officially part of the spamchecker API, may
+            # disappear without warning depending on the results of ongoing
+            # experiments.
+            # Use this to return additional information as part of an error.
+            Tuple[Codes, Dict],
+            # Deprecated
+            bool,
+        ]
+    ],
+]
+SHOULD_DROP_FEDERATED_EVENT_CALLBACK = Callable[
     ["synapse.events.EventBase"],
     Awaitable[Union[bool, str]],
 ]
@@ -163,11 +181,16 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer") -> None:
 
 
 class SpamChecker:
+    NOT_SPAM = "NOT_SPAM"
+
     def __init__(self, hs: "synapse.server.HomeServer") -> None:
         self.hs = hs
         self.clock = hs.get_clock()
 
         self._check_event_for_spam_callbacks: List[CHECK_EVENT_FOR_SPAM_CALLBACK] = []
+        self._should_drop_federated_event_callbacks: List[
+            SHOULD_DROP_FEDERATED_EVENT_CALLBACK
+        ] = []
         self._user_may_join_room_callbacks: List[USER_MAY_JOIN_ROOM_CALLBACK] = []
         self._user_may_invite_callbacks: List[USER_MAY_INVITE_CALLBACK] = []
         self._user_may_send_3pid_invite_callbacks: List[
@@ -191,6 +214,9 @@ class SpamChecker:
     def register_callbacks(
         self,
         check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
+        should_drop_federated_event: Optional[
+            SHOULD_DROP_FEDERATED_EVENT_CALLBACK
+        ] = None,
         user_may_join_room: Optional[USER_MAY_JOIN_ROOM_CALLBACK] = None,
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
         user_may_send_3pid_invite: Optional[USER_MAY_SEND_3PID_INVITE_CALLBACK] = None,
@@ -208,6 +234,11 @@ class SpamChecker:
         """Register callbacks from module for each hook."""
         if check_event_for_spam is not None:
             self._check_event_for_spam_callbacks.append(check_event_for_spam)
+
+        if should_drop_federated_event is not None:
+            self._should_drop_federated_event_callbacks.append(
+                should_drop_federated_event
+            )
 
         if user_may_join_room is not None:
             self._user_may_join_room_callbacks.append(user_may_join_room)
@@ -244,7 +275,7 @@ class SpamChecker:
 
     async def check_event_for_spam(
         self, event: "synapse.events.EventBase"
-    ) -> Union[bool, str]:
+    ) -> Union[Tuple[Codes, Dict], str]:
         """Checks if a given event is considered "spammy" by this server.
 
         If the server considers an event spammy, then it will be rejected if
@@ -255,10 +286,61 @@ class SpamChecker:
             event: the event to be checked
 
         Returns:
-            True or a string if the event is spammy. If a string is returned it
-            will be used as the error message returned to the user.
+            - `NOT_SPAM` if the event is considered good (non-spammy) and should be let
+                through. Other spamcheck filters may still reject it.
+            - A `Code` if the event is considered spammy and is rejected with a specific
+                error message/code.
+            - A string that isn't `NOT_SPAM` if the event is considered spammy and the
+                string should be used as the client-facing error message. This usage is
+                generally discouraged as it doesn't support internationalization.
         """
         for callback in self._check_event_for_spam_callbacks:
+            with Measure(
+                self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
+            ):
+                res = await delay_cancellation(callback(event))
+                if res is False or res == self.NOT_SPAM:
+                    # This spam-checker accepts the event.
+                    # Other spam-checkers may reject it, though.
+                    continue
+                elif res is True:
+                    # This spam-checker rejects the event with deprecated
+                    # return value `True`
+                    return Codes.FORBIDDEN
+                elif not isinstance(res, str):
+                    # mypy complains that we can't reach this code because of the
+                    # return type in CHECK_EVENT_FOR_SPAM_CALLBACK, but we don't know
+                    # for sure that the module actually returns it.
+                    logger.warning(
+                        "Module returned invalid value, rejecting message as spam"
+                    )
+                    res = "This message has been rejected as probable spam"
+                else:
+                    # The module rejected the event either with a `Codes`
+                    # or some other `str`. In either case, we stop here.
+                    pass
+
+                return res
+
+        # No spam-checker has rejected the event, let it pass.
+        return self.NOT_SPAM
+
+    async def should_drop_federated_event(
+        self, event: "synapse.events.EventBase"
+    ) -> Union[bool, str]:
+        """Checks if a given federated event is considered "spammy" by this
+        server.
+
+        If the server considers an event spammy, it will be silently dropped,
+        and in doing so will split-brain our view of the room's DAG.
+
+        Args:
+            event: the event to be checked
+
+        Returns:
+            True if the event should be silently dropped
+        """
+        for callback in self._should_drop_federated_event_callbacks:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):

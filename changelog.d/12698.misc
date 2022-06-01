@@ -1,1 +1,0 @@
-Respect the `@cancellable` flag for `DirectServe{Html,Json}Resource`s.

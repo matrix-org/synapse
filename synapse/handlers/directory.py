@@ -45,6 +45,7 @@ class DirectoryHandler:
         self.appservice_handler = hs.get_application_service_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.config = hs.config
         self.enable_room_list_search = hs.config.roomdirectory.enable_room_list_search
         self.require_membership = hs.config.server.require_membership_for_aliases
@@ -319,7 +320,7 @@ class DirectoryHandler:
         Raises:
             ShadowBanError if the requester has been shadow-banned.
         """
-        alias_event = await self.store.get_current_state_event(
+        alias_event = await self._storage_controllers.state.get_current_state_event(
             room_id, EventTypes.CanonicalAlias, ""
         )
 
@@ -463,7 +464,11 @@ class DirectoryHandler:
         making_public = visibility == "public"
         if making_public:
             room_aliases = await self.store.get_aliases_for_room(room_id)
-            canonical_alias = await self.store.get_canonical_alias_for_room(room_id)
+            canonical_alias = (
+                await self._storage_controllers.state.get_canonical_alias_for_room(
+                    room_id
+                )
+            )
             if canonical_alias:
                 room_aliases.append(canonical_alias)
 

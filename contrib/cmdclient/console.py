@@ -16,6 +16,7 @@
 
 """ Starts a synapse client console. """
 import argparse
+import binascii
 import cmd
 import getpass
 import json
@@ -26,9 +27,8 @@ import urllib
 from http import TwistedHttpClient
 from typing import Optional
 
-import nacl.encoding
-import nacl.signing
 import urlparse
+from signedjson.key import NACL_ED25519, decode_verify_key_bytes
 from signedjson.sign import SignatureVerifyException, verify_signed_json
 
 from twisted.internet import defer, reactor, threads
@@ -41,7 +41,6 @@ TRUSTED_ID_SERVERS = ["localhost:8001"]
 
 
 class SynapseCmd(cmd.Cmd):
-
     """Basic synapse command-line processor.
 
     This processes commands from the user and calls the relevant HTTP methods.
@@ -420,8 +419,8 @@ class SynapseCmd(cmd.Cmd):
                 pubKey = None
                 pubKeyObj = yield self.http_client.do_request("GET", url)
                 if "public_key" in pubKeyObj:
-                    pubKey = nacl.signing.VerifyKey(
-                        pubKeyObj["public_key"], encoder=nacl.encoding.HexEncoder
+                    pubKey = decode_verify_key_bytes(
+                        NACL_ED25519, binascii.unhexlify(pubKeyObj["public_key"])
                     )
                 else:
                     print("No public key found in pubkey response!")

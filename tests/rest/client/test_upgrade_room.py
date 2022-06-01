@@ -249,7 +249,9 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
 
         new_space_id = channel.json_body["replacement_room"]
 
-        state_ids = self.get_success(self.store.get_current_state_ids(new_space_id))
+        state_ids = self.get_success(
+            self.store.get_partial_current_state_ids(new_space_id)
+        )
 
         # Ensure the new room is still a space.
         create_event = self.get_success(
@@ -284,7 +286,9 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
 
         new_room_id = channel.json_body["replacement_room"]
 
-        state_ids = self.get_success(self.store.get_current_state_ids(new_room_id))
+        state_ids = self.get_success(
+            self.store.get_partial_current_state_ids(new_room_id)
+        )
 
         # Ensure the new room is the same type as the old room.
         create_event = self.get_success(

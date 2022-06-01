@@ -1,0 +1,1 @@
+Update to `check_event_for_spam`. Deprecate the current callback signature, replace it with a new signature that is both less ambiguous (replacing booleans with explicit allow/block) and more powerful (ability to return explicit error codes).

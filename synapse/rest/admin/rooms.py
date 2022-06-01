@@ -419,6 +419,7 @@ class RoomStateRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.clock = hs.get_clock()
         self._event_serializer = hs.get_event_client_serializer()
 
@@ -431,7 +432,7 @@ class RoomStateRestServlet(RestServlet):
         if not ret:
             raise NotFoundError("Room not found")
 
-        event_ids = await self.store.get_current_state_ids(room_id)
+        event_ids = await self._storage_controllers.state.get_current_state_ids(room_id)
         events = await self.store.get_events(event_ids.values())
         now = self.clock.time_msec()
         room_state = self._event_serializer.serialize_events(events.values(), now)
@@ -449,6 +450,7 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.is_mine = hs.is_mine
 
     async def on_POST(
@@ -490,8 +492,10 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
         )
 
         # send invite if room has "JoinRules.INVITE"
-        join_rules_event = await self.store.get_current_state_event(
-            room_id, EventTypes.JoinRules, ""
+        join_rules_event = (
+            await self._storage_controllers.state.get_current_state_event(
+                room_id, EventTypes.JoinRules, ""
+            )
         )
         if join_rules_event:
             if not (join_rules_event.content.get("join_rule") == JoinRules.PUBLIC):
@@ -537,6 +541,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
         super().__init__(hs)
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
+        self._state_storage_controller = hs.get_storage_controllers().state
         self.event_creation_handler = hs.get_event_creation_handler()
         self.state_handler = hs.get_state_handler()
         self.is_mine_id = hs.is_mine_id
@@ -554,7 +559,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
         user_to_add = content.get("user_id", requester.user.to_string())
 
         # Figure out which local users currently have power in the room, if any.
-        filtered_room_state = await self.store.get_filtered_current_state(
+        filtered_room_state = await self._state_storage_controller.get_current_state(
             room_id,
             StateFilter.from_types(
                 [

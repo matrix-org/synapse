@@ -61,6 +61,7 @@ class Auth:
         self.clock = hs.get_clock()
         self.store = hs.get_datastores().main
         self._account_validity_handler = hs.get_account_validity_handler()
+        self._storage_controllers = hs.get_storage_controllers()
 
         self.token_cache: LruCache[str, Tuple[str, bool]] = LruCache(
             10000, "token_cache"
@@ -599,8 +600,10 @@ class Auth:
         # by checking if they would (theoretically) be able to change the
         # m.room.canonical_alias events
 
-        power_level_event = await self.store.get_current_state_event(
-            room_id, EventTypes.PowerLevels, ""
+        power_level_event = (
+            await self._storage_controllers.state.get_current_state_event(
+                room_id, EventTypes.PowerLevels, ""
+            )
         )
 
         auth_events = {}
@@ -694,7 +697,7 @@ class Auth:
                 room_id, user_id, allow_departed_users=allow_departed_users
             )
         except AuthError:
-            visibility = await self.store.get_current_state_event(
+            visibility = await self._storage_controllers.state.get_current_state_event(
                 room_id, EventTypes.RoomHistoryVisibility, ""
             )
             if (

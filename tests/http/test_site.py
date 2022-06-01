@@ -36,7 +36,7 @@ class SynapseRequestTestCase(HomeserverTestCase):
         # as a control case, first send a regular request.
 
         # complete the connection and wire it up to a fake transport
-        client_address = IPv6Address("TCP", "::1", "2345")
+        client_address = IPv6Address("TCP", "::1", 2345)
         protocol = factory.buildProtocol(client_address)
         transport = StringTransport()
         protocol.makeConnection(transport)

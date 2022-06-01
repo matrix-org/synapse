@@ -938,7 +938,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         users can still get a list of recent highlights.
 
         Args:
-            txn: The transcation
+            txn: The transaction
             room_id: Room ID to delete from
             user_id: user ID to delete for
             stream_ordering: The lowest stream ordering which will

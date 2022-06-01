@@ -49,19 +49,21 @@ class TestServletUtils(unittest.TestCase):
         """Basic tests for parse_json_value_from_request."""
         # Test round-tripping.
         obj = {"foo": 1}
-        result = parse_json_value_from_request(make_request(obj))
-        self.assertEqual(result, obj)
+        result1 = parse_json_value_from_request(make_request(obj))
+        self.assertEqual(result1, obj)
 
         # Results don't have to be objects.
-        result = parse_json_value_from_request(make_request(b'["foo"]'))
-        self.assertEqual(result, ["foo"])
+        result2 = parse_json_value_from_request(make_request(b'["foo"]'))
+        self.assertEqual(result2, ["foo"])
 
         # Test empty.
         with self.assertRaises(SynapseError):
             parse_json_value_from_request(make_request(b""))
 
-        result = parse_json_value_from_request(make_request(b""), allow_empty_body=True)
-        self.assertIsNone(result)
+        result3 = parse_json_value_from_request(
+            make_request(b""), allow_empty_body=True
+        )
+        self.assertIsNone(result3)
 
         # Invalid UTF-8.
         with self.assertRaises(SynapseError):
