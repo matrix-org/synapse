@@ -28,13 +28,12 @@ from http import TwistedHttpClient
 from typing import Optional
 
 import urlparse
-from signedjson.key import decode_verify_key_bytes
+from signedjson.key import NACL_ED25519, decode_verify_key_bytes
 from signedjson.sign import SignatureVerifyException, verify_signed_json
 
 from twisted.internet import defer, reactor, threads
 
 CONFIG_JSON = "cmdclient_config.json"
-NACL_ED25519 = "ed25519"
 
 # TODO: The concept of trusted identity servers has been deprecated. This option and checks
 #  should be removed
