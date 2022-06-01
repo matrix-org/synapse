@@ -74,7 +74,7 @@ class ConfigLoadingFileTestCase(ConfigFileTestCase):
         )
 
     def test_disable_registration(self):
-        self.generate_config()
+        self.generate_config_and_remove_lines_containing("registration_shared_secret")
         self.add_lines_to_config(
             ["enable_registration: true", "disable_registration: true"]
         )

@@ -21,7 +21,7 @@ from tests.config.utils import ConfigFileTestCase
 class HomeserverAppStartTestCase(ConfigFileTestCase):
     def test_wrong_start_caught(self):
         # Generate a config with a worker_app
-        self.generate_config()
+        self.generate_config_and_remove_lines_containing("registration_shared_secret")
         # Add a blank line as otherwise the next addition ends up on a line with a comment
         self.add_lines_to_config(["  "])
         self.add_lines_to_config(["worker_app: test_worker_app"])
