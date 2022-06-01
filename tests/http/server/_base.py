@@ -264,13 +264,11 @@ def make_request_with_cancellation_test(
                 # Check that the request finished with a 499,
                 # ie. the `CancelledError` wasn't swallowed.
                 respond_mock.assert_called_once()
-                args, _kwargs = respond_mock.call_args
-                code = args[1]
 
-                if code != HTTP_STATUS_REQUEST_CANCELLED:
+                if request.code != HTTP_STATUS_REQUEST_CANCELLED:
                     raise AssertionError(
-                        f"{code} != {HTTP_STATUS_REQUEST_CANCELLED} : Cancelled "
-                        "request did not finish with the correct status code."
+                        f"{request.code} != {HTTP_STATUS_REQUEST_CANCELLED} : "
+                        "Cancelled request did not finish with the correct status code."
                     )
         finally:
             # Unblock any processing that might be shared between requests.
