@@ -335,7 +335,7 @@ class FederationEventHandler:
         event.internal_metadata.send_on_behalf_of = origin
 
         context = await self._state_handler.compute_event_context(event)
-        context = await self._check_event_auth(origin, event, context)
+        await self._check_event_auth(origin, event, context)
         if context.rejected:
             raise SynapseError(
                 403, f"{event.membership} event was rejected", Codes.FORBIDDEN
@@ -471,7 +471,7 @@ class FederationEventHandler:
                 partial_state=partial_state,
             )
 
-            context = await self._check_event_auth(origin, event, context)
+            await self._check_event_auth(origin, event, context)
             if context.rejected:
                 raise SynapseError(400, "Join event was rejected")
 
@@ -1098,11 +1098,7 @@ class FederationEventHandler:
                 event,
                 state_ids_before_event=state_ids,
             )
-            context = await self._check_event_auth(
-                origin,
-                event,
-                context,
-            )
+            await self._check_event_auth(origin, event, context)
         except AuthError as e:
             # FIXME richvdh 2021/10/07 I don't think this is reachable. Let's log it
             #   for now
@@ -1478,11 +1474,8 @@ class FederationEventHandler:
         )
 
     async def _check_event_auth(
-        self,
-        origin: str,
-        event: EventBase,
-        context: EventContext,
-    ) -> EventContext:
+        self, origin: str, event: EventBase, context: EventContext
+    ) -> None:
         """
         Checks whether an event should be rejected (for failing auth checks).
 
@@ -1491,9 +1484,6 @@ class FederationEventHandler:
             event: The event itself.
             context:
                 The event context.
-
-        Returns:
-            The updated context object.
 
         Raises:
             AuthError if we were unable to find copies of the event's auth events.
@@ -1509,7 +1499,7 @@ class FederationEventHandler:
             logger.warning("While validating received event %r: %s", event, e)
             # TODO: use a different rejected reason here?
             context.rejected = RejectedReason.AUTH_ERROR
-            return context
+            return
 
         # next, check that we have all of the event's auth events.
         #
@@ -1532,7 +1522,7 @@ class FederationEventHandler:
                 "While checking auth of %r against auth_events: %s", event, e
             )
             context.rejected = RejectedReason.AUTH_ERROR
-            return context
+            return
 
         # now check the auth rules pass against the room state before the event
         # https://spec.matrix.org/v1.3/server-server-api/#checks-performed-on-receipt-of-a-pdu:
@@ -1551,7 +1541,7 @@ class FederationEventHandler:
         if collections.Counter(event.auth_event_ids()) == collections.Counter(
             calculated_auth_event_ids
         ):
-            return context
+            return
 
         # otherwise, re-run the auth checks based on what we calculated.
         calculated_auth_events = await self._store.get_events_as_list(
@@ -1590,8 +1580,6 @@ class FederationEventHandler:
                 e,
             )
             context.rejected = RejectedReason.AUTH_ERROR
-
-        return context
 
     async def _maybe_kick_guest_users(self, event: EventBase) -> None:
         if event.type != EventTypes.GuestAccess:
