@@ -83,8 +83,6 @@ class Thumbnailer:
             # A lot of parsing errors can happen when parsing EXIF
             logger.info("Error parsing image EXIF information: %s", e)
 
-            self.close()
-
     def transpose(self) -> Tuple[int, int]:
         """Transpose the image using its EXIF Orientation tag
 
