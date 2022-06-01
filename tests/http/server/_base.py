@@ -361,37 +361,37 @@ class Deferred__next__Patch:
                 self._previous_stack = stack
 
                 return self._original_Deferred___next__(deferred, value)
-            else:
-                # We want to block at the current `await`.
-                if deferred.called and not deferred.paused:
-                    # This `Deferred` already has a result.
-                    # We return a new, unresolved, `Deferred` for `_inlineCallbacks` to
-                    # wait on. This blocks the coroutine that did this `await`.
-                    # We queue it up for unblocking later.
-                    new_deferred: "Deferred[T]" = Deferred()
-                    self._to_unblock[new_deferred] = deferred.result
 
-                    _log_await_stack(
-                        stack,
-                        self._previous_stack,
-                        self._request_number,
-                        "force-blocked await",
-                    )
-                    self._previous_stack = stack
+            # We want to block at the current `await`.
+            if deferred.called and not deferred.paused:
+                # This `Deferred` already has a result.
+                # We return a new, unresolved, `Deferred` for `_inlineCallbacks` to wait
+                # on. This blocks the coroutine that did this `await`.
+                # We queue it up for unblocking later.
+                new_deferred: "Deferred[T]" = Deferred()
+                self._to_unblock[new_deferred] = deferred.result
 
-                    return make_deferred_yieldable(new_deferred)
-                else:
-                    # This `Deferred` does not have a result yet.
-                    # The `await` will block normally, so we don't have to do anything.
-                    _log_await_stack(
-                        stack,
-                        self._previous_stack,
-                        self._request_number,
-                        "blocking await",
-                    )
-                    self._previous_stack = stack
+                _log_await_stack(
+                    stack,
+                    self._previous_stack,
+                    self._request_number,
+                    "force-blocked await",
+                )
+                self._previous_stack = stack
 
-                    return self._original_Deferred___next__(deferred, value)
+                return make_deferred_yieldable(new_deferred)
+
+            # This `Deferred` does not have a result yet.
+            # The `await` will block normally, so we don't have to do anything.
+            _log_await_stack(
+                stack,
+                self._previous_stack,
+                self._request_number,
+                "blocking await",
+            )
+            self._previous_stack = stack
+
+            return self._original_Deferred___next__(deferred, value)
 
         return mock.patch.object(Deferred, "__next__", new=Deferred___next__)
 
