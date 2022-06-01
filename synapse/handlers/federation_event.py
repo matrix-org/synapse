@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections
 import itertools
 import logging
 from http import HTTPStatus
@@ -1539,6 +1540,14 @@ class FederationEventHandler:
         calculated_auth_event_ids = self._event_auth_handler.compute_auth_events(
             event, prev_state_ids, for_verification=True
         )
+
+        # if those are the same, we're done here.
+        if collections.Counter(event.auth_event_ids()) == collections.Counter(
+            calculated_auth_event_ids
+        ):
+            return context
+
+        # otherwise, re-run the auth checks based on what we calculated.
         calculated_auth_events = await self._store.get_events_as_list(
             calculated_auth_event_ids
         )
