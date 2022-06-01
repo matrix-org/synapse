@@ -235,6 +235,7 @@ def make_request_with_cancellation_test(
                     # `respond_with_json` writes the response asynchronously, so we
                     # might have to give the reactor a kick before the channel gets
                     # the response.
+                    deferred_patch.unblock_awaits()
                     channel.await_result()
 
                     return channel
@@ -244,14 +245,25 @@ def make_request_with_cancellation_test(
 
                 _log_for_request(request_number, "--- disconnected ---")
 
-                # We may need to pump the reactor to allow `delay_cancellation`s to
-                # finish.
-                if not respond_mock.called:
-                    reactor.advance(0.0)
+                # Advance the reactor just enough to get a response.
+                # We don't want to advance the reactor too far, because we can only
+                # detect re-starts of finished logging contexts after we set the
+                # finished flag below.
+                for _ in range(2):
+                    # We may need to pump the reactor to allow `delay_cancellation`s to
+                    # finish.
+                    if not respond_mock.called:
+                        reactor.advance(0.0)
 
-                # Try advancing the clock if that didn't work.
-                if not respond_mock.called:
-                    reactor.advance(1.0)
+                    # Try advancing the clock if that didn't work.
+                    if not respond_mock.called:
+                        reactor.advance(1.0)
+
+                    # `delay_cancellation`s may be waiting for processing that we've
+                    # forced to block. Try unblocking them, followed by another round of
+                    # pumping the reactor.
+                    if not respond_mock.called:
+                        deferred_patch.unblock_awaits()
 
                 # Mark the request's logging context as finished. If it gets
                 # activated again, an `AssertionError` will be raised and bubble up
@@ -272,7 +284,8 @@ def make_request_with_cancellation_test(
                         "Cancelled request did not finish with the correct status code."
                     )
         finally:
-            # Unblock any processing that might be shared between requests.
+            # Unblock any processing that might be shared between requests, if we
+            # haven't already done so.
             deferred_patch.unblock_awaits()
 
     assert False, "unreachable"  # noqa: B011
@@ -400,7 +413,9 @@ class Deferred__next__Patch:
         Must be called when done, otherwise processing shared between multiple requests,
         such as database queries started by `@cached`, will become permanently stuck.
         """
-        for deferred, result in self._to_unblock.items():
+        to_unblock = self._to_unblock
+        self._to_unblock = {}
+        for deferred, result in to_unblock.items():
             deferred.callback(result)
 
 
