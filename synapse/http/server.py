@@ -937,7 +937,6 @@ def set_corp_headers(request: Request) -> None:
     """
     request.setHeader(b"Cross-Origin-Resource-Policy", b"cross-origin")
 
-
 def respond_with_html(request: Request, code: int, html: str) -> None:
     """
     Wraps `respond_with_html_bytes` by first encoding HTML from a str to UTF-8 bytes.

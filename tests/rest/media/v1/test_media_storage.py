@@ -486,7 +486,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
                 channel.headers.getRawHeaders(b"Cross-Origin-Resource-Policy"),
                 [b"cross-origin"],
             )
-            
+
             if expected_body is not None:
                 self.assertEqual(
                     channel.result["body"], expected_body, channel.result["body"]
