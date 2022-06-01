@@ -146,9 +146,10 @@ def make_request_with_cancellation_test(
             request, but the request neglects to cancel that processing or wait for it
             to complete.
 
-            Note that "Re-starting finished log context" errors get caught by twisted
-            and will manifest in a different logging context error at a later point.
-            When debugging logging context failures, setting a breakpoint in
+            Note that "Re-starting finished log context" errors get raised within the
+            request handling code and may or may not get caught. These errors will
+            likely manifest as a different logging context error at a later point. When
+            debugging logging context failures, setting a breakpoint in
             `logcontext_error` can prove useful.
         * A request gets stuck, possibly due to a previous cancellation.
         * The request does not return a 499 when the client disconnects.
@@ -253,11 +254,11 @@ def make_request_with_cancellation_test(
                     reactor.advance(1.0)
 
                 # Mark the request's logging context as finished. If it gets
-                # activated again, an `AssertionError` will be raised. This
-                # `AssertionError` will likely be caught by twisted and turned into
-                # a `Failure`. Instead, a different `AssertionError` will be
-                # observed when the logging context is deactivated, as it wouldn't
-                # have tracked resource usage correctly.
+                # activated again, an `AssertionError` will be raised and bubble up
+                # through request handling code. This `AssertionError` may or may not be
+                # caught. Eventually some other code will deactivate the logging
+                # context which will raise a different `AssertionError` because
+                # resource usage won't have been correctly tracked.
                 if isinstance(request, SynapseRequest) and request.logcontext:
                     request.logcontext.finished = True
 
