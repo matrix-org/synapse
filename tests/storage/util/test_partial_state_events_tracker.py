@@ -123,21 +123,17 @@ class PartialStateEventsTrackerTestCase(TestCase):
 
 class PartialCurrentStateTrackerTestCase(TestCase):
     def setUp(self) -> None:
-        self.mock_store = mock.Mock(spec_set=["has_room_only_got_partial_state"])
+        self.mock_store = mock.Mock(spec_set=["is_partial_state_room"])
 
         self.tracker = PartialCurrentStateTracker(self.mock_store)
 
     def test_does_not_block_for_full_state_rooms(self):
-        self.mock_store.has_room_only_got_partial_state.return_value = make_awaitable(
-            False
-        )
+        self.mock_store.is_partial_state_room.return_value = make_awaitable(False)
 
         self.successResultOf(ensureDeferred(self.tracker.await_full_state("room_id")))
 
     def test_blocks_for_partial_room_state(self):
-        self.mock_store.has_room_only_got_partial_state.return_value = make_awaitable(
-            True
-        )
+        self.mock_store.is_partial_state_room.return_value = make_awaitable(True)
 
         d = ensureDeferred(self.tracker.await_full_state("room_id"))
 
@@ -151,20 +147,16 @@ class PartialCurrentStateTrackerTestCase(TestCase):
     def test_un_partial_state_race(self):
         # We should correctly handle race between awaiting the state and us
         # un-partialling the state
-        async def has_room_only_got_partial_state(events):
+        async def is_partial_state_room(events):
             self.tracker.notify_un_partial_stated("room_id")
             return True
 
-        self.mock_store.has_room_only_got_partial_state.side_effect = (
-            has_room_only_got_partial_state
-        )
+        self.mock_store.is_partial_state_room.side_effect = is_partial_state_room
 
         self.successResultOf(ensureDeferred(self.tracker.await_full_state("room_id")))
 
     def test_cancellation(self):
-        self.mock_store.has_room_only_got_partial_state.return_value = make_awaitable(
-            True
-        )
+        self.mock_store.is_partial_state_room.return_value = make_awaitable(True)
 
         d1 = ensureDeferred(self.tracker.await_full_state("room_id"))
         self.assertNoResult(d1)

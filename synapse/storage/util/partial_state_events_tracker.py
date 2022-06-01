@@ -159,9 +159,7 @@ class PartialCurrentStateTracker:
 
         try:
             # Check if the room has partial current state or not.
-            has_partial_state = await self._store.has_room_only_got_partial_state(
-                room_id
-            )
+            has_partial_state = await self._store.is_partial_state_room(room_id)
             if not has_partial_state:
                 return
 

@@ -1112,7 +1112,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             keyvalues={"room_id": room_id},
         )
 
-    async def has_room_only_got_partial_state(self, room_id: str) -> bool:
+    async def is_partial_state_room(self, room_id: str) -> bool:
         """Checks if this room has partial state.
 
         Returns true if this is a "partial-state" room, which means that the state
@@ -1125,7 +1125,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             keyvalues={"room_id": room_id},
             retcol="room_id",
             allow_none=True,
-            desc="has_room_only_got_partial_state",
+            desc="is_partial_state_room",
         )
 
         return entry is not None
