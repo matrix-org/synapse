@@ -70,7 +70,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
 
         self.event_creation_handler = hs.get_event_creation_handler()
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
+        self._storage_controllers = hs.get_storage_controllers()
         self.clock = hs.get_clock()
 
     @staticmethod
@@ -127,7 +127,9 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             event.internal_metadata.outlier = content["outlier"]
 
             requester = Requester.deserialize(self.store, content["requester"])
-            context = EventContext.deserialize(self.storage, content["context"])
+            context = EventContext.deserialize(
+                self._storage_controllers, content["context"]
+            )
 
             ratelimit = content["ratelimit"]
             extra_users = [UserID.from_string(u) for u in content["extra_users"]]

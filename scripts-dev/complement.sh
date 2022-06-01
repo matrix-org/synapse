@@ -43,6 +43,10 @@ fi
 # Build the base Synapse image from the local checkout
 docker build -t matrixdotorg/synapse -f "docker/Dockerfile" .
 
+extra_test_args=()
+
+test_tags="synapse_blacklist,msc2716,msc3030,msc3787"
+
 # If we're using workers, modify the docker files slightly.
 if [[ -n "$WORKERS" ]]; then
   # Build the workers docker image (from the base Synapse image).
@@ -52,10 +56,21 @@ if [[ -n "$WORKERS" ]]; then
   COMPLEMENT_DOCKERFILE=SynapseWorkers.Dockerfile
 
   # And provide some more configuration to complement.
-  export COMPLEMENT_SPAWN_HS_TIMEOUT_SECS=60
+
+  # It can take quite a while to spin up a worker-mode Synapse for the first
+  # time (the main problem is that we start 14 python processes for each test,
+  # and complement likes to do two of them in parallel).
+  export COMPLEMENT_SPAWN_HS_TIMEOUT_SECS=120
+
+  # ... and it takes longer than 10m to run the whole suite.
+  extra_test_args+=("-timeout=60m")
 else
   export COMPLEMENT_BASE_IMAGE=complement-synapse
   COMPLEMENT_DOCKERFILE=Dockerfile
+
+  # We only test faster room joins on monoliths, because they are purposefully
+  # being developed without worker support to start with.
+  test_tags="$test_tags,faster_joins"
 fi
 
 # Build the Complement image from the Synapse image we just built.
@@ -64,4 +79,5 @@ docker build -t $COMPLEMENT_BASE_IMAGE -f "docker/complement/$COMPLEMENT_DOCKERF
 # Run the tests!
 echo "Images built; running complement"
 cd "$COMPLEMENT_DIR"
-go test -v -tags synapse_blacklist,msc2716,msc3030,faster_joins -count=1 "$@" ./tests/...
+
+go test -v -tags $test_tags -count=1 "${extra_test_args[@]}" "$@" ./tests/...

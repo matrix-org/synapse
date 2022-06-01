@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+from http import HTTPStatus
 from typing import List, Optional
 
 from parameterized import parameterized
@@ -21,9 +22,10 @@ from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.constants import (
+    EduTypes,
     EventContentFields,
     EventTypes,
-    ReadReceiptEventFields,
+    ReceiptTypes,
     RelationTypes,
 )
 from synapse.rest.client import devices, knock, login, read_marker, receipts, room, sync
@@ -346,7 +348,7 @@ class SyncKnockTestCase(
         # Knock on a room
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/knock/%s" % (self.room_id,),
+            f"/_matrix/client/r0/knock/{self.room_id}",
             b"{}",
             self.knocker_tok,
         )
@@ -407,65 +409,103 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
 
     @override_config({"experimental_features": {"msc2285_enabled": True}})
-    def test_hidden_read_receipts(self) -> None:
+    def test_private_read_receipts(self) -> None:
         # Send a message as the first user
         res = self.helper.send(self.room_id, body="hello", tok=self.tok)
 
-        # Send a read receipt to tell the server the first user's message was read
-        body = json.dumps({ReadReceiptEventFields.MSC2285_HIDDEN: True}).encode("utf8")
+        # Send a private read receipt to tell the server the first user's message was read
         channel = self.make_request(
             "POST",
-            "/rooms/%s/receipt/m.read/%s" % (self.room_id, res["event_id"]),
-            body,
+            f"/rooms/{self.room_id}/receipt/org.matrix.msc2285.read.private/{res['event_id']}",
+            {},
             access_token=self.tok2,
         )
         self.assertEqual(channel.code, 200)
 
-        # Test that the first user can't see the other user's hidden read receipt
-        self.assertEqual(self._get_read_receipt(), None)
+        # Test that the first user can't see the other user's private read receipt
+        self.assertIsNone(self._get_read_receipt())
 
-    @parameterized.expand(
-        [
-            # Old Element version, expected to send an empty body
-            (
-                "agent1",
-                "Element/1.2.2 (Linux; U; Android 9; MatrixAndroidSDK_X 0.0.1)",
-                200,
-            ),
-            # Old SchildiChat version, expected to send an empty body
-            ("agent2", "SchildiChat/1.2.1 (Android 10)", 200),
-            # Expected 400: Denies empty body starting at version 1.3+
-            ("agent3", "Element/1.3.6 (Android 10)", 400),
-            ("agent4", "SchildiChat/1.3.6 (Android 11)", 400),
-            # Contains "Riot": Receipts with empty bodies expected
-            ("agent5", "Element (Riot.im) (Android 9)", 200),
-            # Expected 400: Does not contain "Android"
-            ("agent6", "Element/1.2.1", 400),
-            # Expected 400: Different format, missing "/" after Element; existing build that should allow empty bodies, but minimal ongoing usage
-            ("agent7", "Element dbg/1.1.8-dev (Android)", 400),
-        ]
-    )
-    def test_read_receipt_with_empty_body(
-        self, name: str, user_agent: str, expected_status_code: int
-    ) -> None:
+    @override_config({"experimental_features": {"msc2285_enabled": True}})
+    def test_public_receipt_can_override_private(self) -> None:
+        """
+        Sending a public read receipt to the same event which has a private read
+        receipt should cause that receipt to become public.
+        """
+        # Send a message as the first user
+        res = self.helper.send(self.room_id, body="hello", tok=self.tok)
+
+        # Send a private read receipt
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ_PRIVATE}/{res['event_id']}",
+            {},
+            access_token=self.tok2,
+        )
+        self.assertEqual(channel.code, 200)
+        self.assertIsNone(self._get_read_receipt())
+
+        # Send a public read receipt
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ}/{res['event_id']}",
+            {},
+            access_token=self.tok2,
+        )
+        self.assertEqual(channel.code, 200)
+
+        # Test that we did override the private read receipt
+        self.assertNotEqual(self._get_read_receipt(), None)
+
+    @override_config({"experimental_features": {"msc2285_enabled": True}})
+    def test_private_receipt_cannot_override_public(self) -> None:
+        """
+        Sending a private read receipt to the same event which has a public read
+        receipt should cause no change.
+        """
+        # Send a message as the first user
+        res = self.helper.send(self.room_id, body="hello", tok=self.tok)
+
+        # Send a public read receipt
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ}/{res['event_id']}",
+            {},
+            access_token=self.tok2,
+        )
+        self.assertEqual(channel.code, 200)
+        self.assertNotEqual(self._get_read_receipt(), None)
+
+        # Send a private read receipt
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ_PRIVATE}/{res['event_id']}",
+            {},
+            access_token=self.tok2,
+        )
+        self.assertEqual(channel.code, 200)
+
+        # Test that we didn't override the public read receipt
+        self.assertIsNone(self._get_read_receipt())
+
+    def test_read_receipt_with_empty_body_is_rejected(self) -> None:
         # Send a message as the first user
         res = self.helper.send(self.room_id, body="hello", tok=self.tok)
 
         # Send a read receipt for this message with an empty body
         channel = self.make_request(
             "POST",
-            "/rooms/%s/receipt/m.read/%s" % (self.room_id, res["event_id"]),
+            f"/rooms/{self.room_id}/receipt/m.read/{res['event_id']}",
             access_token=self.tok2,
-            custom_headers=[("User-Agent", user_agent)],
         )
-        self.assertEqual(channel.code, expected_status_code)
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST)
+        self.assertEqual(channel.json_body["errcode"], "M_NOT_JSON", channel.json_body)
 
     def _get_read_receipt(self) -> Optional[JsonDict]:
         """Syncs and returns the read receipt."""
 
         # Checks if event is a read receipt
         def is_read_receipt(event: JsonDict) -> bool:
-            return event["type"] == "m.receipt"
+            return event["type"] == EduTypes.RECEIPT
 
         # Sync
         channel = self.make_request(
@@ -477,6 +517,9 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
 
         # Store the next batch for the next request.
         self.next_batch = channel.json_body["next_batch"]
+
+        if channel.json_body.get("rooms", None) is None:
+            return None
 
         # Return the read receipt
         ephemeral_events = channel.json_body["rooms"]["join"][self.room_id][
@@ -498,7 +541,10 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
     def default_config(self) -> JsonDict:
         config = super().default_config()
-        config["experimental_features"] = {"msc2654_enabled": True}
+        config["experimental_features"] = {
+            "msc2654_enabled": True,
+            "msc2285_enabled": True,
+        }
         return config
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
@@ -560,10 +606,10 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(1)
 
         # Send a read receipt to tell the server we've read the latest event.
-        body = json.dumps({"m.read": res["event_id"]}).encode("utf8")
+        body = json.dumps({ReceiptTypes.READ: res["event_id"]}).encode("utf8")
         channel = self.make_request(
             "POST",
-            "/rooms/%s/read_markers" % self.room_id,
+            f"/rooms/{self.room_id}/read_markers",
             body,
             access_token=self.tok,
         )
@@ -572,16 +618,15 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         # Check that the unread counter is back to 0.
         self._check_unread_count(0)
 
-        # Check that hidden read receipts don't break unread counts
+        # Check that private read receipts don't break unread counts
         res = self.helper.send(self.room_id, "hello", tok=self.tok2)
         self._check_unread_count(1)
 
         # Send a read receipt to tell the server we've read the latest event.
-        body = json.dumps({ReadReceiptEventFields.MSC2285_HIDDEN: True}).encode("utf8")
         channel = self.make_request(
             "POST",
-            "/rooms/%s/receipt/m.read/%s" % (self.room_id, res["event_id"]),
-            body,
+            f"/rooms/{self.room_id}/receipt/org.matrix.msc2285.read.private/{res['event_id']}",
+            {},
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
@@ -612,12 +657,13 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(3)
 
         # Check that custom events with a body increase the unread counter.
-        self.helper.send_event(
+        result = self.helper.send_event(
             self.room_id,
             "org.matrix.custom_type",
             {"body": "hello"},
             tok=self.tok2,
         )
+        event_id = result["event_id"]
         self._check_unread_count(4)
 
         # Check that edits don't increase the unread counter.
@@ -627,7 +673,10 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             content={
                 "body": "hello",
                 "msgtype": "m.text",
-                "m.relates_to": {"rel_type": RelationTypes.REPLACE},
+                "m.relates_to": {
+                    "rel_type": RelationTypes.REPLACE,
+                    "event_id": event_id,
+                },
             },
             tok=self.tok2,
         )
@@ -643,13 +692,73 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(4)
 
         # Check that tombstone events changes increase the unread counter.
-        self.helper.send_state(
+        res1 = self.helper.send_state(
             self.room_id,
             EventTypes.Tombstone,
             {"replacement_room": "!someroom:test"},
             tok=self.tok2,
         )
         self._check_unread_count(5)
+        res2 = self.helper.send(self.room_id, "hello", tok=self.tok2)
+
+        # Make sure both m.read and org.matrix.msc2285.read.private advance
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/m.read/{res1['event_id']}",
+            {},
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        self._check_unread_count(1)
+
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/org.matrix.msc2285.read.private/{res2['event_id']}",
+            {},
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        self._check_unread_count(0)
+
+    # We test for both receipt types that influence notification counts
+    @parameterized.expand([ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE])
+    def test_read_receipts_only_go_down(self, receipt_type: ReceiptTypes) -> None:
+        # Join the new user
+        self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
+
+        # Send messages
+        res1 = self.helper.send(self.room_id, "hello", tok=self.tok2)
+        res2 = self.helper.send(self.room_id, "hello", tok=self.tok2)
+
+        # Read last event
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/{receipt_type}/{res2['event_id']}",
+            {},
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        self._check_unread_count(0)
+
+        # Make sure neither m.read nor org.matrix.msc2285.read.private make the
+        # read receipt go up to an older event
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/org.matrix.msc2285.read.private/{res1['event_id']}",
+            {},
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        self._check_unread_count(0)
+
+        channel = self.make_request(
+            "POST",
+            f"/rooms/{self.room_id}/receipt/m.read/{res1['event_id']}",
+            {},
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+        self._check_unread_count(0)
 
     def _check_unread_count(self, expected_count: int) -> None:
         """Syncs and compares the unread count with the expected value."""
@@ -662,9 +771,11 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 200, channel.json_body)
 
-        room_entry = channel.json_body["rooms"]["join"][self.room_id]
+        room_entry = (
+            channel.json_body.get("rooms", {}).get("join", {}).get(self.room_id, {})
+        )
         self.assertEqual(
-            room_entry["org.matrix.msc2654.unread_count"],
+            room_entry.get("org.matrix.msc2654.unread_count", 0),
             expected_count,
             room_entry,
         )

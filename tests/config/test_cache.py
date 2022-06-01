@@ -38,6 +38,7 @@ class CacheConfigTests(TestCase):
             "SYNAPSE_NOT_CACHE": "BLAH",
         }
         self.config.read_config(config, config_dir_path="", data_dir_path="")
+        self.config.resize_all_caches()
 
         self.assertEqual(dict(self.config.cache_factors), {"something_or_other": 2.0})
 
@@ -52,6 +53,7 @@ class CacheConfigTests(TestCase):
             "SYNAPSE_CACHE_FACTOR_FOO": 1,
         }
         self.config.read_config(config, config_dir_path="", data_dir_path="")
+        self.config.resize_all_caches()
 
         self.assertEqual(
             dict(self.config.cache_factors),
@@ -71,6 +73,7 @@ class CacheConfigTests(TestCase):
 
         config = {"caches": {"per_cache_factors": {"foo": 3}}}
         self.config.read_config(config)
+        self.config.resize_all_caches()
 
         self.assertEqual(cache.max_size, 300)
 
@@ -82,6 +85,7 @@ class CacheConfigTests(TestCase):
         """
         config = {"caches": {"per_cache_factors": {"foo": 2}}}
         self.config.read_config(config, config_dir_path="", data_dir_path="")
+        self.config.resize_all_caches()
 
         cache = LruCache(100)
         add_resizable_cache("foo", cache_resize_callback=cache.set_cache_factor)
@@ -99,6 +103,7 @@ class CacheConfigTests(TestCase):
 
         config = {"caches": {"global_factor": 4}}
         self.config.read_config(config, config_dir_path="", data_dir_path="")
+        self.config.resize_all_caches()
 
         self.assertEqual(cache.max_size, 400)
 
@@ -110,6 +115,7 @@ class CacheConfigTests(TestCase):
         """
         config = {"caches": {"global_factor": 1.5}}
         self.config.read_config(config, config_dir_path="", data_dir_path="")
+        self.config.resize_all_caches()
 
         cache = LruCache(100)
         add_resizable_cache("foo", cache_resize_callback=cache.set_cache_factor)
@@ -128,6 +134,7 @@ class CacheConfigTests(TestCase):
             "SYNAPSE_CACHE_FACTOR_CACHE_B": 3,
         }
         self.config.read_config(config, config_dir_path="", data_dir_path="")
+        self.config.resize_all_caches()
 
         cache_a = LruCache(100)
         add_resizable_cache("*cache_a*", cache_resize_callback=cache_a.set_cache_factor)
@@ -148,6 +155,7 @@ class CacheConfigTests(TestCase):
 
         config = {"caches": {"event_cache_size": "10k"}}
         self.config.read_config(config, config_dir_path="", data_dir_path="")
+        self.config.resize_all_caches()
 
         cache = LruCache(
             max_size=self.config.event_cache_size,

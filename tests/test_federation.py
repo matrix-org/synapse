@@ -233,7 +233,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         # Register mock device list retrieval on the federation client.
         federation_client = self.homeserver.get_federation_client()
         federation_client.query_user_devices = Mock(
-            return_value=succeed(
+            return_value=make_awaitable(
                 {
                     "user_id": remote_user_id,
                     "stream_id": 1,

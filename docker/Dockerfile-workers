@@ -20,6 +20,9 @@ RUN rm /etc/nginx/sites-enabled/default
 # Copy Synapse worker, nginx and supervisord configuration template files
 COPY ./docker/conf-workers/* /conf/
 
+# Copy a script to prefix log lines with the supervisor program name
+COPY ./docker/prefix-log /usr/local/bin/
+
 # Expose nginx listener port
 EXPOSE 8080/tcp
 

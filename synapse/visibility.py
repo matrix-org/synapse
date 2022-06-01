@@ -20,9 +20,9 @@ from typing_extensions import Final
 from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.events import EventBase
 from synapse.events.utils import prune_event
-from synapse.storage import Storage
+from synapse.storage.controllers import StorageControllers
 from synapse.storage.state import StateFilter
-from synapse.types import StateMap, get_domain_from_id
+from synapse.types import RetentionPolicy, StateMap, get_domain_from_id
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ _HISTORY_VIS_KEY: Final[Tuple[str, str]] = (EventTypes.RoomHistoryVisibility, ""
 
 
 async def filter_events_for_client(
-    storage: Storage,
+    storage: StorageControllers,
     user_id: str,
     events: List[EventBase],
     is_peeking: bool = False,
@@ -94,7 +94,7 @@ async def filter_events_for_client(
 
     if filter_send_to_client:
         room_ids = {e.room_id for e in events}
-        retention_policies = {}
+        retention_policies: Dict[str, RetentionPolicy] = {}
 
         for room_id in room_ids:
             retention_policies[
@@ -137,7 +137,7 @@ async def filter_events_for_client(
             # events.
             if not event.is_state():
                 retention_policy = retention_policies[event.room_id]
-                max_lifetime = retention_policy.get("max_lifetime")
+                max_lifetime = retention_policy.max_lifetime
 
                 if max_lifetime is not None:
                     oldest_allowed_ts = storage.main.clock.time_msec() - max_lifetime
@@ -268,7 +268,7 @@ async def filter_events_for_client(
 
 
 async def filter_events_for_server(
-    storage: Storage,
+    storage: StorageControllers,
     server_name: str,
     events: List[EventBase],
     redact: bool = True,
@@ -360,7 +360,7 @@ async def filter_events_for_server(
 
 
 async def _event_to_history_vis(
-    storage: Storage, events: Collection[EventBase]
+    storage: StorageControllers, events: Collection[EventBase]
 ) -> Dict[str, str]:
     """Get the history visibility at each of the given events
 
@@ -407,7 +407,7 @@ async def _event_to_history_vis(
 
 
 async def _event_to_memberships(
-    storage: Storage, events: Collection[EventBase], server_name: str
+    storage: StorageControllers, events: Collection[EventBase], server_name: str
 ) -> Dict[str, StateMap[EventBase]]:
     """Get the remote membership list at each of the given events
 
@@ -419,6 +419,13 @@ async def _event_to_memberships(
         return {}
 
     # for each event, get the event_ids of the membership state at those events.
+    #
+    # TODO: this means that we request the entire membership list. If there  are only
+    #   one or two users on this server, and the room is huge, this is very wasteful
+    #   (it means more db work, and churns the *stateGroupMembersCache*).
+    #   It might be that we could extend StateFilter to specify "give me keys matching
+    #   *:<server_name>", to avoid this.
+
     event_to_state_ids = await storage.state.get_state_ids_for_events(
         frozenset(e.event_id for e in events),
         state_filter=StateFilter.from_types(types=((EventTypes.Member, None),)),

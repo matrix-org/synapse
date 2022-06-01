@@ -14,7 +14,7 @@
 import json
 import os
 import tempfile
-from typing import List, Optional, cast
+from typing import List, cast
 from unittest.mock import Mock
 
 import yaml
@@ -149,15 +149,12 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
             outfile.write(yaml.dump(as_yaml))
             self.as_yaml_files.append(as_token)
 
-    def _set_state(
-        self, id: str, state: ApplicationServiceState, txn: Optional[int] = None
-    ):
+    def _set_state(self, id: str, state: ApplicationServiceState):
         return self.db_pool.runOperation(
             self.engine.convert_param_style(
-                "INSERT INTO application_services_state(as_id, state, last_txn) "
-                "VALUES(?,?,?)"
+                "INSERT INTO application_services_state(as_id, state) VALUES(?,?)"
             ),
-            (id, state.value, txn),
+            (id, state.value),
         )
 
     def _insert_txn(self, as_id, txn_id, events):
@@ -283,17 +280,6 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         res = self.get_success(
             self.db_pool.runQuery(
                 self.engine.convert_param_style(
-                    "SELECT last_txn FROM application_services_state WHERE as_id=?"
-                ),
-                (service.id,),
-            )
-        )
-        self.assertEqual(1, len(res))
-        self.assertEqual(txn_id, res[0][0])
-
-        res = self.get_success(
-            self.db_pool.runQuery(
-                self.engine.convert_param_style(
                     "SELECT * FROM application_services_txns WHERE txn_id=?"
                 ),
                 (txn_id,),
@@ -316,14 +302,13 @@ class ApplicationServiceTransactionStoreTestCase(unittest.HomeserverTestCase):
         res = self.get_success(
             self.db_pool.runQuery(
                 self.engine.convert_param_style(
-                    "SELECT last_txn, state FROM application_services_state WHERE as_id=?"
+                    "SELECT state FROM application_services_state WHERE as_id=?"
                 ),
                 (service.id,),
             )
         )
         self.assertEqual(1, len(res))
-        self.assertEqual(txn_id, res[0][0])
-        self.assertEqual(ApplicationServiceState.UP.value, res[0][1])
+        self.assertEqual(ApplicationServiceState.UP.value, res[0][0])
 
         res = self.get_success(
             self.db_pool.runQuery(

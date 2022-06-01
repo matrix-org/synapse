@@ -69,7 +69,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         #     event_forward_extremities
         #     event_json
         #     event_push_actions
-        #     event_reference_hashes
         #     event_relations
         #     event_search
         #     event_to_state_groups
@@ -220,7 +219,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "event_auth",
             "event_edges",
             "event_forward_extremities",
-            "event_reference_hashes",
             "event_relations",
             "event_search",
             "rejections",
@@ -324,7 +322,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         )
 
     def _purge_room_txn(self, txn: LoggingTransaction, room_id: str) -> List[int]:
-        # First we fetch all the state groups that should be deleted, before
+        # First, fetch all the state groups that should be deleted, before
         # we delete that information.
         txn.execute(
             """
@@ -364,7 +362,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "event_edges",
             "event_json",
             "event_push_actions_staging",
-            "event_reference_hashes",
             "event_relations",
             "event_to_state_groups",
             "event_auth_chains",
@@ -385,7 +382,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
                 (room_id,),
             )
 
-        # and finally, the tables with an index on room_id (or no useful index)
+        # next, the tables with an index on room_id (or no useful index)
         for table in (
             "current_state_events",
             "destination_rooms",
@@ -393,8 +390,13 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "event_forward_extremities",
             "event_push_actions",
             "event_search",
+            "partial_state_events",
             "events",
+            "federation_inbound_events_staging",
             "group_rooms",
+            "local_current_membership",
+            "partial_state_rooms_servers",
+            "partial_state_rooms",
             "receipts_graph",
             "receipts_linearized",
             "room_aliases",
@@ -403,7 +405,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "room_stats_state",
             "room_stats_current",
             "room_stats_earliest_token",
-            "rooms",
             "stream_ordering_to_exterm",
             "users_in_public_rooms",
             "users_who_share_private_rooms",
@@ -415,7 +416,9 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "group_summary_rooms",
             "room_account_data",
             "room_tags",
-            "local_current_membership",
+            # "rooms" happens last, to keep the foreign keys in the other tables
+            # happy
+            "rooms",
         ):
             logger.info("[purge] removing %s from %s", room_id, table)
             txn.execute("DELETE FROM %s WHERE room_id=?" % (table,), (room_id,))

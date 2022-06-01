@@ -262,7 +262,9 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         )
         msg, msgctx = self.build_event()
         self.get_success(
-            self.storage.persistence.persist_events([(j2, j2ctx), (msg, msgctx)])
+            self._storage_controllers.persistence.persist_events(
+                [(j2, j2ctx), (msg, msgctx)]
+            )
         )
         self.replicate()
 
@@ -323,12 +325,14 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
 
         if backfill:
             self.get_success(
-                self.storage.persistence.persist_events(
+                self._storage_controllers.persistence.persist_events(
                     [(event, context)], backfilled=True
                 )
             )
         else:
-            self.get_success(self.storage.persistence.persist_event(event, context))
+            self.get_success(
+                self._storage_controllers.persistence.persist_event(event, context)
+            )
 
         return event
 

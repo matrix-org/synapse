@@ -122,6 +122,51 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
             "count_users_by_service", _count_users_by_service
         )
 
+    async def get_monthly_active_users_by_service(
+        self, start_timestamp: Optional[int] = None, end_timestamp: Optional[int] = None
+    ) -> List[Tuple[str, str]]:
+        """Generates list of monthly active users and their services.
+        Please see "get_monthly_active_count_by_service" docstring for more details
+        about services.
+
+        Arguments:
+            start_timestamp: If specified, only include users that were first active
+                at or after this point
+            end_timestamp: If specified, only include users that were first active
+                at or before this point
+
+        Returns:
+            A list of tuples (appservice_id, user_id). "native" is emitted as the
+            appservice for users that don't come from appservices (i.e. native Matrix
+            users).
+
+        """
+        if start_timestamp is not None and end_timestamp is not None:
+            where_clause = 'WHERE "timestamp" >= ? and "timestamp" <= ?'
+            query_params = [start_timestamp, end_timestamp]
+        elif start_timestamp is not None:
+            where_clause = 'WHERE "timestamp" >= ?'
+            query_params = [start_timestamp]
+        elif end_timestamp is not None:
+            where_clause = 'WHERE "timestamp" <= ?'
+            query_params = [end_timestamp]
+        else:
+            where_clause = ""
+            query_params = []
+
+        def _list_users(txn: LoggingTransaction) -> List[Tuple[str, str]]:
+            sql = f"""
+                    SELECT COALESCE(appservice_id, 'native'), user_id
+                    FROM monthly_active_users
+                    LEFT JOIN users ON monthly_active_users.user_id=users.name
+                    {where_clause};
+                """
+
+            txn.execute(sql, query_params)
+            return cast(List[Tuple[str, str]], txn.fetchall())
+
+        return await self.db_pool.runInteraction("list_users", _list_users)
+
     async def get_registered_reserved_users(self) -> List[str]:
         """Of the reserved threepids defined in config, retrieve those that are associated
         with registered users
@@ -232,10 +277,10 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
             # is racy.
             # Have resolved to invalidate the whole cache for now and do
             # something about it if and when the perf becomes significant
-            self._invalidate_all_cache_and_stream(  # type: ignore[attr-defined]
+            self._invalidate_all_cache_and_stream(
                 txn, self.user_last_seen_monthly_active
             )
-            self._invalidate_cache_and_stream(txn, self.get_monthly_active_count, ())  # type: ignore[attr-defined]
+            self._invalidate_cache_and_stream(txn, self.get_monthly_active_count, ())
 
         reserved_users = await self.get_registered_reserved_users()
         await self.db_pool.runInteraction(
@@ -363,7 +408,7 @@ class MonthlyActiveUsersWorkerStore(RegistrationWorkerStore):
 
         if self._limit_usage_by_mau or self._mau_stats_only:
             # Trial users and guests should not be included as part of MAU group
-            is_guest = await self.is_guest(user_id)  # type: ignore[attr-defined]
+            is_guest = await self.is_guest(user_id)
             if is_guest:
                 return
             is_trial = await self.is_trial_user(user_id)

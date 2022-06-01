@@ -71,6 +71,9 @@ class DirectoryHandler:
             if wchar in room_alias.localpart:
                 raise SynapseError(400, "Invalid characters in room alias")
 
+        if ":" in room_alias.localpart:
+            raise SynapseError(400, "Invalid character in room alias localpart: ':'.")
+
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
             # TODO(erikj): Change this.

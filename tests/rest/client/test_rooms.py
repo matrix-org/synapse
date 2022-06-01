@@ -22,11 +22,11 @@ from typing import Any, Dict, Iterable, List, Optional
 from unittest.mock import Mock, call
 from urllib import parse as urlparse
 
-from twisted.internet import defer
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.constants import (
+    EduTypes,
     EventContentFields,
     EventTypes,
     Membership,
@@ -926,7 +926,7 @@ class RoomJoinTestCase(RoomBase):
         ) -> bool:
             return return_value
 
-        callback_mock = Mock(side_effect=user_may_join_room)
+        callback_mock = Mock(side_effect=user_may_join_room, spec=lambda *x: None)
         self.hs.get_spam_checker()._user_may_join_room_callbacks.append(callback_mock)
 
         # Join a first room, without being invited to it.
@@ -1117,6 +1117,264 @@ class RoomMessagesTestCase(RoomBase):
         self.assertEqual(200, channel.code, msg=channel.result["body"])
 
 
+class RoomPowerLevelOverridesTestCase(RoomBase):
+    """Tests that the power levels can be overridden with server config."""
+
+    user_id = "@sid1:red"
+
+    servlets = [
+        admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.admin_user_id = self.register_user("admin", "pass")
+        self.admin_access_token = self.login("admin", "pass")
+
+    def power_levels(self, room_id: str) -> Dict[str, Any]:
+        return self.helper.get_state(
+            room_id, "m.room.power_levels", self.admin_access_token
+        )
+
+    def test_default_power_levels_with_room_override(self) -> None:
+        """
+        Create a room, providing power level overrides.
+        Confirm that the room's power levels reflect the overrides.
+
+        See https://github.com/matrix-org/matrix-spec/issues/492
+        - currently we overwrite each key of power_level_content_override
+        completely.
+        """
+
+        room_id = self.helper.create_room_as(
+            self.user_id,
+            extra_content={
+                "power_level_content_override": {"events": {"custom.event": 0}}
+            },
+        )
+        self.assertEqual(
+            {
+                "custom.event": 0,
+            },
+            self.power_levels(room_id)["events"],
+        )
+
+    @unittest.override_config(
+        {
+            "default_power_level_content_override": {
+                "public_chat": {"events": {"custom.event": 0}},
+            }
+        },
+    )
+    def test_power_levels_with_server_override(self) -> None:
+        """
+        With a server configured to modify the room-level defaults,
+        Create a room, without providing any extra power level overrides.
+        Confirm that the room's power levels reflect the server-level overrides.
+
+        Similar to https://github.com/matrix-org/matrix-spec/issues/492,
+        we overwrite each key of power_level_content_override completely.
+        """
+
+        room_id = self.helper.create_room_as(self.user_id)
+        self.assertEqual(
+            {
+                "custom.event": 0,
+            },
+            self.power_levels(room_id)["events"],
+        )
+
+    @unittest.override_config(
+        {
+            "default_power_level_content_override": {
+                "public_chat": {
+                    "events": {"server.event": 0},
+                    "ban": 13,
+                },
+            }
+        },
+    )
+    def test_power_levels_with_server_and_room_overrides(self) -> None:
+        """
+        With a server configured to modify the room-level defaults,
+        create a room, providing different overrides.
+        Confirm that the room's power levels reflect both overrides, and
+        choose the room overrides where they clash.
+        """
+
+        room_id = self.helper.create_room_as(
+            self.user_id,
+            extra_content={
+                "power_level_content_override": {"events": {"room.event": 0}}
+            },
+        )
+
+        # Room override wins over server config
+        self.assertEqual(
+            {"room.event": 0},
+            self.power_levels(room_id)["events"],
+        )
+
+        # But where there is no room override, server config wins
+        self.assertEqual(13, self.power_levels(room_id)["ban"])
+
+
+class RoomPowerLevelOverridesInPracticeTestCase(RoomBase):
+    """
+    Tests that we can really do various otherwise-prohibited actions
+    based on overriding the power levels in config.
+    """
+
+    user_id = "@sid1:red"
+
+    def test_creator_can_post_state_event(self) -> None:
+        # Given I am the creator of a room
+        room_id = self.helper.create_room_as(self.user_id)
+
+        # When I send a state event
+        path = "/rooms/{room_id}/state/custom.event/my_state_key".format(
+            room_id=urlparse.quote(room_id),
+        )
+        channel = self.make_request("PUT", path, "{}")
+
+        # Then I am allowed
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+
+    def test_normal_user_can_not_post_state_event(self) -> None:
+        # Given I am a normal member of a room
+        room_id = self.helper.create_room_as("@some_other_guy:red")
+        self.helper.join(room=room_id, user=self.user_id)
+
+        # When I send a state event
+        path = "/rooms/{room_id}/state/custom.event/my_state_key".format(
+            room_id=urlparse.quote(room_id),
+        )
+        channel = self.make_request("PUT", path, "{}")
+
+        # Then I am not allowed because state events require PL>=50
+        self.assertEqual(403, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            "You don't have permission to post that to the room. "
+            "user_level (0) < send_level (50)",
+            channel.json_body["error"],
+        )
+
+    @unittest.override_config(
+        {
+            "default_power_level_content_override": {
+                "public_chat": {"events": {"custom.event": 0}},
+            }
+        },
+    )
+    def test_with_config_override_normal_user_can_post_state_event(self) -> None:
+        # Given the server has config allowing normal users to post my event type,
+        # and I am a normal member of a room
+        room_id = self.helper.create_room_as("@some_other_guy:red")
+        self.helper.join(room=room_id, user=self.user_id)
+
+        # When I send a state event
+        path = "/rooms/{room_id}/state/custom.event/my_state_key".format(
+            room_id=urlparse.quote(room_id),
+        )
+        channel = self.make_request("PUT", path, "{}")
+
+        # Then I am allowed
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+
+    @unittest.override_config(
+        {
+            "default_power_level_content_override": {
+                "public_chat": {"events": {"custom.event": 0}},
+            }
+        },
+    )
+    def test_any_room_override_defeats_config_override(self) -> None:
+        # Given the server has config allowing normal users to post my event type
+        # And I am a normal member of a room
+        # But the room was created with special permissions
+        extra_content: Dict[str, Any] = {
+            "power_level_content_override": {"events": {}},
+        }
+        room_id = self.helper.create_room_as(
+            "@some_other_guy:red", extra_content=extra_content
+        )
+        self.helper.join(room=room_id, user=self.user_id)
+
+        # When I send a state event
+        path = "/rooms/{room_id}/state/custom.event/my_state_key".format(
+            room_id=urlparse.quote(room_id),
+        )
+        channel = self.make_request("PUT", path, "{}")
+
+        # Then I am not allowed
+        self.assertEqual(403, channel.code, msg=channel.result["body"])
+
+    @unittest.override_config(
+        {
+            "default_power_level_content_override": {
+                "public_chat": {"events": {"custom.event": 0}},
+            }
+        },
+    )
+    def test_specific_room_override_defeats_config_override(self) -> None:
+        # Given the server has config allowing normal users to post my event type,
+        # and I am a normal member of a room,
+        # but the room was created with special permissions for this event type
+        extra_content = {
+            "power_level_content_override": {"events": {"custom.event": 1}},
+        }
+        room_id = self.helper.create_room_as(
+            "@some_other_guy:red", extra_content=extra_content
+        )
+        self.helper.join(room=room_id, user=self.user_id)
+
+        # When I send a state event
+        path = "/rooms/{room_id}/state/custom.event/my_state_key".format(
+            room_id=urlparse.quote(room_id),
+        )
+        channel = self.make_request("PUT", path, "{}")
+
+        # Then I am not allowed
+        self.assertEqual(403, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            "You don't have permission to post that to the room. "
+            + "user_level (0) < send_level (1)",
+            channel.json_body["error"],
+        )
+
+    @unittest.override_config(
+        {
+            "default_power_level_content_override": {
+                "public_chat": {"events": {"custom.event": 0}},
+                "private_chat": None,
+                "trusted_private_chat": None,
+            }
+        },
+    )
+    def test_config_override_applies_only_to_specific_preset(self) -> None:
+        # Given the server has config for public_chats,
+        # and I am a normal member of a private_chat room
+        room_id = self.helper.create_room_as("@some_other_guy:red", is_public=False)
+        self.helper.invite(room=room_id, src="@some_other_guy:red", targ=self.user_id)
+        self.helper.join(room=room_id, user=self.user_id)
+
+        # When I send a state event
+        path = "/rooms/{room_id}/state/custom.event/my_state_key".format(
+            room_id=urlparse.quote(room_id),
+        )
+        channel = self.make_request("PUT", path, "{}")
+
+        # Then I am not allowed because the public_chat config does not
+        # affect this room, because this room is a private_chat
+        self.assertEqual(403, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            "You don't have permission to post that to the room. "
+            + "user_level (0) < send_level (50)",
+            channel.json_body["error"],
+        )
+
+
 class RoomInitialSyncTestCase(RoomBase):
     """Tests /rooms/$room_id/initialSync."""
 
@@ -1155,7 +1413,7 @@ class RoomInitialSyncTestCase(RoomBase):
             e["content"]["user_id"]: e for e in channel.json_body["presence"]
         }
         self.assertTrue(self.user_id in presence_by_user)
-        self.assertEqual("m.presence", presence_by_user[self.user_id]["type"])
+        self.assertEqual(EduTypes.PRESENCE, presence_by_user[self.user_id]["type"])
 
 
 class RoomMessageListTestCase(RoomBase):
@@ -1426,9 +1684,7 @@ class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
 
     def test_simple(self) -> None:
         "Simple test for searching rooms over federation"
-        self.federation_client.get_public_rooms.side_effect = lambda *a, **k: defer.succeed(  # type: ignore[attr-defined]
-            {}
-        )
+        self.federation_client.get_public_rooms.return_value = make_awaitable({})  # type: ignore[attr-defined]
 
         search_filter = {"generic_search_term": "foobar"}
 
@@ -1456,7 +1712,7 @@ class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
         # with a 404, when using search filters.
         self.federation_client.get_public_rooms.side_effect = (  # type: ignore[attr-defined]
             HttpResponseException(404, "Not Found", b""),
-            defer.succeed({}),
+            make_awaitable({}),
         )
 
         search_filter = {"generic_search_term": "foobar"}
@@ -2601,7 +2857,9 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
 
         # Add a mock to the spamchecker callbacks for user_may_send_3pid_invite. Make it
         # allow everything for now.
-        mock = Mock(return_value=make_awaitable(True))
+        # `spec` argument is needed for this function mock to have `__qualname__`, which
+        # is needed for `Measure` metrics buried in SpamChecker.
+        mock = Mock(return_value=make_awaitable(True), spec=lambda *x: None)
         self.hs.get_spam_checker()._user_may_send_3pid_invite_callbacks.append(mock)
 
         # Send a 3PID invite into the room and check that it succeeded.

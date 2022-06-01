@@ -14,9 +14,10 @@
 # limitations under the License.
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from prometheus_client import Counter
+from typing_extensions import TypeGuard
 
 from synapse.api.constants import EventTypes, Membership, ThirdPartyEntityKind
 from synapse.api.errors import CodeMessageException
@@ -66,7 +67,7 @@ def _is_valid_3pe_metadata(info: JsonDict) -> bool:
     return True
 
 
-def _is_valid_3pe_result(r: JsonDict, field: str) -> bool:
+def _is_valid_3pe_result(r: object, field: str) -> TypeGuard[JsonDict]:
     if not isinstance(r, dict):
         return False
 
@@ -154,6 +155,9 @@ class ApplicationServiceApi(SimpleHttpClient):
         if service.url is None:
             return []
 
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
         uri = "%s%s/thirdparty/%s/%s" % (
             service.url,
             APP_SERVICE_PREFIX,
@@ -161,7 +165,11 @@ class ApplicationServiceApi(SimpleHttpClient):
             urllib.parse.quote(protocol),
         )
         try:
-            response = await self.get_json(uri, fields)
+            args: Mapping[Any, Any] = {
+                **fields,
+                b"access_token": service.hs_token,
+            }
+            response = await self.get_json(uri, args=args)
             if not isinstance(response, list):
                 logger.warning(
                     "query_3pe to %s returned an invalid response %r", uri, response
@@ -189,13 +197,15 @@ class ApplicationServiceApi(SimpleHttpClient):
             return {}
 
         async def _get() -> Optional[JsonDict]:
+            # This is required by the configuration.
+            assert service.hs_token is not None
             uri = "%s%s/thirdparty/protocol/%s" % (
                 service.url,
                 APP_SERVICE_PREFIX,
                 urllib.parse.quote(protocol),
             )
             try:
-                info = await self.get_json(uri)
+                info = await self.get_json(uri, {"access_token": service.hs_token})
 
                 if not _is_valid_3pe_metadata(info):
                     logger.warning(

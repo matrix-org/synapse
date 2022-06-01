@@ -23,6 +23,8 @@ from http import HTTPStatus
 from io import BytesIO, StringIO
 from typing import (
     TYPE_CHECKING,
+    Any,
+    BinaryIO,
     Callable,
     Dict,
     Generic,
@@ -44,7 +46,7 @@ from typing_extensions import Literal
 from twisted.internet import defer
 from twisted.internet.error import DNSLookupError
 from twisted.internet.interfaces import IReactorTime
-from twisted.internet.task import _EPSILON, Cooperator
+from twisted.internet.task import Cooperator
 from twisted.web.client import ResponseFailed
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IBodyProducer, IResponse
@@ -58,11 +60,13 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
+from synapse.crypto.context_factory import FederationPolicyForHTTPS
 from synapse.http import QuieterFileBodyProducer
 from synapse.http.client import (
     BlacklistingAgentWrapper,
     BodyExceededMaxSize,
     ByteWriteable,
+    _make_scheduler,
     encode_query_args,
     read_body_with_max_size,
 )
@@ -73,7 +77,7 @@ from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.types import JsonDict
 from synapse.util import json_decoder
-from synapse.util.async_helpers import timeout_deferred
+from synapse.util.async_helpers import AwakenableSleeper, timeout_deferred
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
@@ -88,9 +92,6 @@ incoming_responses_counter = Counter(
     "synapse_http_matrixfederationclient_responses", "", ["method", "code"]
 )
 
-# a federation response can be rather large (eg a big state_ids is 50M or so), so we
-# need a generous limit here.
-MAX_RESPONSE_SIZE = 100 * 1024 * 1024
 
 MAX_LONG_RETRIES = 10
 MAX_SHORT_RETRIES = 3
@@ -111,6 +112,11 @@ class ByteParser(ByteWriteable, Generic[T], abc.ABC):
     """The expected content type of the response, e.g. `application/json`. If
     the content type doesn't match we fail the request.
     """
+
+    # a federation response can be rather large (eg a big state_ids is 50M or so), so we
+    # need a generous limit here.
+    MAX_RESPONSE_SIZE: int = 100 * 1024 * 1024
+    """The largest response this parser will accept."""
 
     @abc.abstractmethod
     def finish(self) -> T:
@@ -181,7 +187,7 @@ class JsonParser(ByteParser[Union[JsonDict, list]]):
 
     CONTENT_TYPE = "application/json"
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._buffer = StringIO()
         self._binary_wrapper = BinaryIOWrapper(self._buffer)
 
@@ -199,7 +205,6 @@ async def _handle_response(
     response: IResponse,
     start_ms: int,
     parser: ByteParser[T],
-    max_response_size: Optional[int] = None,
 ) -> T:
     """
     Reads the body of a response with a timeout and sends it to a parser
@@ -211,16 +216,14 @@ async def _handle_response(
         response: response to the request
         start_ms: Timestamp when request was made
         parser: The parser for the response
-        max_response_size: The maximum size to read from the response, if None
-            uses the default.
 
     Returns:
         The parsed response
     """
 
-    if max_response_size is None:
-        max_response_size = MAX_RESPONSE_SIZE
+    max_response_size = parser.MAX_RESPONSE_SIZE
 
+    finished = False
     try:
         check_content_type_is(response.headers, parser.CONTENT_TYPE)
 
@@ -229,6 +232,7 @@ async def _handle_response(
 
         length = await make_deferred_yieldable(d)
 
+        finished = True
         value = parser.finish()
     except BodyExceededMaxSize as e:
         # The response was too big.
@@ -236,7 +240,7 @@ async def _handle_response(
             "{%s} [%s] JSON response exceeded max size %i - %s %s",
             request.txn_id,
             request.destination,
-            MAX_RESPONSE_SIZE,
+            max_response_size,
             request.method,
             request.uri.decode("ascii"),
         )
@@ -279,6 +283,15 @@ async def _handle_response(
             e,
         )
         raise
+    finally:
+        if not finished:
+            # There was an exception and we didn't `finish()` the parse.
+            # Let the parser know that it can free up any resources.
+            try:
+                parser.finish()
+            except Exception:
+                # Ignore any additional exceptions.
+                pass
 
     time_taken_secs = reactor.seconds() - start_ms / 1000
 
@@ -299,7 +312,9 @@ async def _handle_response(
 class BinaryIOWrapper:
     """A wrapper for a TextIO which converts from bytes on the fly."""
 
-    def __init__(self, file: typing.TextIO, encoding="utf-8", errors="strict"):
+    def __init__(
+        self, file: typing.TextIO, encoding: str = "utf-8", errors: str = "strict"
+    ):
         self.decoder = codecs.getincrementaldecoder(encoding)(errors)
         self.file = file
 
@@ -317,7 +332,11 @@ class MatrixFederationHttpClient:
             requests.
     """
 
-    def __init__(self, hs: "HomeServer", tls_client_options_factory):
+    def __init__(
+        self,
+        hs: "HomeServer",
+        tls_client_options_factory: Optional[FederationPolicyForHTTPS],
+    ):
         self.hs = hs
         self.signing_key = hs.signing_key
         self.server_name = hs.hostname
@@ -348,16 +367,20 @@ class MatrixFederationHttpClient:
         self.version_string_bytes = hs.version_string.encode("ascii")
         self.default_timeout = 60
 
-        def schedule(x):
-            self.reactor.callLater(_EPSILON, x)
+        self._cooperator = Cooperator(scheduler=_make_scheduler(self.reactor))
 
-        self._cooperator = Cooperator(scheduler=schedule)
+        self._sleeper = AwakenableSleeper(self.reactor)
+
+    def wake_destination(self, destination: str) -> None:
+        """Called when the remote server may have come back online."""
+
+        self._sleeper.wake(destination)
 
     async def _send_request_with_optional_trailing_slash(
         self,
         request: MatrixFederationRequest,
         try_trailing_slash_on_400: bool = False,
-        **send_request_args,
+        **send_request_args: Any,
     ) -> IResponse:
         """Wrapper for _send_request which can optionally retry the request
         upon receiving a combination of a 400 HTTP response code and a
@@ -474,6 +497,8 @@ class MatrixFederationHttpClient:
             self._store,
             backoff_on_404=backoff_on_404,
             ignore_backoff=ignore_backoff,
+            notifier=self.hs.get_notifier(),
+            replication_client=self.hs.get_replication_command_handler(),
         )
 
         method_bytes = request.method.encode("ascii")
@@ -664,7 +689,9 @@ class MatrixFederationHttpClient:
                             delay,
                         )
 
-                        await self.clock.sleep(delay)
+                        # Sleep for the calculated delay, or wake up immediately
+                        # if we get notified that the server is back up.
+                        await self._sleeper.sleep(request.destination, delay * 1000)
                         retries_left -= 1
                     else:
                         raise
@@ -729,7 +756,7 @@ class MatrixFederationHttpClient:
         for key, sig in request["signatures"][self.server_name].items():
             auth_headers.append(
                 (
-                    'X-Matrix origin=%s,key="%s",sig="%s",destination="%s"'
+                    'X-Matrix origin="%s",key="%s",sig="%s",destination="%s"'
                     % (
                         self.server_name,
                         key,
@@ -754,7 +781,6 @@ class MatrixFederationHttpClient:
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Literal[None] = None,
-        max_response_size: Optional[int] = None,
     ) -> Union[JsonDict, list]:
         ...
 
@@ -772,7 +798,6 @@ class MatrixFederationHttpClient:
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Optional[ByteParser[T]] = None,
-        max_response_size: Optional[int] = None,
     ) -> T:
         ...
 
@@ -789,7 +814,6 @@ class MatrixFederationHttpClient:
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Optional[ByteParser] = None,
-        max_response_size: Optional[int] = None,
     ):
         """Sends the specified json data using PUT
 
@@ -825,8 +849,6 @@ class MatrixFederationHttpClient:
                 enabled.
             parser: The parser to use to decode the response. Defaults to
                 parsing as JSON.
-            max_response_size: The maximum size to read from the response, if None
-                uses the default.
 
         Returns:
             Succeeds when we get a 2xx HTTP response. The
@@ -877,7 +899,6 @@ class MatrixFederationHttpClient:
             response,
             start_ms,
             parser=parser,
-            max_response_size=max_response_size,
         )
 
         return body
@@ -966,7 +987,6 @@ class MatrixFederationHttpClient:
         ignore_backoff: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Literal[None] = None,
-        max_response_size: Optional[int] = None,
     ) -> Union[JsonDict, list]:
         ...
 
@@ -981,7 +1001,6 @@ class MatrixFederationHttpClient:
         ignore_backoff: bool = ...,
         try_trailing_slash_on_400: bool = ...,
         parser: ByteParser[T] = ...,
-        max_response_size: Optional[int] = ...,
     ) -> T:
         ...
 
@@ -995,7 +1014,6 @@ class MatrixFederationHttpClient:
         ignore_backoff: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Optional[ByteParser] = None,
-        max_response_size: Optional[int] = None,
     ):
         """GETs some json from the given host homeserver and path
 
@@ -1024,9 +1042,6 @@ class MatrixFederationHttpClient:
 
             parser: The parser to use to decode the response. Defaults to
                 parsing as JSON.
-
-            max_response_size: The maximum size to read from the response. If None,
-                uses the default.
 
         Returns:
             Succeeds when we get a 2xx HTTP response. The
@@ -1072,7 +1087,6 @@ class MatrixFederationHttpClient:
             response,
             start_ms,
             parser=parser,
-            max_response_size=max_response_size,
         )
 
         return body
@@ -1148,7 +1162,7 @@ class MatrixFederationHttpClient:
         self,
         destination: str,
         path: str,
-        output_stream,
+        output_stream: BinaryIO,
         args: Optional[QueryParams] = None,
         retry_on_dns_fail: bool = True,
         max_size: Optional[int] = None,
@@ -1239,10 +1253,10 @@ class MatrixFederationHttpClient:
         return length, headers
 
 
-def _flatten_response_never_received(e):
+def _flatten_response_never_received(e: BaseException) -> str:
     if hasattr(e, "reasons"):
         reasons = ", ".join(
-            _flatten_response_never_received(f.value) for f in e.reasons
+            _flatten_response_never_received(f.value) for f in e.reasons  # type: ignore[attr-defined]
         )
 
         return "%s:[%s]" % (type(e).__name__, reasons)

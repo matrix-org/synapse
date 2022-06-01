@@ -28,7 +28,7 @@ from typing import (
 )
 
 from synapse.api import errors
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EduTypes, EventTypes
 from synapse.api.errors import (
     Codes,
     FederationDeniedError,
@@ -43,6 +43,7 @@ from synapse.metrics.background_process_metrics import (
 )
 from synapse.types import (
     JsonDict,
+    StreamKeyType,
     StreamToken,
     UserID,
     get_domain_from_id,
@@ -60,6 +61,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 MAX_DEVICE_DISPLAY_NAME_LEN = 100
+DELETE_STALE_DEVICES_INTERVAL_MS = 24 * 60 * 60 * 1000
 
 
 class DeviceWorkerHandler:
@@ -69,7 +71,7 @@ class DeviceWorkerHandler:
         self.store = hs.get_datastores().main
         self.notifier = hs.get_notifier()
         self.state = hs.get_state_handler()
-        self.state_store = hs.get_storage().state
+        self._state_storage = hs.get_storage_controllers().state
         self._auth_handler = hs.get_auth_handler()
         self.server_name = hs.hostname
 
@@ -202,7 +204,9 @@ class DeviceWorkerHandler:
                 continue
 
             # mapping from event_id -> state_dict
-            prev_state_ids = await self.state_store.get_state_ids_for_events(event_ids)
+            prev_state_ids = await self._state_storage.get_state_ids_for_events(
+                event_ids
+            )
 
             # Check if we've joined the room? If so we just blindly add all the users to
             # the "possibly changed" users.
@@ -276,7 +280,8 @@ class DeviceHandler(DeviceWorkerHandler):
         federation_registry = hs.get_federation_registry()
 
         federation_registry.register_edu_handler(
-            "m.device_list_update", self.device_list_updater.incoming_device_list_update
+            EduTypes.DEVICE_LIST_UPDATE,
+            self.device_list_updater.incoming_device_list_update,
         )
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
@@ -290,6 +295,19 @@ class DeviceHandler(DeviceWorkerHandler):
 
         # On start up check if there are any updates pending.
         hs.get_reactor().callWhenRunning(self._handle_new_device_update_async)
+
+        self._delete_stale_devices_after = hs.config.server.delete_stale_devices_after
+
+        # Ideally we would run this on a worker and condition this on the
+        # "run_background_tasks_on" setting, but this would mean making the notification
+        # of device list changes over federation work on workers, which is nontrivial.
+        if self._delete_stale_devices_after is not None:
+            self.clock.looping_call(
+                run_as_background_process,
+                DELETE_STALE_DEVICES_INTERVAL_MS,
+                "delete_stale_devices",
+                self._delete_stale_devices,
+            )
 
     def _check_device_name_length(self, name: Optional[str]) -> None:
         """
@@ -365,6 +383,19 @@ class DeviceHandler(DeviceWorkerHandler):
             attempts += 1
 
         raise errors.StoreError(500, "Couldn't generate a device ID.")
+
+    async def _delete_stale_devices(self) -> None:
+        """Background task that deletes devices which haven't been accessed for more than
+        a configured time period.
+        """
+        # We should only be running this job if the config option is defined.
+        assert self._delete_stale_devices_after is not None
+        now_ms = self.clock.time_msec()
+        since_ms = now_ms - self._delete_stale_devices_after
+        devices = await self.store.get_local_devices_not_accessed_since(since_ms)
+
+        for user_id, user_devices in devices.items():
+            await self.delete_devices(user_id, user_devices)
 
     @trace
     async def delete_device(self, user_id: str, device_id: str) -> None:
@@ -502,11 +533,12 @@ class DeviceHandler(DeviceWorkerHandler):
         # specify the user ID too since the user should always get their own device list
         # updates, even if they aren't in any rooms.
         self.notifier.on_new_event(
-            "device_list_key", position, users={user_id}, rooms=room_ids
+            StreamKeyType.DEVICE_LIST, position, users={user_id}, rooms=room_ids
         )
 
-        # We may need to do some processing asynchronously.
-        self._handle_new_device_update_async()
+        # We may need to do some processing asynchronously for local user IDs.
+        if self.hs.is_mine_id(user_id):
+            self._handle_new_device_update_async()
 
     async def notify_user_signature_update(
         self, from_user_id: str, user_ids: List[str]
@@ -522,7 +554,9 @@ class DeviceHandler(DeviceWorkerHandler):
             from_user_id, user_ids
         )
 
-        self.notifier.on_new_event("device_list_key", position, users=[from_user_id])
+        self.notifier.on_new_event(
+            StreamKeyType.DEVICE_LIST, position, users=[from_user_id]
+        )
 
     async def user_left_room(self, user: UserID, room_id: str) -> None:
         user_id = user.to_string()
@@ -683,9 +717,13 @@ class DeviceHandler(DeviceWorkerHandler):
                             self.federation_sender.send_device_messages(
                                 host, immediate=False
                             )
-                            log_kv(
-                                {"message": "sent device update to host", "host": host}
-                            )
+                            # TODO: when called, this isn't in a logging context.
+                            # This leads to log spam, sentry event spam, and massive
+                            # memory usage.
+                            # See https://github.com/matrix-org/synapse/issues/12552.
+                            # log_kv(
+                            #     {"message": "sent device update to host", "host": host}
+                            # )
 
                     if current_stream_id != stream_id:
                         # Clear the set of hosts we've already sent to as we're
@@ -756,6 +794,10 @@ class DeviceListUpdater:
         device_id = edu_content.pop("device_id")
         stream_id = str(edu_content.pop("stream_id"))  # They may come as ints
         prev_ids = edu_content.pop("prev_id", [])
+        if not isinstance(prev_ids, list):
+            raise SynapseError(
+                400, "Device list update had an invalid 'prev_ids' field"
+            )
         prev_ids = [str(p) for p in prev_ids]  # They may come as ints
 
         if get_domain_from_id(user_id) != origin:
