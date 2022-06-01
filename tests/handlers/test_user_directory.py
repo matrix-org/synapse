@@ -954,7 +954,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         self.get_success(
-            self.hs.get_storage().persistence.persist_event(event, context)
+            self.hs.get_storage_controllers().persistence.persist_event(event, context)
         )
 
     def test_local_user_leaving_room_remains_in_user_directory(self) -> None:

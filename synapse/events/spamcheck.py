@@ -21,6 +21,7 @@ from typing import (
     Awaitable,
     Callable,
     Collection,
+    Dict,
     List,
     Optional,
     Tuple,
@@ -30,7 +31,7 @@ from typing import (
 from synapse.api.errors import Codes
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
-from synapse.spam_checker_api import Allow, Decision, RegistrationBehaviour
+from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import RoomAlias, UserProfile
 from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 from synapse.util.metrics import Measure
@@ -41,17 +42,19 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
 CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
     ["synapse.events.EventBase"],
     Awaitable[
         Union[
-            Allow,
+            str,
             Codes,
+            # Highly experimental, not officially part of the spamchecker API, may
+            # disappear without warning depending on the results of ongoing
+            # experiments.
+            # Use this to return additional information as part of an error.
+            Tuple[Codes, Dict],
             # Deprecated
             bool,
-            # Deprecated
-            str,
         ]
     ],
 ]
@@ -178,6 +181,8 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer") -> None:
 
 
 class SpamChecker:
+    NOT_SPAM = "NOT_SPAM"
+
     def __init__(self, hs: "synapse.server.HomeServer") -> None:
         self.hs = hs
         self.clock = hs.get_clock()
@@ -270,7 +275,7 @@ class SpamChecker:
 
     async def check_event_for_spam(
         self, event: "synapse.events.EventBase"
-    ) -> Union[Decision, str]:
+    ) -> Union[Tuple[Codes, Dict], str]:
         """Checks if a given event is considered "spammy" by this server.
 
         If the server considers an event spammy, then it will be rejected if
@@ -281,22 +286,20 @@ class SpamChecker:
             event: the event to be checked
 
         Returns:
-            - on `ALLOW`, the event is considered good (non-spammy) and should
-                be let through. Other spamcheck filters may still reject it.
-            - on `Code`, the event is considered spammy and is rejected with a specific
+            - `NOT_SPAM` if the event is considered good (non-spammy) and should be let
+                through. Other spamcheck filters may still reject it.
+            - A `Code` if the event is considered spammy and is rejected with a specific
                 error message/code.
-            - on `str`, the event is considered spammy and the string is used as error
-                message. This usage is generally discouraged as it doesn't support
-                internationalization.
+            - A string that isn't `NOT_SPAM` if the event is considered spammy and the
+                string should be used as the client-facing error message. This usage is
+                generally discouraged as it doesn't support internationalization.
         """
         for callback in self._check_event_for_spam_callbacks:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                res: Union[Decision, str, bool] = await delay_cancellation(
-                    callback(event)
-                )
-                if res is False or res is Allow.ALLOW:
+                res = await delay_cancellation(callback(event))
+                if res is False or res == self.NOT_SPAM:
                     # This spam-checker accepts the event.
                     # Other spam-checkers may reject it, though.
                     continue
@@ -304,13 +307,23 @@ class SpamChecker:
                     # This spam-checker rejects the event with deprecated
                     # return value `True`
                     return Codes.FORBIDDEN
+                elif not isinstance(res, str):
+                    # mypy complains that we can't reach this code because of the
+                    # return type in CHECK_EVENT_FOR_SPAM_CALLBACK, but we don't know
+                    # for sure that the module actually returns it.
+                    logger.warning(
+                        "Module returned invalid value, rejecting message as spam"
+                    )
+                    res = "This message has been rejected as probable spam"
                 else:
-                    # This spam-checker rejects the event either with a `str`
-                    # or with a `Codes`. In either case, we stop here.
-                    return res
+                    # The module rejected the event either with a `Codes`
+                    # or some other `str`. In either case, we stop here.
+                    pass
+
+                return res
 
         # No spam-checker has rejected the event, let it pass.
-        return Allow.ALLOW
+        return self.NOT_SPAM
 
     async def should_drop_federated_event(
         self, event: "synapse.events.EventBase"

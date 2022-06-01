@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Tupl
 import attr
 from prometheus_client import Counter
 
+from synapse.api.constants import EduTypes
 from synapse.api.errors import (
     FederationDeniedError,
     HttpResponseException,
@@ -542,7 +543,7 @@ class PerDestinationQueue:
         edu = Edu(
             origin=self._server_name,
             destination=self._destination,
-            edu_type="m.receipt",
+            edu_type=EduTypes.RECEIPT,
             content=self._pending_rrs,
         )
         self._pending_rrs = {}
@@ -592,7 +593,7 @@ class PerDestinationQueue:
             Edu(
                 origin=self._server_name,
                 destination=self._destination,
-                edu_type="m.direct_to_device",
+                edu_type=EduTypes.DIRECT_TO_DEVICE,
                 content=content,
             )
             for content in contents
@@ -670,7 +671,7 @@ class _TransactionQueueManager:
                 Edu(
                     origin=self.queue._server_name,
                     destination=self.queue._destination,
-                    edu_type="m.presence",
+                    edu_type=EduTypes.PRESENCE,
                     content={
                         "push": [
                             format_user_presence_state(

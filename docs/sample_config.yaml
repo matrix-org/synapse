@@ -2216,7 +2216,9 @@ sso:
 
 
 password_config:
-   # Uncomment to disable password login
+   # Uncomment to disable password login.
+   # Set to `only_for_reauth` to permit reauthentication for users that
+   # have passwords and are already logged in.
    #
    #enabled: false
 
