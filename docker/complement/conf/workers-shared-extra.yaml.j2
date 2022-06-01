@@ -82,8 +82,10 @@ experimental_features:
   msc2716_enabled: true
   # server-side support for partial state in /send_join responses
   msc3706_enabled: true
+  {% if not workers_in_use %}
   # client-side support for partial state in /send_join responses
   faster_joins: true
+  {% endif %}
   # Enable jump to date endpoint
   msc3030_enabled: true
 
@@ -92,3 +94,5 @@ server_notices:
   system_mxid_display_name: "Server Alert"
   system_mxid_avatar_url: ""
   room_name: "Server Alert"
+
+{% include "shared-orig.yaml.j2" %}

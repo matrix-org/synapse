@@ -20,10 +20,13 @@ RUN pg_ctlcluster 13 main start &&  su postgres -c "echo \
   LC_CTYPE='C' \
   template=template0;\" | psql" && pg_ctlcluster 13 main stop
 
-# Replace the shared homeserver config to disable rate-limiting,
+# Extend the shared homeserver config to disable rate-limiting,
 # set Complement's static shared secret, enable registration, amongst other
 # tweaks to get Synapse ready for testing.
-COPY conf/workers-shared.yaml /conf/workers/shared.yaml
+# To do this, we copy the old template out of the way and then include it
+# with Jinja2.
+RUN mv /conf/shared.yaml.j2 /conf/shared-orig.yaml.j2
+COPY conf/workers-shared-extra.yaml.j2 /conf/shared.yaml.j2
 
 WORKDIR /data
 

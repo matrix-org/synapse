@@ -37,8 +37,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, MutableMapping, NoReturn, Set
 
-import jinja2
 import yaml
+from jinja2 import Environment, FileSystemLoader
 
 MAIN_PROCESS_HTTP_LISTENER_PORT = 8080
 
@@ -234,13 +234,15 @@ def convert(src: str, dst: str, **template_vars: object) -> None:
         dst: Path to write to.
         template_vars: The arguments to replace placeholder variables in the template with.
     """
-    # Read the template file
-    with open(src) as infile:
-        template = infile.read()
 
-    # Generate a string from the template. We disable autoescape to prevent template
-    # variables from being escaped.
-    rendered = jinja2.Template(template, autoescape=False).render(**template_vars)
+    # Read the template file
+    # We disable autoescape to prevent template variables from being escaped,
+    # as we're not using HTML.
+    env = Environment(loader=FileSystemLoader(os.path.dirname(src)), autoescape=False)
+    template = env.get_template(os.path.basename(src))
+
+    # Generate a string from the template.
+    rendered = template.render(**template_vars)
 
     # Write the generated contents to a file
     #
@@ -505,7 +507,7 @@ def generate_worker_files(
             if reg_path.suffix.lower() in (".yaml", ".yml")
         ]
 
-    enable_redis = len(worker_types) > 0
+    workers_in_use = len(worker_types) > 0
 
     # Shared homeserver config
     convert(
@@ -513,7 +515,8 @@ def generate_worker_files(
         "/conf/workers/shared.yaml",
         shared_worker_config=yaml.dump(shared_config),
         appservice_registrations=appservice_registrations,
-        enable_redis=enable_redis,
+        enable_redis=workers_in_use,
+        workers_in_use=workers_in_use,
     )
 
     # Nginx config
@@ -533,7 +536,7 @@ def generate_worker_files(
         "/etc/supervisor/supervisord.conf",
         main_config_path=config_path,
         worker_config=supervisord_config,
-        enable_redis=enable_redis,
+        enable_redis=workers_in_use,
     )
 
     # healthcheck config
