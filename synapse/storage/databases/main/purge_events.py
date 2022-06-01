@@ -16,6 +16,7 @@ import logging
 from typing import Any, List, Set, Tuple, cast
 
 from synapse.api.errors import SynapseError
+from synapse.storage.engines._base import IsolationLevel
 from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main import CacheInvalidationWorkerStore
 from synapse.storage.databases.main.state import StateGroupWorkerStore
@@ -320,7 +321,10 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             The list of state groups to delete.
         """
         return await self.db_pool.runInteraction(
-            "purge_room", self._purge_room_txn, room_id
+            "purge_room",
+            self._purge_room_txn,
+            room_id=room_id,
+            isolation_level=IsolationLevel.READ_COMMITTED,
         )
 
     def _purge_room_txn(self, txn: LoggingTransaction, room_id: str) -> List[int]:
