@@ -337,8 +337,10 @@ class Deferred__next__Patch:
             seen enough of them.
 
             `Deferred.__next__` will normally:
-                * return `self` if unresolved, which will come out of
-                    `coroutine.send()`.
+                * return `self` if the `Deferred` is unresolved, in which case
+                   `coroutine.send()` will return the `Deferred`, and
+                   `_defer.inlineCallbacks` will stop running the coroutine until the
+                   `Deferred` is resolved.
                 * raise a `StopIteration(result)`, containing the result of the `await`.
                 * raise another exception, which will come out of the `await`.
             """
