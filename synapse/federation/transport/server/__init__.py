@@ -284,10 +284,9 @@ class OpenIdUserInfo(BaseFederationServlet):
 
         power_levels = {}
         for room in room_list:
-            room_state = await self.hs.get_state_handler().get_current_state(
-                room.room_id
+            room_power_levels = await self.hs.get_state_handler().get_current_state(
+                room_id=room.room_id, event_type=EventTypes.PowerLevels
             )
-            room_power_levels = room_state.get((EventTypes.PowerLevels, ""))
             if room_power_levels is not None:
                 stripped_content = copy.deepcopy(room_power_levels.content)
                 stripped_content["users"] = {
