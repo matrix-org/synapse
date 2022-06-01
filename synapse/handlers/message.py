@@ -202,8 +202,10 @@ class MessageHandler:
                     % (user_id, room_id, at_token),
                 )
 
-            room_state_events = await self.state_storage.get_state_for_events(
-                [last_event_id], state_filter=state_filter
+            room_state_events = (
+                await self._state_storage_controller.get_state_for_events(
+                    [last_event_id], state_filter=state_filter
+                )
             )
             room_state: Mapping[Any, EventBase] = room_state_events[last_event_id]
         else:
