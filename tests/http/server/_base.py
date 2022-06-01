@@ -234,7 +234,7 @@ def make_request_with_cancellation_test(
                     # `respond_with_json` writes the response asynchronously, so we
                     # might have to give the reactor a kick before the channel gets
                     # the response.
-                    reactor.advance(1.0)
+                    channel.await_result()
 
                     return channel
 
