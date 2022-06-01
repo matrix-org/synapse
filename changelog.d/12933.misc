@@ -1,1 +1,1 @@
-Fix Complement (develop only) test suite using the wrong path for `checkout_complement.sh`.
+Test Synapse against Complement with workers.
