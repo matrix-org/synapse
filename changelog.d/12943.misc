@@ -1,0 +1,1 @@
+Remove code which incorrectly attempted to reconcile state with remote servers when processing incoming events.
