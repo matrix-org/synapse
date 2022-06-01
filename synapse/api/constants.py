@@ -263,10 +263,10 @@ class ReceiptTypes:
 
 
 class OpenIdUserInfoFields:
-    """ Enumeration of user-requested fields in the open id userinfo according to
+    """Enumeration of user-requested fields in the open id userinfo according to
     MSC3356. The following constants are used in synapse.rest.client.openid for user
     input validation and in synapse.federation.transport.server when expanding the
-    optional userinfo fields. """
+    optional userinfo fields."""
 
     DISPLAY_NAME: Final = "org.matrix.msc3356.display_name"
     AVATAR_URL: Final = "org.matrix.msc3356.avatar_url"
