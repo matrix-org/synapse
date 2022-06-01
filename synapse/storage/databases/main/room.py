@@ -1114,7 +1114,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
     async def has_room_only_got_partial_state(self, room_id: str) -> bool:
         """Checks if this room has partial state.
-        
+
         Returns true if this is a "partial-state" room, which means that the state
         at events in the room, and `current_state_events`, may not yet be
         complete.
