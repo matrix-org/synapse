@@ -18,7 +18,11 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from synapse.api.errors import SynapseError
-from synapse.http.server import DirectServeJsonResource, set_cors_headers, set_corp_headers
+from synapse.http.server import (
+    DirectServeJsonResource,
+    set_corp_headers,
+    set_cors_headers,
+)
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.media.v1.media_storage import MediaStorage

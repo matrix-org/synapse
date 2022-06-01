@@ -15,7 +15,11 @@
 import logging
 from typing import TYPE_CHECKING
 
-from synapse.http.server import DirectServeJsonResource, set_cors_headers, set_corp_headers
+from synapse.http.server import (
+    DirectServeJsonResource,
+    set_corp_headers,
+    set_cors_headers,
+)
 from synapse.http.servlet import parse_boolean
 from synapse.http.site import SynapseRequest
 
