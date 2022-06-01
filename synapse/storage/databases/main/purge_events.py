@@ -16,10 +16,10 @@ import logging
 from typing import Any, List, Set, Tuple, cast
 
 from synapse.api.errors import SynapseError
-from synapse.storage.engines._base import IsolationLevel
 from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main import CacheInvalidationWorkerStore
 from synapse.storage.databases.main.state import StateGroupWorkerStore
+from synapse.storage.engines._base import IsolationLevel
 from synapse.types import RoomStreamToken
 
 logger = logging.getLogger(__name__)
