@@ -1,6 +1,6 @@
 # Scaling synapse via workers
 
-For small instances it recommended to run Synapse in the default monolith mode.
+For small instances it is recommended to run Synapse in the default monolith mode.
 For larger instances where performance is a concern it can be helpful to split
 out functionality into multiple separate python processes. These processes are
 called 'workers', and are (eventually) intended to scale horizontally
@@ -193,7 +193,7 @@ information.
     ^/_matrix/federation/v1/user/devices/
     ^/_matrix/federation/v1/get_groups_publicised$
     ^/_matrix/key/v2/query
-    ^/_matrix/federation/(v1|unstable/org.matrix.msc2946)/hierarchy/
+    ^/_matrix/federation/v1/hierarchy/
 
     # Inbound federation transaction request
     ^/_matrix/federation/v1/send/
@@ -205,9 +205,11 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/context/.*$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/members$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state$
-    ^/_matrix/client/(v1|unstable/org.matrix.msc2946)/rooms/.*/hierarchy$
+    ^/_matrix/client/v1/rooms/.*/hierarchy$
+    ^/_matrix/client/unstable/org.matrix.msc2716/rooms/.*/batch_send$
     ^/_matrix/client/unstable/im.nheko.summary/rooms/.*/summary$
     ^/_matrix/client/(r0|v3|unstable)/account/3pid$
+    ^/_matrix/client/(r0|v3|unstable)/account/whoami$
     ^/_matrix/client/(r0|v3|unstable)/devices$
     ^/_matrix/client/versions$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/voip/turnServer$
@@ -236,9 +238,6 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/join/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/profile/
-
-    # Device requests
-    ^/_matrix/client/(r0|v3|unstable)/sendToDevice/
 
     # Account data requests
     ^/_matrix/client/(r0|v3|unstable)/.*/tags

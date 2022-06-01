@@ -1,0 +1,1 @@
+Enable the `/account/whoami` endpoint on synapse worker processes. Contributed by Nick @ Beeper.

@@ -1,1 +1,0 @@
-Give a meaningful error message when a client tries to create a room with an invalid alias localpart.

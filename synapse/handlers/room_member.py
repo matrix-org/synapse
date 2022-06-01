@@ -1081,17 +1081,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # Transfer alias mappings in the room directory
         await self.store.update_aliases_for_room(old_room_id, room_id)
 
-        # Check if any groups we own contain the predecessor room
-        local_group_ids = await self.store.get_local_groups_for_room(old_room_id)
-        for group_id in local_group_ids:
-            # Add new the new room to those groups
-            await self.store.add_room_to_group(
-                group_id, room_id, old_room is not None and old_room["is_public"]
-            )
-
-            # Remove the old room from those groups
-            await self.store.remove_room_from_group(group_id, old_room_id)
-
     async def copy_user_state_on_room_upgrade(
         self, old_room_id: str, new_room_id: str, user_ids: Iterable[str]
     ) -> None:

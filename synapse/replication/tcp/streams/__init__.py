@@ -29,7 +29,6 @@ from synapse.replication.tcp.streams._base import (
     BackfillStream,
     CachesStream,
     DeviceListsStream,
-    GroupServerStream,
     PresenceFederationStream,
     PresenceStream,
     PushersStream,
@@ -61,7 +60,6 @@ STREAMS_MAP = {
         FederationStream,
         TagAccountDataStream,
         AccountDataStream,
-        GroupServerStream,
         UserSignatureStream,
     )
 }
@@ -81,6 +79,5 @@ __all__ = [
     "ToDeviceStream",
     "TagAccountDataStream",
     "AccountDataStream",
-    "GroupServerStream",
     "UserSignatureStream",
 ]

@@ -1,0 +1,1 @@
+Fix a bug where we did not correctly handle invalid device list updates over federation. Contributed by Carl Bordum Hansen.

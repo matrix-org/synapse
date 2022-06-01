@@ -33,7 +33,7 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, HistoryVisibility, Membership
+from synapse.api.constants import EduTypes, EventTypes, HistoryVisibility, Membership
 from synapse.api.errors import AuthError
 from synapse.events import EventBase
 from synapse.handlers.presence import format_user_presence_state
@@ -221,7 +221,7 @@ class Notifier:
         self.room_to_user_streams: Dict[str, Set[_NotifierUserStream]] = {}
 
         self.hs = hs
-        self.storage = hs.get_storage()
+        self._storage_controllers = hs.get_storage_controllers()
         self.event_sources = hs.get_event_sources()
         self.store = hs.get_datastores().main
         self.pending_new_room_events: List[_PendingRoomEventEntry] = []
@@ -623,7 +623,7 @@ class Notifier:
 
                 if name == "room":
                     new_events = await filter_events_for_client(
-                        self.storage,
+                        self._storage_controllers,
                         user.to_string(),
                         new_events,
                         is_peeking=is_peeking,
@@ -632,7 +632,7 @@ class Notifier:
                     now = self.clock.time_msec()
                     new_events[:] = [
                         {
-                            "type": "m.presence",
+                            "type": EduTypes.PRESENCE,
                             "content": format_user_presence_state(event, now),
                         }
                         for event in new_events

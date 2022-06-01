@@ -32,7 +32,7 @@ class BaseSlavedStoreTestCase(BaseStreamTestCase):
 
         self.master_store = hs.get_datastores().main
         self.slaved_store = self.worker_hs.get_datastores().main
-        self.storage = hs.get_storage()
+        self._storage_controllers = hs.get_storage_controllers()
 
     def replicate(self):
         """Tell the master side of replication that something has happened, and then
