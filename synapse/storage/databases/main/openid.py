@@ -42,6 +42,20 @@ class OpenIdStore(SQLBaseStore):
     async def get_user_id_and_userinfo_fields_for_open_id_token(
         self, token: str, ts_now_ms: int
     ) -> Optional[Tuple[str, List[str]]]:
+        """Check the validity of an openid token and return token
+        information
+
+        Args:
+            token: The token
+            ts_now_ms: The current timestamp. This value is used to check
+              the validity of the token.
+
+        Returns:
+            A tuple containing:
+             * The user id
+             * A list of user-requested fields according to MSC3356
+        """
+
         def get_user_id_for_token_txn(
             txn: LoggingTransaction,
         ) -> Optional[Tuple[str, List[str]]]:
