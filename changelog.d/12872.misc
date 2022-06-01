@@ -1,1 +1,1 @@
-When querying the current state of the room wait for lazy joining of the room to finish.
+Faster room joins: when querying the current state of the room, wait for state to be populated.
