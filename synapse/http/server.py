@@ -927,6 +927,16 @@ def set_cors_headers(request: Request) -> None:
         b"X-Requested-With, Content-Type, Authorization, Date",
     )
 
+def set_corp_headers(request: Request) -> None:
+    """Set the CORP headers so that javascript running in a web browsers can
+    embed the resource returned from this request when their client requires
+    the `Cross-Origin-Embedder-Policy: require-corp` header.
+
+    Args:
+        request: The http request to add the CORP header to.
+    """
+    request.setHeader(b"Cross-Origin-Resource-Policy", b"cross-origin")
+
 
 def respond_with_html(request: Request, code: int, html: str) -> None:
     """

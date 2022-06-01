@@ -15,7 +15,7 @@
 import logging
 from typing import TYPE_CHECKING
 
-from synapse.http.server import DirectServeJsonResource, set_cors_headers
+from synapse.http.server import DirectServeJsonResource, set_cors_headers, set_corp_headers
 from synapse.http.servlet import parse_boolean
 from synapse.http.site import SynapseRequest
 
@@ -38,6 +38,7 @@ class DownloadResource(DirectServeJsonResource):
 
     async def _async_render_GET(self, request: SynapseRequest) -> None:
         set_cors_headers(request)
+        set_corp_headers(request)
         request.setHeader(
             b"Content-Security-Policy",
             b"sandbox;"
