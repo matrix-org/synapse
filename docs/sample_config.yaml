@@ -16,7 +16,7 @@
 #
 # [1] https://docs.ansible.com/ansible/latest/reference_appendices/YAMLSyntax.html
 #
-# For more information on how to configure Synapse, including a complete accounting of 
+# For more information on how to configure Synapse, including a complete accounting of
 # each option, go to docs/usage/configuration/config_documentation.md
 server_name: "SERVERNAME"
 pid_file: DATADIR/homeserver.pid
