@@ -1536,12 +1536,14 @@ class FederationEventHandler:
             StateFilter.from_types(event_types)
         )
 
-        auth_events_ids = self._event_auth_handler.compute_auth_events(
+        calculated_auth_event_ids = self._event_auth_handler.compute_auth_events(
             event, prev_state_ids, for_verification=True
         )
-        auth_events_x = await self._store.get_events(auth_events_ids)
+        calculated_auth_events = await self._store.get_events_as_list(
+            calculated_auth_event_ids
+        )
         calculated_auth_event_map = {
-            (e.type, e.state_key): e for e in auth_events_x.values()
+            (e.type, e.state_key): e for e in calculated_auth_events
         }
 
         try:
