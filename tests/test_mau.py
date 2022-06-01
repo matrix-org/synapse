@@ -105,7 +105,6 @@ class TestMauLimit(unittest.HomeserverTestCase):
         self.store.services_cache.append(
             ApplicationService(
                 token=as_token,
-                hostname=self.hs.hostname,
                 id="SomeASID",
                 sender="@as_sender:test",
                 namespaces={"users": [{"regex": "@as_*", "exclusive": True}]},
@@ -251,7 +250,6 @@ class TestMauLimit(unittest.HomeserverTestCase):
         self.store.services_cache.append(
             ApplicationService(
                 token=as_token_1,
-                hostname=self.hs.hostname,
                 id="SomeASID",
                 sender="@as_sender_1:test",
                 namespaces={"users": [{"regex": "@as_1.*", "exclusive": True}]},
@@ -262,7 +260,6 @@ class TestMauLimit(unittest.HomeserverTestCase):
         self.store.services_cache.append(
             ApplicationService(
                 token=as_token_2,
-                hostname=self.hs.hostname,
                 id="AnotherASID",
                 sender="@as_sender_2:test",
                 namespaces={"users": [{"regex": "@as_2.*", "exclusive": True}]},
