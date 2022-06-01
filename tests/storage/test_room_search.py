@@ -99,7 +99,9 @@ class EventSearchInsertionTest(HomeserverTestCase):
         prev_event_ids = self.get_success(store.get_prev_events_for_room(room_id))
         prev_event = self.get_success(store.get_event(prev_event_ids[0]))
         prev_state_map = self.get_success(
-            self.hs.get_storage().state.get_state_ids_for_event(prev_event_ids[0])
+            self.hs.get_storage_controllers().state.get_state_ids_for_event(
+                prev_event_ids[0]
+            )
         )
 
         event_dict = {

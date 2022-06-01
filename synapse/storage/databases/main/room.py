@@ -23,6 +23,7 @@ from typing import (
     Collection,
     Dict,
     List,
+    Mapping,
     Optional,
     Tuple,
     Union,
@@ -1080,6 +1081,32 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             "get_rooms_for_retention_period_in_range",
             get_rooms_for_retention_period_in_range_txn,
         )
+
+    async def get_partial_state_rooms_and_servers(
+        self,
+    ) -> Mapping[str, Collection[str]]:
+        """Get all rooms containing events with partial state, and the servers known
+        to be in the room.
+
+        Returns:
+            A dictionary of rooms with partial state, with room IDs as keys and
+            lists of servers in rooms as values.
+        """
+        room_servers: Dict[str, List[str]] = {}
+
+        rows = await self.db_pool.simple_select_list(
+            "partial_state_rooms_servers",
+            keyvalues=None,
+            retcols=("room_id", "server_name"),
+            desc="get_partial_state_rooms",
+        )
+
+        for row in rows:
+            room_id = row["room_id"]
+            server_name = row["server_name"]
+            room_servers.setdefault(room_id, []).append(server_name)
+
+        return room_servers
 
     async def clear_partial_state_room(self, room_id: str) -> bool:
         # this can race with incoming events, so we watch out for FK errors.

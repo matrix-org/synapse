@@ -639,7 +639,7 @@ class StreamToken:
         6. `push_rules_key`: `541479`
         7. `to_device_key`: `274711`
         8. `device_list_key`: `265584`
-        9. `groups_key`: `1`
+        9. `groups_key`: `1` (note that this key is now unused)
 
     You can see how many of these keys correspond to the various
     fields in a "/sync" response:
@@ -691,6 +691,7 @@ class StreamToken:
     push_rules_key: int
     to_device_key: int
     device_list_key: int
+    # Note that the groups key is no longer used and may have bogus values.
     groups_key: int
 
     _SEPARATOR = "_"
@@ -722,6 +723,9 @@ class StreamToken:
                 str(self.push_rules_key),
                 str(self.to_device_key),
                 str(self.device_list_key),
+                # Note that the groups key is no longer used, but it is still
+                # serialized so that there will not be confusion in the future
+                # if additional tokens are added.
                 str(self.groups_key),
             ]
         )
