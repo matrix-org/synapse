@@ -30,6 +30,9 @@ _xml_encoding_match = re.compile(
 )
 _content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
 
+# Certain elements aren't meant for display.
+ARIA_ROLES_TO_IGNORE = {"directory", "menu", "menubar", "toolbar"}
+
 
 def _normalise_encoding(encoding: str) -> Optional[str]:
     """Use the Python codec's name as the normalised entry."""
@@ -315,6 +318,10 @@ def _iterate_over_text(
         if isinstance(el, str):
             yield el
         elif el.tag not in tags_to_ignore:
+            # If the element isn't meant for display, ignore it.
+            if el.get("role") in ARIA_ROLES_TO_IGNORE:
+                continue
+
             # el.text is the text before the first child, so we can immediately
             # return it if the text exists.
             if el.text:
