@@ -200,7 +200,6 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
             og["og:title"] = None
 
     if "og:image" not in og:
-        # TODO: extract a favicon failing all else
         meta_image = tree.xpath(
             "//*/meta[translate(@itemprop, 'IMAGE', 'image')='image'][not(@content='')]/@content[1]"
         )
@@ -208,6 +207,8 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
         if meta_image:
             og["og:image"] = meta_image[0]
         else:
+            # Try to find images which are larger than 10px by 10px.
+            #
             # TODO: consider inlined CSS styles as well as width & height attribs
             images = tree.xpath("//img[@src][number(@width)>10][number(@height)>10]")
             images = sorted(
@@ -216,10 +217,17 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
                     -1 * float(i.attrib["width"]) * float(i.attrib["height"])
                 ),
             )
+            # If no images were found, try to find *any* images.
             if not images:
-                images = tree.xpath("//img[@src]")
+                images = tree.xpath("//img[@src][1]")
             if images:
                 og["og:image"] = images[0].attrib["src"]
+
+            # Finally, fallback to the favicon if nothing else.
+            else:
+                favicons = tree.xpath("//link[@href][contains(@rel, 'icon')]/@href[1]")
+                if favicons:
+                    og["og:image"] = favicons[0]
 
     if "og:description" not in og:
         # Check the first meta description tag for content.
