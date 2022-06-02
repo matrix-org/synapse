@@ -23,11 +23,13 @@ from typing import (
     Collection,
     Dict,
     List,
-    Literal,
     Optional,
     Tuple,
     Union,
 )
+
+# `Literal` appears with Python 3.8.
+from typing_extensions import Literal
 
 from synapse.api.errors import Codes
 from synapse.rest.media.v1._base import FileInfo

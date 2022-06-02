@@ -18,9 +18,12 @@
 """Tests REST events for /rooms paths."""
 
 import json
-from typing import Any, Dict, Iterable, List, Literal, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional, Union
 from unittest.mock import Mock, call
 from urllib import parse as urlparse
+
+# `Literal` appears with Python 3.8.
+from typing_extensions import Literal
 
 from twisted.test.proto_helpers import MemoryReactor
 
