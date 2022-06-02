@@ -30,7 +30,6 @@ from typing import (
 )
 
 from synapse.api.errors import Codes
-from synapse.module_api import NOT_SPAM
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
 from synapse.spam_checker_api import RegistrationBehaviour
@@ -392,7 +391,7 @@ class SpamChecker:
                 return res
 
         # No spam-checker has rejected the event, let it pass.
-        return NOT_SPAM
+        return self.NOT_SPAM
 
     async def should_drop_federated_event(
         self, event: "synapse.events.EventBase"
@@ -440,7 +439,7 @@ class SpamChecker:
                 may_join_room = await delay_cancellation(
                     callback(user_id, room_id, is_invited)
                 )
-            if may_join_room is True or may_join_room is NOT_SPAM:
+            if may_join_room is True or may_join_room is self.NOT_SPAM:
                 continue
             elif may_join_room is False:
                 return Codes.FORBIDDEN
@@ -448,7 +447,7 @@ class SpamChecker:
                 return may_join_room
 
         # No spam-checker has rejected the request, let it pass.
-        return NOT_SPAM
+        return self.NOT_SPAM
 
     async def user_may_invite(
         self, inviter_userid: str, invitee_userid: str, room_id: str
@@ -470,7 +469,7 @@ class SpamChecker:
                 may_invite = await delay_cancellation(
                     callback(inviter_userid, invitee_userid, room_id)
                 )
-            if may_invite is True or may_invite is NOT_SPAM:
+            if may_invite is True or may_invite is self.NOT_SPAM:
                 continue
             elif may_invite is False:
                 return Codes.FORBIDDEN
@@ -478,7 +477,7 @@ class SpamChecker:
                 return may_invite
 
         # No spam-checker has rejected the request, let it pass.
-        return NOT_SPAM
+        return self.NOT_SPAM
 
     async def user_may_send_3pid_invite(
         self, inviter_userid: str, medium: str, address: str, room_id: str
@@ -504,14 +503,14 @@ class SpamChecker:
                 may_send_3pid_invite = await delay_cancellation(
                     callback(inviter_userid, medium, address, room_id)
                 )
-            if may_send_3pid_invite is True or may_send_3pid_invite is NOT_SPAM:
+            if may_send_3pid_invite is True or may_send_3pid_invite is self.NOT_SPAM:
                 continue
             elif may_send_3pid_invite is False:
                 return Codes.FORBIDDEN
             else:
                 return may_send_3pid_invite
 
-        return NOT_SPAM
+        return self.NOT_SPAM
 
     async def user_may_create_room(
         self, userid: str
@@ -526,14 +525,14 @@ class SpamChecker:
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
                 may_create_room = await delay_cancellation(callback(userid))
-            if may_create_room is True or may_create_room is NOT_SPAM:
+            if may_create_room is True or may_create_room is self.NOT_SPAM:
                 continue
             elif may_create_room is False:
                 return Codes.FORBIDDEN
             else:
                 return may_create_room
 
-        return NOT_SPAM
+        return self.NOT_SPAM
 
     async def user_may_create_room_alias(
         self, userid: str, room_alias: RoomAlias
@@ -552,14 +551,14 @@ class SpamChecker:
                 may_create_room_alias = await delay_cancellation(
                     callback(userid, room_alias)
                 )
-            if may_create_room_alias is True or may_create_room_alias is NOT_SPAM:
+            if may_create_room_alias is True or may_create_room_alias is self.NOT_SPAM:
                 continue
             elif may_create_room_alias is False:
                 return Codes.FORBIDDEN
             else:
                 return may_create_room_alias
 
-        return NOT_SPAM
+        return self.NOT_SPAM
 
     async def user_may_publish_room(
         self, userid: str, room_id: str
@@ -575,14 +574,14 @@ class SpamChecker:
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
                 may_publish_room = await delay_cancellation(callback(userid, room_id))
-            if may_publish_room is True or may_publish_room is NOT_SPAM:
+            if may_publish_room is True or may_publish_room is self.NOT_SPAM:
                 continue
             elif may_publish_room is False:
                 return Codes.FORBIDDEN
             else:
                 return may_publish_room
 
-        return NOT_SPAM
+        return self.NOT_SPAM
 
     async def check_username_for_spam(self, user_profile: UserProfile) -> bool:
         """Checks if a user ID or display name are considered "spammy" by this server.
@@ -666,7 +665,7 @@ class SpamChecker:
                 await file.write_chunks_to(buffer.write)
 
                 if buffer.getvalue() == b"Hello World":
-                    return NOT_SPAM
+                    return self.NOT_SPAM
 
                 return Codes.FORBIDDEN
 
@@ -681,11 +680,11 @@ class SpamChecker:
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
                 spam = await delay_cancellation(callback(file_wrapper, file_info))
-            if spam is False or spam is NOT_SPAM:
+            if spam is False or spam is self.NOT_SPAM:
                 continue
             elif spam is True:
                 return Codes.FORBIDDEN
             else:
                 return spam
 
-        return NOT_SPAM
+        return self.NOT_SPAM
