@@ -202,8 +202,9 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
     if "og:image" not in og:
         # TODO: extract a favicon failing all else
         meta_image = tree.xpath(
-            "//*/meta[translate(@itemprop, 'IMAGE', 'image')='image']/@content"
+            "//*/meta[translate(@itemprop, 'IMAGE', 'image')='image'][not(@content='')]/@content[1]"
         )
+        # If a meta image is found, use it.
         if meta_image:
             og["og:image"] = meta_image[0]
         else:
@@ -221,11 +222,11 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
                 og["og:image"] = images[0].attrib["src"]
 
     if "og:description" not in og:
+        # Check the first meta description tag for content.
         meta_description = tree.xpath(
-            "//*/meta"
-            "[translate(@name, 'DESCRIPTION', 'description')='description']"
-            "/@content"
+            "//*/meta[translate(@name, 'DESCRIPTION', 'description')='description'][not(@content='')]/@content[1]"
         )
+        # If a meta description is found with content, use it.
         if meta_description:
             og["og:description"] = meta_description[0]
         else:
