@@ -13,6 +13,38 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Receipts are stored as per-user ranges from a starting event to an ending event.
+If the starting event is missing than the range is considered to cover all events
+earlier in the room than the ending events.
+
+Since events in a room are a DAG we need to linearise it before applying receipts.
+Synapse linearises the room by sorting events by (topological ordering, stream ordering).
+To ensure that receipts are non-overlapping and correct the following operations
+need to occur:
+
+* When a new receipt is received from a client, we coalesce it with other receipts.
+* When new events are received, any receipt range which includes the event's
+  topological ordering must be split into two receipts.
+
+Given a simple linear room:
+
+    A--B--C--D
+
+    This is covered by a single receipt [A, D]
+
+If a forked in the DAG occurs:
+
+    A--B--C--D  which linearises to: A--B--E--C--F--D
+     \     /
+      E---F
+
+    The receipt from above must be split into component parts:
+        [A, B]
+        [C, C]
+        [D, D]
+"""
+
 import logging
 from typing import (
     TYPE_CHECKING,

@@ -98,7 +98,7 @@ def main():
     # Create a new room as user 2, add a bunch of messages.
     result = requests.post(
         f"{HOMESERVER}/_matrix/client/v3/createRoom",
-        json={"visibility": "public", "name": f"Road to Nowhere ({monotonic()})"},
+        json={"visibility": "public", "name": f"Ranged Read Receipts ({monotonic()})"},
         headers=USER_2_HEADERS,
     )
     _check_for_status(result)
@@ -115,29 +115,16 @@ def main():
 
     # User 2 sends some messages.
     event_ids = []
-    with open("road_to_no_where.txt", "r") as f:
-        count = 0
-        forks = 1
-        for line in f.readlines():
-            line = line.strip()
-            if not line:
-                if forks < 3:
-                    last_event_id = first_event_id
-                    forks += 1
-                else:
-                    # Let the server figure it out.
-                    last_event_id = None
-                continue
 
-            # Send a msg to the room.
-            last_event_id = _send_event(room_id, line, last_event_id)
-            event_ids.append(last_event_id)
-            sleep(1)
+    def _send_and_append(body, prev_message_id = None):
+        event_id = _send_event(room_id, body, prev_message_id)
+        event_ids.append(event_id)
+        return event_id
 
-            count += 1
-
-            if count == 20:  # End of second verse
-                break
+    prev_message_id = first_message_id = _send_and_append("Root")
+    for msg in range(3):
+        prev_message_id = _send_and_append(f"Fork 1 Message {msg}", prev_message_id)
+    sleep(1)
 
     # User 2 sends a read receipt.
     print("@second reads to end")
@@ -151,26 +138,36 @@ def main():
     _sync_and_show(room_id)
 
     # User 1 sends a read receipt.
-    print("@test reads from 3 -> 8")
+    print("@test reads from fork 1")
     result = requests.post(
-        f"{HOMESERVER}/_matrix/client/v3/rooms/{room_id}/receipt/m.read/{event_ids[8]}/{event_ids[3]}",
+        f"{HOMESERVER}/_matrix/client/v3/rooms/{room_id}/receipt/m.read/{event_ids[3]}/{event_ids[1]}",
         headers=USER_1_HEADERS,
         json={},
     )
     _check_for_status(result)
+
+    _sync_and_show(room_id)
+
+    # Create a fork in the DAG.
+    prev_message_id = first_message_id
+    for msg in range(1):
+        prev_message_id = _send_and_append(f"Fork 2 Message {msg}", prev_message_id)
+    sleep(1)
+    # # Join the forks.
+    _send_and_append("Tail")
 
     _sync_and_show(room_id)
 
     # User 1 sends another read receipt.
-    print("@test reads from 13 -> 14")
-    result = requests.post(
-        f"{HOMESERVER}/_matrix/client/v3/rooms/{room_id}/receipt/m.read/{event_ids[14]}/{event_ids[13]}",
-        headers=USER_1_HEADERS,
-        json={},
-    )
-    _check_for_status(result)
+    # print("@test reads everything")
+    # result = requests.post(
+    #     f"{HOMESERVER}/_matrix/client/v3/rooms/{room_id}/receipt/m.read/{event_ids[-1]}/{event_ids[0]}",
+    #     headers=USER_1_HEADERS,
+    #     json={},
+    # )
+    # _check_for_status(result)
 
-    _sync_and_show(room_id)
+    # _sync_and_show(room_id)
 
 
 if __name__ == "__main__":
