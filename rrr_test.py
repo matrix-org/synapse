@@ -150,7 +150,7 @@ def main():
 
     # Create a fork in the DAG.
     prev_message_id = first_message_id
-    for msg in range(1):
+    for msg in range(3):
         prev_message_id = _send_and_append(f"Fork 2 Message {msg}", prev_message_id)
     sleep(1)
     # # Join the forks.
@@ -159,15 +159,15 @@ def main():
     _sync_and_show(room_id)
 
     # User 1 sends another read receipt.
-    # print("@test reads everything")
-    # result = requests.post(
-    #     f"{HOMESERVER}/_matrix/client/v3/rooms/{room_id}/receipt/m.read/{event_ids[-1]}/{event_ids[0]}",
-    #     headers=USER_1_HEADERS,
-    #     json={},
-    # )
-    # _check_for_status(result)
+    print("@test reads everything")
+    result = requests.post(
+        f"{HOMESERVER}/_matrix/client/v3/rooms/{room_id}/receipt/m.read/{event_ids[-1]}/{event_ids[0]}",
+        headers=USER_1_HEADERS,
+        json={},
+    )
+    _check_for_status(result)
 
-    # _sync_and_show(room_id)
+    _sync_and_show(room_id)
 
 
 if __name__ == "__main__":
