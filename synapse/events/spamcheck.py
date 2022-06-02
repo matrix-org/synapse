@@ -23,12 +23,14 @@ from typing import (
     Collection,
     Dict,
     List,
+    Literal,
     Optional,
     Tuple,
     Union,
 )
 
 from synapse.api.errors import Codes
+from synapse.module_api import NOT_SPAM
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
 from synapse.spam_checker_api import RegistrationBehaviour
@@ -66,7 +68,7 @@ USER_MAY_JOIN_ROOM_CALLBACK = Callable[
     [str, str, bool],
     Awaitable[
         Union[
-            Allow,
+            Literal["NOT_SPAM"],
             Codes,
             # Deprecated
             bool,
@@ -77,7 +79,7 @@ USER_MAY_INVITE_CALLBACK = Callable[
     [str, str, str],
     Awaitable[
         Union[
-            Allow,
+            Literal["NOT_SPAM"],
             Codes,
             # Deprecated
             bool,
@@ -88,7 +90,7 @@ USER_MAY_SEND_3PID_INVITE_CALLBACK = Callable[
     [str, str, str, str],
     Awaitable[
         Union[
-            Allow,
+            Literal["NOT_SPAM"],
             Codes,
             # Deprecated
             bool,
@@ -99,7 +101,7 @@ USER_MAY_CREATE_ROOM_CALLBACK = Callable[
     [str],
     Awaitable[
         Union[
-            Allow,
+            Literal["NOT_SPAM"],
             Codes,
             # Deprecated
             bool,
@@ -110,7 +112,7 @@ USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[
     [str, RoomAlias],
     Awaitable[
         Union[
-            Allow,
+            Literal["NOT_SPAM"],
             Codes,
             # Deprecated
             bool,
@@ -121,7 +123,7 @@ USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[
     [str, str],
     Awaitable[
         Union[
-            Allow,
+            Literal["NOT_SPAM"],
             Codes,
             # Deprecated
             bool,
@@ -150,7 +152,7 @@ CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK = Callable[
     [ReadableFileWrapper, FileInfo],
     Awaitable[
         Union[
-            Allow,
+            Literal["NOT_SPAM"],
             Codes,
             # Deprecated
             bool,
@@ -248,7 +250,7 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer") -> None:
 
 
 class SpamChecker:
-    NOT_SPAM = "NOT_SPAM"
+    NOT_SPAM: Literal["NOT_SPAM"] = "NOT_SPAM"
 
     def __init__(self, hs: "synapse.server.HomeServer") -> None:
         self.hs = hs
@@ -390,7 +392,7 @@ class SpamChecker:
                 return res
 
         # No spam-checker has rejected the event, let it pass.
-        return self.NOT_SPAM
+        return "NOT_SPAM"
 
     async def should_drop_federated_event(
         self, event: "synapse.events.EventBase"
@@ -419,7 +421,7 @@ class SpamChecker:
 
     async def user_may_join_room(
         self, user_id: str, room_id: str, is_invited: bool
-    ) -> Decision:
+    ) -> Union[Tuple[Codes, Dict], Literal["NOT_SPAM"]]:
         """Checks if a given users is allowed to join a room.
         Not called when a user creates a room.
 
@@ -429,7 +431,7 @@ class SpamChecker:
             is_invited: Whether the user is invited into the room
 
         Returns:
-            ALLOW if the operation is permitted, Codes otherwise.
+            NOT_SPAM if the operation is permitted, Codes otherwise.
         """
         for callback in self._user_may_join_room_callbacks:
             with Measure(
@@ -438,19 +440,19 @@ class SpamChecker:
                 may_join_room = await delay_cancellation(
                     callback(user_id, room_id, is_invited)
                 )
-            if may_join_room is True or may_join_room is Allow.ALLOW:
+            if may_join_room is True or may_join_room is NOT_SPAM:
                 continue
             elif may_join_room is False:
-                return Codes.FORBIDDEN
+                return (Codes.FORBIDDEN, {})
             else:
                 return may_join_room
 
         # No spam-checker has rejected the request, let it pass.
-        return Allow.ALLOW
+        return "NOT_SPAM"
 
     async def user_may_invite(
         self, inviter_userid: str, invitee_userid: str, room_id: str
-    ) -> Decision:
+    ) -> Union[Tuple[Codes, Dict], Literal["NOT_SPAM"]]:
         """Checks if a given user may send an invite
 
         Args:
@@ -459,7 +461,7 @@ class SpamChecker:
             room_id: The room ID
 
         Returns:
-            ALLOW if the operation is permitted, Codes otherwise.
+            NOT_SPAM if the operation is permitted, Codes otherwise.
         """
         for callback in self._user_may_invite_callbacks:
             with Measure(
@@ -468,19 +470,19 @@ class SpamChecker:
                 may_invite = await delay_cancellation(
                     callback(inviter_userid, invitee_userid, room_id)
                 )
-            if may_invite is True or may_invite is Allow.ALLOW:
+            if may_invite is True or may_invite is NOT_SPAM:
                 continue
             elif may_invite is False:
-                return Codes.FORBIDDEN
+                return [Codes.FORBIDDEN, {}]
             else:
                 return may_invite
 
         # No spam-checker has rejected the request, let it pass.
-        return Allow.ALLOW
+        return "NOT_SPAM"
 
     async def user_may_send_3pid_invite(
         self, inviter_userid: str, medium: str, address: str, room_id: str
-    ) -> Decision:
+    ) -> Union[Tuple[Codes, Dict], Literal["NOT_SPAM"]]:
         """Checks if a given user may invite a given threepid into the room
 
         Note that if the threepid is already associated with a Matrix user ID, Synapse
@@ -493,7 +495,7 @@ class SpamChecker:
             room_id: The room ID
 
         Returns:
-            ALLOW if the operation is permitted, Codes otherwise.
+            NOT_SPAM if the operation is permitted, Codes otherwise.
         """
         for callback in self._user_may_send_3pid_invite_callbacks:
             with Measure(
@@ -502,16 +504,18 @@ class SpamChecker:
                 may_send_3pid_invite = await delay_cancellation(
                     callback(inviter_userid, medium, address, room_id)
                 )
-            if may_send_3pid_invite is True or may_send_3pid_invite is Allow.ALLOW:
+            if may_send_3pid_invite is True or may_send_3pid_invite is NOT_SPAM:
                 continue
             elif may_send_3pid_invite is False:
                 return Codes.FORBIDDEN
             else:
                 return may_send_3pid_invite
 
-        return Allow.ALLOW
+        return "NOT_SPAM"
 
-    async def user_may_create_room(self, userid: str) -> Decision:
+    async def user_may_create_room(
+        self, userid: str
+    ) -> Union[Tuple[Codes, Dict], Literal["NOT_SPAM"]]:
         """Checks if a given user may create a room
 
         Args:
@@ -522,18 +526,18 @@ class SpamChecker:
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
                 may_create_room = await delay_cancellation(callback(userid))
-            if may_create_room is True or may_create_room is Allow.ALLOW:
+            if may_create_room is True or may_create_room is NOT_SPAM:
                 continue
             elif may_create_room is False:
                 return Codes.FORBIDDEN
             else:
                 return may_create_room
 
-        return Allow.ALLOW
+        return "NOT_SPAM"
 
     async def user_may_create_room_alias(
         self, userid: str, room_alias: RoomAlias
-    ) -> Decision:
+    ) -> Union[Tuple[Codes, Dict], Literal["NOT_SPAM"]]:
         """Checks if a given user may create a room alias
 
         Args:
@@ -548,16 +552,18 @@ class SpamChecker:
                 may_create_room_alias = await delay_cancellation(
                     callback(userid, room_alias)
                 )
-            if may_create_room_alias is True or may_create_room_alias is Allow.ALLOW:
+            if may_create_room_alias is True or may_create_room_alias is NOT_SPAM:
                 continue
             elif may_create_room_alias is False:
                 return Codes.FORBIDDEN
             else:
                 return may_create_room_alias
 
-        return Allow.ALLOW
+        return "NOT_SPAM"
 
-    async def user_may_publish_room(self, userid: str, room_id: str) -> Decision:
+    async def user_may_publish_room(
+        self, userid: str, room_id: str
+    ) -> Union[Tuple[Codes, Dict], Literal["NOT_SPAM"]]:
         """Checks if a given user may publish a room to the directory
 
         Args:
@@ -569,14 +575,14 @@ class SpamChecker:
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
                 may_publish_room = await delay_cancellation(callback(userid, room_id))
-            if may_publish_room is True or may_publish_room is Allow.ALLOW:
+            if may_publish_room is True or may_publish_room is NOT_SPAM:
                 continue
             elif may_publish_room is False:
                 return Codes.FORBIDDEN
             else:
                 return may_publish_room
 
-        return Allow.ALLOW
+        return "NOT_SPAM"
 
     async def check_username_for_spam(self, user_profile: UserProfile) -> bool:
         """Checks if a user ID or display name are considered "spammy" by this server.
@@ -642,7 +648,7 @@ class SpamChecker:
 
     async def check_media_file_for_spam(
         self, file_wrapper: ReadableFileWrapper, file_info: FileInfo
-    ) -> Decision:
+    ) -> Union[Tuple[Codes, Dict], Literal["NOT_SPAM"]]:
         """Checks if a piece of newly uploaded media should be blocked.
 
         This will be called for local uploads, downloads of remote media, each
@@ -660,7 +666,7 @@ class SpamChecker:
                 await file.write_chunks_to(buffer.write)
 
                 if buffer.getvalue() == b"Hello World":
-                    return ALLOW
+                    return "NOT_SPAM"
 
                 return Codes.FORBIDDEN
 
@@ -675,11 +681,11 @@ class SpamChecker:
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
                 spam = await delay_cancellation(callback(file_wrapper, file_info))
-            if spam is False or spam is Allow.ALLOW:
+            if spam is False or spam is NOT_SPAM:
                 continue
             elif spam is True:
                 return Codes.FORBIDDEN
             else:
                 return spam
 
-        return Allow.ALLOW
+        return "NOT_SPAM"
