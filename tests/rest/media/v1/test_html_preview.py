@@ -235,6 +235,21 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
 
         self.assertEqual(og, {"og:title": None, "og:description": "Some text."})
 
+        # Another variant is a title with no content.
+        html = b"""
+        <html>
+        <head><title></title></head>
+        <body>
+        <h1>Title</h1>
+        </body>
+        </html>
+        """
+
+        tree = decode_body(html, "http://example.com/test.html")
+        og = parse_html_to_open_graph(tree)
+
+        self.assertEqual(og, {"og:title": "Title", "og:description": "Title"})
+
     def test_h1_as_title(self) -> None:
         html = b"""
         <html>

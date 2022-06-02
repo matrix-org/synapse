@@ -177,7 +177,9 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
     # "og:video:secure_url": "https://www.youtube.com/v/LXDBoHyjmtw?version=3",
 
     og: Dict[str, Optional[str]] = {}
-    for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')][@content][not(@content='')]"):
+    for tag in tree.xpath(
+        "//*/meta[starts-with(@property, 'og:')][@content][not(@content='')]"
+    ):
         # if we've got more than 50 tags, someone is taking the piss
         if len(og) >= 50:
             logger.warning("Skipping OG for page with too many 'og:' tags")
@@ -195,10 +197,10 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
     # "article:modified_time" content="2016-04-01T18:31:53+00:00" />
 
     if "og:title" not in og:
-        # do some basic spidering of the HTML
-        title = tree.xpath("(//title)[1] | (//h1)[1] | (//h2)[1] | (//h3)[1]")
-        if title and title[0].text is not None:
-            og["og:title"] = title[0].text.strip()
+        # Attempt to find a title from the title tag, or the biggest header on the page.
+        title = tree.xpath("((//title)[1] | (//h1)[1] | (//h2)[1] | (//h3)[1])/text()")
+        if title:
+            og["og:title"] = title[0].strip()
         else:
             og["og:title"] = None
 
