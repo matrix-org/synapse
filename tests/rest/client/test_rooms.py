@@ -18,7 +18,7 @@
 """Tests REST events for /rooms paths."""
 
 import json
-from typing import Any, Dict, Iterable, List, Optional, Union
+from typing import Any, Dict, Iterable, List, Literal, Optional, Union
 from unittest.mock import Mock, call
 from urllib import parse as urlparse
 
@@ -37,7 +37,6 @@ from synapse.handlers.pagination import PurgeStatus
 from synapse.rest import admin
 from synapse.rest.client import account, directory, login, profile, room, sync
 from synapse.server import HomeServer
-from synapse.spam_checker_api import Allow, Decision
 from synapse.types import JsonDict, RoomAlias, UserID, create_requester
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
@@ -711,7 +710,7 @@ class RoomsCreateTestCase(RoomBase):
             mxid: str,
             room_id: str,
             is_invite: bool,
-        ) -> Decision:
+        ) -> Codes:
             return Codes.CONSENT_NOT_GIVEN
 
         join_mock = Mock(side_effect=user_may_join_room)
@@ -999,13 +998,13 @@ class RoomJoinTestCase(RoomBase):
         """
 
         # Register a dummy callback. Make it allow all room joins for now.
-        return_value: Union[Allow, Codes] = Allow.ALLOW
+        return_value: Union[Literal["NOT_SPAM"], Codes] = "NOT_SPAM"
 
         async def user_may_join_room(
             userid: str,
             room_id: str,
             is_invited: bool,
-        ) -> Union[Allow, Codes]:
+        ) -> Union[Literal["NOT_SPAM"], Codes]:
             return return_value
 
         callback_mock = Mock(side_effect=user_may_join_room, spec=lambda *x: None)
@@ -2998,7 +2997,7 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         # allow everything for now.
         # `spec` argument is needed for this function mock to have `__qualname__`, which
         # is needed for `Measure` metrics buried in SpamChecker.
-        mock = Mock(return_value=make_awaitable(Allow.ALLOW), spec=lambda *x: None)
+        mock = Mock(return_value=make_awaitable("NOT_SPAM"), spec=lambda *x: None)
         self.hs.get_spam_checker()._user_may_send_3pid_invite_callbacks.append(mock)
 
         # Send a 3PID invite into the room and check that it succeeded.

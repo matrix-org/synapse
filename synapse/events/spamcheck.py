@@ -375,7 +375,7 @@ class SpamChecker:
                 elif res is True:
                     # This spam-checker rejects the event with deprecated
                     # return value `True`
-                    return Codes.FORBIDDEN
+                    return (Codes.FORBIDDEN, {})
                 elif not isinstance(res, str):
                     # mypy complains that we can't reach this code because of the
                     # return type in CHECK_EVENT_FOR_SPAM_CALLBACK, but we don't know
@@ -392,7 +392,7 @@ class SpamChecker:
                 return res
 
         # No spam-checker has rejected the event, let it pass.
-        return "NOT_SPAM"
+        return NOT_SPAM
 
     async def should_drop_federated_event(
         self, event: "synapse.events.EventBase"
@@ -421,7 +421,7 @@ class SpamChecker:
 
     async def user_may_join_room(
         self, user_id: str, room_id: str, is_invited: bool
-    ) -> Union[Tuple[Codes, Dict], Literal["NOT_SPAM"]]:
+    ) -> Union[Codes, Literal["NOT_SPAM"]]:
         """Checks if a given users is allowed to join a room.
         Not called when a user creates a room.
 
@@ -443,16 +443,16 @@ class SpamChecker:
             if may_join_room is True or may_join_room is NOT_SPAM:
                 continue
             elif may_join_room is False:
-                return (Codes.FORBIDDEN, {})
+                return Codes.FORBIDDEN
             else:
                 return may_join_room
 
         # No spam-checker has rejected the request, let it pass.
-        return "NOT_SPAM"
+        return NOT_SPAM
 
     async def user_may_invite(
         self, inviter_userid: str, invitee_userid: str, room_id: str
-    ) -> Union[Tuple[Codes, Dict], Literal["NOT_SPAM"]]:
+    ) -> Union[Codes, Literal["NOT_SPAM"]]:
         """Checks if a given user may send an invite
 
         Args:
@@ -473,16 +473,16 @@ class SpamChecker:
             if may_invite is True or may_invite is NOT_SPAM:
                 continue
             elif may_invite is False:
-                return [Codes.FORBIDDEN, {}]
+                return Codes.FORBIDDEN
             else:
                 return may_invite
 
         # No spam-checker has rejected the request, let it pass.
-        return "NOT_SPAM"
+        return NOT_SPAM
 
     async def user_may_send_3pid_invite(
         self, inviter_userid: str, medium: str, address: str, room_id: str
-    ) -> Union[Tuple[Codes, Dict], Literal["NOT_SPAM"]]:
+    ) -> Union[Codes, Literal["NOT_SPAM"]]:
         """Checks if a given user may invite a given threepid into the room
 
         Note that if the threepid is already associated with a Matrix user ID, Synapse
@@ -511,11 +511,11 @@ class SpamChecker:
             else:
                 return may_send_3pid_invite
 
-        return "NOT_SPAM"
+        return NOT_SPAM
 
     async def user_may_create_room(
         self, userid: str
-    ) -> Union[Tuple[Codes, Dict], Literal["NOT_SPAM"]]:
+    ) -> Union[Codes, Literal["NOT_SPAM"]]:
         """Checks if a given user may create a room
 
         Args:
@@ -533,11 +533,11 @@ class SpamChecker:
             else:
                 return may_create_room
 
-        return "NOT_SPAM"
+        return NOT_SPAM
 
     async def user_may_create_room_alias(
         self, userid: str, room_alias: RoomAlias
-    ) -> Union[Tuple[Codes, Dict], Literal["NOT_SPAM"]]:
+    ) -> Union[Codes, Literal["NOT_SPAM"]]:
         """Checks if a given user may create a room alias
 
         Args:
@@ -559,11 +559,11 @@ class SpamChecker:
             else:
                 return may_create_room_alias
 
-        return "NOT_SPAM"
+        return NOT_SPAM
 
     async def user_may_publish_room(
         self, userid: str, room_id: str
-    ) -> Union[Tuple[Codes, Dict], Literal["NOT_SPAM"]]:
+    ) -> Union[Codes, Literal["NOT_SPAM"]]:
         """Checks if a given user may publish a room to the directory
 
         Args:
@@ -582,7 +582,7 @@ class SpamChecker:
             else:
                 return may_publish_room
 
-        return "NOT_SPAM"
+        return NOT_SPAM
 
     async def check_username_for_spam(self, user_profile: UserProfile) -> bool:
         """Checks if a user ID or display name are considered "spammy" by this server.
@@ -648,7 +648,7 @@ class SpamChecker:
 
     async def check_media_file_for_spam(
         self, file_wrapper: ReadableFileWrapper, file_info: FileInfo
-    ) -> Union[Tuple[Codes, Dict], Literal["NOT_SPAM"]]:
+    ) -> Union[Codes, Literal["NOT_SPAM"]]:
         """Checks if a piece of newly uploaded media should be blocked.
 
         This will be called for local uploads, downloads of remote media, each
@@ -666,7 +666,7 @@ class SpamChecker:
                 await file.write_chunks_to(buffer.write)
 
                 if buffer.getvalue() == b"Hello World":
-                    return "NOT_SPAM"
+                    return NOT_SPAM
 
                 return Codes.FORBIDDEN
 
@@ -688,4 +688,4 @@ class SpamChecker:
             else:
                 return spam
 
-        return "NOT_SPAM"
+        return NOT_SPAM
