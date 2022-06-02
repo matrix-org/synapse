@@ -145,7 +145,7 @@ class SummarizeTestCase(unittest.TestCase):
         )
 
 
-class CalcOgTestCase(unittest.TestCase):
+class OpenGraphFromHtmlTestCase(unittest.TestCase):
     if not lxml:
         skip = "url preview feature requires lxml"
 
@@ -249,6 +249,26 @@ class CalcOgTestCase(unittest.TestCase):
         og = parse_html_to_open_graph(tree)
 
         self.assertEqual(og, {"og:title": "Title", "og:description": "Some text."})
+
+    def test_empty_description(self) -> None:
+        """Description tags with empty content should be ignored."""
+        html = b"""
+        <html>
+        <meta property="og:description" content=""/>
+        <meta property="og:description"/>
+        <meta name="description" content=""/>
+        <meta name="description"/>
+        <meta name="description" content="Finally!"/>
+        <body>
+        <h1>Title</h1>
+        </body>
+        </html>
+        """
+
+        tree = decode_body(html, "http://example.com/test.html")
+        og = parse_html_to_open_graph(tree)
+
+        self.assertEqual(og, {"og:title": "Title", "og:description": "Finally!"})
 
     def test_missing_title_and_broken_h1(self) -> None:
         html = b"""

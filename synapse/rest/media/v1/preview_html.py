@@ -174,13 +174,13 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
     # "og:video:secure_url": "https://www.youtube.com/v/LXDBoHyjmtw?version=3",
 
     og: Dict[str, Optional[str]] = {}
-    for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')]"):
-        if "content" in tag.attrib:
-            # if we've got more than 50 tags, someone is taking the piss
-            if len(og) >= 50:
-                logger.warning("Skipping OG for page with too many 'og:' tags")
-                return {}
-            og[tag.attrib["property"]] = tag.attrib["content"]
+    for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')][@content][not(@content='')]"):
+        # if we've got more than 50 tags, someone is taking the piss
+        if len(og) >= 50:
+            logger.warning("Skipping OG for page with too many 'og:' tags")
+            return {}
+
+        og[tag.attrib["property"]] = tag.attrib["content"]
 
     # TODO: grab article: meta tags too, e.g.:
 
