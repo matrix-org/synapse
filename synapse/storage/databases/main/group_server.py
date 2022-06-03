@@ -29,6 +29,4 @@ class GroupServerStore(SQLBaseStore):
         db_conn: LoggingDatabaseConnection,
         hs: "HomeServer",
     ):
-        # Register a legacy groups background update as a no-op.
-        database.updates.register_noop_background_update("local_group_updates_index")
         super().__init__(database, db_conn, hs)
