@@ -73,14 +73,14 @@ class ExternalShardedCache:
             for shard in hs.config.redis.cache_shard_hosts:
                 logger.info(
                     "Connecting to redis (host=%r port=%r) for external cache",
-                    shard.host,
-                    shard.port,
+                    shard["host"],
+                    shard["port"],
                 )
                 self._redis_shards.append(
                     lazyConnection(
                         hs=hs,
-                        host=shard.host,
-                        port=shard.port,
+                        host=shard["host"],
+                        port=shard["port"],
                         reconnect=True,
                     ),
                 )
@@ -169,7 +169,7 @@ class ExternalShardedCache:
         ):
             with response_timer.labels("get").time():
                 deferreds = [
-                    self._mget_shard(shard_id, keys)
+                    defer.ensureDeferred(self._mget_shard(shard_id, keys))
                     for shard_id, keys in shard_id_to_key_mapping.items()
                 ]
                 results: Union[
