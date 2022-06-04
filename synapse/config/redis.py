@@ -34,3 +34,42 @@ class RedisConfig(Config):
         self.redis_host = redis_config.get("host", "localhost")
         self.redis_port = redis_config.get("port", 6379)
         self.redis_password = redis_config.get("password")
+
+        cache_shard_config = redis_config.get("cache_shards")
+        if cache_shard_config:
+            self.cache_shard_hosts = cache_shard_config.get("hosts", [])
+            self.cache_shard_expire = cache_shard_config.get("expire_caches", False)
+            self.cache_shard_ttl = cache_shard_config.get("cache_entry_ttl", False)
+
+    def generate_config_section(self, **kwargs: Any) -> str:
+        return """\
+        # Configuration for Redis when using workers. This *must* be enabled when
+        # using workers (unless using old style direct TCP configuration).
+        #
+        redis:
+          # Uncomment the below to enable Redis support.
+          #
+          #enabled: true
+
+          # Optional host and port to use to connect to redis. Defaults to
+          # localhost and 6379
+          #
+          #host: localhost
+          #port: 6379
+
+          # Optional password if configured on the Redis instance
+          #
+          #password: <secret_password>
+
+          # Optional one or more Redis hosts to use for long term shared caches.
+          # Should be configured to automatically expire records when out of
+          # memory, and not be the same instance as used for replication.
+          #
+          #cache_shards:
+          #  enabled: false
+          #  expire_caches: false
+          #  cache_entry_ttl: 30m
+          #  hosts:
+          #    - host: localhost
+          #      port: 6379
+        """
