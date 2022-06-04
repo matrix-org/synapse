@@ -29,7 +29,7 @@ from typing import (
 from synapse.api.constants import EduTypes, ReceiptTypes
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import ReceiptsStream
-from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
+from synapse.storage._base import SQLBaseStore, IsolationLevel, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
@@ -764,6 +764,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 linearized_event_id,
                 data,
                 stream_id=stream_id,
+                # Read committed is actually beneficial here because we check for a receipt with
+                # greater stream order, and checking the very latest data at select time is better
+                # than the data at transaction start time.
+                isolation_level=IsolationLevel.READ_COMMITTED,
             )
 
         # If the receipt was older than the currently persisted one, nothing to do.
