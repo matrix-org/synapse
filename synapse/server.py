@@ -110,6 +110,7 @@ from synapse.push.bulk_push_rule_evaluator import BulkPushRuleEvaluator
 from synapse.push.pusherpool import PusherPool
 from synapse.replication.tcp.client import ReplicationDataHandler
 from synapse.replication.tcp.external_cache import ExternalCache
+from synapse.replication.tcp.external_sharded_cache import ExternalShardedCache
 from synapse.replication.tcp.handler import ReplicationCommandHandler
 from synapse.replication.tcp.resource import ReplicationStreamer
 from synapse.replication.tcp.streams import STREAMS_MAP, Stream
@@ -770,6 +771,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_external_cache(self) -> ExternalCache:
         return ExternalCache(self)
+
+    @cache_in_self
+    def get_external_sharded_cache(self) -> ExternalShardedCache:
+        return ExternalShardedCache(self)
 
     @cache_in_self
     def get_account_handler(self) -> AccountHandler:
