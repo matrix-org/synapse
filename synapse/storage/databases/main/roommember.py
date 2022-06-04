@@ -831,10 +831,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         """
 
         sharded_cache = self.hs.get_external_sharded_cache()
+        sharded_cache_enabled = sharded_cache.is_enabled()
+
         missing = []
         rows = []
 
-        if sharded_cache.is_enabled():
+        if sharded_cache_enabled:
             event_id_to_row = await sharded_cache.mget(
                 "_get_joined_profile_from_event_id", event_ids
             )
@@ -858,10 +860,10 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             )
             rows += missing_rows
 
-            if sharded_cache.is_enabled():
+            if sharded_cache_enabled and missing_rows:
                 await sharded_cache.mset(
                     "_get_joined_profile_from_event_id",
-                    {row["event_id"]: row for row in rows},
+                    {row["event_id"]: row for row in missing_rows},
                 )
 
         return {
