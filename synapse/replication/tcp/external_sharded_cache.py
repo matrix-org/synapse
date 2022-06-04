@@ -154,7 +154,7 @@ class ExternalShardedCache:
         """Look up a key/value combinations in the named cache."""
 
         if not self.is_enabled():
-            return None
+            return {}
 
         shard_id_to_key_mapping: dict[int, dict[str, str]] = defaultdict(dict)
 
@@ -175,7 +175,7 @@ class ExternalShardedCache:
                 results: Union[
                     list, list[dict[str, Any]]
                 ] = await make_deferred_yieldable(
-                    defer.gatherResults(deferreds, consumeErrors=True)  # type: ignore
+                    defer.gatherResults(deferreds, consumeErrors=True)
                 ).addErrback(
                     unwrapFirstError
                 )
