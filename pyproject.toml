@@ -178,6 +178,7 @@ jaeger-client = { version = ">=4.0.0", optional = true }
 pyjwt = { version = ">=1.6.4", optional = true }
 txredisapi = { version = ">=1.4.7", optional = true }
 hiredis = { version = "*", optional = true }
+jump-consistent-hash = { version = ">=3.2.0", optional = true }
 Pympler = { version = "*", optional = true }
 parameterized = { version = ">=0.7.4", optional = true }
 idna = { version = ">=2.5", optional = true }
@@ -199,7 +200,7 @@ opentracing = ["jaeger-client", "opentracing"]
 jwt = ["pyjwt"]
 # hiredis is not a *strict* dependency, but it makes things much faster.
 # (if it is not installed, we fall back to slow code.)
-redis = ["txredisapi", "hiredis"]
+redis = ["txredisapi", "hiredis", "jump-consistent-hash"]
 # Required to use experimental `caches.track_memory_usage` config option.
 cache_memory = ["pympler"]
 test = ["parameterized", "idna"]
@@ -233,7 +234,7 @@ all = [
     # jwt
     "pyjwt",
     # redis
-    "txredisapi", "hiredis",
+    "txredisapi", "hiredis", "jump-consistent-hash",
     # cache_memory
     "pympler",
     # omitted:
