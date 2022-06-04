@@ -16,7 +16,7 @@ import binascii
 import logging
 import marshal
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Any, Iterable, Union
 
 import jump
 from prometheus_client import Counter, Histogram
