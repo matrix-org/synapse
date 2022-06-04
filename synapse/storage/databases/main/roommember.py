@@ -830,15 +830,39 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             Map from event ID to `user_id` and ProfileInfo (or None if not join event).
         """
 
-        rows = await self.db_pool.simple_select_many_batch(
-            table="room_memberships",
-            column="event_id",
-            iterable=event_ids,
-            retcols=("user_id", "display_name", "avatar_url", "event_id"),
-            keyvalues={"membership": Membership.JOIN},
-            batch_size=500,
-            desc="_get_joined_profiles_from_event_ids",
-        )
+        sharded_cache = self.hs.get_external_sharded_cache()
+        missing = []
+        rows = []
+
+        if sharded_cache.is_enabled():
+            event_id_to_row = await sharded_cache.mget(
+                "_get_joined_profile_from_event_id", event_ids
+            )
+            for event_id, row in event_id_to_row.items():
+                if row:
+                    rows.append(row)
+                else:
+                    missing.append(event_id)
+        else:
+            missing = list(event_ids)
+
+        if missing:
+            missing_rows = await self.db_pool.simple_select_many_batch(
+                table="room_memberships",
+                column="event_id",
+                iterable=event_ids,
+                retcols=("user_id", "display_name", "avatar_url", "event_id"),
+                keyvalues={"membership": Membership.JOIN},
+                batch_size=500,
+                desc="_get_joined_profiles_from_event_ids",
+            )
+            rows += missing_rows
+
+            if sharded_cache.is_enabled():
+                await sharded_cache.mset(
+                    "_get_joined_profile_from_event_id",
+                    {row["event_id"]: row for row in rows},
+                )
 
         return {
             row["event_id"]: (
