@@ -1,1 +1,1 @@
-Use lower isolation level when purging rooms to avoid serialization errors.
+Use lower isolation level when purging rooms to avoid serialization errors. Contributed by Nick @ Beeper.
