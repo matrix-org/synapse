@@ -1,0 +1,1 @@
+Cleanup old slaved storage classes that are no longer required with generic workers. Contributed by Nick @ Beeper.
