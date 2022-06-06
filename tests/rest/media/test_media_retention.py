@@ -58,8 +58,9 @@ class MediaRetentionTestCase(unittest.HomeserverTestCase):
         media_repository = hs.get_media_repository()
         test_media_content = b"example string"
 
-        def _create_media_and_set_last_accessed(
+        def _create_media_and_set_attributes(
             last_accessed_ms: Optional[int],
+            is_quarantined: Optional[bool] = False,
         ) -> str:
             # "Upload" some media to the local media store
             mxc_uri = self.get_success(
@@ -84,10 +85,22 @@ class MediaRetentionTestCase(unittest.HomeserverTestCase):
                     )
                 )
 
+            if is_quarantined:
+                # Mark this media as quarantined
+                self.get_success(
+                    self.store.quarantine_media_by_id(
+                        server_name=self.hs.config.server.server_name,
+                        media_id=media_id,
+                        quarantined_by="@theadmin:test",
+                    )
+                )
+
             return media_id
 
-        def _cache_remote_media_and_set_last_accessed(
-            media_id: str, last_accessed_ms: Optional[int]
+        def _cache_remote_media_and_set_attributes(
+            media_id: str,
+            last_accessed_ms: Optional[int],
+            is_quarantined: Optional[bool] = False,
         ) -> str:
             # Pretend to cache some remote media
             self.get_success(
@@ -112,23 +125,52 @@ class MediaRetentionTestCase(unittest.HomeserverTestCase):
                     )
                 )
 
+            if is_quarantined:
+                # Mark this media as quarantined
+                self.get_success(
+                    self.store.quarantine_media_by_id(
+                        server_name=self.remote_server_name,
+                        media_id=media_id,
+                        quarantined_by="@theadmin:test",
+                    )
+                )
+
             return media_id
 
         # Start with the local media store
-        self.local_recently_accessed_media = _create_media_and_set_last_accessed(
-            self.THIRTY_DAYS_IN_MS
+        self.local_recently_accessed_media = _create_media_and_set_attributes(
+            last_accessed_ms=self.THIRTY_DAYS_IN_MS,
         )
-        self.local_not_recently_accessed_media = _create_media_and_set_last_accessed(
-            self.ONE_DAY_IN_MS
+        self.local_not_recently_accessed_media = _create_media_and_set_attributes(
+            last_accessed_ms=self.ONE_DAY_IN_MS,
         )
-        self.local_never_accessed_media = _create_media_and_set_last_accessed(None)
+        self.local_not_recently_accessed_quarantined_media = (
+            _create_media_and_set_attributes(
+                last_accessed_ms=self.ONE_DAY_IN_MS,
+                is_quarantined=True,
+            )
+        )
+        self.local_never_accessed_media = _create_media_and_set_attributes(
+            last_accessed_ms=None,
+        )
 
         # And now the remote media store
-        self.remote_recently_accessed_media = _cache_remote_media_and_set_last_accessed(
-            "a", self.THIRTY_DAYS_IN_MS
+        self.remote_recently_accessed_media = _cache_remote_media_and_set_attributes(
+            media_id="a",
+            last_accessed_ms=self.THIRTY_DAYS_IN_MS,
         )
         self.remote_not_recently_accessed_media = (
-            _cache_remote_media_and_set_last_accessed("b", self.ONE_DAY_IN_MS)
+            _cache_remote_media_and_set_attributes(
+                media_id="b",
+                last_accessed_ms=self.ONE_DAY_IN_MS,
+            )
+        )
+        self.remote_not_recently_accessed_quarantined_media = (
+            _cache_remote_media_and_set_attributes(
+                media_id="c",
+                last_accessed_ms=self.ONE_DAY_IN_MS,
+                is_quarantined=True,
+            )
         )
         # Remote media will always have a "last accessed" attribute, as it would not
         # be fetched from the remote homeserver unless instigated by a user.
@@ -163,8 +205,16 @@ class MediaRetentionTestCase(unittest.HomeserverTestCase):
             ],
             not_purged=[
                 (self.hs.config.server.server_name, self.local_recently_accessed_media),
+                (
+                    self.hs.config.server.server_name,
+                    self.local_not_recently_accessed_quarantined_media,
+                ),
                 (self.remote_server_name, self.remote_recently_accessed_media),
                 (self.remote_server_name, self.remote_not_recently_accessed_media),
+                (
+                    self.remote_server_name,
+                    self.remote_not_recently_accessed_quarantined_media,
+                ),
             ],
         )
 
@@ -198,6 +248,14 @@ class MediaRetentionTestCase(unittest.HomeserverTestCase):
                 (
                     self.hs.config.server.server_name,
                     self.local_not_recently_accessed_media,
+                ),
+                (
+                    self.hs.config.server.server_name,
+                    self.local_not_recently_accessed_quarantined_media,
+                ),
+                (
+                    self.remote_server_name,
+                    self.remote_not_recently_accessed_quarantined_media,
                 ),
                 (self.hs.config.server.server_name, self.local_never_accessed_media),
             ],
