@@ -35,7 +35,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
         )
 
         hs.get_storage_controllers().state.get_current_hosts_in_room = Mock(
-            return_value=make_awaitable(["test", "host2"])
+            return_value=make_awaitable({"test", "host2"})
         )
 
         return hs
