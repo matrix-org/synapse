@@ -259,3 +259,16 @@ class ReceiptTypes:
     READ: Final = "m.read"
     READ_PRIVATE: Final = "org.matrix.msc2285.read.private"
     FULLY_READ: Final = "m.fully_read"
+
+
+class OpenIdUserInfoFields:
+    """Enumeration of user-requested fields in the open id userinfo according to
+    MSC3356. The following constants are used in synapse.rest.client.openid for user
+    input validation and in synapse.federation.transport.server when expanding the
+    optional userinfo fields."""
+
+    DISPLAY_NAME: Final = "org.matrix.msc3356.display_name"
+    AVATAR_URL: Final = "org.matrix.msc3356.avatar_url"
+    ROOM_POWERLEVELS: Final = "org.matrix.msc3356.room_powerlevels"
+
+    ALL_OPEN_ID_USER_INFO_FIELDS: Final = (DISPLAY_NAME, AVATAR_URL, ROOM_POWERLEVELS)

@@ -15,7 +15,14 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.errors import AuthError
+from synapse.api.constants import OpenIdUserInfoFields
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    InvalidAPICallError,
+    SynapseError,
+    UnrecognizedRequestError,
+)
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -70,6 +77,7 @@ class IdTokenServlet(RestServlet):
         self.store = hs.get_datastores().main
         self.clock = hs.get_clock()
         self.server_name = hs.config.server.server_name
+        self.msc3356_enabled = hs.config.experimental.msc3356_enabled
 
     async def on_POST(
         self, request: SynapseRequest, user_id: str
@@ -78,14 +86,38 @@ class IdTokenServlet(RestServlet):
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot request tokens for other users.")
 
-        # Parse the request body to make sure it's JSON, but ignore the contents
-        # for now.
-        parse_json_object_from_request(request)
+        json = parse_json_object_from_request(request, allow_empty_body=True)
+
+        userinfo_fields = None
+        if "org.matrix.msc3356.userinfo_fields" in json:
+            if not self.msc3356_enabled:
+                raise UnrecognizedRequestError(
+                    "Experimental feature org.matrix.msc3356 is not enabled",
+                )
+
+            userinfo_fields = json["org.matrix.msc3356.userinfo_fields"]
+            if not (
+                isinstance(userinfo_fields, list)
+                and all(isinstance(v, str) for v in userinfo_fields)
+            ):
+                raise InvalidAPICallError(
+                    "'org.matrix.msc3356.userinfo_fields' values must be a list of strings",
+                )
+
+            for field in userinfo_fields:
+                if field not in OpenIdUserInfoFields.ALL_OPEN_ID_USER_INFO_FIELDS:
+                    raise SynapseError(
+                        400,
+                        f"Unknown userinfo field '{field}'",
+                        Codes.INVALID_PARAM,
+                    )
 
         token = random_string(24)
         ts_valid_until_ms = self.clock.time_msec() + self.EXPIRES_MS
 
-        await self.store.insert_open_id_token(token, ts_valid_until_ms, user_id)
+        await self.store.insert_open_id_token(
+            token, ts_valid_until_ms, user_id, userinfo_fields
+        )
 
         return (
             200,

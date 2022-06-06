@@ -12,11 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import copy
 import logging
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple, Type
 
 from typing_extensions import Literal
 
+from synapse.api.constants import EventTypes, Membership, OpenIdUserInfoFields
 from synapse.api.errors import FederationDeniedError, SynapseError
 from synapse.federation.transport.server._base import (
     Authenticator,
@@ -33,7 +35,7 @@ from synapse.http.servlet import (
     parse_integer_from_args,
     parse_string_from_args,
 )
-from synapse.types import JsonDict, ThirdPartyInstanceID
+from synapse.types import JsonDict, ThirdPartyInstanceID, UserID
 from synapse.util.ratelimitutils import FederationRateLimiter
 
 if TYPE_CHECKING:
@@ -239,9 +241,9 @@ class OpenIdUserInfo(BaseFederationServlet):
                 {"errcode": "M_MISSING_TOKEN", "error": "Access Token required"},
             )
 
-        user_id = await self.handler.on_openid_userinfo(token)
+        token_info = await self.handler.on_openid_userinfo(token)
 
-        if user_id is None:
+        if token_info is None:
             return (
                 401,
                 {
@@ -250,7 +252,46 @@ class OpenIdUserInfo(BaseFederationServlet):
                 },
             )
 
-        return 200, {"sub": user_id}
+        user_id, userinfo_fields = token_info
+        userinfo: JsonDict = {"sub": user_id}
+
+        if OpenIdUserInfoFields.DISPLAY_NAME in userinfo_fields:
+            localpart = UserID.from_string(user_id).localpart
+            userinfo[
+                OpenIdUserInfoFields.DISPLAY_NAME
+            ] = await self.hs.get_datastores().main.get_profile_displayname(localpart)
+        if OpenIdUserInfoFields.AVATAR_URL in userinfo_fields:
+            localpart = UserID.from_string(user_id).localpart
+            userinfo[
+                OpenIdUserInfoFields.AVATAR_URL
+            ] = await self.hs.get_datastores().main.get_profile_avatar_url(localpart)
+        if OpenIdUserInfoFields.ROOM_POWERLEVELS in userinfo_fields:
+            userinfo[
+                OpenIdUserInfoFields.ROOM_POWERLEVELS
+            ] = await self._get_powerlevels(user_id)
+
+        return 200, userinfo
+
+    async def _get_powerlevels(self, user_id: str) -> Dict[str, Dict[str, Any]]:
+        room_list = await self.hs.get_datastores().main.get_rooms_for_local_user_where_membership_is(
+            user_id=user_id, membership_list=[Membership.JOIN]
+        )
+
+        power_levels = {}
+        for room in room_list:
+            room_power_levels = await self.hs.get_state_handler().get_current_state(
+                room_id=room.room_id, event_type=EventTypes.PowerLevels
+            )
+            if room_power_levels is not None:
+                # Copy the whole power levels state event. Strip all explicit power levels
+                # except those for user_id, as specified in MSC3356
+                stripped_content = copy.deepcopy(room_power_levels.content)
+                stripped_content["users"] = {
+                    k: v for k, v in stripped_content["users"].items() if k == user_id
+                }
+                power_levels[room.room_id] = stripped_content
+
+        return power_levels
 
 
 SERVLET_GROUPS: Dict[str, Iterable[Type[BaseFederationServlet]]] = {
