@@ -438,15 +438,19 @@ class SpamChecker:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                may_join_room = await delay_cancellation(
-                    callback(user_id, room_id, is_invited)
-                )
-            if may_join_room is True or may_join_room is self.NOT_SPAM:
-                continue
-            elif may_join_room is False:
-                return Codes.FORBIDDEN
-            else:
-                return may_join_room
+                res = await delay_cancellation(callback(user_id, room_id, is_invited))
+                # Normalize return values to `Codes` or `"NOT_SPAM"`.
+                if res is True or res is self.NOT_SPAM:
+                    continue
+                elif res is False:
+                    return Codes.FORBIDDEN
+                elif isinstance(res, Codes):
+                    return res
+                else:
+                    logger.warning(
+                        "Module returned invalid value, rejecting join as spam"
+                    )
+                    return Codes.FORBIDDEN
 
         # No spam-checker has rejected the request, let it pass.
         return self.NOT_SPAM
@@ -468,15 +472,21 @@ class SpamChecker:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                may_invite = await delay_cancellation(
+                res = await delay_cancellation(
                     callback(inviter_userid, invitee_userid, room_id)
                 )
-            if may_invite is True or may_invite is self.NOT_SPAM:
-                continue
-            elif may_invite is False:
-                return Codes.FORBIDDEN
-            else:
-                return may_invite
+                # Normalize return values to `Codes` or `"NOT_SPAM"`.
+                if res is True or res is self.NOT_SPAM:
+                    continue
+                elif res is False:
+                    return Codes.FORBIDDEN
+                elif isinstance(res, Codes):
+                    return res
+                else:
+                    logger.warning(
+                        "Module returned invalid value, rejecting invite as spam"
+                    )
+                    return Codes.FORBIDDEN
 
         # No spam-checker has rejected the request, let it pass.
         return self.NOT_SPAM
@@ -502,15 +512,21 @@ class SpamChecker:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                may_send_3pid_invite = await delay_cancellation(
+                res = await delay_cancellation(
                     callback(inviter_userid, medium, address, room_id)
                 )
-            if may_send_3pid_invite is True or may_send_3pid_invite is self.NOT_SPAM:
-                continue
-            elif may_send_3pid_invite is False:
-                return Codes.FORBIDDEN
-            else:
-                return may_send_3pid_invite
+                # Normalize return values to `Codes` or `"NOT_SPAM"`.
+                if res is True or res is self.NOT_SPAM:
+                    continue
+                elif res is False:
+                    return Codes.FORBIDDEN
+                elif isinstance(res, Codes):
+                    return res
+                else:
+                    logger.warning(
+                        "Module returned invalid value, rejecting 3pid invite as spam"
+                    )
+                    return Codes.FORBIDDEN
 
         return self.NOT_SPAM
 
@@ -526,13 +542,18 @@ class SpamChecker:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                may_create_room = await delay_cancellation(callback(userid))
-            if may_create_room is True or may_create_room is self.NOT_SPAM:
-                continue
-            elif may_create_room is False:
-                return Codes.FORBIDDEN
-            else:
-                return may_create_room
+                res = await delay_cancellation(callback(userid))
+                if res is True or res is self.NOT_SPAM:
+                    continue
+                elif res is False:
+                    return Codes.FORBIDDEN
+                elif isinstance(res, Codes):
+                    return res
+                else:
+                    logger.warning(
+                        "Module returned invalid value, rejecting room creation as spam"
+                    )
+                    return Codes.FORBIDDEN
 
         return self.NOT_SPAM
 
@@ -550,15 +571,18 @@ class SpamChecker:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                may_create_room_alias = await delay_cancellation(
-                    callback(userid, room_alias)
-                )
-            if may_create_room_alias is True or may_create_room_alias is self.NOT_SPAM:
-                continue
-            elif may_create_room_alias is False:
-                return Codes.FORBIDDEN
-            else:
-                return may_create_room_alias
+                res = await delay_cancellation(callback(userid, room_alias))
+                if res is True or res is self.NOT_SPAM:
+                    continue
+                elif res is False:
+                    return Codes.FORBIDDEN
+                elif isinstance(res, Codes):
+                    return res
+                else:
+                    logger.warning(
+                        "Module returned invalid value, rejecting room create as spam"
+                    )
+                    return Codes.FORBIDDEN
 
         return self.NOT_SPAM
 
@@ -575,13 +599,18 @@ class SpamChecker:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                may_publish_room = await delay_cancellation(callback(userid, room_id))
-            if may_publish_room is True or may_publish_room is self.NOT_SPAM:
-                continue
-            elif may_publish_room is False:
-                return Codes.FORBIDDEN
-            else:
-                return may_publish_room
+                res = await delay_cancellation(callback(userid, room_id))
+                if res is True or res is self.NOT_SPAM:
+                    continue
+                elif res is False:
+                    return Codes.FORBIDDEN
+                elif isinstance(res, Codes):
+                    return res
+                else:
+                    logger.warning(
+                        "Module returned invalid value, rejecting room publication as spam"
+                    )
+                    return Codes.FORBIDDEN
 
         return self.NOT_SPAM
 
@@ -662,12 +691,12 @@ class SpamChecker:
 
             async def check_media_file_for_spam(
                 self, file: ReadableFileWrapper, file_info: FileInfo
-            ) -> Decision:
+            ) -> Union[Codes, Literal["NOT_SPAM"]]:
                 buffer = BytesIO()
                 await file.write_chunks_to(buffer.write)
 
                 if buffer.getvalue() == b"Hello World":
-                    return self.NOT_SPAM
+                    return synapse.module_api.NOT_SPAM
 
                 return Codes.FORBIDDEN
 
@@ -681,12 +710,18 @@ class SpamChecker:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                spam = await delay_cancellation(callback(file_wrapper, file_info))
-            if spam is False or spam is self.NOT_SPAM:
-                continue
-            elif spam is True:
-                return Codes.FORBIDDEN
-            else:
-                return spam
+                res = await delay_cancellation(callback(file_wrapper, file_info))
+                # Normalize return values to `Codes` or `"NOT_SPAM"`.
+                if res is False or res is self.NOT_SPAM:
+                    continue
+                elif res is True:
+                    return Codes.FORBIDDEN
+                elif isinstance(res, Codes):
+                    return res
+                else:
+                    logger.warning(
+                        "Module returned invalid value, rejecting media file as spam"
+                    )
+                    return Codes.FORBIDDEN
 
         return self.NOT_SPAM

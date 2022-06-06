@@ -89,6 +89,231 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.61.0
+
+## New signature for the spam checker callback `user_may_join_room`
+
+The previous signature has been deprecated.
+
+Whereas `user_may_join_room` callbacks used to return `bool`, they should now return `Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes"]`.
+
+This is part of an ongoing refactoring of the SpamChecker API to make it less ambiguous and more powerful.
+
+If your module implements `user_may_join_room` as follows:
+
+```python
+async def user_may_join_room(self, user_id: str, room_id: str, is_invited: bool)
+    if ...:
+        # Request is spam
+        return False
+    # Request is not spam
+    return True
+```
+
+you should rewrite it as follows:
+
+```python
+async def user_may_join_room(self, user_id: str, room_id: str, is_invited: bool)
+    if ...:
+        # Request is spam, mark it as forbidden (you may use some more precise error
+        # code if it is useful).
+        return synapse.module_api.errors.Codes.FORBIDDEN
+    # Request is not spam, mark it as such.
+    return synapse.module_api.NOT_SPAM
+```
+
+
+## New signature for the spam checker callback `user_may_invite`
+
+The previous signature has been deprecated.
+
+Whereas `user_may_invite` callbacks used to return `bool`, they should now return `Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes"]`.
+
+This is part of an ongoing refactoring of the SpamChecker API to make it less ambiguous and more powerful.
+
+If your module implements `user_may_invite` as follows:
+
+```python
+async def user_may_invite(self, self, inviter_userid: str, invitee_userid: str, room_id: str):
+    if ...:
+        # Request is spam
+        return False
+    # Request is not spam
+    return True
+```
+
+you should rewrite it as follows:
+
+```python
+async def user_may_invite(self, self, inviter_userid: str, invitee_userid: str, room_id: str):
+    if ...:
+        # Request is spam, mark it as forbidden (you may use some more precise error
+        # code if it is useful).
+        return synapse.module_api.errors.Codes.FORBIDDEN
+    # Request is not spam, mark it as such.
+    return synapse.module_api.NOT_SPAM
+```
+
+
+## New signature for the spam checker callback `user_may_send_3pid_invite`
+
+The previous signature has been deprecated.
+
+Whereas `user_may_send_3pid_invite` callbacks used to return `bool`, they should now return `Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes"]`.
+
+This is part of an ongoing refactoring of the SpamChecker API to make it less ambiguous and more powerful.
+
+If your module implements `user_may_send_3pid_invite` as follows:
+
+```python
+async def user_may_send_3pid_invite(self, inviter_userid: str, medium: str, address: str, room_id: str):
+    if ...:
+        # Request is spam
+        return False
+    # Request is not spam
+    return True
+```
+
+you should rewrite it as follows:
+
+```python
+async def user_may_send_3pid_invite(self, inviter_userid: str, medium: str, address: str, room_id: str):
+    if ...:
+        # Request is spam, mark it as forbidden (you may use some more precise error
+        # code if it is useful).
+        return synapse.module_api.errors.Codes.FORBIDDEN
+    # Request is not spam, mark it as such.
+    return synapse.module_api.NOT_SPAM
+```
+
+## New signature for the spam checker callback `user_may_create_room`
+
+The previous signature has been deprecated.
+
+Whereas `user_may_create_room` callbacks used to return `bool`, they should now return `Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes"]`.
+
+This is part of an ongoing refactoring of the SpamChecker API to make it less ambiguous and more powerful.
+
+If your module implements `user_may_create_room` as follows:
+
+```python
+async def user_may_create_room(self, userid: str):
+    if ...:
+        # Request is spam
+        return False
+    # Request is not spam
+    return True
+```
+
+you should rewrite it as follows:
+
+```python
+async def user_may_create_room(self, userid: str):
+    if ...:
+        # Request is spam, mark it as forbidden (you may use some more precise error
+        # code if it is useful).
+        return synapse.module_api.errors.Codes.FORBIDDEN
+    # Request is not spam, mark it as such.
+    return synapse.module_api.NOT_SPAM
+```
+
+
+## New signature for the spam checker callback `user_may_create_room_alias`
+
+The previous signature has been deprecated.
+
+Whereas `user_may_create_room_alias` callbacks used to return `bool`, they should now return `Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes"]`.
+
+This is part of an ongoing refactoring of the SpamChecker API to make it less ambiguous and more powerful.
+
+If your module implements `user_may_create_room_alias` as follows:
+
+```python
+async def user_may_create_room_alias(self, userid: str, room_alias: RoomAlias):
+    if ...:
+        # Request is spam
+        return False
+    # Request is not spam
+    return True
+```
+
+you should rewrite it as follows:
+
+```python
+async def user_may_create_room_alias(self, userid: str, room_alias: RoomAlias):
+    if ...:
+        # Request is spam, mark it as forbidden (you may use some more precise error
+        # code if it is useful).
+        return synapse.module_api.errors.Codes.FORBIDDEN
+    # Request is not spam, mark it as such.
+    return synapse.module_api.NOT_SPAM
+```
+
+
+## New signature for the spam checker callback `user_may_publish_room`
+
+The previous signature has been deprecated.
+
+Whereas `user_may_publish_room` callbacks used to return `bool`, they should now return `Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes"]`.
+
+This is part of an ongoing refactoring of the SpamChecker API to make it less ambiguous and more powerful.
+
+If your module implements `user_may_publish_room` as follows:
+
+```python
+async def user_may_publish_room(self, userid: str, room_id: str):
+    if ...:
+        # Request is spam
+        return False
+    # Request is not spam
+    return True
+```
+
+you should rewrite it as follows:
+
+```python
+async def user_may_publish_room(self, userid: str, room_id: str):
+    if ...:
+        # Request is spam, mark it as forbidden (you may use some more precise error
+        # code if it is useful).
+        return synapse.module_api.errors.Codes.FORBIDDEN
+    # Request is not spam, mark it as such.
+    return synapse.module_api.NOT_SPAM
+```
+
+
+## New signature for the spam checker callback `check_media_file_for_spam`
+
+The previous signature has been deprecated.
+
+Whereas `check_media_file_for_spam` callbacks used to return `bool`, they should now return `Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes"]`.
+
+This is part of an ongoing refactoring of the SpamChecker API to make it less ambiguous and more powerful.
+
+If your module implements `check_media_file_for_spam` as follows:
+
+```python
+async def check_media_file_for_spam(self, file_wrapper: ReadableFileWrapper, file_info: FileInfo):
+    if ...:
+        # Request is spam
+        return False
+    # Request is not spam
+    return True
+```
+
+you should rewrite it as follows:
+
+```python
+async def check_media_file_for_spam(self, file_wrapper: ReadableFileWrapper, file_info: FileInfo):
+    if ...:
+        # Request is spam, mark it as forbidden (you may use some more precise error
+        # code if it is useful).
+        return synapse.module_api.errors.Codes.FORBIDDEN
+    # Request is not spam, mark it as such.
+    return synapse.module_api.NOT_SPAM
+```
+
+
 # Upgrading to v1.60.0
 
 ## Adding a new unique index to `state_group_edges` could fail if your database is corrupted

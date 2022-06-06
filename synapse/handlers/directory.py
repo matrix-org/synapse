@@ -144,10 +144,10 @@ class DirectoryHandler:
             spam_check = await self.spam_checker.user_may_create_room_alias(
                 user_id, room_alias
             )
-            if isinstance(spam_check, Codes):
+            if spam_check != self.spam_checker.NOT_SPAM:
                 raise AuthError(
                     403,
-                    "This user is not permitted to publish rooms to the room list",
+                    "This user is not permitted to create this alias",
                     spam_check,
                 )
 

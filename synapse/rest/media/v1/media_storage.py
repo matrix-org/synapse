@@ -153,7 +153,7 @@ class MediaStorage:
                         # Note that we'll delete the stored media, due to the
                         # try/except below. The media also won't be stored in
                         # the DB.
-                        raise SpamMediaException("Not found", spam_check)
+                        raise SpamMediaException(errcode=spam_check)
 
                     for provider in self.storage_providers:
                         await provider.store_file(path, file_info)

@@ -49,12 +49,14 @@ Called when a user is trying to join a room. The user is represented by their Ma
 `!room:example.com`). The module is also given a boolean to indicate whether the user
 currently has a pending invite in the room.
 
+This callback isn't called if the join is performed by a server administrator, or in the
+context of a room creation.
+
 The callback must return one of:
   - `synapse.module_api.NOT_SPAM`, to allow the operation. Other callbacks may still 
     decide to reject it.
   - `synapse.module_api.errors.Codes` to reject the operation with an error code. In case
     of doubt, `synapse.module_api.errors.Codes.FORBIDDEN` is a good error code.
-    typically will not localize the error message to the user's preferred locale.
   - (deprecated) `False`, which is the same as returning `synapse.module_api.NOT_SPAM`.
   - (deprecated) `True`, which is the same as returning `synapse.module_api.errors.Codes.FORBIDDEN`.
 
@@ -64,10 +66,6 @@ The value of the first callback that does not return `synapse.module_api.NOT_SPA
 be used. If this happens, Synapse will not call any of the subsequent implementations of
 this callback.
 
-
-This callback isn't called if the join is performed by a server administrator, or in the
-context of a room creation.
-
 ### `user_may_invite`
 
 _First introduced in Synapse v1.37.0_
@@ -75,7 +73,7 @@ _First introduced in Synapse v1.37.0_
 _Changed in Synapse v1.61.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean is now deprecated._ 
 
 ```python
-async def user_may_invite(inviter: str, invitee: str, room_id: str) -> ["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
+async def user_may_invite(inviter: str, invitee: str, room_id: str) -> Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
 ```
 
 Called when processing an invitation. Both inviter and invitee are
@@ -87,7 +85,7 @@ The callback must return one of:
     decide to reject it.
   - `synapse.module_api.errors.Codes` to reject the operation with an error code. In case
     of doubt, `synapse.module_api.errors.Codes.FORBIDDEN` is a good error code.
-    typically will not localize the error message to the user's preferred locale.
+
   - (deprecated) `False`, which is the same as returning `synapse.module_api.NOT_SPAM`.
   - (deprecated) `True`, which is the same as returning `synapse.module_api.errors.Codes.FORBIDDEN`.
 
@@ -141,7 +139,7 @@ The callback must return one of:
     decide to reject it.
   - `synapse.module_api.errors.Codes` to reject the operation with an error code. In case
     of doubt, `synapse.module_api.errors.Codes.FORBIDDEN` is a good error code.
-    typically will not localize the error message to the user's preferred locale.
+
   - (deprecated) `False`, which is the same as returning `synapse.module_api.NOT_SPAM`.
   - (deprecated) `True`, which is the same as returning `synapse.module_api.errors.Codes.FORBIDDEN`.
 
@@ -169,7 +167,7 @@ The callback must return one of:
     decide to reject it.
   - `synapse.module_api.errors.Codes` to reject the operation with an error code. In case
     of doubt, `synapse.module_api.errors.Codes.FORBIDDEN` is a good error code.
-    typically will not localize the error message to the user's preferred locale.
+
   - (deprecated) `False`, which is the same as returning `synapse.module_api.NOT_SPAM`.
   - (deprecated) `True`, which is the same as returning `synapse.module_api.errors.Codes.FORBIDDEN`.
 
@@ -188,7 +186,7 @@ _First introduced in Synapse v1.37.0_
 _Changed in Synapse v1.61.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean is now deprecated._ 
 
 ```python
-async def user_may_create_room_alias(user_id: str, room_alias: "synapse.types.RoomAlias") -> ["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
+async def user_may_create_room_alias(user_id: str, room_alias: "synapse.module_api.RoomAlias") -> ["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
 ```
 
 Called when trying to associate an alias with an existing room.
@@ -198,7 +196,7 @@ The callback must return one of:
     decide to reject it.
   - `synapse.module_api.errors.Codes` to reject the operation with an error code. In case
     of doubt, `synapse.module_api.errors.Codes.FORBIDDEN` is a good error code.
-    typically will not localize the error message to the user's preferred locale.
+
   - (deprecated) `False`, which is the same as returning `synapse.module_api.NOT_SPAM`.
   - (deprecated) `True`, which is the same as returning `synapse.module_api.errors.Codes.FORBIDDEN`.
 
@@ -227,7 +225,7 @@ The callback must return one of:
     decide to reject it.
   - `synapse.module_api.errors.Codes` to reject the operation with an error code. In case
     of doubt, `synapse.module_api.errors.Codes.FORBIDDEN` is a good error code.
-    typically will not localize the error message to the user's preferred locale.
+
   - (deprecated) `False`, which is the same as returning `synapse.module_api.NOT_SPAM`.
   - (deprecated) `True`, which is the same as returning `synapse.module_api.errors.Codes.FORBIDDEN`.
 
@@ -321,7 +319,7 @@ The callback must return one of:
     decide to reject it.
   - `synapse.module_api.errors.Codes` to reject the operation with an error code. In case
     of doubt, `synapse.module_api.errors.Codes.FORBIDDEN` is a good error code.
-    typically will not localize the error message to the user's preferred locale.
+
   - (deprecated) `False`, which is the same as returning `synapse.module_api.NOT_SPAM`.
   - (deprecated) `True`, which is the same as returning `synapse.module_api.errors.Codes.FORBIDDEN`.
 
@@ -397,5 +395,5 @@ class ListSpamChecker:
         if event.sender in self.evil_users:
           return Codes.FORBIDDEN
         else:
-          return "NOT_SPAM"
+          return synapse.module_api.NOT_SPAM
 ```

@@ -683,6 +683,8 @@ class RoomsCreateTestCase(RoomBase):
     def test_spam_checker_may_join_room_deprecated(self) -> None:
         """Tests that the user_may_join_room spam checker callback is correctly bypassed
         when creating a new room.
+
+        In this test, we use the deprecated API in which callbacks return a bool.
         """
 
         async def user_may_join_room(
@@ -707,6 +709,8 @@ class RoomsCreateTestCase(RoomBase):
     def test_spam_checker_may_join_room(self) -> None:
         """Tests that the user_may_join_room spam checker callback is correctly bypassed
         when creating a new room.
+
+        In this test, we use the more recent API in which callbacks return a `Union[Codes, Literal["NOT_SPAM"]]`.
         """
 
         async def user_may_join_room(
@@ -953,6 +957,8 @@ class RoomJoinTestCase(RoomBase):
         ) -> bool:
             return return_value
 
+        # `spec` argument is needed for this function mock to have `__qualname__`, which
+        # is needed for `Measure` metrics buried in SpamChecker.
         callback_mock = Mock(side_effect=user_may_join_room, spec=lambda *x: None)
         self.hs.get_spam_checker()._user_may_join_room_callbacks.append(callback_mock)
 
@@ -1001,7 +1007,7 @@ class RoomJoinTestCase(RoomBase):
         """
 
         # Register a dummy callback. Make it allow all room joins for now.
-        return_value: Union[Literal["NOT_SPAM"], Codes] = "NOT_SPAM"
+        return_value: Union[Literal["NOT_SPAM"], Codes] = synapse.module_api.NOT_SPAM
 
         async def user_may_join_room(
             userid: str,
@@ -1010,6 +1016,8 @@ class RoomJoinTestCase(RoomBase):
         ) -> Union[Literal["NOT_SPAM"], Codes]:
             return return_value
 
+        # `spec` argument is needed for this function mock to have `__qualname__`, which
+        # is needed for `Measure` metrics buried in SpamChecker.
         callback_mock = Mock(side_effect=user_may_join_room, spec=lambda *x: None)
         self.hs.get_spam_checker()._user_may_join_room_callbacks.append(callback_mock)
 
@@ -2930,8 +2938,13 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
 
     def test_threepid_invite_spamcheck_deprecated(self) -> None:
+        """
+        Test allowing/blocking threepid invites with a spam-check module.
+
+        In this test, we use the deprecated API in which callbacks return a bool.
+        """
         # Mock a few functions to prevent the test from failing due to failing to talk to
-        # a remote IS. We keep the mock for _mock_make_and_store_3pid_invite around so we
+        # a remote IS. We keep the mock for make_and_store_3pid_invite around so we
         # can check its call_count later on during the test.
         make_invite_mock = Mock(return_value=make_awaitable(0))
         self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock
@@ -2987,8 +3000,12 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         make_invite_mock.assert_called_once()
 
     def test_threepid_invite_spamcheck(self) -> None:
+        """
+        Test allowing/blocking threepid invites with a spam-check module.
+
+        In this test, we use the more recent API in which callbacks return a `Union[Codes, Literal["NOT_SPAM"]]`."""
         # Mock a few functions to prevent the test from failing due to failing to talk to
-        # a remote IS. We keep the mock for _mock_make_and_store_3pid_invite around so we
+        # a remote IS. We keep the mock for make_and_store_3pid_invite around so we
         # can check its call_count later on during the test.
         make_invite_mock = Mock(return_value=make_awaitable(0))
         self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock
@@ -3000,7 +3017,10 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         # allow everything for now.
         # `spec` argument is needed for this function mock to have `__qualname__`, which
         # is needed for `Measure` metrics buried in SpamChecker.
-        mock = Mock(return_value=make_awaitable("NOT_SPAM"), spec=lambda *x: None)
+        mock = Mock(
+            return_value=make_awaitable(synapse.module_api.NOT_SPAM),
+            spec=lambda *x: None,
+        )
         self.hs.get_spam_checker()._user_may_send_3pid_invite_callbacks.append(mock)
 
         # Send a 3PID invite into the room and check that it succeeded.
