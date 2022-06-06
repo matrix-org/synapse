@@ -71,6 +71,7 @@ class SQLBaseStore(metaclass=ABCMeta):
             self._attempt_to_invalidate_cache("is_host_joined", (room_id, host))
         if members_changed:
             self._attempt_to_invalidate_cache("get_users_in_room", (room_id,))
+            self._attempt_to_invalidate_cache("get_current_hosts_in_room", (room_id,))
             self._attempt_to_invalidate_cache(
                 "get_users_in_room_with_profiles", (room_id,)
             )
