@@ -35,6 +35,10 @@ from synapse.util import Clock
 from tests import unittest
 from tests.unittest import override_config
 
+# Login flows we expect to appear in the list after the normal ones.
+ADDITIONAL_LOGIN_FLOWS = [
+    {"type": "m.login.application_service", "actions": ["login"]},
+]
 
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
@@ -49,6 +53,11 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         config = super().default_config()
         config["allow_guest_access"] = True
         return config
+
+    def _get_login_flows(self) -> JsonDict:
+        channel = self.make_request("GET", "/_matrix/client/r0/login")
+        self.assertEqual(channel.code, 200, channel.result)
+        return channel.json_body["flows"]
 
     def test_POST_appservice_registration_valid(self) -> None:
         user_id = "@as_user_kermit:test"
@@ -121,6 +130,10 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["error"], "Invalid username")
 
     def test_POST_user_valid(self) -> None:
+        # login flows should have actions "login" and "register"
+        flows = self._get_login_flows()
+        self.assertEqual(flows, [{"type": "m.login.password", "actions": ["login", "register"]}] + ADDITIONAL_LOGIN_FLOWS)
+
         user_id = "@kermit:test"
         device_id = "frogfone"
         params = {
@@ -142,6 +155,10 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     @override_config({"enable_registration": False})
     def test_POST_disabled_registration(self) -> None:
+        # login flows should only have action "login"
+        flows = self._get_login_flows()
+        self.assertEqual(flows, [{"type": "m.login.password", "actions": ["login"]}] + ADDITIONAL_LOGIN_FLOWS)
+
         request_data = json.dumps({"username": "kermit", "password": "monkey"})
         self.auth_result = (None, {"username": "kermit", "password": "monkey"}, None)
 

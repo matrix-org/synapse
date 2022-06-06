@@ -83,7 +83,7 @@ EXPECTED_CLIENT_REDIRECT_URL_PARAMS = [("<ab c>", ""), ('q" =+"', '"fö&=o"')]
 
 # Login flows we expect to appear in the list after the normal ones.
 ADDITIONAL_LOGIN_FLOWS = [
-    {"type": "m.login.application_service"},
+    {"type": "m.login.application_service", "actions": ["login"]},
 ]
 
 
