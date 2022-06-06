@@ -81,11 +81,9 @@ TEST_CLIENT_REDIRECT_URL = 'https://x?<ab c>&q"+%3D%2B"="fö%26=o"'
 # the query params in TEST_CLIENT_REDIRECT_URL
 EXPECTED_CLIENT_REDIRECT_URL_PARAMS = [("<ab c>", ""), ('q" =+"', '"fö&=o"')]
 
-# (possibly experimental) login flows we expect to appear in the list after the normal
-# ones
+# Login flows we expect to appear in the list after the normal ones.
 ADDITIONAL_LOGIN_FLOWS = [
     {"type": "m.login.application_service"},
-    {"type": "uk.half-shot.msc2778.login.application_service"},
 ]
 
 
@@ -1114,7 +1112,6 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
         self.service = ApplicationService(
             id="unique_identifier",
             token="some_token",
-            hostname="example.com",
             sender="@asbot:example.com",
             namespaces={
                 ApplicationService.NS_USERS: [
@@ -1127,7 +1124,6 @@ class AppserviceLoginRestServletTestCase(unittest.HomeserverTestCase):
         self.another_service = ApplicationService(
             id="another__identifier",
             token="another_token",
-            hostname="example.com",
             sender="@as2bot:example.com",
             namespaces={
                 ApplicationService.NS_USERS: [

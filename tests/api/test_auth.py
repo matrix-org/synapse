@@ -105,7 +105,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.store.get_user_by_access_token = simple_async_mock(None)
 
         request = Mock(args={})
-        request.getClientIP.return_value = "127.0.0.1"
+        request.getClientAddress.return_value.host = "127.0.0.1"
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = self.get_success(self.auth.get_user_by_req(request))
@@ -124,7 +124,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.store.get_user_by_access_token = simple_async_mock(None)
 
         request = Mock(args={})
-        request.getClientIP.return_value = "192.168.10.10"
+        request.getClientAddress.return_value.host = "192.168.10.10"
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = self.get_success(self.auth.get_user_by_req(request))
@@ -143,7 +143,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.store.get_user_by_access_token = simple_async_mock(None)
 
         request = Mock(args={})
-        request.getClientIP.return_value = "131.111.8.42"
+        request.getClientAddress.return_value.host = "131.111.8.42"
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         f = self.get_failure(
@@ -190,7 +190,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.store.get_user_by_access_token = simple_async_mock(None)
 
         request = Mock(args={})
-        request.getClientIP.return_value = "127.0.0.1"
+        request.getClientAddress.return_value.host = "127.0.0.1"
         request.args[b"access_token"] = [self.test_token]
         request.args[b"user_id"] = [masquerading_user_id]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
@@ -209,7 +209,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.store.get_user_by_access_token = simple_async_mock(None)
 
         request = Mock(args={})
-        request.getClientIP.return_value = "127.0.0.1"
+        request.getClientAddress.return_value.host = "127.0.0.1"
         request.args[b"access_token"] = [self.test_token]
         request.args[b"user_id"] = [masquerading_user_id]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
@@ -236,7 +236,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.store.get_device = simple_async_mock({"hidden": False})
 
         request = Mock(args={})
-        request.getClientIP.return_value = "127.0.0.1"
+        request.getClientAddress.return_value.host = "127.0.0.1"
         request.args[b"access_token"] = [self.test_token]
         request.args[b"user_id"] = [masquerading_user_id]
         request.args[b"org.matrix.msc3202.device_id"] = [masquerading_device_id]
@@ -268,7 +268,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.store.get_device = simple_async_mock(None)
 
         request = Mock(args={})
-        request.getClientIP.return_value = "127.0.0.1"
+        request.getClientAddress.return_value.host = "127.0.0.1"
         request.args[b"access_token"] = [self.test_token]
         request.args[b"user_id"] = [masquerading_user_id]
         request.args[b"org.matrix.msc3202.device_id"] = [masquerading_device_id]
@@ -288,7 +288,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
         self.store.insert_client_ip = simple_async_mock(None)
         request = Mock(args={})
-        request.getClientIP.return_value = "127.0.0.1"
+        request.getClientAddress.return_value.host = "127.0.0.1"
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         self.get_success(self.auth.get_user_by_req(request))
@@ -305,7 +305,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
         self.store.insert_client_ip = simple_async_mock(None)
         request = Mock(args={})
-        request.getClientIP.return_value = "127.0.0.1"
+        request.getClientAddress.return_value.host = "127.0.0.1"
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         self.get_success(self.auth.get_user_by_req(request))
@@ -404,7 +404,6 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         appservice = ApplicationService(
             "abcd",
-            self.hs.config.server.server_name,
             id="1234",
             namespaces={
                 "users": [{"regex": "@_appservice.*:sender", "exclusive": True}]
@@ -433,7 +432,6 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         appservice = ApplicationService(
             "abcd",
-            self.hs.config.server.server_name,
             id="1234",
             namespaces={
                 "users": [{"regex": "@_appservice.*:sender", "exclusive": True}]

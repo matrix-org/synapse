@@ -21,17 +21,7 @@
 import abc
 import functools
 import logging
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, TypeVar, cast
 
 from twisted.internet.interfaces import IOpenSSLContextFactory
 from twisted.internet.tcp import Port
@@ -60,8 +50,6 @@ from synapse.federation.federation_server import (
 from synapse.federation.send_queue import FederationRemoteSendQueue
 from synapse.federation.sender import AbstractFederationSender, FederationSender
 from synapse.federation.transport.client import TransportLayerClient
-from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
-from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
 from synapse.handlers.account import AccountHandler
 from synapse.handlers.account_data import AccountDataHandler
 from synapse.handlers.account_validity import AccountValidityHandler
@@ -79,7 +67,6 @@ from synapse.handlers.event_auth import EventAuthHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.federation import FederationHandler
 from synapse.handlers.federation_event import FederationEventHandler
-from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerHandler
 from synapse.handlers.identity import IdentityHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
@@ -119,7 +106,7 @@ from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpC
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.module_api import ModuleApi
 from synapse.notifier import Notifier
-from synapse.push.action_generator import ActionGenerator
+from synapse.push.bulk_push_rule_evaluator import BulkPushRuleEvaluator
 from synapse.push.pusherpool import PusherPool
 from synapse.replication.tcp.client import ReplicationDataHandler
 from synapse.replication.tcp.external_cache import ExternalCache
@@ -136,7 +123,8 @@ from synapse.server_notices.worker_server_notices_sender import (
     WorkerServerNoticesSender,
 )
 from synapse.state import StateHandler, StateResolutionHandler
-from synapse.storage import Databases, Storage
+from synapse.storage import Databases
+from synapse.storage.controllers import StorageControllers
 from synapse.streams.events import EventSources
 from synapse.types import DomainSpecificString, ISynapseReactor
 from synapse.util import Clock
@@ -644,36 +632,12 @@ class HomeServer(metaclass=abc.ABCMeta):
         return ReplicationCommandHandler(self)
 
     @cache_in_self
-    def get_action_generator(self) -> ActionGenerator:
-        return ActionGenerator(self)
+    def get_bulk_push_rule_evaluator(self) -> BulkPushRuleEvaluator:
+        return BulkPushRuleEvaluator(self)
 
     @cache_in_self
     def get_user_directory_handler(self) -> UserDirectoryHandler:
         return UserDirectoryHandler(self)
-
-    @cache_in_self
-    def get_groups_local_handler(
-        self,
-    ) -> Union[GroupsLocalWorkerHandler, GroupsLocalHandler]:
-        if self.config.worker.worker_app:
-            return GroupsLocalWorkerHandler(self)
-        else:
-            return GroupsLocalHandler(self)
-
-    @cache_in_self
-    def get_groups_server_handler(self):
-        if self.config.worker.worker_app:
-            return GroupsServerWorkerHandler(self)
-        else:
-            return GroupsServerHandler(self)
-
-    @cache_in_self
-    def get_groups_attestation_signing(self) -> GroupAttestationSigning:
-        return GroupAttestationSigning(self)
-
-    @cache_in_self
-    def get_groups_attestation_renewer(self) -> GroupAttestionRenewer:
-        return GroupAttestionRenewer(self)
 
     @cache_in_self
     def get_stats_handler(self) -> StatsHandler:
@@ -681,7 +645,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_spam_checker(self) -> SpamChecker:
-        return SpamChecker()
+        return SpamChecker(self)
 
     @cache_in_self
     def get_third_party_event_rules(self) -> ThirdPartyEventRules:
@@ -766,8 +730,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         return PasswordPolicyHandler(self)
 
     @cache_in_self
-    def get_storage(self) -> Storage:
-        return Storage(self, self.get_datastores())
+    def get_storage_controllers(self) -> StorageControllers:
+        return StorageControllers(self, self.get_datastores())
 
     @cache_in_self
     def get_replication_streamer(self) -> ReplicationStreamer:

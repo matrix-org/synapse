@@ -418,6 +418,7 @@ class RoomStateRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.clock = hs.get_clock()
         self._event_serializer = hs.get_event_client_serializer()
 
@@ -430,7 +431,7 @@ class RoomStateRestServlet(RestServlet):
         if not ret:
             raise NotFoundError("Room not found")
 
-        event_ids = await self.store.get_current_state_ids(room_id)
+        event_ids = await self._storage_controllers.state.get_current_state_ids(room_id)
         events = await self.store.get_events(event_ids.values())
         now = self.clock.time_msec()
         room_state = self._event_serializer.serialize_events(events.values(), now)

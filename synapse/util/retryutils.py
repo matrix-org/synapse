@@ -14,12 +14,16 @@
 import logging
 import random
 from types import TracebackType
-from typing import Any, Optional, Type
+from typing import TYPE_CHECKING, Any, Optional, Type
 
-import synapse.logging.context
 from synapse.api.errors import CodeMessageException
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage import DataStore
 from synapse.util import Clock
+
+if TYPE_CHECKING:
+    from synapse.notifier import Notifier
+    from synapse.replication.tcp.handler import ReplicationCommandHandler
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +135,8 @@ class RetryDestinationLimiter:
         retry_interval: int,
         backoff_on_404: bool = False,
         backoff_on_failure: bool = True,
+        notifier: Optional["Notifier"] = None,
+        replication_client: Optional["ReplicationCommandHandler"] = None,
     ):
         """Marks the destination as "down" if an exception is thrown in the
         context, except for CodeMessageException with code < 500.
@@ -159,6 +165,9 @@ class RetryDestinationLimiter:
         self.retry_interval = retry_interval
         self.backoff_on_404 = backoff_on_404
         self.backoff_on_failure = backoff_on_failure
+
+        self.notifier = notifier
+        self.replication_client = replication_client
 
     def __enter__(self) -> None:
         pass
@@ -239,8 +248,21 @@ class RetryDestinationLimiter:
                     retry_last_ts,
                     self.retry_interval,
                 )
+
+                if self.notifier:
+                    # Inform the relevant places that the remote server is back up.
+                    self.notifier.notify_remote_server_up(self.destination)
+
+                if self.replication_client:
+                    # If we're on a worker we try and inform master about this. The
+                    # replication client doesn't hook into the notifier to avoid
+                    # infinite loops where we send a `REMOTE_SERVER_UP` command to
+                    # master, which then echoes it back to us which in turn pokes
+                    # the notifier.
+                    self.replication_client.send_remote_server_up(self.destination)
+
             except Exception:
                 logger.exception("Failed to store destination_retry_timings")
 
         # we deliberately do this in the background.
-        synapse.logging.context.run_in_background(store_retry_timings)
+        run_as_background_process("store_retry_timings", store_retry_timings)

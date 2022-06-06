@@ -1,1 +1,0 @@
-Add new `enable_registration_token_3pid_bypass` configuration option to allow registrations via token as an alternative to verifying a 3pid.

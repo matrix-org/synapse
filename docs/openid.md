@@ -159,7 +159,7 @@ Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to 
 oidc_providers:
   - idp_id: keycloak
     idp_name: "My KeyCloak server"
-    issuer: "https://127.0.0.1:8443/auth/realms/{realm_name}"
+    issuer: "https://127.0.0.1:8443/realms/{realm_name}"
     client_id: "synapse"
     client_secret: "copy secret generated from above"
     scopes: ["openid", "profile"]
@@ -293,7 +293,7 @@ can be used to retrieve information on the authenticated user. As the Synapse
 login mechanism needs an attribute to uniquely identify users, and that endpoint
 does not return a `sub` property, an alternative `subject_claim` has to be set.
 
-1. Create a new OAuth application: https://github.com/settings/applications/new.
+1. Create a new OAuth application: [https://github.com/settings/applications/new](https://github.com/settings/applications/new).
 2. Set the callback URL to `[synapse public baseurl]/_synapse/client/oidc/callback`.
 
 Synapse config:
@@ -322,10 +322,10 @@ oidc_providers:
 
 [Google][google-idp] is an OpenID certified authentication and authorisation provider.
 
-1. Set up a project in the Google API Console (see
-   https://developers.google.com/identity/protocols/oauth2/openid-connect#appsetup).
-2. Add an "OAuth Client ID" for a Web Application under "Credentials".
-3. Copy the Client ID and Client Secret, and add the following to your synapse config:
+1. Set up a project in the Google API Console (see 
+   [documentation](https://developers.google.com/identity/protocols/oauth2/openid-connect#appsetup)).
+3. Add an "OAuth Client ID" for a Web Application under "Credentials".
+4. Copy the Client ID and Client Secret, and add the following to your synapse config:
    ```yaml
    oidc_providers:
      - idp_id: google
@@ -501,8 +501,8 @@ As well as the private key file, you will need:
  * Team ID: a 10-character ID associated with your developer account.
  * Key ID: the 10-character identifier for the key.
 
-https://help.apple.com/developer-account/?lang=en#/dev77c875b7e has more
-documentation on setting up SiWA.
+[Apple's developer documentation](https://help.apple.com/developer-account/?lang=en#/dev77c875b7e)
+has more information on setting up SiWA.
 
 The synapse config will look like this:
 
@@ -535,8 +535,8 @@ needed to add OAuth2 capabilities to your Django projects. It supports
 
 Configuration on Django's side:
 
-1. Add an application: https://example.com/admin/oauth2_provider/application/add/ and choose parameters like this:
-* `Redirect uris`: https://synapse.example.com/_synapse/client/oidc/callback
+1. Add an application: `https://example.com/admin/oauth2_provider/application/add/` and choose parameters like this:
+* `Redirect uris`: `https://synapse.example.com/_synapse/client/oidc/callback`
 * `Client type`: `Confidential`
 * `Authorization grant type`: `Authorization code`
 * `Algorithm`: `HMAC with SHA-2 256`

@@ -34,7 +34,7 @@ from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import LoggingTransaction, make_in_list_sql_clause
 from synapse.storage.databases.main.stream import generate_pagination_where_clause
 from synapse.storage.engines import PostgresEngine
-from synapse.types import JsonDict, RoomStreamToken, StreamToken
+from synapse.types import JsonDict, RoomStreamToken, StreamKeyType, StreamToken
 from synapse.util.caches.descriptors import cached, cachedList
 
 logger = logging.getLogger(__name__)
@@ -161,7 +161,9 @@ class RelationsWorkerStore(SQLBaseStore):
             if len(events) > limit and last_topo_id and last_stream_id:
                 next_key = RoomStreamToken(last_topo_id, last_stream_id)
                 if from_token:
-                    next_token = from_token.copy_and_replace("room_key", next_key)
+                    next_token = from_token.copy_and_replace(
+                        StreamKeyType.ROOM, next_key
+                    )
                 else:
                     next_token = StreamToken(
                         room_key=next_key,
@@ -445,8 +447,8 @@ class RelationsWorkerStore(SQLBaseStore):
     @cachedList(cached_method_name="get_thread_summary", list_name="event_ids")
     async def get_thread_summaries(
         self, event_ids: Collection[str]
-    ) -> Dict[str, Optional[Tuple[int, EventBase, Optional[EventBase]]]]:
-        """Get the number of threaded replies, the latest reply (if any), and the latest edit for that reply for the given event.
+    ) -> Dict[str, Optional[Tuple[int, EventBase]]]:
+        """Get the number of threaded replies and the latest reply (if any) for the given events.
 
         Args:
             event_ids: Summarize the thread related to this event ID.
@@ -458,7 +460,6 @@ class RelationsWorkerStore(SQLBaseStore):
             Each summary is a tuple of:
                 The number of events in the thread.
                 The most recent event in the thread.
-                The most recent edit to the most recent event in the thread, if applicable.
         """
 
         def _get_thread_summaries_txn(
@@ -544,9 +545,6 @@ class RelationsWorkerStore(SQLBaseStore):
 
         latest_events = await self.get_events(latest_event_ids.values())  # type: ignore[attr-defined]
 
-        # Check to see if any of those events are edited.
-        latest_edits = await self.get_applicable_edits(latest_event_ids.values())
-
         # Map to the event IDs to the thread summary.
         #
         # There might not be a summary due to there not being a thread or
@@ -557,8 +555,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
             summary = None
             if latest_event:
-                latest_edit = latest_edits.get(latest_event_id)
-                summary = (counts[parent_event_id], latest_event, latest_edit)
+                summary = (counts[parent_event_id], latest_event)
             summaries[parent_event_id] = summary
 
         return summaries
@@ -768,6 +765,59 @@ class RelationsWorkerStore(SQLBaseStore):
 
         return await self.db_pool.runInteraction(
             "get_if_user_has_annotated_event", _get_if_user_has_annotated_event
+        )
+
+    @cached(iterable=True)
+    async def get_mutual_event_relations_for_rel_type(
+        self, event_id: str, relation_type: str
+    ) -> Set[Tuple[str, str]]:
+        raise NotImplementedError()
+
+    @cachedList(
+        cached_method_name="get_mutual_event_relations_for_rel_type",
+        list_name="relation_types",
+    )
+    async def get_mutual_event_relations(
+        self, event_id: str, relation_types: Collection[str]
+    ) -> Dict[str, Set[Tuple[str, str]]]:
+        """
+        Fetch event metadata for events which related to the same event as the given event.
+
+        If the given event has no relation information, returns an empty dictionary.
+
+        Args:
+            event_id: The event ID which is targeted by relations.
+            relation_types: The relation types to check for mutual relations.
+
+        Returns:
+            A dictionary of relation type to:
+                A set of tuples of:
+                    The sender
+                    The event type
+        """
+        rel_type_sql, rel_type_args = make_in_list_sql_clause(
+            self.database_engine, "relation_type", relation_types
+        )
+
+        sql = f"""
+            SELECT DISTINCT relation_type, sender, type FROM event_relations
+            INNER JOIN events USING (event_id)
+            WHERE relates_to_id = ? AND {rel_type_sql}
+        """
+
+        def _get_event_relations(
+            txn: LoggingTransaction,
+        ) -> Dict[str, Set[Tuple[str, str]]]:
+            txn.execute(sql, [event_id] + rel_type_args)
+            result: Dict[str, Set[Tuple[str, str]]] = {
+                rel_type: set() for rel_type in relation_types
+            }
+            for rel_type, sender, type in txn.fetchall():
+                result[rel_type].add((sender, type))
+            return result
+
+        return await self.db_pool.runInteraction(
+            "get_event_relations", _get_event_relations
         )
 
 

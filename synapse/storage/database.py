@@ -31,6 +31,7 @@ from typing import (
     List,
     Optional,
     Tuple,
+    Type,
     TypeVar,
     cast,
     overload,
@@ -38,9 +39,10 @@ from typing import (
 
 import attr
 from prometheus_client import Histogram
-from typing_extensions import Literal
+from typing_extensions import Concatenate, Literal, ParamSpec
 
 from twisted.enterprise import adbapi
+from twisted.internet.interfaces import IReactorCore
 
 from synapse.api.errors import StoreError
 from synapse.config.database import DatabaseConnectionConfig
@@ -88,11 +90,15 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
     "device_lists_remote_extremeties": "device_lists_remote_extremeties_unique_idx",
     "device_lists_remote_cache": "device_lists_remote_cache_unique_idx",
     "event_search": "event_search_event_id_idx",
+    "local_media_repository_thumbnails": "local_media_repository_thumbnails_method_idx",
+    "remote_media_cache_thumbnails": "remote_media_repository_thumbnails_method_idx",
 }
 
 
 def make_pool(
-    reactor, db_config: DatabaseConnectionConfig, engine: BaseDatabaseEngine
+    reactor: IReactorCore,
+    db_config: DatabaseConnectionConfig,
+    engine: BaseDatabaseEngine,
 ) -> adbapi.ConnectionPool:
     """Get the connection pool for the database."""
 
@@ -101,7 +107,7 @@ def make_pool(
     db_args = dict(db_config.config.get("args", {}))
     db_args.setdefault("cp_reconnect", True)
 
-    def _on_new_connection(conn):
+    def _on_new_connection(conn: Connection) -> None:
         # Ensure we have a logging context so we can correctly track queries,
         # etc.
         with LoggingContext("db.on_new_connection"):
@@ -157,7 +163,11 @@ class LoggingDatabaseConnection:
     default_txn_name: str
 
     def cursor(
-        self, *, txn_name=None, after_callbacks=None, exception_callbacks=None
+        self,
+        *,
+        txn_name: Optional[str] = None,
+        after_callbacks: Optional[List["_CallbackListEntry"]] = None,
+        exception_callbacks: Optional[List["_CallbackListEntry"]] = None,
     ) -> "LoggingTransaction":
         if not txn_name:
             txn_name = self.default_txn_name
@@ -183,18 +193,23 @@ class LoggingDatabaseConnection:
         self.conn.__enter__()
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback) -> Optional[bool]:
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_value: Optional[BaseException],
+        traceback: Optional[types.TracebackType],
+    ) -> Optional[bool]:
         return self.conn.__exit__(exc_type, exc_value, traceback)
 
     # Proxy through any unknown lookups to the DB conn class.
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         return getattr(self.conn, name)
 
 
 # The type of entry which goes on our after_callbacks and exception_callbacks lists.
-_CallbackListEntry = Tuple[Callable[..., object], Iterable[Any], Dict[str, Any]]
+_CallbackListEntry = Tuple[Callable[..., object], Tuple[object, ...], Dict[str, object]]
 
-
+P = ParamSpec("P")
 R = TypeVar("R")
 
 
@@ -239,7 +254,9 @@ class LoggingTransaction:
         self.after_callbacks = after_callbacks
         self.exception_callbacks = exception_callbacks
 
-    def call_after(self, callback: Callable[..., object], *args: Any, **kwargs: Any):
+    def call_after(
+        self, callback: Callable[P, object], *args: P.args, **kwargs: P.kwargs
+    ) -> None:
         """Call the given callback on the main twisted thread after the transaction has
         finished.
 
@@ -256,11 +273,12 @@ class LoggingTransaction:
         # LoggingTransaction isn't expecting there to be any callbacks; assert that
         # is not the case.
         assert self.after_callbacks is not None
-        self.after_callbacks.append((callback, args, kwargs))
+        # type-ignore: need mypy containing https://github.com/python/mypy/pull/12668
+        self.after_callbacks.append((callback, args, kwargs))  # type: ignore[arg-type]
 
     def call_on_exception(
-        self, callback: Callable[..., object], *args: Any, **kwargs: Any
-    ):
+        self, callback: Callable[P, object], *args: P.args, **kwargs: P.kwargs
+    ) -> None:
         """Call the given callback on the main twisted thread after the transaction has
         failed.
 
@@ -274,7 +292,8 @@ class LoggingTransaction:
         # LoggingTransaction isn't expecting there to be any callbacks; assert that
         # is not the case.
         assert self.exception_callbacks is not None
-        self.exception_callbacks.append((callback, args, kwargs))
+        # type-ignore: need mypy containing https://github.com/python/mypy/pull/12668
+        self.exception_callbacks.append((callback, args, kwargs))  # type: ignore[arg-type]
 
     def fetchone(self) -> Optional[Tuple]:
         return self.txn.fetchone()
@@ -339,7 +358,13 @@ class LoggingTransaction:
         "Strip newlines out of SQL so that the loggers in the DB are on one line"
         return " ".join(line.strip() for line in sql.splitlines() if line.strip())
 
-    def _do_execute(self, func: Callable[..., R], sql: str, *args: Any) -> R:
+    def _do_execute(
+        self,
+        func: Callable[Concatenate[str, P], R],
+        sql: str,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> R:
         sql = self._make_sql_one_line(sql)
 
         # TODO(paul): Maybe use 'info' and 'debug' for values?
@@ -348,7 +373,10 @@ class LoggingTransaction:
         sql = self.database_engine.convert_param_style(sql)
         if args:
             try:
-                sql_logger.debug("[SQL values] {%s} %r", self.name, args[0])
+                # The type-ignore should be redundant once mypy releases a version with
+                # https://github.com/python/mypy/pull/12668. (`args` might be empty,
+                # (but we'll catch the index error if so.)
+                sql_logger.debug("[SQL values] {%s} %r", self.name, args[0])  # type: ignore[index]
             except Exception:
                 # Don't let logging failures stop SQL from working
                 pass
@@ -363,7 +391,7 @@ class LoggingTransaction:
                     opentracing.tags.DATABASE_STATEMENT: sql,
                 },
             ):
-                return func(sql, *args)
+                return func(sql, *args, **kwargs)
         except Exception as e:
             sql_logger.debug("[SQL FAIL] {%s} %s", self.name, e)
             raise
@@ -378,17 +406,22 @@ class LoggingTransaction:
     def __enter__(self) -> "LoggingTransaction":
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_value: Optional[BaseException],
+        traceback: Optional[types.TracebackType],
+    ) -> None:
         self.close()
 
 
 class PerformanceCounters:
-    def __init__(self):
-        self.current_counters = {}
-        self.previous_counters = {}
+    def __init__(self) -> None:
+        self.current_counters: Dict[str, Tuple[int, float]] = {}
+        self.previous_counters: Dict[str, Tuple[int, float]] = {}
 
     def update(self, key: str, duration_secs: float) -> None:
-        count, cum_time = self.current_counters.get(key, (0, 0))
+        count, cum_time = self.current_counters.get(key, (0, 0.0))
         count += 1
         cum_time += duration_secs
         self.current_counters[key] = (count, cum_time)
@@ -514,7 +547,7 @@ class DatabasePool:
     def start_profiling(self) -> None:
         self._previous_loop_ts = monotonic_time()
 
-        def loop():
+        def loop() -> None:
             curr = self._current_txn_total_time
             prev = self._previous_txn_total_time
             self._previous_txn_total_time = curr
@@ -540,9 +573,9 @@ class DatabasePool:
         desc: str,
         after_callbacks: List[_CallbackListEntry],
         exception_callbacks: List[_CallbackListEntry],
-        func: Callable[..., R],
-        *args: Any,
-        **kwargs: Any,
+        func: Callable[Concatenate[LoggingTransaction, P], R],
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> R:
         """Start a new database transaction with the given connection.
 
@@ -572,7 +605,10 @@ class DatabasePool:
         # will fail if we have to repeat the transaction.
         # For now, we just log an error, and hope that it works on the first attempt.
         # TODO: raise an exception.
-        for i, arg in enumerate(args):
+
+        # Type-ignore Mypy doesn't yet consider ParamSpec.args to be iterable; see
+        # https://github.com/python/mypy/pull/12668
+        for i, arg in enumerate(args):  # type: ignore[arg-type, var-annotated]
             if inspect.isgenerator(arg):
                 logger.error(
                     "Programming error: generator passed to new_transaction as "
@@ -580,7 +616,9 @@ class DatabasePool:
                     i,
                     func,
                 )
-        for name, val in kwargs.items():
+        # Type-ignore Mypy doesn't yet consider ParamSpec.args to be a mapping; see
+        # https://github.com/python/mypy/pull/12668
+        for name, val in kwargs.items():  # type: ignore[attr-defined]
             if inspect.isgenerator(val):
                 logger.error(
                     "Programming error: generator passed to new_transaction as "
@@ -1168,7 +1206,7 @@ class DatabasePool:
         if lock:
             self.engine.lock_table(txn, table)
 
-        def _getwhere(key):
+        def _getwhere(key: str) -> str:
             # If the value we're passing in is None (aka NULL), we need to use
             # IS, not =, as NULL = NULL equals NULL (False).
             if keyvalues[key] is None:
@@ -2240,7 +2278,7 @@ class DatabasePool:
         term: Optional[str],
         col: str,
         retcols: Collection[str],
-        desc="simple_search_list",
+        desc: str = "simple_search_list",
     ) -> Optional[List[Dict[str, Any]]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.

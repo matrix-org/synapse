@@ -24,7 +24,7 @@ from synapse.api.errors import NotFoundError, SynapseError
 from synapse.api.filtering import Filter
 from synapse.events import EventBase
 from synapse.storage.state import StateFilter
-from synapse.types import JsonDict, UserID
+from synapse.types import JsonDict, StreamKeyType, UserID
 from synapse.visibility import filter_events_for_client
 
 if TYPE_CHECKING:
@@ -55,8 +55,8 @@ class SearchHandler:
         self.hs = hs
         self._event_serializer = hs.get_event_client_serializer()
         self._relations_handler = hs.get_relations_handler()
-        self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self._storage_controllers = hs.get_storage_controllers()
+        self._state_storage_controller = self._storage_controllers.state
         self.auth = hs.get_auth()
 
     async def get_old_rooms_from_upgraded_room(self, room_id: str) -> Iterable[str]:
@@ -460,7 +460,7 @@ class SearchHandler:
         filtered_events = await search_filter.filter([r["event"] for r in results])
 
         events = await filter_events_for_client(
-            self.storage, user.to_string(), filtered_events
+            self._storage_controllers, user.to_string(), filtered_events
         )
 
         events.sort(key=lambda e: -rank_map[e.event_id])
@@ -559,7 +559,7 @@ class SearchHandler:
             filtered_events = await search_filter.filter([r["event"] for r in results])
 
             events = await filter_events_for_client(
-                self.storage, user.to_string(), filtered_events
+                self._storage_controllers, user.to_string(), filtered_events
             )
 
             room_events.extend(events)
@@ -644,22 +644,22 @@ class SearchHandler:
             )
 
             events_before = await filter_events_for_client(
-                self.storage, user.to_string(), res.events_before
+                self._storage_controllers, user.to_string(), res.events_before
             )
 
             events_after = await filter_events_for_client(
-                self.storage, user.to_string(), res.events_after
+                self._storage_controllers, user.to_string(), res.events_after
             )
 
             context: JsonDict = {
                 "events_before": events_before,
                 "events_after": events_after,
                 "start": await now_token.copy_and_replace(
-                    "room_key", res.start
+                    StreamKeyType.ROOM, res.start
                 ).to_string(self.store),
-                "end": await now_token.copy_and_replace("room_key", res.end).to_string(
-                    self.store
-                ),
+                "end": await now_token.copy_and_replace(
+                    StreamKeyType.ROOM, res.end
+                ).to_string(self.store),
             }
 
             if include_profile:
@@ -677,7 +677,7 @@ class SearchHandler:
                     [(EventTypes.Member, sender) for sender in senders]
                 )
 
-                state = await self.state_store.get_state_for_event(
+                state = await self._state_storage_controller.get_state_for_event(
                     last_event_id, state_filter
                 )
 

@@ -743,14 +743,17 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         """
 
         def _f(txn: LoggingTransaction) -> Optional[Tuple[int, int, str]]:
-            sql = (
-                "SELECT stream_ordering, topological_ordering, event_id"
-                " FROM events"
-                " WHERE room_id = ? AND stream_ordering <= ?"
-                " AND NOT outlier"
-                " ORDER BY stream_ordering DESC"
-                " LIMIT 1"
-            )
+            sql = """
+                SELECT stream_ordering, topological_ordering, event_id
+                FROM events
+                LEFT JOIN rejections USING (event_id)
+                WHERE room_id = ?
+                    AND stream_ordering <= ?
+                    AND NOT outlier
+                    AND rejections.event_id IS NULL
+                ORDER BY stream_ordering DESC
+                LIMIT 1
+            """
             txn.execute(sql, (room_id, stream_ordering))
             return cast(Optional[Tuple[int, int, str]], txn.fetchone())
 
@@ -762,15 +765,16 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         self,
         room_id: str,
         end_token: RoomStreamToken,
-    ) -> Optional[EventBase]:
-        """Returns the last event in a room at or before a stream ordering
+    ) -> Optional[str]:
+        """Returns the ID of the last event in a room at or before a stream ordering
 
         Args:
             room_id
             end_token: The token used to stream from
 
         Returns:
-            The most recent event.
+            The ID of the most recent event, or None if there are no events in the room
+            before this stream ordering.
         """
 
         last_row = await self.get_room_event_before_stream_ordering(
@@ -778,37 +782,28 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             stream_ordering=end_token.stream,
         )
         if last_row:
-            _, _, event_id = last_row
-            event = await self.get_event(event_id, get_prev_content=True)
-            return event
-
+            return last_row[2]
         return None
 
     async def get_current_room_stream_token_for_room_id(
-        self, room_id: Optional[str] = None
+        self, room_id: str
     ) -> RoomStreamToken:
-        """Returns the current position of the rooms stream.
-
-        By default, it returns a live token with the current global stream
-        token. Specifying a `room_id` causes it to return a historic token with
-        the room specific topological token.
-        """
+        """Returns the current position of the rooms stream (historic token)."""
         stream_ordering = self.get_room_max_stream_ordering()
-        if room_id is None:
-            return RoomStreamToken(None, stream_ordering)
-        else:
-            topo = await self.db_pool.runInteraction(
-                "_get_max_topological_txn", self._get_max_topological_txn, room_id
-            )
-            return RoomStreamToken(topo, stream_ordering)
+        topo = await self.db_pool.runInteraction(
+            "_get_max_topological_txn", self._get_max_topological_txn, room_id
+        )
+        return RoomStreamToken(topo, stream_ordering)
 
     def get_stream_id_for_event_txn(
         self,
         txn: LoggingTransaction,
         event_id: str,
-        allow_none=False,
-    ) -> int:
-        return self.db_pool.simple_select_one_onecol_txn(
+        allow_none: bool = False,
+    ) -> Optional[int]:
+        # Type ignore: we pass keyvalues a Dict[str, str]; the function wants
+        # Dict[str, Any]. I think mypy is unhappy because Dict is invariant?
+        return self.db_pool.simple_select_one_onecol_txn(  # type: ignore[call-overload]
             txn=txn,
             table="events",
             keyvalues={"event_id": event_id},
@@ -870,7 +865,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         rows = txn.fetchall()
-        return rows[0][0] if rows else 0
+        # An aggregate function like MAX() will always return one row per group
+        # so we can safely rely on the lookup here. For example, when a we
+        # lookup a `room_id` which does not exist, `rows` will look like
+        # `[(None,)]`
+        return rows[0][0] if rows[0][0] is not None else 0
 
     @staticmethod
     def _set_before_and_after(

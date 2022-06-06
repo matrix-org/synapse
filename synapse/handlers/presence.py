@@ -49,7 +49,7 @@ from prometheus_client import Counter
 from typing_extensions import ContextManager
 
 import synapse.metrics
-from synapse.api.constants import EventTypes, Membership, PresenceState
+from synapse.api.constants import EduTypes, EventTypes, Membership, PresenceState
 from synapse.api.errors import SynapseError
 from synapse.api.presence import UserPresenceState
 from synapse.appservice import ApplicationService
@@ -66,7 +66,7 @@ from synapse.replication.tcp.commands import ClearUserSyncsCommand
 from synapse.replication.tcp.streams import PresenceFederationStream, PresenceStream
 from synapse.storage.databases.main import DataStore
 from synapse.streams import EventSource
-from synapse.types import JsonDict, UserID, get_domain_from_id
+from synapse.types import JsonDict, StreamKeyType, UserID, get_domain_from_id
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.metrics import Measure
@@ -134,6 +134,7 @@ class BasePresenceHandler(abc.ABC):
     def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.presence_router = hs.get_presence_router()
         self.state = hs.get_state_handler()
         self.is_mine_id = hs.is_mine_id
@@ -394,7 +395,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
 
         # Route presence EDUs to the right worker
         hs.get_federation_registry().register_instances_for_edu(
-            "m.presence",
+            EduTypes.PRESENCE,
             hs.config.worker.writers.presence,
         )
 
@@ -522,7 +523,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         room_ids_to_states, users_to_states = parties
 
         self.notifier.on_new_event(
-            "presence_key",
+            StreamKeyType.PRESENCE,
             stream_id,
             rooms=room_ids_to_states.keys(),
             users=users_to_states.keys(),
@@ -649,7 +650,9 @@ class PresenceHandler(BasePresenceHandler):
 
         federation_registry = hs.get_federation_registry()
 
-        federation_registry.register_edu_handler("m.presence", self.incoming_presence)
+        federation_registry.register_edu_handler(
+            EduTypes.PRESENCE, self.incoming_presence
+        )
 
         LaterGauge(
             "synapse_handlers_presence_user_to_current_state_size",
@@ -659,27 +662,28 @@ class PresenceHandler(BasePresenceHandler):
         )
 
         now = self.clock.time_msec()
-        for state in self.user_to_current_state.values():
-            self.wheel_timer.insert(
-                now=now, obj=state.user_id, then=state.last_active_ts + IDLE_TIMER
-            )
-            self.wheel_timer.insert(
-                now=now,
-                obj=state.user_id,
-                then=state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT,
-            )
-            if self.is_mine_id(state.user_id):
+        if self._presence_enabled:
+            for state in self.user_to_current_state.values():
+                self.wheel_timer.insert(
+                    now=now, obj=state.user_id, then=state.last_active_ts + IDLE_TIMER
+                )
                 self.wheel_timer.insert(
                     now=now,
                     obj=state.user_id,
-                    then=state.last_federation_update_ts + FEDERATION_PING_INTERVAL,
+                    then=state.last_user_sync_ts + SYNC_ONLINE_TIMEOUT,
                 )
-            else:
-                self.wheel_timer.insert(
-                    now=now,
-                    obj=state.user_id,
-                    then=state.last_federation_update_ts + FEDERATION_TIMEOUT,
-                )
+                if self.is_mine_id(state.user_id):
+                    self.wheel_timer.insert(
+                        now=now,
+                        obj=state.user_id,
+                        then=state.last_federation_update_ts + FEDERATION_PING_INTERVAL,
+                    )
+                else:
+                    self.wheel_timer.insert(
+                        now=now,
+                        obj=state.user_id,
+                        then=state.last_federation_update_ts + FEDERATION_TIMEOUT,
+                    )
 
         # Set of users who have presence in the `user_to_current_state` that
         # have not yet been persisted
@@ -804,6 +808,13 @@ class PresenceHandler(BasePresenceHandler):
                 This is currently used to bump the max presence stream ID without changing any
                 user's presence (see PresenceHandler.add_users_to_send_full_presence_to).
         """
+        if not self._presence_enabled:
+            # We shouldn't get here if presence is disabled, but we check anyway
+            # to ensure that we don't a) send out presence federation and b)
+            # don't add things to the wheel timer that will never be handled.
+            logger.warning("Tried to update presence states when presence is disabled")
+            return
+
         now = self.clock.time_msec()
 
         with Measure(self.clock, "presence_update_states"):
@@ -1137,7 +1148,7 @@ class PresenceHandler(BasePresenceHandler):
         room_ids_to_states, users_to_states = parties
 
         self.notifier.on_new_event(
-            "presence_key",
+            StreamKeyType.PRESENCE,
             stream_id,
             rooms=room_ids_to_states.keys(),
             users=[UserID.from_string(u) for u in users_to_states],
@@ -1228,6 +1239,10 @@ class PresenceHandler(BasePresenceHandler):
             presence == PresenceState.BUSY and not self._busy_presence_enabled
         ):
             raise SynapseError(400, "Invalid presence state")
+
+        # If presence is disabled, no-op
+        if not self.hs.config.server.use_presence:
+            return
 
         user_id = target_user.to_string()
 
@@ -1334,7 +1349,10 @@ class PresenceHandler(BasePresenceHandler):
                     self._event_pos,
                     room_max_stream_ordering,
                 )
-                max_pos, deltas = await self.store.get_current_state_deltas(
+                (
+                    max_pos,
+                    deltas,
+                ) = await self._storage_controllers.state.get_current_state_deltas(
                     self._event_pos, room_max_stream_ordering
                 )
 

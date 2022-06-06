@@ -38,6 +38,7 @@ from synapse.event_auth import get_named_level, get_power_level_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
+from synapse.storage.state import StateFilter
 from synapse.types import (
     JsonDict,
     Requester,
@@ -67,6 +68,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.auth = hs.get_auth()
         self.state_handler = hs.get_state_handler()
         self.config = hs.config
@@ -362,7 +364,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             historical=historical,
         )
 
-        prev_state_ids = await context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids(
+            StateFilter.from_types([(EventTypes.Member, None)])
+        )
 
         prev_member_event_id = prev_state_ids.get((EventTypes.Member, user_id), None)
 
@@ -991,7 +995,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # If the host is in the room, but not one of the authorised hosts
         # for restricted join rules, a remote join must be used.
         room_version = await self.store.get_room_version(room_id)
-        current_state_ids = await self.store.get_current_state_ids(room_id)
+        current_state_ids = await self._storage_controllers.state.get_current_state_ids(
+            room_id
+        )
 
         # If restricted join rules are not being used, a local join can always
         # be used.
@@ -1078,17 +1084,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # Transfer alias mappings in the room directory
         await self.store.update_aliases_for_room(old_room_id, room_id)
 
-        # Check if any groups we own contain the predecessor room
-        local_group_ids = await self.store.get_local_groups_for_room(old_room_id)
-        for group_id in local_group_ids:
-            # Add new the new room to those groups
-            await self.store.add_room_to_group(
-                group_id, room_id, old_room is not None and old_room["is_public"]
-            )
-
-            # Remove the old room from those groups
-            await self.store.remove_room_from_group(group_id, old_room_id)
-
     async def copy_user_state_on_room_upgrade(
         self, old_room_id: str, new_room_id: str, user_ids: Iterable[str]
     ) -> None:
@@ -1160,7 +1155,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         else:
             requester = types.create_requester(target_user)
 
-        prev_state_ids = await context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids(
+            StateFilter.from_types([(EventTypes.GuestAccess, None)])
+        )
         if event.membership == Membership.JOIN:
             if requester.is_guest:
                 guest_can_join = await self._can_guest_join(prev_state_ids)

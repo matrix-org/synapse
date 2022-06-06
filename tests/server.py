@@ -109,6 +109,17 @@ class FakeChannel:
     _ip: str = "127.0.0.1"
     _producer: Optional[Union[IPullProducer, IPushProducer]] = None
     resource_usage: Optional[ContextResourceUsage] = None
+    _request: Optional[Request] = None
+
+    @property
+    def request(self) -> Request:
+        assert self._request is not None
+        return self._request
+
+    @request.setter
+    def request(self, request: Request) -> None:
+        assert self._request is None
+        self._request = request
 
     @property
     def json_body(self):
@@ -181,7 +192,7 @@ class FakeChannel:
             self.resource_usage = _self.logcontext.get_resource_usage()
 
     def getPeer(self):
-        # We give an address so that getClientIP returns a non null entry,
+        # We give an address so that getClientAddress/getClientIP returns a non null entry,
         # causing us to record the MAU
         return address.IPv4Address("TCP", self._ip, 3423)
 
@@ -322,6 +333,8 @@ def make_request(
     channel = FakeChannel(site, reactor, ip=client_ip)
 
     req = request(channel, site)
+    channel.request = req
+
     req.content = BytesIO(content)
     # Twisted expects to be at the end of the content when parsing the request.
     req.content.seek(0, SEEK_END)
@@ -562,7 +575,10 @@ class FakeTransport:
     """
 
     _peer_address: Optional[IAddress] = attr.ib(default=None)
-    """The value to be returend by getPeer"""
+    """The value to be returned by getPeer"""
+
+    _host_address: Optional[IAddress] = attr.ib(default=None)
+    """The value to be returned by getHost"""
 
     disconnecting = False
     disconnected = False
@@ -571,11 +587,11 @@ class FakeTransport:
     producer = attr.ib(default=None)
     autoflush = attr.ib(default=True)
 
-    def getPeer(self):
+    def getPeer(self) -> Optional[IAddress]:
         return self._peer_address
 
-    def getHost(self):
-        return None
+    def getHost(self) -> Optional[IAddress]:
+        return self._host_address
 
     def loseConnection(self, reason=None):
         if not self.disconnecting:
@@ -733,6 +749,7 @@ def setup_test_homeserver(
     if config is None:
         config = default_config(name, parse=True)
 
+    config.caches.resize_all_caches()
     config.ldap_enabled = False
 
     if "clock" not in kwargs:

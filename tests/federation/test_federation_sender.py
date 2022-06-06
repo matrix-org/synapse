@@ -19,7 +19,7 @@ from signedjson.types import BaseKey, SigningKey
 
 from twisted.internet import defer
 
-from synapse.api.constants import RoomEncryptionAlgorithms
+from synapse.api.constants import EduTypes, RoomEncryptionAlgorithms
 from synapse.rest import admin
 from synapse.rest.client import login
 from synapse.types import JsonDict, ReadReceipt
@@ -63,7 +63,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             data["edus"],
             [
                 {
-                    "edu_type": "m.receipt",
+                    "edu_type": EduTypes.RECEIPT,
                     "content": {
                         "room_id": {
                             "m.read": {
@@ -103,7 +103,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             data["edus"],
             [
                 {
-                    "edu_type": "m.receipt",
+                    "edu_type": EduTypes.RECEIPT,
                     "content": {
                         "room_id": {
                             "m.read": {
@@ -138,7 +138,7 @@ class FederationSenderReceiptsTestCases(HomeserverTestCase):
             data["edus"],
             [
                 {
-                    "edu_type": "m.receipt",
+                    "edu_type": EduTypes.RECEIPT,
                     "content": {
                         "room_id": {
                             "m.read": {
@@ -322,8 +322,10 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
         # expect signing key update edu
         self.assertEqual(len(self.edus), 2)
-        self.assertEqual(self.edus.pop(0)["edu_type"], "m.signing_key_update")
-        self.assertEqual(self.edus.pop(0)["edu_type"], "org.matrix.signing_key_update")
+        self.assertEqual(self.edus.pop(0)["edu_type"], EduTypes.SIGNING_KEY_UPDATE)
+        self.assertEqual(
+            self.edus.pop(0)["edu_type"], EduTypes.UNSTABLE_SIGNING_KEY_UPDATE
+        )
 
         # sign the devices
         d1_json = build_device_dict(u1, "D1", device1_signing_key)
@@ -348,7 +350,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         self.assertEqual(len(self.edus), 2)
         stream_id = None  # FIXME: there is a discontinuity in the stream IDs: see #7142
         for edu in self.edus:
-            self.assertEqual(edu["edu_type"], "m.device_list_update")
+            self.assertEqual(edu["edu_type"], EduTypes.DEVICE_LIST_UPDATE)
             c = edu["content"]
             if stream_id is not None:
                 self.assertEqual(c["prev_id"], [stream_id])
@@ -388,7 +390,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         # expect three edus, in an unknown order
         self.assertEqual(len(self.edus), 3)
         for edu in self.edus:
-            self.assertEqual(edu["edu_type"], "m.device_list_update")
+            self.assertEqual(edu["edu_type"], EduTypes.DEVICE_LIST_UPDATE)
             c = edu["content"]
             self.assertGreaterEqual(
                 c.items(),
@@ -435,7 +437,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         self.assertEqual(len(self.edus), 3)
         stream_id = None
         for edu in self.edus:
-            self.assertEqual(edu["edu_type"], "m.device_list_update")
+            self.assertEqual(edu["edu_type"], EduTypes.DEVICE_LIST_UPDATE)
             c = edu["content"]
             self.assertEqual(c["prev_id"], [stream_id] if stream_id is not None else [])
             if stream_id is not None:
@@ -487,7 +489,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         # there should be a single update for this user.
         self.assertEqual(len(self.edus), 1)
         edu = self.edus.pop(0)
-        self.assertEqual(edu["edu_type"], "m.device_list_update")
+        self.assertEqual(edu["edu_type"], EduTypes.DEVICE_LIST_UPDATE)
         c = edu["content"]
 
         # synapse uses an empty prev_id list to indicate "needs a full resync".
@@ -544,7 +546,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         # ... and we should get a single update for this user.
         self.assertEqual(len(self.edus), 1)
         edu = self.edus.pop(0)
-        self.assertEqual(edu["edu_type"], "m.device_list_update")
+        self.assertEqual(edu["edu_type"], EduTypes.DEVICE_LIST_UPDATE)
         c = edu["content"]
 
         # synapse uses an empty prev_id list to indicate "needs a full resync".
@@ -560,7 +562,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         """Check that the given EDU is an update for the given device
         Returns the stream_id.
         """
-        self.assertEqual(edu["edu_type"], "m.device_list_update")
+        self.assertEqual(edu["edu_type"], EduTypes.DEVICE_LIST_UPDATE)
         content = edu["content"]
 
         expected = {

@@ -50,7 +50,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         hs = self.setup_test_homeserver(federation_http_client=None)
         self.handler = hs.get_federation_handler()
         self.store = hs.get_datastores().main
-        self.state_store = hs.get_storage().state
+        self.state_storage_controller = hs.get_storage_controllers().state
         self._event_auth_handler = hs.get_event_auth_handler()
         return hs
 
@@ -237,7 +237,9 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         )
         current_state = self.get_success(
             self.store.get_events_as_list(
-                (self.get_success(self.store.get_current_state_ids(room_id))).values()
+                (
+                    self.get_success(self.store.get_partial_current_state_ids(room_id))
+                ).values()
             )
         )
 
@@ -276,7 +278,11 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
             # federation handler wanting to backfill the fake event.
             self.get_success(
                 federation_event_handler._process_received_pdu(
-                    self.OTHER_SERVER_NAME, event, state=current_state
+                    self.OTHER_SERVER_NAME,
+                    event,
+                    state_ids={
+                        (e.type, e.state_key): e.event_id for e in current_state
+                    },
                 )
             )
 
@@ -332,8 +338,11 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
             most_recent_prev_event_depth,
         ) = self.get_success(self.store.get_max_depth_of(prev_event_ids))
         # mapping from (type, state_key) -> state_event_id
+        assert most_recent_prev_event_id is not None
         prev_state_map = self.get_success(
-            self.state_store.get_state_ids_for_event(most_recent_prev_event_id)
+            self.state_storage_controller.get_state_ids_for_event(
+                most_recent_prev_event_id
+            )
         )
         # List of state event ID's
         prev_state_ids = list(prev_state_map.values())
@@ -505,7 +514,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         self.get_success(d)
 
         # sanity-check: the room should show that the new user is a member
-        r = self.get_success(self.store.get_current_state_ids(room_id))
+        r = self.get_success(self.store.get_partial_current_state_ids(room_id))
         self.assertEqual(r[(EventTypes.Member, other_user)], join_event.event_id)
 
         return join_event

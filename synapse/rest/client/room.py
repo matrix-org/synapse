@@ -34,7 +34,7 @@ from synapse.api.errors import (
 )
 from synapse.api.filtering import Filter
 from synapse.events.utils import format_event_for_client_v2
-from synapse.http.server import HttpServer
+from synapse.http.server import HttpServer, cancellable
 from synapse.http.servlet import (
     ResolveRoomIdMixin,
     RestServlet,
@@ -109,10 +109,10 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
 
     def register(self, http_server: HttpServer) -> None:
-        # /room/$roomid/state/$eventtype
+        # /rooms/$roomid/state/$eventtype
         no_state_key = "/rooms/(?P<room_id>[^/]*)/state/(?P<event_type>[^/]*)$"
 
-        # /room/$roomid/state/$eventtype/$statekey
+        # /rooms/$roomid/state/$eventtype/$statekey
         state_key = (
             "/rooms/(?P<room_id>[^/]*)/state/"
             "(?P<event_type>[^/]*)/(?P<state_key>[^/]*)$"
@@ -143,6 +143,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
             self.__class__.__name__,
         )
 
+    @cancellable
     def on_GET_no_state_key(
         self, request: SynapseRequest, room_id: str, event_type: str
     ) -> Awaitable[Tuple[int, JsonDict]]:
@@ -153,6 +154,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
     ) -> Awaitable[Tuple[int, JsonDict]]:
         return self.on_PUT(request, room_id, event_type, "")
 
+    @cancellable
     async def on_GET(
         self, request: SynapseRequest, room_id: str, event_type: str, state_key: str
     ) -> Tuple[int, JsonDict]:
@@ -481,6 +483,7 @@ class RoomMemberListRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
 
+    @cancellable
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
@@ -602,6 +605,7 @@ class RoomStateRestServlet(RestServlet):
         self.message_handler = hs.get_message_handler()
         self.auth = hs.get_auth()
 
+    @cancellable
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, List[JsonDict]]:
@@ -1189,12 +1193,7 @@ class TimestampLookupRestServlet(RestServlet):
 
 
 class RoomHierarchyRestServlet(RestServlet):
-    PATTERNS = (
-        re.compile(
-            "^/_matrix/client/(v1|unstable/org.matrix.msc2946)"
-            "/rooms/(?P<room_id>[^/]*)/hierarchy$"
-        ),
-    )
+    PATTERNS = (re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/hierarchy$"),)
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

@@ -65,7 +65,7 @@ class HttpPusher(Pusher):
 
     def __init__(self, hs: "HomeServer", pusher_config: PusherConfig):
         super().__init__(hs, pusher_config)
-        self.storage = self.hs.get_storage()
+        self._storage_controllers = self.hs.get_storage_controllers()
         self.app_display_name = pusher_config.app_display_name
         self.device_display_name = pusher_config.device_display_name
         self.pushkey_ts = pusher_config.ts
@@ -343,7 +343,9 @@ class HttpPusher(Pusher):
             }
             return d
 
-        ctx = await push_tools.get_context_for_event(self.storage, event, self.user_id)
+        ctx = await push_tools.get_context_for_event(
+            self._storage_controllers, event, self.user_id
+        )
 
         d = {
             "notification": {
@@ -405,7 +407,7 @@ class HttpPusher(Pusher):
         rejected = []
         if "rejected" in resp:
             rejected = resp["rejected"]
-        else:
+        if not rejected:
             self.badge_count_last_call = badge
         return rejected
 

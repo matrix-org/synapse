@@ -179,7 +179,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             result_children_ids.append(
                 [
                     (cs["room_id"], cs["state_key"])
-                    for cs in result_room.get("children_state")
+                    for cs in result_room["children_state"]
                 ]
             )
 
@@ -772,7 +772,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 {
                     "room_id": public_room,
                     "world_readable": False,
-                    "join_rules": JoinRules.PUBLIC,
+                    "join_rule": JoinRules.PUBLIC,
                 },
             ),
             (
@@ -780,7 +780,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 {
                     "room_id": knock_room,
                     "world_readable": False,
-                    "join_rules": JoinRules.KNOCK,
+                    "join_rule": JoinRules.KNOCK,
                 },
             ),
             (
@@ -788,7 +788,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 {
                     "room_id": not_invited_room,
                     "world_readable": False,
-                    "join_rules": JoinRules.INVITE,
+                    "join_rule": JoinRules.INVITE,
                 },
             ),
             (
@@ -796,7 +796,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 {
                     "room_id": invited_room,
                     "world_readable": False,
-                    "join_rules": JoinRules.INVITE,
+                    "join_rule": JoinRules.INVITE,
                 },
             ),
             (
@@ -804,7 +804,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 {
                     "room_id": restricted_room,
                     "world_readable": False,
-                    "join_rules": JoinRules.RESTRICTED,
+                    "join_rule": JoinRules.RESTRICTED,
                     "allowed_room_ids": [],
                 },
             ),
@@ -813,7 +813,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 {
                     "room_id": restricted_accessible_room,
                     "world_readable": False,
-                    "join_rules": JoinRules.RESTRICTED,
+                    "join_rule": JoinRules.RESTRICTED,
                     "allowed_room_ids": [self.room],
                 },
             ),
@@ -822,7 +822,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 {
                     "room_id": world_readable_room,
                     "world_readable": True,
-                    "join_rules": JoinRules.INVITE,
+                    "join_rule": JoinRules.INVITE,
                 },
             ),
             (
@@ -830,7 +830,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 {
                     "room_id": joined_room,
                     "world_readable": False,
-                    "join_rules": JoinRules.INVITE,
+                    "join_rule": JoinRules.INVITE,
                 },
             ),
         )
@@ -911,7 +911,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             {
                 "room_id": fed_room,
                 "world_readable": False,
-                "join_rules": JoinRules.INVITE,
+                "join_rule": JoinRules.INVITE,
             },
         )
 
@@ -1092,3 +1092,29 @@ class RoomSummaryTestCase(unittest.HomeserverTestCase):
         )
         result = self.get_success(self.handler.get_room_summary(user2, self.room))
         self.assertEqual(result.get("room_id"), self.room)
+
+    def test_fed(self):
+        """
+        Return data over federation and ensure that it is handled properly.
+        """
+        fed_hostname = self.hs.hostname + "2"
+        fed_room = "#fed_room:" + fed_hostname
+
+        requested_room_entry = _RoomEntry(
+            fed_room,
+            {"room_id": fed_room, "world_readable": True},
+        )
+
+        async def summarize_remote_room_hierarchy(_self, room, suggested_only):
+            return requested_room_entry, {}, set()
+
+        with mock.patch(
+            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room_hierarchy",
+            new=summarize_remote_room_hierarchy,
+        ):
+            result = self.get_success(
+                self.handler.get_room_summary(
+                    self.user, fed_room, remote_room_hosts=[fed_hostname]
+                )
+            )
+        self.assertEqual(result.get("room_id"), fed_room)

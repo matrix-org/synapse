@@ -1,1 +1,0 @@
-Remove special-case for `twisted` logger from default log config.

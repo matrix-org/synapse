@@ -1,1 +1,0 @@
-Consistently check if an object is a `frozendict`.

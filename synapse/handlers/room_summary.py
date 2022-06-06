@@ -90,6 +90,7 @@ class RoomSummaryHandler:
     def __init__(self, hs: "HomeServer"):
         self._event_auth_handler = hs.get_event_auth_handler()
         self._store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self._event_serializer = hs.get_event_client_serializer()
         self._server_name = hs.hostname
         self._federation_client = hs.get_federation_client()
@@ -105,6 +106,7 @@ class RoomSummaryHandler:
             hs.get_clock(),
             "get_room_hierarchy",
         )
+        self._msc3266_enabled = hs.config.experimental.msc3266_enabled
 
     async def get_room_hierarchy(
         self,
@@ -536,7 +538,7 @@ class RoomSummaryHandler:
         Returns:
              True if the room is accessible to the requesting user or server.
         """
-        state_ids = await self._store.get_current_state_ids(room_id)
+        state_ids = await self._storage_controllers.state.get_current_state_ids(room_id)
 
         # If there's no state for the room, it isn't known.
         if not state_ids:
@@ -561,8 +563,13 @@ class RoomSummaryHandler:
         if join_rules_event_id:
             join_rules_event = await self._store.get_event(join_rules_event_id)
             join_rule = join_rules_event.content.get("join_rule")
-            if join_rule == JoinRules.PUBLIC or (
-                room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
+            if (
+                join_rule == JoinRules.PUBLIC
+                or (room_version.msc2403_knocking and join_rule == JoinRules.KNOCK)
+                or (
+                    room_version.msc3787_knock_restricted_join_rule
+                    and join_rule == JoinRules.KNOCK_RESTRICTED
+                )
             ):
                 return True
 
@@ -630,7 +637,7 @@ class RoomSummaryHandler:
         return False
 
     async def _is_remote_room_accessible(
-        self, requester: str, room_id: str, room: JsonDict
+        self, requester: Optional[str], room_id: str, room: JsonDict
     ) -> bool:
         """
         Calculate whether the room received over federation should be shown to the requester.
@@ -645,7 +652,8 @@ class RoomSummaryHandler:
         due to an invite, etc.
 
         Args:
-            requester: The user requesting the summary.
+            requester: The user requesting the summary. If not passed only world
+                readability is checked.
             room_id: The room ID returned over federation.
             room: The summary of the room returned over federation.
 
@@ -655,10 +663,13 @@ class RoomSummaryHandler:
         # The API doesn't return the room version so assume that a
         # join rule of knock is valid.
         if (
-            room.get("join_rules") in (JoinRules.PUBLIC, JoinRules.KNOCK)
+            room.get("join_rule")
+            in (JoinRules.PUBLIC, JoinRules.KNOCK, JoinRules.KNOCK_RESTRICTED)
             or room.get("world_readable") is True
         ):
             return True
+        elif not requester:
+            return False
 
         # Check if the user is a member of any of the allowed rooms from the response.
         allowed_rooms = room.get("allowed_room_ids")
@@ -692,7 +703,9 @@ class RoomSummaryHandler:
         # there should always be an entry
         assert stats is not None, "unable to retrieve stats for %s" % (room_id,)
 
-        current_state_ids = await self._store.get_current_state_ids(room_id)
+        current_state_ids = await self._storage_controllers.state.get_current_state_ids(
+            room_id
+        )
         create_event = await self._store.get_event(
             current_state_ids[(EventTypes.Create, "")]
         )
@@ -704,9 +717,6 @@ class RoomSummaryHandler:
             "canonical_alias": stats["canonical_alias"],
             "num_joined_members": stats["joined_members"],
             "avatar_url": stats["avatar"],
-            # plural join_rules is a documentation error but kept for historical
-            # purposes. Should match /publicRooms.
-            "join_rules": stats["join_rules"],
             "join_rule": stats["join_rules"],
             "world_readable": (
                 stats["history_visibility"] == HistoryVisibility.WORLD_READABLE
@@ -714,6 +724,10 @@ class RoomSummaryHandler:
             "guest_can_join": stats["guest_access"] == "can_join",
             "room_type": create_event.content.get(EventContentFields.ROOM_TYPE),
         }
+
+        if self._msc3266_enabled:
+            entry["im.nheko.summary.version"] = stats["version"]
+            entry["im.nheko.summary.encryption"] = stats["encryption"]
 
         # Federation requests need to provide additional information so the
         # requested server is able to filter the response appropriately.
@@ -749,7 +763,9 @@ class RoomSummaryHandler:
         """
 
         # look for child rooms/spaces.
-        current_state_ids = await self._store.get_current_state_ids(room_id)
+        current_state_ids = await self._storage_controllers.state.get_current_state_ids(
+            room_id
+        )
 
         events = await self._store.get_events_as_list(
             [
@@ -812,9 +828,45 @@ class RoomSummaryHandler:
 
                 room_summary["membership"] = membership or "leave"
         else:
-            # TODO federation API, descoped from initial unstable implementation
-            #      as MSC needs more maturing on that side.
-            raise SynapseError(400, "Federation is not currently supported.")
+            # Reuse the hierarchy query over federation
+            if remote_room_hosts is None:
+                raise SynapseError(400, "Missing via to query remote room")
+
+            (
+                room_entry,
+                children_room_entries,
+                inaccessible_children,
+            ) = await self._summarize_remote_room_hierarchy(
+                _RoomQueueEntry(room_id, remote_room_hosts),
+                suggested_only=True,
+            )
+
+            # The results over federation might include rooms that we, as the
+            # requesting server, are allowed to see, but the requesting user is
+            # not permitted to see.
+            #
+            # Filter the returned results to only what is accessible to the user.
+            if not room_entry or not await self._is_remote_room_accessible(
+                requester, room_entry.room_id, room_entry.room
+            ):
+                raise NotFoundError("Room not found or is not accessible")
+
+            room = dict(room_entry.room)
+            room.pop("allowed_room_ids", None)
+
+            # If there was a requester, add their membership.
+            # We keep the membership in the local membership table unless the
+            # room is purged even for remote rooms.
+            if requester:
+                (
+                    membership,
+                    _,
+                ) = await self._store.get_local_current_membership_for_user_in_room(
+                    requester, room_id
+                )
+                room["membership"] = membership or "leave"
+
+            return room
 
         return room_summary
 
