@@ -182,6 +182,7 @@ IGNORED_TABLES = {
     "groups",
     "local_group_membership",
     "local_group_updates",
+    "remote_profile_cache",
 }
 
 
