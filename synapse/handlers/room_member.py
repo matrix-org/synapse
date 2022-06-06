@@ -1401,7 +1401,19 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         txn_id: Optional[str],
         id_access_token: Optional[str] = None,
     ) -> int:
-        room_state = await self.state_handler.get_current_state(room_id)
+        room_state = await self._storage_controllers.state.get_current_state(
+            room_id,
+            StateFilter.from_types(
+                [
+                    (EventTypes.Member, user.to_string()),
+                    (EventTypes.CanonicalAlias, ""),
+                    (EventTypes.Name, ""),
+                    (EventTypes.Create, ""),
+                    (EventTypes.JoinRules, ""),
+                    (EventTypes.RoomAvatar, ""),
+                ]
+            ),
+        )
 
         inviter_display_name = ""
         inviter_avatar_url = ""
@@ -1797,7 +1809,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
     async def forget(self, user: UserID, room_id: str) -> None:
         user_id = user.to_string()
 
-        member = await self.state_handler.get_current_state(
+        member = await self._storage_controllers.state.get_current_state_event(
             room_id=room_id, event_type=EventTypes.Member, state_key=user_id
         )
         membership = member.membership if member else None

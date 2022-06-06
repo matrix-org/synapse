@@ -371,7 +371,7 @@ class FederationHandler:
         # First we try hosts that are already in the room
         # TODO: HEURISTIC ALERT.
 
-        curr_state = await self.state_handler.get_current_state(room_id)
+        curr_state = await self._storage_controllers.state.get_current_state(room_id)
 
         curr_domains = get_domains_from_state(curr_state)
 
