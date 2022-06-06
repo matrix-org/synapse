@@ -1,1 +1,1 @@
-Reduce amount of state we pull out when attempting to send catchup PDUs.
+Reduce the amount of state we pull from the DB.
