@@ -407,7 +407,7 @@ class DeviceHandler(DeviceWorkerHandler):
         """
 
         try:
-            await self.store.delete_device(user_id, device_id)
+            await self.store.delete_devices(user_id, [device_id])
         except errors.StoreError as e:
             if e.code == 404:
                 # no match
@@ -638,7 +638,7 @@ class DeviceHandler(DeviceWorkerHandler):
         await self.store.update_device(user_id, device_id, old_device["display_name"])
         # can't call self.delete_device because that will clobber the
         # access token so call the storage layer directly
-        await self.store.delete_device(user_id, old_device_id)
+        await self.store.delete_devices(user_id, [old_device_id])
         await self.store.delete_e2e_keys_by_device(
             user_id=user_id, device_id=old_device_id
         )
