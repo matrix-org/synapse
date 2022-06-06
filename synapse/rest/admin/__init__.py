@@ -20,8 +20,6 @@ import platform
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Optional, Tuple
 
-from matrix_common.versionstring import get_distribution_version_string
-
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer, JsonResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -88,6 +86,7 @@ from synapse.rest.admin.users import (
     WhoisRestServlet,
 )
 from synapse.types import JsonDict, RoomStreamToken
+from synapse.util import SYNAPSE_VERSION
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -100,7 +99,7 @@ class VersionServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self.res = {
-            "server_version": get_distribution_version_string("matrix-synapse"),
+            "server_version": SYNAPSE_VERSION,
             "python_version": platform.python_version(),
         }
 

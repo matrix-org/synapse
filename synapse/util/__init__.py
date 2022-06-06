@@ -19,6 +19,7 @@ from typing import Any, Callable, Dict, Generator, Optional
 
 import attr
 from frozendict import frozendict
+from matrix_common.versionstring import get_distribution_version_string
 
 from twisted.internet import defer, task
 from twisted.internet.defer import Deferred
@@ -183,3 +184,8 @@ def log_failure(
     if not consumeErrors:
         return failure
     return None
+
+
+# Version string with git info. Computed here once so that we don't invoke git multiple
+# times.
+SYNAPSE_VERSION = get_distribution_version_string("matrix-synapse", __file__)
