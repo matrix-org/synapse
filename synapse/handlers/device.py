@@ -398,35 +398,6 @@ class DeviceHandler(DeviceWorkerHandler):
             await self.delete_devices(user_id, user_devices)
 
     @trace
-    async def delete_device(self, user_id: str, device_id: str) -> None:
-        """Delete the given device
-
-        Args:
-            user_id: The user to delete the device from.
-            device_id: The device to delete.
-        """
-
-        try:
-            await self.store.delete_devices(user_id, [device_id])
-        except errors.StoreError as e:
-            if e.code == 404:
-                # no match
-                set_tag("error", True)
-                log_kv(
-                    {"reason": "User doesn't have device id.", "device_id": device_id}
-                )
-            else:
-                raise
-
-        await self._auth_handler.delete_access_tokens_for_user(
-            user_id, device_id=device_id
-        )
-
-        await self.store.delete_e2e_keys_by_device(user_id=user_id, device_id=device_id)
-
-        await self.notify_device_update(user_id, [device_id])
-
-    @trace
     async def delete_all_devices_for_user(
         self, user_id: str, except_device_id: Optional[str] = None
     ) -> None:
@@ -591,7 +562,7 @@ class DeviceHandler(DeviceWorkerHandler):
             user_id, device_id, device_data
         )
         if old_device_id is not None:
-            await self.delete_device(user_id, old_device_id)
+            await self.delete_devices(user_id, [old_device_id])
         return device_id
 
     async def get_dehydrated_device(
