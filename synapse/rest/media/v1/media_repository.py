@@ -923,7 +923,7 @@ class MediaRepository:
             )
 
     async def delete_old_remote_media(self, before_ts: int) -> Dict[str, int]:
-        old_media = await self.store.get_remote_media_before(
+        old_media = await self.store.get_remote_media_ids(
             before_ts, include_quarantined_media=False
         )
 
@@ -995,7 +995,7 @@ class MediaRepository:
         Returns:
             A tuple of (list of deleted media IDs, total deleted media IDs).
         """
-        old_media = await self.store.get_local_media_before(
+        old_media = await self.store.get_local_media_ids(
             before_ts,
             size_gt,
             keep_profiles,

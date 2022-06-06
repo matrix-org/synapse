@@ -251,7 +251,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             "get_local_media_by_user_paginate_txn", get_local_media_by_user_paginate_txn
         )
 
-    async def get_local_media_before(
+    async def get_local_media_ids(
         self,
         before_ts: int,
         size_gt: int,
@@ -321,12 +321,12 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 AND quarantined_by IS NULL
             """
 
-        def _get_local_media_before_txn(txn: LoggingTransaction) -> List[str]:
+        def _get_local_media_ids_txn(txn: LoggingTransaction) -> List[str]:
             txn.execute(sql, (before_ts, before_ts, size_gt))
             return [row[0] for row in txn]
 
         return await self.db_pool.runInteraction(
-            "get_local_media_before", _get_local_media_before_txn
+            "get_local_media_ids", _get_local_media_ids_txn
         )
 
     async def store_local_media(
@@ -626,7 +626,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="store_remote_media_thumbnail",
         )
 
-    async def get_remote_media_before(
+    async def get_remote_media_ids(
         self, before_ts: int, include_quarantined_media: bool
     ) -> List[Dict[str, str]]:
         """
@@ -656,7 +656,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             """
 
         return await self.db_pool.execute(
-            "get_remote_media_before", self.db_pool.cursor_to_dict, sql, before_ts
+            "get_remote_media_ids", self.db_pool.cursor_to_dict, sql, before_ts
         )
 
     async def delete_remote_media(self, media_origin: str, media_id: str) -> None:
