@@ -923,7 +923,9 @@ class MediaRepository:
             )
 
     async def delete_old_remote_media(self, before_ts: int) -> Dict[str, int]:
-        old_media = await self.store.get_remote_media_before(before_ts)
+        old_media = await self.store.get_remote_media_before(
+            before_ts, include_quarantined_media=False
+        )
 
         deleted = 0
 
