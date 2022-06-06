@@ -315,6 +315,10 @@ jobs:
       matrix:
         include:
           - _: monolith
+            _db: SQLite
+
+          - _: monolith
+            postgres: Postgres
 
     steps:
       # The path is set via a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on the path to run Complement.
@@ -343,7 +347,7 @@ jobs:
 
       - run: |
           set -o pipefail
-          WORKERS=${{ matrix.workers && 1 }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | gotestfmt
+          POSTGRES=${{ matrix.postgres && 1 }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | gotestfmt
         shell: bash
         name: Run Complement Tests
 
