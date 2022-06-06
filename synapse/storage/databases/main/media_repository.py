@@ -256,7 +256,28 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         before_ts: int,
         size_gt: int,
         keep_profiles: bool,
+        include_quarantined_media: bool,
     ) -> List[str]:
+        """
+        Retrieve a list of media IDs from the local media store.
+
+        Args:
+            before_ts: Only retrieve IDs from media that was either last accessed
+                (or if never accessed, created) before the given UNIX timestamp in ms.
+            size_gt: Only retrieve IDs from media that has a size (in bytes) greater than
+                the given integer.
+            keep_profiles: If True, exclude media IDs from the results that are used in the
+                following situations:
+                    * global profile user avatar
+                    * per-room profile user avatar
+                    * room avatar
+                    * a user's avatar in the user directory
+            include_quarantined_media: If False, exclude media IDs from the results that have
+                been marked as quarantined.
+
+        Returns:
+            A list of local media IDs.
+        """
 
         # to find files that have never been accessed (last_access_ts IS NULL)
         # compare with `created_ts`
@@ -293,6 +314,12 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 media_prefix="mxc://%s/" % (self.server_name,),
             )
             sql += sql_keep
+
+        if include_quarantined_media is False:
+            # Only include media that has not been quarantined
+            sql += """
+                AND quarantined_by IS NULL
+            """
 
         def _get_local_media_before_txn(txn: LoggingTransaction) -> List[str]:
             txn.execute(sql, (before_ts, before_ts, size_gt))
