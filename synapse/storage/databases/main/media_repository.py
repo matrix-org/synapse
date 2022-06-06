@@ -278,10 +278,6 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                          WHERE profiles.avatar_url = '{media_prefix}' || lmr.media_id)
                     AND NOT EXISTS
                         (SELECT 1
-                         FROM groups
-                         WHERE groups.avatar_url = '{media_prefix}' || lmr.media_id)
-                    AND NOT EXISTS
-                        (SELECT 1
                          FROM room_memberships
                          WHERE room_memberships.avatar_url = '{media_prefix}' || lmr.media_id)
                     AND NOT EXISTS

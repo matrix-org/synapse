@@ -679,6 +679,17 @@ class ServerConfig(Config):
             config.get("exclude_rooms_from_sync") or []
         )
 
+        delete_stale_devices_after: Optional[str] = (
+            config.get("delete_stale_devices_after") or None
+        )
+
+        if delete_stale_devices_after is not None:
+            self.delete_stale_devices_after: Optional[int] = self.parse_duration(
+                delete_stale_devices_after
+            )
+        else:
+            self.delete_stale_devices_after = None
+
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
 

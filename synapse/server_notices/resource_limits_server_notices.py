@@ -36,6 +36,7 @@ class ResourceLimitsServerNotices:
     def __init__(self, hs: "HomeServer"):
         self._server_notices_manager = hs.get_server_notices_manager()
         self._store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self._auth = hs.get_auth()
         self._config = hs.config
         self._resouce_limited = False
@@ -178,8 +179,10 @@ class ResourceLimitsServerNotices:
         currently_blocked = False
         pinned_state_event = None
         try:
-            pinned_state_event = await self._state.get_current_state(
-                room_id, event_type=EventTypes.Pinned
+            pinned_state_event = (
+                await self._storage_controllers.state.get_current_state_event(
+                    room_id, event_type=EventTypes.Pinned, state_key=""
+                )
             )
         except AuthError:
             # The user has yet to join the server notices room

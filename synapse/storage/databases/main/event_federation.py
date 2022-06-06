@@ -1057,7 +1057,7 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
             INNER JOIN batch_events AS c
             ON i.next_batch_id = c.batch_id
             /* Get the depth of the batch start event from the events table */
-            INNER JOIN events AS e USING (event_id)
+            INNER JOIN events AS e ON c.event_id = e.event_id
             /* Find an insertion event which matches the given event_id */
             WHERE i.event_id = ?
             LIMIT ?
@@ -1318,17 +1318,14 @@ class EventFederationWorkerStore(SignatureWorkerStore, EventsWorkerStore, SQLBas
 
         query = (
             "SELECT prev_event_id FROM event_edges "
-            "WHERE room_id = ? AND event_id = ? AND is_state = ? "
+            "WHERE event_id = ? AND NOT is_state "
             "LIMIT ?"
         )
 
         while front and len(event_results) < limit:
             new_front = set()
             for event_id in front:
-                txn.execute(
-                    query, (room_id, event_id, False, limit - len(event_results))
-                )
-
+                txn.execute(query, (event_id, limit - len(event_results)))
                 new_results = {t[0] for t in txn} - seen_events
 
                 new_front |= new_results

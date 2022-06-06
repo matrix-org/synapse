@@ -21,6 +21,7 @@ from typing import (
     Awaitable,
     Callable,
     Collection,
+    Dict,
     List,
     Optional,
     Tuple,
@@ -41,12 +42,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
 CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
     ["synapse.events.EventBase"],
     Awaitable[
         Union[
             str,
+            Codes,
+            # Highly experimental, not officially part of the spamchecker API, may
+            # disappear without warning depending on the results of ongoing
+            # experiments.
+            # Use this to return additional information as part of an error.
+            Tuple[Codes, Dict],
             # Deprecated
             bool,
         ]
@@ -267,7 +273,9 @@ class SpamChecker:
         if check_media_file_for_spam is not None:
             self._check_media_file_for_spam_callbacks.append(check_media_file_for_spam)
 
-    async def check_event_for_spam(self, event: "synapse.events.EventBase") -> str:
+    async def check_event_for_spam(
+        self, event: "synapse.events.EventBase"
+    ) -> Union[Tuple[Codes, Dict], str]:
         """Checks if a given event is considered "spammy" by this server.
 
         If the server considers an event spammy, then it will be rejected if
@@ -303,7 +311,7 @@ class SpamChecker:
                     # mypy complains that we can't reach this code because of the
                     # return type in CHECK_EVENT_FOR_SPAM_CALLBACK, but we don't know
                     # for sure that the module actually returns it.
-                    logger.warning(  # type: ignore[unreachable]
+                    logger.warning(
                         "Module returned invalid value, rejecting message as spam"
                     )
                     res = "This message has been rejected as probable spam"

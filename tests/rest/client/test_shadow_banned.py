@@ -17,7 +17,7 @@ from unittest.mock import Mock, patch
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EduTypes, EventTypes
 from synapse.rest.client import (
     directory,
     login,
@@ -226,7 +226,7 @@ class RoomTestCase(_ShadowBannedBase):
             events[0],
             [
                 {
-                    "type": "m.typing",
+                    "type": EduTypes.TYPING,
                     "room_id": room_id,
                     "content": {"user_ids": [self.other_user_id]},
                 }

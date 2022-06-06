@@ -31,11 +31,6 @@ MAX_ALIAS_LENGTH = 255
 # the maximum length for a user id is 255 characters
 MAX_USERID_LENGTH = 255
 
-# The maximum length for a group id is 255 characters
-MAX_GROUPID_LENGTH = 255
-MAX_GROUP_CATEGORYID_LENGTH = 255
-MAX_GROUP_ROLEID_LENGTH = 255
-
 
 class Membership:
 
@@ -100,7 +95,6 @@ class EventTypes:
     Aliases: Final = "m.room.aliases"
     Redaction: Final = "m.room.redaction"
     ThirdPartyInvite: Final = "m.room.third_party_invite"
-    RelatedGroups: Final = "m.room.related_groups"
 
     RoomHistoryVisibility: Final = "m.room.history_visibility"
     CanonicalAlias: Final = "m.room.canonical_alias"
@@ -142,7 +136,13 @@ class DeviceKeyAlgorithms:
 
 
 class EduTypes:
-    Presence: Final = "m.presence"
+    PRESENCE: Final = "m.presence"
+    TYPING: Final = "m.typing"
+    RECEIPT: Final = "m.receipt"
+    DEVICE_LIST_UPDATE: Final = "m.device_list_update"
+    SIGNING_KEY_UPDATE: Final = "m.signing_key_update"
+    UNSTABLE_SIGNING_KEY_UPDATE: Final = "org.matrix.signing_key_update"
+    DIRECT_TO_DEVICE: Final = "m.direct_to_device"
 
 
 class RejectedReason:

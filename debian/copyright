@@ -22,29 +22,6 @@ Files: synapse/config/repository.py
 Copyright: 2014-2015, matrix.org
 License: Apache-2.0
 
-Files: contrib/jitsimeetbridge/unjingle/strophe/base64.js
-Copyright: Public Domain (Tyler Akins http://rumkin.com)
-License: public-domain
- This code was written by Tyler Akins and has been placed in the
- public domain.  It would be nice if you left this header intact.
- Base64 code from Tyler Akins -- http://rumkin.com
-
-Files: contrib/jitsimeetbridge/unjingle/strophe/md5.js
-Copyright: 1999-2002, Paul Johnston & Contributors
-License: BSD-3-clause
-
-Files: contrib/jitsimeetbridge/unjingle/strophe/strophe.js
-Copyright: 2006-2008, OGG, LLC
-License: Expat
-
-Files: contrib/jitsimeetbridge/unjingle/strophe/XMLHttpRequest.js
-Copyright: 2010 passive.ly LLC
-License: Expat
-
-Files: contrib/jitsimeetbridge/unjingle/*.js
-Copyright: 2014 Jitsi
-License: Apache-2.0
-
 Files: debian/*
 Copyright: 2016-2017, Erik Johnston <erik@matrix.org>
 	   2017, Rahul De <rahulde@swecha.net>
