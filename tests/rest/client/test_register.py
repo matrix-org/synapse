@@ -40,6 +40,7 @@ ADDITIONAL_LOGIN_FLOWS = [
     {"type": "m.login.application_service", "actions": ["login"]},
 ]
 
+
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     servlets = [
@@ -132,7 +133,11 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
     def test_POST_user_valid(self) -> None:
         # login flows should have actions "login" and "register"
         flows = self._get_login_flows()
-        self.assertEqual(flows, [{"type": "m.login.password", "actions": ["login", "register"]}] + ADDITIONAL_LOGIN_FLOWS)
+        self.assertEqual(
+            flows,
+            [{"type": "m.login.password", "actions": ["login", "register"]}]
+            + ADDITIONAL_LOGIN_FLOWS,
+        )
 
         user_id = "@kermit:test"
         device_id = "frogfone"
@@ -157,7 +162,11 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
     def test_POST_disabled_registration(self) -> None:
         # login flows should only have action "login"
         flows = self._get_login_flows()
-        self.assertEqual(flows, [{"type": "m.login.password", "actions": ["login"]}] + ADDITIONAL_LOGIN_FLOWS)
+        self.assertEqual(
+            flows,
+            [{"type": "m.login.password", "actions": ["login"]}]
+            + ADDITIONAL_LOGIN_FLOWS,
+        )
 
         request_data = json.dumps({"username": "kermit", "password": "monkey"})
         self.auth_result = (None, {"username": "kermit", "password": "monkey"}, None)

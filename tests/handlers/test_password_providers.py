@@ -183,7 +183,11 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
     def password_only_auth_provider_login_test_body(self):
         # login flows should only have m.login.password
         flows = self._get_login_flows()
-        self.assertEqual(flows, [{"type": "m.login.password", "actions": ["login", "register"]}] + ADDITIONAL_LOGIN_FLOWS)
+        self.assertEqual(
+            flows,
+            [{"type": "m.login.password", "actions": ["login", "register"]}]
+            + ADDITIONAL_LOGIN_FLOWS,
+        )
 
         # check_password must return an awaitable
         mock_password_provider.check_password.return_value = make_awaitable(True)
@@ -400,7 +404,10 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         flows = self._get_login_flows()
         self.assertEqual(
             flows,
-            [{"type": "m.login.password", "actions": ["login", "register"]}, {"type": "test.login_type", "actions": ["login", "register"]}]
+            [
+                {"type": "m.login.password", "actions": ["login", "register"]},
+                {"type": "test.login_type", "actions": ["login", "register"]},
+            ]
             + ADDITIONAL_LOGIN_FLOWS,
         )
 
@@ -545,7 +552,11 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.register_user("localuser", "localpass")
 
         flows = self._get_login_flows()
-        self.assertEqual(flows, [{"type": "test.login_type", "actions": ["login", "register"]}] + ADDITIONAL_LOGIN_FLOWS)
+        self.assertEqual(
+            flows,
+            [{"type": "test.login_type", "actions": ["login", "register"]}]
+            + ADDITIONAL_LOGIN_FLOWS,
+        )
 
         # login shouldn't work and should be rejected with a 400 ("unknown login type")
         channel = self._send_password_login("localuser", "localpass")
@@ -580,7 +591,11 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.register_user("localuser", "localpass")
 
         flows = self._get_login_flows()
-        self.assertEqual(flows, [{"type": "test.login_type", "actions": ["login", "register"]}] + ADDITIONAL_LOGIN_FLOWS)
+        self.assertEqual(
+            flows,
+            [{"type": "test.login_type", "actions": ["login", "register"]}]
+            + ADDITIONAL_LOGIN_FLOWS,
+        )
 
         # login shouldn't work and should be rejected with a 400 ("unknown login type")
         channel = self._send_password_login("localuser", "localpass")
@@ -611,7 +626,11 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.register_user("localuser", "localpass")
 
         flows = self._get_login_flows()
-        self.assertEqual(flows, [{"type": "test.login_type", "actions": ["login", "register"]}] + ADDITIONAL_LOGIN_FLOWS)
+        self.assertEqual(
+            flows,
+            [{"type": "test.login_type", "actions": ["login", "register"]}]
+            + ADDITIONAL_LOGIN_FLOWS,
+        )
 
         # login shouldn't work and should be rejected with a 400 ("unknown login type")
         channel = self._send_password_login("localuser", "localpass")
@@ -716,7 +735,11 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.register_user("localuser", "localpass")
 
         flows = self._get_login_flows()
-        self.assertEqual(flows, [{"type": "test.login_type", "actions": ["login", "register"]}] + ADDITIONAL_LOGIN_FLOWS)
+        self.assertEqual(
+            flows,
+            [{"type": "test.login_type", "actions": ["login", "register"]}]
+            + ADDITIONAL_LOGIN_FLOWS,
+        )
 
         # password login shouldn't work and should be rejected with a 400
         # ("unknown login type")
