@@ -473,7 +473,7 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
             "m.login.sso",
             "m.login.token",
             "m.login.password",
-        ] + [f["type"] for f in ADDITIONAL_LOGIN_FLOWS]
+        ] + [str(f["type"]) for f in ADDITIONAL_LOGIN_FLOWS]
 
         self.assertCountEqual(
             [f["type"] for f in channel.json_body["flows"]], expected_flow_types
