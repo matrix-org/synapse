@@ -14,6 +14,7 @@
 
 import logging
 import threading
+from contextlib import nullcontext
 from functools import wraps
 from types import TracebackType
 from typing import (
@@ -41,11 +42,7 @@ from synapse.logging.context import (
     LoggingContext,
     PreserveLoggingContext,
 )
-from synapse.logging.opentracing import (
-    SynapseTags,
-    noop_context_manager,
-    start_active_span,
-)
+from synapse.logging.opentracing import SynapseTags, start_active_span
 from synapse.metrics._types import Collector
 
 if TYPE_CHECKING:
@@ -238,7 +235,7 @@ def run_as_background_process(
                         f"bgproc.{desc}", tags={SynapseTags.REQUEST_ID: str(context)}
                     )
                 else:
-                    ctx = noop_context_manager()
+                    ctx = nullcontext()
                 with ctx:
                     return await func(*args, **kwargs)
             except Exception:

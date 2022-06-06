@@ -1,0 +1,1 @@
+Experimental: expand `check_event_for_spam` with ability to return additional fields. This enables spam-checker implementations to experiment with mechanisms to give users more information about why they are blocked and whether any action is needed from them to be unblocked.

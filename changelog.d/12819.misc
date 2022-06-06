@@ -1,1 +1,0 @@
-Add Complement's shared registration secret to the Complement worker image. This fixes tests that depend on it.

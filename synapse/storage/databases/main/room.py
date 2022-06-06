@@ -23,6 +23,7 @@ from typing import (
     Collection,
     Dict,
     List,
+    Mapping,
     Optional,
     Tuple,
     Union,
@@ -233,24 +234,23 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                     UNION SELECT room_id from appservice_room_list
             """
 
-            sql = """
+            sql = f"""
                 SELECT
                     COUNT(*)
                 FROM (
-                    %(published_sql)s
+                    {published_sql}
                 ) published
                 INNER JOIN room_stats_state USING (room_id)
                 INNER JOIN room_stats_current USING (room_id)
                 WHERE
                     (
-                        join_rules = 'public' OR join_rules = '%(knock_join_rule)s'
+                        join_rules = '{JoinRules.PUBLIC}'
+                        OR join_rules = '{JoinRules.KNOCK}'
+                        OR join_rules = '{JoinRules.KNOCK_RESTRICTED}'
                         OR history_visibility = 'world_readable'
                     )
                     AND joined_members > 0
-            """ % {
-                "published_sql": published_sql,
-                "knock_join_rule": JoinRules.KNOCK,
-            }
+            """
 
             txn.execute(sql, query_args)
             return cast(Tuple[int], txn.fetchone())[0]
@@ -369,29 +369,29 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         if where_clauses:
             where_clause = " AND " + " AND ".join(where_clauses)
 
-        sql = """
+        dir = "DESC" if forwards else "ASC"
+        sql = f"""
             SELECT
                 room_id, name, topic, canonical_alias, joined_members,
                 avatar, history_visibility, guest_access, join_rules
             FROM (
-                %(published_sql)s
+                {published_sql}
             ) published
             INNER JOIN room_stats_state USING (room_id)
             INNER JOIN room_stats_current USING (room_id)
             WHERE
                 (
-                    join_rules = 'public' OR join_rules = '%(knock_join_rule)s'
+                    join_rules = '{JoinRules.PUBLIC}'
+                    OR join_rules = '{JoinRules.KNOCK}'
+                    OR join_rules = '{JoinRules.KNOCK_RESTRICTED}'
                     OR history_visibility = 'world_readable'
                 )
                 AND joined_members > 0
-                %(where_clause)s
-            ORDER BY joined_members %(dir)s, room_id %(dir)s
-        """ % {
-            "published_sql": published_sql,
-            "where_clause": where_clause,
-            "dir": "DESC" if forwards else "ASC",
-            "knock_join_rule": JoinRules.KNOCK,
-        }
+                {where_clause}
+            ORDER BY
+                joined_members {dir},
+                room_id {dir}
+        """
 
         if limit is not None:
             query_args.append(limit)
@@ -1082,6 +1082,32 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             get_rooms_for_retention_period_in_range_txn,
         )
 
+    async def get_partial_state_rooms_and_servers(
+        self,
+    ) -> Mapping[str, Collection[str]]:
+        """Get all rooms containing events with partial state, and the servers known
+        to be in the room.
+
+        Returns:
+            A dictionary of rooms with partial state, with room IDs as keys and
+            lists of servers in rooms as values.
+        """
+        room_servers: Dict[str, List[str]] = {}
+
+        rows = await self.db_pool.simple_select_list(
+            "partial_state_rooms_servers",
+            keyvalues=None,
+            retcols=("room_id", "server_name"),
+            desc="get_partial_state_rooms",
+        )
+
+        for row in rows:
+            room_id = row["room_id"]
+            server_name = row["server_name"]
+            room_servers.setdefault(room_id, []).append(server_name)
+
+        return room_servers
+
     async def clear_partial_state_room(self, room_id: str) -> bool:
         # this can race with incoming events, so we watch out for FK errors.
         # TODO(faster_joins): this still doesn't completely fix the race, since the persist process
@@ -1112,6 +1138,24 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             table="partial_state_rooms",
             keyvalues={"room_id": room_id},
         )
+
+    async def is_partial_state_room(self, room_id: str) -> bool:
+        """Checks if this room has partial state.
+
+        Returns true if this is a "partial-state" room, which means that the state
+        at events in the room, and `current_state_events`, may not yet be
+        complete.
+        """
+
+        entry = await self.db_pool.simple_select_one_onecol(
+            table="partial_state_rooms",
+            keyvalues={"room_id": room_id},
+            retcol="room_id",
+            allow_none=True,
+            desc="is_partial_state_room",
+        )
+
+        return entry is not None
 
 
 class _BackgroundUpdates:

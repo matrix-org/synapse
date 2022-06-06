@@ -30,6 +30,9 @@ _xml_encoding_match = re.compile(
 )
 _content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
 
+# Certain elements aren't meant for display.
+ARIA_ROLES_TO_IGNORE = {"directory", "menu", "menubar", "toolbar"}
+
 
 def _normalise_encoding(encoding: str) -> Optional[str]:
     """Use the Python codec's name as the normalised entry."""
@@ -174,13 +177,15 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
     # "og:video:secure_url": "https://www.youtube.com/v/LXDBoHyjmtw?version=3",
 
     og: Dict[str, Optional[str]] = {}
-    for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')]"):
-        if "content" in tag.attrib:
-            # if we've got more than 50 tags, someone is taking the piss
-            if len(og) >= 50:
-                logger.warning("Skipping OG for page with too many 'og:' tags")
-                return {}
-            og[tag.attrib["property"]] = tag.attrib["content"]
+    for tag in tree.xpath(
+        "//*/meta[starts-with(@property, 'og:')][@content][not(@content='')]"
+    ):
+        # if we've got more than 50 tags, someone is taking the piss
+        if len(og) >= 50:
+            logger.warning("Skipping OG for page with too many 'og:' tags")
+            return {}
+
+        og[tag.attrib["property"]] = tag.attrib["content"]
 
     # TODO: grab article: meta tags too, e.g.:
 
@@ -192,21 +197,23 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
     # "article:modified_time" content="2016-04-01T18:31:53+00:00" />
 
     if "og:title" not in og:
-        # do some basic spidering of the HTML
-        title = tree.xpath("(//title)[1] | (//h1)[1] | (//h2)[1] | (//h3)[1]")
-        if title and title[0].text is not None:
-            og["og:title"] = title[0].text.strip()
+        # Attempt to find a title from the title tag, or the biggest header on the page.
+        title = tree.xpath("((//title)[1] | (//h1)[1] | (//h2)[1] | (//h3)[1])/text()")
+        if title:
+            og["og:title"] = title[0].strip()
         else:
             og["og:title"] = None
 
     if "og:image" not in og:
-        # TODO: extract a favicon failing all else
         meta_image = tree.xpath(
-            "//*/meta[translate(@itemprop, 'IMAGE', 'image')='image']/@content"
+            "//*/meta[translate(@itemprop, 'IMAGE', 'image')='image'][not(@content='')]/@content[1]"
         )
+        # If a meta image is found, use it.
         if meta_image:
             og["og:image"] = meta_image[0]
         else:
+            # Try to find images which are larger than 10px by 10px.
+            #
             # TODO: consider inlined CSS styles as well as width & height attribs
             images = tree.xpath("//img[@src][number(@width)>10][number(@height)>10]")
             images = sorted(
@@ -215,17 +222,24 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
                     -1 * float(i.attrib["width"]) * float(i.attrib["height"])
                 ),
             )
+            # If no images were found, try to find *any* images.
             if not images:
-                images = tree.xpath("//img[@src]")
+                images = tree.xpath("//img[@src][1]")
             if images:
                 og["og:image"] = images[0].attrib["src"]
 
+            # Finally, fallback to the favicon if nothing else.
+            else:
+                favicons = tree.xpath("//link[@href][contains(@rel, 'icon')]/@href[1]")
+                if favicons:
+                    og["og:image"] = favicons[0]
+
     if "og:description" not in og:
+        # Check the first meta description tag for content.
         meta_description = tree.xpath(
-            "//*/meta"
-            "[translate(@name, 'DESCRIPTION', 'description')='description']"
-            "/@content"
+            "//*/meta[translate(@name, 'DESCRIPTION', 'description')='description'][not(@content='')]/@content[1]"
         )
+        # If a meta description is found with content, use it.
         if meta_description:
             og["og:description"] = meta_description[0]
         else:
@@ -246,7 +260,9 @@ def parse_html_description(tree: "etree.Element") -> Optional[str]:
 
     Grabs any text nodes which are inside the <body/> tag, unless they are within
     an HTML5 semantic markup tag (<header/>, <nav/>, <aside/>, <footer/>), or
-    if they are within a <script/> or <style/> tag.
+    if they are within a <script/>, <svg/> or <style/> tag, or if they are within
+    a tag whose content is usually only shown to old browsers
+    (<iframe/>, <video/>, <canvas/>, <picture/>).
 
     This is a very very very coarse approximation to a plain text render of the page.
 
@@ -268,6 +284,12 @@ def parse_html_description(tree: "etree.Element") -> Optional[str]:
         "script",
         "noscript",
         "style",
+        "svg",
+        "iframe",
+        "video",
+        "canvas",
+        "img",
+        "picture",
         etree.Comment,
     )
 
@@ -281,7 +303,7 @@ def parse_html_description(tree: "etree.Element") -> Optional[str]:
 
 
 def _iterate_over_text(
-    tree: "etree.Element", *tags_to_ignore: Iterable[Union[str, "etree.Comment"]]
+    tree: "etree.Element", *tags_to_ignore: Union[str, "etree.Comment"]
 ) -> Generator[str, None, None]:
     """Iterate over the tree returning text nodes in a depth first fashion,
     skipping text nodes inside certain tags.
@@ -298,6 +320,10 @@ def _iterate_over_text(
         if isinstance(el, str):
             yield el
         elif el.tag not in tags_to_ignore:
+            # If the element isn't meant for display, ignore it.
+            if el.get("role") in ARIA_ROLES_TO_IGNORE:
+                continue
+
             # el.text is the text before the first child, so we can immediately
             # return it if the text exists.
             if el.text:

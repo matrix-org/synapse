@@ -22,6 +22,7 @@ from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 import synapse.storage
+from synapse.api.constants import EduTypes
 from synapse.appservice import (
     ApplicationService,
     TransactionOneTimeKeyCounts,
@@ -476,7 +477,7 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
 
         # Check that the ephemeral event is a read receipt with the expected structure
         latest_read_receipt = all_ephemeral_events[-1]
-        self.assertEqual(latest_read_receipt["type"], "m.receipt")
+        self.assertEqual(latest_read_receipt["type"], EduTypes.RECEIPT)
 
         event_id = list(latest_read_receipt["content"].keys())[0]
         self.assertEqual(
@@ -696,7 +697,6 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         # Create an application service
         appservice = ApplicationService(
             token=random_string(10),
-            hostname="example.com",
             id=random_string(10),
             sender="@as:example.com",
             rate_limited=False,
@@ -775,7 +775,6 @@ class ApplicationServicesHandlerDeviceListsTestCase(unittest.HomeserverTestCase)
         # Create an appservice that is interested in "local_user"
         appservice = ApplicationService(
             token=random_string(10),
-            hostname="example.com",
             id=random_string(10),
             sender="@as:example.com",
             rate_limited=False,
@@ -842,7 +841,6 @@ class ApplicationServicesHandlerOtkCountsTestCase(unittest.HomeserverTestCase):
         self._service_token = "VERYSECRET"
         self._service = ApplicationService(
             self._service_token,
-            "as1.invalid",
             "as1",
             "@as.sender:test",
             namespaces={

@@ -54,7 +54,7 @@ export COMPLEMENT_BASE_IMAGE=complement-synapse
 
 extra_test_args=()
 
-test_tags="synapse_blacklist,msc2716,msc3030"
+test_tags="synapse_blacklist,msc2716,msc3030,msc3787"
 
 # All environment variables starting with PASS_ will be shared.
 # (The prefix is stripped off before reaching the container.)

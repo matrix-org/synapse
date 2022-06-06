@@ -174,7 +174,7 @@ class PushRulesWorkerStore(
                 "conditions",
                 "actions",
             ),
-            desc="get_push_rules_enabled_for_user",
+            desc="get_push_rules_for_user",
         )
 
         rows.sort(key=lambda row: (-int(row["priority_class"]), -int(row["priority"])))
@@ -188,10 +188,10 @@ class PushRulesWorkerStore(
         results = await self.db_pool.simple_select_list(
             table="push_rules_enable",
             keyvalues={"user_name": user_id},
-            retcols=("user_name", "rule_id", "enabled"),
+            retcols=("rule_id", "enabled"),
             desc="get_push_rules_enabled_for_user",
         )
-        return {r["rule_id"]: False if r["enabled"] == 0 else True for r in results}
+        return {r["rule_id"]: bool(r["enabled"]) for r in results}
 
     async def have_push_rules_changed_for_user(
         self, user_id: str, last_id: int
@@ -213,11 +213,7 @@ class PushRulesWorkerStore(
                 "have_push_rules_changed", have_push_rules_changed_txn
             )
 
-    @cachedList(
-        cached_method_name="get_push_rules_for_user",
-        list_name="user_ids",
-        num_args=1,
-    )
+    @cachedList(cached_method_name="get_push_rules_for_user", list_name="user_ids")
     async def bulk_get_push_rules(
         self, user_ids: Collection[str]
     ) -> Dict[str, List[JsonDict]]:
@@ -249,9 +245,7 @@ class PushRulesWorkerStore(
         return results
 
     @cachedList(
-        cached_method_name="get_push_rules_enabled_for_user",
-        list_name="user_ids",
-        num_args=1,
+        cached_method_name="get_push_rules_enabled_for_user", list_name="user_ids"
     )
     async def bulk_get_push_rules_enabled(
         self, user_ids: Collection[str]
