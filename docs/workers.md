@@ -191,7 +191,6 @@ information.
     ^/_matrix/federation/v1/event_auth/
     ^/_matrix/federation/v1/exchange_third_party_invite/
     ^/_matrix/federation/v1/user/devices/
-    ^/_matrix/federation/v1/get_groups_publicised$
     ^/_matrix/key/v2/query
     ^/_matrix/federation/v1/hierarchy/
 
@@ -213,9 +212,6 @@ information.
     ^/_matrix/client/(r0|v3|unstable)/devices$
     ^/_matrix/client/versions$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/voip/turnServer$
-    ^/_matrix/client/(r0|v3|unstable)/joined_groups$
-    ^/_matrix/client/(r0|v3|unstable)/publicised_groups$
-    ^/_matrix/client/(r0|v3|unstable)/publicised_groups/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
@@ -255,9 +251,7 @@ information.
 
 Additionally, the following REST endpoints can be handled for GET requests:
 
-    ^/_matrix/federation/v1/groups/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/pushrules/
-    ^/_matrix/client/(r0|v3|unstable)/groups/
 
 Pagination requests can also be handled, but all requests for a given
 room must be routed to the same instance. Additionally, care must be taken to

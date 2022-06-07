@@ -404,7 +404,6 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         appservice = ApplicationService(
             "abcd",
-            self.hs.config.server.server_name,
             id="1234",
             namespaces={
                 "users": [{"regex": "@_appservice.*:sender", "exclusive": True}]
@@ -433,7 +432,6 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         appservice = ApplicationService(
             "abcd",
-            self.hs.config.server.server_name,
             id="1234",
             namespaces={
                 "users": [{"regex": "@_appservice.*:sender", "exclusive": True}]
