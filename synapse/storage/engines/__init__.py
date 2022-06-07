@@ -14,17 +14,19 @@
 from typing import Any, Mapping
 
 from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
-from .postgres import PostgresEngine
-from .sqlite import Sqlite3Engine
 
 
 def create_engine(database_config: Mapping[str, Any]) -> BaseDatabaseEngine:
     name = database_config["name"]
 
     if name == "sqlite3":
+        from .sqlite import Sqlite3Engine
+
         return Sqlite3Engine(database_config)
 
     if name == "psycopg2":
+        from .postgres import PostgresEngine
+
         return PostgresEngine(database_config)
 
     raise RuntimeError("Unsupported database engine '%s'" % (name,))
