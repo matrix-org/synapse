@@ -1,7 +1,7 @@
 [run]
 branch = True
 parallel = True
-include=$TOP/synapse/*
+source = synapse/
 data_file = $TOP/.coverage
 relative_files = True
 
