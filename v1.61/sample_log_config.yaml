@@ -1,0 +1,77 @@
+# Log configuration for Synapse.
+#
+# This is a YAML file containing a standard Python logging configuration
+# dictionary. See [1] for details on the valid settings.
+#
+# Synapse also supports structured logging for machine readable logs which can
+# be ingested by ELK stacks. See [2] for details.
+#
+# [1]: https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
+# [2]: https://matrix-org.github.io/synapse/latest/structured_logging.html
+
+version: 1
+
+formatters:
+    precise:
+        format: '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s - %(message)s'
+
+handlers:
+    file:
+        class: logging.handlers.TimedRotatingFileHandler
+        formatter: precise
+        filename: /var/log/matrix-synapse/homeserver.log
+        when: midnight
+        backupCount: 3  # Does not include the current log file.
+        encoding: utf8
+
+    # Default to buffering writes to log file for efficiency.
+    # WARNING/ERROR logs will still be flushed immediately, but there will be a
+    # delay (of up to `period` seconds, or until the buffer is full with
+    # `capacity` messages) before INFO/DEBUG logs get written.
+    buffer:
+        class: synapse.logging.handlers.PeriodicallyFlushingMemoryHandler
+        target: file
+
+        # The capacity is the maximum number of log lines that are buffered
+        # before being written to disk. Increasing this will lead to better
+        # performance, at the expensive of it taking longer for log lines to
+        # be written to disk.
+        # This parameter is required.
+        capacity: 10
+
+        # Logs with a level at or above the flush level will cause the buffer to
+        # be flushed immediately.
+        # Default value: 40 (ERROR)
+        # Other values: 50 (CRITICAL), 30 (WARNING), 20 (INFO), 10 (DEBUG)
+        flushLevel: 30  # Flush immediately for WARNING logs and higher
+
+        # The period of time, in seconds, between forced flushes.
+        # Messages will not be delayed for longer than this time.
+        # Default value: 5 seconds
+        period: 5
+
+    # A handler that writes logs to stderr. Unused by default, but can be used
+    # instead of "buffer" and "file" in the logger handlers.
+    console:
+        class: logging.StreamHandler
+        formatter: precise
+
+loggers:
+    synapse.storage.SQL:
+        # beware: increasing this to DEBUG will make synapse log sensitive
+        # information such as access tokens.
+        level: INFO
+
+root:
+    level: INFO
+
+    # Write logs to the `buffer` handler, which will buffer them together in memory,
+    # then write them to a file.
+    #
+    # Replace "buffer" with "console" to log to stderr instead. (Note that you'll
+    # also need to update the configuration for the `twisted` logger above, in
+    # this case.)
+    #
+    handlers: [buffer]
+
+disable_existing_loggers: false
