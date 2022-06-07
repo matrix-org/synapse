@@ -327,7 +327,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         if include_protected_media is False:
             # Do not include media that has been protected from quarantine
             sql += """
-                AND safe_from_quarantine = 0
+                AND safe_from_quarantine = false
             """
 
         def _get_local_media_ids_txn(txn: LoggingTransaction) -> List[str]:
