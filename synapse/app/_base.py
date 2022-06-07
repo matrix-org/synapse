@@ -37,7 +37,6 @@ from typing import (
 )
 
 from cryptography.utils import CryptographyDeprecationWarning
-from matrix_common.versionstring import get_distribution_version_string
 from typing_extensions import ParamSpec
 
 import twisted
@@ -68,6 +67,7 @@ from synapse.metrics import install_gc_manager, register_threadpool
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.metrics.jemalloc import setup_jemalloc_stats
 from synapse.types import ISynapseReactor
+from synapse.util import SYNAPSE_VERSION
 from synapse.util.caches.lrucache import setup_expire_lru_cache_entries
 from synapse.util.daemonize import daemonize_process
 from synapse.util.gai_resolver import GAIResolver
@@ -540,7 +540,7 @@ def setup_sentry(hs: "HomeServer") -> None:
 
     sentry_sdk.init(
         dsn=hs.config.metrics.sentry_dsn,
-        release=get_distribution_version_string("matrix-synapse"),
+        release=SYNAPSE_VERSION,
     )
 
     # We set some default tags that give some context to this instance

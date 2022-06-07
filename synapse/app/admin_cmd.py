@@ -19,8 +19,6 @@ import sys
 import tempfile
 from typing import List, Optional
 
-from matrix_common.versionstring import get_distribution_version_string
-
 from twisted.internet import defer, task
 
 import synapse
@@ -43,6 +41,7 @@ from synapse.replication.slave.storage.registration import SlavedRegistrationSto
 from synapse.server import HomeServer
 from synapse.storage.databases.main.room import RoomWorkerStore
 from synapse.types import StateMap
+from synapse.util import SYNAPSE_VERSION
 from synapse.util.logcontext import LoggingContext
 
 logger = logging.getLogger("synapse.app.admin_cmd")
@@ -220,7 +219,7 @@ def start(config_options: List[str]) -> None:
     ss = AdminCmdServer(
         config.server.server_name,
         config=config,
-        version_string="Synapse/" + get_distribution_version_string("matrix-synapse"),
+        version_string=f"Synapse/{SYNAPSE_VERSION}",
     )
 
     setup_logging(ss, config, use_worker_options=True)
