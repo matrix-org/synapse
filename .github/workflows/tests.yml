@@ -244,6 +244,13 @@ jobs:
           path: |
             /logs/results.tap
             /logs/**/*.log*
+      - name: Upload coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage
+          path: /coverage/.coverage.*
+          retention-days: 1
+
 
   export-data:
     if: ${{ !failure() && !cancelled() }} # Allow previous steps to be skipped, but not fail
