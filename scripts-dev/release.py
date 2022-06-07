@@ -55,9 +55,12 @@ def run_until_successful(
 def cli() -> None:
     """An interactive script to walk through the parts of creating a release.
 
-    Requires the dev dependencies be installed, which can be done via:
+    Requirements:
+      - The dev dependencies be installed, which can be done via:
 
-        pip install -e .[dev]
+            pip install -e .[dev]
+
+      - A checkout of the sytest repository at ../sytest
 
     Then to use:
 
@@ -90,9 +93,11 @@ def prepare() -> None:
 
     # Make sure we're in a git repo.
     repo = get_repo_and_check_clean_checkout()
+    sytest_repo = get_repo_and_check_clean_checkout("../sytest", "sytest")
 
     click.secho("Updating git repo...")
     repo.remote().fetch()
+    sytest_repo.remote().fetch()
 
     # Get the current version and AST from root Synapse module.
     current_version = get_package_version()
@@ -469,14 +474,18 @@ def get_release_branch_name(version_number: version.Version) -> str:
     return f"release-v{version_number.major}.{version_number.minor}"
 
 
-def get_repo_and_check_clean_checkout() -> git.Repo:
+def get_repo_and_check_clean_checkout(
+    path: str = ".", name: str = "synapse"
+) -> git.Repo:
     """Get the project repo and check it's not got any uncommitted changes."""
     try:
-        repo = git.Repo()
+        repo = git.Repo(path=path)
     except git.InvalidGitRepositoryError:
-        raise click.ClickException("Not in Synapse repo.")
+        raise click.ClickException(
+            f"{path} is not a git repository (expecting a {name} repository)."
+        )
     if repo.is_dirty():
-        raise click.ClickException("Uncommitted changes exist.")
+        raise click.ClickException(f"Uncommitted changes exist in {path}.")
     return repo
 
 
