@@ -993,6 +993,7 @@ class MediaRepository:
             keep_profiles: Switch to delete also files that are still used in image data
                 (e.g user profile, room avatar). If false these files will be deleted.
             delete_quarantined_media: If True, media marked as quarantined will be deleted.
+            delete_protected_media: If True, media marked as protected will be deleted.
 
         Returns:
             A tuple of (list of deleted media IDs, total deleted media IDs).
