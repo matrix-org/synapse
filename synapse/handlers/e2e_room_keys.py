@@ -273,8 +273,9 @@ class E2eRoomKeysHandler:
                     user_id, version, None, version_etag
                 )
 
-            count = await self.store.count_e2e_room_keys(user_id, version)
-            return {"etag": str(version_etag), "count": count}
+            # Beeper: Clients don't care, save some time
+            # count = await self.store.count_e2e_room_keys(user_id, version)
+            return {"etag": str(version_etag), "count": 0 }
 
     @staticmethod
     def _should_replace_room_key(
