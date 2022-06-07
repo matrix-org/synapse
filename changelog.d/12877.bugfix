@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse 1.54 which could sometimes cause exceptions when handling federated traffic.
