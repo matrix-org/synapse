@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.58 where Synapse would not report full version information when installed from a git checkout. (This is a best-effort affair and not guaranteed to be stable.)
