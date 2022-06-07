@@ -92,11 +92,11 @@ def prepare() -> None:
     """
 
     # Make sure we're in a git repo.
-    repo = get_repo_and_check_clean_checkout()
+    synapse_repo = get_repo_and_check_clean_checkout()
     sytest_repo = get_repo_and_check_clean_checkout("../sytest", "sytest")
 
     click.secho("Updating git repo...")
-    repo.remote().fetch()
+    synapse_repo.remote().fetch()
     sytest_repo.remote().fetch()
 
     # Get the current version and AST from root Synapse module.
@@ -171,12 +171,12 @@ def prepare() -> None:
     assert not parsed_new_version.is_postrelease
 
     release_branch_name = get_release_branch_name(parsed_new_version)
-    release_branch = find_ref(repo, release_branch_name)
+    release_branch = find_ref(synapse_repo, release_branch_name)
     if release_branch:
         if release_branch.is_remote():
             # If the release branch only exists on the remote we check it out
             # locally.
-            repo.git.checkout(release_branch_name)
+            synapse_repo.git.checkout(release_branch_name)
     else:
         # If a branch doesn't exist we create one. We ask which one branch it
         # should be based off, defaulting to sensible values depending on the
@@ -192,25 +192,25 @@ def prepare() -> None:
             "Which branch should the release be based on?", default=default
         )
 
-        base_branch = find_ref(repo, branch_name)
+        base_branch = find_ref(synapse_repo, branch_name)
         if not base_branch:
             print(f"Could not find base branch {branch_name}!")
             click.get_current_context().abort()
 
         # Check out the base branch and ensure it's up to date
-        repo.head.set_reference(base_branch, "check out the base branch")
-        repo.head.reset(index=True, working_tree=True)
+        synapse_repo.head.set_reference(base_branch, "check out the base branch")
+        synapse_repo.head.reset(index=True, working_tree=True)
         if not base_branch.is_remote():
-            update_branch(repo)
+            update_branch(synapse_repo)
 
         # Create the new release branch
         # Type ignore will no longer be needed after GitPython 3.1.28.
         # See https://github.com/gitpython-developers/GitPython/pull/1419
-        repo.create_head(release_branch_name, commit=base_branch)  # type: ignore[arg-type]
+        synapse_repo.create_head(release_branch_name, commit=base_branch)  # type: ignore[arg-type]
 
     # Switch to the release branch and ensure it's up to date.
-    repo.git.checkout(release_branch_name)
-    update_branch(repo)
+    synapse_repo.git.checkout(release_branch_name)
+    update_branch(synapse_repo)
 
     # Update the version specified in pyproject.toml.
     subprocess.check_output(["poetry", "version", new_version])
@@ -235,15 +235,15 @@ def prepare() -> None:
     run_until_successful('dch -M -r -D stable ""', shell=True)
 
     # Show the user the changes and ask if they want to edit the change log.
-    repo.git.add("-u")
+    synapse_repo.git.add("-u")
     subprocess.run("git diff --cached", shell=True)
 
     if click.confirm("Edit changelog?", default=False):
         click.edit(filename="CHANGES.md")
 
     # Commit the changes.
-    repo.git.add("-u")
-    repo.git.commit("-m", new_version)
+    synapse_repo.git.add("-u")
+    synapse_repo.git.commit("-m", new_version)
 
     # We give the option to bail here in case the user wants to make sure things
     # are OK before pushing.
@@ -251,17 +251,21 @@ def prepare() -> None:
         print("")
         print("Run when ready to push:")
         print("")
-        print(f"\tgit push -u {repo.remote().name} {repo.active_branch.name}")
+        print(
+            f"\tgit push -u {synapse_repo.remote().name} {synapse_repo.active_branch.name}"
+        )
         print("")
         sys.exit(0)
 
     # Otherwise, push and open the changelog in the browser.
-    repo.git.push("-u", repo.remote().name, repo.active_branch.name)
+    synapse_repo.git.push(
+        "-u", synapse_repo.remote().name, synapse_repo.active_branch.name
+    )
 
     print("Opening the changelog in your browser...")
     print("Please ask others to give it a check.")
     click.launch(
-        f"https://github.com/matrix-org/synapse/blob/{repo.active_branch.name}/CHANGES.md"
+        f"https://github.com/matrix-org/synapse/blob/{synapse_repo.active_branch.name}/CHANGES.md"
     )
 
 
