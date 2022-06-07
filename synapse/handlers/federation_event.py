@@ -30,6 +30,7 @@ from typing import (
 
 from prometheus_client import Counter
 
+from synapse import event_auth
 from synapse.api.constants import (
     EventContentFields,
     EventTypes,
@@ -56,7 +57,6 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.logging.context import nested_logging_context, run_in_background
-from synapse.logging.utils import log_function
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (
@@ -64,6 +64,7 @@ from synapse.replication.http.federation import (
 )
 from synapse.state import StateResolutionStore
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
+from synapse.storage.state import StateFilter
 from synapse.types import (
     PersistedEventPosition,
     RoomStreamToken,
@@ -96,15 +97,15 @@ class FederationEventHandler:
     """
 
     def __init__(self, hs: "HomeServer"):
-        self._store = hs.get_datastore()
-        self._storage = hs.get_storage()
-        self._state_store = self._storage.state
+        self._store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
+        self._state_storage_controller = self._storage_controllers.state
 
         self._state_handler = hs.get_state_handler()
         self._event_creation_handler = hs.get_event_creation_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
         self._message_handler = hs.get_message_handler()
-        self._action_generator = hs.get_action_generator()
+        self._bulk_push_rule_evaluator = hs.get_bulk_push_rule_evaluator()
         self._state_resolution_handler = hs.get_state_resolution_handler()
         # avoid a circular dependency by deferring execution here
         self._get_room_member_handler = hs.get_room_member_handler
@@ -225,7 +226,7 @@ class FederationEventHandler:
                     len(missing_prevs),
                     shortstr(missing_prevs),
                 )
-                with (await self._room_pdu_linearizer.queue(pdu.room_id)):
+                async with self._room_pdu_linearizer.queue(pdu.room_id):
                     logger.info(
                         "Acquired room lock to fetch %d missing prev_events",
                         len(missing_prevs),
@@ -273,9 +274,8 @@ class FederationEventHandler:
                     affected=pdu.event_id,
                 )
 
-        await self._process_received_pdu(origin, pdu, state=None)
+        await self._process_received_pdu(origin, pdu, state_ids=None)
 
-    @log_function
     async def on_send_membership_event(
         self, origin: str, event: EventBase
     ) -> Tuple[EventBase, EventContext]:
@@ -399,6 +399,7 @@ class FederationEventHandler:
         state: List[EventBase],
         event: EventBase,
         room_version: RoomVersion,
+        partial_state: bool,
     ) -> int:
         """Persists the events returned by a send_join
 
@@ -414,6 +415,7 @@ class FederationEventHandler:
             event
             room_version: The room version we expect this room to have, and
                 will raise if it doesn't match the version in the create event.
+            partial_state: True if the state omits non-critical membership events
 
         Returns:
             The stream ID after which all events have been persisted.
@@ -421,13 +423,8 @@ class FederationEventHandler:
         Raises:
             SynapseError if the response is in some way invalid.
         """
-        for e in itertools.chain(auth_events, state):
-            e.internal_metadata.outlier = True
-
-        event_map = {e.event_id: e for e in itertools.chain(auth_events, state)}
-
         create_event = None
-        for e in auth_events:
+        for e in state:
             if (e.type, e.state_key) == (EventTypes.Create, ""):
                 create_event = e
                 break
@@ -444,11 +441,6 @@ class FederationEventHandler:
         if room_version.identifier != room_version_id:
             raise SynapseError(400, "Room version mismatch")
 
-        # filter out any events we have already seen
-        seen_remotes = await self._store.have_seen_events(room_id, event_map.keys())
-        for s in seen_remotes:
-            event_map.pop(s, None)
-
         # persist the auth chain and state events.
         #
         # any invalid events here will be marked as rejected, and we'll carry on.
@@ -460,22 +452,96 @@ class FederationEventHandler:
         # signatures right now doesn't mean that we will *never* be able to, so it
         # is premature to reject them.
         #
-        await self._auth_and_persist_outliers(room_id, event_map.values())
+        await self._auth_and_persist_outliers(
+            room_id, itertools.chain(auth_events, state)
+        )
 
         # and now persist the join event itself.
-        logger.info("Peristing join-via-remote %s", event)
+        logger.info(
+            "Peristing join-via-remote %s (partial_state: %s)", event, partial_state
+        )
         with nested_logging_context(suffix=event.event_id):
             context = await self._state_handler.compute_event_context(
-                event, old_state=state
+                event,
+                state_ids_before_event={
+                    (e.type, e.state_key): e.event_id for e in state
+                },
+                partial_state=partial_state,
             )
 
             context = await self._check_event_auth(origin, event, context)
             if context.rejected:
                 raise SynapseError(400, "Join event was rejected")
 
-            return await self.persist_events_and_notify(room_id, [(event, context)])
+            # the remote server is responsible for sending our join event to the rest
+            # of the federation. Indeed, attempting to do so will result in problems
+            # when we try to look up the state before the join (to get the server list)
+            # and discover that we do not have it.
+            event.internal_metadata.proactively_send = False
 
-    @log_function
+            stream_id_after_persist = await self.persist_events_and_notify(
+                room_id, [(event, context)]
+            )
+
+            # If we're joining the room again, check if there is new marker
+            # state indicating that there is new history imported somewhere in
+            # the DAG. Multiple markers can exist in the current state with
+            # unique state_keys.
+            #
+            # Do this after the state from the remote join was persisted (via
+            # `persist_events_and_notify`). Otherwise we can run into a
+            # situation where the create event doesn't exist yet in the
+            # `current_state_events`
+            for e in state:
+                await self._handle_marker_event(origin, e)
+
+            return stream_id_after_persist
+
+    async def update_state_for_partial_state_event(
+        self, destination: str, event: EventBase
+    ) -> None:
+        """Recalculate the state at an event as part of a de-partial-stating process
+
+        Args:
+            destination: server to request full state from
+            event: partial-state event to be de-partial-stated
+
+        Raises:
+            FederationError if we fail to request state from the remote server.
+        """
+        logger.info("Updating state for %s", event.event_id)
+        with nested_logging_context(suffix=event.event_id):
+            # if we have all the event's prev_events, then we can work out the
+            # state based on their states. Otherwise, we request it from the destination
+            # server.
+            #
+            # This is the same operation as we do when we receive a regular event
+            # over federation.
+            state_ids = await self._resolve_state_at_missing_prevs(destination, event)
+
+            # build a new state group for it if need be
+            context = await self._state_handler.compute_event_context(
+                event,
+                state_ids_before_event=state_ids,
+            )
+            if context.partial_state:
+                # this can happen if some or all of the event's prev_events still have
+                # partial state - ie, an event has an earlier stream_ordering than one
+                # or more of its prev_events, so we de-partial-state it before its
+                # prev_events.
+                #
+                # TODO(faster_joins): we probably need to be more intelligent, and
+                #    exclude partial-state prev_events from consideration
+                logger.warning(
+                    "%s still has partial state: can't de-partial-state it yet",
+                    event.event_id,
+                )
+                return
+            await self._store.update_state_for_partial_state_event(event, context)
+            self._state_storage_controller.notify_event_un_partial_stated(
+                event.event_id
+            )
+
     async def backfill(
         self, dest: str, room_id: str, limit: int, extremities: Collection[str]
     ) -> None:
@@ -514,7 +580,11 @@ class FederationEventHandler:
                     f"room {ev.room_id}, when we were backfilling in {room_id}"
                 )
 
-        await self._process_pulled_events(dest, events, backfilled=True)
+        await self._process_pulled_events(
+            dest,
+            events,
+            backfilled=True,
+        )
 
     async def _get_missing_events_for_pdu(
         self, origin: str, pdu: EventBase, prevs: Set[str], min_depth: int
@@ -632,11 +702,24 @@ class FederationEventHandler:
             backfilled: True if this is part of a historical batch of events (inhibits
                 notification to clients, and validation of device keys.)
         """
+        logger.debug(
+            "processing pulled backfilled=%s events=%s",
+            backfilled,
+            [
+                "event_id=%s,depth=%d,body=%s,prevs=%s\n"
+                % (
+                    event.event_id,
+                    event.depth,
+                    event.content.get("body", event.type),
+                    event.prev_event_ids(),
+                )
+                for event in events
+            ],
+        )
 
         # We want to sort these by depth so we process them and
         # tell clients about them in order.
         sorted_events = sorted(events, key=lambda x: x.depth)
-
         for ev in sorted_events:
             with nested_logging_context(ev.event_id):
                 await self._process_pulled_event(origin, ev, backfilled=backfilled)
@@ -666,7 +749,9 @@ class FederationEventHandler:
         logger.info("Processing pulled event %s", event)
 
         # these should not be outliers.
-        assert not event.internal_metadata.is_outlier()
+        assert (
+            not event.internal_metadata.is_outlier()
+        ), "pulled event unexpectedly flagged as outlier"
 
         event_id = event.event_id
 
@@ -689,9 +774,12 @@ class FederationEventHandler:
             return
 
         try:
-            state = await self._resolve_state_at_missing_prevs(origin, event)
+            state_ids = await self._resolve_state_at_missing_prevs(origin, event)
+            # TODO(faster_joins): make sure that _resolve_state_at_missing_prevs does
+            #   not return partial state
+
             await self._process_received_pdu(
-                origin, event, state=state, backfilled=backfilled
+                origin, event, state_ids=state_ids, backfilled=backfilled
             )
         except FederationError as e:
             if e.code == 403:
@@ -701,7 +789,7 @@ class FederationEventHandler:
 
     async def _resolve_state_at_missing_prevs(
         self, dest: str, event: EventBase
-    ) -> Optional[Iterable[EventBase]]:
+    ) -> Optional[StateMap[str]]:
         """Calculate the state at an event with missing prev_events.
 
         This is used when we have pulled a batch of events from a remote server, and
@@ -728,8 +816,12 @@ class FederationEventHandler:
             event: an event to check for missing prevs.
 
         Returns:
-            if we already had all the prev events, `None`. Otherwise, returns a list of
-            the events in the state at `event`.
+            if we already had all the prev events, `None`. Otherwise, returns
+            the event ids of the state at `event`.
+
+        Raises:
+            FederationError if we fail to get the state from the remote server after any
+                missing `prev_event`s.
         """
         room_id = event.room_id
         event_id = event.event_id
@@ -749,10 +841,12 @@ class FederationEventHandler:
         )
         # Calculate the state after each of the previous events, and
         # resolve them to find the correct state at the current event.
-        event_map = {event_id: event}
+
         try:
             # Get the state of the events we know about
-            ours = await self._state_store.get_state_groups_ids(room_id, seen)
+            ours = await self._state_storage_controller.get_state_groups_ids(
+                room_id, seen
+            )
 
             # state_maps is a list of mappings from (type, state_key) to event_id
             state_maps: List[StateMap[str]] = list(ours.values())
@@ -769,40 +863,23 @@ class FederationEventHandler:
                     # note that if any of the missing prevs share missing state or
                     # auth events, the requests to fetch those events are deduped
                     # by the get_pdu_cache in federation_client.
-                    remote_state = await self._get_state_after_missing_prev_event(
-                        dest, room_id, p
+                    remote_state_map = (
+                        await self._get_state_ids_after_missing_prev_event(
+                            dest, room_id, p
+                        )
                     )
 
-                    remote_state_map = {
-                        (x.type, x.state_key): x.event_id for x in remote_state
-                    }
                     state_maps.append(remote_state_map)
-
-                    for x in remote_state:
-                        event_map[x.event_id] = x
 
             room_version = await self._store.get_room_version_id(room_id)
             state_map = await self._state_resolution_handler.resolve_events_with_store(
                 room_id,
                 room_version,
                 state_maps,
-                event_map,
+                event_map={event_id: event},
                 state_res_store=StateResolutionStore(self._store),
             )
 
-            # We need to give _process_received_pdu the actual state events
-            # rather than event ids, so generate that now.
-
-            # First though we need to fetch all the events that are in
-            # state_map, so we can build up the state below.
-            evs = await self._store.get_events(
-                list(state_map.values()),
-                get_prev_content=False,
-                redact_behaviour=EventRedactBehaviour.AS_IS,
-            )
-            event_map.update(evs)
-
-            state = [event_map[e] for e in state_map.values()]
         except Exception:
             logger.warning(
                 "Error attempting to resolve state at missing prev_events",
@@ -814,14 +891,14 @@ class FederationEventHandler:
                 "We can't get valid state history.",
                 affected=event_id,
             )
-        return state
+        return state_map
 
-    async def _get_state_after_missing_prev_event(
+    async def _get_state_ids_after_missing_prev_event(
         self,
         destination: str,
         room_id: str,
         event_id: str,
-    ) -> List[EventBase]:
+    ) -> StateMap[str]:
         """Requests all of the room state at a given event from a remote homeserver.
 
         Args:
@@ -830,7 +907,11 @@ class FederationEventHandler:
             event_id: The id of the event we want the state at.
 
         Returns:
-            A list of events in the state, including the event itself
+            The event ids of the state *after* the given event.
+
+        Raises:
+            InvalidResponseError: if the remote homeserver's response contains fields
+                of the wrong type.
         """
         (
             state_event_ids,
@@ -845,19 +926,17 @@ class FederationEventHandler:
             len(auth_event_ids),
         )
 
-        # start by just trying to fetch the events from the store
+        # Start by checking events we already have in the DB
         desired_events = set(state_event_ids)
         desired_events.add(event_id)
         logger.debug("Fetching %i events from cache/store", len(desired_events))
-        fetched_events = await self._store.get_events(
-            desired_events, allow_rejected=True
-        )
+        have_events = await self._store.have_seen_events(room_id, desired_events)
 
-        missing_desired_events = desired_events - fetched_events.keys()
+        missing_desired_events = desired_events - have_events
         logger.debug(
             "We are missing %i events (got %i)",
             len(missing_desired_events),
-            len(fetched_events),
+            len(have_events),
         )
 
         # We probably won't need most of the auth events, so let's just check which
@@ -868,59 +947,77 @@ class FederationEventHandler:
         #   already have a bunch of the state events. It would be nice if the
         #   federation api gave us a way of finding out which we actually need.
 
-        missing_auth_events = set(auth_event_ids) - fetched_events.keys()
+        missing_auth_events = set(auth_event_ids) - have_events
         missing_auth_events.difference_update(
             await self._store.have_seen_events(room_id, missing_auth_events)
         )
         logger.debug("We are also missing %i auth events", len(missing_auth_events))
 
         missing_events = missing_desired_events | missing_auth_events
-        logger.debug("Fetching %i events from remote", len(missing_events))
-        await self._get_events_and_persist(
-            destination=destination, room_id=room_id, event_ids=missing_events
-        )
 
-        # we need to make sure we re-load from the database to get the rejected
-        # state correct.
-        fetched_events.update(
-            await self._store.get_events(missing_desired_events, allow_rejected=True)
-        )
-
-        # check for events which were in the wrong room.
+        # Making an individual request for each of 1000s of events has a lot of
+        # overhead. On the other hand, we don't really want to fetch all of the events
+        # if we already have most of them.
         #
-        # this can happen if a remote server claims that the state or
-        # auth_events at an event in room A are actually events in room B
-
-        bad_events = [
-            (event_id, event.room_id)
-            for event_id, event in fetched_events.items()
-            if event.room_id != room_id
-        ]
-
-        for bad_event_id, bad_room_id in bad_events:
-            # This is a bogus situation, but since we may only discover it a long time
-            # after it happened, we try our best to carry on, by just omitting the
-            # bad events from the returned state set.
-            logger.warning(
-                "Remote server %s claims event %s in room %s is an auth/state "
-                "event in room %s",
-                destination,
-                bad_event_id,
-                bad_room_id,
-                room_id,
+        # As an arbitrary heuristic, if we are missing more than 10% of the events, then
+        # we fetch the whole state.
+        #
+        # TODO: might it be better to have an API which lets us do an aggregate event
+        #   request
+        if (len(missing_events) * 10) >= len(auth_event_ids) + len(state_event_ids):
+            logger.debug("Requesting complete state from remote")
+            await self._get_state_and_persist(destination, room_id, event_id)
+        else:
+            logger.debug("Fetching %i events from remote", len(missing_events))
+            await self._get_events_and_persist(
+                destination=destination, room_id=room_id, event_ids=missing_events
             )
 
-            del fetched_events[bad_event_id]
+        # We now need to fill out the state map, which involves fetching the
+        # type and state key for each event ID in the state.
+        state_map = {}
+
+        event_metadata = await self._store.get_metadata_for_events(state_event_ids)
+        for state_event_id, metadata in event_metadata.items():
+            if metadata.room_id != room_id:
+                # This is a bogus situation, but since we may only discover it a long time
+                # after it happened, we try our best to carry on, by just omitting the
+                # bad events from the returned state set.
+                #
+                # This can happen if a remote server claims that the state or
+                # auth_events at an event in room A are actually events in room B
+                logger.warning(
+                    "Remote server %s claims event %s in room %s is an auth/state "
+                    "event in room %s",
+                    destination,
+                    state_event_id,
+                    metadata.room_id,
+                    room_id,
+                )
+                continue
+
+            if metadata.state_key is None:
+                logger.warning(
+                    "Remote server gave us non-state event in state: %s", state_event_id
+                )
+                continue
+
+            state_map[(metadata.event_type, metadata.state_key)] = state_event_id
 
         # if we couldn't get the prev event in question, that's a problem.
-        remote_event = fetched_events.get(event_id)
+        remote_event = await self._store.get_event(
+            event_id,
+            allow_none=True,
+            allow_rejected=True,
+            redact_behaviour=EventRedactBehaviour.as_is,
+        )
         if not remote_event:
             raise Exception("Unable to get missing prev_event %s" % (event_id,))
 
         # missing state at that event is a warning, not a blocker
         # XXX: this doesn't sound right? it means that we'll end up with incomplete
         #   state.
-        failed_to_fetch = desired_events - fetched_events.keys()
+        failed_to_fetch = desired_events - event_metadata.keys()
         if failed_to_fetch:
             logger.warning(
                 "Failed to fetch missing state events for %s %s",
@@ -928,20 +1025,39 @@ class FederationEventHandler:
                 failed_to_fetch,
             )
 
-        remote_state = [
-            fetched_events[e_id] for e_id in state_event_ids if e_id in fetched_events
-        ]
-
         if remote_event.is_state() and remote_event.rejected_reason is None:
-            remote_state.append(remote_event)
+            state_map[
+                (remote_event.type, remote_event.state_key)
+            ] = remote_event.event_id
 
-        return remote_state
+        return state_map
+
+    async def _get_state_and_persist(
+        self, destination: str, room_id: str, event_id: str
+    ) -> None:
+        """Get the complete room state at a given event, and persist any new events
+        as outliers"""
+        room_version = await self._store.get_room_version(room_id)
+        auth_events, state_events = await self._federation_client.get_room_state(
+            destination, room_id, event_id=event_id, room_version=room_version
+        )
+        logger.info("/state returned %i events", len(auth_events) + len(state_events))
+
+        await self._auth_and_persist_outliers(
+            room_id, itertools.chain(auth_events, state_events)
+        )
+
+        # we also need the event itself.
+        if not await self._store.have_seen_event(room_id, event_id):
+            await self._get_events_and_persist(
+                destination=destination, room_id=room_id, event_ids=(event_id,)
+            )
 
     async def _process_received_pdu(
         self,
         origin: str,
         event: EventBase,
-        state: Optional[Iterable[EventBase]],
+        state_ids: Optional[StateMap[str]],
         backfilled: bool = False,
     ) -> None:
         """Called when we have a new non-outlier event.
@@ -963,7 +1079,7 @@ class FederationEventHandler:
 
             event: event to be persisted
 
-            state: Normally None, but if we are handling a gap in the graph
+            state_ids: Normally None, but if we are handling a gap in the graph
                 (ie, we are missing one or more prev_events), the resolved state at the
                 event
 
@@ -975,7 +1091,8 @@ class FederationEventHandler:
 
         try:
             context = await self._state_handler.compute_event_context(
-                event, old_state=state
+                event,
+                state_ids_before_event=state_ids,
             )
             context = await self._check_event_auth(
                 origin,
@@ -992,9 +1109,11 @@ class FederationEventHandler:
             # For new (non-backfilled and non-outlier) events we check if the event
             # passes auth based on the current state. If it doesn't then we
             # "soft-fail" the event.
-            await self._check_for_soft_fail(event, state, origin=origin)
+            await self._check_for_soft_fail(event, state_ids, origin=origin)
 
         await self._run_push_actions_and_persist_event(event, context, backfilled)
+
+        await self._handle_marker_event(origin, event)
 
         if backfilled or context.rejected:
             return
@@ -1075,8 +1194,6 @@ class FederationEventHandler:
                     event.sender,
                 )
 
-        await self._handle_marker_event(origin, event)
-
     async def _resync_device(self, sender: str) -> None:
         """We have detected that the device list for the given user may be out
         of sync, so we try and resync them.
@@ -1129,6 +1246,14 @@ class FederationEventHandler:
 
         if insertion_event_id is None:
             # Nothing to retrieve then (invalid marker)
+            return
+
+        already_seen_insertion_event = await self._store.have_seen_event(
+            marker_event.room_id, insertion_event_id
+        )
+        if already_seen_insertion_event:
+            # No need to process a marker again if we have already seen the
+            # insertion event that it was pointing to
             return
 
         logger.debug(
@@ -1192,7 +1317,6 @@ class FederationEventHandler:
                         [destination],
                         event_id,
                         room_version,
-                        outlier=True,
                     )
                     if event is None:
                         logger.warning(
@@ -1221,9 +1345,10 @@ class FederationEventHandler:
         """Persist a batch of outlier events fetched from remote servers.
 
         We first sort the events to make sure that we process each event's auth_events
-        before the event itself, and then auth and persist them.
+        before the event itself.
 
-        Notifies about the events where appropriate.
+        We then mark the events as outliers, persist them to the database, and, where
+        appropriate (eg, an invite), awake the notifier.
 
         Params:
             room_id: the room that the events are meant to be in (though this has
@@ -1231,6 +1356,16 @@ class FederationEventHandler:
             events: the events that have been fetched
         """
         event_map = {event.event_id: event for event in events}
+
+        # filter out any events we have already seen. This might happen because
+        # the events were eagerly pushed to us (eg, during a room join), or because
+        # another thread has raced against us since we decided to request the event.
+        #
+        # This is just an optimisation, so it doesn't need to be watertight - the event
+        # persister does another round of deduplication.
+        seen_remotes = await self._store.have_seen_events(room_id, event_map.keys())
+        for s in seen_remotes:
+            event_map.pop(s, None)
 
         # XXX: it might be possible to kick this process off in parallel with fetching
         # the events.
@@ -1274,7 +1409,8 @@ class FederationEventHandler:
         Persists a batch of events where we have (theoretically) already persisted all
         of their auth events.
 
-        Notifies about the events where appropriate.
+        Marks the events as outliers, auths them, persists them to the database, and,
+        where appropriate (eg, an invite), awakes the notifier.
 
         Params:
             origin: where the events came from
@@ -1312,7 +1448,10 @@ class FederationEventHandler:
                         return None
                     auth.append(ae)
 
-                context = EventContext.for_outlier()
+                # we're not bothering about room state, so flag the event as an outlier.
+                event.internal_metadata.outlier = True
+
+                context = EventContext.for_outlier(self._storage_controllers)
                 try:
                     validate_event_for_room_version(room_version_obj, event)
                     check_auth_rules_for_event(room_version_obj, event, auth)
@@ -1323,7 +1462,14 @@ class FederationEventHandler:
             return event, context
 
         events_to_persist = (x for x in (prep(event) for event in fetched_events) if x)
-        await self.persist_events_and_notify(room_id, tuple(events_to_persist))
+        await self.persist_events_and_notify(
+            room_id,
+            tuple(events_to_persist),
+            # Mark these events backfilled as they're historic events that will
+            # eventually be backfilled. For example, missing events we fetch
+            # during backfill should be marked as backfilled as well.
+            backfilled=True,
+        )
 
     async def _check_event_auth(
         self,
@@ -1382,7 +1528,11 @@ class FederationEventHandler:
             return context
 
         # now check auth against what we think the auth events *should* be.
-        prev_state_ids = await context.get_prev_state_ids()
+        event_types = event_auth.auth_types_for_event(event.room_version, event)
+        prev_state_ids = await context.get_prev_state_ids(
+            StateFilter.from_types(event_types)
+        )
+
         auth_events_ids = self._event_auth_handler.compute_auth_events(
             event, prev_state_ids, for_verification=True
         )
@@ -1434,14 +1584,16 @@ class FederationEventHandler:
         if guest_access == GuestAccess.CAN_JOIN:
             return
 
-        current_state_map = await self._state_handler.get_current_state(event.room_id)
-        current_state = list(current_state_map.values())
-        await self._get_room_member_handler().kick_guest_users(current_state)
+        current_state = await self._storage_controllers.state.get_current_state(
+            event.room_id
+        )
+        current_state_list = list(current_state.values())
+        await self._get_room_member_handler().kick_guest_users(current_state_list)
 
     async def _check_for_soft_fail(
         self,
         event: EventBase,
-        state: Optional[Iterable[EventBase]],
+        state_ids: Optional[StateMap[str]],
         origin: str,
     ) -> None:
         """Checks if we should soft fail the event; if so, marks the event as
@@ -1449,7 +1601,7 @@ class FederationEventHandler:
 
         Args:
             event
-            state: The state at the event if we don't have all the event's prev events
+            state_ids: The state at the event if we don't have all the event's prev events
             origin: The host the event originates from.
         """
         extrem_ids_list = await self._store.get_latest_event_ids_in_room(event.room_id)
@@ -1464,8 +1616,11 @@ class FederationEventHandler:
         room_version = await self._store.get_room_version_id(event.room_id)
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
+        # The event types we want to pull from the "current" state.
+        auth_types = auth_types_for_event(room_version_obj, event)
+
         # Calculate the "current state".
-        if state is not None:
+        if state_ids is not None:
             # If we're explicitly given the state then we won't have all the
             # prev events, and so we have a gap in the graph. In this case
             # we want to be a little careful as we might have been down for
@@ -1478,20 +1633,25 @@ class FederationEventHandler:
             # given state at the event. This should correctly handle cases
             # like bans, especially with state res v2.
 
-            state_sets_d = await self._state_store.get_state_groups(
+            state_sets_d = await self._state_storage_controller.get_state_groups_ids(
                 event.room_id, extrem_ids
             )
-            state_sets: List[Iterable[EventBase]] = list(state_sets_d.values())
-            state_sets.append(state)
-            current_states = await self._state_handler.resolve_events(
-                room_version, state_sets, event
+            state_sets: List[StateMap[str]] = list(state_sets_d.values())
+            state_sets.append(state_ids)
+            current_state_ids = (
+                await self._state_resolution_handler.resolve_events_with_store(
+                    event.room_id,
+                    room_version,
+                    state_sets,
+                    event_map=None,
+                    state_res_store=StateResolutionStore(self._store),
+                )
             )
-            current_state_ids: StateMap[str] = {
-                k: e.event_id for k, e in current_states.items()
-            }
         else:
-            current_state_ids = await self._state_handler.get_current_state_ids(
-                event.room_id, latest_event_ids=extrem_ids
+            current_state_ids = (
+                await self._state_storage_controller.get_current_state_ids(
+                    event.room_id, StateFilter.from_types(auth_types)
+                )
             )
 
         logger.debug(
@@ -1501,7 +1661,6 @@ class FederationEventHandler:
         )
 
         # Now check if event pass auth against said current state
-        auth_types = auth_types_for_event(room_version_obj, event)
         current_state_ids_list = [
             e for k, e in current_state_ids.items() if k in auth_types
         ]
@@ -1693,31 +1852,22 @@ class FederationEventHandler:
             event_id: the event for which we are lacking auth events
         """
         try:
-            remote_event_map = {
-                e.event_id: e
-                for e in await self._federation_client.get_event_auth(
-                    destination, room_id, event_id
-                )
-            }
+            remote_events = await self._federation_client.get_event_auth(
+                destination, room_id, event_id
+            )
+
         except RequestSendFailed as e1:
             # The other side isn't around or doesn't implement the
             # endpoint, so lets just bail out.
             logger.info("Failed to get event auth from remote: %s", e1)
             return
 
-        logger.info("/event_auth returned %i events", len(remote_event_map))
+        logger.info("/event_auth returned %i events", len(remote_events))
 
         # `event` may be returned, but we should not yet process it.
-        remote_event_map.pop(event_id, None)
+        remote_auth_events = (e for e in remote_events if e.event_id != event_id)
 
-        # nor should we reprocess any events we have already seen.
-        seen_remotes = await self._store.have_seen_events(
-            room_id, remote_event_map.keys()
-        )
-        for s in seen_remotes:
-            remote_event_map.pop(s, None)
-
-        await self._auth_and_persist_outliers(room_id, remote_event_map.values())
+        await self._auth_and_persist_outliers(room_id, remote_auth_events)
 
     async def _update_context_for_auth_events(
         self, event: EventBase, context: EventContext, auth_events: StateMap[EventBase]
@@ -1756,7 +1906,7 @@ class FederationEventHandler:
 
         # create a new state group as a delta from the existing one.
         prev_group = context.state_group
-        state_group = await self._state_store.store_state_group(
+        state_group = await self._state_storage_controller.store_state_group(
             event.event_id,
             event.room_id,
             prev_group=prev_group,
@@ -1765,12 +1915,13 @@ class FederationEventHandler:
         )
 
         return EventContext.with_state(
+            storage=self._storage_controllers,
             state_group=state_group,
             state_group_before_event=context.state_group_before_event,
-            current_state_ids=current_state_ids,
-            prev_state_ids=prev_state_ids,
+            state_delta_due_to_event=state_updates,
             prev_group=prev_group,
             delta_ids=state_updates,
+            partial_state=context.partial_state,
         )
 
     async def _run_push_actions_and_persist_event(
@@ -1803,7 +1954,7 @@ class FederationEventHandler:
                     min_depth,
                 )
             else:
-                await self._action_generator.handle_push_actions_for_event(
+                await self._bulk_push_rule_evaluator.action_for_event_by_user(
                     event, context
                 )
 
@@ -1838,7 +1989,7 @@ class FederationEventHandler:
             The stream ID after which all events have been persisted.
         """
         if not event_and_contexts:
-            return self._store.get_current_events_token()
+            return self._store.get_room_max_stream_ordering()
 
         instance = self._config.worker.events_shard_config.get_instance(room_id)
         if instance != self._instance_name:
@@ -1854,11 +2005,14 @@ class FederationEventHandler:
                 )
             return result["max_stream_id"]
         else:
-            assert self._storage.persistence
+            assert self._storage_controllers.persistence
 
             # Note that this returns the events that were persisted, which may not be
             # the same as were passed in if some were deduplicated due to transaction IDs.
-            events, max_stream_token = await self._storage.persistence.persist_events(
+            (
+                events,
+                max_stream_token,
+            ) = await self._storage_controllers.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
             )
 

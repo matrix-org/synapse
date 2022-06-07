@@ -23,7 +23,7 @@ class RoomStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         # We can't test RoomStore on its own without the DirectoryStore, for
         # management of the 'room_aliases' table
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.room = RoomID.from_string("!abcde:test")
         self.alias = RoomAlias.from_string("#a-room-name:test")
@@ -71,8 +71,8 @@ class RoomEventsStoreTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         # Room events need the full datastore, for persist_event() and
         # get_room_state()
-        self.store = hs.get_datastore()
-        self.storage = hs.get_storage()
+        self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.event_factory = hs.get_event_factory()
 
         self.room = RoomID.from_string("!abcde:test")
@@ -88,7 +88,7 @@ class RoomEventsStoreTestCase(HomeserverTestCase):
 
     def inject_room_event(self, **kwargs):
         self.get_success(
-            self.storage.persistence.persist_event(
+            self._storage_controllers.persistence.persist_event(
                 self.event_factory.create_event(room_id=self.room.to_string(), **kwargs)
             )
         )
@@ -101,10 +101,12 @@ class RoomEventsStoreTestCase(HomeserverTestCase):
         )
 
         state = self.get_success(
-            self.store.get_current_state(room_id=self.room.to_string())
+            self._storage_controllers.state.get_current_state(
+                room_id=self.room.to_string()
+            )
         )
 
-        self.assertEquals(1, len(state))
+        self.assertEqual(1, len(state))
         self.assertObjectHasAttributes(
             {"type": "m.room.name", "room_id": self.room.to_string(), "name": name},
             state[0],
@@ -118,10 +120,12 @@ class RoomEventsStoreTestCase(HomeserverTestCase):
         )
 
         state = self.get_success(
-            self.store.get_current_state(room_id=self.room.to_string())
+            self._storage_controllers.state.get_current_state(
+                room_id=self.room.to_string()
+            )
         )
 
-        self.assertEquals(1, len(state))
+        self.assertEqual(1, len(state))
         self.assertObjectHasAttributes(
             {"type": "m.room.topic", "room_id": self.room.to_string(), "topic": topic},
             state[0],

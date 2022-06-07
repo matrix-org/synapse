@@ -17,8 +17,8 @@ import logging
 from typing import Any, List, Set
 
 from synapse.config.sso import SsoAttributeRequirement
-from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.types import JsonDict
+from synapse.util.check_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module, load_python_module
 
 from ._base import Config, ConfigError
@@ -65,7 +65,7 @@ def _dict_merge(merge_dict: dict, into_dict: dict) -> None:
 class SAML2Config(Config):
     section = "saml2"
 
-    def read_config(self, config, **kwargs) -> None:
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.saml2_enabled = False
 
         saml2_config = config.get("saml2_config")
@@ -165,13 +165,13 @@ class SAML2Config(Config):
         config_path = saml2_config.get("config_path", None)
         if config_path is not None:
             mod = load_python_module(config_path)
-            config = getattr(mod, "CONFIG", None)
-            if config is None:
+            config_dict_from_file = getattr(mod, "CONFIG", None)
+            if config_dict_from_file is None:
                 raise ConfigError(
                     "Config path specified by saml2_config.config_path does not "
                     "have a CONFIG property."
                 )
-            _dict_merge(merge_dict=config, into_dict=saml2_config_dict)
+            _dict_merge(merge_dict=config_dict_from_file, into_dict=saml2_config_dict)
 
         import saml2.config
 
@@ -223,7 +223,7 @@ class SAML2Config(Config):
             },
         }
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs) -> str:
+    def generate_config_section(self, config_dir_path: str, **kwargs: Any) -> str:
         return """\
         ## Single sign-on integration ##
 

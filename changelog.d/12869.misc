@@ -1,0 +1,1 @@
+Don't generate empty AS transactions when the AS is flagged as down. Contributed by Nick @ Beeper.

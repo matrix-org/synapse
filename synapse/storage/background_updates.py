@@ -12,20 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from types import TracebackType
 from typing import (
     TYPE_CHECKING,
+    Any,
     AsyncContextManager,
     Awaitable,
     Callable,
     Dict,
     Iterable,
+    List,
     Optional,
+    Type,
 )
 
 import attr
 
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage.types import Connection
+from synapse.storage.types import Connection, Cursor
 from synapse.types import JsonDict
 from synapse.util import Clock, json_encoder
 
@@ -60,20 +64,26 @@ class _BackgroundUpdateHandler:
 
 
 class _BackgroundUpdateContextManager:
-    BACKGROUND_UPDATE_INTERVAL_MS = 1000
-    BACKGROUND_UPDATE_DURATION_MS = 100
-
-    def __init__(self, sleep: bool, clock: Clock):
+    def __init__(
+        self, sleep: bool, clock: Clock, sleep_duration_ms: int, update_duration: int
+    ):
         self._sleep = sleep
         self._clock = clock
+        self._sleep_duration_ms = sleep_duration_ms
+        self._update_duration_ms = update_duration
 
     async def __aenter__(self) -> int:
         if self._sleep:
-            await self._clock.sleep(self.BACKGROUND_UPDATE_INTERVAL_MS / 1000)
+            await self._clock.sleep(self._sleep_duration_ms / 1000)
 
-        return self.BACKGROUND_UPDATE_DURATION_MS
+        return self._update_duration_ms
 
-    async def __aexit__(self, *exc) -> None:
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc: Optional[BaseException],
+        tb: Optional[TracebackType],
+    ) -> None:
         pass
 
 
@@ -102,10 +112,12 @@ class BackgroundUpdatePerformance:
         Returns:
             A duration in ms as a float
         """
-        if self.avg_duration_ms == 0:
-            return 0
-        elif self.total_item_count == 0:
+        # We want to return None if this is the first background update item
+        if self.total_item_count == 0:
             return None
+        # Avoid dividing by zero
+        elif self.avg_duration_ms == 0:
+            return 0
         else:
             # Use the exponential moving average so that we can adapt to
             # changes in how long the update process takes.
@@ -131,9 +143,6 @@ class BackgroundUpdater:
     process and autotuning the batch size.
     """
 
-    MINIMUM_BACKGROUND_BATCH_SIZE = 1
-    DEFAULT_BACKGROUND_BATCH_SIZE = 100
-
     def __init__(self, hs: "HomeServer", database: "DatabasePool"):
         self._clock = hs.get_clock()
         self.db_pool = database
@@ -157,6 +166,14 @@ class BackgroundUpdater:
         # Whether background updates are enabled. This allows us to
         # enable/disable background updates via the admin API.
         self.enabled = True
+
+        self.minimum_background_batch_size = hs.config.background_updates.min_batch_size
+        self.default_background_batch_size = (
+            hs.config.background_updates.default_batch_size
+        )
+        self.update_duration_ms = hs.config.background_updates.update_duration_ms
+        self.sleep_duration_ms = hs.config.background_updates.sleep_duration_ms
+        self.sleep_enabled = hs.config.background_updates.sleep_enabled
 
     def register_update_controller_callbacks(
         self,
@@ -214,7 +231,9 @@ class BackgroundUpdater:
         if self._on_update_callback is not None:
             return self._on_update_callback(update_name, database_name, oneshot)
 
-        return _BackgroundUpdateContextManager(sleep, self._clock)
+        return _BackgroundUpdateContextManager(
+            sleep, self._clock, self.sleep_duration_ms, self.update_duration_ms
+        )
 
     async def _default_batch_size(self, update_name: str, database_name: str) -> int:
         """The batch size to use for the first iteration of a new background
@@ -223,7 +242,7 @@ class BackgroundUpdater:
         if self._default_batch_size_callback is not None:
             return await self._default_batch_size_callback(update_name, database_name)
 
-        return self.DEFAULT_BACKGROUND_BATCH_SIZE
+        return self.default_background_batch_size
 
     async def _min_batch_size(self, update_name: str, database_name: str) -> int:
         """A lower bound on the batch size of a new background update.
@@ -233,7 +252,7 @@ class BackgroundUpdater:
         if self._min_batch_size_callback is not None:
             return await self._min_batch_size_callback(update_name, database_name)
 
-        return self.MINIMUM_BACKGROUND_BATCH_SIZE
+        return self.minimum_background_batch_size
 
     def get_current_update(self) -> Optional[BackgroundUpdatePerformance]:
         """Returns the current background update, if any."""
@@ -252,20 +271,31 @@ class BackgroundUpdater:
         if self.enabled:
             # if we start a new background update, not all updates are done.
             self._all_done = False
-            run_as_background_process("background_updates", self.run_background_updates)
+            sleep = self.sleep_enabled
+            run_as_background_process(
+                "background_updates", self.run_background_updates, sleep
+            )
 
-    async def run_background_updates(self, sleep: bool = True) -> None:
+    async def run_background_updates(self, sleep: bool) -> None:
         if self._running or not self.enabled:
             return
 
         self._running = True
+
+        back_to_back_failures = 0
 
         try:
             logger.info("Starting background schema updates")
             while self.enabled:
                 try:
                     result = await self.do_next_background_update(sleep)
+                    back_to_back_failures = 0
                 except Exception:
+                    back_to_back_failures += 1
+                    if back_to_back_failures >= 5:
+                        raise RuntimeError(
+                            "5 back-to-back background update failures; aborting."
+                        )
                     logger.exception("Error doing update")
                 else:
                     if result:
@@ -339,7 +369,7 @@ class BackgroundUpdater:
             True if we have finished running all the background updates, otherwise False
         """
 
-        def get_background_updates_txn(txn):
+        def get_background_updates_txn(txn: Cursor) -> List[Dict[str, Any]]:
             txn.execute(
                 """
                 SELECT update_name, depends_on FROM background_updates
@@ -456,7 +486,7 @@ class BackgroundUpdater:
         self,
         update_name: str,
         update_handler: Callable[[JsonDict, int], Awaitable[int]],
-    ):
+    ) -> None:
         """Register a handler for doing a background update.
 
         The handler should take two arguments:
@@ -505,6 +535,7 @@ class BackgroundUpdater:
         where_clause: Optional[str] = None,
         unique: bool = False,
         psql_only: bool = False,
+        replaces_index: Optional[str] = None,
     ) -> None:
         """Helper for store classes to do a background index addition
 
@@ -524,6 +555,8 @@ class BackgroundUpdater:
             unique: true to make a UNIQUE index
             psql_only: true to only create this index on psql databases (useful
                 for virtual sqlite tables)
+            replaces_index: The name of an index that this index replaces.
+                The named index will be dropped upon completion of the new index.
         """
 
         def create_index_psql(conn: Connection) -> None:
@@ -555,6 +588,12 @@ class BackgroundUpdater:
                 }
                 logger.debug("[SQL] %s", sql)
                 c.execute(sql)
+
+                if replaces_index is not None:
+                    # We drop the old index as the new index has now been created.
+                    sql = f"DROP INDEX IF EXISTS {replaces_index}"
+                    logger.debug("[SQL] %s", sql)
+                    c.execute(sql)
             finally:
                 conn.set_session(autocommit=False)  # type: ignore
 
@@ -583,6 +622,12 @@ class BackgroundUpdater:
             logger.debug("[SQL] %s", sql)
             c.execute(sql)
 
+            if replaces_index is not None:
+                # We drop the old index as the new index has now been created.
+                sql = f"DROP INDEX IF EXISTS {replaces_index}"
+                logger.debug("[SQL] %s", sql)
+                c.execute(sql)
+
         if isinstance(self.db_pool.engine, engines.PostgresEngine):
             runner: Optional[Callable[[Connection], None]] = create_index_psql
         elif psql_only:
@@ -590,7 +635,7 @@ class BackgroundUpdater:
         else:
             runner = create_index_sqlite
 
-        async def updater(progress, batch_size):
+        async def updater(progress: JsonDict, batch_size: int) -> int:
             if runner is not None:
                 logger.info("Adding index %s to %s", index_name, table)
                 await self.db_pool.runWithConnection(runner)

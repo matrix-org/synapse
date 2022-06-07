@@ -27,7 +27,7 @@ class StateDeltasStore(SQLBaseStore):
     # attribute. TODO: can we get static analysis to enforce this?
     _curr_state_delta_stream_cache: StreamChangeCache
 
-    async def get_current_state_deltas(
+    async def get_partial_current_state_deltas(
         self, prev_stream_id: int, max_stream_id: int
     ) -> Tuple[int, List[Dict[str, Any]]]:
         """Fetch a list of room state changes since the given stream id
@@ -41,6 +41,8 @@ class StateDeltasStore(SQLBaseStore):
                 state has been deleted.
             - prev_event_id (str|None): previous event_id for this state key. None
                 if it's new state.
+
+        This may be the partial state if we're lazy joining the room.
 
         Args:
             prev_stream_id: point to get changes since (exclusive)
@@ -56,7 +58,9 @@ class StateDeltasStore(SQLBaseStore):
         prev_stream_id = int(prev_stream_id)
 
         # check we're not going backwards
-        assert prev_stream_id <= max_stream_id
+        assert (
+            prev_stream_id <= max_stream_id
+        ), f"New stream id {max_stream_id} is smaller than prev stream id {prev_stream_id}"
 
         if not self._curr_state_delta_stream_cache.has_any_entity_changed(
             prev_stream_id

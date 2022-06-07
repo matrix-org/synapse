@@ -17,7 +17,7 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
@@ -41,13 +41,13 @@ class QuarantineMediaInRoom(RestServlet):
     """
 
     PATTERNS = [
-        *admin_patterns("/room/(?P<room_id>[^/]+)/media/quarantine$"),
+        *admin_patterns("/room/(?P<room_id>[^/]*)/media/quarantine$"),
         # This path kept around for legacy reasons
-        *admin_patterns("/quarantine_media/(?P<room_id>[^/]+)"),
+        *admin_patterns("/quarantine_media/(?P<room_id>[^/]*)$"),
     ]
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_POST(
@@ -71,10 +71,10 @@ class QuarantineMediaByUser(RestServlet):
     this server.
     """
 
-    PATTERNS = admin_patterns("/user/(?P<user_id>[^/]+)/media/quarantine$")
+    PATTERNS = admin_patterns("/user/(?P<user_id>[^/]*)/media/quarantine$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_POST(
@@ -83,7 +83,7 @@ class QuarantineMediaByUser(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
-        logging.info("Quarantining local media by user: %s", user_id)
+        logging.info("Quarantining media by user: %s", user_id)
 
         # Quarantine all media this user has uploaded
         num_quarantined = await self.store.quarantine_media_ids_by_user(
@@ -99,11 +99,11 @@ class QuarantineMediaByID(RestServlet):
     """
 
     PATTERNS = admin_patterns(
-        "/media/quarantine/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)"
+        "/media/quarantine/(?P<server_name>[^/]*)/(?P<media_id>[^/]*)$"
     )
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_POST(
@@ -112,7 +112,7 @@ class QuarantineMediaByID(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
-        logging.info("Quarantining local media by ID: %s/%s", server_name, media_id)
+        logging.info("Quarantining media by ID: %s/%s", server_name, media_id)
 
         # Quarantine this media id
         await self.store.quarantine_media_by_id(
@@ -128,22 +128,19 @@ class UnquarantineMediaByID(RestServlet):
     """
 
     PATTERNS = admin_patterns(
-        "/media/unquarantine/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)"
+        "/media/unquarantine/(?P<server_name>[^/]*)/(?P<media_id>[^/]*)$"
     )
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_POST(
         self, request: SynapseRequest, server_name: str, media_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_requester_is_admin(self.auth, request)
 
-        logging.info(
-            "Remove from quarantine local media by ID: %s/%s", server_name, media_id
-        )
+        logging.info("Remove from quarantine media by ID: %s/%s", server_name, media_id)
 
         # Remove from quarantine this media id
         await self.store.quarantine_media_by_id(server_name, media_id, None)
@@ -154,17 +151,16 @@ class UnquarantineMediaByID(RestServlet):
 class ProtectMediaByID(RestServlet):
     """Protect local media from being quarantined."""
 
-    PATTERNS = admin_patterns("/media/protect/(?P<media_id>[^/]+)")
+    PATTERNS = admin_patterns("/media/protect/(?P<media_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_POST(
         self, request: SynapseRequest, media_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_requester_is_admin(self.auth, request)
 
         logging.info("Protecting local media by ID: %s", media_id)
 
@@ -177,17 +173,16 @@ class ProtectMediaByID(RestServlet):
 class UnprotectMediaByID(RestServlet):
     """Unprotect local media from being quarantined."""
 
-    PATTERNS = admin_patterns("/media/unprotect/(?P<media_id>[^/]+)")
+    PATTERNS = admin_patterns("/media/unprotect/(?P<media_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_POST(
         self, request: SynapseRequest, media_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_requester_is_admin(self.auth, request)
 
         logging.info("Unprotecting local media by ID: %s", media_id)
 
@@ -200,19 +195,16 @@ class UnprotectMediaByID(RestServlet):
 class ListMediaInRoom(RestServlet):
     """Lists all of the media in a given room."""
 
-    PATTERNS = admin_patterns("/room/(?P<room_id>[^/]+)/media$")
+    PATTERNS = admin_patterns("/room/(?P<room_id>[^/]*)/media$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-        is_admin = await self.auth.is_server_admin(requester.user)
-        if not is_admin:
-            raise AuthError(HTTPStatus.FORBIDDEN, "You are not a server admin")
+        await assert_requester_is_admin(self.auth, request)
 
         local_mxcs, remote_mxcs = await self.store.get_media_mxcs_in_room(room_id)
 
@@ -254,10 +246,10 @@ class PurgeMediaCacheRestServlet(RestServlet):
 class DeleteMediaByID(RestServlet):
     """Delete local media by a given ID. Removes it from this server."""
 
-    PATTERNS = admin_patterns("/media/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)")
+    PATTERNS = admin_patterns("/media/(?P<server_name>[^/]*)/(?P<media_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.server_name = hs.hostname
         self.media_repository = hs.get_media_repository()
@@ -286,10 +278,10 @@ class DeleteMediaByDateSize(RestServlet):
     timestamp and size.
     """
 
-    PATTERNS = admin_patterns("/media/(?P<server_name>[^/]+)/delete$")
+    PATTERNS = admin_patterns("/media/(?P<server_name>[^/]*)/delete$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.server_name = hs.hostname
         self.media_repository = hs.get_media_repository()
@@ -353,12 +345,12 @@ class UserMediaRestServlet(RestServlet):
         media that exist given for this user
     """
 
-    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]+)/media$")
+    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/media$")
 
     def __init__(self, hs: "HomeServer"):
         self.is_mine = hs.is_mine
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.media_repository = hs.get_media_repository()
 
     async def on_GET(
@@ -403,16 +395,7 @@ class UserMediaRestServlet(RestServlet):
                 request,
                 "order_by",
                 default=MediaSortOrder.CREATED_TS.value,
-                allowed_values=(
-                    MediaSortOrder.MEDIA_ID.value,
-                    MediaSortOrder.UPLOAD_NAME.value,
-                    MediaSortOrder.CREATED_TS.value,
-                    MediaSortOrder.LAST_ACCESS_TS.value,
-                    MediaSortOrder.MEDIA_LENGTH.value,
-                    MediaSortOrder.MEDIA_TYPE.value,
-                    MediaSortOrder.QUARANTINED_BY.value,
-                    MediaSortOrder.SAFE_FROM_QUARANTINE.value,
-                ),
+                allowed_values=[sort_order.value for sort_order in MediaSortOrder],
             )
             direction = parse_string(
                 request, "dir", default="f", allowed_values=("f", "b")
@@ -470,16 +453,7 @@ class UserMediaRestServlet(RestServlet):
                 request,
                 "order_by",
                 default=MediaSortOrder.CREATED_TS.value,
-                allowed_values=(
-                    MediaSortOrder.MEDIA_ID.value,
-                    MediaSortOrder.UPLOAD_NAME.value,
-                    MediaSortOrder.CREATED_TS.value,
-                    MediaSortOrder.LAST_ACCESS_TS.value,
-                    MediaSortOrder.MEDIA_LENGTH.value,
-                    MediaSortOrder.MEDIA_TYPE.value,
-                    MediaSortOrder.QUARANTINED_BY.value,
-                    MediaSortOrder.SAFE_FROM_QUARANTINE.value,
-                ),
+                allowed_values=[sort_order.value for sort_order in MediaSortOrder],
             )
             direction = parse_string(
                 request, "dir", default="f", allowed_values=("f", "b")
@@ -490,7 +464,7 @@ class UserMediaRestServlet(RestServlet):
         )
 
         deleted_media, total = await self.media_repository.delete_local_media_ids(
-            ([row["media_id"] for row in media])
+            [row["media_id"] for row in media]
         )
 
         return HTTPStatus.OK, {"deleted_media": deleted_media, "total": total}

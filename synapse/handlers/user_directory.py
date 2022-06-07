@@ -19,8 +19,8 @@ import synapse.metrics
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules, Membership
 from synapse.handlers.state_deltas import MatchChange, StateDeltasHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.storage.databases.main.user_directory import SearchResult
 from synapse.storage.roommember import ProfileInfo
-from synapse.types import JsonDict
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
@@ -55,12 +55,13 @@ class UserDirectoryHandler(StateDeltasHandler):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.server_name = hs.hostname
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
-        self.update_user_directory = hs.config.server.update_user_directory
+        self.update_user_directory = hs.config.worker.should_update_user_directory
         self.search_all_users = hs.config.userdirectory.user_directory_search_all_users
         self.spam_checker = hs.get_spam_checker()
         # The current position in the current_state_delta stream
@@ -78,7 +79,7 @@ class UserDirectoryHandler(StateDeltasHandler):
 
     async def search_users(
         self, user_id: str, search_term: str, limit: int
-    ) -> JsonDict:
+    ) -> SearchResult:
         """Searches for users in directory
 
         Returns:
@@ -148,9 +149,21 @@ class UserDirectoryHandler(StateDeltasHandler):
         if self.pos is None:
             self.pos = await self.store.get_user_directory_stream_pos()
 
-        # If still None then the initial background update hasn't happened yet.
-        if self.pos is None:
-            return None
+            # If still None then the initial background update hasn't happened yet.
+            if self.pos is None:
+                return None
+
+            room_max_stream_ordering = self.store.get_room_max_stream_ordering()
+            if self.pos > room_max_stream_ordering:
+                # apparently, we've processed more events than exist in the database!
+                # this can happen if events are removed with history purge or similar.
+                logger.warning(
+                    "Event stream ordering appears to have gone backwards (%i -> %i): "
+                    "rewinding user directory processor",
+                    self.pos,
+                    room_max_stream_ordering,
+                )
+                self.pos = room_max_stream_ordering
 
         # Loop round handling deltas until we're up to date
         while True:
@@ -162,7 +175,10 @@ class UserDirectoryHandler(StateDeltasHandler):
                 logger.debug(
                     "Processing user stats %s->%s", self.pos, room_max_stream_ordering
                 )
-                max_pos, deltas = await self.store.get_current_state_deltas(
+                (
+                    max_pos,
+                    deltas,
+                ) = await self._storage_controllers.state.get_current_state_deltas(
                     self.pos, room_max_stream_ordering
                 )
 

@@ -1,6 +1,6 @@
 # Scaling synapse via workers
 
-For small instances it recommended to run Synapse in the default monolith mode.
+For small instances it is recommended to run Synapse in the default monolith mode.
 For larger instances where performance is a concern it can be helpful to split
 out functionality into multiple separate python processes. These processes are
 called 'workers', and are (eventually) intended to scale horizontally
@@ -27,7 +27,7 @@ feeds streams of newly written data between processes so they can be kept in
 sync with the database state.
 
 When configured to do so, Synapse uses a
-[Redis pub/sub channel](https://redis.io/topics/pubsub) to send the replication
+[Redis pub/sub channel](https://redis.io/docs/manual/pubsub/) to send the replication
 stream between all configured Synapse processes. Additionally, processes may
 make HTTP requests to each other, primarily for operations which need to wait
 for a reply ─ such as sending an event.
@@ -138,22 +138,7 @@ as the `listeners` option in the shared config.
 For example:
 
 ```yaml
-worker_app: synapse.app.generic_worker
-worker_name: worker1
-
-# The replication listener on the main synapse process.
-worker_replication_host: 127.0.0.1
-worker_replication_http_port: 9093
-
-worker_listeners:
- - type: http
-   port: 8083
-   resources:
-     - names:
-       - client
-       - federation
-
-worker_log_config: /home/matrix/synapse/config/worker1_log_config.yaml
+{{#include systemd-with-workers/workers/generic_worker.yaml}}
 ```
 
 ...is a full configuration for a generic worker instance, which will expose a
@@ -178,12 +163,15 @@ recommend the use of `systemd` where available: for information on setting up
 
 ### `synapse.app.generic_worker`
 
-This worker can handle API requests matching the following regular
-expressions:
+This worker can handle API requests matching the following regular expressions.
+These endpoints can be routed to any worker. If a worker is set up to handle a
+stream then, for maximum efficiency, additional endpoints should be routed to that
+worker: refer to the [stream writers](#stream-writers) section below for further
+information.
 
     # Sync requests
-    ^/_matrix/client/(v2_alpha|r0|v3)/sync$
-    ^/_matrix/client/(api/v1|v2_alpha|r0|v3)/events$
+    ^/_matrix/client/(r0|v3)/sync$
+    ^/_matrix/client/(api/v1|r0|v3)/events$
     ^/_matrix/client/(api/v1|r0|v3)/initialSync$
     ^/_matrix/client/(api/v1|r0|v3)/rooms/[^/]+/initialSync$
 
@@ -197,20 +185,14 @@ expressions:
     ^/_matrix/federation/v1/query/
     ^/_matrix/federation/v1/make_join/
     ^/_matrix/federation/v1/make_leave/
-    ^/_matrix/federation/v1/send_join/
-    ^/_matrix/federation/v2/send_join/
-    ^/_matrix/federation/v1/send_leave/
-    ^/_matrix/federation/v2/send_leave/
-    ^/_matrix/federation/v1/invite/
-    ^/_matrix/federation/v2/invite/
-    ^/_matrix/federation/v1/query_auth/
+    ^/_matrix/federation/(v1|v2)/send_join/
+    ^/_matrix/federation/(v1|v2)/send_leave/
+    ^/_matrix/federation/(v1|v2)/invite/
     ^/_matrix/federation/v1/event_auth/
     ^/_matrix/federation/v1/exchange_third_party_invite/
     ^/_matrix/federation/v1/user/devices/
-    ^/_matrix/federation/v1/get_groups_publicised$
     ^/_matrix/key/v2/query
-    ^/_matrix/federation/unstable/org.matrix.msc2946/spaces/
-    ^/_matrix/federation/(v1|unstable/org.matrix.msc2946)/hierarchy/
+    ^/_matrix/federation/v1/hierarchy/
 
     # Inbound federation transaction request
     ^/_matrix/federation/v1/send/
@@ -222,26 +204,28 @@ expressions:
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/context/.*$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/members$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state$
-    ^/_matrix/client/unstable/org.matrix.msc2946/rooms/.*/spaces$
-    ^/_matrix/client/(v1|unstable/org.matrix.msc2946)/rooms/.*/hierarchy$
+    ^/_matrix/client/v1/rooms/.*/hierarchy$
+    ^/_matrix/client/unstable/org.matrix.msc2716/rooms/.*/batch_send$
     ^/_matrix/client/unstable/im.nheko.summary/rooms/.*/summary$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/account/3pid$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/devices$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/query$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/changes$
+    ^/_matrix/client/(r0|v3|unstable)/account/3pid$
+    ^/_matrix/client/(r0|v3|unstable)/account/whoami$
+    ^/_matrix/client/(r0|v3|unstable)/devices$
     ^/_matrix/client/versions$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/voip/turnServer$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_groups$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/publicised_groups$
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/publicised_groups/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
 
+    # Encryption requests
+    ^/_matrix/client/(r0|v3|unstable)/keys/query$
+    ^/_matrix/client/(r0|v3|unstable)/keys/changes$
+    ^/_matrix/client/(r0|v3|unstable)/keys/claim$
+    ^/_matrix/client/(r0|v3|unstable)/room_keys/
+
     # Registration/login requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/login$
     ^/_matrix/client/(r0|v3|unstable)/register$
-    ^/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity$
+    ^/_matrix/client/v1/register/m.login.registration_token/validity$
 
     # Event sending requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/redact
@@ -251,10 +235,23 @@ expressions:
     ^/_matrix/client/(api/v1|r0|v3|unstable)/join/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/profile/
 
+    # Account data requests
+    ^/_matrix/client/(r0|v3|unstable)/.*/tags
+    ^/_matrix/client/(r0|v3|unstable)/.*/account_data
+
+    # Receipts requests
+    ^/_matrix/client/(r0|v3|unstable)/rooms/.*/receipt
+    ^/_matrix/client/(r0|v3|unstable)/rooms/.*/read_markers
+
+    # Presence requests
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
+
+    # User directory search requests
+    ^/_matrix/client/(r0|v3|unstable)/user_directory/search$
 
 Additionally, the following REST endpoints can be handled for GET requests:
 
-    ^/_matrix/federation/v1/groups/
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/pushrules/
 
 Pagination requests can also be handled, but all requests for a given
 room must be routed to the same instance. Additionally, care must be taken to
@@ -326,16 +323,17 @@ effects of bursts of events from that bridge on events sent by normal users.
 
 #### Stream writers
 
-Additionally, there is *experimental* support for moving writing of specific
-streams (such as events) off of the main process to a particular worker. (This
-is only supported with Redis-based replication.)
-
-Currently supported streams are `events` and `typing`.
+Additionally, the writing of specific streams (such as events) can be moved off
+of the main process to a particular worker.
+(This is only supported with Redis-based replication.)
 
 To enable this, the worker must have a HTTP replication listener configured,
-have a `worker_name` and be listed in the `instance_map` config. For example to
-move event persistence off to a dedicated worker, the shared configuration would
-include:
+have a `worker_name` and be listed in the `instance_map` config. The same worker
+can handle multiple streams, but unless otherwise documented, each stream can only
+have a single writer.
+
+For example, to move event persistence off to a dedicated worker, the shared
+configuration would include:
 
 ```yaml
 instance_map:
@@ -347,8 +345,20 @@ stream_writers:
     events: event_persister1
 ```
 
-The `events` stream also experimentally supports having multiple writers, where
-work is sharded between them by room ID. Note that you *must* restart all worker
+An example for a stream writer instance:
+
+```yaml
+{{#include systemd-with-workers/workers/event_persister.yaml}}
+```
+
+Some of the streams have associated endpoints which, for maximum efficiency, should
+be routed to the workers handling that stream. See below for the currently supported
+streams and the endpoints associated with them:
+
+##### The `events` stream
+
+The `events` stream experimentally supports having multiple writers, where work
+is sharded between them by room ID. Note that you *must* restart all worker
 instances when adding or removing event persisters. An example `stream_writers`
 configuration with multiple writers:
 
@@ -359,9 +369,46 @@ stream_writers:
         - event_persister2
 ```
 
+##### The `typing` stream
+
+The following endpoints should be routed directly to the worker configured as
+the stream writer for the `typing` stream:
+
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/typing
+
+##### The `to_device` stream
+
+The following endpoints should be routed directly to the worker configured as
+the stream writer for the `to_device` stream:
+
+    ^/_matrix/client/(r0|v3|unstable)/sendToDevice/
+
+##### The `account_data` stream
+
+The following endpoints should be routed directly to the worker configured as
+the stream writer for the `account_data` stream:
+
+    ^/_matrix/client/(r0|v3|unstable)/.*/tags
+    ^/_matrix/client/(r0|v3|unstable)/.*/account_data
+
+##### The `receipts` stream
+
+The following endpoints should be routed directly to the worker configured as
+the stream writer for the `receipts` stream:
+
+    ^/_matrix/client/(r0|v3|unstable)/rooms/.*/receipt
+    ^/_matrix/client/(r0|v3|unstable)/rooms/.*/read_markers
+
+##### The `presence` stream
+
+The following endpoints should be routed directly to the worker configured as
+the stream writer for the `presence` stream:
+
+    ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
+
 #### Background tasks
 
-There is also *experimental* support for moving background tasks to a separate
+There is also support for moving background tasks to a separate
 worker. Background tasks are run periodically or started via replication. Exactly
 which tasks are configured to run depends on your Synapse configuration (e.g. if
 stats is enabled).
@@ -374,8 +421,56 @@ the shared configuration would include:
 run_background_tasks_on: background_worker
 ```
 
-You might also wish to investigate the `update_user_directory` and
+You might also wish to investigate the `update_user_directory_from_worker` and
 `media_instance_running_background_jobs` settings.
+
+An example for a dedicated background worker instance:
+
+```yaml
+{{#include systemd-with-workers/workers/background_worker.yaml}}
+```
+
+#### Updating the User Directory
+
+You can designate one generic worker to update the user directory.
+
+Specify its name in the shared configuration as follows:
+
+```yaml
+update_user_directory_from_worker: worker_name
+```
+
+This work cannot be load-balanced; please ensure the main process is restarted
+after setting this option in the shared configuration!
+
+User directory updates allow REST endpoints matching the following regular
+expressions to work:
+
+    ^/_matrix/client/(r0|v3|unstable)/user_directory/search$
+
+The above endpoints can be routed to any worker, though you may choose to route
+it to the chosen user directory worker.
+
+This style of configuration supersedes the legacy `synapse.app.user_dir`
+worker application type.
+
+
+#### Notifying Application Services
+
+You can designate one generic worker to send output traffic to Application Services.
+
+Specify its name in the shared configuration as follows:
+
+```yaml
+notify_appservices_from_worker: worker_name
+```
+
+This work cannot be load-balanced; please ensure the main process is restarted
+after setting this option in the shared configuration!
+
+This style of configuration supersedes the legacy `synapse.app.appservice`
+worker application type.
+
 
 ### `synapse.app.pusher`
 
@@ -394,6 +489,9 @@ pusher_instances:
 
 
 ### `synapse.app.appservice`
+
+**Deprecated as of Synapse v1.59.** [Use `synapse.app.generic_worker` with the
+`notify_appservices_from_worker` option instead.](#notifying-application-services)
 
 Handles sending output traffic to Application Services. Doesn't handle any
 REST endpoints itself, but you should set `notify_appservices: False` in the
@@ -462,14 +560,26 @@ Note that if a reverse proxy is used , then `/_matrix/media/` must be routed for
 
 ### `synapse.app.user_dir`
 
+**Deprecated as of Synapse v1.59.** [Use `synapse.app.generic_worker` with the
+`update_user_directory_from_worker` option instead.](#updating-the-user-directory)
+
 Handles searches in the user directory. It can handle REST endpoints matching
 the following regular expressions:
 
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/user_directory/search$
+    ^/_matrix/client/(r0|v3|unstable)/user_directory/search$
 
-When using this worker you must also set `update_user_directory: False` in the
+When using this worker you must also set `update_user_directory: false` in the
 shared configuration file to stop the main synapse running background
 jobs related to updating the user directory.
+
+Above endpoint is not *required* to be routed to this worker. By default,
+`update_user_directory` is set to `true`, which means the main process
+will handle updates. All workers configured with `client` can handle the above
+endpoint as long as either this worker or the main process are configured to
+handle it, and are online.
+
+If `update_user_directory` is set to `false`, and this worker is not running,
+the above endpoint may give outdated results.
 
 ### `synapse.app.frontend_proxy`
 
@@ -477,7 +587,7 @@ Proxies some frequently-requested client endpoints to add caching and remove
 load from the main synapse. It can handle REST endpoints matching the following
 regular expressions:
 
-    ^/_matrix/client/(api/v1|r0|v3|unstable)/keys/upload
+    ^/_matrix/client/(r0|v3|unstable)/keys/upload
 
 If `use_presence` is False in the homeserver config, it can also handle REST
 endpoints matching the following regular expressions:
@@ -547,14 +657,14 @@ The following shows an example setup using Redis and a reverse proxy:
 |   Main       |  |   Generic    |  |   Generic    |  |  Event       |
 |   Process    |  |   Worker 1   |  |   Worker 2   |  |  Persister   |
 +--------------+  +--------------+  +--------------+  +--------------+
-      ^    ^          |   ^   |         |   ^   |          ^    ^
-      |    |          |   |   |         |   |   |          |    |
-      |    |          |   |   |  HTTP   |   |   |          |    |
-      |    +----------+<--|---|---------+   |   |          |    |
-      |                   |   +-------------|-->+----------+    |
-      |                   |                 |                   |
-      |                   |                 |                   |
-      v                   v                 v                   v
-====================================================================
+      ^    ^          |   ^   |         |   ^   |         |   ^   ^
+      |    |          |   |   |         |   |   |         |   |   |
+      |    |          |   |   |  HTTP   |   |   |         |   |   |
+      |    +----------+<--|---|---------+<--|---|---------+   |   |
+      |                   |   +-------------|-->+-------------+   |
+      |                   |                 |                     |
+      |                   |                 |                     |
+      v                   v                 v                     v
+======================================================================
                                                          Redis pub/sub channel
 ```

@@ -12,24 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Iterable
 
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams._base import DeviceListsStream, UserSignatureStream
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.devices import DeviceWorkerStore
 from synapse.storage.databases.main.end_to_end_keys import EndToEndKeyWorkerStore
-from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
 class SlavedDeviceStore(EndToEndKeyWorkerStore, DeviceWorkerStore, BaseSlavedStore):
-    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
-        super().__init__(database, db_conn, hs)
-
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         self.hs = hs
 
         self._device_list_id_gen = SlavedIdTracker(
@@ -39,23 +41,18 @@ class SlavedDeviceStore(EndToEndKeyWorkerStore, DeviceWorkerStore, BaseSlavedSto
             extra_tables=[
                 ("user_signature_stream", "stream_id"),
                 ("device_lists_outbound_pokes", "stream_id"),
+                ("device_lists_changes_in_room", "stream_id"),
             ],
         )
-        device_list_max = self._device_list_id_gen.get_current_token()
-        self._device_list_stream_cache = StreamChangeCache(
-            "DeviceListStreamChangeCache", device_list_max
-        )
-        self._user_signature_stream_cache = StreamChangeCache(
-            "UserSignatureStreamChangeCache", device_list_max
-        )
-        self._device_list_federation_stream_cache = StreamChangeCache(
-            "DeviceListFederationStreamChangeCache", device_list_max
-        )
+
+        super().__init__(database, db_conn, hs)
 
     def get_device_stream_token(self) -> int:
         return self._device_list_id_gen.get_current_token()
 
-    def process_replication_rows(self, stream_name, instance_name, token, rows):
+    def process_replication_rows(
+        self, stream_name: str, instance_name: str, token: int, rows: Iterable[Any]
+    ) -> None:
         if stream_name == DeviceListsStream.NAME:
             self._device_list_id_gen.advance(instance_name, token)
             self._invalidate_caches_for_devices(token, rows)
@@ -65,7 +62,9 @@ class SlavedDeviceStore(EndToEndKeyWorkerStore, DeviceWorkerStore, BaseSlavedSto
                 self._user_signature_stream_cache.entity_has_changed(row.user_id, token)
         return super().process_replication_rows(stream_name, instance_name, token, rows)
 
-    def _invalidate_caches_for_devices(self, token, rows):
+    def _invalidate_caches_for_devices(
+        self, token: int, rows: Iterable[DeviceListsStream.DeviceListsStreamRow]
+    ) -> None:
         for row in rows:
             # The entities are either user IDs (starting with '@') whose devices
             # have changed, or remote servers that we need to tell about

@@ -37,27 +37,23 @@ class UserMediaStatisticsRestServlet(RestServlet):
     PATTERNS = admin_patterns("/statistics/users/media$")
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         order_by = parse_string(
-            request, "order_by", default=UserSortOrder.USER_ID.value
+            request,
+            "order_by",
+            default=UserSortOrder.USER_ID.value,
+            allowed_values=(
+                UserSortOrder.MEDIA_LENGTH.value,
+                UserSortOrder.MEDIA_COUNT.value,
+                UserSortOrder.USER_ID.value,
+                UserSortOrder.DISPLAYNAME.value,
+            ),
         )
-        if order_by not in (
-            UserSortOrder.MEDIA_LENGTH.value,
-            UserSortOrder.MEDIA_COUNT.value,
-            UserSortOrder.USER_ID.value,
-            UserSortOrder.DISPLAYNAME.value,
-        ):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "Unknown value for order_by: %s" % (order_by,),
-                errcode=Codes.INVALID_PARAM,
-            )
 
         start = parse_integer(request, "from", default=0)
         if start < 0:

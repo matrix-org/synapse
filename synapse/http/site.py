@@ -14,11 +14,12 @@
 import contextlib
 import logging
 import time
-from typing import Generator, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Generator, Optional, Tuple, Union
 
 import attr
 from zope.interface import implementer
 
+from twisted.internet.defer import Deferred
 from twisted.internet.interfaces import IAddress, IReactorTime
 from twisted.python.failure import Failure
 from twisted.web.http import HTTPChannel
@@ -34,6 +35,9 @@ from synapse.logging.context import (
     PreserveLoggingContext,
 )
 from synapse.types import Requester
+
+if TYPE_CHECKING:
+    import opentracing
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +70,9 @@ class SynapseRequest(Request):
         self,
         channel: HTTPChannel,
         site: "SynapseSite",
-        *args,
+        *args: Any,
         max_request_body_size: int = 1024,
-        **kw,
+        **kw: Any,
     ):
         super().__init__(channel, *args, **kw)
         self._max_request_body_size = max_request_body_size
@@ -81,8 +85,20 @@ class SynapseRequest(Request):
         # server name, for client requests this is the Requester object.
         self._requester: Optional[Union[Requester, str]] = None
 
+        # An opentracing span for this request. Will be closed when the request is
+        # completely processed.
+        self._opentracing_span: "Optional[opentracing.Span]" = None
+
         # we can't yet create the logcontext, as we don't know the method.
         self.logcontext: Optional[LoggingContext] = None
+
+        # The `Deferred` to cancel if the client disconnects early and
+        # `is_render_cancellable` is set. Expected to be set by `Resource.render`.
+        self.render_deferred: Optional["Deferred[None]"] = None
+        # A boolean indicating whether `render_deferred` should be cancelled if the
+        # client disconnects early. Expected to be set by the coroutine started by
+        # `Resource.render`, if rendering is asynchronous.
+        self.is_render_cancellable = False
 
         global _next_request_seq
         self.request_seq = _next_request_seq
@@ -147,6 +163,13 @@ class SynapseRequest(Request):
         self.logcontext.request.requester = requester
         # If there's no authenticated entity, it was the requester.
         self.logcontext.request.authenticated_entity = authenticated_entity or requester
+
+    def set_opentracing_span(self, span: "opentracing.Span") -> None:
+        """attach an opentracing span to this request
+
+        Doing so will cause the span to be closed when we finish processing the request
+        """
+        self._opentracing_span = span
 
     def get_request_id(self) -> str:
         return "%s-%i" % (self.get_method(), self.request_seq)
@@ -224,7 +247,7 @@ class SynapseRequest(Request):
             request_id,
             request=ContextRequest(
                 request_id=request_id,
-                ip_address=self.getClientIP(),
+                ip_address=self.getClientAddress().host,
                 site_tag=self.synapse_site.site_tag,
                 # The requester is going to be unknown at this point.
                 requester=None,
@@ -286,6 +309,9 @@ class SynapseRequest(Request):
             self._processing_finished_time = time.time()
             self._is_processing = False
 
+            if self._opentracing_span:
+                self._opentracing_span.log_kv({"event": "finished processing"})
+
             # if we've already sent the response, log it now; otherwise, we wait for the
             # response to be sent.
             if self.finish_time is not None:
@@ -299,6 +325,8 @@ class SynapseRequest(Request):
         """
         self.finish_time = time.time()
         Request.finish(self)
+        if self._opentracing_span:
+            self._opentracing_span.log_kv({"event": "response sent"})
         if not self._is_processing:
             assert self.logcontext is not None
             with PreserveLoggingContext(self.logcontext):
@@ -333,7 +361,26 @@ class SynapseRequest(Request):
         with PreserveLoggingContext(self.logcontext):
             logger.info("Connection from client lost before response was sent")
 
-            if not self._is_processing:
+            if self._opentracing_span:
+                self._opentracing_span.log_kv(
+                    {"event": "client connection lost", "reason": str(reason.value)}
+                )
+
+            if self._is_processing:
+                if self.is_render_cancellable:
+                    if self.render_deferred is not None:
+                        # Throw a cancellation into the request processing, in the hope
+                        # that it will finish up sooner than it normally would.
+                        # The `self.processing()` context manager will call
+                        # `_finished_processing()` when done.
+                        with PreserveLoggingContext():
+                            self.render_deferred.cancel()
+                    else:
+                        logger.error(
+                            "Connection from client lost, but have no Deferred to "
+                            "cancel even though the request is marked as cancellable."
+                        )
+            else:
                 self._finished_processing()
 
     def _started_processing(self, servlet_name: str) -> None:
@@ -357,7 +404,7 @@ class SynapseRequest(Request):
 
         self.synapse_site.access_logger.debug(
             "%s - %s - Received request: %s %s",
-            self.getClientIP(),
+            self.getClientAddress().host,
             self.synapse_site.site_tag,
             self.get_method(),
             self.get_redacted_uri(),
@@ -383,7 +430,10 @@ class SynapseRequest(Request):
 
         user_agent = get_request_user_agent(self, "-")
 
-        code = str(self.code)
+        # int(self.code) looks redundant, because self.code is already an int.
+        # But self.code might be an HTTPStatus (which inherits from int)---which has
+        # a different string representation. So ensure we really have an integer.
+        code = str(int(self.code))
         if not self.finished:
             # we didn't send the full response before we gave up (presumably because
             # the connection dropped)
@@ -402,7 +452,7 @@ class SynapseRequest(Request):
             "%s - %s - {%s}"
             " Processed request: %.3fsec/%.3fsec (%.3fsec, %.3fsec) (%.3fsec/%.3fsec/%d)"
             ' %sB %s "%s %s %s" "%s" [%d dbevts]',
-            self.getClientIP(),
+            self.getClientAddress().host,
             self.synapse_site.site_tag,
             requester,
             processing_time,
@@ -420,6 +470,10 @@ class SynapseRequest(Request):
             user_agent,
             usage.evt_db_fetch_count,
         )
+
+        # complete the opentracing span, if any.
+        if self._opentracing_span:
+            self._opentracing_span.finish()
 
         try:
             self.request_metrics.stop(self.finish_time, self.code, self.sentLength)
@@ -506,9 +560,9 @@ class XForwardedForRequest(SynapseRequest):
 
 
 @implementer(IAddress)
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class _XForwardedForAddress:
-    host = attr.ib(type=str)
+    host: str
 
 
 class SynapseSite(Site):
@@ -557,7 +611,7 @@ class SynapseSite(Site):
         proxied = config.http_options.x_forwarded
         request_class = XForwardedForRequest if proxied else SynapseRequest
 
-        def request_factory(channel, queued: bool) -> Request:
+        def request_factory(channel: HTTPChannel, queued: bool) -> Request:
             return request_class(
                 channel,
                 self,

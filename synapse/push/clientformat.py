@@ -40,13 +40,17 @@ def format_push_rules_for_user(
 
         # Remove internal stuff.
         for c in r["conditions"]:
-            c.pop("_id", None)
+            c.pop("_cache_key", None)
 
             pattern_type = c.pop("pattern_type", None)
             if pattern_type == "user_id":
                 c["pattern"] = user.to_string()
             elif pattern_type == "user_localpart":
                 c["pattern"] = user.localpart
+
+            sender_type = c.pop("sender_type", None)
+            if sender_type == "user_id":
+                c["sender"] = user.to_string()
 
         rulearray = rules["global"][template_name]
 

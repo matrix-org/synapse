@@ -63,7 +63,7 @@ server {
 
     server_name matrix.example.com;
 
-    location ~* ^(\/_matrix|\/_synapse\/client) {
+    location ~ ^(/_matrix|/_synapse/client) {
         # note: do not add a path (even a single /) after the port in `proxy_pass`,
         # otherwise nginx will canonicalise the URI and cause signature verification
         # errors.
@@ -182,7 +182,7 @@ matrix.example.com {
 
 ```
 frontend https
-  bind :::443 v4v6 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
+  bind *:443,[::]:443 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
   http-request set-header X-Forwarded-Proto https if { ssl_fc }
   http-request set-header X-Forwarded-Proto http if !{ ssl_fc }
   http-request set-header X-Forwarded-For %[src]
@@ -195,7 +195,7 @@ frontend https
   use_backend matrix if matrix-host matrix-path
 
 frontend matrix-federation
-  bind :::8448 v4v6 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1
+  bind *:8448,[::]:8448 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1
   http-request set-header X-Forwarded-Proto https if { ssl_fc }
   http-request set-header X-Forwarded-Proto http if !{ ssl_fc }
   http-request set-header X-Forwarded-For %[src]
@@ -204,6 +204,28 @@ frontend matrix-federation
 
 backend matrix
   server matrix 127.0.0.1:8008
+```
+
+
+[Delegation](delegate.md) example:
+```
+frontend https
+  acl matrix-well-known-client-path path /.well-known/matrix/client
+  acl matrix-well-known-server-path path /.well-known/matrix/server
+  use_backend matrix-well-known-client if matrix-well-known-client-path
+  use_backend matrix-well-known-server if matrix-well-known-server-path
+ 
+backend matrix-well-known-client
+  http-after-response set-header Access-Control-Allow-Origin "*"
+  http-after-response set-header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+  http-after-response set-header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+  http-request return status 200 content-type application/json string '{"m.homeserver":{"base_url":"https://matrix.example.com"},"m.identity_server":{"base_url":"https://identity.example.com"}}'
+
+backend matrix-well-known-server
+  http-after-response set-header Access-Control-Allow-Origin "*"
+  http-after-response set-header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+  http-after-response set-header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+  http-request return status 200 content-type application/json string '{"m.server":"matrix.example.com:443"}'
 ```
 
 ### Relayd

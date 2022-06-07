@@ -52,11 +52,11 @@ class SendServerNoticeServlet(RestServlet):
     """
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
         self.auth = hs.get_auth()
         self.server_notices_manager = hs.get_server_notices_manager()
         self.admin_handler = hs.get_admin_handler()
         self.txns = HttpTransactionCache(hs)
+        self.is_mine = hs.is_mine
 
     def register(self, json_resource: HttpServer) -> None:
         PATTERN = "/send_server_notice"
@@ -88,7 +88,7 @@ class SendServerNoticeServlet(RestServlet):
             )
 
         target_user = UserID.from_string(body["user_id"])
-        if not self.hs.is_mine(target_user):
+        if not self.is_mine(target_user):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST, "Server notices can only be sent to local users"
             )

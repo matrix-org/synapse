@@ -15,11 +15,13 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, List, Tuple, cast
+from typing import Any, Dict, Iterable, List, Tuple, cast
 
+from synapse.replication.tcp.streams import TagAccountDataStream
 from synapse.storage._base import db_to_json
 from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main.account_data import AccountDataWorkerStore
+from synapse.storage.util.id_generators import AbstractStreamIdGenerator
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
@@ -95,7 +97,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
         )
 
         def get_tag_content(
-            txn: LoggingTransaction, tag_ids
+            txn: LoggingTransaction, tag_ids: List[Tuple[int, str, str]]
         ) -> List[Tuple[int, Tuple[str, str, str]]]:
             sql = "SELECT tag, content FROM room_tags WHERE user_id=? AND room_id=?"
             results = []
@@ -204,6 +206,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
             The next account data ID.
         """
         assert self._can_write_to_account_data
+        assert isinstance(self._account_data_id_gen, AbstractStreamIdGenerator)
 
         content_json = json_encoder.encode(content)
 
@@ -230,6 +233,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
             The next account data ID.
         """
         assert self._can_write_to_account_data
+        assert isinstance(self._account_data_id_gen, AbstractStreamIdGenerator)
 
         def remove_tag_txn(txn: LoggingTransaction, next_id: int) -> None:
             sql = (
@@ -247,7 +251,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
         return self._account_data_id_gen.get_current_token()
 
     def _update_revision_txn(
-        self, txn, user_id: str, room_id: str, next_id: int
+        self, txn: LoggingTransaction, user_id: str, room_id: str, next_id: int
     ) -> None:
         """Update the latest revision of the tags for the given user and room.
 
@@ -258,6 +262,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
             next_id: The the revision to advance to.
         """
         assert self._can_write_to_account_data
+        assert isinstance(self._account_data_id_gen, AbstractStreamIdGenerator)
 
         txn.call_after(
             self._account_data_stream_cache.entity_has_changed, user_id, next_id
@@ -286,6 +291,21 @@ class TagsWorkerStore(AccountDataWorkerStore):
                 # which stream_id ends up in the table, as long as it is higher
                 # than the id that the client has.
                 pass
+
+    def process_replication_rows(
+        self,
+        stream_name: str,
+        instance_name: str,
+        token: int,
+        rows: Iterable[Any],
+    ) -> None:
+        if stream_name == TagAccountDataStream.NAME:
+            self._account_data_id_gen.advance(instance_name, token)
+            for row in rows:
+                self.get_tags_for_user.invalidate((row.user_id,))
+                self._account_data_stream_cache.entity_has_changed(row.user_id, token)
+
+        super().process_replication_rows(stream_name, instance_name, token, rows)
 
 
 class TagsStore(TagsWorkerStore):

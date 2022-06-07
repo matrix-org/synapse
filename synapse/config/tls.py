@@ -14,13 +14,15 @@
 
 import logging
 import os
-from typing import List, Optional, Pattern
+from typing import Any, List, Optional, Pattern
+
+from matrix_common.regex import glob_to_regex
 
 from OpenSSL import SSL, crypto
 from twisted.internet._sslverify import Certificate, trustRootFromCertificates
 
 from synapse.config._base import Config, ConfigError
-from synapse.util import glob_to_regex
+from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +30,7 @@ logger = logging.getLogger(__name__)
 class TlsConfig(Config):
     section = "tls"
 
-    def read_config(self, config: dict, config_dir_path: str, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
 
         self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
         self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
@@ -132,7 +134,7 @@ class TlsConfig(Config):
         self.tls_certificate: Optional[crypto.X509] = None
         self.tls_private_key: Optional[crypto.PKey] = None
 
-    def read_certificate_from_disk(self):
+    def read_certificate_from_disk(self) -> None:
         """
         Read the certificates and private key from disk.
         """
@@ -141,13 +143,13 @@ class TlsConfig(Config):
 
     def generate_config_section(
         self,
-        config_dir_path,
-        server_name,
-        data_dir_path,
-        tls_certificate_path,
-        tls_private_key_path,
-        **kwargs,
-    ):
+        config_dir_path: str,
+        data_dir_path: str,
+        server_name: str,
+        tls_certificate_path: Optional[str],
+        tls_private_key_path: Optional[str],
+        **kwargs: Any,
+    ) -> str:
         """If the TLS paths are not specified the default will be certs in the
         config directory"""
 

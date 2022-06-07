@@ -52,9 +52,8 @@ class EventReportsRestServlet(RestServlet):
     PATTERNS = admin_patterns("/event_reports$")
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
@@ -115,9 +114,8 @@ class EventReportDetailRestServlet(RestServlet):
     PATTERNS = admin_patterns("/event_reports/(?P<report_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_GET(
         self, request: SynapseRequest, report_id: str

@@ -40,7 +40,7 @@ class OembedConfig(Config):
 
     section = "oembed"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         oembed_config: Dict[str, Any] = config.get("oembed") or {}
 
         # A list of patterns which will be used.
@@ -57,9 +57,9 @@ class OembedConfig(Config):
         """
         # Whether to use the packaged providers.json file.
         if not oembed_config.get("disable_default_providers") or False:
-            providers = json.load(
-                pkg_resources.resource_stream("synapse", "res/providers.json")
-            )
+            with pkg_resources.resource_stream("synapse", "res/providers.json") as s:
+                providers = json.load(s)
+
             yield from self._parse_and_validate_provider(
                 providers, config_path=("oembed",)
             )
@@ -143,7 +143,7 @@ class OembedConfig(Config):
         )
         return re.compile(pattern)
 
-    def generate_config_section(self, **kwargs):
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         # oEmbed allows for easier embedding content from a website. It can be
         # used for generating URLs previews of services which support it.

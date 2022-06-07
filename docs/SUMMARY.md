@@ -13,11 +13,11 @@
 
 # Upgrading
   - [Upgrading between Synapse Versions](upgrade.md)
-  - [Upgrading from pre-Synapse 1.0](MSC1711_certificates_FAQ.md)
 
 # Usage
   - [Federation](federate.md)
   - [Configuration](usage/configuration/README.md)
+    - [Configuration Manual](usage/configuration/config_documentation.md) 
     - [Homeserver Sample Config File](usage/configuration/homeserver_sample_config.md)
     - [Logging Sample Config File](usage/configuration/logging_sample_config.md)
     - [Structured Logging](structured_logging.md)
@@ -30,6 +30,7 @@
         - [SSO Mapping Providers](sso_mapping_providers.md)
       - [Password Auth Providers](password_auth_providers.md)
       - [JSON Web Tokens](jwt.md)
+      - [Refresh Tokens](usage/configuration/user_authentication/refresh_tokens.md)
     - [Registration Captcha](CAPTCHA_SETUP.md)
     - [Application Services](application_services.md)
     - [Server Notices](server_notices.md)
@@ -45,6 +46,7 @@
         - [Account validity callbacks](modules/account_validity_callbacks.md)
         - [Password auth provider callbacks](modules/password_auth_provider_callbacks.md)
         - [Background update controller callbacks](modules/background_update_controller_callbacks.md)
+        - [Account data callbacks](modules/account_data_callbacks.md)
         - [Porting a legacy module to the new interface](modules/porting_legacy_module.md)
     - [Workers](workers.md)
       - [Using `synctl` with Workers](synctl_workers.md)
@@ -71,7 +73,7 @@
     - [Understanding Synapse Through Grafana Graphs](usage/administration/understanding_synapse_through_grafana_graphs.md)
     - [Useful SQL for Admins](usage/administration/useful_sql_for_admins.md)
     - [Database Maintenance Tools](usage/administration/database_maintenance_tools.md)
-    - [State Groups](usage/administration/state_groups.md) 
+    - [State Groups](usage/administration/state_groups.md)
     - [Request log format](usage/administration/request_log.md)
     - [Admin FAQ](usage/administration/admin_faq.md)
     - [Scripts]()
@@ -79,12 +81,15 @@
 # Development
   - [Contributing Guide](development/contributing_guide.md)
   - [Code Style](code_style.md)
+  - [Release Cycle](development/releases.md)
   - [Git Usage](development/git.md)
   - [Testing]()
+    - [Demo scripts](development/demo.md)
   - [OpenTracing](opentracing.md)
   - [Database Schemas](development/database_schema.md)
   - [Experimental features](development/experimental_features.md)
   - [Synapse Architecture]()
+    - [Cancellation](development/synapse_architecture/cancellation.md)
     - [Log Contexts](log_contexts.md)
     - [Replication](replication.md)
     - [TCP Replication](tcp_replication.md)

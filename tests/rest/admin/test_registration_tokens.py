@@ -14,6 +14,7 @@
 import random
 import string
 from http import HTTPStatus
+from typing import Optional
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -33,7 +34,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
@@ -42,21 +43,27 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
 
         self.url = "/_synapse/admin/v1/registration_tokens"
 
-    def _new_token(self, **kwargs) -> str:
+    def _new_token(
+        self,
+        token: Optional[str] = None,
+        uses_allowed: Optional[int] = None,
+        pending: int = 0,
+        completed: int = 0,
+        expiry_time: Optional[int] = None,
+    ) -> str:
         """Helper function to create a token."""
-        token = kwargs.get(
-            "token",
-            "".join(random.choices(string.ascii_letters, k=8)),
-        )
+        if token is None:
+            token = "".join(random.choices(string.ascii_letters, k=8))
+
         self.get_success(
             self.store.db_pool.simple_insert(
                 "registration_tokens",
                 {
                     "token": token,
-                    "uses_allowed": kwargs.get("uses_allowed", None),
-                    "pending": kwargs.get("pending", 0),
-                    "completed": kwargs.get("completed", 0),
-                    "expiry_time": kwargs.get("expiry_time", None),
+                    "uses_allowed": uses_allowed,
+                    "pending": pending,
+                    "completed": completed,
+                    "expiry_time": expiry_time,
                 },
             )
         )
@@ -216,20 +223,13 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
         # Create all possible single character tokens
         tokens = []
         for c in string.ascii_letters + string.digits + "._~-":
-            tokens.append(
-                {
-                    "token": c,
-                    "uses_allowed": None,
-                    "pending": 0,
-                    "completed": 0,
-                    "expiry_time": None,
-                }
-            )
+            tokens.append((c, None, 0, 0, None))
         self.get_success(
             self.store.db_pool.simple_insert_many(
                 "registration_tokens",
-                tokens,
-                "create_all_registration_tokens",
+                keys=("token", "uses_allowed", "pending", "completed", "expiry_time"),
+                values=tokens,
+                desc="create_all_registration_tokens",
             )
         )
 

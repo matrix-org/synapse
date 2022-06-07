@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, TypeVar
 
 import bleach
 import jinja2
+from markupsafe import Markup
 
 from synapse.api.constants import EventTypes, Membership, RoomTypes
 from synapse.api.errors import StoreError
@@ -112,11 +113,11 @@ class Mailer:
         self.template_text = template_text
 
         self.send_email_handler = hs.get_send_email_handler()
-        self.store = self.hs.get_datastore()
-        self.state_store = self.hs.get_storage().state
+        self.store = self.hs.get_datastores().main
+        self._state_storage_controller = self.hs.get_storage_controllers().state
         self.macaroon_gen = self.hs.get_macaroon_generator()
         self.state_handler = self.hs.get_state_handler()
-        self.storage = hs.get_storage()
+        self._storage_controllers = hs.get_storage_controllers()
         self.app_name = app_name
         self.email_subjects: EmailSubjectConfig = hs.config.email.email_subjects
 
@@ -178,7 +179,7 @@ class Mailer:
         await self.send_email(
             email_address,
             self.email_subjects.email_validation
-            % {"server_name": self.hs.config.server.server_name},
+            % {"server_name": self.hs.config.server.server_name, "app": self.app_name},
             template_vars,
         )
 
@@ -209,7 +210,7 @@ class Mailer:
         await self.send_email(
             email_address,
             self.email_subjects.email_validation
-            % {"server_name": self.hs.config.server.server_name},
+            % {"server_name": self.hs.config.server.server_name, "app": self.app_name},
             template_vars,
         )
 
@@ -232,15 +233,13 @@ class Mailer:
             reason: The notification that was ready and is the cause of an email
                 being sent.
         """
-        rooms_in_order = deduped_ordered_list([pa["room_id"] for pa in push_actions])
+        rooms_in_order = deduped_ordered_list([pa.room_id for pa in push_actions])
 
-        notif_events = await self.store.get_events(
-            [pa["event_id"] for pa in push_actions]
-        )
+        notif_events = await self.store.get_events([pa.event_id for pa in push_actions])
 
         notifs_by_room: Dict[str, List[EmailPushAction]] = {}
         for pa in push_actions:
-            notifs_by_room.setdefault(pa["room_id"], []).append(pa)
+            notifs_by_room.setdefault(pa.room_id, []).append(pa)
 
         # collect the current state for all the rooms in which we have
         # notifications
@@ -256,7 +255,9 @@ class Mailer:
             user_display_name = user_id
 
         async def _fetch_room_state(room_id: str) -> None:
-            room_state = await self.store.get_current_state_ids(room_id)
+            room_state = await self._state_storage_controller.get_current_state_ids(
+                room_id
+            )
             state_by_room[room_id] = room_state
 
         # Run at most 3 of these at once: sync does 10 at a time but email
@@ -264,7 +265,7 @@ class Mailer:
         await concurrently_execute(_fetch_room_state, rooms_in_order, 3)
 
         # actually sort our so-called rooms_in_order list, most recent room first
-        rooms_in_order.sort(key=lambda r: -(notifs_by_room[r][-1]["received_ts"] or 0))
+        rooms_in_order.sort(key=lambda r: -(notifs_by_room[r][-1].received_ts or 0))
 
         rooms: List[RoomVars] = []
 
@@ -356,7 +357,7 @@ class Mailer:
         # Check if one of the notifs is an invite event for the user.
         is_invite = False
         for n in notifs:
-            ev = notif_events[n["event_id"]]
+            ev = notif_events[n.event_id]
             if ev.type == EventTypes.Member and ev.state_key == user_id:
                 if ev.content.get("membership") == Membership.INVITE:
                     is_invite = True
@@ -376,7 +377,7 @@ class Mailer:
         if not is_invite:
             for n in notifs:
                 notifvars = await self._get_notif_vars(
-                    n, user_id, notif_events[n["event_id"]], room_state_ids
+                    n, user_id, notif_events[n.event_id], room_state_ids
                 )
 
                 # merge overlapping notifs together.
@@ -444,20 +445,20 @@ class Mailer:
         """
 
         results = await self.store.get_events_around(
-            notif["room_id"],
-            notif["event_id"],
+            notif.room_id,
+            notif.event_id,
             before_limit=CONTEXT_BEFORE,
             after_limit=CONTEXT_AFTER,
         )
 
         ret: NotifVars = {
             "link": self._make_notif_link(notif),
-            "ts": notif["received_ts"],
+            "ts": notif.received_ts,
             "messages": [],
         }
 
         the_events = await filter_events_for_client(
-            self.storage, user_id, results["events_before"]
+            self._storage_controllers, user_id, results.events_before
         )
         the_events.append(notif_event)
 
@@ -495,7 +496,7 @@ class Mailer:
             )
         else:
             # Attempt to check the historical state for the room.
-            historical_state = await self.state_store.get_state_for_event(
+            historical_state = await self._state_storage_controller.get_state_for_event(
                 event.event_id, StateFilter.from_types((type_state_key,))
             )
             sender_state_event = historical_state.get(type_state_key)
@@ -516,7 +517,7 @@ class Mailer:
 
         ret: MessageVars = {
             "event_type": event.type,
-            "is_historical": event.event_id != notif["event_id"],
+            "is_historical": event.event_id != notif.event_id,
             "id": event.event_id,
             "ts": event.origin_server_ts,
             "sender_name": sender_name,
@@ -610,7 +611,7 @@ class Mailer:
         # See if one of the notifs is an invite event for the user
         invite_event = None
         for n in notifs:
-            ev = notif_events[n["event_id"]]
+            ev = notif_events[n.event_id]
             if ev.type == EventTypes.Member and ev.state_key == user_id:
                 if ev.content.get("membership") == Membership.INVITE:
                     invite_event = ev
@@ -659,7 +660,7 @@ class Mailer:
         if len(notifs) == 1:
             # There is just the one notification, so give some detail
             sender_name = None
-            event = notif_events[notifs[0]["event_id"]]
+            event = notif_events[notifs[0].event_id]
             if ("m.room.member", event.sender) in room_state_ids:
                 state_event_id = room_state_ids[("m.room.member", event.sender)]
                 state_event = await self.store.get_event(state_event_id)
@@ -753,9 +754,9 @@ class Mailer:
         # are already in descending received_ts.
         sender_ids = {}
         for n in notifs:
-            sender = notif_events[n["event_id"]].sender
+            sender = notif_events[n.event_id].sender
             if sender not in sender_ids:
-                sender_ids[sender] = n["event_id"]
+                sender_ids[sender] = n.event_id
 
         # Get the actual member events (in order to calculate a pretty name for
         # the room).
@@ -768,8 +769,10 @@ class Mailer:
                 member_event_ids.append(sender_state_event_id)
             else:
                 # Attempt to check the historical state for the room.
-                historical_state = await self.state_store.get_state_for_event(
-                    event_id, StateFilter.from_types((type_state_key,))
+                historical_state = (
+                    await self._state_storage_controller.get_state_for_event(
+                        event_id, StateFilter.from_types((type_state_key,))
+                    )
                 )
                 sender_state_event = historical_state.get(type_state_key)
                 if sender_state_event:
@@ -830,17 +833,17 @@ class Mailer:
         if self.hs.config.email.email_riot_base_url:
             return "%s/#/room/%s/%s" % (
                 self.hs.config.email.email_riot_base_url,
-                notif["room_id"],
-                notif["event_id"],
+                notif.room_id,
+                notif.event_id,
             )
         elif self.app_name == "Vector":
             # need /beta for Universal Links to work on iOS
             return "https://vector.im/beta/#/room/%s/%s" % (
-                notif["room_id"],
-                notif["event_id"],
+                notif.room_id,
+                notif.event_id,
             )
         else:
-            return "https://matrix.to/#/%s/%s" % (notif["room_id"], notif["event_id"])
+            return "https://matrix.to/#/%s/%s" % (notif.room_id, notif.event_id)
 
     def _make_unsubscribe_link(
         self, user_id: str, app_id: str, email_address: str
@@ -869,7 +872,7 @@ class Mailer:
         )
 
 
-def safe_markup(raw_html: str) -> jinja2.Markup:
+def safe_markup(raw_html: str) -> Markup:
     """
     Sanitise a raw HTML string to a set of allowed tags and attributes, and linkify any bare URLs.
 
@@ -879,7 +882,7 @@ def safe_markup(raw_html: str) -> jinja2.Markup:
     Returns:
         A Markup object ready to safely use in a Jinja template.
     """
-    return jinja2.Markup(
+    return Markup(
         bleach.linkify(
             bleach.clean(
                 raw_html,
@@ -893,7 +896,7 @@ def safe_markup(raw_html: str) -> jinja2.Markup:
     )
 
 
-def safe_text(raw_text: str) -> jinja2.Markup:
+def safe_text(raw_text: str) -> Markup:
     """
     Sanitise text (escape any HTML tags), and then linkify any bare URLs.
 
@@ -903,7 +906,7 @@ def safe_text(raw_text: str) -> jinja2.Markup:
     Returns:
         A Markup object ready to safely use in a Jinja template.
     """
-    return jinja2.Markup(
+    return Markup(
         bleach.linkify(bleach.clean(raw_text, tags=[], attributes=[], strip=False))
     )
 

@@ -106,7 +106,7 @@ async def _sendmail(
         factory = build_sender_factory(hostname=smtphost if enable_tls else None)
 
     reactor.connectTCP(
-        smtphost,  # type: ignore[arg-type]
+        smtphost,
         smtpport,
         factory,
         timeout=30,

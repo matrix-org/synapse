@@ -15,11 +15,12 @@
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Pattern, Set, Tuple, Union
+
+from matrix_common.regex import glob_to_regex, to_word_pattern
 
 from synapse.events import EventBase
-from synapse.types import JsonDict, UserID
-from synapse.util import glob_to_regex, re_word_boundary
+from synapse.types import UserID
 from synapse.util.caches.lrucache import LruCache
 
 logger = logging.getLogger(__name__)
@@ -119,18 +120,68 @@ class PushRuleEvaluatorForEvent:
         room_member_count: int,
         sender_power_level: int,
         power_levels: Dict[str, Union[int, Dict[str, int]]],
+        relations: Dict[str, Set[Tuple[str, str]]],
+        relations_match_enabled: bool,
     ):
         self._event = event
         self._room_member_count = room_member_count
         self._sender_power_level = sender_power_level
         self._power_levels = power_levels
+        self._relations = relations
+        self._relations_match_enabled = relations_match_enabled
 
         # Maps strings of e.g. 'content.body' -> event["content"]["body"]
         self._value_cache = _flatten_dict(event)
 
+        # Maps cache keys to final values.
+        self._condition_cache: Dict[str, bool] = {}
+
+    def check_conditions(
+        self, conditions: List[dict], uid: str, display_name: Optional[str]
+    ) -> bool:
+        """
+        Returns true if a user's conditions/user ID/display name match the event.
+
+        Args:
+            conditions: The user's conditions to match.
+            uid: The user's MXID.
+            display_name: The display name.
+
+        Returns:
+             True if all conditions match the event, False otherwise.
+        """
+        for cond in conditions:
+            _cache_key = cond.get("_cache_key", None)
+            if _cache_key:
+                res = self._condition_cache.get(_cache_key, None)
+                if res is False:
+                    return False
+                elif res is True:
+                    continue
+
+            res = self.matches(cond, uid, display_name)
+            if _cache_key:
+                self._condition_cache[_cache_key] = bool(res)
+
+            if not res:
+                return False
+
+        return True
+
     def matches(
         self, condition: Dict[str, Any], user_id: str, display_name: Optional[str]
     ) -> bool:
+        """
+        Returns true if a user's condition/user ID/display name match the event.
+
+        Args:
+            condition: The user's condition to match.
+            uid: The user's MXID.
+            display_name: The display name, or None if there is not one.
+
+        Returns:
+             True if the condition matches the event, False otherwise.
+        """
         if condition["kind"] == "event_match":
             return self._event_match(condition, user_id)
         elif condition["kind"] == "contains_display_name":
@@ -141,10 +192,29 @@ class PushRuleEvaluatorForEvent:
             return _sender_notification_permission(
                 self._event, condition, self._sender_power_level, self._power_levels
             )
+        elif (
+            condition["kind"] == "org.matrix.msc3772.relation_match"
+            and self._relations_match_enabled
+        ):
+            return self._relation_match(condition, user_id)
         else:
+            # XXX This looks incorrect -- we have reached an unknown condition
+            #     kind and are unconditionally returning that it matches. Note
+            #     that it seems possible to provide a condition to the /pushrules
+            #     endpoint with an unknown kind, see _rule_tuple_from_request_object.
             return True
 
     def _event_match(self, condition: dict, user_id: str) -> bool:
+        """
+        Check an "event_match" push rule condition.
+
+        Args:
+            condition: The "event_match" push rule condition to match.
+            user_id: The user's MXID.
+
+        Returns:
+             True if the condition matches the event, False otherwise.
+        """
         pattern = condition.get("pattern", None)
 
         if not pattern:
@@ -166,13 +236,22 @@ class PushRuleEvaluatorForEvent:
 
             return _glob_matches(pattern, body, word_boundary=True)
         else:
-            haystack = self._get_value(condition["key"])
+            haystack = self._value_cache.get(condition["key"], None)
             if haystack is None:
                 return False
 
             return _glob_matches(pattern, haystack)
 
     def _contains_display_name(self, display_name: Optional[str]) -> bool:
+        """
+        Check an "event_match" push rule condition.
+
+        Args:
+            display_name: The display name, or None if there is not one.
+
+        Returns:
+             True if the display name is found in the event body, False otherwise.
+        """
         if not display_name:
             return False
 
@@ -184,14 +263,46 @@ class PushRuleEvaluatorForEvent:
         r = regex_cache.get((display_name, False, True), None)
         if not r:
             r1 = re.escape(display_name)
-            r1 = re_word_boundary(r1)
+            r1 = to_word_pattern(r1)
             r = re.compile(r1, flags=re.IGNORECASE)
             regex_cache[(display_name, False, True)] = r
 
         return bool(r.search(body))
 
-    def _get_value(self, dotted_key: str) -> Optional[str]:
-        return self._value_cache.get(dotted_key, None)
+    def _relation_match(self, condition: dict, user_id: str) -> bool:
+        """
+        Check an "relation_match" push rule condition.
+
+        Args:
+            condition: The "event_match" push rule condition to match.
+            user_id: The user's MXID.
+
+        Returns:
+             True if the condition matches the event, False otherwise.
+        """
+        rel_type = condition.get("rel_type")
+        if not rel_type:
+            logger.warning("relation_match condition missing rel_type")
+            return False
+
+        sender_pattern = condition.get("sender")
+        if sender_pattern is None:
+            sender_type = condition.get("sender_type")
+            if sender_type == "user_id":
+                sender_pattern = user_id
+        type_pattern = condition.get("type")
+
+        # If any other relations matches, return True.
+        for sender, event_type in self._relations.get(rel_type, ()):
+            if sender_pattern and not _glob_matches(sender_pattern, sender):
+                continue
+            if type_pattern and not _glob_matches(type_pattern, event_type):
+                continue
+            # All values must have matched.
+            return True
+
+        # No relations matched.
+        return False
 
 
 # Caches (string, is_glob, word_boundary) -> regex for push. See _glob_matches
@@ -213,7 +324,7 @@ def _glob_matches(glob: str, value: str, word_boundary: bool = False) -> bool:
     try:
         r = regex_cache.get((glob, True, word_boundary), None)
         if not r:
-            r = glob_to_regex(glob, word_boundary)
+            r = glob_to_regex(glob, word_boundary=word_boundary)
             regex_cache[(glob, True, word_boundary)] = r
         return bool(r.search(value))
     except re.error:
@@ -222,7 +333,7 @@ def _glob_matches(glob: str, value: str, word_boundary: bool = False) -> bool:
 
 
 def _flatten_dict(
-    d: Union[EventBase, JsonDict],
+    d: Union[EventBase, Mapping[str, Any]],
     prefix: Optional[List[str]] = None,
     result: Optional[Dict[str, str]] = None,
 ) -> Dict[str, str]:
@@ -233,7 +344,7 @@ def _flatten_dict(
     for key, value in d.items():
         if isinstance(value, str):
             result[".".join(prefix + [key])] = value.lower()
-        elif isinstance(value, dict):
+        elif isinstance(value, Mapping):
             _flatten_dict(value, prefix=(prefix + [key]), result=result)
 
     return result

@@ -44,7 +44,8 @@ class DirectoryHandler:
         self.state = hs.get_state_handler()
         self.appservice_handler = hs.get_application_service_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.config = hs.config
         self.enable_room_list_search = hs.config.roomdirectory.enable_room_list_search
         self.require_membership = hs.config.server.require_membership_for_aliases
@@ -70,6 +71,9 @@ class DirectoryHandler:
         for wchar in string.whitespace:
             if wchar in room_alias.localpart:
                 raise SynapseError(400, "Invalid characters in room alias")
+
+        if ":" in room_alias.localpart:
+            raise SynapseError(400, "Invalid character in room alias localpart: ':'.")
 
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
@@ -119,7 +123,7 @@ class DirectoryHandler:
 
         service = requester.app_service
         if service:
-            if not service.is_interested_in_alias(room_alias_str):
+            if not service.is_room_alias_in_namespace(room_alias_str):
                 raise SynapseError(
                     400,
                     "This application service has not reserved this kind of alias.",
@@ -221,7 +225,7 @@ class DirectoryHandler:
     async def delete_appservice_association(
         self, service: ApplicationService, room_alias: RoomAlias
     ) -> None:
-        if not service.is_interested_in_alias(room_alias.to_string()):
+        if not service.is_room_alias_in_namespace(room_alias.to_string()):
             raise SynapseError(
                 400,
                 "This application service has not reserved this kind of alias",
@@ -278,13 +282,15 @@ class DirectoryHandler:
 
         users = await self.store.get_users_in_room(room_id)
         extra_servers = {get_domain_from_id(u) for u in users}
-        servers = set(extra_servers) | set(servers)
+        servers_set = set(extra_servers) | set(servers)
 
         # If this server is in the list of servers, return it first.
-        if self.server_name in servers:
-            servers = [self.server_name] + [s for s in servers if s != self.server_name]
+        if self.server_name in servers_set:
+            servers = [self.server_name] + [
+                s for s in servers_set if s != self.server_name
+            ]
         else:
-            servers = list(servers)
+            servers = list(servers_set)
 
         return {"room_id": room_id, "servers": servers}
 
@@ -314,7 +320,7 @@ class DirectoryHandler:
         Raises:
             ShadowBanError if the requester has been shadow-banned.
         """
-        alias_event = await self.state.get_current_state(
+        alias_event = await self._storage_controllers.state.get_current_state_event(
             room_id, EventTypes.CanonicalAlias, ""
         )
 
@@ -374,7 +380,7 @@ class DirectoryHandler:
         # non-exclusive locks on the alias (or there are no interested services)
         services = self.store.get_app_services()
         interested_services = [
-            s for s in services if s.is_interested_in_alias(alias.to_string())
+            s for s in services if s.is_room_alias_in_namespace(alias.to_string())
         ]
 
         for service in interested_services:
@@ -458,7 +464,11 @@ class DirectoryHandler:
         making_public = visibility == "public"
         if making_public:
             room_aliases = await self.store.get_aliases_for_room(room_id)
-            canonical_alias = await self.store.get_canonical_alias_for_room(room_id)
+            canonical_alias = (
+                await self._storage_controllers.state.get_canonical_alias_for_room(
+                    room_id
+                )
+            )
             if canonical_alias:
                 room_aliases.append(canonical_alias)
 

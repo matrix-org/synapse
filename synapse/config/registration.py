@@ -13,18 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
-from typing import Optional
+from typing import Any, Optional
 
 from synapse.api.constants import RoomCreationPreset
 from synapse.config._base import Config, ConfigError
-from synapse.types import RoomAlias, UserID
+from synapse.types import JsonDict, RoomAlias, UserID
 from synapse.util.stringutils import random_string_with_symbols, strtobool
 
 
 class RegistrationConfig(Config):
     section = "registration"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.enable_registration = strtobool(
             str(config.get("enable_registration", False))
         )
@@ -33,11 +33,18 @@ class RegistrationConfig(Config):
                 str(config["disable_registration"])
             )
 
+        self.enable_registration_without_verification = strtobool(
+            str(config.get("enable_registration_without_verification", False))
+        )
+
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
         self.enable_3pid_lookup = config.get("enable_3pid_lookup", True)
         self.registration_requires_token = config.get(
             "registration_requires_token", False
+        )
+        self.enable_registration_token_3pid_bypass = config.get(
+            "enable_registration_token_3pid_bypass", False
         )
         self.registration_shared_secret = config.get("registration_shared_secret")
 
@@ -190,7 +197,11 @@ class RegistrationConfig(Config):
         # The success template used during fallback auth.
         self.fallback_success_template = self.read_template("auth_success.html")
 
-    def generate_config_section(self, generate_secrets=False, **kwargs):
+        self.inhibit_user_in_use_error = config.get("inhibit_user_in_use_error", False)
+
+    def generate_config_section(
+        self, generate_secrets: bool = False, **kwargs: Any
+    ) -> str:
         if generate_secrets:
             registration_shared_secret = 'registration_shared_secret: "%s"' % (
                 random_string_with_symbols(50),
@@ -205,9 +216,17 @@ class RegistrationConfig(Config):
         # Registration can be rate-limited using the parameters in the "Ratelimiting"
         # section of this file.
 
-        # Enable registration for new users.
+        # Enable registration for new users. Defaults to 'false'. It is highly recommended that if you enable registration,
+        # you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration
+        # without any verification, you must also set `enable_registration_without_verification`, found below.
         #
         #enable_registration: false
+
+        # Enable registration without email or captcha verification. Note: this option is *not* recommended,
+        # as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
+        # unless `enable_registration` is also enabled.
+        #
+        #enable_registration_without_verification: true
 
         # Time that a user's session remains valid for, after they log in.
         #
@@ -292,6 +311,12 @@ class RegistrationConfig(Config):
         # Defaults to false. Uncomment the following to require tokens:
         #
         #registration_requires_token: true
+
+        # Allow users to submit a token during registration to bypass any required 3pid
+        # steps configured in `registrations_require_3pid`.
+        # Defaults to false, requiring that registration tokens (if enabled) complete a 3pid flow.
+        #
+        #enable_registration_token_3pid_bypass: false
 
         # If set, allows registration of standard or admin accounts by anyone who
         # has the shared secret, even if registration is otherwise disabled.
@@ -446,6 +471,16 @@ class RegistrationConfig(Config):
         # Defaults to true.
         #
         #auto_join_rooms_for_guests: false
+
+        # Whether to inhibit errors raised when registering a new account if the user ID
+        # already exists. If turned on, that requests to /register/available will always
+        # show a user ID as available, and Synapse won't raise an error when starting
+        # a registration with a user ID that already exists. However, Synapse will still
+        # raise an error if the registration completes and the username conflicts.
+        #
+        # Defaults to false.
+        #
+        #inhibit_user_in_use_error: true
         """
             % locals()
         )

@@ -168,11 +168,27 @@ import inspect
 import logging
 import re
 from functools import wraps
-from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Pattern, Type
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Collection,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Optional,
+    Pattern,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import attr
+from typing_extensions import ParamSpec
 
 from twisted.internet import defer
+from twisted.web.http import Request
 from twisted.web.http_headers import Headers
 
 from synapse.config import ConfigError
@@ -219,11 +235,12 @@ class _DummyTagNames:
 
 try:
     import opentracing
+    import opentracing.tags
 
     tags = opentracing.tags
 except ImportError:
-    opentracing = None
-    tags = _DummyTagNames
+    opentracing = None  # type: ignore[assignment]
+    tags = _DummyTagNames  # type: ignore[assignment]
 try:
     from jaeger_client import Config as JaegerConfig
 
@@ -245,16 +262,16 @@ try:
         class BaseReporter:  # type: ignore[no-redef]
             pass
 
-    @attr.s(slots=True, frozen=True)
+    @attr.s(slots=True, frozen=True, auto_attribs=True)
     class _WrappedRustReporter(BaseReporter):
         """Wrap the reporter to ensure `report_span` never throws."""
 
-        _reporter = attr.ib(type=Reporter, default=attr.Factory(Reporter))
+        _reporter: Reporter = attr.Factory(Reporter)
 
         def set_process(self, *args, **kwargs):
             return self._reporter.set_process(*args, **kwargs)
 
-        def report_span(self, span):
+        def report_span(self, span: "opentracing.Span") -> None:
             try:
                 return self._reporter.report_span(span)
             except Exception:
@@ -287,6 +304,9 @@ class SynapseTags:
     # Uniqueish ID of a database transaction
     DB_TXN_ID = "db.txn_id"
 
+    # The name of the external cache
+    CACHE_NAME = "cache.name"
+
 
 class SynapseBaggage:
     FORCE_TRACING = "synapse-force-tracing"
@@ -302,15 +322,19 @@ _homeserver_whitelist: Optional[Pattern[str]] = None
 Sentinel = object()
 
 
-def only_if_tracing(func):
+P = ParamSpec("P")
+R = TypeVar("R")
+
+
+def only_if_tracing(func: Callable[P, R]) -> Callable[P, Optional[R]]:
     """Executes the function only if we're tracing. Otherwise returns None."""
 
     @wraps(func)
-    def _only_if_tracing_inner(*args, **kwargs):
+    def _only_if_tracing_inner(*args: P.args, **kwargs: P.kwargs) -> Optional[R]:
         if opentracing:
             return func(*args, **kwargs)
         else:
-            return
+            return None
 
     return _only_if_tracing_inner
 
@@ -351,22 +375,15 @@ def ensure_active_span(message, ret=None):
     return ensure_active_span_inner_1
 
 
-@contextlib.contextmanager
-def noop_context_manager(*args, **kwargs):
-    """Does exactly what it says on the tin"""
-    # TODO: replace with contextlib.nullcontext once we drop support for Python 3.6
-    yield
-
-
 # Setup
 
 
-def init_tracer(hs: "HomeServer"):
+def init_tracer(hs: "HomeServer") -> None:
     """Set the whitelists and initialise the JaegerClient tracer"""
     global opentracing
     if not hs.config.tracing.opentracer_enabled:
         # We don't have a tracer
-        opentracing = None
+        opentracing = None  # type: ignore[assignment]
         return
 
     if not opentracing or not JaegerConfig:
@@ -403,11 +420,11 @@ def init_tracer(hs: "HomeServer"):
 
 
 @only_if_tracing
-def set_homeserver_whitelist(homeserver_whitelist):
+def set_homeserver_whitelist(homeserver_whitelist: Iterable[str]) -> None:
     """Sets the homeserver whitelist
 
     Args:
-        homeserver_whitelist (Iterable[str]): regex of whitelisted homeservers
+        homeserver_whitelist: regexes specifying whitelisted homeservers
     """
     global _homeserver_whitelist
     if homeserver_whitelist:
@@ -418,15 +435,15 @@ def set_homeserver_whitelist(homeserver_whitelist):
 
 
 @only_if_tracing
-def whitelisted_homeserver(destination):
+def whitelisted_homeserver(destination: str) -> bool:
     """Checks if a destination matches the whitelist
 
     Args:
-        destination (str)
+        destination
     """
 
     if _homeserver_whitelist:
-        return _homeserver_whitelist.match(destination)
+        return _homeserver_whitelist.match(destination) is not None
     return False
 
 
@@ -441,20 +458,28 @@ def start_active_span(
     start_time=None,
     ignore_active_span=False,
     finish_on_close=True,
+    *,
+    tracer=None,
 ):
-    """Starts an active opentracing span. Note, the scope doesn't become active
-    until it has been entered, however, the span starts from the time this
-    message is called.
+    """Starts an active opentracing span.
+
+    Records the start time for the span, and sets it as the "active span" in the
+    scope manager.
+
     Args:
         See opentracing.tracer
     Returns:
-        scope (Scope) or noop_context_manager
+        scope (Scope) or contextlib.nullcontext
     """
 
     if opentracing is None:
-        return noop_context_manager()
+        return contextlib.nullcontext()  # type: ignore[unreachable]
 
-    return opentracing.tracer.start_active_span(
+    if tracer is None:
+        # use the global tracer by default
+        tracer = opentracing.tracer
+
+    return tracer.start_active_span(
         operation_name,
         child_of=child_of,
         references=references,
@@ -466,21 +491,42 @@ def start_active_span(
 
 
 def start_active_span_follows_from(
-    operation_name: str, contexts: Collection, inherit_force_tracing=False
+    operation_name: str,
+    contexts: Collection,
+    child_of=None,
+    start_time: Optional[float] = None,
+    *,
+    inherit_force_tracing=False,
+    tracer=None,
 ):
     """Starts an active opentracing span, with additional references to previous spans
 
     Args:
         operation_name: name of the operation represented by the new span
         contexts: the previous spans to inherit from
+
+        child_of: optionally override the parent span. If unset, the currently active
+           span will be the parent. (If there is no currently active span, the first
+           span in `contexts` will be the parent.)
+
+        start_time: optional override for the start time of the created span. Seconds
+            since the epoch.
+
         inherit_force_tracing: if set, and any of the previous contexts have had tracing
            forced, the new span will also have tracing forced.
+        tracer: override the opentracing tracer. By default the global tracer is used.
     """
     if opentracing is None:
-        return noop_context_manager()
+        return contextlib.nullcontext()  # type: ignore[unreachable]
 
     references = [opentracing.follows_from(context) for context in contexts]
-    scope = start_active_span(operation_name, references=references)
+    scope = start_active_span(
+        operation_name,
+        child_of=child_of,
+        references=references,
+        start_time=start_time,
+        tracer=tracer,
+    )
 
     if inherit_force_tracing and any(
         is_context_forced_tracing(ctx) for ctx in contexts
@@ -490,62 +536,20 @@ def start_active_span_follows_from(
     return scope
 
 
-def start_active_span_from_request(
-    request,
-    operation_name,
-    references=None,
-    tags=None,
-    start_time=None,
-    ignore_active_span=False,
-    finish_on_close=True,
-):
-    """
-    Extracts a span context from a Twisted Request.
-    args:
-        headers (twisted.web.http.Request)
-
-        For the other args see opentracing.tracer
-
-    returns:
-        span_context (opentracing.span.SpanContext)
-    """
-    # Twisted encodes the values as lists whereas opentracing doesn't.
-    # So, we take the first item in the list.
-    # Also, twisted uses byte arrays while opentracing expects strings.
-
-    if opentracing is None:
-        return noop_context_manager()
-
-    header_dict = {
-        k.decode(): v[0].decode() for k, v in request.requestHeaders.getAllRawHeaders()
-    }
-    context = opentracing.tracer.extract(opentracing.Format.HTTP_HEADERS, header_dict)
-
-    return opentracing.tracer.start_active_span(
-        operation_name,
-        child_of=context,
-        references=references,
-        tags=tags,
-        start_time=start_time,
-        ignore_active_span=ignore_active_span,
-        finish_on_close=finish_on_close,
-    )
-
-
 def start_active_span_from_edu(
-    edu_content,
-    operation_name,
-    references: Optional[list] = None,
-    tags=None,
-    start_time=None,
-    ignore_active_span=False,
-    finish_on_close=True,
-):
+    edu_content: Dict[str, Any],
+    operation_name: str,
+    references: Optional[List["opentracing.Reference"]] = None,
+    tags: Optional[Dict] = None,
+    start_time: Optional[float] = None,
+    ignore_active_span: bool = False,
+    finish_on_close: bool = True,
+) -> "opentracing.Scope":
     """
     Extracts a span context from an edu and uses it to start a new active span
 
     Args:
-        edu_content (dict): and edu_content with a `context` field whose value is
+        edu_content: an edu_content with a `context` field whose value is
         canonical json for a dict which contains opentracing information.
 
         For the other args see opentracing.tracer
@@ -553,7 +557,7 @@ def start_active_span_from_edu(
     references = references or []
 
     if opentracing is None:
-        return noop_context_manager()
+        return contextlib.nullcontext()  # type: ignore[unreachable]
 
     carrier = json_decoder.decode(edu_content.get("context", "{}")).get(
         "opentracing", {}
@@ -586,26 +590,29 @@ def start_active_span_from_edu(
 
 # Opentracing setters for tags, logs, etc
 @only_if_tracing
-def active_span():
+def active_span() -> Optional["opentracing.Span"]:
     """Get the currently active span, if any"""
     return opentracing.tracer.active_span
 
 
 @ensure_active_span("set a tag")
-def set_tag(key, value):
+def set_tag(key: str, value: Union[str, bool, int, float]) -> None:
     """Sets a tag on the active span"""
+    assert opentracing.tracer.active_span is not None
     opentracing.tracer.active_span.set_tag(key, value)
 
 
 @ensure_active_span("log")
-def log_kv(key_values, timestamp=None):
+def log_kv(key_values: Dict[str, Any], timestamp: Optional[float] = None) -> None:
     """Log to the active span"""
+    assert opentracing.tracer.active_span is not None
     opentracing.tracer.active_span.log_kv(key_values, timestamp)
 
 
 @ensure_active_span("set the traces operation name")
-def set_operation_name(operation_name):
+def set_operation_name(operation_name: str) -> None:
     """Sets the operation name of the active span"""
+    assert opentracing.tracer.active_span is not None
     opentracing.tracer.active_span.set_operation_name(operation_name)
 
 
@@ -629,7 +636,9 @@ def force_tracing(span=Sentinel) -> None:
     span.set_baggage_item(SynapseBaggage.FORCE_TRACING, "1")
 
 
-def is_context_forced_tracing(span_context) -> bool:
+def is_context_forced_tracing(
+    span_context: Optional["opentracing.SpanContext"],
+) -> bool:
     """Check if sampling has been force for the given span context."""
     if span_context is None:
         return False
@@ -674,6 +683,7 @@ def inject_header_dict(
     span = opentracing.tracer.active_span
 
     carrier: Dict[str, str] = {}
+    assert span is not None
     opentracing.tracer.inject(span.context, opentracing.Format.HTTP_HEADERS, carrier)
 
     for key, value in carrier.items():
@@ -700,13 +710,13 @@ def inject_response_headers(response_headers: Headers) -> None:
 
 
 @ensure_active_span("get the active span context as a dict", ret={})
-def get_active_span_text_map(destination=None):
+def get_active_span_text_map(destination: Optional[str] = None) -> Dict[str, str]:
     """
     Gets a span context as a dict. This can be used instead of manually
     injecting a span into an empty carrier.
 
     Args:
-        destination (str): the name of the remote server.
+        destination: the name of the remote server.
 
     Returns:
         dict: the active span's context if opentracing is enabled, otherwise empty.
@@ -716,6 +726,7 @@ def get_active_span_text_map(destination=None):
         return {}
 
     carrier: Dict[str, str] = {}
+    assert opentracing.tracer.active_span is not None
     opentracing.tracer.inject(
         opentracing.tracer.active_span.context, opentracing.Format.TEXT_MAP, carrier
     )
@@ -724,35 +735,50 @@ def get_active_span_text_map(destination=None):
 
 
 @ensure_active_span("get the span context as a string.", ret={})
-def active_span_context_as_string():
+def active_span_context_as_string() -> str:
     """
     Returns:
         The active span context encoded as a string.
     """
     carrier: Dict[str, str] = {}
     if opentracing:
+        assert opentracing.tracer.active_span is not None
         opentracing.tracer.inject(
             opentracing.tracer.active_span.context, opentracing.Format.TEXT_MAP, carrier
         )
     return json_encoder.encode(carrier)
 
 
+def span_context_from_request(request: Request) -> "Optional[opentracing.SpanContext]":
+    """Extract an opentracing context from the headers on an HTTP request
+
+    This is useful when we have received an HTTP request from another part of our
+    system, and want to link our spans to those of the remote system.
+    """
+    if not opentracing:
+        return None
+    header_dict = {
+        k.decode(): v[0].decode() for k, v in request.requestHeaders.getAllRawHeaders()
+    }
+    return opentracing.tracer.extract(opentracing.Format.HTTP_HEADERS, header_dict)
+
+
 @only_if_tracing
-def span_context_from_string(carrier):
+def span_context_from_string(carrier: str) -> Optional["opentracing.SpanContext"]:
     """
     Returns:
         The active span context decoded from a string.
     """
-    carrier = json_decoder.decode(carrier)
-    return opentracing.tracer.extract(opentracing.Format.TEXT_MAP, carrier)
+    payload: Dict[str, str] = json_decoder.decode(carrier)
+    return opentracing.tracer.extract(opentracing.Format.TEXT_MAP, payload)
 
 
 @only_if_tracing
-def extract_text_map(carrier):
+def extract_text_map(carrier: Dict[str, str]) -> Optional["opentracing.SpanContext"]:
     """
     Wrapper method for opentracing's tracer.extract for TEXT_MAP.
     Args:
-        carrier (dict): a dict possibly containing a span context.
+        carrier: a dict possibly containing a span context.
 
     Returns:
         The active span context extracted from carrier.
@@ -773,7 +799,7 @@ def trace(func=None, opname=None):
 
     def decorator(func):
         if opentracing is None:
-            return func
+            return func  # type: ignore[unreachable]
 
         _opname = opname if opname else func.__name__
 
@@ -831,7 +857,7 @@ def trace(func=None, opname=None):
         return decorator
 
 
-def tag_args(func):
+def tag_args(func: Callable[P, R]) -> Callable[P, R]:
     """
     Tags all of the args to the active span.
     """
@@ -840,11 +866,11 @@ def tag_args(func):
         return func
 
     @wraps(func)
-    def _tag_args_inner(*args, **kwargs):
+    def _tag_args_inner(*args: P.args, **kwargs: P.kwargs) -> R:
         argspec = inspect.getfullargspec(func)
         for i, arg in enumerate(argspec.args[1:]):
-            set_tag("ARG_" + arg, args[i])
-        set_tag("args", args[len(argspec.args) :])
+            set_tag("ARG_" + arg, args[i])  # type: ignore[index]
+        set_tag("args", args[len(argspec.args) :])  # type: ignore[index]
         set_tag("kwargs", kwargs)
         return func(*args, **kwargs)
 
@@ -852,7 +878,9 @@ def tag_args(func):
 
 
 @contextlib.contextmanager
-def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
+def trace_servlet(
+    request: "SynapseRequest", extract_context: bool = False
+) -> Generator[None, None, None]:
     """Returns a context manager which traces a request. It starts a span
     with some servlet specific tags such as the request metrics name and
     request information.
@@ -864,7 +892,7 @@ def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
     """
 
     if opentracing is None:
-        yield
+        yield  # type: ignore[unreachable]
         return
 
     request_tags = {
@@ -872,14 +900,17 @@ def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
         tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
         tags.HTTP_METHOD: request.get_method(),
         tags.HTTP_URL: request.get_redacted_uri(),
-        tags.PEER_HOST_IPV6: request.getClientIP(),
+        tags.PEER_HOST_IPV6: request.getClientAddress().host,
     }
 
     request_name = request.request_metrics.name
-    if extract_context:
-        scope = start_active_span_from_request(request, request_name)
-    else:
-        scope = start_active_span(request_name)
+    context = span_context_from_request(request) if extract_context else None
+
+    # we configure the scope not to finish the span immediately on exit, and instead
+    # pass the span into the SynapseRequest, which will finish it once we've finished
+    # sending the response to the client.
+    scope = start_active_span(request_name, child_of=context, finish_on_close=False)
+    request.set_opentracing_span(scope.span)
 
     with scope:
         inject_response_headers(request.responseHeaders)

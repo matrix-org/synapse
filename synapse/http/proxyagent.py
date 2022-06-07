@@ -41,7 +41,7 @@ from synapse.types import ISynapseReactor
 
 logger = logging.getLogger(__name__)
 
-_VALID_URI = re.compile(br"\A[\x21-\x7e]+\Z")
+_VALID_URI = re.compile(rb"\A[\x21-\x7e]+\Z")
 
 
 @implementer(IAgent)
@@ -245,7 +245,7 @@ def http_proxy_endpoint(
     proxy: Optional[bytes],
     reactor: IReactorCore,
     tls_options_factory: Optional[IPolicyForHTTPS],
-    **kwargs,
+    **kwargs: object,
 ) -> Tuple[Optional[IStreamClientEndpoint], Optional[ProxyCredentials]]:
     """Parses an http proxy setting and returns an endpoint for the proxy
 

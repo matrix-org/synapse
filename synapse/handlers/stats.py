@@ -39,7 +39,8 @@ class StatsHandler:
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.state = hs.get_state_handler()
         self.server_name = hs.hostname
         self.clock = hs.get_clock()
@@ -80,6 +81,17 @@ class StatsHandler:
         # If self.pos is None then means we haven't fetched it from DB
         if self.pos is None:
             self.pos = await self.store.get_stats_positions()
+            room_max_stream_ordering = self.store.get_room_max_stream_ordering()
+            if self.pos > room_max_stream_ordering:
+                # apparently, we've processed more events than exist in the database!
+                # this can happen if events are removed with history purge or similar.
+                logger.warning(
+                    "Event stream ordering appears to have gone backwards (%i -> %i): "
+                    "rewinding stats processor",
+                    self.pos,
+                    room_max_stream_ordering,
+                )
+                self.pos = room_max_stream_ordering
 
         # Loop round handling deltas until we're up to date
 
@@ -94,7 +106,10 @@ class StatsHandler:
             logger.debug(
                 "Processing room stats %s->%s", self.pos, room_max_stream_ordering
             )
-            max_pos, deltas = await self.store.get_current_state_deltas(
+            (
+                max_pos,
+                deltas,
+            ) = await self._storage_controllers.state.get_current_state_deltas(
                 self.pos, room_max_stream_ordering
             )
 

@@ -14,9 +14,8 @@
 
 import json
 import logging
-import re
 import typing
-from typing import Any, Callable, Dict, Generator, Optional, Pattern
+from typing import Any, Callable, Dict, Generator, Optional
 
 import attr
 from frozendict import frozendict
@@ -33,9 +32,6 @@ if typing.TYPE_CHECKING:
     pass
 
 logger = logging.getLogger(__name__)
-
-
-_WILDCARD_RUN = re.compile(r"([\?\*]+)")
 
 
 def _reject_invalid_json(val: Any) -> None:
@@ -78,7 +74,9 @@ json_decoder = json.JSONDecoder(parse_constant=_reject_invalid_json)
 
 
 def unwrapFirstError(failure: Failure) -> Failure:
-    # defer.gatherResults and DeferredLists wrap failures.
+    # Deprecated: you probably just want to catch defer.FirstError and reraise
+    # the subFailure's value, which will do a better job of preserving stacktraces.
+    # (actually, you probably want to use yieldable_gather_results anyway)
     failure.trap(defer.FirstError)
     return failure.value.subFailure  # type: ignore[union-attr]  # Issue in Twisted's annotations
 
@@ -185,56 +183,3 @@ def log_failure(
     if not consumeErrors:
         return failure
     return None
-
-
-def glob_to_regex(glob: str, word_boundary: bool = False) -> Pattern:
-    """Converts a glob to a compiled regex object.
-
-    Args:
-        glob: pattern to match
-        word_boundary: If True, the pattern will be allowed to match at word boundaries
-           anywhere in the string. Otherwise, the pattern is anchored at the start and
-           end of the string.
-
-    Returns:
-        compiled regex pattern
-    """
-
-    # Patterns with wildcards must be simplified to avoid performance cliffs
-    # - The glob `?**?**?` is equivalent to the glob `???*`
-    # - The glob `???*` is equivalent to the regex `.{3,}`
-    chunks = []
-    for chunk in _WILDCARD_RUN.split(glob):
-        # No wildcards? re.escape()
-        if not _WILDCARD_RUN.match(chunk):
-            chunks.append(re.escape(chunk))
-            continue
-
-        # Wildcards? Simplify.
-        qmarks = chunk.count("?")
-        if "*" in chunk:
-            chunks.append(".{%d,}" % qmarks)
-        else:
-            chunks.append(".{%d}" % qmarks)
-
-    res = "".join(chunks)
-
-    if word_boundary:
-        res = re_word_boundary(res)
-    else:
-        # \A anchors at start of string, \Z at end of string
-        res = r"\A" + res + r"\Z"
-
-    return re.compile(res, re.IGNORECASE)
-
-
-def re_word_boundary(r: str) -> str:
-    """
-    Adds word boundary characters to the start and end of an
-    expression to require that the match occur as a whole word,
-    but do so respecting the fact that strings starting or ending
-    with non-word characters will change word boundaries.
-    """
-    # we can't use \b as it chokes on unicode. however \W seems to be okay
-    # as shorthand for [^0-9A-Za-z_].
-    return r"(^|\W)%s(\W|$)" % (r,)

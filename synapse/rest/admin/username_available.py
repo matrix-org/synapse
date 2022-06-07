@@ -37,7 +37,7 @@ class UsernameAvailableRestServlet(RestServlet):
         }
     """
 
-    PATTERNS = admin_patterns("/username_available")
+    PATTERNS = admin_patterns("/username_available$")
 
     def __init__(self, hs: "HomeServer"):
         self.auth = hs.get_auth()

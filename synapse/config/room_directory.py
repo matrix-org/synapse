@@ -13,10 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
+from typing import Any, List
+
+from matrix_common.regex import glob_to_regex
 
 from synapse.types import JsonDict
-from synapse.util import glob_to_regex
 
 from ._base import Config, ConfigError
 
@@ -24,7 +25,7 @@ from ._base import Config, ConfigError
 class RoomDirectoryConfig(Config):
     section = "roomdirectory"
 
-    def read_config(self, config, **kwargs) -> None:
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.enable_room_list_search = config.get("enable_room_list_search", True)
 
         alias_creation_rules = config.get("alias_creation_rules")
@@ -51,7 +52,7 @@ class RoomDirectoryConfig(Config):
                 _RoomDirectoryRule("room_list_publication_rules", {"action": "allow"})
             ]
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs) -> str:
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """
         # Uncomment to disable searching the public room list. When disabled
         # blocks searching local and remote room lists for local and remote

@@ -13,15 +13,18 @@
 # limitations under the License.
 import logging
 from types import TracebackType
-from typing import TYPE_CHECKING, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Optional, Set, Tuple, Type
 from weakref import WeakValueDictionary
 
 from twisted.internet.interfaces import IReactorCore
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.database import DatabasePool, LoggingTransaction
-from synapse.storage.types import Connection
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
@@ -54,7 +57,12 @@ class LockStore(SQLBaseStore):
     `last_renewed_ts` column with the current time.
     """
 
-    def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
         self._reactor = hs.get_reactor()
@@ -76,6 +84,8 @@ class LockStore(SQLBaseStore):
             self._on_shutdown,
         )
 
+        self._acquiring_locks: Set[Tuple[str, str]] = set()
+
     @wrap_as_background_process("LockStore._on_shutdown")
     async def _on_shutdown(self) -> None:
         """Called when the server is shutting down"""
@@ -91,6 +101,21 @@ class LockStore(SQLBaseStore):
         logger.info("Dropped locks due to shutdown")
 
     async def try_acquire_lock(self, lock_name: str, lock_key: str) -> Optional["Lock"]:
+        """Try to acquire a lock for the given name/key. Will return an async
+        context manager if the lock is successfully acquired, which *must* be
+        used (otherwise the lock will leak).
+        """
+        if (lock_name, lock_key) in self._acquiring_locks:
+            return None
+        try:
+            self._acquiring_locks.add((lock_name, lock_key))
+            return await self._try_acquire_lock(lock_name, lock_key)
+        finally:
+            self._acquiring_locks.discard((lock_name, lock_key))
+
+    async def _try_acquire_lock(
+        self, lock_name: str, lock_key: str
+    ) -> Optional["Lock"]:
         """Try to acquire a lock for the given name/key. Will return an async
         context manager if the lock is successfully acquired, which *must* be
         used (otherwise the lock will leak).

@@ -142,6 +142,7 @@ class BackgroundFileConsumer:
 
     def wait(self) -> "Deferred[None]":
         """Returns a deferred that resolves when finished writing to file"""
+        assert self._finished_deferred is not None
         return make_deferred_yieldable(self._finished_deferred)
 
     def _resume_paused_producer(self) -> None:

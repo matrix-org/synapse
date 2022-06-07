@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import attr
+
+from synapse.types import JsonDict
 
 from ._base import Config
 
@@ -43,7 +45,7 @@ class FederationRateLimitConfig:
 class RatelimitConfig(Config):
     section = "ratelimiting"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
 
         # Load the new-style messages config if it exists. Otherwise fall back
         # to the old method.
@@ -134,7 +136,15 @@ class RatelimitConfig(Config):
             defaults={"per_second": 0.003, "burst_count": 5},
         )
 
-    def generate_config_section(self, **kwargs):
+        self.rc_third_party_invite = RateLimitConfig(
+            config.get("rc_third_party_invite", {}),
+            defaults={
+                "per_second": self.rc_message.per_second,
+                "burst_count": self.rc_message.burst_count,
+            },
+        )
+
+    def generate_config_section(self, **kwargs: Any) -> str:
         return """\
         ## Ratelimiting ##
 
@@ -168,6 +178,9 @@ class RatelimitConfig(Config):
         #   - one for ratelimiting how often a user or IP can attempt to validate a 3PID.
         #   - two for ratelimiting how often invites can be sent in a room or to a
         #     specific user.
+        #   - one for ratelimiting 3PID invites (i.e. invites sent to a third-party ID
+        #     such as an email address or a phone number) based on the account that's
+        #     sending the invite.
         #
         # The defaults are as shown below.
         #
@@ -217,6 +230,10 @@ class RatelimitConfig(Config):
         #  per_user:
         #    per_second: 0.003
         #    burst_count: 5
+        #
+        #rc_third_party_invite:
+        #  per_second: 0.2
+        #  burst_count: 10
 
         # Ratelimiting settings for incoming federation
         #

@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Tupl
 import attr
 from prometheus_client import Counter
 
+from synapse.api.constants import EduTypes
 from synapse.api.errors import (
     FederationDeniedError,
     HttpResponseException,
@@ -36,6 +37,7 @@ from synapse.metrics import sent_transactions_counter
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import ReadReceipt
 from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
+from synapse.visibility import filter_events_for_server
 
 if TYPE_CHECKING:
     import synapse.server
@@ -76,7 +78,8 @@ class PerDestinationQueue:
     ):
         self._server_name = hs.hostname
         self._clock = hs.get_clock()
-        self._store = hs.get_datastore()
+        self._storage_controllers = hs.get_storage_controllers()
+        self._store = hs.get_datastores().main
         self._transaction_manager = transaction_manager
         self._instance_name = hs.get_instance_name()
         self._federation_shard_config = hs.config.worker.federation_shard_config
@@ -218,6 +221,16 @@ class PerDestinationQueue:
     def send_edu(self, edu: Edu) -> None:
         self._pending_edus.append(edu)
         self.attempt_new_transaction()
+
+    def mark_new_data(self) -> None:
+        """Marks that the destination has new data to send, without starting a
+        new transaction.
+
+        If a transaction loop is already in progress then a new transaction will
+        be attempted when the current one finishes.
+        """
+
+        self._new_data_to_send = True
 
     def attempt_new_transaction(self) -> None:
         """Try to start a new transaction to this destination
@@ -381,7 +394,8 @@ class PerDestinationQueue:
                 )
             )
 
-        if self._last_successful_stream_ordering is None:
+        _tmp_last_successful_stream_ordering = self._last_successful_stream_ordering
+        if _tmp_last_successful_stream_ordering is None:
             # if it's still None, then this means we don't have the information
             # in our database ­ we haven't successfully sent a PDU to this server
             # (at least since the introduction of the feature tracking
@@ -391,11 +405,12 @@ class PerDestinationQueue:
             self._catching_up = False
             return
 
+        last_successful_stream_ordering: int = _tmp_last_successful_stream_ordering
+
         # get at most 50 catchup room/PDUs
         while True:
             event_ids = await self._store.get_catch_up_room_event_ids(
-                self._destination,
-                self._last_successful_stream_ordering,
+                self._destination, last_successful_stream_ordering
             )
 
             if not event_ids:
@@ -403,7 +418,7 @@ class PerDestinationQueue:
                 # of a race condition, so we check that no new events have been
                 # skipped due to us being in catch-up mode
 
-                if self._catchup_last_skipped > self._last_successful_stream_ordering:
+                if self._catchup_last_skipped > last_successful_stream_ordering:
                     # another event has been skipped because we were in catch-up mode
                     continue
 
@@ -428,6 +443,12 @@ class PerDestinationQueue:
                     "No events retrieved when we asked for %r. "
                     "This should not happen." % event_ids
                 )
+
+            logger.info(
+                "Catching up destination %s with %d PDUs",
+                self._destination,
+                len(catchup_pdus),
+            )
 
             # We send transactions with events from one room only, as its likely
             # that the remote will have to do additional processing, which may
@@ -470,22 +491,23 @@ class PerDestinationQueue:
                         # offline
                         if (
                             p.internal_metadata.stream_ordering
-                            < self._last_successful_stream_ordering
+                            < last_successful_stream_ordering
                         ):
                             continue
 
-                        # Filter out events where the server is not in the room,
-                        # e.g. it may have left/been kicked. *Ideally* we'd pull
-                        # out the kick and send that, but it's a rare edge case
-                        # so we don't bother for now (the server that sent the
-                        # kick should send it out if its online).
-                        hosts = await self._state.get_hosts_in_room_at_events(
-                            p.room_id, [p.event_id]
-                        )
-                        if self._destination not in hosts:
-                            continue
-
                         new_pdus.append(p)
+
+                    # Filter out events where the server is not in the room,
+                    # e.g. it may have left/been kicked. *Ideally* we'd pull
+                    # out the kick and send that, but it's a rare edge case
+                    # so we don't bother for now (the server that sent the
+                    # kick should send it out if its online).
+                    new_pdus = await filter_events_for_server(
+                        self._storage_controllers,
+                        self._destination,
+                        new_pdus,
+                        redact=False,
+                    )
 
                     # If we've filtered out all the extremities, fall back to
                     # sending the original event. This should ensure that the
@@ -513,12 +535,11 @@ class PerDestinationQueue:
                 # from the *original* PDU, rather than the PDU(s) we actually
                 # send. This is because we use it to mark our position in the
                 # queue of missed PDUs to process.
-                self._last_successful_stream_ordering = (
-                    pdu.internal_metadata.stream_ordering
-                )
+                last_successful_stream_ordering = pdu.internal_metadata.stream_ordering
 
+                self._last_successful_stream_ordering = last_successful_stream_ordering
                 await self._store.set_destination_last_successful_stream_ordering(
-                    self._destination, self._last_successful_stream_ordering
+                    self._destination, last_successful_stream_ordering
                 )
 
     def _get_rr_edus(self, force_flush: bool) -> Iterable[Edu]:
@@ -531,7 +552,7 @@ class PerDestinationQueue:
         edu = Edu(
             origin=self._server_name,
             destination=self._destination,
-            edu_type="m.receipt",
+            edu_type=EduTypes.RECEIPT,
             content=self._pending_rrs,
         )
         self._pending_rrs = {}
@@ -581,7 +602,7 @@ class PerDestinationQueue:
             Edu(
                 origin=self._server_name,
                 destination=self._destination,
-                edu_type="m.direct_to_device",
+                edu_type=EduTypes.DIRECT_TO_DEVICE,
                 content=content,
             )
             for content in contents
@@ -607,18 +628,18 @@ class PerDestinationQueue:
         self._pending_pdus = []
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class _TransactionQueueManager:
     """A helper async context manager for pulling stuff off the queues and
     tracking what was last successfully sent, etc.
     """
 
-    queue = attr.ib(type=PerDestinationQueue)
+    queue: PerDestinationQueue
 
-    _device_stream_id = attr.ib(type=Optional[int], default=None)
-    _device_list_id = attr.ib(type=Optional[int], default=None)
-    _last_stream_ordering = attr.ib(type=Optional[int], default=None)
-    _pdus = attr.ib(type=List[EventBase], factory=list)
+    _device_stream_id: Optional[int] = None
+    _device_list_id: Optional[int] = None
+    _last_stream_ordering: Optional[int] = None
+    _pdus: List[EventBase] = attr.Factory(list)
 
     async def __aenter__(self) -> Tuple[List[EventBase], List[Edu]]:
         # First we calculate the EDUs we want to send, if any.
@@ -659,7 +680,7 @@ class _TransactionQueueManager:
                 Edu(
                     origin=self.queue._server_name,
                     destination=self.queue._destination,
-                    edu_type="m.presence",
+                    edu_type=EduTypes.PRESENCE,
                     content={
                         "push": [
                             format_user_presence_state(

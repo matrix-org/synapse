@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from canonicaljson import encode_canonical_json
 from signedjson.sign import sign_json
@@ -76,17 +76,17 @@ class LocalKey(Resource):
 
     def response_json_object(self) -> JsonDict:
         verify_keys = {}
-        for key in self.config.key.signing_key:
-            verify_key_bytes = key.verify_key.encode()
-            key_id = "%s:%s" % (key.alg, key.version)
+        for signing_key in self.config.key.signing_key:
+            verify_key_bytes = signing_key.verify_key.encode()
+            key_id = "%s:%s" % (signing_key.alg, signing_key.version)
             verify_keys[key_id] = {"key": encode_base64(verify_key_bytes)}
 
         old_verify_keys = {}
-        for key_id, key in self.config.key.old_signing_keys.items():
-            verify_key_bytes = key.encode()
+        for key_id, old_signing_key in self.config.key.old_signing_keys.items():
+            verify_key_bytes = old_signing_key.encode()
             old_verify_keys[key_id] = {
                 "key": encode_base64(verify_key_bytes),
-                "expired_ts": key.expired_ts,
+                "expired_ts": old_signing_key.expired,
             }
 
         json_object = {
@@ -99,7 +99,7 @@ class LocalKey(Resource):
             json_object = sign_json(json_object, self.config.server.server_name, key)
         return json_object
 
-    def render_GET(self, request: Request) -> int:
+    def render_GET(self, request: Request) -> Optional[int]:
         time_now = self.clock.time_msec()
         # Update the expiry time if less than half the interval remains.
         if time_now + self.config.key.key_refresh_interval / 2 > self.valid_until_ts:

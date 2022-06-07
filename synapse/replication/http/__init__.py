@@ -40,7 +40,7 @@ class ReplicationRestResource(JsonResource):
         super().__init__(hs, canonical_json=False, extract_context=True)
         self.register_servlets(hs)
 
-    def register_servlets(self, hs: "HomeServer"):
+    def register_servlets(self, hs: "HomeServer") -> None:
         send_event.register_servlets(hs, self)
         federation.register_servlets(hs, self)
         presence.register_servlets(hs, self)

@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, List
+from typing import Any, Dict, List
 from urllib import parse as urlparse
 
 import yaml
@@ -31,12 +31,11 @@ logger = logging.getLogger(__name__)
 class AppServiceConfig(Config):
     section = "appservice"
 
-    def read_config(self, config, **kwargs) -> None:
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.app_service_config_files = config.get("app_service_config_files", [])
-        self.notify_appservices = config.get("notify_appservices", True)
         self.track_appservice_user_ips = config.get("track_appservice_user_ips", False)
 
-    def generate_config_section(cls, **kwargs) -> str:
+    def generate_config_section(cls, **kwargs: Any) -> str:
         return """\
         # A list of application service config files to use
         #
@@ -56,7 +55,8 @@ def load_appservices(
 ) -> List[ApplicationService]:
     """Returns a list of Application Services from the config files."""
     if not isinstance(config_files, list):
-        logger.warning("Expected %s to be a list of AS config files.", config_files)
+        # type-ignore: this function gets arbitrary json value; we do use this path.
+        logger.warning("Expected %s to be a list of AS config files.", config_files)  # type: ignore[unreachable]
         return []
 
     # Dicts of value -> filename
@@ -147,8 +147,7 @@ def _load_appservice(
     # protocols check
     protocols = as_info.get("protocols")
     if protocols:
-        # Because strings are lists in python
-        if isinstance(protocols, str) or not isinstance(protocols, list):
+        if not isinstance(protocols, list):
             raise KeyError("Optional 'protocols' must be a list if present.")
         for p in protocols:
             if not isinstance(p, str):
@@ -167,16 +166,27 @@ def _load_appservice(
 
     supports_ephemeral = as_info.get("de.sorunome.msc2409.push_ephemeral", False)
 
+    # Opt-in flag for the MSC3202-specific transactional behaviour.
+    # When enabled, appservice transactions contain the following information:
+    #  - device One-Time Key counts
+    #  - device unused fallback key usage states
+    #  - device list changes
+    msc3202_transaction_extensions = as_info.get("org.matrix.msc3202", False)
+    if not isinstance(msc3202_transaction_extensions, bool):
+        raise ValueError(
+            "The `org.matrix.msc3202` option should be true or false if specified."
+        )
+
     return ApplicationService(
         token=as_info["as_token"],
-        hostname=hostname,
         url=as_info["url"],
         namespaces=as_info["namespaces"],
         hs_token=as_info["hs_token"],
         sender=user_id,
         id=as_info["id"],
-        supports_ephemeral=supports_ephemeral,
         protocols=protocols,
         rate_limited=rate_limited,
         ip_range_whitelist=ip_range_whitelist,
+        supports_ephemeral=supports_ephemeral,
+        msc3202_transaction_extensions=msc3202_transaction_extensions,
     )

@@ -360,7 +360,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             channel.code,
             msg=channel.json_body,
         )
-        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
+        self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
             "Boolean query parameter 'keep_profiles' must be one of ['true', 'false']",
             channel.json_body["error"],
@@ -580,7 +580,9 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         return server_and_media_id
 
-    def _access_media(self, server_and_media_id, expect_success=True) -> None:
+    def _access_media(
+        self, server_and_media_id: str, expect_success: bool = True
+    ) -> None:
         """
         Try to access a media and check the result
         """
@@ -632,7 +634,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         media_repo = hs.get_media_repository_resource()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.server_name = hs.hostname
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
@@ -700,6 +702,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
         """
 
         media_info = self.get_success(self.store.get_local_media(self.media_id))
+        assert media_info is not None
         self.assertFalse(media_info["quarantined_by"])
 
         # quarantining
@@ -713,6 +716,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
         self.assertFalse(channel.json_body)
 
         media_info = self.get_success(self.store.get_local_media(self.media_id))
+        assert media_info is not None
         self.assertTrue(media_info["quarantined_by"])
 
         # remove from quarantine
@@ -726,6 +730,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
         self.assertFalse(channel.json_body)
 
         media_info = self.get_success(self.store.get_local_media(self.media_id))
+        assert media_info is not None
         self.assertFalse(media_info["quarantined_by"])
 
     def test_quarantine_protected_media(self) -> None:
@@ -738,6 +743,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
 
         # verify protection
         media_info = self.get_success(self.store.get_local_media(self.media_id))
+        assert media_info is not None
         self.assertTrue(media_info["safe_from_quarantine"])
 
         # quarantining
@@ -752,6 +758,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
 
         # verify that is not in quarantine
         media_info = self.get_success(self.store.get_local_media(self.media_id))
+        assert media_info is not None
         self.assertFalse(media_info["quarantined_by"])
 
 
@@ -765,7 +772,7 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         media_repo = hs.get_media_repository_resource()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -828,6 +835,7 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
         """
 
         media_info = self.get_success(self.store.get_local_media(self.media_id))
+        assert media_info is not None
         self.assertFalse(media_info["safe_from_quarantine"])
 
         # protect
@@ -841,6 +849,7 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
         self.assertFalse(channel.json_body)
 
         media_info = self.get_success(self.store.get_local_media(self.media_id))
+        assert media_info is not None
         self.assertTrue(media_info["safe_from_quarantine"])
 
         # unprotect
@@ -854,6 +863,7 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
         self.assertFalse(channel.json_body)
 
         media_info = self.get_success(self.store.get_local_media(self.media_id))
+        assert media_info is not None
         self.assertFalse(media_info["safe_from_quarantine"])
 
 

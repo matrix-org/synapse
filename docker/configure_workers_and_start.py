@@ -21,6 +21,11 @@
 #   * SYNAPSE_REPORT_STATS: Whether to report stats.
 #   * SYNAPSE_WORKER_TYPES: A comma separated list of worker names as specified in WORKER_CONFIG
 #         below. Leave empty for no workers, or set to '*' for all possible workers.
+#   * SYNAPSE_AS_REGISTRATION_DIR: If specified, a directory in which .yaml and .yml files
+#         will be treated as Application Service registration files.
+#   * SYNAPSE_TLS_CERT: Path to a TLS certificate in PEM format.
+#   * SYNAPSE_TLS_KEY: Path to a TLS key. If this and SYNAPSE_TLS_CERT are specified,
+#         Nginx will be configured to serve TLS on port 8448.
 #
 # NOTE: According to Complement's ENTRYPOINT expectations for a homeserver image (as defined
 # in the project's README), this script may be run multiple times, and functionality should
@@ -29,6 +34,8 @@
 import os
 import subprocess
 import sys
+from pathlib import Path
+from typing import Any, Dict, List, Mapping, MutableMapping, NoReturn, Set
 
 import jinja2
 import yaml
@@ -36,7 +43,7 @@ import yaml
 MAIN_PROCESS_HTTP_LISTENER_PORT = 8080
 
 
-WORKERS_CONFIG = {
+WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
     "pusher": {
         "app": "synapse.app.pusher",
         "listener_resources": [],
@@ -68,10 +75,10 @@ WORKERS_CONFIG = {
         "worker_extra_conf": "enable_media_repo: true",
     },
     "appservice": {
-        "app": "synapse.app.appservice",
+        "app": "synapse.app.generic_worker",
         "listener_resources": [],
         "endpoint_patterns": [],
-        "shared_extra_conf": {"notify_appservices": False},
+        "shared_extra_conf": {"notify_appservices_from_worker": "appservice"},
         "worker_extra_conf": "",
     },
     "federation_sender": {
@@ -151,6 +158,7 @@ WORKERS_CONFIG = {
             "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/join/",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/profile/",
+            "^/_matrix/client/(v1|unstable/org.matrix.msc2716)/rooms/.*/batch_send",
         ],
         "shared_extra_conf": {},
         "worker_extra_conf": "",
@@ -170,7 +178,7 @@ WORKERS_CONFIG = {
 # Templates for sections that may be inserted multiple times in config files
 SUPERVISORD_PROCESS_CONFIG_BLOCK = """
 [program:synapse_{name}]
-command=/usr/local/bin/python -m {app} \
+command=/usr/local/bin/prefix-log /usr/local/bin/python -m {app} \
     --config-path="{config_path}" \
     --config-path=/conf/workers/shared.yaml \
     --config-path=/conf/workers/{name}.yaml
@@ -200,7 +208,7 @@ upstream {upstream_worker_type} {{
 
 
 # Utility functions
-def log(txt: str):
+def log(txt: str) -> None:
     """Log something to the stdout.
 
     Args:
@@ -209,7 +217,7 @@ def log(txt: str):
     print(txt)
 
 
-def error(txt: str):
+def error(txt: str) -> NoReturn:
     """Log something and exit with an error code.
 
     Args:
@@ -219,7 +227,7 @@ def error(txt: str):
     sys.exit(2)
 
 
-def convert(src: str, dst: str, **template_vars):
+def convert(src: str, dst: str, **template_vars: object) -> None:
     """Generate a file from a template
 
     Args:
@@ -289,7 +297,7 @@ def add_sharding_to_shared_config(
         shared_config.setdefault("media_instance_running_background_jobs", worker_name)
 
 
-def generate_base_homeserver_config():
+def generate_base_homeserver_config() -> None:
     """Starts Synapse and generates a basic homeserver config, which will later be
     modified for worker support.
 
@@ -301,13 +309,15 @@ def generate_base_homeserver_config():
     subprocess.check_output(["/usr/local/bin/python", "/start.py", "migrate_config"])
 
 
-def generate_worker_files(environ, config_path: str, data_dir: str):
+def generate_worker_files(
+    environ: Mapping[str, str], config_path: str, data_dir: str
+) -> None:
     """Read the desired list of workers from environment variables and generate
     shared homeserver, nginx and supervisord configs.
 
     Args:
-        environ: _Environ[str]
-        config_path: Where to output the generated Synapse main worker config file.
+        environ: os.environ instance.
+        config_path: The location of the generated Synapse main worker config file.
         data_dir: The location of the synapse data directory. Where log and
             user-facing config files live.
     """
@@ -320,7 +330,8 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     # and adding a replication listener.
 
     # First read the original config file and extract the listeners block. Then we'll add
-    # another listener for replication. Later we'll write out the result.
+    # another listener for replication. Later we'll write out the result to the shared
+    # config file.
     listeners = [
         {
             "port": 9093,
@@ -339,7 +350,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     # base shared worker jinja2 template.
     #
     # This config file will be passed to all workers, included Synapse's main process.
-    shared_config = {"listeners": listeners}
+    shared_config: Dict[str, Any] = {"listeners": listeners}
 
     # The supervisord config. The contents of which will be inserted into the
     # base supervisord jinja2 template.
@@ -355,7 +366,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     #   worker_type: {1234, 1235, ...}}
     # }
     # and will be used to construct 'upstream' nginx directives.
-    nginx_upstreams = {}
+    nginx_upstreams: Dict[str, Set[int]] = {}
 
     # A map of: {"endpoint": "upstream"}, where "upstream" is a str representing what will be
     # placed after the proxy_pass directive. The main benefit to representing this data as a
@@ -367,13 +378,13 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     nginx_locations = {}
 
     # Read the desired worker configuration from the environment
-    worker_types = environ.get("SYNAPSE_WORKER_TYPES")
-    if worker_types is None:
+    worker_types_env = environ.get("SYNAPSE_WORKER_TYPES")
+    if worker_types_env is None:
         # No workers, just the main process
         worker_types = []
     else:
         # Split type names by comma
-        worker_types = worker_types.split(",")
+        worker_types = worker_types_env.split(",")
 
     # Create the worker configuration directory if it doesn't already exist
     os.makedirs("/conf/workers", exist_ok=True)
@@ -384,7 +395,11 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     # A counter of worker_type -> int. Used for determining the name for a given
     # worker type when generating its config file, as each worker's name is just
     # worker_type + instance #
-    worker_type_counter = {}
+    worker_type_counter: Dict[str, int] = {}
+
+    # A list of internal endpoints to healthcheck, starting with the main process
+    # which exists even if no workers do.
+    healthcheck_urls = ["http://localhost:8080/health"]
 
     # For each worker type specified by the user, create config values
     for worker_type in worker_types:
@@ -404,11 +419,13 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
         # e.g. federation_reader1
         worker_name = worker_type + str(new_worker_count)
         worker_config.update(
-            {"name": worker_name, "port": worker_port, "config_path": config_path}
+            {"name": worker_name, "port": str(worker_port), "config_path": config_path}
         )
 
         # Update the shared config with any worker-type specific options
         shared_config.update(worker_config["shared_extra_conf"])
+
+        healthcheck_urls.append("http://localhost:%d/health" % (worker_port,))
 
         # Check if more than one instance of this worker type has been specified
         worker_type_total_count = worker_types.count(worker_type)
@@ -438,21 +455,7 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
 
         # Write out the worker's logging config file
 
-        # Check whether we should write worker logs to disk, in addition to the console
-        extra_log_template_args = {}
-        if environ.get("SYNAPSE_WORKERS_WRITE_LOGS_TO_DISK"):
-            extra_log_template_args["LOG_FILE_PATH"] = "{dir}/logs/{name}.log".format(
-                dir=data_dir, name=worker_name
-            )
-
-        # Render and write the file
-        log_config_filepath = "/conf/workers/{name}.log.config".format(name=worker_name)
-        convert(
-            "/conf/log.config",
-            log_config_filepath,
-            worker_name=worker_name,
-            **extra_log_template_args,
-        )
+        log_config_filepath = generate_worker_log_config(environ, worker_name, data_dir)
 
         # Then a worker config file
         convert(
@@ -475,15 +478,10 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     # Determine the load-balancing upstreams to configure
     nginx_upstream_config = ""
 
-    # At the same time, prepare a list of internal endpoints to healthcheck
-    # starting with the main process which exists even if no workers do.
-    healthcheck_urls = ["http://localhost:8080/health"]
-
     for upstream_worker_type, upstream_worker_ports in nginx_upstreams.items():
         body = ""
         for port in upstream_worker_ports:
             body += "    server localhost:%d;\n" % (port,)
-            healthcheck_urls.append("http://localhost:%d/health" % (port,))
 
         # Add to the list of configured upstreams
         nginx_upstream_config += NGINX_UPSTREAM_CONFIG_BLOCK.format(
@@ -493,11 +491,27 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
 
     # Finally, we'll write out the config files.
 
+    # log config for the master process
+    master_log_config = generate_worker_log_config(environ, "master", data_dir)
+    shared_config["log_config"] = master_log_config
+
+    # Find application service registrations
+    appservice_registrations = None
+    appservice_registration_dir = os.environ.get("SYNAPSE_AS_REGISTRATION_DIR")
+    if appservice_registration_dir:
+        # Scan for all YAML files that should be application service registrations.
+        appservice_registrations = [
+            str(reg_path.resolve())
+            for reg_path in Path(appservice_registration_dir).iterdir()
+            if reg_path.suffix.lower() in (".yaml", ".yml")
+        ]
+
     # Shared homeserver config
     convert(
         "/conf/shared.yaml.j2",
         "/conf/workers/shared.yaml",
         shared_worker_config=yaml.dump(shared_config),
+        appservice_registrations=appservice_registrations,
     )
 
     # Nginx config
@@ -506,12 +520,15 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
         "/etc/nginx/conf.d/matrix-synapse.conf",
         worker_locations=nginx_location_config,
         upstream_directives=nginx_upstream_config,
+        tls_cert_path=os.environ.get("SYNAPSE_TLS_CERT"),
+        tls_key_path=os.environ.get("SYNAPSE_TLS_KEY"),
     )
 
     # Supervisord config
+    os.makedirs("/etc/supervisor", exist_ok=True)
     convert(
         "/conf/supervisord.conf.j2",
-        "/etc/supervisor/conf.d/supervisord.conf",
+        "/etc/supervisor/supervisord.conf",
         main_config_path=config_path,
         worker_config=supervisord_config,
     )
@@ -529,15 +546,31 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
         os.mkdir(log_dir)
 
 
-def start_supervisord():
-    """Starts up supervisord which then starts and monitors all other necessary processes
+def generate_worker_log_config(
+    environ: Mapping[str, str], worker_name: str, data_dir: str
+) -> str:
+    """Generate a log.config file for the given worker.
 
-    Raises: CalledProcessError if calling start.py return a non-zero exit code.
+    Returns: the path to the generated file
     """
-    subprocess.run(["/usr/bin/supervisord"], stdin=subprocess.PIPE)
+    # Check whether we should write worker logs to disk, in addition to the console
+    extra_log_template_args = {}
+    if environ.get("SYNAPSE_WORKERS_WRITE_LOGS_TO_DISK"):
+        extra_log_template_args["LOG_FILE_PATH"] = "{dir}/logs/{name}.log".format(
+            dir=data_dir, name=worker_name
+        )
+    # Render and write the file
+    log_config_filepath = "/conf/workers/{name}.log.config".format(name=worker_name)
+    convert(
+        "/conf/log.config",
+        log_config_filepath,
+        worker_name=worker_name,
+        **extra_log_template_args,
+    )
+    return log_config_filepath
 
 
-def main(args, environ):
+def main(args: List[str], environ: MutableMapping[str, str]) -> None:
     config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
     config_path = environ.get("SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml")
     data_dir = environ.get("SYNAPSE_DATA_DIR", "/data")
@@ -564,7 +597,13 @@ def main(args, environ):
 
     # Start supervisord, which will start Synapse, all of the configured worker
     # processes, redis, nginx etc. according to the config we created above.
-    start_supervisord()
+    log("Starting supervisord")
+    os.execl(
+        "/usr/local/bin/supervisord",
+        "supervisord",
+        "-c",
+        "/etc/supervisor/supervisord.conf",
+    )
 
 
 if __name__ == "__main__":
