@@ -16,6 +16,7 @@ from typing import Iterable, Optional
 
 from canonicaljson import encode_canonical_json
 
+from synapse.api.constants import ReceiptTypes
 from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent, _EventInternalMetadata, make_event_from_dict
 from synapse.handlers.room import RoomEventSource
@@ -164,9 +165,16 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         )
         event1 = self.persist(type="m.room.message", msgtype="m.text", body="hello")
         self.replicate()
+
+        self.get_success(
+            self.master_store.insert_receipt(
+                ROOM_ID, ReceiptTypes.READ, USER_ID_2, [event1.event_id], {}
+            )
+        )
+
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
-            [ROOM_ID, USER_ID_2, event1.event_id],
+            [ROOM_ID, USER_ID_2],
             NotifCounts(highlight_count=0, unread_count=0, notify_count=0),
         )
 
@@ -179,7 +187,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.replicate()
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
-            [ROOM_ID, USER_ID_2, event1.event_id],
+            [ROOM_ID, USER_ID_2],
             NotifCounts(highlight_count=0, unread_count=0, notify_count=1),
         )
 
@@ -194,7 +202,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.replicate()
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
-            [ROOM_ID, USER_ID_2, event1.event_id],
+            [ROOM_ID, USER_ID_2],
             NotifCounts(highlight_count=1, unread_count=0, notify_count=2),
         )
 
