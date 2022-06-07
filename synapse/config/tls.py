@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import logging
-import os
 from typing import Any, List, Optional, Pattern
 
 from matrix_common.regex import glob_to_regex
@@ -143,9 +142,6 @@ class TlsConfig(Config):
 
     def generate_config_section(
         self,
-        config_dir_path: str,
-        data_dir_path: str,
-        server_name: str,
         tls_certificate_path: Optional[str],
         tls_private_key_path: Optional[str],
         **kwargs: Any,
@@ -153,21 +149,13 @@ class TlsConfig(Config):
         """If the TLS paths are not specified the default will be certs in the
         config directory"""
 
-        base_key_name = os.path.join(config_dir_path, server_name)
-
         if bool(tls_certificate_path) != bool(tls_private_key_path):
             raise ConfigError(
                 "Please specify both a cert path and a key path or neither."
             )
 
         if tls_certificate_path and tls_private_key_path:
-            return (
-                """\
-            tls_certificate_path: "%(tls_certificate_path)s"
-            tls_private_key_path: "%(tls_private_key_path)s"
-            """
-                % locals()
-            )
+            return f"tls_certificate_path: {tls_certificate_path}\ntls_private_key_path: {tls_private_key_path}"
         else:
             return ""
 

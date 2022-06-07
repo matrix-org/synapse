@@ -711,9 +711,6 @@ class ServerConfig(Config):
 
         pid_file = os.path.join(data_dir_path, "homeserver.pid")
 
-        # Bring DEFAULT_ROOM_VERSION into the local-scope for use in the
-        # default config string
-        default_room_version = DEFAULT_ROOM_VERSION
         secure_listeners = []
         unsecure_listeners = []
         private_addresses = ["::1", "127.0.0.1"]
