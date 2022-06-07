@@ -15,8 +15,6 @@
 import logging
 from typing import TYPE_CHECKING, Any, Mapping, NoReturn, Optional, Tuple, cast
 
-import psycopg2
-
 from synapse.storage.engines._base import (
     BaseDatabaseEngine,
     IncorrectDatabaseSetup,
@@ -25,6 +23,7 @@ from synapse.storage.engines._base import (
 from synapse.storage.types import Cursor
 
 if TYPE_CHECKING:
+    import psycopg2
 
     from synapse.storage.database import LoggingDatabaseConnection
 
