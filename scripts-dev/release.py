@@ -192,21 +192,32 @@ def prepare() -> None:
             "Which branch should the release be based on?", default=default
         )
 
-        base_branch = find_ref(synapse_repo, branch_name)
-        if not base_branch:
-            print(f"Could not find base branch {branch_name}!")
-            click.get_current_context().abort()
+        for repo_name, repo in {"synapse": synapse_repo, "sytest": sytest_repo}.items():
+            base_branch = find_ref(repo, branch_name)
+            if not base_branch:
+                print(f"Could not find base branch {branch_name} for {repo_name}!")
+                click.get_current_context().abort()
 
-        # Check out the base branch and ensure it's up to date
-        synapse_repo.head.set_reference(base_branch, "check out the base branch")
-        synapse_repo.head.reset(index=True, working_tree=True)
-        if not base_branch.is_remote():
-            update_branch(synapse_repo)
+            # Check out the base branch and ensure it's up to date
+            repo.head.set_reference(
+                base_branch, f"check out the base branch for {repo_name}"
+            )
+            repo.head.reset(index=True, working_tree=True)
+            if not base_branch.is_remote():
+                update_branch(repo)
 
-        # Create the new release branch
-        # Type ignore will no longer be needed after GitPython 3.1.28.
-        # See https://github.com/gitpython-developers/GitPython/pull/1419
-        synapse_repo.create_head(release_branch_name, commit=base_branch)  # type: ignore[arg-type]
+            # Create the new release branch
+            # Type ignore will no longer be needed after GitPython 3.1.28.
+            # See https://github.com/gitpython-developers/GitPython/pull/1419
+            repo.create_head(release_branch_name, commit=base_branch)  # type: ignore[arg-type]
+
+        # Special-case SyTest: we don't actually prepare any files so we may
+        # as well push it now (and only when we create a release branch;
+        # not on subsequent RCs or full releases).
+        if click.confirm("Push new SyTest branch?", default=True):
+            sytest_repo.git.push(
+                "-u", sytest_repo.remote().name, sytest_repo.active_branch.name
+            )
 
     # Switch to the release branch and ensure it's up to date.
     synapse_repo.git.checkout(release_branch_name)
