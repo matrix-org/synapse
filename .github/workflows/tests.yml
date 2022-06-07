@@ -395,9 +395,11 @@ jobs:
         shell: bash
         name: Run Complement Tests
 
-      # a job which combines the coverage reports from all trials runs, ready for upload to SonarQube.
+  # a job which combines the coverage reports from all trials runs, ready for upload to SonarQube.
   coverage:
-    needs: trial
+    needs:
+      - trial
+      - sytest
     runs-on: ubuntu-latest
     env:
       TOP: ${{ github.workspace }}
@@ -419,7 +421,7 @@ jobs:
           path: coverage.xml
           retention-days: 1
 
-      # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
+  # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
   tests-done:
     if: ${{ always() }}
     needs:
