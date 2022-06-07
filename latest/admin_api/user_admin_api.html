@@ -246,7 +246,9 @@ specific <code>user_id</code>.</p>
 <p>Body parameters:</p>
 <ul>
 <li><code>password</code> - string, optional. If provided, the user's password is updated and all
-devices are logged out.</li>
+devices are logged out, unless <code>logout_devices</code> is set to <code>false</code>.</li>
+<li><code>logout_devices</code> - bool, optional, defaults to <code>true</code>. If set to false, devices aren't
+logged out even when <code>password</code> is provided.</li>
 <li><code>displayname</code> - string, optional, defaults to the value of <code>user_id</code>.</li>
 <li><code>threepids</code> - array, optional, allows setting the third-party IDs (email, msisdn)
 <ul>
