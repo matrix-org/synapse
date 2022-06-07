@@ -1583,6 +1583,12 @@ been accessed, the media's creation time is used instead. Both thumbnails
 and the original media will be removed. If either of these options are unset,
 then media of that type will not be purged.
 
+Local or cached remote media that has been
+[quarantined](../../admin_api/media_admin_api.md#quarantining-media-in-a-room)
+will not be deleted. Similarly, local media that has been marked as
+[protected from quarantine](../../admin_api/media_admin_api.md#protecting-media-from-being-quarantined)
+will not be deleted.
+
 Example configuration:
 ```yaml
 media_retention:

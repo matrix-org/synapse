@@ -920,6 +920,7 @@ class MediaRepository:
                 before_ts=local_media_threshold_timestamp_ms,
                 keep_profiles=True,
                 delete_quarantined_media=False,
+                delete_protected_media=False,
             )
 
     async def delete_old_remote_media(self, before_ts: int) -> Dict[str, int]:
@@ -979,6 +980,7 @@ class MediaRepository:
         size_gt: int = 0,
         keep_profiles: bool = True,
         delete_quarantined_media: bool = False,
+        delete_protected_media: bool = False,
     ) -> Tuple[List[str], int]:
         """
         Delete local or remote media from this server by size and timestamp. Removes
@@ -1000,6 +1002,7 @@ class MediaRepository:
             size_gt,
             keep_profiles,
             include_quarantined_media=delete_quarantined_media,
+            include_protected_media=delete_protected_media,
         )
         return await self._remove_local_media_from_disk(old_media)
 

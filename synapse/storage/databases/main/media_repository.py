@@ -257,6 +257,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         size_gt: int,
         keep_profiles: bool,
         include_quarantined_media: bool,
+        include_protected_media: bool,
     ) -> List[str]:
         """
         Retrieve a list of media IDs from the local media store.
@@ -274,6 +275,8 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                     * a user's avatar in the user directory
             include_quarantined_media: If False, exclude media IDs from the results that have
                 been marked as quarantined.
+            include_protected_media: If False, exclude media IDs from the results that have
+                been marked as protected from quarantine.
 
         Returns:
             A list of local media IDs.
@@ -316,9 +319,15 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             sql += sql_keep
 
         if include_quarantined_media is False:
-            # Only include media that has not been quarantined
+            # Do not include media that has been quarantined
             sql += """
                 AND quarantined_by IS NULL
+            """
+
+        if include_protected_media is False:
+            # Do not include media that has been protected from quarantine
+            sql += """
+                AND safe_from_quarantine = 0
             """
 
         def _get_local_media_ids_txn(txn: LoggingTransaction) -> List[str]:
