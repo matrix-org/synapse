@@ -1,0 +1,1 @@
+Fix a bug introduced in v1.60.0 that causes synapse to fail to start when python module sqlite3 is not installed.
