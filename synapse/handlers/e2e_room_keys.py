@@ -369,7 +369,9 @@ class E2eRoomKeysHandler:
                 else:
                     raise
 
-            res["count"] = await self.store.count_e2e_room_keys(user_id, res["version"])
+            # # Beeper: Clients don't care, save some time
+            # res["count"] = await self.store.count_e2e_room_keys(user_id, res["version"])
+            res["count"] = 0
             res["etag"] = str(res["etag"])
             return res
 
