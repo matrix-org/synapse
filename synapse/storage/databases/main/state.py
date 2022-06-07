@@ -127,13 +127,8 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             NotFoundError: if the room is unknown
         """
 
-        # First we try looking up room version from the database, but for old
-        # rooms we might not have added the room version to it yet so we fall
-        # back to previous behaviour and look in current state events.
-        #
         # We really should have an entry in the rooms table for every room we
-        # care about, but let's be a bit paranoid (at least while the background
-        # update is happening) to avoid breaking existing rooms.
+        # care about, but let's be a bit paranoid.
         room_version = self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="rooms",
