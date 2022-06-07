@@ -3,6 +3,7 @@ branch = True
 parallel = True
 include=$TOP/synapse/*
 data_file = $TOP/.coverage
+relative_files = True
 
 [report]
 precision = 2
