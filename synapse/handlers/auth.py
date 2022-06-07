@@ -81,6 +81,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+INVALID_USERNAME_OR_PASSWORD = "Invalid username or password"
+
 
 def convert_client_dict_legacy_fields_to_identifier(
     submission: JsonDict,
@@ -1215,7 +1217,9 @@ class AuthHandler:
                     await self._failed_login_attempts_ratelimiter.can_do_action(
                         None, (medium, address)
                     )
-                raise LoginError(403, "", errcode=Codes.FORBIDDEN)
+                raise LoginError(
+                    403, msg=INVALID_USERNAME_OR_PASSWORD, errcode=Codes.FORBIDDEN
+                )
 
             identifier_dict = {"type": "m.id.user", "user": user_id}
 
@@ -1341,7 +1345,7 @@ class AuthHandler:
 
         # We raise a 403 here, but note that if we're doing user-interactive
         # login, it turns all LoginErrors into a 401 anyway.
-        raise LoginError(403, "Invalid password", errcode=Codes.FORBIDDEN)
+        raise LoginError(403, msg=INVALID_USERNAME_OR_PASSWORD, errcode=Codes.FORBIDDEN)
 
     async def check_password_provider_3pid(
         self, medium: str, address: str, password: str
