@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines.postgres import PostgresEngine
 from synapse.storage.prepare_database import get_statements
 
 FIX_INDEXES = """

@@ -37,7 +37,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.databases.main.push_rule import PushRulesWorkerStore
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines.postgres import PostgresEngine
 from synapse.storage.util.id_generators import (
     AbstractStreamIdGenerator,
     AbstractStreamIdTracker,

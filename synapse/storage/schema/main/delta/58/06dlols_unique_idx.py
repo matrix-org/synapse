@@ -20,7 +20,8 @@ entries, and with a UNIQUE index.
 import logging
 from io import StringIO
 
-from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
+from synapse.storage.engines import BaseDatabaseEngine
+from synapse.storage.engines.postgres import PostgresEngine
 from synapse.storage.prepare_database import execute_statements_from_stream
 from synapse.storage.types import Cursor
 

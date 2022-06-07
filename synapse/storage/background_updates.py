@@ -628,7 +628,7 @@ class BackgroundUpdater:
                 logger.debug("[SQL] %s", sql)
                 c.execute(sql)
 
-        if isinstance(self.db_pool.engine, engines.PostgresEngine):
+        if isinstance(self.db_pool.engine, engines.postgres.PostgresEngine):
             runner: Optional[Callable[[Connection], None]] = create_index_psql
         elif psql_only:
             runner = None

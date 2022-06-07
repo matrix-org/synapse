@@ -42,7 +42,8 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.state import StateFilter
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.storage.engines.postgres import PostgresEngine
+from synapse.storage.engines.sqlite import Sqlite3Engine
 from synapse.types import (
     JsonDict,
     UserProfile,

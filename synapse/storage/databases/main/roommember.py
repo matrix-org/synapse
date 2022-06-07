@@ -45,7 +45,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
-from synapse.storage.engines import Sqlite3Engine
+from synapse.storage.engines.sqlite import Sqlite3Engine
 from synapse.storage.roommember import (
     GetRoomsForUserWithStreamOrdering,
     MemberSummary,

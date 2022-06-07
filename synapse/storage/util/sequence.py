@@ -16,11 +16,8 @@ import logging
 import threading
 from typing import TYPE_CHECKING, Callable, List, Optional
 
-from synapse.storage.engines import (
-    BaseDatabaseEngine,
-    IncorrectDatabaseSetup,
-    PostgresEngine,
-)
+from synapse.storage.engines import BaseDatabaseEngine, IncorrectDatabaseSetup
+from synapse.storage.engines.postgres import PostgresEngine
 from synapse.storage.types import Connection, Cursor
 
 if TYPE_CHECKING:

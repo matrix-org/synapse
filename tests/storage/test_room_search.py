@@ -16,7 +16,7 @@ import synapse.rest.admin
 from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
 from synapse.rest.client import login, room
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines.postgres import PostgresEngine
 
 from tests.unittest import HomeserverTestCase, skip_unless
 from tests.utils import USE_POSTGRES_FOR_TESTS

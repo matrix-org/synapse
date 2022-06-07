@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Optional
 
 from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines.postgres import PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
 
 if TYPE_CHECKING:

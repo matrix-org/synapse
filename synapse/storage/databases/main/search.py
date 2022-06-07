@@ -27,7 +27,9 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
+from synapse.storage.engines import BaseDatabaseEngine
+from synapse.storage.engines.postgres import PostgresEngine
+from synapse.storage.engines.sqlite import Sqlite3Engine
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:

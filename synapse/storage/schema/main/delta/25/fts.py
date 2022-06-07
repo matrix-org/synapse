@@ -14,7 +14,8 @@
 import json
 import logging
 
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.storage.engines.postgres import PostgresEngine
+from synapse.storage.engines.sqlite import Sqlite3Engine
 from synapse.storage.prepare_database import get_statements
 
 logger = logging.getLogger(__name__)

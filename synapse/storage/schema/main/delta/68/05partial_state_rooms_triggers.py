@@ -18,7 +18,9 @@ This migration adds triggers to the partial_state_events tables to enforce uniqu
 
 Triggers cannot be expressed in .sql files, so we have to use a separate file.
 """
-from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
+from synapse.storage.engines import BaseDatabaseEngine
+from synapse.storage.engines.postgres import PostgresEngine
+from synapse.storage.engines.sqlite import Sqlite3Engine
 from synapse.storage.types import Cursor
 
 

@@ -31,7 +31,8 @@ from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.pusher import PusherWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.storage.engines.postgres import PostgresEngine
+from synapse.storage.engines.sqlite import Sqlite3Engine
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
 from synapse.storage.util.id_generators import (
     AbstractStreamIdGenerator,

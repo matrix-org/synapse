@@ -55,7 +55,9 @@ from synapse.logging.context import (
 from synapse.metrics import register_threadpool
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
-from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
+from synapse.storage.engines import BaseDatabaseEngine
+from synapse.storage.engines.postgres import PostgresEngine
+from synapse.storage.engines.sqlite import Sqlite3Engine
 from synapse.storage.types import Connection, Cursor
 from synapse.util.async_helpers import delay_cancellation
 from synapse.util.iterutils import batch_iter

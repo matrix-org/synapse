@@ -67,7 +67,8 @@ from synapse.http.site import SynapseRequest
 from synapse.logging.context import ContextResourceUsage
 from synapse.server import HomeServer
 from synapse.storage import DataStore
-from synapse.storage.engines import PostgresEngine, create_engine
+from synapse.storage.engines import create_engine
+from synapse.storage.engines.postgres import PostgresEngine
 from synapse.types import JsonDict
 from synapse.util import Clock
 

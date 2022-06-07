@@ -53,7 +53,7 @@ SQLite:
 
 import logging
 
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines.postgres import PostgresEngine
 
 logger = logging.getLogger(__name__)
 

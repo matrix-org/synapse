@@ -23,7 +23,7 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines.postgres import PostgresEngine
 from synapse.storage.types import Connection
 from synapse.storage.util.id_generators import (
     AbstractStreamIdGenerator,

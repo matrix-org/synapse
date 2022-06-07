@@ -19,7 +19,7 @@ Adds a postgres SEQUENCE for generating guest user IDs.
 from synapse.storage.databases.main.registration import (
     find_max_generated_user_id_localpart,
 )
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines.postgres import PostgresEngine
 
 
 def run_create(cur, database_engine, *args, **kwargs):

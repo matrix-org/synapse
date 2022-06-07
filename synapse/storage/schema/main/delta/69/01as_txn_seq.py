@@ -17,7 +17,7 @@
 Adds a postgres SEQUENCE for generating application service transaction IDs.
 """
 
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines.postgres import PostgresEngine
 
 
 def run_create(cur, database_engine, *args, **kwargs):
