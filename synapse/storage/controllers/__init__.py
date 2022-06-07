@@ -18,7 +18,7 @@ from synapse.storage.controllers.persist_events import (
     EventsPersistenceStorageController,
 )
 from synapse.storage.controllers.purge_events import PurgeEventsStorageController
-from synapse.storage.controllers.state import StateGroupStorageController
+from synapse.storage.controllers.state import StateStorageController
 from synapse.storage.databases import Databases
 from synapse.storage.databases.main import DataStore
 
@@ -39,7 +39,7 @@ class StorageControllers:
         self.main = stores.main
 
         self.purge_events = PurgeEventsStorageController(hs, stores)
-        self.state = StateGroupStorageController(hs, stores)
+        self.state = StateStorageController(hs, stores)
 
         self.persistence = None
         if stores.persist_events:

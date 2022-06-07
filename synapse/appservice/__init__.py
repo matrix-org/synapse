@@ -70,7 +70,6 @@ class ApplicationService:
     def __init__(
         self,
         token: str,
-        hostname: str,
         id: str,
         sender: str,
         url: Optional[str] = None,
@@ -88,7 +87,6 @@ class ApplicationService:
         )  # url must not end with a slash
         self.hs_token = hs_token
         self.sender = sender
-        self.server_name = hostname
         self.namespaces = self._check_namespaces(namespaces)
         self.id = id
         self.ip_range_whitelist = ip_range_whitelist

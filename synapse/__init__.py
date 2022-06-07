@@ -20,8 +20,6 @@ import json
 import os
 import sys
 
-from matrix_common.versionstring import get_distribution_version_string
-
 # Check that we're not running on an unsupported Python version.
 if sys.version_info < (3, 7):
     print("Synapse requires Python 3.7 or above.")
@@ -70,7 +68,9 @@ try:
 except ImportError:
     pass
 
-__version__ = get_distribution_version_string("matrix-synapse")
+import synapse.util
+
+__version__ = synapse.util.SYNAPSE_VERSION
 
 if bool(os.environ.get("SYNAPSE_TEST_PATCH_LOG_CONTEXTS", False)):
     # We import here so that we don't have to install a bunch of deps when

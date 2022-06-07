@@ -1,1 +1,0 @@
-Refactor `have_seen_events` to reduce memory consumed when processing federation traffic.

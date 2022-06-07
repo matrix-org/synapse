@@ -371,7 +371,7 @@ class FederationHandler:
         # First we try hosts that are already in the room
         # TODO: HEURISTIC ALERT.
 
-        curr_state = await self.state_handler.get_current_state(room_id)
+        curr_state = await self._storage_controllers.state.get_current_state(room_id)
 
         curr_domains = get_domains_from_state(curr_state)
 
@@ -750,7 +750,9 @@ class FederationHandler:
         # Note that this requires the /send_join request to come back to the
         # same server.
         if room_version.msc3083_join_rules:
-            state_ids = await self.store.get_current_state_ids(room_id)
+            state_ids = await self._state_storage_controller.get_current_state_ids(
+                room_id
+            )
             if await self._event_auth_handler.has_restricted_join_rules(
                 state_ids, room_version
             ):
@@ -1552,6 +1554,9 @@ class FederationHandler:
                 success = await self.store.clear_partial_state_room(room_id)
                 if success:
                     logger.info("State resync complete for %s", room_id)
+                    self._storage_controllers.state.notify_room_un_partial_stated(
+                        room_id
+                    )
 
                     # TODO(faster_joins) update room stats and user directory?
                     return

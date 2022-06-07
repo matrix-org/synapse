@@ -134,6 +134,7 @@ class BasePresenceHandler(abc.ABC):
     def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.presence_router = hs.get_presence_router()
         self.state = hs.get_state_handler()
         self.is_mine_id = hs.is_mine_id
@@ -1348,7 +1349,10 @@ class PresenceHandler(BasePresenceHandler):
                     self._event_pos,
                     room_max_stream_ordering,
                 )
-                max_pos, deltas = await self.store.get_current_state_deltas(
+                (
+                    max_pos,
+                    deltas,
+                ) = await self._storage_controllers.state.get_current_state_deltas(
                     self._event_pos, room_max_stream_ordering
                 )
 

@@ -95,7 +95,6 @@ class EventTypes:
     Aliases: Final = "m.room.aliases"
     Redaction: Final = "m.room.redaction"
     ThirdPartyInvite: Final = "m.room.third_party_invite"
-    RelatedGroups: Final = "m.room.related_groups"
 
     RoomHistoryVisibility: Final = "m.room.history_visibility"
     CanonicalAlias: Final = "m.room.canonical_alias"

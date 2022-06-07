@@ -226,6 +226,13 @@ class UserRestServletV2(RestServlet):
             if not isinstance(password, str) or len(password) > 512:
                 raise SynapseError(HTTPStatus.BAD_REQUEST, "Invalid password")
 
+        logout_devices = body.get("logout_devices", True)
+        if not isinstance(logout_devices, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "'logout_devices' parameter is not of type boolean",
+            )
+
         deactivate = body.get("deactivated", False)
         if not isinstance(deactivate, bool):
             raise SynapseError(
@@ -305,7 +312,6 @@ class UserRestServletV2(RestServlet):
                     await self.store.set_server_admin(target_user, set_admin_to)
 
             if password is not None:
-                logout_devices = True
                 new_password_hash = await self.auth_handler.hash(password)
 
                 await self.set_password_handler.set_password(
