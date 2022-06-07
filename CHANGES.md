@@ -1,7 +1,7 @@
 Synapse 1.61.0rc1 (2022-06-07)
 ==============================
 
-This release removes support for the non-standard feature known both as 'groups' and as 'communities', which ha. They have been superseded by *Spaces*.
+This release removes support for the non-standard feature known both as 'groups' and as 'communities', which have been superseded by *Spaces*.
 
 Features
 --------
@@ -19,7 +19,7 @@ Features
 Bugfixes
 --------
 
-- Always send an `access_token` in `/thirdparty/` requests to appservices, as required by the [Application Service APIspecification](https://spec.matrix.org/v1.1/application-service-api/#third-party-networks). ([\#12746](https://github.com/matrix-org/synapse/issues/12746))
+- Always send an `access_token` in `/thirdparty/` requests to appservices, as required by the [Application Service API specification](https://spec.matrix.org/v1.1/application-service-api/#third-party-networks). ([\#12746](https://github.com/matrix-org/synapse/issues/12746))
 - Implement [MSC3816](https://github.com/matrix-org/matrix-spec-proposals/pull/3816): sending the root event in a thread should count as having 'participated' in it. ([\#12766](https://github.com/matrix-org/synapse/issues/12766))
 - Delete events from the `federation_inbound_events_staging` table when a room is purged through the admin API. ([\#12784](https://github.com/matrix-org/synapse/issues/12784))
 - Fix a bug where we did not correctly handle invalid device list updates over federation. Contributed by Carl Bordum Hansen. ([\#12829](https://github.com/matrix-org/synapse/issues/12829))
