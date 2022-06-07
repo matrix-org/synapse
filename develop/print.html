@@ -4404,6 +4404,11 @@ otherwise downloaded by a local or remote user. If the media has never
 been accessed, the media's creation time is used instead. Both thumbnails
 and the original media will be removed. If either of these options are unset,
 then media of that type will not be purged.</p>
+<p>Local or cached remote media that has been
+<a href="usage/configuration/../../admin_api/media_admin_api.html#quarantining-media-in-a-room">quarantined</a>
+will not be deleted. Similarly, local media that has been marked as
+<a href="usage/configuration/../../admin_api/media_admin_api.html#protecting-media-from-being-quarantined">protected from quarantine</a>
+will not be deleted.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">media_retention:
     local_media_lifetime: 90d
