@@ -53,14 +53,16 @@ class MediaRetentionTestCase(unittest.HomeserverTestCase):
         # Create a user to upload media with
         test_user_id = self.register_user("alice", "password")
 
-        # Inject media (3 images each; recently accessed, old access, never accessed)
-        # into both the local store and the remote cache
+        # Inject media (recently accessed, old access, never accessed, old access
+        # quarantined media) into both the local store and the remote cache, plus
+        # one additional local media that is marked as protected from quarantine.
         media_repository = hs.get_media_repository()
         test_media_content = b"example string"
 
         def _create_media_and_set_attributes(
             last_accessed_ms: Optional[int],
             is_quarantined: Optional[bool] = False,
+            is_protected: Optional[bool] = False,
         ) -> str:
             # "Upload" some media to the local media store
             mxc_uri = self.get_success(
@@ -92,6 +94,15 @@ class MediaRetentionTestCase(unittest.HomeserverTestCase):
                         server_name=self.hs.config.server.server_name,
                         media_id=media_id,
                         quarantined_by="@theadmin:test",
+                    )
+                )
+
+            if is_protected:
+                # Mark this media as protected from quarantine
+                self.get_success(
+                    self.store.mark_local_media_as_safe(
+                        media_id=media_id,
+                        safe=True,
                     )
                 )
 
@@ -148,6 +159,12 @@ class MediaRetentionTestCase(unittest.HomeserverTestCase):
             _create_media_and_set_attributes(
                 last_accessed_ms=self.ONE_DAY_IN_MS,
                 is_quarantined=True,
+            )
+        )
+        self.local_not_recently_accessed_protected_media = (
+            _create_media_and_set_attributes(
+                last_accessed_ms=self.ONE_DAY_IN_MS,
+                is_protected=True,
             )
         )
         self.local_never_accessed_media = _create_media_and_set_attributes(
@@ -209,6 +226,10 @@ class MediaRetentionTestCase(unittest.HomeserverTestCase):
                     self.hs.config.server.server_name,
                     self.local_not_recently_accessed_quarantined_media,
                 ),
+                (
+                    self.hs.config.server.server_name,
+                    self.local_not_recently_accessed_protected_media,
+                ),
                 (self.remote_server_name, self.remote_recently_accessed_media),
                 (self.remote_server_name, self.remote_not_recently_accessed_media),
                 (
@@ -252,6 +273,10 @@ class MediaRetentionTestCase(unittest.HomeserverTestCase):
                 (
                     self.hs.config.server.server_name,
                     self.local_not_recently_accessed_quarantined_media,
+                ),
+                (
+                    self.hs.config.server.server_name,
+                    self.local_not_recently_accessed_protected_media,
                 ),
                 (
                     self.remote_server_name,
