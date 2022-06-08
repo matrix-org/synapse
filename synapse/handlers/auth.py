@@ -37,9 +37,7 @@ from typing import (
 
 import attr
 import bcrypt
-import pymacaroons
 import unpaddedbase64
-from pymacaroons.exceptions import MacaroonVerificationFailedException
 
 from twisted.internet.defer import CancelledError
 from twisted.web.server import Request
@@ -69,7 +67,7 @@ from synapse.storage.roommember import ProfileInfo
 from synapse.types import JsonDict, Requester, UserID
 from synapse.util import stringutils as stringutils
 from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
-from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
+from synapse.util.macaroons import LoginTokenAttributes
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import base62_encode
 from synapse.util.threepids import canonicalise_email
@@ -178,19 +176,6 @@ class SsoLoginExtraAttributes:
     # time the session was created, in milliseconds
     creation_time: int
     extra_attributes: JsonDict
-
-
-@attr.s(slots=True, frozen=True, auto_attribs=True)
-class LoginTokenAttributes:
-    """Data we store in a short-term login token"""
-
-    user_id: str
-
-    auth_provider_id: str
-    """The SSO Identity Provider that the user authenticated with, to get this token."""
-
-    auth_provider_session_id: Optional[str]
-    """The session ID advertised by the SSO Identity Provider."""
 
 
 class AuthHandler:
@@ -1828,156 +1813,6 @@ class AuthHandler:
         query.append((param_name, param))
         url_parts[4] = urllib.parse.urlencode(query)
         return urllib.parse.urlunparse(url_parts)
-
-
-@attr.s(slots=True, auto_attribs=True)
-class MacaroonGenerator:
-    hs: "HomeServer"
-
-    def generate_guest_access_token(self, user_id: str) -> str:
-        macaroon = self._generate_base_macaroon(user_id)
-        macaroon.add_first_party_caveat("type = access")
-        # Include a nonce, to make sure that each login gets a different
-        # access token.
-        macaroon.add_first_party_caveat(
-            "nonce = %s" % (stringutils.random_string_with_symbols(16),)
-        )
-        macaroon.add_first_party_caveat("guest = true")
-        return macaroon.serialize()
-
-    def generate_delete_pusher_token(
-        self, user_id: str, app_id: str, pushkey: str
-    ) -> str:
-        macaroon = self._generate_base_macaroon(user_id)
-        macaroon.add_first_party_caveat("type = delete_pusher")
-        macaroon.add_first_party_caveat(f"app_id = {app_id}")
-        macaroon.add_first_party_caveat(f"pushkey = {pushkey}")
-        return macaroon.serialize()
-
-    def generate_short_term_login_token(
-        self,
-        user_id: str,
-        auth_provider_id: str,
-        auth_provider_session_id: Optional[str] = None,
-        duration_in_ms: int = (2 * 60 * 1000),
-    ) -> str:
-        macaroon = self._generate_base_macaroon(user_id)
-        macaroon.add_first_party_caveat("type = login")
-        now = self.hs.get_clock().time_msec()
-        expiry = now + duration_in_ms
-        macaroon.add_first_party_caveat("time < %d" % (expiry,))
-        macaroon.add_first_party_caveat("auth_provider_id = %s" % (auth_provider_id,))
-        if auth_provider_session_id is not None:
-            macaroon.add_first_party_caveat(
-                "auth_provider_session_id = %s" % (auth_provider_session_id,)
-            )
-        return macaroon.serialize()
-
-    def verify_short_term_login_token(self, token: str) -> LoginTokenAttributes:
-        """Verify a short-term-login macaroon
-
-        Checks that the given token is a valid, unexpired short-term-login token
-        minted by this server.
-
-        Args:
-            token: the login token to verify
-
-        Returns:
-            the user_id that this token is valid for
-
-        Raises:
-            MacaroonVerificationFailedException if the verification failed
-        """
-        macaroon = pymacaroons.Macaroon.deserialize(token)
-        user_id = get_value_from_macaroon(macaroon, "user_id")
-        auth_provider_id = get_value_from_macaroon(macaroon, "auth_provider_id")
-
-        auth_provider_session_id: Optional[str] = None
-        try:
-            auth_provider_session_id = get_value_from_macaroon(
-                macaroon, "auth_provider_session_id"
-            )
-        except MacaroonVerificationFailedException:
-            pass
-
-        v = pymacaroons.Verifier()
-        v.satisfy_exact("gen = 1")
-        v.satisfy_exact("type = login")
-        v.satisfy_general(lambda c: c.startswith("user_id = "))
-        v.satisfy_general(lambda c: c.startswith("auth_provider_id = "))
-        v.satisfy_general(lambda c: c.startswith("auth_provider_session_id = "))
-        satisfy_expiry(v, self.hs.get_clock().time_msec)
-        v.verify(macaroon, self.hs.config.key.macaroon_secret_key)
-
-        return LoginTokenAttributes(
-            user_id=user_id,
-            auth_provider_id=auth_provider_id,
-            auth_provider_session_id=auth_provider_session_id,
-        )
-
-    def verify_guest_token(self, token: str) -> str:
-        """Verify a guest access token macaroon
-
-        Checks that the given token is a valid, unexpired guest access token
-        minted by this server.
-
-        Args:
-            token: the login token to verify
-
-        Returns:
-            the user_id that this token is valid for
-
-        Raises:
-            MacaroonVerificationFailedException if the verification failed
-        """
-        macaroon = pymacaroons.Macaroon.deserialize(token)
-        user_id = get_value_from_macaroon(macaroon, "user_id")
-
-        # At some point, Syapse would generate macaroons without the "guest"
-        # caveat for regular users. Because of how macaroon verification works,
-        # to avoid validating those as guest tokens, we explicitely verify if
-        # the macaroon includes the "guest = true" caveat.
-        is_guest = any(
-            (caveat.caveat_id == "guest = true" for caveat in macaroon.caveats)
-        )
-
-        if not is_guest:
-            raise MacaroonVerificationFailedException("Macaroon is not a guest token")
-
-        v = pymacaroons.Verifier()
-        v.satisfy_exact("gen = 1")
-        v.satisfy_exact("type = access")
-        v.satisfy_exact("guest = true")
-        v.satisfy_general(lambda c: c.startswith("user_id = "))
-        v.satisfy_general(lambda c: c.startswith("nonce = "))
-        satisfy_expiry(v, self.hs.get_clock().time_msec)
-        v.verify(macaroon, self.hs.config.key.macaroon_secret_key)
-
-        return user_id
-
-    def verify_delete_pusher_token(self, token: str, app_id: str, pushkey: str) -> str:
-        macaroon = pymacaroons.Macaroon.deserialize(token)
-        user_id = get_value_from_macaroon(macaroon, "user_id")
-
-        v = pymacaroons.Verifier()
-        v.satisfy_exact("gen = 1")
-        v.satisfy_exact("type = delete_pusher")
-        v.satisfy_exact(f"app_id = {app_id}")
-        v.satisfy_exact(f"pushkey = {pushkey}")
-        v.satisfy_general(lambda c: c.startswith("user_id = "))
-        v.verify(macaroon, self.hs.config.key.macaroon_secret_key)
-
-        return user_id
-
-    def _generate_base_macaroon(self, user_id: str) -> pymacaroons.Macaroon:
-        macaroon = pymacaroons.Macaroon(
-            location=self.hs.config.server.server_name,
-            identifier="key",
-            key=self.hs.config.key.macaroon_secret_key,
-        )
-        macaroon.add_first_party_caveat("gen = 1")
-        macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
-        return macaroon
 
 
 def load_legacy_password_auth_providers(hs: "HomeServer") -> None:

@@ -159,16 +159,18 @@ class KeyConfig(Config):
             )
         )
 
-        self.macaroon_secret_key = config.get(
+        macaroon_secret_key: Optional[str] = config.get(
             "macaroon_secret_key", self.root.registration.registration_shared_secret
         )
 
-        if not self.macaroon_secret_key:
+        if not macaroon_secret_key:
             # Unfortunately, there are people out there that don't have this
             # set. Lets just be "nice" and derive one from their secret key.
             logger.warning("Config is missing macaroon_secret_key")
             seed = bytes(self.signing_key[0])
             self.macaroon_secret_key = hashlib.sha256(seed).digest()
+        else:
+            self.macaroon_secret_key = macaroon_secret_key.encode("utf-8")
 
         # a secret which is used to calculate HMACs for form values, to stop
         # falsification of values
