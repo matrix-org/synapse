@@ -910,7 +910,9 @@ class TestStateResolutionStore:
 
         return list(result)
 
-    def get_auth_chain_difference(self, room_id, auth_sets):
+    def get_auth_chain_difference(
+        self, room_id: str, auth_sets: List[Set[str]]
+    ) -> "defer.Deferred[Set[str]]":
         chains = [frozenset(self._get_auth_chain(a)) for a in auth_sets]
 
         common = set(chains[0]).intersection(*chains[1:])
