@@ -429,10 +429,10 @@ jobs:
   tests-done:
     if: ${{ always() }}
     needs:
-      - check-sampleconfig
-      - lint
-      - lint-crlf
-      - lint-newsfile
+#      - check-sampleconfig
+#      - lint
+#      - lint-crlf
+#      - lint-newsfile
       - trial
 #      - trial-olddeps
       - sytest
