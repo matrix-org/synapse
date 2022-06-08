@@ -393,6 +393,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
                 event.event_id,
                 {user_id: actions for user_id, actions in push_actions},
                 False,
+                None,
             )
         )
         return event, context

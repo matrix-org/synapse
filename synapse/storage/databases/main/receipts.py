@@ -731,7 +731,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 user_id,
                 receipt_type,
                 start_topo_ordering - 1 if start_topo_ordering is not None else None,
-                end_topo_ordering + 1,
+                end_topo_ordering + 1 if end_topo_ordering is not None else None,
             ),
         )
         overlapping_receipts = txn.fetchall()
