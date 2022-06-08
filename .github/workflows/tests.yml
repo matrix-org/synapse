@@ -199,7 +199,11 @@ jobs:
         WORKERS: ${{ matrix.workers && 1 }}
         REDIS: ${{ matrix.redis && 1 }}
         BLACKLIST: ${{ matrix.workers && 'synapse-blacklist-with-workers' }}
-        TOP: ${{ github.workspace }}
+        # $TOP is usually defined as {{ github.workspace }}, however in this case we're
+        # operating in the context of the container, where the path defined by
+        # github.workspace doesn't exist, and the equivalent path is defined as /src in
+        # synapse_sytest.sh.
+        TOP: "/src"
 
     strategy:
       fail-fast: false
