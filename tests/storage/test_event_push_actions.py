@@ -151,6 +151,13 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _rotate(11)
         _assert_counts(2, 1)
 
+        # Check that sending read receipts at different points results in the
+        # right counts.
+        _mark_read(8, 8)
+        _assert_counts(1, 0)
+        _mark_read(10, 10)
+        _assert_counts(0, 0)
+
     def test_find_first_stream_ordering_after_ts(self):
         def add_event(so, ts):
             self.get_success(

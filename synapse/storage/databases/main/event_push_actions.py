@@ -265,7 +265,34 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
 
         # Finally we need to count push actions that haven't been summarized
         # yet.
-        sql = """
+        # We only want to pull out push actions that we haven't summarized yet.
+        stream_ordering = max(stream_ordering, summary_stream_ordering)
+        notify_count, unread_count = self._get_notif_unread_count_for_user_room(
+            txn, room_id, user_id, stream_ordering
+        )
+
+        counts.notify_count += notify_count
+        counts.unread_count += unread_count
+
+        return counts
+
+    def _get_notif_unread_count_for_user_room(
+        self,
+        txn: LoggingTransaction,
+        room_id: str,
+        user_id: str,
+        stream_ordering: int,
+        max_stream_ordering: Optional[int] = None,
+    ) -> Tuple[int, int]:
+        """Returns the notify and unread counts for the given user/room."""
+
+        clause = ""
+        args = [user_id, room_id, stream_ordering]
+        if max_stream_ordering is not None:
+            clause = "AND ea.stream_ordering <= ?"
+            args.append(max_stream_ordering)
+
+        sql = f"""
             SELECT
                COUNT(CASE WHEN notif = 1 THEN 1 END),
                COUNT(CASE WHEN unread = 1 THEN 1 END)
@@ -273,19 +300,16 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
              WHERE user_id = ?
                AND room_id = ?
                AND ea.stream_ordering > ?
+               {clause}
         """
 
-        # We only want to pull out push actions that we haven't summarized yet.
-        stream_ordering = max(summary_stream_ordering, stream_ordering)
-
-        txn.execute(sql, (user_id, room_id, stream_ordering))
+        txn.execute(sql, args)
         row = txn.fetchone()
 
         if row:
-            counts.notify_count += row[0]
-            counts.unread_count += row[1]
+            return cast(Tuple[int, int], row)
 
-        return counts
+        return 0, 0
 
     async def get_push_action_users_in_range(
         self, min_stream_ordering: int, max_stream_ordering: int
@@ -1042,12 +1066,26 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
             (user_id, room_id, stream_ordering, self.stream_ordering_month_ago),
         )
 
-        txn.execute(
-            """
-            DELETE FROM event_push_summary
-            WHERE room_id = ? AND user_id = ? AND stream_ordering <= ?
-        """,
-            (room_id, user_id, stream_ordering),
+        old_rotate_stream_ordering = self.db_pool.simple_select_one_onecol_txn(
+            txn,
+            table="event_push_summary_stream_ordering",
+            keyvalues={},
+            retcol="stream_ordering",
+        )
+
+        notif_count, unread_count = self._get_notif_unread_count_for_user_room(
+            txn, room_id, user_id, stream_ordering, old_rotate_stream_ordering
+        )
+
+        self.db_pool.simple_upsert_txn(
+            txn,
+            table="event_push_summary",
+            keyvalues={"room_id": room_id, "user_id": user_id},
+            values={
+                "notif_count": notif_count,
+                "unread_count": unread_count,
+                "stream_ordering": stream_ordering,
+            },
         )
 
 
