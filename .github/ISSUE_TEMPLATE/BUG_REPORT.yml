@@ -60,8 +60,7 @@ body:
         $ curl http://localhost:8008/_synapse/admin/v1/server_version
         ```
 
-        (You may need to replace `localhost:8008` if Synapse is not configured to
-        listen on that port.)
+        (You may need to replace `localhost:8008` if Synapse is not configured to listen on that port.)
     validations:
       required: true
   - type: dropdown
