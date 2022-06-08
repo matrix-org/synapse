@@ -201,9 +201,9 @@ jobs:
         BLACKLIST: ${{ matrix.workers && 'synapse-blacklist-with-workers' }}
         # $TOP is usually defined as {{ github.workspace }}, however in this case we're
         # operating in the context of the container, where the path defined by
-        # github.workspace doesn't exist, and the equivalent path is defined as /src in
-        # synapse_sytest.sh.
-        TOP: "/src"
+        # github.workspace doesn't exist, and the equivalent path is defined as /synapse
+        # in synapse_sytest.sh.
+        TOP: "/synapse"
 
     strategy:
       fail-fast: false
@@ -417,7 +417,7 @@ jobs:
       - name: Combine coverage reports
         run: poetry run coverage combine
       - name: Write coverage to XML
-        run: poetry run coverage xml -i
+        run: poetry run coverage xml
       - name: Upload combined coverage
         uses: actions/upload-artifact@v3
         with:
