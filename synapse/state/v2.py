@@ -24,6 +24,7 @@ from typing import (
     Generator,
     Iterable,
     List,
+    Mapping,
     Optional,
     Sequence,
     Set,
@@ -264,7 +265,7 @@ async def _get_power_level_for_sender(
 
 async def _get_auth_chain_difference(
     room_id: str,
-    state_sets: Sequence[StateMap[str]],
+    state_sets: Sequence[Mapping[Any, str]],
     event_map: Dict[str, EventBase],
     state_res_store: StateResolutionStore,
 ) -> Set[str]:
