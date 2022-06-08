@@ -876,7 +876,7 @@ class TestStateResolutionStore:
             {eid: self.event_map[eid] for eid in event_ids if eid in self.event_map}
         )
 
-    def _get_auth_chain(self, event_ids: List[str]) -> List[str]:
+    def _get_auth_chain(self, event_ids: Iterable[str]) -> List[str]:
         """Gets the full auth chain for a set of events (including rejected
         events).
 
