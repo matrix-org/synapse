@@ -72,6 +72,11 @@ class StateResolutionStore(Protocol):
 _AWAIT_AFTER_ITERATIONS = 100
 
 
+__all__ = [
+    "resolve_events_with_store",
+]
+
+
 async def resolve_events_with_store(
     clock: Clock,
     room_id: str,
