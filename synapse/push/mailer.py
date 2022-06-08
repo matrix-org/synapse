@@ -255,7 +255,9 @@ class Mailer:
             user_display_name = user_id
 
         async def _fetch_room_state(room_id: str) -> None:
-            room_state = await self.store.get_current_state_ids(room_id)
+            room_state = await self._state_storage_controller.get_current_state_ids(
+                room_id
+            )
             state_by_room[room_id] = room_state
 
         # Run at most 3 of these at once: sync does 10 at a time but email

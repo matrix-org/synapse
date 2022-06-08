@@ -87,6 +87,7 @@ class LoginDict(TypedDict):
 class RegistrationHandler:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.clock = hs.get_clock()
         self.hs = hs
         self.auth = hs.get_auth()
@@ -528,7 +529,7 @@ class RegistrationHandler:
 
                 if requires_invite:
                     # If the server is in the room, check if the room is public.
-                    state = await self.store.get_filtered_current_state_ids(
+                    state = await self._storage_controllers.state.get_current_state_ids(
                         room_id, StateFilter.from_types([(EventTypes.JoinRules, "")])
                     )
 

@@ -1,0 +1,1 @@
+Remove the `delete_device` method and always call `delete_devices`.

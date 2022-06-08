@@ -70,6 +70,7 @@ Changes in SCHEMA_VERSION = 70:
 
 Changes in SCHEMA_VERSION = 71:
     - event_edges.room_id is no longer read from.
+    - Tables related to groups are no longer accessed.
 
 Changes in SCHEMA_VERSION = 72:
     - event_edges.(room_id, is_state) are no longer written to.

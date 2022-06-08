@@ -33,7 +33,6 @@ class ApplicationServiceTestCase(unittest.TestCase):
             sender="@as:test",
             url="some_url",
             token="some_token",
-            hostname="matrix.org",  # only used by get_groups_for_user
         )
         self.event = Mock(
             event_id="$abc:xyz",

@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.60 where Synapse would fail to start if the `sqlite3` module was not available.
