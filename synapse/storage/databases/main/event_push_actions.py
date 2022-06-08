@@ -763,6 +763,8 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, SQLBaseStore):
                 if caught_up:
                     break
                 await self.hs.get_clock().sleep(self._rotate_delay)
+
+            await self._remove_old_push_actions_that_have_rotated()
         finally:
             self._doing_notif_rotation = False
 
@@ -924,17 +926,71 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, SQLBaseStore):
         )
 
         txn.execute(
-            "DELETE FROM event_push_actions"
-            " WHERE ? <= stream_ordering AND stream_ordering < ? AND highlight = 0",
-            (old_rotate_stream_ordering, rotate_to_stream_ordering),
-        )
-
-        logger.info("Rotating notifications, deleted %s push actions", txn.rowcount)
-
-        txn.execute(
             "UPDATE event_push_summary_stream_ordering SET stream_ordering = ?",
             (rotate_to_stream_ordering,),
         )
+
+    async def _remove_old_push_actions_that_have_rotated(
+        self,
+    ) -> None:
+        """Clear out old push actions that rotated been summarized."""
+
+        # We want to clear out anything that older than a day that *has* already
+        # been rotated.
+        rotated_upto_stream_ordering = await self.db_pool.simple_select_one_onecol(
+            table="event_push_summary_stream_ordering",
+            keyvalues={},
+            retcol="stream_ordering",
+        )
+
+        max_stream_ordering_to_delete = min(
+            rotated_upto_stream_ordering, self.stream_ordering_day_ago
+        )
+
+        def remove_old_push_actions_that_have_rotated_txn(
+            txn: LoggingTransaction,
+        ) -> bool:
+            # We don't want to clear out too much at a time, so we bound our
+            # deletes.
+            batch_size = 10000
+
+            txn.execute(
+                """
+                SELECT stream_ordering FROM event_push_actions
+                WHERE stream_ordering < ? AND highlight = 0
+                ORDER BY stream_ordering ASC LIMIT 1 OFFSET ?
+            """,
+                (
+                    max_stream_ordering_to_delete,
+                    batch_size,
+                ),
+            )
+            stream_row = txn.fetchone()
+
+            if stream_row:
+                (stream_ordering,) = stream_row
+            else:
+                stream_ordering = max_stream_ordering_to_delete
+
+            txn.execute(
+                """
+                DELETE FROM event_push_actions
+                WHERE stream_ordering < ? AND highlight = 0
+                """,
+                (stream_ordering,),
+            )
+
+            logger.info("Rotating notifications, deleted %s push actions", txn.rowcount)
+
+            return txn.rowcount < batch_size
+
+        while True:
+            done = await self.db_pool.runInteraction(
+                "_remove_old_push_actions_that_have_rotated",
+                remove_old_push_actions_that_have_rotated_txn,
+            )
+            if done:
+                break
 
     def _remove_old_push_actions_before_txn(
         self, txn: LoggingTransaction, room_id: str, user_id: str, stream_ordering: int
