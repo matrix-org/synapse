@@ -1915,6 +1915,45 @@ class MacaroonGenerator:
             auth_provider_session_id=auth_provider_session_id,
         )
 
+    def verify_guest_token(self, token: str) -> str:
+        """Verify a guest access token macaroon
+
+        Checks that the given token is a valid, unexpired guest access token
+        minted by this server.
+
+        Args:
+            token: the login token to verify
+
+        Returns:
+            the user_id that this token is valid for
+
+        Raises:
+            MacaroonVerificationFailedException if the verification failed
+        """
+        macaroon = pymacaroons.Macaroon.deserialize(token)
+        user_id = get_value_from_macaroon(macaroon, "user_id")
+
+        # At some point, Syapse would generate macaroons without the "guest"
+        # caveat for regular users. Because of how macaroon verification works,
+        # to avoid validating those as guest tokens, we explicitely verify if
+        # the macaroon includes the "guest = true" caveat.
+        is_guest = any(
+            (caveat.caveat_id == "guest = true" for caveat in macaroon.caveats)
+        )
+
+        if not is_guest:
+            raise MacaroonVerificationFailedException("Macaroon is not a guest token")
+
+        v = pymacaroons.Verifier()
+        v.satisfy_exact("gen = 1")
+        v.satisfy_exact("type = access")
+        v.satisfy_exact("guest = true")
+        v.satisfy_general(lambda c: c.startswith("user_id = "))
+        v.satisfy_general(lambda c: c.startswith("nonce = "))
+        satisfy_expiry(v, self.hs.get_clock().time_msec)
+        v.verify(macaroon, self.hs.config.key.macaroon_secret_key)
+
+        return user_id
 
     def verify_delete_pusher_token(self, token: str, app_id: str, pushkey: str) -> str:
         macaroon = pymacaroons.Macaroon.deserialize(token)

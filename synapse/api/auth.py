@@ -34,8 +34,6 @@ from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import active_span, force_tracing, start_active_span
 from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import Requester, UserID, create_requester
-from synapse.util.caches.lrucache import LruCache
-from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -45,10 +43,6 @@ logger = logging.getLogger(__name__)
 
 # guests always get this device id.
 GUEST_DEVICE_ID = "guest_device"
-
-
-class _InvalidMacaroonException(Exception):
-    pass
 
 
 class Auth:
@@ -62,16 +56,12 @@ class Auth:
         self.store = hs.get_datastores().main
         self._account_validity_handler = hs.get_account_validity_handler()
         self._storage_controllers = hs.get_storage_controllers()
-
-        self.token_cache: LruCache[str, Tuple[str, bool]] = LruCache(
-            10000, "token_cache"
-        )
+        self._macaroon_generator = hs.get_macaroon_generator()
 
         self._auth_blocking = AuthBlocking(self.hs)
 
         self._track_appservice_user_ips = hs.config.appservice.track_appservice_user_ips
         self._track_puppeted_user_ips = hs.config.api.track_puppeted_user_ips
-        self._macaroon_secret_key = hs.config.key.macaroon_secret_key
         self._force_tracing_for_users = hs.config.tracing.force_tracing_for_users
 
     async def check_user_in_room(
@@ -126,7 +116,6 @@ class Auth:
         self,
         request: SynapseRequest,
         allow_guest: bool = False,
-        rights: str = "access",
         allow_expired: bool = False,
     ) -> Requester:
         """Get a registered user's ID.
@@ -135,7 +124,6 @@ class Auth:
             request: An HTTP request with an access_token query parameter.
             allow_guest: If False, will raise an AuthError if the user making the
                 request is a guest.
-            rights: The operation being performed; the access token must allow this
             allow_expired: If True, allow the request through even if the account
                 is expired, or session token lifetime has ended. Note that
                 /login will deliver access tokens regardless of expiration.
@@ -150,7 +138,7 @@ class Auth:
         parent_span = active_span()
         with start_active_span("get_user_by_req"):
             requester = await self._wrapped_get_user_by_req(
-                request, allow_guest, rights, allow_expired
+                request, allow_guest, allow_expired
             )
 
             if parent_span:
@@ -176,7 +164,6 @@ class Auth:
         self,
         request: SynapseRequest,
         allow_guest: bool,
-        rights: str,
         allow_expired: bool,
     ) -> Requester:
         """Helper for get_user_by_req
@@ -214,7 +201,7 @@ class Auth:
                 return requester
 
             user_info = await self.get_user_by_access_token(
-                access_token, rights, allow_expired=allow_expired
+                access_token, allow_expired=allow_expired
             )
             token_id = user_info.token_id
             is_guest = user_info.is_guest
@@ -394,15 +381,12 @@ class Auth:
     async def get_user_by_access_token(
         self,
         token: str,
-        rights: str = "access",
         allow_expired: bool = False,
     ) -> TokenLookupResult:
         """Validate access token and get user_id from it
 
         Args:
             token: The access token to get the user by
-            rights: The operation being performed; the access token must
-                allow this
             allow_expired: If False, raises an InvalidClientTokenError
                 if the token is expired
 
@@ -413,70 +397,55 @@ class Auth:
                 is invalid
         """
 
-        if rights == "access":
-            # First look in the database to see if the access token is present
-            # as an opaque token.
-            r = await self.store.get_user_by_access_token(token)
-            if r:
-                valid_until_ms = r.valid_until_ms
-                if (
-                    not allow_expired
-                    and valid_until_ms is not None
-                    and valid_until_ms < self.clock.time_msec()
-                ):
-                    # there was a valid access token, but it has expired.
-                    # soft-logout the user.
-                    raise InvalidClientTokenError(
-                        msg="Access token has expired", soft_logout=True
-                    )
+        # First look in the database to see if the access token is present
+        # as an opaque token.
+        r = await self.store.get_user_by_access_token(token)
+        if r:
+            valid_until_ms = r.valid_until_ms
+            if (
+                not allow_expired
+                and valid_until_ms is not None
+                and valid_until_ms < self.clock.time_msec()
+            ):
+                # there was a valid access token, but it has expired.
+                # soft-logout the user.
+                raise InvalidClientTokenError(
+                    msg="Access token has expired", soft_logout=True
+                )
 
-                return r
+            return r
 
         # If the token isn't found in the database, then it could still be a
-        # macaroon, so we check that here.
+        # macaroon for a guest, so we check that here.
         try:
-            user_id, guest = self._parse_and_validate_macaroon(token, rights)
+            user_id = self._macaroon_generator.verify_guest_token(token)
 
-            if rights == "access":
-                if not guest:
-                    # non-guest access tokens must be in the database
-                    logger.warning("Unrecognised access token - not in store.")
-                    raise InvalidClientTokenError()
-
-                # Guest access tokens are not stored in the database (there can
-                # only be one access token per guest, anyway).
-                #
-                # In order to prevent guest access tokens being used as regular
-                # user access tokens (and hence getting around the invalidation
-                # process), we look up the user id and check that it is indeed
-                # a guest user.
-                #
-                # It would of course be much easier to store guest access
-                # tokens in the database as well, but that would break existing
-                # guest tokens.
-                stored_user = await self.store.get_user_by_id(user_id)
-                if not stored_user:
-                    raise InvalidClientTokenError("Unknown user_id %s" % user_id)
-                if not stored_user["is_guest"]:
-                    raise InvalidClientTokenError(
-                        "Guest access token used for regular user"
-                    )
-
-                ret = TokenLookupResult(
-                    user_id=user_id,
-                    is_guest=True,
-                    # all guests get the same device id
-                    device_id=GUEST_DEVICE_ID,
+            # Guest access tokens are not stored in the database (there can
+            # only be one access token per guest, anyway).
+            #
+            # In order to prevent guest access tokens being used as regular
+            # user access tokens (and hence getting around the invalidation
+            # process), we look up the user id and check that it is indeed
+            # a guest user.
+            #
+            # It would of course be much easier to store guest access
+            # tokens in the database as well, but that would break existing
+            # guest tokens.
+            stored_user = await self.store.get_user_by_id(user_id)
+            if not stored_user:
+                raise InvalidClientTokenError("Unknown user_id %s" % user_id)
+            if not stored_user["is_guest"]:
+                raise InvalidClientTokenError(
+                    "Guest access token used for regular user"
                 )
-            elif rights == "delete_pusher":
-                # We don't store these tokens in the database
 
-                ret = TokenLookupResult(user_id=user_id, is_guest=False)
-            else:
-                raise RuntimeError("Unknown rights setting %s", rights)
-            return ret
+            return TokenLookupResult(
+                user_id=user_id,
+                is_guest=True,
+                # all guests get the same device id
+                device_id=GUEST_DEVICE_ID,
+            )
         except (
-            _InvalidMacaroonException,
             pymacaroons.exceptions.MacaroonException,
             TypeError,
             ValueError,
@@ -487,78 +456,6 @@ class Auth:
                 e,
             )
             raise InvalidClientTokenError("Invalid access token passed.")
-
-    def _parse_and_validate_macaroon(
-        self, token: str, rights: str = "access"
-    ) -> Tuple[str, bool]:
-        """Takes a macaroon and tries to parse and validate it. This is cached
-        if and only if rights == access and there isn't an expiry.
-
-        On invalid macaroon raises _InvalidMacaroonException
-
-        Returns:
-            (user_id, is_guest)
-        """
-        if rights == "access":
-            cached = self.token_cache.get(token, None)
-            if cached:
-                return cached
-
-        try:
-            macaroon = pymacaroons.Macaroon.deserialize(token)
-        except Exception:  # deserialize can throw more-or-less anything
-            # The access token doesn't look like a macaroon.
-            raise _InvalidMacaroonException()
-
-        try:
-            user_id = get_value_from_macaroon(macaroon, "user_id")
-
-            guest = False
-            for caveat in macaroon.caveats:
-                if caveat.caveat_id == "guest = true":
-                    guest = True
-
-            self.validate_macaroon(macaroon, rights, user_id=user_id)
-        except (
-            pymacaroons.exceptions.MacaroonException,
-            KeyError,
-            TypeError,
-            ValueError,
-        ):
-            raise InvalidClientTokenError("Invalid macaroon passed.")
-
-        if rights == "access":
-            self.token_cache[token] = (user_id, guest)
-
-        return user_id, guest
-
-    def validate_macaroon(
-        self, macaroon: pymacaroons.Macaroon, type_string: str, user_id: str
-    ) -> None:
-        """
-        validate that a Macaroon is understood by and was signed by this server.
-
-        Args:
-            macaroon: The macaroon to validate
-            type_string: The kind of token required (e.g. "access", "delete_pusher")
-            user_id: The user_id required
-        """
-        v = pymacaroons.Verifier()
-
-        # the verifier runs a test for every caveat on the macaroon, to check
-        # that it is met for the current request. Each caveat must match at
-        # least one of the predicates specified by satisfy_exact or
-        # specify_general.
-        v.satisfy_exact("gen = 1")
-        v.satisfy_exact("type = " + type_string)
-        v.satisfy_exact("user_id = %s" % user_id)
-        v.satisfy_exact("guest = true")
-        satisfy_expiry(v, self.clock.time_msec)
-
-        # access_tokens include a nonce for uniqueness: any value is acceptable
-        v.satisfy_general(lambda c: c.startswith("nonce = "))
-
-        v.verify(macaroon, self._macaroon_secret_key)
 
     def get_appservice_by_req(self, request: SynapseRequest) -> ApplicationService:
         token = self.get_access_token_from_request(request)
