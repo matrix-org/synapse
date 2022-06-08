@@ -37,7 +37,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        IMPORTANT: please answer the following questions, to help us narrow down the problem.
+        ---
+
+        **IMPORTANT**: please answer the following questions, to help us narrow down the problem.
   - type: input
     id: homeserver
     attributes:
