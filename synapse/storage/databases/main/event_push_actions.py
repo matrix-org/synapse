@@ -217,42 +217,52 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, SQLBaseStore):
     def _get_unread_counts_by_pos_txn(
         self, txn: LoggingTransaction, room_id: str, user_id: str, stream_ordering: int
     ) -> NotifCounts:
-        sql = (
-            "SELECT"
-            "   COUNT(CASE WHEN notif = 1 THEN 1 END),"
-            "   COUNT(CASE WHEN highlight = 1 THEN 1 END),"
-            "   COUNT(CASE WHEN unread = 1 THEN 1 END)"
-            " FROM event_push_actions ea"
-            " WHERE user_id = ?"
-            "   AND room_id = ?"
-            "   AND stream_ordering > ?"
-        )
-
-        txn.execute(sql, (user_id, room_id, stream_ordering))
-        row = txn.fetchone()
+        """Get the number of unread messages for a user/room that have happened
+        since the given stream ordering.
+        """
 
         (notif_count, highlight_count, unread_count) = (0, 0, 0)
 
-        if row:
-            (notif_count, highlight_count, unread_count) = row
-
+        # First we pull the counts from the summary table
         txn.execute(
             """
-                SELECT notif_count, unread_count FROM event_push_summary
+                SELECT stream_ordering, notif_count, COALESCE(unread_count, 0)
+                FROM event_push_summary
                 WHERE room_id = ? AND user_id = ? AND stream_ordering > ?
             """,
             (room_id, user_id, stream_ordering),
         )
         row = txn.fetchone()
 
+        summary_stream_ordering = 0
+        if row:
+            summary_stream_ordering = row[0]
+            notif_count += row[1]
+            unread_count += row[2]
+
+        # And then we need to count push actions that haven't been summarized
+        # yet.
+        sql = """
+            SELECT
+               COUNT(CASE WHEN notif = 1 THEN 1 END),
+               COUNT(CASE WHEN highlight = 1 THEN 1 END),
+               COUNT(CASE WHEN unread = 1 THEN 1 END)
+             FROM event_push_actions ea
+             WHERE user_id = ?
+               AND room_id = ?
+               AND ea.stream_ordering > ?
+        """
+
+        # We only want to pull out push actions that we haven't summarized yet.
+        stream_ordering = max(summary_stream_ordering, stream_ordering)
+
+        txn.execute(sql, (user_id, room_id, stream_ordering))
+        row = txn.fetchone()
+
         if row:
             notif_count += row[0]
-
-            if row[1] is not None:
-                # The unread_count column of event_push_summary is NULLable, so we need
-                # to make sure we don't try increasing the unread counts if it's NULL
-                # for this row.
-                unread_count += row[1]
+            highlight_count += row[1]
+            unread_count += row[2]
 
         return NotifCounts(
             notify_count=notif_count,
