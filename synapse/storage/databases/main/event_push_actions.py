@@ -82,15 +82,15 @@ class UserPushAction(EmailPushAction):
     profile_tag: str
 
 
-@attr.s(slots=True, frozen=True, auto_attribs=True)
+@attr.s(slots=True, auto_attribs=True)
 class NotifCounts:
     """
     The per-user, per-room count of notifications. Used by sync and push.
     """
 
-    notify_count: int
-    unread_count: int
-    highlight_count: int
+    notify_count: int = 0
+    unread_count: int = 0
+    highlight_count: int = 0
 
 
 def _serialize_action(actions: List[Union[dict, str]], is_highlight: bool) -> str:
@@ -231,7 +231,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         since the given stream ordering.
         """
 
-        (notif_count, highlight_count, unread_count) = (0, 0, 0)
+        counts = NotifCounts()
 
         # First we pull the counts from the summary table
         txn.execute(
@@ -247,15 +247,27 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         summary_stream_ordering = 0
         if row:
             summary_stream_ordering = row[0]
-            notif_count += row[1]
-            unread_count += row[2]
+            counts.notify_count += row[1]
+            counts.unread_count += row[2]
 
-        # And then we need to count push actions that haven't been summarized
+        # Next we need to count highlights, which aren't summarized
+        sql = """
+            SELECT COUNT(*) FROM event_push_actions
+            WHERE user_id = ?
+                AND room_id = ?
+                AND stream_ordering > ?
+                AND highlight = 1
+        """
+        txn.execute(sql, (user_id, room_id, stream_ordering))
+        row = txn.fetchone()
+        if row:
+            counts.highlight_count += row[0]
+
+        # Finally we need to count push actions that haven't been summarized
         # yet.
         sql = """
             SELECT
                COUNT(CASE WHEN notif = 1 THEN 1 END),
-               COUNT(CASE WHEN highlight = 1 THEN 1 END),
                COUNT(CASE WHEN unread = 1 THEN 1 END)
              FROM event_push_actions ea
              WHERE user_id = ?
@@ -270,15 +282,10 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         row = txn.fetchone()
 
         if row:
-            notif_count += row[0]
-            highlight_count += row[1]
-            unread_count += row[2]
+            counts.notify_count += row[0]
+            counts.unread_count += row[1]
 
-        return NotifCounts(
-            notify_count=notif_count,
-            unread_count=unread_count,
-            highlight_count=highlight_count,
-        )
+        return counts
 
     async def get_push_action_users_in_range(
         self, min_stream_ordering: int, max_stream_ordering: int
@@ -836,7 +843,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
                     max(stream_ordering) as stream_ordering
                 FROM event_push_actions
                 WHERE ? <= stream_ordering AND stream_ordering < ?
-                    AND highlight = 0
                     AND %s = 1
                 GROUP BY user_id, room_id
             ) AS upd

@@ -144,8 +144,12 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _assert_counts(1, 1)
         _rotate(9)
         _assert_counts(1, 1)
-        _rotate(10)
-        _assert_counts(1, 1)
+
+        # Check that adding another notification and rotating after highlight
+        # works.
+        _inject_actions(10, PlAIN_NOTIF)
+        _rotate(11)
+        _assert_counts(2, 1)
 
     def test_find_first_stream_ordering_after_ts(self):
         def add_event(so, ts):
