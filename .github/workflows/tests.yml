@@ -10,45 +10,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check-sampleconfig:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-      - run: pip install .
-      - run: scripts-dev/generate_sample_config.sh --check
-      - run: scripts-dev/config-lint.sh
-
-  lint:
-    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v1"
-    with:
-      typechecking-extras: "all"
-
-  lint-crlf:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Check line endings
-        run: scripts-dev/check_line_terminators.sh
-
-  lint-newsfile:
-    if: ${{ github.base_ref == 'develop'  || contains(github.base_ref, 'release-') }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-      - uses: actions/setup-python@v2
-      - run: "pip install 'towncrier>=18.6.0rc1'"
-      - run: scripts-dev/check-newsfragment.sh
-        env:
-          PULL_REQUEST_NUMBER: ${{ github.event.number }}
+#  check-sampleconfig:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v2
+#      - uses: actions/setup-python@v2
+#      - run: pip install .
+#      - run: scripts-dev/generate_sample_config.sh --check
+#      - run: scripts-dev/config-lint.sh
+#
+#  lint:
+#    uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v1"
+#    with:
+#      typechecking-extras: "all"
+#
+#  lint-crlf:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v2
+#      - name: Check line endings
+#        run: scripts-dev/check_line_terminators.sh
+#
+#  lint-newsfile:
+#    if: ${{ github.base_ref == 'develop'  || contains(github.base_ref, 'release-') }}
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v2
+#        with:
+#          ref: ${{ github.event.pull_request.head.sha }}
+#          fetch-depth: 0
+#      - uses: actions/setup-python@v2
+#      - run: "pip install 'towncrier>=18.6.0rc1'"
+#      - run: scripts-dev/check-newsfragment.sh
+#        env:
+#          PULL_REQUEST_NUMBER: ${{ github.event.number }}
 
   # Dummy step to gate other tests on without repeating the whole list
   linting-done:
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
-    needs: [lint, lint-crlf, lint-newsfile, check-sampleconfig]
+#    needs: [lint, lint-crlf, lint-newsfile, check-sampleconfig]
     runs-on: ubuntu-latest
     steps:
       - run: "true"
@@ -124,32 +124,32 @@ jobs:
           path: .coverage.*
           retention-days: 1
 
-  trial-olddeps:
-    # Note: sqlite only; no postgres
-    if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
-    needs: linting-done
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Test with old deps
-        uses: docker://ubuntu:focal # For old python and sqlite
-        # Note: focal seems to be using 3.8, but the oldest is 3.7?
-        # See https://github.com/matrix-org/synapse/issues/12343
-        with:
-          workdir: /github/workspace
-          entrypoint: .ci/scripts/test_old_deps.sh
-      - name: Dump logs
-        # Logs are most useful when the command fails, always include them.
-        if: ${{ always() }}
-        # Note: Dumps to workflow logs instead of using actions/upload-artifact
-        #       This keeps logs colocated with failing jobs
-        #       It also ignores find's exit code; this is a best effort affair
-        run: >-
-          find _trial_temp -name '*.log'
-          -exec echo "::group::{}" \;
-          -exec cat {} \;
-          -exec echo "::endgroup::" \;
-          || true
+#  trial-olddeps:
+#    # Note: sqlite only; no postgres
+#    if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
+#    needs: linting-done
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v2
+#      - name: Test with old deps
+#        uses: docker://ubuntu:focal # For old python and sqlite
+#        # Note: focal seems to be using 3.8, but the oldest is 3.7?
+#        # See https://github.com/matrix-org/synapse/issues/12343
+#        with:
+#          workdir: /github/workspace
+#          entrypoint: .ci/scripts/test_old_deps.sh
+#      - name: Dump logs
+#        # Logs are most useful when the command fails, always include them.
+#        if: ${{ always() }}
+#        # Note: Dumps to workflow logs instead of using actions/upload-artifact
+#        #       This keeps logs colocated with failing jobs
+#        #       It also ignores find's exit code; this is a best effort affair
+#        run: >-
+#          find _trial_temp -name '*.log'
+#          -exec echo "::group::{}" \;
+#          -exec cat {} \;
+#          -exec echo "::endgroup::" \;
+#          || true
 
   trial-pypy:
     # Very slow; only run if the branch name includes 'pypy'
@@ -434,7 +434,7 @@ jobs:
       - lint-crlf
       - lint-newsfile
       - trial
-      - trial-olddeps
+#      - trial-olddeps
       - sytest
       - export-data
       - portdb
