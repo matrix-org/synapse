@@ -1,9 +1,13 @@
 [run]
 branch = True
 parallel = True
-source = $TOP/synapse
+include = $TOP/synapse/*
 data_file = $TOP/.coverage
-relative_files = True
 
 [report]
 precision = 2
+
+[paths]
+source =
+    synapse
+    /synapse/synapse
