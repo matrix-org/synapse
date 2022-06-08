@@ -1845,6 +1845,15 @@ class MacaroonGenerator:
         macaroon.add_first_party_caveat("guest = true")
         return macaroon.serialize()
 
+    def generate_delete_pusher_token(
+        self, user_id: str, app_id: str, pushkey: str
+    ) -> str:
+        macaroon = self._generate_base_macaroon(user_id)
+        macaroon.add_first_party_caveat("type = delete_pusher")
+        macaroon.add_first_party_caveat(f"app_id = {app_id}")
+        macaroon.add_first_party_caveat(f"pushkey = {pushkey}")
+        return macaroon.serialize()
+
     def generate_short_term_login_token(
         self,
         user_id: str,
@@ -1906,10 +1915,20 @@ class MacaroonGenerator:
             auth_provider_session_id=auth_provider_session_id,
         )
 
-    def generate_delete_pusher_token(self, user_id: str) -> str:
-        macaroon = self._generate_base_macaroon(user_id)
-        macaroon.add_first_party_caveat("type = delete_pusher")
-        return macaroon.serialize()
+
+    def verify_delete_pusher_token(self, token: str, app_id: str, pushkey: str) -> str:
+        macaroon = pymacaroons.Macaroon.deserialize(token)
+        user_id = get_value_from_macaroon(macaroon, "user_id")
+
+        v = pymacaroons.Verifier()
+        v.satisfy_exact("gen = 1")
+        v.satisfy_exact("type = delete_pusher")
+        v.satisfy_exact(f"app_id = {app_id}")
+        v.satisfy_exact(f"pushkey = {pushkey}")
+        v.satisfy_general(lambda c: c.startswith("user_id = "))
+        v.verify(macaroon, self.hs.config.key.macaroon_secret_key)
+
+        return user_id
 
     def _generate_base_macaroon(self, user_id: str) -> pymacaroons.Macaroon:
         macaroon = pymacaroons.Macaroon(
