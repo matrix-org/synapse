@@ -235,7 +235,6 @@ def convert(src: str, dst: str, **template_vars: object) -> None:
         dst: Path to write to.
         template_vars: The arguments to replace placeholder variables in the template with.
     """
-
     # Read the template file
     # We disable autoescape to prevent template variables from being escaped,
     # as we're not using HTML.
