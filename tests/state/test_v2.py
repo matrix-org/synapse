@@ -515,7 +515,16 @@ class StateTestCase(unittest.TestCase):
             if fake_event.state_key is not None:
                 state_after[(fake_event.type, fake_event.state_key)] = event_id
 
-            auth_types = set(auth_types_for_event(RoomVersions.V6, fake_event))
+            # This type ignore is a bit sad. Things we have tried:
+            # 1. Define a `GenericEvent` Protocol satisfied by FakeEvent, EventBase and
+            #    EventBuilder. But this is Hard because the relevant attributes are
+            #    DictProperty[T] descriptors on EventBase but normal Ts on FakeEvent.
+            # 2. Define a `GenericEvent` Protocol describing `FakeEvent` only, and
+            #    change this function to accept Union[Event, EventBase, EventBuilder].
+            #    This seems reasonable to me, but mypy isn't happy. I think that's
+            #    a mypy bug, see https://github.com/python/mypy/issues/5570
+            # Instead, resort to a type-ignore.
+            auth_types = set(auth_types_for_event(RoomVersions.V6, fake_event))  # type: ignore[arg-type]
 
             auth_events = []
             for key in auth_types:
