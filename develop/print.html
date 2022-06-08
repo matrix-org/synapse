@@ -16663,6 +16663,11 @@ Here is how to run your local Synapse checkout against your local Complement che
 <p>To run a specific test, you can specify the whole name structure:</p>
 <pre><code class="language-sh">COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages/parallel/Historical_events_resolve_in_the_correct_order
 </code></pre>
+<p>The above will run a monolithic (single-process) Synapse with SQLite as the database. For other configurations, try:</p>
+<ul>
+<li>Passing <code>POSTGRES=1</code> as an environment variable to use the Postgres database instead.</li>
+<li>Passing <code>WORKERS=1</code> as an environment variable to use a workerised setup instead. This option implies the use of Postgres.</li>
+</ul>
 <h3 id="access-database-for-homeserver-after-complement-test-runs"><a class="header" href="#access-database-for-homeserver-after-complement-test-runs">Access database for homeserver after Complement test runs.</a></h3>
 <p>If you're curious what the database looks like after you run some tests, here are some steps to get you going in Synapse:</p>
 <ol>
