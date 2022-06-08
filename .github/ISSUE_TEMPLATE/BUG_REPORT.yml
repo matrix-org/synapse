@@ -11,12 +11,11 @@ body:
 
         If you want to report a security issue, please see https://matrix.org/security-disclosure-policy/
 
-        This is a bug report template. By following the instructions below and
+        This is a bug report form. By following the instructions below and
         completing the sections with your information, you will help the us to get all
         the necessary data to fix your issue.
 
-        You can also preview your report before submitting it. You may remove sections
-        that aren't relevant to your particular case.
+        You can also preview your report before submitting it.
   - type: textarea
     id: description
     attributes:
@@ -47,7 +46,7 @@ body:
     id: homeserver
     attributes:
       label: Homeserver
-      description: Was this issue identified on matrix.org or another homeserver?
+      description: Which homeserver was this issue identified on? (matrix.org, another homeserver, etc)
     validations:
       required: true
   - type: input
@@ -55,7 +54,7 @@ body:
     attributes:
       label: Synapse Version
       description: |
-        What version of Synapse is running?
+        What version of Synapse is this homeserver running?
 
         You can find the Synapse version by visiting https://yourserver.example.com/_matrix/federation/v1/version
 
