@@ -1,3 +1,11 @@
+{#
+  This file extends the default 'shared' configuration file (from the 'synapse-workers'
+  docker image) with Complement-specific  tweak.
+
+  The base configuration is moved out of the default path to `shared-orig.yaml.j2`
+  in the Complement Dockerfile and below we include that original file.
+#}
+
 ## Server ##
 report_stats: False
 trusted_key_servers: []
@@ -95,12 +103,4 @@ server_notices:
   system_mxid_avatar_url: ""
   room_name: "Server Alert"
 
-{#
-  This file is intended to extend the configuration with Complement-specific
-  tweaks, so here we include the original section of configuration that does
-  not have any Complement-specific values.
-
-  The base configuration is moved out of the default path to `shared-orig.yaml.j2`
-  in the Complement Dockerfile.
-#}
 {% include "shared-orig.yaml.j2" %}
