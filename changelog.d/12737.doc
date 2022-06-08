@@ -1,0 +1,1 @@
+Add documentation for how to configure Synapse with Workers using Docker Compose. Includes example worker config and docker-compose.yaml. Contributed by @Thumbscrew.
