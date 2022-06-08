@@ -3,7 +3,11 @@ branch = True
 parallel = True
 source = $TOP/synapse
 data_file = $TOP/.coverage
-relative_files = True
 
 [report]
 precision = 2
+
+[paths]
+source =
+    /home/runner/work/synapse/synapse
+    /src/synapse
