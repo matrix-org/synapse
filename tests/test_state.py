@@ -190,6 +190,7 @@ class StateTestCase(unittest.TestCase):
                 "get_clock",
                 "get_state_resolution_handler",
                 "get_account_validity_handler",
+                "get_macaroon_generator",
                 "hostname",
             ]
         )
