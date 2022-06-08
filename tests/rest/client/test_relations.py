@@ -728,6 +728,7 @@ class RelationsTestCase(BaseRelationsTestCase):
 
 
 class RelationPaginationTestCase(BaseRelationsTestCase):
+    @unittest.override_config({"experimental_features": {"msc3715_enabled": True}})
     def test_basic_paginate_relations(self) -> None:
         """Tests that calling pagination API correctly the latest relations."""
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
