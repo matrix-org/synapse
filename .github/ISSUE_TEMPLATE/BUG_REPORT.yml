@@ -1,6 +1,5 @@
 name: Bug report
 description: Create a report to help us improve
-#labels: ["bug", "triage"]
 body:
   - type: markdown
     attributes:
@@ -84,6 +83,8 @@ body:
       description: |
         Tell us about the environment in which your homeserver is operating...
         e.g. distro, hardware, if it's running in a vm/container, etc.
+    validations:
+      required: true
   - type: textarea
     id: logs
     attributes:
@@ -96,6 +97,8 @@ body:
 
         **Bug reports are usually very difficult to diagnose without logging.**
       render: shell
+    validations:
+      required: true
   - type: textarea
     id: anything_else
     attributes:
