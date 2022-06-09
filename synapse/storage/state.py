@@ -546,6 +546,7 @@ class StateFilter:
         #  the sender of a piece of state wasn't actually in the room, then clearly that
         #  state shouldn't have been returned.
         #  We should at least add some tests around this to see what happens.
+        #  https://github.com/matrix-org/synapse/issues/13006
 
         # if we haven't requested membership events, then it depends on the value of
         # 'include_others'

@@ -1547,9 +1547,11 @@ class FederationHandler:
                 # all the events are updated, so we can update current state and
                 # clear the lazy-loading flag.
                 logger.info("Updating current state for %s", room_id)
+                # TODO(faster_joins): support workers
+                #   https://github.com/matrix-org/synapse/issues/12994
                 assert (
                     self._storage_controllers.persistence is not None
-                ), "TODO(faster_joins): support for workers"
+                ), "worker-mode deployments not currently supported here"
                 await self._storage_controllers.persistence.update_current_state(
                     room_id
                 )
