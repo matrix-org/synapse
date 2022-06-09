@@ -24,7 +24,7 @@ from synapse.events import make_event_from_dict
 from synapse.util.frozenutils import unfreeze
 
 
-def make_graph(file_name: str, room_id: str, file_prefix: str, limit: int) -> None:
+def make_graph(file_name: str, file_prefix: str, limit: int) -> None:
     """
     Generate a dot and SVG file for a graph of events in the room based on the
     topological ordering by reading line-delimited JSON from a file.
@@ -149,8 +149,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("-l", "--limit", help="Only retrieve the last N events.")
     parser.add_argument("event_file")
-    parser.add_argument("room")
 
     args = parser.parse_args()
 
-    make_graph(args.event_file, args.room, args.prefix, args.limit)
+    make_graph(args.event_file, args.prefix, args.limit)

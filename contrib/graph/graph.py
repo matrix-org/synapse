@@ -26,7 +26,7 @@ def make_name(pdu_id: str, origin: str) -> str:
     return "%s@%s" % (pdu_id, origin)
 
 
-def make_graph(pdus: List[dict], room: str, filename_prefix: str) -> None:
+def make_graph(pdus: List[dict], filename_prefix: str) -> None:
     """
     Generate a dot and SVG file for a graph of events in the room based on the
     topological ordering by querying a homeserver.
@@ -146,4 +146,4 @@ if __name__ == "__main__":
 
     pdus = get_pdus(host, room)
 
-    make_graph(pdus, room, prefix)
+    make_graph(pdus, prefix)
