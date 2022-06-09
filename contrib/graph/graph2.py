@@ -14,8 +14,8 @@
 
 
 import argparse
-import cgi
 import datetime
+import html
 import json
 import sqlite3
 
@@ -88,7 +88,7 @@ def make_graph(db_name: str, room_id: str, file_prefix: str, limit: int) -> None
             "name": event.event_id,
             "type": event.type,
             "state_key": event.get("state_key", None),
-            "content": cgi.escape(content, quote=True),
+            "content": html.escape(content, quote=True),
             "time": t,
             "depth": event.depth,
             "state_group": state_group,

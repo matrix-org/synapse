@@ -16,10 +16,10 @@ import argparse
 import cgi
 import datetime
 import json
+import urllib.request
 from typing import List
 
 import pydot
-import urllib2
 
 
 def make_name(pdu_id: str, origin: str) -> str:
@@ -118,7 +118,7 @@ def make_graph(pdus: List[dict], room: str, filename_prefix: str) -> None:
 
 def get_pdus(host: str, room: str) -> List[dict]:
     transaction = json.loads(
-        urllib2.urlopen(
+        urllib.request.urlopen(
             "http://%s/_matrix/federation/v1/context/%s/" % (host, room)
         ).read()
     )

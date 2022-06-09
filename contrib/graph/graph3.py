@@ -13,11 +13,11 @@
 # limitations under the License.
 
 import argparse
-import cgi
 import datetime
+import html
+import json
 
 import pydot
-import simplejson as json
 
 from synapse.events import FrozenEvent
 from synapse.util.frozenutils import unfreeze
@@ -70,8 +70,8 @@ def make_graph(file_name: str, room_id: str, file_prefix: str, limit: int) -> No
             content.append(
                 "<b>%s</b>: %s,"
                 % (
-                    cgi.escape(key, quote=True).encode("ascii", "xmlcharrefreplace"),
-                    cgi.escape(value, quote=True).encode("ascii", "xmlcharrefreplace"),
+                    html.escape(key, quote=True).encode("ascii", "xmlcharrefreplace"),
+                    html.escape(value, quote=True).encode("ascii", "xmlcharrefreplace"),
                 )
             )
 
