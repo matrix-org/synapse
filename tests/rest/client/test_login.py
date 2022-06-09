@@ -41,7 +41,7 @@ from tests.test_utils.html_parsers import TestHtmlParser
 from tests.unittest import HomeserverTestCase, override_config, skip_unless
 
 try:
-    from authlib.jose import jwt, jwk
+    from authlib.jose import jwk, jwt
 
     HAS_JWT = True
 except ImportError:
@@ -900,7 +900,8 @@ class JWTTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.result["code"], b"403", channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(
-            channel.json_body["error"], "JWT validation failed: Signature has expired"
+            channel.json_body["error"],
+            "JWT validation failed: expired_token: The token is expired",
         )
 
     def test_login_jwt_not_before(self) -> None:
@@ -910,7 +911,7 @@ class JWTTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(
             channel.json_body["error"],
-            "JWT validation failed: The token is not yet valid (nbf)",
+            "JWT validation failed: invalid_token: The token is not valid yet",
         )
 
     def test_login_no_sub(self) -> None:
@@ -932,7 +933,8 @@ class JWTTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.result["code"], b"403", channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(
-            channel.json_body["error"], "JWT validation failed: Invalid issuer"
+            channel.json_body["error"],
+            'JWT validation failed: invalid_claim: Invalid claim "iss"',
         )
 
         # Not providing an issuer.
@@ -941,7 +943,7 @@ class JWTTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(
             channel.json_body["error"],
-            'JWT validation failed: Token is missing the "iss" claim',
+            'JWT validation failed: missing_claim: Missing "iss" claim',
         )
 
     def test_login_iss_no_config(self) -> None:
@@ -963,7 +965,8 @@ class JWTTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.result["code"], b"403", channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(
-            channel.json_body["error"], "JWT validation failed: Invalid audience"
+            channel.json_body["error"],
+            'JWT validation failed: invalid_claim: Invalid claim "aud"',
         )
 
         # Not providing an audience.
@@ -972,7 +975,7 @@ class JWTTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(
             channel.json_body["error"],
-            'JWT validation failed: Token is missing the "aud" claim',
+            'JWT validation failed: missing_claim: Missing "aud" claim',
         )
 
     def test_login_aud_no_config(self) -> None:
@@ -981,7 +984,8 @@ class JWTTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.result["code"], b"403", channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(
-            channel.json_body["error"], "JWT validation failed: Invalid audience"
+            channel.json_body["error"],
+            'JWT validation failed: invalid_claim: Invalid claim "aud"',
         )
 
     def test_login_default_sub(self) -> None:
