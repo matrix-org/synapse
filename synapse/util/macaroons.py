@@ -131,6 +131,14 @@ class MacaroonGenerator:
         self._secret_key = secret_key
 
     def generate_guest_access_token(self, user_id: str) -> str:
+        """Generate a guest access token for the given user ID
+
+        Args:
+            user_id: The user ID for which the guest token should be generated.
+
+        Returns:
+            A signed access token for that guest user.
+        """
         nonce = stringutils.random_string_with_symbols(16)
         macaroon = self._generate_base_macaroon("access")
         macaroon.add_first_party_caveat(f"user_id = {user_id}")
@@ -141,6 +149,16 @@ class MacaroonGenerator:
     def generate_delete_pusher_token(
         self, user_id: str, app_id: str, pushkey: str
     ) -> str:
+        """Generate a signed token used for unsubscribing from email notifications
+
+        Args:
+            user_id: The user for which this token will be valid.
+            app_id: The app_id for this pusher.
+            pushkey: The unique identifier of this pusher.
+
+        Returns:
+            A signed token which can be used in unsubscribe links.
+        """
         macaroon = self._generate_base_macaroon("delete_pusher")
         macaroon.add_first_party_caveat(f"user_id = {user_id}")
         macaroon.add_first_party_caveat(f"app_id = {app_id}")
@@ -154,6 +172,16 @@ class MacaroonGenerator:
         auth_provider_session_id: Optional[str] = None,
         duration_in_ms: int = (2 * 60 * 1000),
     ) -> str:
+        """Generate a short-term login token used during SSO logins
+
+        Args:
+            user_id: The user for which the token is valid.
+            auth_provider_id: The SSO IdP the user used.
+            auth_provider_session_id: The session ID got during login from the SSO IdP.
+
+        Returns:
+            A signed token valid for using as a ``m.login.token`` token.
+        """
         now = self._clock.time_msec()
         expiry = now + duration_in_ms
         macaroon = self._generate_base_macaroon("login")
@@ -212,10 +240,12 @@ class MacaroonGenerator:
         minted by this server.
 
         Args:
-            token: the login token to verify
+            token: The login token to verify.
 
         Returns:
-            the user_id that this token is valid for
+            A set of attributes carried by this token, including the
+            ``user_id`` and informations about the SSO IDP used during that
+            login.
 
         Raises:
             MacaroonVerificationFailedException if the verification failed
@@ -253,10 +283,10 @@ class MacaroonGenerator:
         minted by this server.
 
         Args:
-            token: the login token to verify
+            token: The access token to verify.
 
         Returns:
-            the user_id that this token is valid for
+            The ``user_id`` that this token is valid for.
 
         Raises:
             MacaroonVerificationFailedException if the verification failed
@@ -285,6 +315,19 @@ class MacaroonGenerator:
         return user_id
 
     def verify_delete_pusher_token(self, token: str, app_id: str, pushkey: str) -> str:
+        """Verify a token from an email unsubscribe link
+
+        Args:
+            token: The token to verify.
+            app_id: The app_id of the pusher to delete.
+            pushkey: The unique identifier of the pusher to delete.
+
+        Return:
+            The ``user_id`` for which this token is valid.
+
+        Raises:
+            MacaroonVerificationFailedException if the verification failed
+        """
         macaroon = pymacaroons.Macaroon.deserialize(token)
         user_id = get_value_from_macaroon(macaroon, "user_id")
 
