@@ -23,7 +23,7 @@ import pydot
 
 
 def make_name(pdu_id: str, origin: str) -> str:
-    return "%s@%s" % (pdu_id, origin)
+    return f"{pdu_id}@{origin}"
 
 
 def make_graph(pdus: List[dict], filename_prefix: str) -> None:
@@ -119,7 +119,7 @@ def make_graph(pdus: List[dict], filename_prefix: str) -> None:
 def get_pdus(host: str, room: str) -> List[dict]:
     transaction = json.loads(
         urllib.request.urlopen(
-            "http://%s/_matrix/federation/v1/context/%s/" % (host, room)
+            f"http://{host}/_matrix/federation/v1/context/{room}/"
         ).read()
     )
 

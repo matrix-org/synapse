@@ -115,7 +115,7 @@ def make_graph(file_name: str, file_prefix: str, limit: int) -> None:
             try:
                 end_node = node_map[prev_id]
             except Exception:
-                end_node = pydot.Node(name=prev_id, label="<<b>%s</b>>" % (prev_id,))
+                end_node = pydot.Node(name=prev_id, label=f"<<b>{prev_id}</b>>")
 
                 node_map[prev_id] = end_node
                 graph.add_node(end_node)
