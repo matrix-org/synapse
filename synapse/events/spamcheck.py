@@ -31,6 +31,7 @@ from typing import (
 # `Literal` appears with Python 3.8.
 from typing_extensions import Literal
 
+import synapse
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
 from synapse.spam_checker_api import RegistrationBehaviour
