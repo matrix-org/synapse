@@ -51,10 +51,16 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         room_id = "!foo:example.com"
         user_id = "@user1235:example.com"
 
+        last_read_stream_ordering = [0]
+
         def _assert_counts(noitf_count, highlight_count):
             counts = self.get_success(
                 self.store.db_pool.runInteraction(
-                    "", self.store._get_unread_counts_by_pos_txn, room_id, user_id, 0
+                    "",
+                    self.store._get_unread_counts_by_pos_txn,
+                    room_id,
+                    user_id,
+                    last_read_stream_ordering[0],
                 )
             )
             self.assertEqual(
@@ -98,6 +104,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             )
 
         def _mark_read(stream, depth):
+            last_read_stream_ordering[0] = stream
             self.get_success(
                 self.store.db_pool.runInteraction(
                     "",
