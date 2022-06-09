@@ -194,7 +194,7 @@ When following this route please make sure that the [Platform-specific prerequis
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.7 or later, up to Python 3.10.
+- Python 3.6 or later, up to Python 3.10.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 To install the Synapse homeserver run:
@@ -233,7 +233,7 @@ python -m synapse.app.homeserver \
     --report-stats=[yes|no]
 ```
 
-... substituting an appropriate value for `--server-name`.
+... substituting an appropriate value for `--server-name` and choosing whether or not to report usage statistics (hostname, synapse version & uptime, total_users etc.) to the developers via the `--report-stats` argument.
 
 This command will generate you a config file that you can then customise, but it will
 also generate a set of keys for you. These keys will allow your homeserver to
