@@ -1,11 +1,3 @@
-import argparse
-import cgi
-import datetime
-import json
-
-import pydot
-import urllib2
-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,12 +12,24 @@ import urllib2
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import cgi
+import datetime
+import json
+
+import pydot
+import urllib2
+
 
 def make_name(pdu_id, origin):
     return "%s@%s" % (pdu_id, origin)
 
 
 def make_graph(pdus, room, filename_prefix):
+    """
+    Generate a dot and SVG file for a graph of events in the room based on the
+    topological ordering by querying a homeserver.
+    """
     pdu_map = {}
     node_map = {}
 

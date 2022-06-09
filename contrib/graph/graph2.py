@@ -26,6 +26,10 @@ from synapse.util.frozenutils import unfreeze
 
 
 def make_graph(db_name, room_id, file_prefix, limit):
+    """
+    Generate a dot and SVG file for a graph of events in the room based on the
+    topological ordering by reading from a Synapse SQLite database.
+    """
     conn = sqlite3.connect(db_name)
 
     sql = (
@@ -126,7 +130,7 @@ def make_graph(db_name, room_id, file_prefix, limit):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate a PDU graph for a given room by talking "
-        "to the given homeserver to get the list of PDUs. \n"
+        "to the given a Synapse SQLite file to get the list of PDUs. \n"
         "Requires pydot."
     )
     parser.add_argument(

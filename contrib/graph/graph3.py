@@ -1,13 +1,3 @@
-import argparse
-import cgi
-import datetime
-
-import pydot
-import simplejson as json
-
-from synapse.events import FrozenEvent
-from synapse.util.frozenutils import unfreeze
-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,8 +12,22 @@ from synapse.util.frozenutils import unfreeze
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import cgi
+import datetime
+
+import pydot
+import simplejson as json
+
+from synapse.events import FrozenEvent
+from synapse.util.frozenutils import unfreeze
+
 
 def make_graph(file_name, room_id, file_prefix, limit):
+    """
+    Generate a dot and SVG file for a graph of events in the room based on the
+    topological ordering by reading line-delimited JSON from a file.
+    """
     print("Reading lines")
     with open(file_name) as f:
         lines = f.readlines()
