@@ -36,6 +36,7 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines._base import IsolationLevel
 from synapse.storage.util.id_generators import (
     AbstractStreamIdTracker,
     MultiWriterIdGenerator,
@@ -764,6 +765,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 linearized_event_id,
                 data,
                 stream_id=stream_id,
+                # Read committed is actually beneficial here because we check for a receipt with
+                # greater stream order, and checking the very latest data at select time is better
+                # than the data at transaction start time.
+                isolation_level=IsolationLevel.READ_COMMITTED,
             )
 
         # If the receipt was older than the currently persisted one, nothing to do.
