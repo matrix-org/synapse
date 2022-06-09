@@ -1,1 +1,1 @@
-Clean up access token verification logic and move the unsubscribe link in notification emails to `/_synapse/client/unsubscribe`.
+Refactor macaroon tokens generation and move the unsubscribe link in notification emails to `/_synapse/client/unsubscribe`.
