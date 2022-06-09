@@ -36,20 +36,7 @@ As with other login types, there are additional fields (e.g. `device_id` and
 
 ## Preparing Synapse
 
-The JSON Web Token integration in Synapse uses the
-[`PyJWT`](https://pypi.org/project/pyjwt/) library, which must be installed
-as follows:
-
- * The relevant libraries are included in the Docker images and Debian packages
-   provided by `matrix.org` so no further action is needed.
-
- * If you installed Synapse into a virtualenv, run `/path/to/env/bin/pip
-   install synapse[pyjwt]` to install the necessary dependencies.
-
- * For other installation mechanisms, see the documentation provided by the
-   maintainer.
-
-To enable the JSON web token integration, you should then add an `jwt_config` section
+To enable the JSON web token integration, you should add a `jwt_config` section
 to your configuration file (or uncomment the `enabled: true` line in the
 existing section). See [sample_config.yaml](./sample_config.yaml) for some
 sample settings.
@@ -57,7 +44,7 @@ sample settings.
 ## How to test JWT as a developer
 
 Although JSON Web Tokens are typically generated from an external server, the
-examples below use [PyJWT](https://pyjwt.readthedocs.io/en/latest/) directly.
+example below uses a locally generated JWT.
 
 1.  Configure Synapse with JWT logins, note that this example uses a pre-shared
     secret and an algorithm of HS256:
@@ -70,9 +57,13 @@ examples below use [PyJWT](https://pyjwt.readthedocs.io/en/latest/) directly.
     ```
 2.  Generate a JSON web token:
 
+    There's a small script for doing so locally:
+    `scripts-dev/build_custom_jwt.py`. Have a look inside and set key/secret
+    and the algorithm to be used (`HS256` or `RS256`) as well as the payload
+
     ```bash
-    $ pyjwt --key=my-secret-token --alg=HS256 encode sub=test-user
-    eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0LXVzZXIifQ.Ag71GT8v01UO3w80aqRPTeuVPBIBZkYhNTJJ-_-zQIc
+    $ poetry run scripts-dev/build_custom_jwt.py 
+    eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMSIsImF1ZCI6WyJhdWRpZW5jZSJdfQ.fRrThuWvok5_gOYKyiIVtKTqZuFhYffiiBLTsIIZPwD-cqwICcSNkLtdhfzfau2Yje48XUiqh19VqP17MnnjGbjBTlotyHonXeXRtIKi5nK1DdKoibUkY8ILeXcDfhHe_lCItzjVtmZm7t4ePe6861Y3TQnbCgM2PBQszYOh1KU
     ```
 3.  Query for the login types and ensure `org.matrix.login.jwt` is there:
 
