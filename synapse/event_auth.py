@@ -45,9 +45,7 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def validate_event_for_room_version(
-    room_version_obj: RoomVersion, event: "EventBase"
-) -> None:
+def validate_event_for_room_version(event: "EventBase") -> None:
     """Ensure that the event complies with the limits, and has the right signatures
 
     NB: does not *validate* the signatures - it assumes that any signatures present
@@ -60,12 +58,10 @@ def validate_event_for_room_version(
     NB: This is used to check events that have been received over federation. As such,
     it can only enforce the checks specified in the relevant room version, to avoid
     a split-brain situation where some servers accept such events, and others reject
-    them.
-
-    TODO: consider moving this into EventValidator
+    them. See also EventValidator, which contains extra checks which are applied only to
+    locally-generated events.
 
     Args:
-        room_version_obj: the version of the room which contains this event
         event: the event to be checked
 
     Raises:
@@ -103,7 +99,7 @@ def validate_event_for_room_version(
             raise AuthError(403, "Event not signed by sending server")
 
     is_invite_via_allow_rule = (
-        room_version_obj.msc3083_join_rules
+        event.room_version.msc3083_join_rules
         and event.type == EventTypes.Member
         and event.membership == Membership.JOIN
         and EventContentFields.AUTHORISING_USER in event.content

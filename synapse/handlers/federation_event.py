@@ -1453,7 +1453,7 @@ class FederationEventHandler:
 
                 context = EventContext.for_outlier(self._storage_controllers)
                 try:
-                    validate_event_for_room_version(room_version_obj, event)
+                    validate_event_for_room_version(event)
                     check_auth_rules_for_event(room_version_obj, event, auth)
                 except AuthError as e:
                     logger.warning("Rejecting %r because %s", event, e)
@@ -1501,7 +1501,7 @@ class FederationEventHandler:
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
         try:
-            validate_event_for_room_version(room_version_obj, event)
+            validate_event_for_room_version(event)
         except AuthError as e:
             logger.warning("While validating received event %r: %s", event, e)
             # TODO: use a different rejected reason here?
