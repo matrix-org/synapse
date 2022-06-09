@@ -1,0 +1,1 @@
+Reduce DB usage of `/sync` when a large number of unread messages have recently been sent in a room.
