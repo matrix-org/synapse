@@ -2184,7 +2184,7 @@ sso:
     # The algorithm used to sign the JSON web token.
     #
     # Supported algorithms are listed at
-    # https://pyjwt.readthedocs.io/en/latest/algorithms.html
+    # https://docs.authlib.org/en/latest/specs/rfc7518.html
     #
     # Required if 'enabled' is true.
     #

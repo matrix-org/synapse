@@ -2947,7 +2947,7 @@ Additional sub-options for this setting include:
 * `secret`: This is either the private shared secret or the public key used to
    decode the contents of the JSON web token. Required if `enabled` is set to true.
 * `algorithm`: The algorithm used to sign the JSON web token. Supported algorithms are listed at
-   https://pyjwt.readthedocs.io/en/latest/algorithms.html Required if `enabled` is set to true.
+   https://docs.authlib.org/en/latest/specs/rfc7518.html Required if `enabled` is set to true.
 * `subject_claim`: Name of the claim containing a unique identifier for the user.
    Optional, defaults to `sub`.
 * `issuer`: The issuer to validate the "iss" claim against. Optional. If provided the 

@@ -16,13 +16,7 @@ from typing import Any
 
 from synapse.types import JsonDict
 
-from ._base import Config, ConfigError
-
-MISSING_JWT = """Missing jwt library. This is required for jwt login.
-
-    Install by running:
-        pip install pyjwt
-    """
+from ._base import Config
 
 
 class JWTConfig(Config):
@@ -41,13 +35,6 @@ class JWTConfig(Config):
             # that the claims exist on the JWT.
             self.jwt_issuer = jwt_config.get("issuer")
             self.jwt_audiences = jwt_config.get("audiences")
-
-            try:
-                import jwt
-
-                jwt  # To stop unused lint.
-            except ImportError:
-                raise ConfigError(MISSING_JWT)
         else:
             self.jwt_enabled = False
             self.jwt_secret = None
@@ -89,7 +76,7 @@ class JWTConfig(Config):
             # The algorithm used to sign the JSON web token.
             #
             # Supported algorithms are listed at
-            # https://pyjwt.readthedocs.io/en/latest/algorithms.html
+            # https://docs.authlib.org/en/latest/specs/rfc7518.html
             #
             # Required if 'enabled' is true.
             #

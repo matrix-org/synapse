@@ -14,7 +14,7 @@
 import json
 import time
 import urllib.parse
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 from unittest.mock import Mock
 from urllib.parse import urlencode
 
@@ -41,7 +41,7 @@ from tests.test_utils.html_parsers import TestHtmlParser
 from tests.unittest import HomeserverTestCase, override_config, skip_unless
 
 try:
-    import jwt
+    from authlib.jose import jwt, jwk
 
     HAS_JWT = True
 except ImportError:
@@ -841,7 +841,7 @@ class CASTestCase(unittest.HomeserverTestCase):
         self.assertIn(b"SSO account deactivated", channel.result["body"])
 
 
-@skip_unless(HAS_JWT, "requires jwt")
+@skip_unless(HAS_JWT, "requires authlib")
 class JWTTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
@@ -866,11 +866,9 @@ class JWTTestCase(unittest.HomeserverTestCase):
         return config
 
     def jwt_encode(self, payload: Dict[str, Any], secret: str = jwt_secret) -> str:
-        # PyJWT 2.0.0 changed the return type of jwt.encode from bytes to str.
-        result: Union[str, bytes] = jwt.encode(payload, secret, self.jwt_algorithm)
-        if isinstance(result, bytes):
-            return result.decode("ascii")
-        return result
+        header = {"alg": self.jwt_algorithm}
+        result: bytes = jwt.encode(header, payload, secret)
+        return result.decode("ascii")
 
     def jwt_login(self, *args: Any) -> FakeChannel:
         params = {"type": "org.matrix.login.jwt", "token": self.jwt_encode(*args)}
@@ -1010,7 +1008,7 @@ class JWTTestCase(unittest.HomeserverTestCase):
 # The JWTPubKeyTestCase is a complement to JWTTestCase where we instead use
 # RSS256, with a public key configured in synapse as "jwt_secret", and tokens
 # signed by the private key.
-@skip_unless(HAS_JWT, "requires jwt")
+@skip_unless(HAS_JWT, "requires authlib")
 class JWTPubKeyTestCase(unittest.HomeserverTestCase):
     servlets = [
         login.register_servlets,
@@ -1071,11 +1069,11 @@ class JWTPubKeyTestCase(unittest.HomeserverTestCase):
         return config
 
     def jwt_encode(self, payload: Dict[str, Any], secret: str = jwt_privatekey) -> str:
-        # PyJWT 2.0.0 changed the return type of jwt.encode from bytes to str.
-        result: Union[bytes, str] = jwt.encode(payload, secret, "RS256")
-        if isinstance(result, bytes):
-            return result.decode("ascii")
-        return result
+        header = {"alg": "RS256"}
+        if secret.startswith("-----BEGIN RSA PRIVATE KEY-----"):
+            secret = jwk.dumps(secret, kty="RSA")
+        result: bytes = jwt.encode(header, payload, secret)
+        return result.decode("ascii")
 
     def jwt_login(self, *args: Any) -> FakeChannel:
         params = {"type": "org.matrix.login.jwt", "token": self.jwt_encode(*args)}
