@@ -545,6 +545,7 @@ class FederationHandler:
             if ret.partial_state:
                 # TODO(faster_joins): roll this back if we don't manage to start the
                 #   background resync (eg process_remote_join fails)
+                #   https://github.com/matrix-org/synapse/issues/12998
                 await self.store.store_partial_state_room(room_id, ret.servers_in_room)
 
             max_stream_id = await self._federation_event_handler.process_remote_join(
@@ -1506,14 +1507,17 @@ class FederationHandler:
         # TODO(faster_joins): do we need to lock to avoid races? What happens if other
         #   worker processes kick off a resync in parallel? Perhaps we should just elect
         #   a single worker to do the resync.
+        #   https://github.com/matrix-org/synapse/issues/12994
         #
         # TODO(faster_joins): what happens if we leave the room during a resync? if we
         #   really leave, that might mean we have difficulty getting the room state over
         #   federation.
+        #   https://github.com/matrix-org/synapse/issues/12802
         #
         # TODO(faster_joins): we need some way of prioritising which homeservers in
         #   `other_destinations` to try first, otherwise we'll spend ages trying dead
         #   homeservers for large rooms.
+        #   https://github.com/matrix-org/synapse/issues/12999
 
         if initial_destination is None and len(other_destinations) == 0:
             raise ValueError(
@@ -1559,6 +1563,8 @@ class FederationHandler:
                     )
 
                     # TODO(faster_joins) update room stats and user directory?
+                    #   https://github.com/matrix-org/synapse/issues/12814
+                    #   https://github.com/matrix-org/synapse/issues/12815
                     return
 
                 # we raced against more events arriving with partial state. Go round
@@ -1566,6 +1572,8 @@ class FederationHandler:
                 # TODO(faster_joins): there is still a race here, whereby incoming events which raced
                 #   with us will fail to be persisted after the call to `clear_partial_state_room` due to
                 #   having partial state.
+                #   https://github.com/matrix-org/synapse/issues/12988
+                #
                 continue
 
             events = await self.store.get_events_as_list(
@@ -1588,6 +1596,7 @@ class FederationHandler:
                             #   indefinitely is also not the right thing to do if we can
                             #   reach all homeservers and they all claim they don't have
                             #   the state we want.
+                            #   https://github.com/matrix-org/synapse/issues/13000
                             logger.error(
                                 "Failed to get state for %s at %s from %s because %s, "
                                 "giving up!",
