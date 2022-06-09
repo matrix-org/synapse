@@ -195,10 +195,10 @@ class SynapseHomeServer(HomeServer):
 
             resources.update(
                 {
+                    **build_synapse_client_resource_tree(self),
                     CLIENT_API_PREFIX: client_resource,
                     "/.well-known": well_known_resource(self),
                     "/_synapse/admin": AdminRestResource(self),
-                    **build_synapse_client_resource_tree(self),
                 }
             )
 
