@@ -532,6 +532,7 @@ class FederationEventHandler:
                 #
                 # TODO(faster_joins): we probably need to be more intelligent, and
                 #    exclude partial-state prev_events from consideration
+                #    https://github.com/matrix-org/synapse/issues/13001
                 logger.warning(
                     "%s still has partial state: can't de-partial-state it yet",
                     event.event_id,
@@ -777,6 +778,7 @@ class FederationEventHandler:
             state_ids = await self._resolve_state_at_missing_prevs(origin, event)
             # TODO(faster_joins): make sure that _resolve_state_at_missing_prevs does
             #   not return partial state
+            #   https://github.com/matrix-org/synapse/issues/13002
 
             await self._process_received_pdu(
                 origin, event, state_ids=state_ids, backfilled=backfilled

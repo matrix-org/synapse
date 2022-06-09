@@ -388,10 +388,13 @@ class EventsPersistenceStorageController:
 
         # TODO(faster_joins): get a real stream ordering, to make this work correctly
         #    across workers.
+        #    https://github.com/matrix-org/synapse/issues/12994
         #
         # TODO(faster_joins): this can race against event persistence, in which case we
         #    will end up with incorrect state. Perhaps we should make this a job we
-        #    farm out to the event persister, somehow.
+        #    farm out to the event persister thread, somehow.
+        #    https://github.com/matrix-org/synapse/issues/13007
+        #
         stream_id = self.main_store.get_room_max_stream_ordering()
         await self.persist_events_store.update_current_state(room_id, delta, stream_id)
 

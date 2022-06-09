@@ -1112,6 +1112,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         # this can race with incoming events, so we watch out for FK errors.
         # TODO(faster_joins): this still doesn't completely fix the race, since the persist process
         #   is not atomic. I fear we need an application-level lock.
+        #   https://github.com/matrix-org/synapse/issues/12988
         try:
             await self.db_pool.runInteraction(
                 "clear_partial_state_room", self._clear_partial_state_room_txn, room_id
@@ -1119,6 +1120,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             return True
         except self.db_pool.engine.module.DatabaseError as e:
             # TODO(faster_joins): how do we distinguish between FK errors and other errors?
+            #   https://github.com/matrix-org/synapse/issues/12988
             logger.warning(
                 "Exception while clearing lazy partial-state-room %s, retrying: %s",
                 room_id,
