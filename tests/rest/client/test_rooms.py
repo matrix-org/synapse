@@ -945,6 +945,8 @@ class RoomJoinTestCase(RoomBase):
     def test_spam_checker_may_join_room_deprecated(self) -> None:
         """Tests that the user_may_join_room spam checker callback is correctly called
         and blocks room joins when needed.
+
+        This test uses the deprecated API, in which callbacks return booleans.
         """
 
         # Register a dummy callback. Make it allow all room joins for now.
@@ -1004,6 +1006,8 @@ class RoomJoinTestCase(RoomBase):
     def test_spam_checker_may_join_room(self) -> None:
         """Tests that the user_may_join_room spam checker callback is correctly called
         and blocks room joins when needed.
+
+        This test uses the latest API to this day, in which callbacks return `NOT_SPAM` or `Codes`.
         """
 
         # Register a dummy callback. Make it allow all room joins for now.
