@@ -548,7 +548,6 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
 
         appservice = ApplicationService(
             as_token,
-            self.hs.config.server.server_name,
             id="1234",
             namespaces={"users": [{"regex": user_id, "exclusive": True}]},
             sender=user_id,

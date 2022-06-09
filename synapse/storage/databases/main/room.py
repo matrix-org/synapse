@@ -1112,6 +1112,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         # this can race with incoming events, so we watch out for FK errors.
         # TODO(faster_joins): this still doesn't completely fix the race, since the persist process
         #   is not atomic. I fear we need an application-level lock.
+        #   https://github.com/matrix-org/synapse/issues/12988
         try:
             await self.db_pool.runInteraction(
                 "clear_partial_state_room", self._clear_partial_state_room_txn, room_id
@@ -1119,6 +1120,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             return True
         except self.db_pool.engine.module.DatabaseError as e:
             # TODO(faster_joins): how do we distinguish between FK errors and other errors?
+            #   https://github.com/matrix-org/synapse/issues/12988
             logger.warning(
                 "Exception while clearing lazy partial-state-room %s, retrying: %s",
                 room_id,
@@ -1138,6 +1140,24 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             table="partial_state_rooms",
             keyvalues={"room_id": room_id},
         )
+
+    async def is_partial_state_room(self, room_id: str) -> bool:
+        """Checks if this room has partial state.
+
+        Returns true if this is a "partial-state" room, which means that the state
+        at events in the room, and `current_state_events`, may not yet be
+        complete.
+        """
+
+        entry = await self.db_pool.simple_select_one_onecol(
+            table="partial_state_rooms",
+            keyvalues={"room_id": room_id},
+            retcol="room_id",
+            allow_none=True,
+            desc="is_partial_state_room",
+        )
+
+        return entry is not None
 
 
 class _BackgroundUpdates:

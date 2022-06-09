@@ -32,6 +32,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
         self.state = self.hs.get_state_handler()
         self._persistence = self.hs.get_storage_controllers().persistence
+        self._state_storage_controller = self.hs.get_storage_controllers().state
         self.store = self.hs.get_datastores().main
 
         self.register_user("user", "pass")
@@ -104,7 +105,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
         )
 
         state_before_gap = self.get_success(
-            self.state.get_current_state_ids(self.room_id)
+            self._state_storage_controller.get_current_state_ids(self.room_id)
         )
 
         self.persist_event(remote_event_2, state=state_before_gap)
@@ -137,7 +138,9 @@ class ExtremPruneTestCase(HomeserverTestCase):
         # setting. The state resolution across the old and new event will then
         # include it, and so the resolved state won't match the new state.
         state_before_gap = dict(
-            self.get_success(self.state.get_current_state_ids(self.room_id))
+            self.get_success(
+                self._state_storage_controller.get_current_state_ids(self.room_id)
+            )
         )
         state_before_gap.pop(("m.room.history_visibility", ""))
 
@@ -181,7 +184,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
         )
 
         state_before_gap = self.get_success(
-            self.state.get_current_state_ids(self.room_id)
+            self._state_storage_controller.get_current_state_ids(self.room_id)
         )
 
         self.persist_event(remote_event_2, state=state_before_gap)
@@ -213,7 +216,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
         )
 
         state_before_gap = self.get_success(
-            self.state.get_current_state_ids(self.room_id)
+            self._state_storage_controller.get_current_state_ids(self.room_id)
         )
 
         self.persist_event(remote_event_2, state=state_before_gap)
@@ -255,7 +258,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
         )
 
         state_before_gap = self.get_success(
-            self.state.get_current_state_ids(self.room_id)
+            self._state_storage_controller.get_current_state_ids(self.room_id)
         )
 
         self.persist_event(remote_event_2, state=state_before_gap)
@@ -299,7 +302,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
         )
 
         state_before_gap = self.get_success(
-            self.state.get_current_state_ids(self.room_id)
+            self._state_storage_controller.get_current_state_ids(self.room_id)
         )
 
         self.persist_event(remote_event_2, state=state_before_gap)
@@ -335,7 +338,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
         )
 
         state_before_gap = self.get_success(
-            self.state.get_current_state_ids(self.room_id)
+            self._state_storage_controller.get_current_state_ids(self.room_id)
         )
 
         self.persist_event(remote_event_2, state=state_before_gap)

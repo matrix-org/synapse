@@ -60,7 +60,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         self.appservice = ApplicationService(
             token="i_am_an_app_service",
-            hostname="test",
             id="1234",
             namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
             # Note: this user does not match the regex above, so that tests

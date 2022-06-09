@@ -1,1 +1,0 @@
-Always send an `access_token` in `/thirdparty/` requests to appservices, as required by the [Matrix specification](https://spec.matrix.org/v1.1/application-service-api/#third-party-networks).

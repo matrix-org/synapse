@@ -28,6 +28,7 @@ from synapse.api.constants import (
     EventContentFields,
     EventTypes,
     GuestAccess,
+    HistoryVisibility,
     Membership,
     RelationTypes,
     UserTypes,
@@ -66,7 +67,7 @@ from synapse.util import json_decoder, json_encoder, log_failure, unwrapFirstErr
 from synapse.util.async_helpers import Linearizer, gather_results
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import measure_func
-from synapse.visibility import filter_events_for_client
+from synapse.visibility import get_effective_room_visibility_from_state
 
 if TYPE_CHECKING:
     from synapse.events.third_party_rules import ThirdPartyEventRules
@@ -124,7 +125,9 @@ class MessageHandler:
         )
 
         if membership == Membership.JOIN:
-            data = await self.state.get_current_state(room_id, event_type, state_key)
+            data = await self._storage_controllers.state.get_current_state_event(
+                room_id, event_type, state_key
+            )
         elif membership == Membership.LEAVE:
             key = (event_type, state_key)
             # If the membership is not JOIN, then the event ID should exist.
@@ -182,51 +185,31 @@ class MessageHandler:
         state_filter = state_filter or StateFilter.all()
 
         if at_token:
-            last_event = await self.store.get_last_event_in_room_before_stream_ordering(
-                room_id,
-                end_token=at_token.room_key,
+            last_event_id = (
+                await self.store.get_last_event_in_room_before_stream_ordering(
+                    room_id,
+                    end_token=at_token.room_key,
+                )
             )
 
-            if not last_event:
+            if not last_event_id:
                 raise NotFoundError("Can't find event for token %s" % (at_token,))
 
-            # check whether the user is in the room at that time to determine
-            # whether they should be treated as peeking.
-            state_map = await self._state_storage_controller.get_state_for_event(
-                last_event.event_id,
-                StateFilter.from_types([(EventTypes.Member, user_id)]),
-            )
-
-            joined = False
-            membership_event = state_map.get((EventTypes.Member, user_id))
-            if membership_event:
-                joined = membership_event.membership == Membership.JOIN
-
-            is_peeking = not joined
-
-            visible_events = await filter_events_for_client(
-                self._storage_controllers,
-                user_id,
-                [last_event],
-                filter_send_to_client=False,
-                is_peeking=is_peeking,
-            )
-
-            if visible_events:
-                room_state_events = (
-                    await self._state_storage_controller.get_state_for_events(
-                        [last_event.event_id], state_filter=state_filter
-                    )
-                )
-                room_state: Mapping[Any, EventBase] = room_state_events[
-                    last_event.event_id
-                ]
-            else:
+            if not await self._user_can_see_state_at_event(
+                user_id, room_id, last_event_id
+            ):
                 raise AuthError(
                     403,
                     "User %s not allowed to view events in room %s at token %s"
                     % (user_id, room_id, at_token),
                 )
+
+            room_state_events = (
+                await self._state_storage_controller.get_state_for_events(
+                    [last_event_id], state_filter=state_filter
+                )
+            )
+            room_state: Mapping[Any, EventBase] = room_state_events[last_event_id]
         else:
             (
                 membership,
@@ -236,7 +219,7 @@ class MessageHandler:
             )
 
             if membership == Membership.JOIN:
-                state_ids = await self.store.get_filtered_current_state_ids(
+                state_ids = await self._state_storage_controller.get_current_state_ids(
                     room_id, state_filter=state_filter
                 )
                 room_state = await self.store.get_events(state_ids.values())
@@ -255,6 +238,65 @@ class MessageHandler:
         now = self.clock.time_msec()
         events = self._event_serializer.serialize_events(room_state.values(), now)
         return events
+
+    async def _user_can_see_state_at_event(
+        self, user_id: str, room_id: str, event_id: str
+    ) -> bool:
+        # check whether the user was in the room, and the history visibility,
+        # at that time.
+        state_map = await self._state_storage_controller.get_state_for_event(
+            event_id,
+            StateFilter.from_types(
+                [
+                    (EventTypes.Member, user_id),
+                    (EventTypes.RoomHistoryVisibility, ""),
+                ]
+            ),
+        )
+
+        membership = None
+        membership_event = state_map.get((EventTypes.Member, user_id))
+        if membership_event:
+            membership = membership_event.membership
+
+        # if the user was a member of the room at the time of the event,
+        # they can see it.
+        if membership == Membership.JOIN:
+            return True
+
+        # otherwise, it depends on the history visibility.
+        visibility = get_effective_room_visibility_from_state(state_map)
+
+        if visibility == HistoryVisibility.JOINED:
+            # we weren't a member at the time of the event, so we can't see this event.
+            return False
+
+        # otherwise *invited* is good enough
+        if membership == Membership.INVITE:
+            return True
+
+        if visibility == HistoryVisibility.INVITED:
+            # we weren't invited, so we can't see this event.
+            return False
+
+        if visibility == HistoryVisibility.WORLD_READABLE:
+            return True
+
+        # So it's SHARED, and the user was not a member at the time. The user cannot
+        # see history, unless they have *subsequently* joined the room.
+        #
+        # XXX: if the user has subsequently joined and then left again,
+        # ideally we would share history up to the point they left. But
+        # we don't know when they left. We just treat it as though they
+        # never joined, and restrict access.
+
+        (
+            current_membership,
+            _,
+        ) = await self.store.get_local_current_membership_for_user_in_room(
+            user_id, event_id
+        )
+        return current_membership == Membership.JOIN
 
     async def get_joined_members(self, requester: Requester, room_id: str) -> dict:
         """Get all the joined members in the room and their profile information.
@@ -1060,6 +1102,7 @@ class EventCreationHandler:
             #
             # TODO(faster_joins): figure out how this works, and make sure that the
             #   old state is complete.
+            #   https://github.com/matrix-org/synapse/issues/13003
             metadata = await self.store.get_metadata_for_events(state_event_ids)
 
             state_map_for_event: MutableStateMap[str] = {}

@@ -42,6 +42,7 @@ from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 from tests import unittest
+from tests.http.server._base import make_request_with_cancellation_test
 from tests.test_utils import make_awaitable
 
 PATH_PREFIX = b"/_matrix/client/api/v1"
@@ -471,6 +472,49 @@ class RoomPermissionsTestCase(RoomBase):
         )
 
 
+class RoomStateTestCase(RoomBase):
+    """Tests /rooms/$room_id/state."""
+
+    user_id = "@sid1:red"
+
+    def test_get_state_cancellation(self) -> None:
+        """Test cancellation of a `/rooms/$room_id/state` request."""
+        room_id = self.helper.create_room_as(self.user_id)
+        channel = make_request_with_cancellation_test(
+            "test_state_cancellation",
+            self.reactor,
+            self.site,
+            "GET",
+            "/rooms/%s/state" % room_id,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertCountEqual(
+            [state_event["type"] for state_event in channel.json_body],
+            {
+                "m.room.create",
+                "m.room.power_levels",
+                "m.room.join_rules",
+                "m.room.member",
+                "m.room.history_visibility",
+            },
+        )
+
+    def test_get_state_event_cancellation(self) -> None:
+        """Test cancellation of a `/rooms/$room_id/state/$event_type` request."""
+        room_id = self.helper.create_room_as(self.user_id)
+        channel = make_request_with_cancellation_test(
+            "test_state_cancellation",
+            self.reactor,
+            self.site,
+            "GET",
+            "/rooms/%s/state/m.room.member/%s" % (room_id, self.user_id),
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(channel.json_body, {"membership": "join"})
+
+
 class RoomsMemberListTestCase(RoomBase):
     """Tests /rooms/$room_id/members/list REST events."""
 
@@ -590,6 +634,62 @@ class RoomsMemberListTestCase(RoomBase):
         # can see old list once left
         channel = self.make_request("GET", room_path)
         self.assertEqual(200, channel.code, msg=channel.result["body"])
+
+    def test_get_member_list_cancellation(self) -> None:
+        """Test cancellation of a `/rooms/$room_id/members` request."""
+        room_id = self.helper.create_room_as(self.user_id)
+        channel = make_request_with_cancellation_test(
+            "test_get_member_list_cancellation",
+            self.reactor,
+            self.site,
+            "GET",
+            "/rooms/%s/members" % room_id,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(len(channel.json_body["chunk"]), 1)
+        self.assertLessEqual(
+            {
+                "content": {"membership": "join"},
+                "room_id": room_id,
+                "sender": self.user_id,
+                "state_key": self.user_id,
+                "type": "m.room.member",
+                "user_id": self.user_id,
+            }.items(),
+            channel.json_body["chunk"][0].items(),
+        )
+
+    def test_get_member_list_with_at_token_cancellation(self) -> None:
+        """Test cancellation of a `/rooms/$room_id/members?at=<sync token>` request."""
+        room_id = self.helper.create_room_as(self.user_id)
+
+        # first sync to get an at token
+        channel = self.make_request("GET", "/sync")
+        self.assertEqual(200, channel.code)
+        sync_token = channel.json_body["next_batch"]
+
+        channel = make_request_with_cancellation_test(
+            "test_get_member_list_with_at_token_cancellation",
+            self.reactor,
+            self.site,
+            "GET",
+            "/rooms/%s/members?at=%s" % (room_id, sync_token),
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(len(channel.json_body["chunk"]), 1)
+        self.assertLessEqual(
+            {
+                "content": {"membership": "join"},
+                "room_id": room_id,
+                "sender": self.user_id,
+                "state_key": self.user_id,
+                "type": "m.room.member",
+                "user_id": self.user_id,
+            }.items(),
+            channel.json_body["chunk"][0].items(),
+        )
 
 
 class RoomsCreateTestCase(RoomBase):

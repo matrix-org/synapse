@@ -40,6 +40,7 @@ class StatsHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.state = hs.get_state_handler()
         self.server_name = hs.hostname
         self.clock = hs.get_clock()
@@ -105,7 +106,10 @@ class StatsHandler:
             logger.debug(
                 "Processing room stats %s->%s", self.pos, room_max_stream_ordering
             )
-            max_pos, deltas = await self.store.get_current_state_deltas(
+            (
+                max_pos,
+                deltas,
+            ) = await self._storage_controllers.state.get_current_state_deltas(
                 self.pos, room_max_stream_ordering
             )
 

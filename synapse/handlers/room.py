@@ -107,6 +107,7 @@ class EventContext:
 class RoomCreationHandler:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.hs = hs
@@ -468,7 +469,6 @@ class RoomCreationHandler:
             (EventTypes.RoomAvatar, ""),
             (EventTypes.RoomEncryption, ""),
             (EventTypes.ServerACL, ""),
-            (EventTypes.RelatedGroups, ""),
             (EventTypes.PowerLevels, ""),
         ]
 
@@ -481,8 +481,10 @@ class RoomCreationHandler:
             if room_type == RoomTypes.SPACE:
                 types_to_copy.append((EventTypes.SpaceChild, None))
 
-        old_room_state_ids = await self.store.get_filtered_current_state_ids(
-            old_room_id, StateFilter.from_types(types_to_copy)
+        old_room_state_ids = (
+            await self._storage_controllers.state.get_current_state_ids(
+                old_room_id, StateFilter.from_types(types_to_copy)
+            )
         )
         # map from event_id to BaseEvent
         old_room_state_events = await self.store.get_events(old_room_state_ids.values())
@@ -559,8 +561,10 @@ class RoomCreationHandler:
         )
 
         # Transfer membership events
-        old_room_member_state_ids = await self.store.get_filtered_current_state_ids(
-            old_room_id, StateFilter.from_types([(EventTypes.Member, None)])
+        old_room_member_state_ids = (
+            await self._storage_controllers.state.get_current_state_ids(
+                old_room_id, StateFilter.from_types([(EventTypes.Member, None)])
+            )
         )
 
         # map from event_id to BaseEvent
@@ -1329,6 +1333,7 @@ class TimestampLookupHandler:
         self.store = hs.get_datastores().main
         self.state_handler = hs.get_state_handler()
         self.federation_client = hs.get_federation_client()
+        self._storage_controllers = hs.get_storage_controllers()
 
     async def get_event_for_timestamp(
         self,
@@ -1402,7 +1407,9 @@ class TimestampLookupHandler:
             )
 
             # Find other homeservers from the given state in the room
-            curr_state = await self.state_handler.get_current_state(room_id)
+            curr_state = await self._storage_controllers.state.get_current_state(
+                room_id
+            )
             curr_domains = get_domains_from_state(curr_state)
             likely_domains = [
                 domain for domain, depth in curr_domains if domain != self.server_name

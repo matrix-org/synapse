@@ -388,10 +388,13 @@ class EventsPersistenceStorageController:
 
         # TODO(faster_joins): get a real stream ordering, to make this work correctly
         #    across workers.
+        #    https://github.com/matrix-org/synapse/issues/12994
         #
         # TODO(faster_joins): this can race against event persistence, in which case we
         #    will end up with incorrect state. Perhaps we should make this a job we
-        #    farm out to the event persister, somehow.
+        #    farm out to the event persister thread, somehow.
+        #    https://github.com/matrix-org/synapse/issues/13007
+        #
         stream_id = self.main_store.get_room_max_stream_ordering()
         await self.persist_events_store.update_current_state(room_id, delta, stream_id)
 
@@ -994,7 +997,7 @@ class EventsPersistenceStorageController:
 
         Assumes that we are only persisting events for one room at a time.
         """
-        existing_state = await self.main_store.get_current_state_ids(room_id)
+        existing_state = await self.main_store.get_partial_current_state_ids(room_id)
 
         to_delete = [key for key in existing_state if key not in current_state]
 
@@ -1083,7 +1086,7 @@ class EventsPersistenceStorageController:
         # The server will leave the room, so we go and find out which remote
         # users will still be joined when we leave.
         if current_state is None:
-            current_state = await self.main_store.get_current_state_ids(room_id)
+            current_state = await self.main_store.get_partial_current_state_ids(room_id)
             current_state = dict(current_state)
             for key in delta.to_delete:
                 current_state.pop(key, None)

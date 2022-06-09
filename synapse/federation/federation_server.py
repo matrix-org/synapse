@@ -118,6 +118,8 @@ class FederationServer(FederationBase):
         self.state = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
 
+        self._state_storage_controller = hs.get_storage_controllers().state
+
         self.device_handler = hs.get_device_handler()
 
         # Ensure the following handlers are loaded since they register callbacks
@@ -1221,14 +1223,10 @@ class FederationServer(FederationBase):
         Raises:
             AuthError if the server does not match the ACL
         """
-        state_ids = await self.store.get_current_state_ids(room_id)
-        acl_event_id = state_ids.get((EventTypes.ServerACL, ""))
-
-        if not acl_event_id:
-            return
-
-        acl_event = await self.store.get_event(acl_event_id)
-        if server_matches_acl_event(server_name, acl_event):
+        acl_event = await self._storage_controllers.state.get_current_state_event(
+            room_id, EventTypes.ServerACL, ""
+        )
+        if not acl_event or server_matches_acl_event(server_name, acl_event):
             return
 
         raise AuthError(code=403, msg="Server is banned from room")
