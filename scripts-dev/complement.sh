@@ -18,7 +18,7 @@
 # argument to the script. Complement will then only run those tests. If
 # no regex is supplied, all tests are run. For example;
 #
-# ./complement.sh "TestOutboundFederation(Profile|Send)"
+# ./complement.sh -run "TestOutboundFederation(Profile|Send)"
 #
 
 # Exit if a line returns a non-zero exit code
