@@ -1052,7 +1052,7 @@ class SyncHandler:
 
     async def unread_notifs_for_room_id(
         self, room_id: str, sync_config: SyncConfig
-    ) -> NotifCounts:
+    ) -> Dict[Optional[str], NotifCounts]:
         with Measure(self.clock, "unread_notifs_for_room_id"):
             last_unread_event_id = await self.store.get_last_receipt_event_id_for_user(
                 user_id=sync_config.user.to_string(),
@@ -2122,7 +2122,7 @@ class SyncHandler:
                 )
 
             if room_builder.rtype == "joined":
-                unread_notifications: Dict[str, int] = {}
+                unread_notifications: JsonDict = {}
                 room_sync = JoinedSyncResult(
                     room_id=room_id,
                     timeline=batch,
@@ -2137,10 +2137,18 @@ class SyncHandler:
                 if room_sync or always_include:
                     notifs = await self.unread_notifs_for_room_id(room_id, sync_config)
 
-                    unread_notifications["notification_count"] = notifs.notify_count
-                    unread_notifications["highlight_count"] = notifs.highlight_count
+                    # Notifications for the main timeline.
+                    main_notifs = notifs[None]
+                    unread_notifications.update(main_notifs.to_dict())
 
-                    room_sync.unread_count = notifs.unread_count
+                    room_sync.unread_count = main_notifs.unread_count
+
+                    # And add info for each thread.
+                    unread_notifications["unread_thread_notifications"] = {
+                        thread_id: thread_notifs.to_dict()
+                        for thread_id, thread_notifs in notifs.items()
+                        if thread_id is not None
+                    }
 
                     sync_result_builder.joined.append(room_sync)
 

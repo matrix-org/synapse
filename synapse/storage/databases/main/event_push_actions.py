@@ -24,6 +24,7 @@ from synapse.storage.database import (
     LoggingDatabaseConnection,
     LoggingTransaction,
 )
+from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 
@@ -79,7 +80,7 @@ class UserPushAction(EmailPushAction):
     profile_tag: str
 
 
-@attr.s(slots=True, frozen=True, auto_attribs=True)
+@attr.s(slots=True, auto_attribs=True)
 class NotifCounts:
     """
     The per-user, per-room count of notifications. Used by sync and push.
@@ -88,6 +89,12 @@ class NotifCounts:
     notify_count: int
     unread_count: int
     highlight_count: int
+
+    def to_dict(self) -> JsonDict:
+        return {
+            "notification_count": self.notify_count,
+            "highlight_count": self.highlight_count,
+        }
 
 
 def _serialize_action(actions: List[Union[dict, str]], is_highlight: bool) -> str:
@@ -148,13 +155,13 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 self._rotate_notifs, 30 * 60 * 1000
             )
 
-    @cached(num_args=3, tree=True, max_entries=5000)
+    @cached(max_entries=5000, tree=True, iterable=True)
     async def get_unread_event_push_actions_by_room_for_user(
         self,
         room_id: str,
         user_id: str,
         last_read_event_id: Optional[str],
-    ) -> NotifCounts:
+    ) -> Dict[Optional[str], NotifCounts]:
         """Get the notification count, the highlight count and the unread message count
         for a given user in a given room after the given read receipt.
 
@@ -187,7 +194,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         room_id: str,
         user_id: str,
         last_read_event_id: Optional[str],
-    ) -> NotifCounts:
+    ) -> Dict[Optional[str], NotifCounts]:
         stream_ordering = None
 
         if last_read_event_id is not None:
@@ -217,49 +224,63 @@ class EventPushActionsWorkerStore(SQLBaseStore):
 
     def _get_unread_counts_by_pos_txn(
         self, txn: LoggingTransaction, room_id: str, user_id: str, stream_ordering: int
-    ) -> NotifCounts:
-        sql = (
-            "SELECT"
-            "   COUNT(CASE WHEN notif = 1 THEN 1 END),"
-            "   COUNT(CASE WHEN highlight = 1 THEN 1 END),"
-            "   COUNT(CASE WHEN unread = 1 THEN 1 END)"
-            " FROM event_push_actions ea"
-            " WHERE user_id = ?"
-            "   AND room_id = ?"
-            "   AND stream_ordering > ?"
-        )
+    ) -> Dict[Optional[str], NotifCounts]:
+        sql = """
+        SELECT
+            COUNT(CASE WHEN notif = 1 THEN 1 END),
+            COUNT(CASE WHEN highlight = 1 THEN 1 END),
+            COUNT(CASE WHEN unread = 1 THEN 1 END),
+            thread_id
+        FROM event_push_actions ea
+        WHERE user_id = ?
+            AND room_id = ?
+            AND stream_ordering > ?
+        GROUP BY thread_id
+        """
 
         txn.execute(sql, (user_id, room_id, stream_ordering))
-        row = txn.fetchone()
+        rows = txn.fetchall()
 
-        (notif_count, highlight_count, unread_count) = (0, 0, 0)
-
-        if row:
-            (notif_count, highlight_count, unread_count) = row
+        notif_counts: Dict[Optional[str], NotifCounts] = {
+            # Ensure the main timeline has notification counts.
+            None: NotifCounts(
+                notify_count=0,
+                unread_count=0,
+                highlight_count=0,
+            )
+        }
+        for notif_count, highlight_count, unread_count, thread_id in rows:
+            notif_counts[thread_id] = NotifCounts(
+                notify_count=notif_count,
+                unread_count=unread_count,
+                highlight_count=highlight_count,
+            )
 
         txn.execute(
             """
-                SELECT notif_count, unread_count FROM event_push_summary
+                SELECT notif_count, unread_count, thread_id FROM event_push_summary
                 WHERE room_id = ? AND user_id = ? AND stream_ordering > ?
             """,
             (room_id, user_id, stream_ordering),
         )
-        row = txn.fetchone()
+        rows = txn.fetchall()
 
-        if row:
-            notif_count += row[0]
+        for notif_count, unread_count, thread_id in rows:
+            if unread_count is None:
+                # The unread_count column of event_push_summary is NULLable.
+                unread_count = 0
 
-            if row[1] is not None:
-                # The unread_count column of event_push_summary is NULLable, so we need
-                # to make sure we don't try increasing the unread counts if it's NULL
-                # for this row.
-                unread_count += row[1]
+            if thread_id in notif_counts:
+                notif_counts[thread_id].notify_count += notif_count
+                notif_counts[thread_id].unread_count += unread_count
+            else:
+                notif_counts[thread_id] = NotifCounts(
+                    notify_count=notif_count,
+                    unread_count=unread_count,
+                    highlight_count=0,
+                )
 
-        return NotifCounts(
-            notify_count=notif_count,
-            unread_count=unread_count,
-            highlight_count=highlight_count,
-        )
+        return notif_counts
 
     async def get_push_action_users_in_range(
         self, min_stream_ordering: int, max_stream_ordering: int
