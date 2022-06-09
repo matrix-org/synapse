@@ -28,6 +28,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.appservice import ApplicationService
+from synapse.module_api import NOT_SPAM
 from synapse.storage.databases.main.directory import RoomAliasMapping
 from synapse.types import JsonDict, Requester, RoomAlias, UserID, get_domain_from_id
 
@@ -436,7 +437,7 @@ class DirectoryHandler:
         user_id = requester.user.to_string()
 
         spam_check = await self.spam_checker.user_may_publish_room(user_id, room_id)
-        if isinstance(spam_check, Codes):
+        if spam_check != NOT_SPAM:
             raise AuthError(
                 403,
                 "This user is not permitted to publish rooms to the room list",

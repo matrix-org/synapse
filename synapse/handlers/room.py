@@ -62,6 +62,7 @@ from synapse.events.utils import copy_and_fixup_power_levels_contents
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.handlers.federation import get_domains_from_state
 from synapse.handlers.relations import BundledAggregations
+from synapse.module_api import NOT_SPAM
 from synapse.rest.admin._base import assert_user_is_admin
 from synapse.storage.state import StateFilter
 from synapse.streams import EventSource
@@ -438,7 +439,7 @@ class RoomCreationHandler:
         user_id = requester.user.to_string()
 
         spam_check = await self.spam_checker.user_may_create_room(user_id)
-        if isinstance(spam_check, Codes):
+        if spam_check != NOT_SPAM:
             raise SynapseError(403, "You are not permitted to create rooms", spam_check)
 
         creation_content: JsonDict = {
@@ -728,7 +729,7 @@ class RoomCreationHandler:
 
         if not is_requester_admin:
             spam_check = await self.spam_checker.user_may_create_room(user_id)
-            if isinstance(spam_check, Codes):
+            if spam_check != NOT_SPAM:
                 raise SynapseError(
                     403, "You are not permitted to create rooms", spam_check
                 )

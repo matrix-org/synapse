@@ -59,6 +59,7 @@ from synapse.federation.federation_client import InvalidResponseError
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import nested_logging_context
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.module_api import NOT_SPAM
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationStoreRoomOnOutlierMembershipRestServlet,
@@ -824,7 +825,7 @@ class FederationHandler:
         spam_check = await self.spam_checker.user_may_invite(
             event.sender, event.state_key, event.room_id
         )
-        if isinstance(spam_check, Codes):
+        if spam_check != NOT_SPAM:
             raise SynapseError(
                 403,
                 "This user is not permitted to send invites to this server/user",

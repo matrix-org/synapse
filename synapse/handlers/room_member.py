@@ -38,6 +38,7 @@ from synapse.event_auth import get_named_level, get_power_level_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
+from synapse.module_api import NOT_SPAM
 from synapse.storage.state import StateFilter
 from synapse.types import (
     JsonDict,
@@ -706,7 +707,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 spam_check = await self.spam_checker.user_may_invite(
                     requester.user.to_string(), target_id, room_id
                 )
-                if isinstance(spam_check, Codes):
+                if spam_check != NOT_SPAM:
                     logger.info("Blocking invite due to spam checker")
                     block_invite_code = spam_check
 
@@ -825,7 +826,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 spam_check = await self.spam_checker.user_may_join_room(
                     target.to_string(), room_id, is_invited=inviter is not None
                 )
-                if isinstance(spam_check, Codes):
+                if spam_check != NOT_SPAM:
                     raise SynapseError(403, "Not allowed to join this room", spam_check)
 
             # Check if a remote join should be performed.
@@ -1379,7 +1380,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 address=address,
                 room_id=room_id,
             )
-            if isinstance(spam_check, Codes):
+            if spam_check != NOT_SPAM:
                 raise SynapseError(403, "Cannot send threepid invite", spam_check)
 
             stream_id = await self._make_and_store_3pid_invite(

@@ -108,7 +108,7 @@ async def user_may_send_3pid_invite(
     medium: str,
     address: str,
     room_id: str,
-) -> ["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
+) -> Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
 ```
 
 Called when processing an invitation using a third-party identifier (also called a 3PID,
@@ -157,7 +157,7 @@ _First introduced in Synapse v1.37.0_
 _Changed in Synapse v1.61.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean is now deprecated._ 
 
 ```python
-async def user_may_create_room(user_id: str) -> ["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
+async def user_may_create_room(user_id: str) -> Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
 ```
 
 Called when processing a room creation request.
@@ -186,7 +186,7 @@ _First introduced in Synapse v1.37.0_
 _Changed in Synapse v1.61.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean is now deprecated._ 
 
 ```python
-async def user_may_create_room_alias(user_id: str, room_alias: "synapse.module_api.RoomAlias") -> ["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
+async def user_may_create_room_alias(user_id: str, room_alias: "synapse.module_api.RoomAlias") -> Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
 ```
 
 Called when trying to associate an alias with an existing room.
@@ -215,7 +215,7 @@ _First introduced in Synapse v1.37.0_
 _Changed in Synapse v1.61.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean is now deprecated._ 
 
 ```python
-async def user_may_publish_room(user_id: str, room_id: str) -> ["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
+async def user_may_publish_room(user_id: str, room_id: str) -> Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
 ```
 
 Called when trying to publish a room to the homeserver's public rooms directory.
