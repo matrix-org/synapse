@@ -23,7 +23,7 @@ from synapse.events import FrozenEvent
 from synapse.util.frozenutils import unfreeze
 
 
-def make_graph(file_name, room_id, file_prefix, limit):
+def make_graph(file_name: str, room_id: str, file_prefix: str, limit: int) -> None:
     """
     Generate a dot and SVG file for a graph of events in the room based on the
     topological ordering by reading line-delimited JSON from a file.

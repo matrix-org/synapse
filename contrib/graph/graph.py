@@ -16,16 +16,17 @@ import argparse
 import cgi
 import datetime
 import json
+from typing import List
 
 import pydot
 import urllib2
 
 
-def make_name(pdu_id, origin):
+def make_name(pdu_id: str, origin: str) -> str:
     return "%s@%s" % (pdu_id, origin)
 
 
-def make_graph(pdus, room, filename_prefix):
+def make_graph(pdus: List[dict], room: str, filename_prefix: str) -> None:
     """
     Generate a dot and SVG file for a graph of events in the room based on the
     topological ordering by querying a homeserver.
@@ -115,7 +116,7 @@ def make_graph(pdus, room, filename_prefix):
     graph.write_svg("%s.svg" % filename_prefix, prog="dot")
 
 
-def get_pdus(host, room):
+def get_pdus(host: str, room: str) -> List[dict]:
     transaction = json.loads(
         urllib2.urlopen(
             "http://%s/_matrix/federation/v1/context/%s/" % (host, room)
