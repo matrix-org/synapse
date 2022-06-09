@@ -155,7 +155,10 @@ class TlsConfig(Config):
             )
 
         if tls_certificate_path and tls_private_key_path:
-            return f"tls_certificate_path: {tls_certificate_path}\ntls_private_key_path: {tls_private_key_path}"
+            return f"""\
+                tls_certificate_path: {tls_certificate_path}
+                tls_private_key_path: {tls_private_key_path}
+                """
         else:
             return ""
 

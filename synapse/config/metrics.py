@@ -73,8 +73,5 @@ class MetricsConfig(Config):
     def generate_config_section(
         self, report_stats: Optional[bool] = None, **kwargs: Any
     ) -> str:
-        if report_stats:
-            res = "report_stats: %s\n" % ("true")
-        else:
-            res = "report_stats:"
+        res = "report_stats: %s\n" % ("true" if report_stats else "false")
         return res

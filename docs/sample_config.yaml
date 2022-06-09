@@ -38,7 +38,7 @@ database:
     database: DATADIR/homeserver.db
 log_config: "CONFDIR/SERVERNAME.log.config"
 media_store_path: DATADIR/media_store
-report_stats:
+report_stats: false
 signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 trusted_key_servers:
   - server_name: "matrix.org"
