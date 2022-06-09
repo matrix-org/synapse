@@ -21,7 +21,8 @@ import sqlite3
 
 import pydot
 
-from synapse.events import FrozenEvent
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.events import make_event_from_dict
 from synapse.util.frozenutils import unfreeze
 
 
@@ -32,8 +33,12 @@ def make_graph(db_name: str, room_id: str, file_prefix: str, limit: int) -> None
     """
     conn = sqlite3.connect(db_name)
 
+    sql = "SELECT room_version FROM rooms WHERE room_id = ?"
+    c = conn.execute(sql, (room_id,))
+    room_version = KNOWN_ROOM_VERSIONS[c.fetchone()[0]]
+
     sql = (
-        "SELECT json FROM event_json as j "
+        "SELECT json, internal_metadata FROM event_json as j "
         "INNER JOIN events as e ON e.event_id = j.event_id "
         "WHERE j.room_id = ?"
     )
@@ -47,7 +52,10 @@ def make_graph(db_name: str, room_id: str, file_prefix: str, limit: int) -> None
 
     c = conn.execute(sql, args)
 
-    events = [FrozenEvent(json.loads(e[0])) for e in c.fetchall()]
+    events = [
+        make_event_from_dict(json.loads(e[0]), room_version, json.loads(e[1]))
+        for e in c.fetchall()
+    ]
 
     events.sort(key=lambda e: e.depth)
 
@@ -100,7 +108,7 @@ def make_graph(db_name: str, room_id: str, file_prefix: str, limit: int) -> None
         graph.add_node(node)
 
     for event in events:
-        for prev_id, _ in event.prev_events:
+        for prev_id in event.prev_event_ids():
             try:
                 end_node = node_map[prev_id]
             except Exception:

@@ -19,7 +19,8 @@ import json
 
 import pydot
 
-from synapse.events import FrozenEvent
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.events import make_event_from_dict
 from synapse.util.frozenutils import unfreeze
 
 
@@ -34,7 +35,12 @@ def make_graph(file_name: str, room_id: str, file_prefix: str, limit: int) -> No
 
     print("Read lines")
 
-    events = [FrozenEvent(json.loads(line)) for line in lines]
+    # Figure out the room version, assume the first line is the create event.
+    room_version = KNOWN_ROOM_VERSIONS[
+        json.loads(lines[0]).get("content", {}).get("room_version")
+    ]
+
+    events = [make_event_from_dict(json.loads(line), room_version) for line in lines]
 
     print("Loaded events.")
 
@@ -105,7 +111,7 @@ def make_graph(file_name: str, room_id: str, file_prefix: str, limit: int) -> No
     print("Created Nodes")
 
     for event in events:
-        for prev_id, _ in event.prev_events:
+        for prev_id in event.prev_event_ids():
             try:
                 end_node = node_map[prev_id]
             except Exception:
