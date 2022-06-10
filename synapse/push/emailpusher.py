@@ -32,12 +32,12 @@ logger = logging.getLogger(__name__)
 
 # The amount of time we always wait before ever emailing about a notification
 # (to give the user a chance to respond to other push or notice the window)
-DELAY_BEFORE_MAIL_MS = 1 * 60 * 1000
+DELAY_BEFORE_MAIL_MS = 10 * 60 * 1000
 
 # THROTTLE is the minimum time between mail notifications sent for a given room.
 # Each room maintains its own throttle counter, but each new mail notification
 # sends the pending notifications for all rooms.
-THROTTLE_START_MS = 1 * 60 * 1000
+THROTTLE_START_MS = 10 * 60 * 1000
 THROTTLE_MAX_MS = 24 * 60 * 60 * 1000  # 24h
 # THROTTLE_MULTIPLIER = 6              # 10 mins, 1 hour, 6 hours, 24 hours
 THROTTLE_MULTIPLIER = 144  # 10 mins, 24 hours - i.e. jump straight to 1 day
