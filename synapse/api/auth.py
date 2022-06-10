@@ -20,7 +20,6 @@ from netaddr import IPAddress
 from twisted.web.server import Request
 
 from synapse import event_auth
-from synapse.api.auth_blocking import AuthBlocking
 from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.api.errors import (
     AuthError,
@@ -66,8 +65,6 @@ class Auth:
         self.token_cache: LruCache[str, Tuple[str, bool]] = LruCache(
             10000, "token_cache"
         )
-
-        self._auth_blocking = AuthBlocking(self.hs)
 
         self._track_appservice_user_ips = hs.config.appservice.track_appservice_user_ips
         self._track_puppeted_user_ips = hs.config.api.track_puppeted_user_ips
@@ -711,14 +708,3 @@ class Auth:
                 "User %s not in room %s, and room previews are disabled"
                 % (user_id, room_id),
             )
-
-    async def check_auth_blocking(
-        self,
-        user_id: Optional[str] = None,
-        threepid: Optional[dict] = None,
-        user_type: Optional[str] = None,
-        requester: Optional[Requester] = None,
-    ) -> None:
-        await self._auth_blocking.check_auth_blocking(
-            user_id=user_id, threepid=threepid, user_type=user_type, requester=requester
-        )
