@@ -341,8 +341,8 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
         # following this stream later.
         last_processed_stream_id = from_stream_id
 
-        query_map = {}
-        cross_signing_keys_by_user = {}
+        query_map: Dict[Tuple[str, str], Tuple[int, Optional[str]]] = {}
+        cross_signing_keys_by_user: Dict[str, Dict[str, object]] = {}
         for user_id, device_id, update_stream_id, update_context in updates:
             # Calculate the remaining length budget.
             # Note that, for now, each entry in `cross_signing_keys_by_user`
@@ -688,7 +688,7 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
         } - users_needing_resync
         user_ids_not_in_cache = user_ids - user_ids_in_cache
 
-        results = {}
+        results: Dict[str, Dict[str, JsonDict]] = {}
         for user_id, device_id in query_list:
             if user_id not in user_ids_in_cache:
                 continue
@@ -775,7 +775,7 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
             return set()
 
         def _get_users_whose_devices_changed_txn(txn: LoggingTransaction) -> Set[str]:
-            changes = set()
+            changes: Set[str] = set()
 
             stream_id_where_clause = "stream_id > ?"
             sql_args = [from_key]
