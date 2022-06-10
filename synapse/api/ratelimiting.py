@@ -140,7 +140,7 @@ class Ratelimiter:
         else:
             # We haven't reached our limit yet
             allowed = True
-            action_count = performed_count + n_actions
+            action_count = action_count + n_actions
 
         if update:
             self.actions[key] = (action_count, time_start, rate_hz)
