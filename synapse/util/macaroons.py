@@ -294,7 +294,7 @@ class MacaroonGenerator:
         macaroon = pymacaroons.Macaroon.deserialize(token)
         user_id = get_value_from_macaroon(macaroon, "user_id")
 
-        # At some point, Syapse would generate macaroons without the "guest"
+        # At some point, Synapse would generate macaroons without the "guest"
         # caveat for regular users. Because of how macaroon verification works,
         # to avoid validating those as guest tokens, we explicitely verify if
         # the macaroon includes the "guest = true" caveat.
