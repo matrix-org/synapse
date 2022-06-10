@@ -138,7 +138,7 @@ def make_graph(db_name: str, room_id: str, file_prefix: str, limit: int) -> None
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate a PDU graph for a given room by talking "
-        "to the given a Synapse SQLite file to get the list of PDUs. \n"
+        "to the given Synapse SQLite file to get the list of PDUs. \n"
         "Requires pydot."
     )
     parser.add_argument(
