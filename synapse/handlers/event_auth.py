@@ -48,7 +48,6 @@ class EventAuthHandler:
 
     async def check_auth_rules_from_context(
         self,
-        room_version_obj: RoomVersion,
         event: EventBase,
         context: EventContext,
     ) -> None:

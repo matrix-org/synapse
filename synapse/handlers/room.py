@@ -226,10 +226,9 @@ class RoomCreationHandler:
                 },
             },
         )
-        old_room_version = await self.store.get_room_version(old_room_id)
         validate_event_for_room_version(tombstone_event)
         await self._event_auth_handler.check_auth_rules_from_context(
-            old_room_version, tombstone_event, tombstone_context
+            tombstone_event, tombstone_context
         )
 
         # Upgrade the room
