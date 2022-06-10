@@ -286,7 +286,11 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         # once.
         self.assertEqual(20.0, time_allowed)
 
-    def test_bug(self) -> None:
+    def test_rate_limit_burst_only_given_once(self) -> None:
+        """
+        Regression test against a bug that meant that you could build up
+        extra tokens by timing requests.
+        """
         limiter = Ratelimiter(
             store=self.hs.get_datastores().main, clock=None, rate_hz=0.1, burst_count=3
         )
@@ -302,14 +306,8 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         self.assertTrue(consume_at(0.1))
         self.assertTrue(consume_at(0.2))
 
-        # Give it a bit of delay. We can now rapid-fire requests at 1 Hz
-        # for a short while. (There may be ways to extend this further, but it
-        # would need calculating.)
+        # Wait to recover 1 token (10 seconds at 0.1 Hz).
         self.assertTrue(consume_at(10.1))
-        self.assertTrue(consume_at(11.1))
-        self.assertTrue(consume_at(12.1))
-        self.assertTrue(consume_at(13.1))
-        self.assertTrue(consume_at(14.1))
-        self.assertTrue(consume_at(15.1))
-        self.assertTrue(consume_at(16.1))
-        self.assertTrue(consume_at(17.1))
+
+        # Check that we get rate limited after using that token.
+        self.assertFalse(consume_at(11.1))
