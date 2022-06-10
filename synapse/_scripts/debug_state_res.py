@@ -5,6 +5,7 @@ import sys
 from pprint import pformat
 from unittest.mock import MagicMock, patch
 
+import dictdiffer
 import yaml
 
 from twisted.internet import task
@@ -91,6 +92,16 @@ async def main(reactor: ISynapseReactor, args: argparse.Namespace) -> None:
     logger.info("State resolved at %s:", event.event_id)
     logger.info(pformat(result))
 
+    logger.info("Stored state at %s:", event.event_id)
+    stored_state = await hs.get_storage_controllers().state.get_state_ids_for_event(
+        event.event_id
+    )
+    logger.info(pformat(stored_state))
+
+    logger.info("Diff from resolved to stored:")
+    for change in dictdiffer.diff(result, stored_state):
+        logger.info(change)
+
     if args.debug:
         print(
             f"see state_after_parents[i] for i in range({len(state_after_parents)}"
@@ -115,7 +126,11 @@ parser.add_argument(
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
+    logging.basicConfig(
+        format="%(asctime)s %(name)s:%(lineno)d %(levelname)s %(message)s",
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        stream=sys.stdout,
+    )
     logging.getLogger("synapse.util").setLevel(logging.ERROR)
     logging.getLogger("synapse.storage").setLevel(logging.ERROR)
     task.react(main, [parser.parse_args()])
