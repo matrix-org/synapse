@@ -285,3 +285,31 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         # The time allowed is the current time because we could still repeat the action
         # once.
         self.assertEqual(20.0, time_allowed)
+
+    def test_bug(self) -> None:
+        limiter = Ratelimiter(
+            store=self.hs.get_datastores().main, clock=None, rate_hz=0.1, burst_count=3
+        )
+
+        def consume_at(time: float) -> bool:
+            success, _ = self.get_success_or_raise(
+                limiter.can_do_action(requester=None, key="a", _time_now_s=time)
+            )
+            return success
+
+        # Use all our 3 burst tokens
+        self.assertTrue(consume_at(0.0))
+        self.assertTrue(consume_at(0.1))
+        self.assertTrue(consume_at(0.2))
+
+        # Give it a bit of delay. We can now rapid-fire requests at 1 Hz
+        # for a short while. (There may be ways to extend this further, but it
+        # would need calculating.)
+        self.assertTrue(consume_at(10.1))
+        self.assertTrue(consume_at(11.1))
+        self.assertTrue(consume_at(12.1))
+        self.assertTrue(consume_at(13.1))
+        self.assertTrue(consume_at(14.1))
+        self.assertTrue(consume_at(15.1))
+        self.assertTrue(consume_at(16.1))
+        self.assertTrue(consume_at(17.1))
