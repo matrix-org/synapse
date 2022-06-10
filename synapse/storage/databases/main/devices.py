@@ -791,6 +791,9 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
             """
 
             # Query device changes with a batch of users at a time
+            # Assertion for mypy's benefit; see also
+            # https://mypy.readthedocs.io/en/stable/common_issues.html#narrowing-and-inner-functions
+            assert user_ids_to_check is not None
             for chunk in batch_iter(user_ids_to_check, 100):
                 clause, args = make_in_list_sql_clause(
                     txn.database_engine, "user_id", chunk
