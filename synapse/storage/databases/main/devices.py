@@ -77,7 +77,9 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
     ):
         super().__init__(database, db_conn, hs)
 
-        device_list_max = self._device_list_id_gen.get_current_token()
+        # Type-ignore: _device_list_id_gen is mixed in from either DataStore, where it
+        # is a StreamIdGenerator or SlavedDataStore where it is a SlavedIdTracker.
+        device_list_max = self._device_list_id_gen.get_current_token()  # type: ignore[attr-defined]
         device_list_prefill, min_device_list_id = self.db_pool.get_cache_dict(
             db_conn,
             "device_lists_stream",
@@ -624,7 +626,11 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
             The new stream ID.
         """
 
-        async with self._device_list_id_gen.get_next() as stream_id:
+        # Type-ignore: _device_list_id_gen is mixed in from either DataStore, where it
+        # is a StreamIdGenerator or SlavedDataStore where it is a SlavedIdTracker.
+        # TODO: this looks like it's _writing_. Should this be on DeviceStore rather
+        #  than DeviceWorkerStore?
+        async with self._device_list_id_gen.get_next() as stream_id:  # type: ignore[attr-defined]
             await self.db_pool.runInteraction(
                 "add_user_sig_change_to_streams",
                 self._add_user_signature_change_txn,
@@ -1669,7 +1675,9 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 context,
             )
 
-        async with self._device_list_id_gen.get_next_mult(
+        # Type-ignore: _device_list_id_gen is mixed in from either DataStore, where it
+        # is a StreamIdGenerator or SlavedDataStore where it is a SlavedIdTracker.
+        async with self._device_list_id_gen.get_next_mult(  # type: ignore[attr-defined]
             len(device_ids)
         ) as stream_ids:
             await self.db_pool.runInteraction(
@@ -1893,7 +1901,9 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 [],
             )
 
-        async with self._device_list_id_gen.get_next_mult(len(hosts)) as stream_ids:
+        # Type-ignore: _device_list_id_gen is mixed in from either DataStore where it
+        # is a StreamIdGenerator, or SlavedDataStore where it is a SlavedIdTracker.
+        async with self._device_list_id_gen.get_next_mult(len(hosts)) as stream_ids:  # type: ignore[attr-defined]
             return await self.db_pool.runInteraction(
                 "add_device_list_outbound_pokes",
                 add_device_list_outbound_pokes_txn,
