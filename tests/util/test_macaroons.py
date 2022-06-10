@@ -60,7 +60,7 @@ class MacaroonGeneratorTestCase(TestCase):
         # Raises with another secret key
         with self.assertRaises(MacaroonVerificationFailedException):
             self.other_macaroon_generator.verify_delete_pusher_token(
-                token, "m.mail", "other@example.com"
+                token, "m.mail", "john@example.com"
             )
 
         # Raises when verifying for another pushkey
