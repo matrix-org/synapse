@@ -15,6 +15,7 @@
 import heapq
 import itertools
 import logging
+from pprint import pformat
 from typing import (
     Any,
     Awaitable,
@@ -166,6 +167,10 @@ async def resolve_events_with_store(
     )
 
     logger.debug("sorted %d power events", len(sorted_power_events))
+    for e in sorted_power_events:
+        logger.debug(
+            "%s %s %s", event_map[e].event_id, event_map[e].type, event_map[e].state_key
+        )
 
     # Now sequentially auth each one
     resolved_state = await _iterative_auth_checks(
@@ -179,6 +184,8 @@ async def resolve_events_with_store(
     )
 
     logger.debug("resolved power events")
+    logger.debug("resolved state is now")
+    logger.debug(pformat(resolved_state))
 
     # OK, so we've now resolved the power events. Now sort the remaining
     # events using the mainline of the resolved power level.
@@ -578,6 +585,14 @@ async def _iterative_auth_checks(
                 auth_events.values(),
             )
 
+            if (event.type, event.state_key) == ("m.room.power_levels", ""):
+                logger.warning(
+                    "POWER LEVELS: %s -> %s(%d)",
+                    resolved_state.get((event.type, event.state_key)),
+                    event_id,
+                    event.depth,
+                )
+                logger.warning(pformat(event.content))
             resolved_state[(event.type, event.state_key)] = event_id
         except AuthError:
             pass
