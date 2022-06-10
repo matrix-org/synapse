@@ -348,20 +348,20 @@ def _is_membership_change_allowed(
     invite_level = get_named_level(auth_events, "invite", 0)
     ban_level = get_named_level(auth_events, "ban", 50)
 
-    logger.debug(
-        "_is_membership_change_allowed: %s",
-        {
-            "caller_in_room": caller_in_room,
-            "caller_invited": caller_invited,
-            "caller_knocked": caller_knocked,
-            "target_banned": target_banned,
-            "target_in_room": target_in_room,
-            "membership": membership,
-            "join_rule": join_rule,
-            "target_user_id": target_user_id,
-            "event.user_id": event.user_id,
-        },
-    )
+    # logger.debug(
+    #     "_is_membership_change_allowed: %s",
+    #     {
+    #         "caller_in_room": caller_in_room,
+    #         "caller_invited": caller_invited,
+    #         "caller_knocked": caller_knocked,
+    #         "target_banned": target_banned,
+    #         "target_in_room": target_in_room,
+    #         "membership": membership,
+    #         "join_rule": join_rule,
+    #         "target_user_id": target_user_id,
+    #         "event.user_id": event.user_id,
+    #     },
+    # )
 
     if Membership.INVITE == membership and "third_party_invite" in event.content:
         if not _verify_third_party_invite(event, auth_events):
