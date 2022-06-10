@@ -61,6 +61,6 @@ async def assert_user_is_admin(auth: Auth, requester: Requester) -> None:
     Raises:
         AuthError if the user is not a server admin
     """
-    is_admin = await auth.is_server_admin(requester.user)
+    is_admin = await auth.is_server_admin(requester)
     if not is_admin:
         raise AuthError(HTTPStatus.FORBIDDEN, "You are not a server admin")

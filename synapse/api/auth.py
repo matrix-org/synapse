@@ -38,7 +38,7 @@ from synapse.logging.opentracing import (
     trace,
 )
 from synapse.storage.databases.main.registration import TokenLookupResult
-from synapse.types import Requester, UserID, create_requester
+from synapse.types import Requester, create_requester
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -70,7 +70,7 @@ class Auth:
     async def check_user_in_room(
         self,
         room_id: str,
-        user_id: str,
+        requester: Requester,
         allow_departed_users: bool = False,
     ) -> Tuple[str, Optional[str]]:
         """Check if the user is in the room, or was at some point.
@@ -94,6 +94,7 @@ class Auth:
             membership event ID of the user.
         """
 
+        user_id = requester.user.to_string()
         (
             membership,
             member_event_id,
@@ -472,18 +473,20 @@ class Auth:
         request.requester = create_requester(service.sender, app_service=service)
         return service
 
-    async def is_server_admin(self, user: UserID) -> bool:
+    async def is_server_admin(self, requester: Requester) -> bool:
         """Check if the given user is a local server admin.
 
         Args:
-            user: user to check
+            requester: user to check
 
         Returns:
             True if the user is an admin
         """
-        return await self.store.is_server_admin(user)
+        return await self.store.is_server_admin(requester.user)
 
-    async def check_can_change_room_list(self, room_id: str, user: UserID) -> bool:
+    async def check_can_change_room_list(
+        self, room_id: str, requester: Requester
+    ) -> bool:
         """Determine whether the user is allowed to edit the room's entry in the
         published room list.
 
@@ -492,12 +495,11 @@ class Auth:
             user
         """
 
-        is_admin = await self.is_server_admin(user)
+        is_admin = await self.is_server_admin(requester)
         if is_admin:
             return True
 
-        user_id = user.to_string()
-        await self.check_user_in_room(room_id, user_id)
+        await self.check_user_in_room(room_id, requester)
 
         # We currently require the user is a "moderator" in the room. We do this
         # by checking if they would (theoretically) be able to change the
@@ -516,7 +518,9 @@ class Auth:
         send_level = event_auth.get_send_level(
             EventTypes.CanonicalAlias, "", power_level_event
         )
-        user_level = event_auth.get_user_power_level(user_id, auth_events)
+        user_level = event_auth.get_user_power_level(
+            requester.user.to_string(), auth_events
+        )
 
         return user_level >= send_level
 
@@ -574,7 +578,7 @@ class Auth:
 
     @trace
     async def check_user_in_room_or_world_readable(
-        self, room_id: str, user_id: str, allow_departed_users: bool = False
+        self, room_id: str, requester: Requester, allow_departed_users: bool = False
     ) -> Tuple[str, Optional[str]]:
         """Checks that the user is or was in the room or the room is world
         readable. If it isn't then an exception is raised.
@@ -598,7 +602,7 @@ class Auth:
             #  * The user is a guest user, and has joined the room
             # else it will throw.
             return await self.check_user_in_room(
-                room_id, user_id, allow_departed_users=allow_departed_users
+                room_id, requester, allow_departed_users=allow_departed_users
             )
         except AuthError:
             visibility = await self._storage_controllers.state.get_current_state_event(
@@ -613,6 +617,6 @@ class Auth:
             raise UnstableSpecAuthError(
                 403,
                 "User %s not in room %s, and room previews are disabled"
-                % (user_id, room_id),
+                % (requester.user, room_id),
                 errcode=Codes.NOT_JOINED,
             )
