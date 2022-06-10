@@ -55,7 +55,7 @@ class EventAuthHandler:
         """Check an event passes the auth rules at its own auth events"""
         auth_event_ids = event.auth_event_ids()
         auth_events_by_id = await self._store.get_events(auth_event_ids)
-        check_auth_rules_for_event(room_version_obj, event, auth_events_by_id.values())
+        check_auth_rules_for_event(event, auth_events_by_id.values())
 
     def compute_auth_events(
         self,
