@@ -100,12 +100,12 @@ This release of Synapse will remove deprecated community/groups from codebase.
 For those who have deployed workers, following worker endpoints will no longer be existing
 and they are expected to be removed from reverse proxy config:
 
-`^/_matrix/federation/v1/get_groups_publicised$`
-`^/_matrix/client/(r0|v3|unstable)/joined_groups$`
-`^/_matrix/client/(r0|v3|unstable)/publicised_groups$`
-`^/_matrix/client/(r0|v3|unstable)/publicised_groups/`
-`^/_matrix/federation/v1/groups/`
-`^/_matrix/client/(r0|v3|unstable)/groups/`
+-   `^/_matrix/federation/v1/get_groups_publicised$`
+-   `^/_matrix/client/(r0|v3|unstable)/joined_groups$`
+-   `^/_matrix/client/(r0|v3|unstable)/publicised_groups$`
+-   `^/_matrix/client/(r0|v3|unstable)/publicised_groups/`
+-   `^/_matrix/federation/v1/groups/`
+-   `^/_matrix/client/(r0|v3|unstable)/groups/`
 
 
 # Upgrading to v1.60.0
