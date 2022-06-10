@@ -26,8 +26,6 @@ from typing import (
     Union,
 )
 
-from authlib.jose import JsonWebToken, JWTClaims
-from authlib.jose.errors import BadSignatureError, InvalidClaimError, JoseError
 from typing_extensions import TypedDict
 
 from synapse.api.errors import Codes, LoginError, SynapseError
@@ -421,6 +419,9 @@ class LoginRestServlet(RestServlet):
             raise LoginError(
                 403, "Token field for JWT is missing", errcode=Codes.FORBIDDEN
             )
+
+        from authlib.jose import JsonWebToken, JWTClaims
+        from authlib.jose.errors import BadSignatureError, InvalidClaimError, JoseError
 
         jwt = JsonWebToken([self.jwt_algorithm])
         claim_options = {}
