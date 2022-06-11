@@ -8,7 +8,7 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
     Tests for StreamChangeCache.
     """
 
-    def test_prefilled_cache(self):
+    def test_prefilled_cache(self) -> None:
         """
         Providing a prefilled cache to StreamChangeCache will result in a cache
         with the prefilled-cache entered in.
@@ -16,7 +16,7 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
         cache = StreamChangeCache("#test", 1, prefilled_cache={"user@foo.com": 2})
         self.assertTrue(cache.has_entity_changed("user@foo.com", 1))
 
-    def test_has_entity_changed(self):
+    def test_has_entity_changed(self) -> None:
         """
         StreamChangeCache.entity_has_changed will mark entities as changed, and
         has_entity_changed will observe the changed entities.
@@ -52,7 +52,7 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
         self.assertTrue(cache.has_entity_changed("user@foo.com", 0))
         self.assertTrue(cache.has_entity_changed("not@here.website", 0))
 
-    def test_entity_has_changed_pops_off_start(self):
+    def test_entity_has_changed_pops_off_start(self) -> None:
         """
         StreamChangeCache.entity_has_changed will respect the max size and
         purge the oldest items upon reaching that max size.
@@ -86,7 +86,7 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
         )
         self.assertIsNone(cache.get_all_entities_changed(1))
 
-    def test_get_all_entities_changed(self):
+    def test_get_all_entities_changed(self) -> None:
         """
         StreamChangeCache.get_all_entities_changed will return all changed
         entities since the given position.  If the position is before the start
@@ -142,7 +142,7 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
         r = cache.get_all_entities_changed(3)
         self.assertTrue(r == ok1 or r == ok2)
 
-    def test_has_any_entity_changed(self):
+    def test_has_any_entity_changed(self) -> None:
         """
         StreamChangeCache.has_any_entity_changed will return True if any
         entities have been changed since the provided stream position, and
@@ -168,7 +168,7 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
         self.assertFalse(cache.has_any_entity_changed(2))
         self.assertFalse(cache.has_any_entity_changed(3))
 
-    def test_get_entities_changed(self):
+    def test_get_entities_changed(self) -> None:
         """
         StreamChangeCache.get_entities_changed will return the entities in the
         given list that have changed since the provided stream ID.  If the
@@ -228,7 +228,7 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
             {"bar@baz.net"},
         )
 
-    def test_max_pos(self):
+    def test_max_pos(self) -> None:
         """
         StreamChangeCache.get_max_pos_of_last_change will return the most
         recent point where the entity could have changed.  If the entity is not
