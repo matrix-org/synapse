@@ -22,6 +22,7 @@ from synapse.api.room_versions import RoomVersions
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import DEFAULT_ROOM_VERSION
 from synapse.logging.context import current_context, set_current_context
+from synapse.server import HomeServer
 from synapse.storage.database import LoggingDatabaseConnection
 from synapse.storage.engines import PostgresEngine, create_engine
 from synapse.storage.prepare_database import prepare_database
@@ -270,10 +271,11 @@ class MockClock:
         self.advance_time(ms / 1000.0)
 
 
-async def create_room(hs, room_id: str, creator_id: str):
+async def create_room(hs: HomeServer, room_id: str, creator_id: str) -> None:
     """Creates and persist a creation event for the given room"""
 
     persistence_store = hs.get_storage_controllers().persistence
+    assert persistence_store is not None
     store = hs.get_datastores().main
     event_builder_factory = hs.get_event_builder_factory()
     event_creation_handler = hs.get_event_creation_handler()
