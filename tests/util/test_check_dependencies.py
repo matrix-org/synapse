@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import Generator, Optional
+from typing import Generator, NoReturn, Optional
 from unittest.mock import patch
 
 from synapse.util.check_dependencies import (
@@ -12,17 +12,19 @@ from tests.unittest import TestCase
 
 
 class DummyDistribution(metadata.Distribution):
-    def __init__(self, version: object):
+    def __init__(self, version: Optional[str]):
         self._version = version
 
+    # Type-ignore: This really can return None. More context here:
+    # https://github.com/python/importlib_metadata/issues/371
     @property
-    def version(self):
+    def version(self) -> Optional[str]:  # type: ignore[override]
         return self._version
 
-    def locate_file(self, path):
+    def locate_file(self, path: object) -> NoReturn:
         raise NotImplementedError()
 
-    def read_text(self, filename):
+    def read_text(self, filename: object) -> NoReturn:
         raise NotImplementedError()
 
 
@@ -42,7 +44,7 @@ class TestDependencyChecker(TestCase):
     ) -> Generator[None, None, None]:
         """Pretend that looking up any distribution yields the given `distribution`."""
 
-        def mock_distribution(name: str):
+        def mock_distribution(name: str) -> DummyDistribution:
             if distribution is None:
                 raise metadata.PackageNotFoundError
             else:
