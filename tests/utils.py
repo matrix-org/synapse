@@ -15,7 +15,9 @@
 
 import atexit
 import os
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Dict, Union, cast, overload
+
+from typing_extensions import Literal
 
 from synapse.api.constants import EventTypes
 from synapse.api.room_versions import RoomVersions
@@ -117,7 +119,19 @@ def setupdb() -> None:
         atexit.register(_cleanup)
 
 
-def default_config(name, parse=False):
+@overload
+def default_config(name: str, parse: Literal[False] = ...) -> Dict[str, object]:
+    ...
+
+
+@overload
+def default_config(name: str, parse: Literal[True]) -> HomeServerConfig:
+    ...
+
+
+def default_config(
+    name: str, parse: bool = False
+) -> Union[Dict[str, object], HomeServerConfig]:
     """
     Create a reasonable test config.
     """
