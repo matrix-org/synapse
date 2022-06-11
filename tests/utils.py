@@ -269,10 +269,6 @@ class MockClock:
     def advance_time_msec(self, ms):
         self.advance_time(ms / 1000.0)
 
-    def time_bound_deferred(self, d, *args, **kwargs):
-        # We don't bother timing things out for now.
-        return d
-
 
 async def create_room(hs, room_id: str, creator_id: str):
     """Creates and persist a creation event for the given room"""
