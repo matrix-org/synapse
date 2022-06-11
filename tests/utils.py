@@ -206,7 +206,7 @@ def mock_getRawHeaders(headers=None):
 class MockClock:
     now = 1000
 
-    def __init__(self):
+    def __init__(self) -> None:
         # list of lists of [absolute_time, callback, expired] in no particular
         # order
         self.timers = []
