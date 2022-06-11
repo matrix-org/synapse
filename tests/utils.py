@@ -15,7 +15,18 @@
 
 import atexit
 import os
-from typing import TYPE_CHECKING, Callable, Dict, List, ParamSpec, Union, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    ParamSpec,
+    Tuple,
+    Union,
+    cast,
+    overload,
+)
 
 import attr
 from typing_extensions import Literal
@@ -229,13 +240,23 @@ class Timer:
     expired: bool
 
 
+# TODO: Make this generic over a ParamSpec?
+@attr.s(slots=True, auto_attribs=True)
+class Looper:
+    func: Callable[..., Any]
+    interval: float  # seconds
+    last: float
+    args: Tuple[object, ...]
+    kwargs: Dict[str, object]
+
+
 class MockClock:
     now = 1000.0
 
     def __init__(self) -> None:
         # Timers in no particular order
         self.timers: List[Timer] = []
-        self.loopers = []
+        self.loopers: List[Looper] = []
 
     def time(self) -> float:
         return self.now
@@ -268,7 +289,9 @@ class MockClock:
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
-        self.loopers.append([function, interval / 1000.0, self.now, args, kwargs])
+        # This type-ignore should be redundant once we use a mypy release with
+        # https://github.com/python/mypy/pull/12668.
+        self.loopers.append(Looper(function, interval / 1000.0, self.now, args, kwargs))  # type: ignore[arg-type]
 
     def cancel_call_later(self, timer: Timer, ignore_errs: bool = False) -> None:
         if timer.expired:
@@ -296,10 +319,9 @@ class MockClock:
                 self.timers.append(t)
 
         for looped in self.loopers:
-            func, interval, last, args, kwargs = looped
-            if last + interval < self.now:
-                func(*args, **kwargs)
-                looped[2] = self.now
+            if looped.last + looped.interval < self.now:
+                looped.func(*looped.args, **looped.kwargs)
+                looped.last = self.now
 
     def advance_time_msec(self, ms: float) -> None:
         self.advance_time(ms / 1000.0)
