@@ -219,7 +219,7 @@ def mock_getRawHeaders(headers=None):
 
 
 class MockClock:
-    now = 1000
+    now = 1000.0
 
     def __init__(self) -> None:
         # list of lists of [absolute_time, callback, expired] in no particular
@@ -227,11 +227,11 @@ class MockClock:
         self.timers = []
         self.loopers = []
 
-    def time(self):
+    def time(self) -> float:
         return self.now
 
-    def time_msec(self):
-        return self.time() * 1000
+    def time_msec(self) -> int:
+        return int(self.time() * 1000)
 
     def call_later(self, delay, callback, *args, **kwargs):
         ctx = current_context()
@@ -257,7 +257,7 @@ class MockClock:
         self.timers = [t for t in self.timers if t != timer]
 
     # For unit testing
-    def advance_time(self, secs):
+    def advance_time(self, secs: float) -> None:
         self.now += secs
 
         timers = self.timers
@@ -281,7 +281,7 @@ class MockClock:
                 func(*args, **kwargs)
                 looped[2] = self.now
 
-    def advance_time_msec(self, ms):
+    def advance_time_msec(self, ms: float) -> None:
         self.advance_time(ms / 1000.0)
 
 
