@@ -221,10 +221,15 @@ def default_config(
     return config_dict
 
 
-def mock_getRawHeaders(headers=None):
+def mock_getRawHeaders(headers=None):  # type: ignore[no-untyped-def]
     headers = headers if headers is not None else {}
 
-    def getRawHeaders(name, default=None):
+    def getRawHeaders(name, default=None):  # type: ignore[no-untyped-def]
+        # If the requested header is present, the real twisted function returns
+        # List[str] if name is a str and List[bytes] if name is a bytes.
+        # This mock doesn't support that behaviour.
+        # Fortunately, none of the current callers of mock_getRawHeaders() provide a
+        # headers dict, so we don't encounter this discrepancy in practice.
         return headers.get(name, default)
 
     return getRawHeaders
