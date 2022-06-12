@@ -271,6 +271,9 @@ class StatsHandler:
                 room_state["is_federatable"] = (
                     event_content.get(EventContentFields.FEDERATE, True) is True
                 )
+                room_state["room_type"] = event_content.get(
+                    EventContentFields.ROOM_TYPE
+                )
             elif typ == EventTypes.JoinRules:
                 room_state["join_rules"] = event_content.get("join_rule")
             elif typ == EventTypes.RoomHistoryVisibility:

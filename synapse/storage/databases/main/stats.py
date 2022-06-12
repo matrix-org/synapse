@@ -238,6 +238,7 @@ class StatsStore(StateDeltasStore):
         * avatar
         * canonical_alias
         * guest_access
+        * room_type
 
         A is_federatable key can also be included with a boolean value.
 
@@ -263,6 +264,7 @@ class StatsStore(StateDeltasStore):
             "avatar",
             "canonical_alias",
             "guest_access",
+            "room_type",
         ):
             field = fields.get(col, sentinel)
             if field is not sentinel and (not isinstance(field, str) or "\0" in field):
@@ -603,6 +605,10 @@ class StatsStore(StateDeltasStore):
             elif event.type == EventTypes.Create:
                 room_state["is_federatable"] = (
                     event.content.get(EventContentFields.FEDERATE, True) is True
+                )
+            elif event.state["room_type"]:
+                room_state["room_type"] = event.content.get(
+                    EventContentFields.ROOM_TYPE
                 )
 
         await self.update_room_state(room_id, room_state)
