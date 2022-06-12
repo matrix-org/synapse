@@ -296,8 +296,8 @@ have different characteristics and so admins
 may wish to run multiple groups of workers handling different endpoints so that
 load balancing can be done in different ways.
 
-You could create multiple worker configuration files manually or additionally use 
-a simple `bash` script, such as
+You could create multiple worker configuration files manually or alternatively use 
+a simple `bash` script. For example:
 
 ```#!/bin/bash
 for i in {1..5}
@@ -321,8 +321,8 @@ EOF
 done
 ```
 
-This would create five generic workers with unique worker_name field,
-listening on ports 8081-8085.
+This would create five generic workers with a unique `worker_name` field
+in each file and listening on ports 8081-8085.
 
 For `/sync` and `/initialSync` requests it will be more efficient if all
 requests from a particular user are routed to a single instance. Extracting a
