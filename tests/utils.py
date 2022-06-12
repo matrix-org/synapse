@@ -21,7 +21,6 @@ from typing import (
     Callable,
     Dict,
     List,
-    ParamSpec,
     Tuple,
     Union,
     cast,
@@ -29,7 +28,7 @@ from typing import (
 )
 
 import attr
-from typing_extensions import Literal
+from typing_extensions import Literal, ParamSpec
 
 from synapse.api.constants import EventTypes
 from synapse.api.room_versions import RoomVersions
