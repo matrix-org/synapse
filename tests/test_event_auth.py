@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import unittest
-from typing import Optional
+from typing import Iterable, List, Optional
 
 from parameterized import parameterized
 
@@ -38,7 +38,7 @@ class EventAuthTestCase(unittest.TestCase):
 
         # creator should be able to send state
         event_auth.check_auth_rules_for_event(
-            _random_state_event(RoomVersions.V9, creator),
+            _random_state_event(RoomVersions.V9, creator, auth_events),
             auth_events,
         )
 
@@ -54,7 +54,7 @@ class EventAuthTestCase(unittest.TestCase):
         self.assertRaises(
             AuthError,
             event_auth.check_auth_rules_for_event,
-            _random_state_event(RoomVersions.V9, creator),
+            _random_state_event(RoomVersions.V9, creator, auth_events),
             auth_events,
         )
 
@@ -64,7 +64,7 @@ class EventAuthTestCase(unittest.TestCase):
         self.assertRaises(
             AuthError,
             event_auth.check_auth_rules_for_event,
-            _random_state_event(RoomVersions.V9, creator),
+            _random_state_event(RoomVersions.V9, creator, auth_events),
             auth_events,
         )
 
@@ -539,6 +539,7 @@ def _create_event(
             "state_key": "",
             "sender": user_id,
             "content": {"creator": user_id},
+            "auth_events": [],
         },
         room_version=room_version,
     )
@@ -559,6 +560,7 @@ def _member_event(
             "sender": sender or user_id,
             "state_key": user_id,
             "content": {"membership": membership, **(additional_content or {})},
+            "auth_events": [],
             "prev_events": [],
         },
         room_version=room_version,
@@ -609,7 +611,22 @@ def _alias_event(room_version: RoomVersion, sender: str, **kwargs) -> EventBase:
     return make_event_from_dict(data, room_version=room_version)
 
 
-def _random_state_event(room_version: RoomVersion, sender: str) -> EventBase:
+def _build_auth_dict_for_room_version(
+    room_version: RoomVersion, auth_events: Iterable[EventBase]
+) -> List:
+    if room_version.event_format == EventFormatVersions.V1:
+        return [(e.event_id, "not_used") for e in auth_events]
+    else:
+        return [e.event_id for e in auth_events]
+
+
+def _random_state_event(
+    room_version: RoomVersion,
+    sender: str,
+    auth_events: Optional[Iterable[EventBase]] = None,
+) -> EventBase:
+    if auth_events is None:
+        auth_events = []
     return make_event_from_dict(
         {
             "room_id": TEST_ROOM_ID,
@@ -618,6 +635,7 @@ def _random_state_event(room_version: RoomVersion, sender: str) -> EventBase:
             "sender": sender,
             "state_key": "",
             "content": {"membership": "join"},
+            "auth_events": _build_auth_dict_for_room_version(room_version, auth_events),
         },
         room_version=room_version,
     )
