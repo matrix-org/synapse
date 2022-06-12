@@ -181,6 +181,7 @@ class RoomListHandler:
                 == HistoryVisibility.WORLD_READABLE,
                 "guest_can_join": room["guest_access"] == "can_join",
                 "join_rule": room["join_rules"],
+                "room_type": room["room_type"],
             }
 
             # Filter out Nones – rather omit the field altogether
@@ -239,7 +240,9 @@ class RoomListHandler:
         response["chunk"] = results
 
         response["total_room_count_estimate"] = await self.store.count_public_rooms(
-            network_tuple, ignore_non_federatable=from_federation
+            network_tuple,
+            ignore_non_federatable=from_federation,
+            search_filter=search_filter,
         )
 
         return response

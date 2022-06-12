@@ -37,7 +37,7 @@ from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.config.homeserver import HomeServerConfig
 from synapse.events import EventBase
-from synapse.storage._base import SQLBaseStore, db_to_json
+from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import (
     DatabasePool,
     LoggingDatabaseConnection,
@@ -203,6 +203,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         self,
         network_tuple: Optional[ThirdPartyInstanceID],
         ignore_non_federatable: bool,
+        search_filter: Optional[dict],
     ) -> int:
         """Counts the number of public rooms as tracked in the room_stats_current
         and room_stats_state table.
@@ -210,10 +211,21 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         Args:
             network_tuple
             ignore_non_federatable: If true filters out non-federatable rooms
+            search_filter
         """
 
         def _count_public_rooms_txn(txn: LoggingTransaction) -> int:
             query_args = []
+
+            where_clause = ""
+            if search_filter and search_filter.get("room_type", None):
+                room_type = search_filter["room_type"]
+                clause, args = make_in_list_sql_clause(
+                    self.database_engine, "room_type", room_type
+                )
+
+                where_clause = f" AND {clause}"
+                query_args += args
 
             if network_tuple:
                 if network_tuple.appservice_id:
@@ -249,6 +261,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                         OR join_rules = '{JoinRules.KNOCK_RESTRICTED}'
                         OR history_visibility = 'world_readable'
                     )
+                    {where_clause}
                     AND joined_members > 0
             """
 
@@ -365,6 +378,15 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 search_term.lower(),
             ]
 
+        if search_filter and search_filter.get("room_type", None):
+            room_type = search_filter["room_type"]
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "room_type", room_type
+            )
+
+            where_clauses.append(clause)
+            query_args += args
+
         where_clause = ""
         if where_clauses:
             where_clause = " AND " + " AND ".join(where_clauses)
@@ -373,7 +395,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         sql = f"""
             SELECT
                 room_id, name, topic, canonical_alias, joined_members,
-                avatar, history_visibility, guest_access, join_rules
+                avatar, history_visibility, guest_access, join_rules, room_type
             FROM (
                 {published_sql}
             ) published
