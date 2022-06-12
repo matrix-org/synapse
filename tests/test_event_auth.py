@@ -1,4 +1,4 @@
-# Copyright 2018 New Vector Ltd
+# Copyright 2018-2022 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import typing
 import unittest
 from typing import Iterable, List, Optional
 
@@ -22,7 +23,40 @@ from synapse.api.constants import EventContentFields
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
 from synapse.events import EventBase, make_event_from_dict
+from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import JsonDict, get_domain_from_id
+
+from tests.test_utils import get_awaitable_result
+
+
+class _StubEventSourceStore:
+    """A stub implementation of the EventSourceStore"""
+
+    def __init__(self):
+        self._store: typing.Dict[str, EventBase] = {}
+
+    def add_event(self, event: EventBase):
+        self._store[event.event_id] = event
+
+    def add_events(self, events: typing.Iterable[EventBase]):
+        for event in events:
+            self._store[event.event_id] = event
+
+    async def get_events(
+        self,
+        event_ids: typing.Collection[str],
+        redact_behaviour: EventRedactBehaviour,
+        get_prev_content: bool = False,
+        allow_rejected: bool = False,
+    ) -> typing.Dict[str, EventBase]:
+        assert allow_rejected
+        assert not get_prev_content
+        assert redact_behaviour == EventRedactBehaviour.as_is
+        results = {}
+        for e in event_ids:
+            if e in self._store:
+                results[e] = self._store[e]
+        return results
 
 
 class EventAuthTestCase(unittest.TestCase):
@@ -36,11 +70,15 @@ class EventAuthTestCase(unittest.TestCase):
             _join_event(RoomVersions.V9, creator),
         ]
 
+        event_store = _StubEventSourceStore()
+        event_store.add_events(auth_events)
+
         # creator should be able to send state
-        event_auth.check_auth_rules_for_event(
-            _random_state_event(RoomVersions.V9, creator, auth_events),
-            auth_events,
+        event = _random_state_event(RoomVersions.V9, creator, auth_events)
+        get_awaitable_result(
+            event_auth.check_state_independent_auth_rules(event_store, event)
         )
+        event_auth.check_auth_rules_for_event(event, auth_events)
 
         # ... but a rejected join_rules event should cause it to be rejected
         rejected_join_rules = _join_rules_event(
@@ -50,23 +88,27 @@ class EventAuthTestCase(unittest.TestCase):
         )
         rejected_join_rules.rejected_reason = "stinky"
         auth_events.append(rejected_join_rules)
+        event_store.add_event(rejected_join_rules)
 
-        self.assertRaises(
-            AuthError,
-            event_auth.check_auth_rules_for_event,
-            _random_state_event(RoomVersions.V9, creator, auth_events),
-            auth_events,
-        )
+        with self.assertRaises(AuthError):
+            get_awaitable_result(
+                event_auth.check_state_independent_auth_rules(
+                    event_store,
+                    _random_state_event(RoomVersions.V9, creator),
+                )
+            )
 
         # ... even if there is *also* a good join rules
         auth_events.append(_join_rules_event(RoomVersions.V9, creator, "public"))
+        event_store.add_event(rejected_join_rules)
 
-        self.assertRaises(
-            AuthError,
-            event_auth.check_auth_rules_for_event,
-            _random_state_event(RoomVersions.V9, creator, auth_events),
-            auth_events,
-        )
+        with self.assertRaises(AuthError):
+            get_awaitable_result(
+                event_auth.check_state_independent_auth_rules(
+                    event_store,
+                    _random_state_event(RoomVersions.V9, creator),
+                )
+            )
 
     def test_random_users_cannot_send_state_before_first_pl(self):
         """

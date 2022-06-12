@@ -51,6 +51,7 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion, RoomVers
 from synapse.event_auth import (
     auth_types_for_event,
     check_auth_rules_for_event,
+    check_state_independent_auth_rules,
     validate_event_for_room_version,
 )
 from synapse.events import EventBase
@@ -1430,7 +1431,9 @@ class FederationEventHandler:
             allow_rejected=True,
         )
 
-        def prep(event: EventBase) -> Optional[Tuple[EventBase, EventContext]]:
+        events_and_contexts_to_persist: List[Tuple[EventBase, EventContext]] = []
+
+        async def prep(event: EventBase) -> None:
             with nested_logging_context(suffix=event.event_id):
                 auth = []
                 for auth_event_id in event.auth_event_ids():
@@ -1444,7 +1447,7 @@ class FederationEventHandler:
                             event,
                             auth_event_id,
                         )
-                        return None
+                        return
                     auth.append(ae)
 
                 # we're not bothering about room state, so flag the event as an outlier.
@@ -1453,17 +1456,20 @@ class FederationEventHandler:
                 context = EventContext.for_outlier(self._storage_controllers)
                 try:
                     validate_event_for_room_version(event)
+                    await check_state_independent_auth_rules(self._store, event)
                     check_auth_rules_for_event(event, auth)
                 except AuthError as e:
                     logger.warning("Rejecting %r because %s", event, e)
                     context.rejected = RejectedReason.AUTH_ERROR
 
-            return event, context
+            events_and_contexts_to_persist.append((event, context))
 
-        events_to_persist = (x for x in (prep(event) for event in fetched_events) if x)
+        for event in fetched_events:
+            await prep(event)
+
         await self.persist_events_and_notify(
             room_id,
-            tuple(events_to_persist),
+            events_and_contexts_to_persist,
             # Mark these events backfilled as they're historic events that will
             # eventually be backfilled. For example, missing events we fetch
             # during backfill should be marked as backfilled as well.
@@ -1515,6 +1521,7 @@ class FederationEventHandler:
 
         # ... and check that the event passes auth at those auth events.
         try:
+            await check_state_independent_auth_rules(self._store, event)
             check_auth_rules_for_event(event, claimed_auth_events)
         except AuthError as e:
             logger.warning(
