@@ -296,6 +296,34 @@ have different characteristics and so admins
 may wish to run multiple groups of workers handling different endpoints so that
 load balancing can be done in different ways.
 
+You could create multiple worker configuration files manually or additionally use 
+a simple `bash` script, such as
+
+```#!/bin/bash
+for i in {1..5}
+do
+cat << EOF >> generic_worker$i.yaml
+worker_app: synapse.app.generic_worker
+worker_name: generic_worker$i
+
+# The replication listener on the main synapse process.
+worker_replication_host: 127.0.0.1
+worker_replication_http_port: 9093
+
+worker_listeners:
+  - type: http
+    port: 808$i
+    resources:
+      - names: [client, federation]
+
+worker_log_config: /etc/matrix-synapse/generic-worker-log.yaml
+EOF
+done
+```
+
+This would create five generic workers with unique worker_name field,
+listening on ports 8081-8085.
+
 For `/sync` and `/initialSync` requests it will be more efficient if all
 requests from a particular user are routed to a single instance. Extracting a
 user ID from the access token or `Authorization` header is currently left as an
