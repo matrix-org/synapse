@@ -89,6 +89,47 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.61.0
+
+## New signatures for spam checker callbacks
+
+As a followup to changes in v1.60.0, the following spam-checker callbacks have changed signature:
+
+- `user_may_join_room`
+- `user_may_invite`
+- `user_may_send_3pid_invite`
+- `user_may_create_room`
+- `user_may_create_room_alias`
+- `user_may_publish_room`
+- `check_media_file_for_spam`
+
+For each of these methods, the previous callback signature has been deprecated.
+
+Whereas callbacks used to return `bool`, they should now return `Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes"]`.
+
+For instance, if your module implements `user_may_join_room` as follows:
+
+```python
+async def user_may_join_room(self, user_id: str, room_id: str, is_invited: bool)
+    if ...:
+        # Request is spam
+        return False
+    # Request is not spam
+    return True
+```
+
+you should rewrite it as follows:
+
+```python
+async def user_may_join_room(self, user_id: str, room_id: str, is_invited: bool)
+    if ...:
+        # Request is spam, mark it as forbidden (you may use some more precise error
+        # code if it is useful).
+        return synapse.module_api.errors.Codes.FORBIDDEN
+    # Request is not spam, mark it as such.
+    return synapse.module_api.NOT_SPAM
+```
+
 # Upgrading to v1.60.0
 
 ## Adding a new unique index to `state_group_edges` could fail if your database is corrupted
