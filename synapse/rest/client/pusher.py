@@ -26,6 +26,7 @@ from synapse.http.servlet import (
 from synapse.http.site import SynapseRequest
 from synapse.push import PusherConfigException
 from synapse.rest.client._base import client_patterns
+from synapse.rest.synapse.client.unsubscribe import UnsubscribeResource
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -132,6 +133,23 @@ class PushersSetRestServlet(RestServlet):
         return 200, {}
 
 
+class LegacyPushersRemoveRestServlet(RestServlet):
+    """
+    A servlet to handle legacy "email unsubscribe" links, forwarding requests to the ``UnsubscribeResource``
+    """
+
+    PATTERNS = client_patterns("/pushers/remove$", releases=[], v1=False, unstable=True)
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self._resource = UnsubscribeResource(hs)
+
+    async def on_GET(self, request: SynapseRequest) -> None:
+        # Forward the request to the UnsubscribeResource
+        await self._resource._async_render(request)
+
+
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     PushersRestServlet(hs).register(http_server)
     PushersSetRestServlet(hs).register(http_server)
+    LegacyPushersRemoveRestServlet(hs).register(http_server)

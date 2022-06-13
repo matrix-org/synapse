@@ -44,8 +44,6 @@ def build_synapse_client_resource_tree(hs: "HomeServer") -> Mapping[str, Resourc
         "/_synapse/client/sso_register": SsoRegisterResource(hs),
         # Unsubscribe to notification emails link
         "/_synapse/client/unsubscribe": UnsubscribeResource(hs),
-        # Legacy endpoint
-        "/_matrix/client/unstable/pushers/remove": UnsubscribeResource(hs),
     }
 
     # provider-specific SSO bits. Only load these if they are enabled, since they
