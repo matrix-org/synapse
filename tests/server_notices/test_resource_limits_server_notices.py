@@ -96,7 +96,9 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
     def test_maybe_send_server_notice_to_user_remove_blocked_notice(self):
         """Test when user has blocked notice, but should have it removed"""
 
-        self._rlsn._auth_blocking.check_auth_blocking = Mock(return_value=make_awaitable(None))
+        self._rlsn._auth_blocking.check_auth_blocking = Mock(
+            return_value=make_awaitable(None)
+        )
         mock_event = Mock(
             type=EventTypes.Message, content={"msgtype": ServerNoticeMsgType}
         )
@@ -145,7 +147,9 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         """
         Test when user does not have blocked notice, nor should they (NOOP)
         """
-        self._rlsn._auth_blocking.check_auth_blocking = Mock(return_value=make_awaitable(None))
+        self._rlsn._auth_blocking.check_auth_blocking = Mock(
+            return_value=make_awaitable(None)
+        )
 
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
 
@@ -156,7 +160,9 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         Test when user is not part of the MAU cohort - this should not ever
         happen - but ...
         """
-        self._rlsn._auth_blocking.check_auth_blocking = Mock(return_value=make_awaitable(None))
+        self._rlsn._auth_blocking.check_auth_blocking = Mock(
+            return_value=make_awaitable(None)
+        )
         self._rlsn._store.user_last_seen_monthly_active = Mock(
             return_value=make_awaitable(None)
         )
