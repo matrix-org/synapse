@@ -17,11 +17,16 @@
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-from synapse.api.errors import SynapseError
-from synapse.http.server import DirectServeJsonResource, set_cors_headers
+from synapse.api.errors import Codes, SynapseError, cs_error
+from synapse.http.server import (
+    DirectServeJsonResource,
+    set_cors_headers,
+    respond_with_json,
+)
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.media.v1.media_storage import MediaStorage
+from synapse.config.repository import THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP
 
 from ._base import (
     FileInfo,
@@ -304,6 +309,14 @@ class ThumbnailResource(DirectServeJsonResource):
             url_cache: True if this is from a URL cache.
             server_name: The server name, if this is a remote thumbnail.
         """
+        logger.debug(
+            "_select_and_respond_with_thumbnail: media_id=%s desired=%sx%s (%s) thumbnail_infos=%s",
+            media_id,
+            desired_width,
+            desired_height,
+            desired_method,
+            thumbnail_infos,
+        )
         if thumbnail_infos:
             file_info = self._select_thumbnail(
                 desired_width,
@@ -379,8 +392,40 @@ class ThumbnailResource(DirectServeJsonResource):
                 file_info.thumbnail.length,
             )
         else:
+            # This might be because:
+            # 1. We can't create thumbnails for the given media (corrupted or
+            #    unsupported file type)
+            # 2. The thumbnailing process never ran or errored out initially
+            #    when the media was first uploaded (these bugs should be
+            #    reported and fixed).
+            # 3. `dynamic_thumbnails` is disabled (see `homeserver.yaml`) and we
+            #    can't try to generate one. If this was enabled, Synapse would
+            #    go down a different code path.
             logger.info("Failed to find any generated thumbnails")
-            respond_404(request)
+
+            # We could get away with putting this error text directly in the
+            # error below because it never hits this code path otherwise when
+            # `dynamic_thumbnails` is disabled. But it would be good not to
+            # always assume this will be the case in the future so we provide
+            # accurate information to the user.
+            dynamic_thumbnails_disabled_warning_text = ""
+            if not self.dynamic_thumbnails:
+                dynamic_thumbnails_disabled_warning_text = " We also cannot try to generate a new thumbnail because `dynamic_thumbnails` is disabled (see `homeserver.yaml`)."
+
+            respond_with_json(
+                request,
+                400,
+                cs_error(
+                    "Cannot find any thumbnails for the requested media (%r). This might mean the media is not a supported_media_format=(%s) or your media is corrupted and cannot be thumbnailed.%s"
+                    % (
+                        request.postpath,
+                        ", ".join(THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP.keys()),
+                        dynamic_thumbnails_disabled_warning_text,
+                    ),
+                    code=Codes.UNKNOWN,
+                ),
+                send_cors=True,
+            )
 
     def _select_thumbnail(
         self,
