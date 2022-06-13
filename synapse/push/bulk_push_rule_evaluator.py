@@ -26,15 +26,16 @@ from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
+from synapse.storage.state import StateFilter
+from synapse.types import get_localpart_from_id
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import CacheMetric, register_cache
 from synapse.util.caches.descriptors import lru_cache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.metrics import measure_func
+from synapse.visibility import filter_events_for_client_with_state
 
-from ..storage.state import StateFilter
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
-from ..types import get_localpart_from_id
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -299,6 +300,16 @@ class BulkPushRuleEvaluator:
                 continue
 
             if uid in ignorers:
+                continue
+
+            # This is a check for the case where user joins a room without being
+            # allowed to see history, and then the server receives a delayed
+            # event from before the user joined, which they should not be pushed
+            # for
+            visible = await filter_events_for_client_with_state(
+                self.store, uid, event, context
+            )
+            if not visible:
                 continue
 
             localpart = get_localpart_from_id(uid)
