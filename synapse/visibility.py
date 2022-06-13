@@ -19,7 +19,9 @@ from typing_extensions import Final
 
 from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
 from synapse.events.utils import prune_event
+from synapse.storage import DataStore
 from synapse.storage.controllers import StorageControllers
 from synapse.storage.state import StateFilter
 from synapse.types import RetentionPolicy, StateMap, get_domain_from_id
@@ -105,13 +107,10 @@ async def filter_events_for_client(
         """
         Args:
             event: event to check
-
         Returns:
            None if the user cannot see this event at all
-
            a redacted copy of the event if they can only see a redacted
            version
-
            the original event if they can see it as normal.
         """
         # Only run some checks if these events aren't about to be sent to clients. This is
@@ -256,6 +255,132 @@ async def filter_events_for_client(
 
     # Turn it into a list and remove None entries before returning.
     return [ev for ev in filtered_events if ev]
+
+
+async def filter_events_for_client_with_state(
+    store: DataStore, user_id: str, event: EventBase, context: EventContext
+) -> Optional[EventBase]:
+    """
+    Checks to see if an event is visible to the user at the time of the event
+    Args:
+        store: databases
+        user_id: user_id to be checked
+        event: the event to be checked
+        context: EventContext for the event to be checked
+    Returns: the event if the room history is visible to the user at the time of the event, None if not
+    """
+    filter = StateFilter.from_types(
+        [(EventTypes.Member, user_id), (EventTypes.RoomHistoryVisibility, "")]
+    )
+    state_map = await context.get_prev_state_ids(filter)
+
+    # Use events rather than event ids as content from the events are needed in _check_visibility
+    updated_state_map = {}
+    for state_key, event_id in state_map.items():
+        updated_state_map[state_key] = await store.get_event(event_id)
+
+    if event.is_state():
+        current_state_key = (event.type, event.state_key)
+        # Add current event to updated_state_map, we need to do this here as it may not have been persisted to the db yet
+        updated_state_map[current_state_key] = event
+
+    filtered_event = await _check_visibility(user_id, event, updated_state_map)
+    return filtered_event
+
+
+async def _check_visibility(
+    user_id: str, event: EventBase, state_map: StateMap, is_peeking=False
+) -> Optional[EventBase]:
+    """
+    Checks whether the room history should be visible to the user at the time of this event.
+    Args:
+
+    Returns: the event if the room history is visible to the user at the time of the event, None if not
+    """
+    # Get the room_visibility at the time of the event.
+    visibility = get_effective_room_visibility_from_state(state_map)
+
+    # Always allow history visibility events on boundaries. This is done
+    # by setting the effective visibility to the least restrictive
+    # of the old vs new.
+    if event.type == EventTypes.RoomHistoryVisibility:
+        prev_content = event.unsigned.get("prev_content", {})
+        prev_visibility = prev_content.get("history_visibility", None)
+
+        if prev_visibility not in VISIBILITY_PRIORITY:
+            prev_visibility = HistoryVisibility.SHARED
+
+        new_priority = VISIBILITY_PRIORITY.index(visibility)
+        old_priority = VISIBILITY_PRIORITY.index(prev_visibility)
+        if old_priority < new_priority:
+            visibility = prev_visibility
+
+    # likewise, if the event is the user's own membership event, use
+    # the 'most joined' membership
+    membership = None
+    if event.type == EventTypes.Member and event.state_key == user_id:
+        membership = event.content.get("membership", None)
+        if membership not in MEMBERSHIP_PRIORITY:
+            membership = "leave"
+        # members can see their own membership invite
+        if membership == Membership.INVITE:
+            return event
+
+        prev_content = event.unsigned.get("prev_content", {})
+        prev_membership = prev_content.get("membership", None)
+        if prev_membership not in MEMBERSHIP_PRIORITY:
+            prev_membership = "leave"
+
+        # Always allow the user to see their own leave events, otherwise
+        # they won't see the room disappear if they reject the invite
+        #
+        # (Note this doesn't work for out-of-band invite rejections, which don't
+        # have prev_state populated. They are handled above in the outlier code.)
+        if membership == "leave" and (
+            prev_membership == "join" or prev_membership == "invite"
+        ):
+            return event
+
+        new_priority = MEMBERSHIP_PRIORITY.index(membership)
+        old_priority = MEMBERSHIP_PRIORITY.index(prev_membership)
+        if old_priority < new_priority:
+            membership = prev_membership
+
+    # otherwise, get the user's membership at the time of the event.
+    if membership is None:
+        membership_event = state_map.get((EventTypes.Member, user_id), None)
+        if membership_event:
+            membership = membership_event.membership
+
+    # if the user was a member of the room at the time of the event,
+    # they can see it.
+    if membership == Membership.JOIN:
+        return event
+
+    # otherwise, it depends on the room visibility.
+
+    if visibility == HistoryVisibility.JOINED:
+        # we weren't a member at the time of the event, so we can't
+        # see this event.
+        return None
+
+    elif visibility == HistoryVisibility.INVITED:
+        # user can also see the event if they were *invited* at the time
+        # of the event.
+        return event if membership == Membership.INVITE else None
+
+    elif visibility == HistoryVisibility.SHARED and is_peeking:
+        # if the visibility is shared, users cannot see the event unless
+        # they have *subsequently* joined the room (or were members at the
+        # time, of course)
+        #
+        # XXX: if the user has subsequently joined and then left again,
+        # ideally we would share history up to the point they left. But
+        # we don't know when they left. We just treat it as though they
+        # never joined, and restrict access.
+        return None
+
+    return event
 
 
 def get_effective_room_visibility_from_state(state: StateMap[EventBase]) -> str:
