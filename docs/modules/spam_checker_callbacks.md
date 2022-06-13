@@ -309,7 +309,7 @@ _Changed in Synapse v1.61.0: `synapse.module_api.NOT_SPAM` and `synapse.module_a
 async def check_media_file_for_spam(
     file_wrapper: "synapse.rest.media.v1.media_storage.ReadableFileWrapper",
     file_info: "synapse.rest.media.v1._base.FileInfo",
-) -> ["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
+) -> Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
 ```
 
 Called when storing a local or remote file.
