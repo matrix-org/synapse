@@ -77,7 +77,7 @@ class WellKnownTests(unittest.HomeserverTestCase):
             {
                 "m.homeserver": {"base_url": "https://tesths/"},
                 "m.identity_server": {"base_url": "https://testis"},
-                "custom": False
+                "custom": False,
             },
         )
 
