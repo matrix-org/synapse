@@ -588,7 +588,13 @@ async def _iterative_auth_checks(
 
         try:
             if _is_power_event(event):
-                logger.warning("Considering power event %s %s %s %s", event.event_id, event.type, event.state_key, pformat(event.content))
+                logger.warning(
+                    "Considering power event %s %s %s %s",
+                    event.event_id,
+                    event.type,
+                    event.state_key,
+                    pformat(event.content),
+                )
 
             event_auth.check_auth_rules_for_event(
                 event,
@@ -606,7 +612,9 @@ async def _iterative_auth_checks(
             resolved_state[(event.type, event.state_key)] = event_id
         except AuthError as e:
             if _is_power_event(event):
-                logger.debug("Rejecting %s from %s: %s", event.event_id, event.sender, e)
+                logger.debug(
+                    "Rejecting %s from %s: %s", event.event_id, event.sender, e
+                )
 
         # We await occasionally when we're working with large data sets to
         # ensure that we don't block the reactor loop for too long.
