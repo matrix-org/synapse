@@ -30,7 +30,7 @@ from synapse.server import HomeServer
 from synapse.types import JsonDict
 
 from tests import unittest
-from tests.http.server._base import EndpointCancellationTestHelperMixin
+from tests.http.server._base import test_disconnect
 
 
 def make_request(content):
@@ -108,9 +108,7 @@ class CancellableRestServlet(RestServlet):
         return HTTPStatus.OK, {"result": True}
 
 
-class TestRestServletCancellation(
-    unittest.HomeserverTestCase, EndpointCancellationTestHelperMixin
-):
+class TestRestServletCancellation(unittest.HomeserverTestCase):
     """Tests for `RestServlet` cancellation."""
 
     servlets = [
@@ -120,7 +118,7 @@ class TestRestServletCancellation(
     def test_cancellable_disconnect(self) -> None:
         """Test that handlers with the `@cancellable` flag can be cancelled."""
         channel = self.make_request("GET", "/sleep", await_result=False)
-        self._test_disconnect(
+        test_disconnect(
             self.reactor,
             channel,
             expect_cancellation=True,
@@ -130,7 +128,7 @@ class TestRestServletCancellation(
     def test_uncancellable_disconnect(self) -> None:
         """Test that handlers without the `@cancellable` flag cannot be cancelled."""
         channel = self.make_request("POST", "/sleep", await_result=False)
-        self._test_disconnect(
+        test_disconnect(
             self.reactor,
             channel,
             expect_cancellation=False,

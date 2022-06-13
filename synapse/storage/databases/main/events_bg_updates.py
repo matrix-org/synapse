@@ -177,11 +177,6 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             self._purged_chain_cover_index,
         )
 
-        # The event_thread_relation background update was replaced with the
-        # event_arbitrary_relations one, which handles any relation to avoid
-        # needed to potentially crawl the entire events table in the future.
-        self.db_pool.updates.register_noop_background_update("event_thread_relation")
-
         self.db_pool.updates.register_background_update_handler(
             "event_arbitrary_relations",
             self._event_arbitrary_relations,

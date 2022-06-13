@@ -18,7 +18,7 @@
 # argument to the script. Complement will then only run those tests. If
 # no regex is supplied, all tests are run. For example;
 #
-# ./complement.sh "TestOutboundFederation(Profile|Send)"
+# ./complement.sh -run "TestOutboundFederation(Profile|Send)"
 #
 
 # Exit if a line returns a non-zero exit code
@@ -43,17 +43,29 @@ fi
 # Build the base Synapse image from the local checkout
 docker build -t matrixdotorg/synapse -f "docker/Dockerfile" .
 
+# Build the workers docker image (from the base Synapse image we just built).
+docker build -t matrixdotorg/synapse-workers -f "docker/Dockerfile-workers" .
+
+# Build the unified Complement image (from the worker Synapse image we just built).
+docker build -t complement-synapse \
+  -f "docker/complement/Dockerfile" "docker/complement"
+
+export COMPLEMENT_BASE_IMAGE=complement-synapse
+
 extra_test_args=()
 
 test_tags="synapse_blacklist,msc2716,msc3030,msc3787"
 
-# If we're using workers, modify the docker files slightly.
-if [[ -n "$WORKERS" ]]; then
-  # Build the workers docker image (from the base Synapse image).
-  docker build -t matrixdotorg/synapse-workers -f "docker/Dockerfile-workers" .
+# All environment variables starting with PASS_ will be shared.
+# (The prefix is stripped off before reaching the container.)
+export COMPLEMENT_SHARE_ENV_PREFIX=PASS_
 
-  export COMPLEMENT_BASE_IMAGE=complement-synapse-workers
-  COMPLEMENT_DOCKERFILE=SynapseWorkers.Dockerfile
+if [[ -n "$WORKERS" ]]; then
+  # Use workers.
+  export PASS_SYNAPSE_COMPLEMENT_USE_WORKERS=true
+
+  # Workers can only use Postgres as a database.
+  export PASS_SYNAPSE_COMPLEMENT_DATABASE=postgres
 
   # And provide some more configuration to complement.
 
@@ -65,16 +77,17 @@ if [[ -n "$WORKERS" ]]; then
   # ... and it takes longer than 10m to run the whole suite.
   extra_test_args+=("-timeout=60m")
 else
-  export COMPLEMENT_BASE_IMAGE=complement-synapse
-  COMPLEMENT_DOCKERFILE=Dockerfile
+  export PASS_SYNAPSE_COMPLEMENT_USE_WORKERS=
+  if [[ -n "$POSTGRES" ]]; then
+    export PASS_SYNAPSE_COMPLEMENT_DATABASE=postgres
+  else
+    export PASS_SYNAPSE_COMPLEMENT_DATABASE=sqlite
+  fi
 
   # We only test faster room joins on monoliths, because they are purposefully
   # being developed without worker support to start with.
   test_tags="$test_tags,faster_joins"
 fi
-
-# Build the Complement image from the Synapse image we just built.
-docker build -t $COMPLEMENT_BASE_IMAGE -f "docker/complement/$COMPLEMENT_DOCKERFILE" "docker/complement"
 
 # Run the tests!
 echo "Images built; running complement"

@@ -54,7 +54,7 @@ skip_gitignore = true
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.60.0"
+version = "1.61.0rc1"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -150,7 +150,7 @@ typing-extensions = ">=3.10.0.1"
 cryptography = ">=3.4.7"
 # ijson 3.1.4 fixes a bug with "." in property names
 ijson = ">=3.1.4"
-matrix-common = "~=1.1.0"
+matrix-common = "~=1.2.1"
 # We need packaging.requirements.Requirement, added in 16.1.
 packaging = ">=16.1"
 # At the time of writing, we only use functions from the version `importlib.metadata`
