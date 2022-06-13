@@ -919,10 +919,14 @@ class MediaRepository:
             await self.delete_old_local_media(
                 before_ts=local_media_threshold_timestamp_ms,
                 keep_profiles=True,
+                delete_quarantined_media=False,
+                delete_protected_media=False,
             )
 
     async def delete_old_remote_media(self, before_ts: int) -> Dict[str, int]:
-        old_media = await self.store.get_remote_media_before(before_ts)
+        old_media = await self.store.get_remote_media_ids(
+            before_ts, include_quarantined_media=False
+        )
 
         deleted = 0
 
@@ -975,6 +979,8 @@ class MediaRepository:
         before_ts: int,
         size_gt: int = 0,
         keep_profiles: bool = True,
+        delete_quarantined_media: bool = False,
+        delete_protected_media: bool = False,
     ) -> Tuple[List[str], int]:
         """
         Delete local or remote media from this server by size and timestamp. Removes
@@ -982,18 +988,22 @@ class MediaRepository:
 
         Args:
             before_ts: Unix timestamp in ms.
-                       Files that were last used before this timestamp will be deleted
-            size_gt: Size of the media in bytes. Files that are larger will be deleted
+                Files that were last used before this timestamp will be deleted.
+            size_gt: Size of the media in bytes. Files that are larger will be deleted.
             keep_profiles: Switch to delete also files that are still used in image data
-                           (e.g user profile, room avatar)
-                           If false these files will be deleted
+                (e.g user profile, room avatar). If false these files will be deleted.
+            delete_quarantined_media: If True, media marked as quarantined will be deleted.
+            delete_protected_media: If True, media marked as protected will be deleted.
+
         Returns:
             A tuple of (list of deleted media IDs, total deleted media IDs).
         """
-        old_media = await self.store.get_local_media_before(
+        old_media = await self.store.get_local_media_ids(
             before_ts,
             size_gt,
             keep_profiles,
+            include_quarantined_media=delete_quarantined_media,
+            include_protected_media=delete_protected_media,
         )
         return await self._remove_local_media_from_disk(old_media)
 

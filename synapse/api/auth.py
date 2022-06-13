@@ -29,12 +29,11 @@ from synapse.api.errors import (
     MissingClientTokenError,
 )
 from synapse.appservice import ApplicationService
-from synapse.events import EventBase
 from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import active_span, force_tracing, start_active_span
 from synapse.storage.databases.main.registration import TokenLookupResult
-from synapse.types import Requester, StateMap, UserID, create_requester
+from synapse.types import Requester, UserID, create_requester
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
 
@@ -61,8 +60,8 @@ class Auth:
         self.hs = hs
         self.clock = hs.get_clock()
         self.store = hs.get_datastores().main
-        self.state = hs.get_state_handler()
         self._account_validity_handler = hs.get_account_validity_handler()
+        self._storage_controllers = hs.get_storage_controllers()
 
         self.token_cache: LruCache[str, Tuple[str, bool]] = LruCache(
             10000, "token_cache"
@@ -79,9 +78,8 @@ class Auth:
         self,
         room_id: str,
         user_id: str,
-        current_state: Optional[StateMap[EventBase]] = None,
         allow_departed_users: bool = False,
-    ) -> EventBase:
+    ) -> Tuple[str, Optional[str]]:
         """Check if the user is in the room, or was at some point.
         Args:
             room_id: The room to check.
@@ -99,29 +97,28 @@ class Auth:
         Raises:
             AuthError if the user is/was not in the room.
         Returns:
-            Membership event for the user if the user was in the
-            room. This will be the join event if they are currently joined to
-            the room. This will be the leave event if they have left the room.
+            The current membership of the user in the room and the
+            membership event ID of the user.
         """
-        if current_state:
-            member = current_state.get((EventTypes.Member, user_id), None)
-        else:
-            member = await self.state.get_current_state(
-                room_id=room_id, event_type=EventTypes.Member, state_key=user_id
-            )
 
-        if member:
-            membership = member.membership
+        (
+            membership,
+            member_event_id,
+        ) = await self.store.get_local_current_membership_for_user_in_room(
+            user_id=user_id,
+            room_id=room_id,
+        )
 
+        if membership:
             if membership == Membership.JOIN:
-                return member
+                return membership, member_event_id
 
             # XXX this looks totally bogus. Why do we not allow users who have been banned,
             # or those who were members previously and have been re-invited?
             if allow_departed_users and membership == Membership.LEAVE:
                 forgot = await self.store.did_forget(user_id, room_id)
                 if not forgot:
-                    return member
+                    return membership, member_event_id
 
         raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
 
@@ -602,8 +599,11 @@ class Auth:
         # We currently require the user is a "moderator" in the room. We do this
         # by checking if they would (theoretically) be able to change the
         # m.room.canonical_alias events
-        power_level_event = await self.state.get_current_state(
-            room_id, EventTypes.PowerLevels, ""
+
+        power_level_event = (
+            await self._storage_controllers.state.get_current_state_event(
+                room_id, EventTypes.PowerLevels, ""
+            )
         )
 
         auth_events = {}
@@ -693,12 +693,11 @@ class Auth:
             #  * The user is a non-guest user, and was ever in the room
             #  * The user is a guest user, and has joined the room
             # else it will throw.
-            member_event = await self.check_user_in_room(
+            return await self.check_user_in_room(
                 room_id, user_id, allow_departed_users=allow_departed_users
             )
-            return member_event.membership, member_event.event_id
         except AuthError:
-            visibility = await self.state.get_current_state(
+            visibility = await self._storage_controllers.state.get_current_state_event(
                 room_id, EventTypes.RoomHistoryVisibility, ""
             )
             if (

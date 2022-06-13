@@ -125,7 +125,9 @@ class MessageHandler:
         )
 
         if membership == Membership.JOIN:
-            data = await self.state.get_current_state(room_id, event_type, state_key)
+            data = await self._storage_controllers.state.get_current_state_event(
+                room_id, event_type, state_key
+            )
         elif membership == Membership.LEAVE:
             key = (event_type, state_key)
             # If the membership is not JOIN, then the event ID should exist.
@@ -1098,6 +1100,7 @@ class EventCreationHandler:
             #
             # TODO(faster_joins): figure out how this works, and make sure that the
             #   old state is complete.
+            #   https://github.com/matrix-org/synapse/issues/13003
             metadata = await self.store.get_metadata_for_events(state_event_ids)
 
             state_map_for_event: MutableStateMap[str] = {}

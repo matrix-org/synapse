@@ -801,7 +801,7 @@ class ModuleApi:
         if device_id:
             # delete the device, which will also delete its access tokens
             yield defer.ensureDeferred(
-                self._hs.get_device_handler().delete_device(user_id, device_id)
+                self._hs.get_device_handler().delete_devices(user_id, [device_id])
             )
         else:
             # no associated device. Just delete the access token.

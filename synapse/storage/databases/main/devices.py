@@ -1433,16 +1433,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             )
             raise StoreError(500, "Problem storing device.")
 
-    async def delete_device(self, user_id: str, device_id: str) -> None:
-        """Delete a device and its device_inbox.
-
-        Args:
-            user_id: The ID of the user which owns the device
-            device_id: The ID of the device to delete
-        """
-
-        await self.delete_devices(user_id, [device_id])
-
     async def delete_devices(self, user_id: str, device_ids: List[str]) -> None:
         """Deletes several devices.
 

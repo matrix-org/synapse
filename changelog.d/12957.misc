@@ -1,0 +1,1 @@
+Use lower isolation level when inserting read receipts to avoid serialization errors. Contributed by Nick @ Beeper.

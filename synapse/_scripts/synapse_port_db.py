@@ -40,7 +40,6 @@ from typing import (
 )
 
 import yaml
-from matrix_common.versionstring import get_distribution_version_string
 from typing_extensions import TypedDict
 
 from twisted.internet import defer, reactor as reactor_
@@ -84,7 +83,7 @@ from synapse.storage.databases.state.bg_updates import StateBackgroundUpdateStor
 from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 from synapse.types import ISynapseReactor
-from synapse.util import Clock
+from synapse.util import SYNAPSE_VERSION, Clock
 
 # Cast safety: Twisted does some naughty magic which replaces the
 # twisted.internet.reactor module with a Reactor instance at runtime.
@@ -102,14 +101,6 @@ BOOLEAN_COLUMNS = {
     "devices": ["hidden"],
     "device_lists_outbound_pokes": ["sent"],
     "users_who_share_rooms": ["share_private"],
-    "groups": ["is_public"],
-    "group_rooms": ["is_public"],
-    "group_users": ["is_public", "is_admin"],
-    "group_summary_rooms": ["is_public"],
-    "group_room_categories": ["is_public"],
-    "group_summary_users": ["is_public"],
-    "group_roles": ["is_public"],
-    "local_group_membership": ["is_publicised", "is_admin"],
     "e2e_room_keys": ["is_verified"],
     "account_validity": ["email_sent"],
     "redactions": ["have_censored"],
@@ -175,6 +166,22 @@ IGNORED_TABLES = {
     "ui_auth_sessions",
     "ui_auth_sessions_credentials",
     "ui_auth_sessions_ips",
+    # Groups/communities is no longer supported.
+    "group_attestations_remote",
+    "group_attestations_renewals",
+    "group_invites",
+    "group_roles",
+    "group_room_categories",
+    "group_rooms",
+    "group_summary_roles",
+    "group_summary_room_categories",
+    "group_summary_rooms",
+    "group_summary_users",
+    "group_users",
+    "groups",
+    "local_group_membership",
+    "local_group_updates",
+    "remote_profile_cache",
 }
 
 
@@ -250,9 +257,7 @@ class MockHomeserver:
         self.clock = Clock(reactor)
         self.config = config
         self.hostname = config.server.server_name
-        self.version_string = "Synapse/" + get_distribution_version_string(
-            "matrix-synapse"
-        )
+        self.version_string = SYNAPSE_VERSION
 
     def get_clock(self) -> Clock:
         return self.clock
