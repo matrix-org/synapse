@@ -230,6 +230,21 @@ Example configuration:
 serve_server_wellknown: true
 ```
 ---
+Config option: `custom_wellknown`
+
+This option allows the server to define arbitrary payload in addition to the default wellknown.
+
+If this option is provided, it parses the given yaml to json and 
+serves it on `/.well-known/matrix/client` endpoint
+alongside the standard properties.
+
+Example configuration:
+```yaml
+custom_well_known: 
+  option1: value1
+  option2: value2
+```
+---
 Config option: `soft_file_limit`
  
 Set the soft limit on the number of file descriptors synapse can use.
@@ -3578,3 +3593,4 @@ background_updates:
     min_batch_size: 10
     default_batch_size: 50
 ```
+
