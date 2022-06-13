@@ -30,7 +30,7 @@ from typing import (
 from synapse import event_auth
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
-from synapse.api.room_versions import RoomVersion, RoomVersions
+from synapse.api.room_versions import RoomVersion
 from synapse.events import EventBase
 from synapse.types import MutableStateMap, StateMap
 
@@ -331,7 +331,6 @@ def _resolve_auth_events(
         try:
             # The signatures have already been checked at this point
             event_auth.check_auth_rules_for_event(
-                RoomVersions.V1,
                 event,
                 auth_events.values(),
             )
@@ -349,7 +348,6 @@ def _resolve_normal_events(
         try:
             # The signatures have already been checked at this point
             event_auth.check_auth_rules_for_event(
-                RoomVersions.V1,
                 event,
                 auth_events.values(),
             )
