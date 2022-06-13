@@ -149,12 +149,7 @@ async def main(reactor: ISynapseReactor, args: argparse.Namespace) -> None:
         ] = await hs.get_storage_controllers().state.get_state_ids_for_event(
             prev_event_id
         )
-        logger.info(
-            "parent %d: %s, oldest state %d",
-            i,
-            prev_event_id,
-            max(e.depth for e in state_after_parents[i]),
-        )
+        logger.info("parent %d: %s", i, prev_event_id)
 
     await dump_auth_chains(hs, state_after_parents)
     # return
@@ -176,9 +171,9 @@ async def main(reactor: ISynapseReactor, args: argparse.Namespace) -> None:
     )
     logger.info(pformat(stored_state))
 
-    logger.info("Diff from resolved to stored:")
-    for change in dictdiffer.diff(result, stored_state):
-        logger.info(change)
+    logger.info("Diff from stored to resolved:")
+    for change in dictdiffer.diff(stored_state, result):
+        logger.info(pformat(change))
 
     if args.debug:
         print(
