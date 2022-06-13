@@ -47,11 +47,10 @@ class AuthTestCase(unittest.HomeserverTestCase):
         hs.datastores.main = self.store
         hs.get_auth_handler().store = self.store
         self.auth = Auth(hs)
-        self.auth_blocking = AuthBlocking(hs)
 
         # AuthBlocking reads from the hs' config on initialization. We need to
         # modify its config instead of the hs'
-        self.auth_blocking = self.auth._auth_blocking
+        self.auth_blocking = AuthBlocking(hs)
 
         self.test_user = "@foo:bar"
         self.test_token = b"_test_token_"
