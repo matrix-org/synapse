@@ -61,7 +61,7 @@ class RedisConfig(Config):
           #
           #password: <secret_password>
 
-          # Optional one or more Redis hosts to use for long term sharedd caches.
+          # Optional one or more Redis hosts to use for long term shared caches.
           # Should be configured to automatically expire records when out of
           # memory, and not be the same instance as used for replication.
           #
