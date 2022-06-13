@@ -444,6 +444,21 @@ _biggest_room_by_db_counter = Counter(
     "expensive room for state resolution",
 )
 
+_cpu_times = Histogram(
+    "cpu",
+    "CPU time (utime+stime) spent computing a single state resolution",
+    namespace="synapse",
+    subsystem="state_res",
+    unit="seconds",
+)
+_db_times = Histogram(
+    "db",
+    "Database time spent computing a single state resolution",
+    namespace="synapse",
+    subsystem="state_res",
+    unit="seconds",
+)
+
 
 class StateResolutionHandler:
     """Responsible for doing state conflict resolution.
@@ -608,6 +623,9 @@ class StateResolutionHandler:
         room_metrics.cpu_time += rusage.ru_utime + rusage.ru_stime
         room_metrics.db_time += rusage.db_txn_duration_sec
         room_metrics.db_events += rusage.evt_db_fetch_count
+
+        _cpu_times.observe(rusage.ru_utime + rusage.ru_stime)
+        _db_times.observe(rusage.db_txn_duration_sec)
 
     def _report_metrics(self) -> None:
         if not self._state_res_metrics:
