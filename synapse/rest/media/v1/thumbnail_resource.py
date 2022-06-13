@@ -18,15 +18,15 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from synapse.api.errors import Codes, SynapseError, cs_error
+from synapse.config.repository import THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP
 from synapse.http.server import (
     DirectServeJsonResource,
-    set_cors_headers,
     respond_with_json,
+    set_cors_headers,
 )
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.media.v1.media_storage import MediaStorage
-from synapse.config.repository import THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP
 
 from ._base import (
     FileInfo,
