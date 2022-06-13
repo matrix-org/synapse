@@ -302,6 +302,8 @@ class ServerConfig(Config):
                 "public_baseurl cannot contain query parameters or a #-fragment"
             )
 
+        self.custom_well_known =  config.get("custom_well_known")
+
         # Whether to enable user presence.
         presence_config = config.get("presence") or {}
         self.use_presence = presence_config.get("enabled")
