@@ -150,7 +150,7 @@ async def check_state_independent_auth_rules(
         # 1.5 Otherwise, allow
         return
 
-    # Check the auth events.
+    # 2. Reject if event has auth_events that: ...
     auth_events = await store.get_events(
         event.auth_event_ids(),
         redact_behaviour=EventRedactBehaviour.as_is,
@@ -158,6 +158,7 @@ async def check_state_independent_auth_rules(
     )
     room_id = event.room_id
     auth_dict: MutableStateMap[str] = {}
+    expected_auth_types = auth_types_for_event(event.room_version, event)
     for auth_event_id in event.auth_event_ids():
         auth_event = auth_events.get(auth_event_id)
 
@@ -179,6 +180,24 @@ async def check_state_independent_auth_rules(
                 % (event.event_id, room_id, auth_event_id, auth_event.room_id),
             )
 
+        k = (auth_event.type, auth_event.state_key)
+
+        # 2.1 ... have duplicate entries for a given type and state_key pair
+        if k in auth_dict:
+            raise AuthError(
+                403,
+                f"Event {event.event_id} has duplicate auth_events for {k}: {auth_dict[k]} and {auth_event_id}",
+            )
+
+        # 2.2 ... have entries whose type and state_key don’t match those specified by
+        #   the auth events selection algorithm described in the server
+        #   specification.
+        if k not in expected_auth_types:
+            raise AuthError(
+                403,
+                f"Event {event.event_id} has unexpected auth_event for {k}: {auth_event_id}",
+            )
+
         # We also need to check that the auth event itself is not rejected.
         if auth_event.rejected_reason:
             raise AuthError(
@@ -187,7 +206,7 @@ async def check_state_independent_auth_rules(
                 % (event.event_id, auth_event.event_id),
             )
 
-        auth_dict[(auth_event.type, auth_event.state_key)] = auth_event_id
+        auth_dict[k] = auth_event_id
 
     # 3. If event does not have a m.room.create in its auth_events, reject.
     creation_event = auth_dict.get((EventTypes.Create, ""), None)
