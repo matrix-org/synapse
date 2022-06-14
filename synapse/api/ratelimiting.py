@@ -128,6 +128,9 @@ class Ratelimiter:
         performed_count = action_count - time_delta * rate_hz
         if performed_count < 0:
             performed_count = 0
+
+            # Reset the start time and forgive all actions
+            action_count = 0
             time_start = time_now_s
 
         # This check would be easier read as performed_count + n_actions > burst_count,
