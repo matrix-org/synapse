@@ -15,7 +15,16 @@ import codecs
 import itertools
 import logging
 import re
-from typing import TYPE_CHECKING, Dict, Generator, Iterable, Optional, Set, Union
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Dict,
+    Generator,
+    Iterable,
+    Optional,
+    Set,
+    Union,
+)
 
 if TYPE_CHECKING:
     from lxml import etree
@@ -147,7 +156,10 @@ def decode_body(
 
 
 def _get_meta_tags(
-    tree: "etree.Element", property: str, prefix: str
+    tree: "etree.Element",
+    property: str,
+    prefix: str,
+    property_mapper: Optional[Callable[[str], Optional[str]]] = None,
 ) -> Dict[str, Optional[str]]:
     """
     Search for meta tags prefixed with a particular string.
@@ -157,6 +169,8 @@ def _get_meta_tags(
         property: The name of the property which contains the tag name, e.g.
             "property" for Open Graph.
         prefix: The prefix on the property to search for, e.g. "og" for Open Graph.
+        property_mapper: An optional callable to map the property to the Open Graph
+            form. Can return None for a key to ignore that key.
 
     Returns:
         A map of tag name to value.
@@ -173,9 +187,36 @@ def _get_meta_tags(
             )
             return {}
 
-        results[tag.attrib[property]] = tag.attrib["content"]
+        key = tag.attrib[property]
+        if property_mapper:
+            key = property_mapper(key)
+            # None is a special value used to ignore a value.
+            if key is None:
+                continue
+
+        results[key] = tag.attrib["content"]
 
     return results
+
+
+def _map_twitter_to_open_graph(key: str) -> Optional[str]:
+    """
+    Map a Twitter card property to the analogous Open Graph property.
+
+    Args:
+        key: The Twitter card property (starts with "twitter:").
+
+    Returns:
+        The Open Graph property (starts with "og:") or None to have this property
+        be ignored.
+    """
+    # Twitter card properties with no analogous Open Graph property.
+    if key == "twitter:card" or key == "twitter:creator":
+        return None
+    if key == "twitter:site":
+        return "og:site_name"
+    # Otherwise, swap twitter to og.
+    return "og" + key[7:]
 
 
 def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
@@ -226,12 +267,10 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
     # Twitter cards tags also duplicate Open Graph tags.
     #
     # See https://developer.twitter.com/en/docs/twitter-for-websites/cards/guides/getting-started
-    twitter = _get_meta_tags(tree, "name", "twitter")
+    twitter = _get_meta_tags(tree, "name", "twitter", _map_twitter_to_open_graph)
     # Merge the Twitter values with the Open Graph values, but do not overwrite
     # information from Open Graph tags.
     for key, value in twitter.items():
-        # Convert from Twitter to Open Graph properties.
-        key = "og" + key[7:]
         if key not in og:
             og[key] = value
 
