@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Tests REST events for /profile paths."""
+from http import HTTPStatus
 from typing import Any, Dict, Optional
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -48,6 +49,11 @@ class ProfileTestCase(unittest.HomeserverTestCase):
     def test_get_displayname(self) -> None:
         res = self._get_displayname()
         self.assertEqual(res, "owner")
+
+    def test_get_displayname_rejects_bad_username(self) -> None:
+        # Note: probably ought to urlencode the userid here, since it contains an `@`
+        channel = self.make_request("GET", "/profile/notanmxid@example.com/displayname")
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
 
     def test_set_displayname(self) -> None:
         channel = self.make_request(
