@@ -17,14 +17,15 @@ import tempfile
 from binascii import unhexlify
 from io import BytesIO
 from typing import Any, BinaryIO, Dict, List, Optional, Union
-# `Literal` appears with Python 3.8.
-from typing_extensions import Literal
 from unittest.mock import Mock
 from urllib import parse
 
 import attr
 from parameterized import parameterized, parameterized_class
 from PIL import Image as Image
+
+# `Literal` appears with Python 3.8.
+from typing_extensions import Literal
 
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
