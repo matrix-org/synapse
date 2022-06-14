@@ -304,6 +304,11 @@ To run a specific test, you can specify the whole name structure:
 COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages/parallel/Historical_events_resolve_in_the_correct_order
 ```
 
+The above will run a monolithic (single-process) Synapse with SQLite as the database. For other configurations, try:
+
+- Passing `POSTGRES=1` as an environment variable to use the Postgres database instead.
+- Passing `WORKERS=1` as an environment variable to use a workerised setup instead. This option implies the use of Postgres.
+
 
 ### Access database for homeserver after Complement test runs.
 
@@ -422,8 +427,8 @@ same lightweight approach that the Linux Kernel
 [submitting patches process](
 https://www.kernel.org/doc/html/latest/process/submitting-patches.html#sign-your-work-the-developer-s-certificate-of-origin>),
 [Docker](https://github.com/docker/docker/blob/master/CONTRIBUTING.md), and many other
-projects use: the DCO (Developer Certificate of Origin:
-http://developercertificate.org/). This is a simple declaration that you wrote
+projects use: the DCO ([Developer Certificate of Origin](http://developercertificate.org/)).
+This is a simple declaration that you wrote
 the contribution or otherwise have the right to contribute it to Matrix:
 
 ```

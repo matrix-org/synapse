@@ -35,7 +35,6 @@ from typing_extensions import ParamSpec
 from twisted.internet import defer
 from twisted.web.resource import Resource
 
-from synapse import spam_checker_api
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.events.presence_router import (
@@ -55,6 +54,7 @@ from synapse.events.spamcheck import (
     USER_MAY_JOIN_ROOM_CALLBACK,
     USER_MAY_PUBLISH_ROOM_CALLBACK,
     USER_MAY_SEND_3PID_INVITE_CALLBACK,
+    SpamChecker,
 )
 from synapse.events.third_party_rules import (
     CHECK_CAN_DEACTIVATE_USER_CALLBACK,
@@ -115,6 +115,7 @@ from synapse.types import (
     JsonDict,
     JsonMapping,
     Requester,
+    RoomAlias,
     StateMap,
     UserID,
     UserInfo,
@@ -140,9 +141,7 @@ are loaded into Synapse.
 """
 
 PRESENCE_ALL_USERS = PresenceRouter.ALL_USERS
-
-ALLOW = spam_checker_api.Allow.ALLOW
-# Singleton value used to mark a message as permitted.
+NOT_SPAM = SpamChecker.NOT_SPAM
 
 __all__ = [
     "errors",
@@ -151,7 +150,7 @@ __all__ = [
     "respond_with_html",
     "run_in_background",
     "cached",
-    "Allow",
+    "NOT_SPAM",
     "UserID",
     "DatabasePool",
     "LoggingTransaction",
@@ -165,6 +164,7 @@ __all__ = [
     "EventBase",
     "StateMap",
     "ProfileInfo",
+    "RoomAlias",
     "UserProfile",
 ]
 
@@ -196,6 +196,7 @@ class ModuleApi:
         self._store: Union[
             DataStore, "GenericWorkerSlavedStore"
         ] = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
         self._server_name = hs.hostname
@@ -800,7 +801,7 @@ class ModuleApi:
         if device_id:
             # delete the device, which will also delete its access tokens
             yield defer.ensureDeferred(
-                self._hs.get_device_handler().delete_device(user_id, device_id)
+                self._hs.get_device_handler().delete_devices(user_id, [device_id])
             )
         else:
             # no associated device. Just delete the access token.
@@ -913,7 +914,7 @@ class ModuleApi:
                 The filtered state events in the room.
         """
         state_ids = yield defer.ensureDeferred(
-            self._store.get_filtered_current_state_ids(
+            self._storage_controllers.state.get_current_state_ids(
                 room_id=room_id, state_filter=StateFilter.from_types(types)
             )
         )
@@ -1149,7 +1150,10 @@ class ModuleApi:
             )
 
     async def sleep(self, seconds: float) -> None:
-        """Sleeps for the given number of seconds."""
+        """Sleeps for the given number of seconds.
+
+        Added in Synapse v1.49.0.
+        """
 
         await self._clock.sleep(seconds)
 
@@ -1288,20 +1292,16 @@ class ModuleApi:
                                                                 # regardless of their state key
                     ]
         """
+        state_filter = None
         if event_filter:
             # If a filter was provided, turn it into a StateFilter and retrieve a filtered
             # view of the state.
             state_filter = StateFilter.from_types(event_filter)
-            state_ids = await self._store.get_filtered_current_state_ids(
-                room_id,
-                state_filter,
-            )
-        else:
-            # If no filter was provided, get the whole state. We could also reuse the call
-            # to get_filtered_current_state_ids above, with `state_filter = StateFilter.all()`,
-            # but get_filtered_current_state_ids isn't cached and `get_current_state_ids`
-            # is, so using the latter when we can is better for perf.
-            state_ids = await self._store.get_current_state_ids(room_id)
+
+        state_ids = await self._storage_controllers.state.get_current_state_ids(
+            room_id,
+            state_filter,
+        )
 
         state_events = await self._store.get_events(state_ids.values())
 
@@ -1427,6 +1427,28 @@ class ModuleApi:
         spec = RuleSpec(scope, kind, rule_id, "actions")
         await self._push_rules_handler.set_rule_attr(
             user_id, spec, {"actions": actions}
+        )
+
+    async def get_monthly_active_users_by_service(
+        self, start_timestamp: Optional[int] = None, end_timestamp: Optional[int] = None
+    ) -> List[Tuple[str, str]]:
+        """Generates list of monthly active users and their services.
+        Please see corresponding storage docstring for more details.
+
+        Added in Synapse v1.61.0.
+
+        Arguments:
+            start_timestamp: If specified, only include users that were first active
+                at or after this point
+            end_timestamp: If specified, only include users that were first active
+                at or before this point
+
+        Returns:
+            A list of tuples (appservice_id, user_id)
+
+        """
+        return await self._store.get_monthly_active_users_by_service(
+            start_timestamp, end_timestamp
         )
 
 

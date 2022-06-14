@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import collections.abc
-from typing import Iterable, Type, Union
+from typing import Iterable, Type, Union, cast
 
 import jsonschema
 
@@ -34,6 +34,10 @@ from synapse.types import EventID, JsonDict, RoomID, UserID
 class EventValidator:
     def validate_new(self, event: EventBase, config: HomeServerConfig) -> None:
         """Validates the event has roughly the right format
+
+        Suitable for checking a locally-created event. It has stricter checks than
+        is appropriate for an event received over federation (for which, see
+        event_auth.validate_event_for_room_version)
 
         Args:
             event: The event to validate.
@@ -103,7 +107,12 @@ class EventValidator:
             except jsonschema.ValidationError as e:
                 if e.path:
                     # example: "users_default": '0' is not of type 'integer'
-                    message = '"' + e.path[-1] + '": ' + e.message  # noqa: B306
+                    # cast safety: path entries can be integers, if we fail to validate
+                    # items in an array. However the POWER_LEVELS_SCHEMA doesn't expect
+                    # to see any arrays.
+                    message = (
+                        '"' + cast(str, e.path[-1]) + '": ' + e.message  # noqa: B306
+                    )
                     # jsonschema.ValidationError.message is a valid attribute
                 else:
                     # example: '0' is not of type 'integer'

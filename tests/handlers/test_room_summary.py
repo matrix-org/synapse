@@ -178,8 +178,8 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             result_room_ids.append(result_room["room_id"])
             result_children_ids.append(
                 [
-                    (cs["room_id"], cs["state_key"])
-                    for cs in result_room.get("children_state")
+                    (result_room["room_id"], cs["state_key"])
+                    for cs in result_room["children_state"]
                 ]
             )
 
@@ -772,7 +772,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 {
                     "room_id": public_room,
                     "world_readable": False,
-                    "join_rules": JoinRules.PUBLIC,
+                    "join_rule": JoinRules.PUBLIC,
                 },
             ),
             (
@@ -780,7 +780,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 {
                     "room_id": knock_room,
                     "world_readable": False,
-                    "join_rules": JoinRules.KNOCK,
+                    "join_rule": JoinRules.KNOCK,
                 },
             ),
             (
@@ -788,7 +788,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 {
                     "room_id": not_invited_room,
                     "world_readable": False,
-                    "join_rules": JoinRules.INVITE,
+                    "join_rule": JoinRules.INVITE,
                 },
             ),
             (
@@ -796,7 +796,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 {
                     "room_id": invited_room,
                     "world_readable": False,
-                    "join_rules": JoinRules.INVITE,
+                    "join_rule": JoinRules.INVITE,
                 },
             ),
             (
@@ -804,7 +804,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 {
                     "room_id": restricted_room,
                     "world_readable": False,
-                    "join_rules": JoinRules.RESTRICTED,
+                    "join_rule": JoinRules.RESTRICTED,
                     "allowed_room_ids": [],
                 },
             ),
@@ -813,7 +813,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 {
                     "room_id": restricted_accessible_room,
                     "world_readable": False,
-                    "join_rules": JoinRules.RESTRICTED,
+                    "join_rule": JoinRules.RESTRICTED,
                     "allowed_room_ids": [self.room],
                 },
             ),
@@ -822,7 +822,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 {
                     "room_id": world_readable_room,
                     "world_readable": True,
-                    "join_rules": JoinRules.INVITE,
+                    "join_rule": JoinRules.INVITE,
                 },
             ),
             (
@@ -830,7 +830,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 {
                     "room_id": joined_room,
                     "world_readable": False,
-                    "join_rules": JoinRules.INVITE,
+                    "join_rule": JoinRules.INVITE,
                 },
             ),
         )
@@ -911,7 +911,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             {
                 "room_id": fed_room,
                 "world_readable": False,
-                "join_rules": JoinRules.INVITE,
+                "join_rule": JoinRules.INVITE,
             },
         )
 

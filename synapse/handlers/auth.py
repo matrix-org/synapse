@@ -81,6 +81,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+INVALID_USERNAME_OR_PASSWORD = "Invalid username or password"
+
 
 def convert_client_dict_legacy_fields_to_identifier(
     submission: JsonDict,
@@ -210,7 +212,8 @@ class AuthHandler:
 
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.macaroon_gen = hs.get_macaroon_generator()
-        self._password_enabled = hs.config.auth.password_enabled
+        self._password_enabled_for_login = hs.config.auth.password_enabled_for_login
+        self._password_enabled_for_reauth = hs.config.auth.password_enabled_for_reauth
         self._password_localdb_enabled = hs.config.auth.password_localdb_enabled
         self._third_party_rules = hs.get_third_party_event_rules()
 
@@ -387,13 +390,13 @@ class AuthHandler:
         return params, session_id
 
     async def _get_available_ui_auth_types(self, user: UserID) -> Iterable[str]:
-        """Get a list of the authentication types this user can use"""
+        """Get a list of the user-interactive authentication types this user can use."""
 
         ui_auth_types = set()
 
         # if the HS supports password auth, and the user has a non-null password, we
         # support password auth
-        if self._password_localdb_enabled and self._password_enabled:
+        if self._password_localdb_enabled and self._password_enabled_for_reauth:
             lookupres = await self._find_user_id_and_pwd_hash(user.to_string())
             if lookupres:
                 _, password_hash = lookupres
@@ -402,7 +405,7 @@ class AuthHandler:
 
         # also allow auth from password providers
         for t in self.password_auth_provider.get_supported_login_types().keys():
-            if t == LoginType.PASSWORD and not self._password_enabled:
+            if t == LoginType.PASSWORD and not self._password_enabled_for_reauth:
                 continue
             ui_auth_types.add(t)
 
@@ -710,7 +713,7 @@ class AuthHandler:
             return res
 
         # fall back to the v1 login flow
-        canonical_id, _ = await self.validate_login(authdict)
+        canonical_id, _ = await self.validate_login(authdict, is_reauth=True)
         return canonical_id
 
     def _get_params_recaptcha(self) -> dict:
@@ -1064,7 +1067,7 @@ class AuthHandler:
         Returns:
             Whether users on this server are allowed to change or set a password
         """
-        return self._password_enabled and self._password_localdb_enabled
+        return self._password_enabled_for_login and self._password_localdb_enabled
 
     def get_supported_login_types(self) -> Iterable[str]:
         """Get a the login types supported for the /login API
@@ -1089,9 +1092,9 @@ class AuthHandler:
         # that comes first, where it's present.
         if LoginType.PASSWORD in types:
             types.remove(LoginType.PASSWORD)
-            if self._password_enabled:
+            if self._password_enabled_for_login:
                 types.insert(0, LoginType.PASSWORD)
-        elif self._password_localdb_enabled and self._password_enabled:
+        elif self._password_localdb_enabled and self._password_enabled_for_login:
             types.insert(0, LoginType.PASSWORD)
 
         return types
@@ -1100,6 +1103,7 @@ class AuthHandler:
         self,
         login_submission: Dict[str, Any],
         ratelimit: bool = False,
+        is_reauth: bool = False,
     ) -> Tuple[str, Optional[Callable[["LoginResponse"], Awaitable[None]]]]:
         """Authenticates the user for the /login API
 
@@ -1110,6 +1114,9 @@ class AuthHandler:
             login_submission: the whole of the login submission
                 (including 'type' and other relevant fields)
             ratelimit: whether to apply the failed_login_attempt ratelimiter
+            is_reauth: whether this is part of a User-Interactive Authorisation
+                flow to reauthenticate for a privileged action (rather than a
+                new login)
         Returns:
             A tuple of the canonical user id, and optional callback
                 to be called once the access token and device id are issued
@@ -1132,8 +1139,14 @@ class AuthHandler:
         # special case to check for "password" for the check_password interface
         # for the auth providers
         password = login_submission.get("password")
+
         if login_type == LoginType.PASSWORD:
-            if not self._password_enabled:
+            if is_reauth:
+                passwords_allowed_here = self._password_enabled_for_reauth
+            else:
+                passwords_allowed_here = self._password_enabled_for_login
+
+            if not passwords_allowed_here:
                 raise SynapseError(400, "Password login has been disabled.")
             if not isinstance(password, str):
                 raise SynapseError(400, "Bad parameter: password", Codes.INVALID_PARAM)
@@ -1204,7 +1217,9 @@ class AuthHandler:
                     await self._failed_login_attempts_ratelimiter.can_do_action(
                         None, (medium, address)
                     )
-                raise LoginError(403, "", errcode=Codes.FORBIDDEN)
+                raise LoginError(
+                    403, msg=INVALID_USERNAME_OR_PASSWORD, errcode=Codes.FORBIDDEN
+                )
 
             identifier_dict = {"type": "m.id.user", "user": user_id}
 
@@ -1330,7 +1345,7 @@ class AuthHandler:
 
         # We raise a 403 here, but note that if we're doing user-interactive
         # login, it turns all LoginErrors into a 401 anyway.
-        raise LoginError(403, "Invalid password", errcode=Codes.FORBIDDEN)
+        raise LoginError(403, msg=INVALID_USERNAME_OR_PASSWORD, errcode=Codes.FORBIDDEN)
 
     async def check_password_provider_3pid(
         self, medium: str, address: str, password: str

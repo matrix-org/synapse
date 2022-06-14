@@ -1,5 +1,6 @@
 # Inherit from the official Synapse docker image
-FROM matrixdotorg/synapse
+ARG SYNAPSE_VERSION=latest
+FROM matrixdotorg/synapse:$SYNAPSE_VERSION
 
 # Install deps
 RUN \

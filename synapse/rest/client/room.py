@@ -650,6 +650,7 @@ class RoomEventServlet(RestServlet):
         self.clock = hs.get_clock()
         self._store = hs.get_datastores().main
         self._state = hs.get_state_handler()
+        self._storage_controllers = hs.get_storage_controllers()
         self.event_handler = hs.get_event_handler()
         self._event_serializer = hs.get_event_client_serializer()
         self._relations_handler = hs.get_relations_handler()
@@ -673,8 +674,10 @@ class RoomEventServlet(RestServlet):
         if include_unredacted_content and not await self.auth.is_server_admin(
             requester.user
         ):
-            power_level_event = await self._state.get_current_state(
-                room_id, EventTypes.PowerLevels, ""
+            power_level_event = (
+                await self._storage_controllers.state.get_current_state_event(
+                    room_id, EventTypes.PowerLevels, ""
+                )
             )
 
             auth_events = {}
@@ -1193,12 +1196,7 @@ class TimestampLookupRestServlet(RestServlet):
 
 
 class RoomHierarchyRestServlet(RestServlet):
-    PATTERNS = (
-        re.compile(
-            "^/_matrix/client/(v1|unstable/org.matrix.msc2946)"
-            "/rooms/(?P<room_id>[^/]*)/hierarchy$"
-        ),
-    )
+    PATTERNS = (re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/hierarchy$"),)
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

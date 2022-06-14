@@ -670,6 +670,30 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return user_who_share_room
 
+    @cached(cache_context=True, iterable=True)
+    async def get_mutual_rooms_between_users(
+        self, user_ids: FrozenSet[str], cache_context: _CacheContext
+    ) -> FrozenSet[str]:
+        """
+        Returns the set of rooms that all users in `user_ids` share.
+
+        Args:
+            user_ids: A frozen set of all users to investigate and return
+              overlapping joined rooms for.
+            cache_context
+        """
+        shared_room_ids: Optional[FrozenSet[str]] = None
+        for user_id in user_ids:
+            room_ids = await self.get_rooms_for_user(
+                user_id, on_invalidate=cache_context.invalidate
+            )
+            if shared_room_ids is not None:
+                shared_room_ids &= room_ids
+            else:
+                shared_room_ids = room_ids
+
+        return shared_room_ids or frozenset()
+
     async def get_joined_users_from_context(
         self, event: EventBase, context: EventContext
     ) -> Dict[str, ProfileInfo]:
@@ -868,6 +892,43 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             raise Exception("Invalid host name")
 
         return True
+
+    @cached(iterable=True, max_entries=10000)
+    async def get_current_hosts_in_room(self, room_id: str) -> Set[str]:
+        """Get current hosts in room based on current state."""
+
+        # First we check if we already have `get_users_in_room` in the cache, as
+        # we can just calculate result from that
+        users = self.get_users_in_room.cache.get_immediate(
+            (room_id,), None, update_metrics=False
+        )
+        if users is not None:
+            return {get_domain_from_id(u) for u in users}
+
+        if isinstance(self.database_engine, Sqlite3Engine):
+            # If we're using SQLite then let's just always use
+            # `get_users_in_room` rather than funky SQL.
+            users = await self.get_users_in_room(room_id)
+            return {get_domain_from_id(u) for u in users}
+
+        # For PostgreSQL we can use a regex to pull out the domains from the
+        # joined users in `current_state_events` via regex.
+
+        def get_current_hosts_in_room_txn(txn: LoggingTransaction) -> Set[str]:
+            sql = """
+                SELECT DISTINCT substring(state_key FROM '@[^:]*:(.*)$')
+                FROM current_state_events
+                WHERE
+                    type = 'm.room.member'
+                    AND membership = 'join'
+                    AND room_id = ?
+            """
+            txn.execute(sql, (room_id,))
+            return {d for d, in txn}
+
+        return await self.db_pool.runInteraction(
+            "get_current_hosts_in_room", get_current_hosts_in_room_txn
+        )
 
     async def get_joined_hosts(
         self, room_id: str, state_entry: "_StateCacheEntry"

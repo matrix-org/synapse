@@ -524,7 +524,7 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "matrix-common"
-version = "1.1.0"
+version = "1.2.1"
 description = "Common utilities for Synapse, Sydent and Sygnal"
 category = "main"
 optional = false
@@ -535,7 +535,7 @@ attrs = "*"
 importlib-metadata = {version = ">=1.4", markers = "python_version < \"3.8\""}
 
 [package.extras]
-dev = ["tox", "twisted", "aiounittest", "mypy (==0.910)", "black (==21.9b0)", "flake8 (==4.0.1)", "isort (==5.9.3)"]
+dev = ["tox", "twisted", "aiounittest", "mypy (==0.910)", "black (==22.3.0)", "flake8 (==4.0.1)", "isort (==5.9.3)", "build (==0.8.0)", "twine (==4.0.1)"]
 test = ["tox", "twisted", "aiounittest"]
 
 [[package]]
@@ -813,7 +813,7 @@ python-versions = ">=3.5"
 
 [[package]]
 name = "pyjwt"
-version = "2.3.0"
+version = "2.4.0"
 description = "JSON Web Token implementation in Python"
 category = "main"
 optional = false
@@ -1355,7 +1355,7 @@ python-versions = "*"
 
 [[package]]
 name = "types-jsonschema"
-version = "4.4.1"
+version = "4.4.6"
 description = "Typing stubs for jsonschema"
 category = "dev"
 optional = false
@@ -1563,7 +1563,7 @@ url_preview = ["lxml"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7.1"
-content-hash = "d39d5ac5d51c014581186b7691999b861058b569084c525523baf70b77f292b1"
+content-hash = "c1bb4dabba1e87517e25ca7bf778e8082fbc960a51d83819aec3a154110a374f"
 
 [metadata.files]
 attrs = [
@@ -2042,8 +2042,8 @@ markupsafe = [
     {file = "MarkupSafe-2.1.0.tar.gz", hash = "sha256:80beaf63ddfbc64a0452b841d8036ca0611e049650e20afcb882f5d3c266d65f"},
 ]
 matrix-common = [
-    {file = "matrix_common-1.1.0-py3-none-any.whl", hash = "sha256:5d6dfd777503b2f3a031b566e6af25b6e95f9c0818ef57d954c3190fce5eb407"},
-    {file = "matrix_common-1.1.0.tar.gz", hash = "sha256:a8238748afc2b37079818367fed5156f355771b07c8ff0a175934f47e0ff3276"},
+    {file = "matrix_common-1.2.1-py3-none-any.whl", hash = "sha256:946709c405944a0d4b1d73207b77eb064b6dbfc5d70a69471320b06d8ce98b20"},
+    {file = "matrix_common-1.2.1.tar.gz", hash = "sha256:a99dcf02a6bd95b24a5a61b354888a2ac92bf2b4b839c727b8dd9da2cdfa3853"},
 ]
 matrix-synapse-ldap3 = [
     {file = "matrix-synapse-ldap3-0.2.0.tar.gz", hash = "sha256:91a0715b43a41ec3033244174fca20846836da98fda711fb01687f7199eecd2e"},
@@ -2264,8 +2264,8 @@ pygments = [
     {file = "Pygments-2.11.2.tar.gz", hash = "sha256:4e426f72023d88d03b2fa258de560726ce890ff3b630f88c21cbb8b2503b8c6a"},
 ]
 pyjwt = [
-    {file = "PyJWT-2.3.0-py3-none-any.whl", hash = "sha256:e0c4bb8d9f0af0c7f5b1ec4c5036309617d03d56932877f2f7a0beeb5318322f"},
-    {file = "PyJWT-2.3.0.tar.gz", hash = "sha256:b888b4d56f06f6dcd777210c334e69c737be74755d3e5e9ee3fe67dc18a0ee41"},
+    {file = "PyJWT-2.4.0-py3-none-any.whl", hash = "sha256:72d1d253f32dbd4f5c88eaf1fdc62f3a19f676ccbadb9dbc5d07e951b2b26daf"},
+    {file = "PyJWT-2.4.0.tar.gz", hash = "sha256:d42908208c699b3b973cbeb01a969ba6a96c821eefb1c5bfe4c390c01d67abba"},
 ]
 pymacaroons = [
     {file = "pymacaroons-0.13.0-py2.py3-none-any.whl", hash = "sha256:3e14dff6a262fdbf1a15e769ce635a8aea72e6f8f91e408f9a97166c53b91907"},
@@ -2618,8 +2618,8 @@ types-ipaddress = [
     {file = "types_ipaddress-1.0.8-py3-none-any.whl", hash = "sha256:4933b74da157ba877b1a705d64f6fa7742745e9ffd65e51011f370c11ebedb55"},
 ]
 types-jsonschema = [
-    {file = "types-jsonschema-4.4.1.tar.gz", hash = "sha256:bd68b75217ebbb33b0242db10047581dad3b061a963a46ee80d4a9044080663e"},
-    {file = "types_jsonschema-4.4.1-py3-none-any.whl", hash = "sha256:ab3ecfdc912d6091cc82f4b7556cfbf1a7cbabc26da0ceaa1cbbc232d1d09971"},
+    {file = "types-jsonschema-4.4.6.tar.gz", hash = "sha256:7f2a804618756768c7c0616f8c794b61fcfe3077c7ee1ad47dcf01c5e5f692bb"},
+    {file = "types_jsonschema-4.4.6-py3-none-any.whl", hash = "sha256:1db9031ca49a8444d01bd2ce8cf2f89318382b04610953b108321e6f8fb03390"},
 ]
 types-opentracing = [
     {file = "types-opentracing-2.4.7.tar.gz", hash = "sha256:be60e9618355aa892571ace002e6b353702538b1c0dc4fbc1c921219d6658830"},

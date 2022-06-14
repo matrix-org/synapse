@@ -21,16 +21,20 @@ from typing import (
     Awaitable,
     Callable,
     Collection,
+    Dict,
     List,
     Optional,
     Tuple,
     Union,
 )
 
-from synapse.api.errors import Codes
+# `Literal` appears with Python 3.8.
+from typing_extensions import Literal
+
+import synapse
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
-from synapse.spam_checker_api import Allow, Decision, RegistrationBehaviour
+from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import RoomAlias, UserProfile
 from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 from synapse.util.metrics import Measure
@@ -41,17 +45,19 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
 CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
     ["synapse.events.EventBase"],
     Awaitable[
         Union[
-            Allow,
-            Codes,
+            str,
+            "synapse.api.errors.Codes",
+            # Highly experimental, not officially part of the spamchecker API, may
+            # disappear without warning depending on the results of ongoing
+            # experiments.
+            # Use this to return additional information as part of an error.
+            Tuple["synapse.api.errors.Codes", Dict],
             # Deprecated
             bool,
-            # Deprecated
-            str,
         ]
     ],
 ]
@@ -59,12 +65,72 @@ SHOULD_DROP_FEDERATED_EVENT_CALLBACK = Callable[
     ["synapse.events.EventBase"],
     Awaitable[Union[bool, str]],
 ]
-USER_MAY_JOIN_ROOM_CALLBACK = Callable[[str, str, bool], Awaitable[bool]]
-USER_MAY_INVITE_CALLBACK = Callable[[str, str, str], Awaitable[bool]]
-USER_MAY_SEND_3PID_INVITE_CALLBACK = Callable[[str, str, str, str], Awaitable[bool]]
-USER_MAY_CREATE_ROOM_CALLBACK = Callable[[str], Awaitable[bool]]
-USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[[str, RoomAlias], Awaitable[bool]]
-USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[[str, str], Awaitable[bool]]
+USER_MAY_JOIN_ROOM_CALLBACK = Callable[
+    [str, str, bool],
+    Awaitable[
+        Union[
+            Literal["NOT_SPAM"],
+            "synapse.api.errors.Codes",
+            # Deprecated
+            bool,
+        ]
+    ],
+]
+USER_MAY_INVITE_CALLBACK = Callable[
+    [str, str, str],
+    Awaitable[
+        Union[
+            Literal["NOT_SPAM"],
+            "synapse.api.errors.Codes",
+            # Deprecated
+            bool,
+        ]
+    ],
+]
+USER_MAY_SEND_3PID_INVITE_CALLBACK = Callable[
+    [str, str, str, str],
+    Awaitable[
+        Union[
+            Literal["NOT_SPAM"],
+            "synapse.api.errors.Codes",
+            # Deprecated
+            bool,
+        ]
+    ],
+]
+USER_MAY_CREATE_ROOM_CALLBACK = Callable[
+    [str],
+    Awaitable[
+        Union[
+            Literal["NOT_SPAM"],
+            "synapse.api.errors.Codes",
+            # Deprecated
+            bool,
+        ]
+    ],
+]
+USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[
+    [str, RoomAlias],
+    Awaitable[
+        Union[
+            Literal["NOT_SPAM"],
+            "synapse.api.errors.Codes",
+            # Deprecated
+            bool,
+        ]
+    ],
+]
+USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[
+    [str, str],
+    Awaitable[
+        Union[
+            Literal["NOT_SPAM"],
+            "synapse.api.errors.Codes",
+            # Deprecated
+            bool,
+        ]
+    ],
+]
 CHECK_USERNAME_FOR_SPAM_CALLBACK = Callable[[UserProfile], Awaitable[bool]]
 LEGACY_CHECK_REGISTRATION_FOR_SPAM_CALLBACK = Callable[
     [
@@ -85,7 +151,14 @@ CHECK_REGISTRATION_FOR_SPAM_CALLBACK = Callable[
 ]
 CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK = Callable[
     [ReadableFileWrapper, FileInfo],
-    Awaitable[bool],
+    Awaitable[
+        Union[
+            Literal["NOT_SPAM"],
+            "synapse.api.errors.Codes",
+            # Deprecated
+            bool,
+        ]
+    ],
 ]
 
 
@@ -178,6 +251,8 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer") -> None:
 
 
 class SpamChecker:
+    NOT_SPAM: Literal["NOT_SPAM"] = "NOT_SPAM"
+
     def __init__(self, hs: "synapse.server.HomeServer") -> None:
         self.hs = hs
         self.clock = hs.get_clock()
@@ -270,7 +345,7 @@ class SpamChecker:
 
     async def check_event_for_spam(
         self, event: "synapse.events.EventBase"
-    ) -> Union[Decision, str]:
+    ) -> Union[Tuple["synapse.api.errors.Codes", Dict], str]:
         """Checks if a given event is considered "spammy" by this server.
 
         If the server considers an event spammy, then it will be rejected if
@@ -281,36 +356,44 @@ class SpamChecker:
             event: the event to be checked
 
         Returns:
-            - on `ALLOW`, the event is considered good (non-spammy) and should
-                be let through. Other spamcheck filters may still reject it.
-            - on `Code`, the event is considered spammy and is rejected with a specific
+            - `NOT_SPAM` if the event is considered good (non-spammy) and should be let
+                through. Other spamcheck filters may still reject it.
+            - A `Code` if the event is considered spammy and is rejected with a specific
                 error message/code.
-            - on `str`, the event is considered spammy and the string is used as error
-                message. This usage is generally discouraged as it doesn't support
-                internationalization.
+            - A string that isn't `NOT_SPAM` if the event is considered spammy and the
+                string should be used as the client-facing error message. This usage is
+                generally discouraged as it doesn't support internationalization.
         """
         for callback in self._check_event_for_spam_callbacks:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                res: Union[Decision, str, bool] = await delay_cancellation(
-                    callback(event)
-                )
-                if res is False or res is Allow.ALLOW:
+                res = await delay_cancellation(callback(event))
+                if res is False or res == self.NOT_SPAM:
                     # This spam-checker accepts the event.
                     # Other spam-checkers may reject it, though.
                     continue
                 elif res is True:
                     # This spam-checker rejects the event with deprecated
                     # return value `True`
-                    return Codes.FORBIDDEN
+                    return (synapse.api.errors.Codes.FORBIDDEN, {})
+                elif not isinstance(res, str):
+                    # mypy complains that we can't reach this code because of the
+                    # return type in CHECK_EVENT_FOR_SPAM_CALLBACK, but we don't know
+                    # for sure that the module actually returns it.
+                    logger.warning(
+                        "Module returned invalid value, rejecting message as spam"
+                    )
+                    res = "This message has been rejected as probable spam"
                 else:
-                    # This spam-checker rejects the event either with a `str`
-                    # or with a `Codes`. In either case, we stop here.
-                    return res
+                    # The module rejected the event either with a `Codes`
+                    # or some other `str`. In either case, we stop here.
+                    pass
+
+                return res
 
         # No spam-checker has rejected the event, let it pass.
-        return Allow.ALLOW
+        return self.NOT_SPAM
 
     async def should_drop_federated_event(
         self, event: "synapse.events.EventBase"
@@ -339,7 +422,7 @@ class SpamChecker:
 
     async def user_may_join_room(
         self, user_id: str, room_id: str, is_invited: bool
-    ) -> bool:
+    ) -> Union["synapse.api.errors.Codes", Literal["NOT_SPAM"]]:
         """Checks if a given users is allowed to join a room.
         Not called when a user creates a room.
 
@@ -349,26 +432,33 @@ class SpamChecker:
             is_invited: Whether the user is invited into the room
 
         Returns:
-            Whether the user may join the room
+            NOT_SPAM if the operation is permitted, Codes otherwise.
         """
         for callback in self._user_may_join_room_callbacks:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                may_join_room = await delay_cancellation(
-                    callback(user_id, room_id, is_invited)
-                )
-            if may_join_room is False:
-                return False
+                res = await delay_cancellation(callback(user_id, room_id, is_invited))
+                # Normalize return values to `Codes` or `"NOT_SPAM"`.
+                if res is True or res is self.NOT_SPAM:
+                    continue
+                elif res is False:
+                    return synapse.api.errors.Codes.FORBIDDEN
+                elif isinstance(res, synapse.api.errors.Codes):
+                    return res
+                else:
+                    logger.warning(
+                        "Module returned invalid value, rejecting join as spam"
+                    )
+                    return synapse.api.errors.Codes.FORBIDDEN
 
-        return True
+        # No spam-checker has rejected the request, let it pass.
+        return self.NOT_SPAM
 
     async def user_may_invite(
         self, inviter_userid: str, invitee_userid: str, room_id: str
-    ) -> bool:
+    ) -> Union["synapse.api.errors.Codes", Literal["NOT_SPAM"]]:
         """Checks if a given user may send an invite
-
-        If this method returns false, the invite will be rejected.
 
         Args:
             inviter_userid: The user ID of the sender of the invitation
@@ -376,26 +466,35 @@ class SpamChecker:
             room_id: The room ID
 
         Returns:
-            True if the user may send an invite, otherwise False
+            NOT_SPAM if the operation is permitted, Codes otherwise.
         """
         for callback in self._user_may_invite_callbacks:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                may_invite = await delay_cancellation(
+                res = await delay_cancellation(
                     callback(inviter_userid, invitee_userid, room_id)
                 )
-            if may_invite is False:
-                return False
+                # Normalize return values to `Codes` or `"NOT_SPAM"`.
+                if res is True or res is self.NOT_SPAM:
+                    continue
+                elif res is False:
+                    return synapse.api.errors.Codes.FORBIDDEN
+                elif isinstance(res, synapse.api.errors.Codes):
+                    return res
+                else:
+                    logger.warning(
+                        "Module returned invalid value, rejecting invite as spam"
+                    )
+                    return synapse.api.errors.Codes.FORBIDDEN
 
-        return True
+        # No spam-checker has rejected the request, let it pass.
+        return self.NOT_SPAM
 
     async def user_may_send_3pid_invite(
         self, inviter_userid: str, medium: str, address: str, room_id: str
-    ) -> bool:
+    ) -> Union["synapse.api.errors.Codes", Literal["NOT_SPAM"]]:
         """Checks if a given user may invite a given threepid into the room
-
-        If this method returns false, the threepid invite will be rejected.
 
         Note that if the threepid is already associated with a Matrix user ID, Synapse
         will call user_may_invite with said user ID instead.
@@ -407,88 +506,113 @@ class SpamChecker:
             room_id: The room ID
 
         Returns:
-            True if the user may send the invite, otherwise False
+            NOT_SPAM if the operation is permitted, Codes otherwise.
         """
         for callback in self._user_may_send_3pid_invite_callbacks:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                may_send_3pid_invite = await delay_cancellation(
+                res = await delay_cancellation(
                     callback(inviter_userid, medium, address, room_id)
                 )
-            if may_send_3pid_invite is False:
-                return False
+                # Normalize return values to `Codes` or `"NOT_SPAM"`.
+                if res is True or res is self.NOT_SPAM:
+                    continue
+                elif res is False:
+                    return synapse.api.errors.Codes.FORBIDDEN
+                elif isinstance(res, synapse.api.errors.Codes):
+                    return res
+                else:
+                    logger.warning(
+                        "Module returned invalid value, rejecting 3pid invite as spam"
+                    )
+                    return synapse.api.errors.Codes.FORBIDDEN
 
-        return True
+        return self.NOT_SPAM
 
-    async def user_may_create_room(self, userid: str) -> bool:
+    async def user_may_create_room(
+        self, userid: str
+    ) -> Union["synapse.api.errors.Codes", Literal["NOT_SPAM"]]:
         """Checks if a given user may create a room
-
-        If this method returns false, the creation request will be rejected.
 
         Args:
             userid: The ID of the user attempting to create a room
-
-        Returns:
-            True if the user may create a room, otherwise False
         """
         for callback in self._user_may_create_room_callbacks:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                may_create_room = await delay_cancellation(callback(userid))
-            if may_create_room is False:
-                return False
+                res = await delay_cancellation(callback(userid))
+                if res is True or res is self.NOT_SPAM:
+                    continue
+                elif res is False:
+                    return synapse.api.errors.Codes.FORBIDDEN
+                elif isinstance(res, synapse.api.errors.Codes):
+                    return res
+                else:
+                    logger.warning(
+                        "Module returned invalid value, rejecting room creation as spam"
+                    )
+                    return synapse.api.errors.Codes.FORBIDDEN
 
-        return True
+        return self.NOT_SPAM
 
     async def user_may_create_room_alias(
         self, userid: str, room_alias: RoomAlias
-    ) -> bool:
+    ) -> Union["synapse.api.errors.Codes", Literal["NOT_SPAM"]]:
         """Checks if a given user may create a room alias
-
-        If this method returns false, the association request will be rejected.
 
         Args:
             userid: The ID of the user attempting to create a room alias
             room_alias: The alias to be created
 
-        Returns:
-            True if the user may create a room alias, otherwise False
         """
         for callback in self._user_may_create_room_alias_callbacks:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                may_create_room_alias = await delay_cancellation(
-                    callback(userid, room_alias)
-                )
-            if may_create_room_alias is False:
-                return False
+                res = await delay_cancellation(callback(userid, room_alias))
+                if res is True or res is self.NOT_SPAM:
+                    continue
+                elif res is False:
+                    return synapse.api.errors.Codes.FORBIDDEN
+                elif isinstance(res, synapse.api.errors.Codes):
+                    return res
+                else:
+                    logger.warning(
+                        "Module returned invalid value, rejecting room create as spam"
+                    )
+                    return synapse.api.errors.Codes.FORBIDDEN
 
-        return True
+        return self.NOT_SPAM
 
-    async def user_may_publish_room(self, userid: str, room_id: str) -> bool:
+    async def user_may_publish_room(
+        self, userid: str, room_id: str
+    ) -> Union["synapse.api.errors.Codes", Literal["NOT_SPAM"]]:
         """Checks if a given user may publish a room to the directory
-
-        If this method returns false, the publish request will be rejected.
 
         Args:
             userid: The user ID attempting to publish the room
             room_id: The ID of the room that would be published
-
-        Returns:
-            True if the user may publish the room, otherwise False
         """
         for callback in self._user_may_publish_room_callbacks:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                may_publish_room = await delay_cancellation(callback(userid, room_id))
-            if may_publish_room is False:
-                return False
+                res = await delay_cancellation(callback(userid, room_id))
+                if res is True or res is self.NOT_SPAM:
+                    continue
+                elif res is False:
+                    return synapse.api.errors.Codes.FORBIDDEN
+                elif isinstance(res, synapse.api.errors.Codes):
+                    return res
+                else:
+                    logger.warning(
+                        "Module returned invalid value, rejecting room publication as spam"
+                    )
+                    return synapse.api.errors.Codes.FORBIDDEN
 
-        return True
+        return self.NOT_SPAM
 
     async def check_username_for_spam(self, user_profile: UserProfile) -> bool:
         """Checks if a user ID or display name are considered "spammy" by this server.
@@ -554,7 +678,7 @@ class SpamChecker:
 
     async def check_media_file_for_spam(
         self, file_wrapper: ReadableFileWrapper, file_info: FileInfo
-    ) -> bool:
+    ) -> Union["synapse.api.errors.Codes", Literal["NOT_SPAM"]]:
         """Checks if a piece of newly uploaded media should be blocked.
 
         This will be called for local uploads, downloads of remote media, each
@@ -567,31 +691,37 @@ class SpamChecker:
 
             async def check_media_file_for_spam(
                 self, file: ReadableFileWrapper, file_info: FileInfo
-            ) -> bool:
+            ) -> Union[Codes, Literal["NOT_SPAM"]]:
                 buffer = BytesIO()
                 await file.write_chunks_to(buffer.write)
 
                 if buffer.getvalue() == b"Hello World":
-                    return True
+                    return synapse.module_api.NOT_SPAM
 
-                return False
+                return Codes.FORBIDDEN
 
 
         Args:
             file: An object that allows reading the contents of the media.
             file_info: Metadata about the file.
-
-        Returns:
-            True if the media should be blocked or False if it should be
-            allowed.
         """
 
         for callback in self._check_media_file_for_spam_callbacks:
             with Measure(
                 self.clock, "{}.{}".format(callback.__module__, callback.__qualname__)
             ):
-                spam = await delay_cancellation(callback(file_wrapper, file_info))
-            if spam:
-                return True
+                res = await delay_cancellation(callback(file_wrapper, file_info))
+                # Normalize return values to `Codes` or `"NOT_SPAM"`.
+                if res is False or res is self.NOT_SPAM:
+                    continue
+                elif res is True:
+                    return synapse.api.errors.Codes.FORBIDDEN
+                elif isinstance(res, synapse.api.errors.Codes):
+                    return res
+                else:
+                    logger.warning(
+                        "Module returned invalid value, rejecting media file as spam"
+                    )
+                    return synapse.api.errors.Codes.FORBIDDEN
 
-        return False
+        return self.NOT_SPAM

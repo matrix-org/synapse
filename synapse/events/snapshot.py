@@ -22,7 +22,7 @@ from synapse.events import EventBase
 from synapse.types import JsonDict, StateMap
 
 if TYPE_CHECKING:
-    from synapse.storage import Storage
+    from synapse.storage.controllers import StorageControllers
     from synapse.storage.databases.main import DataStore
     from synapse.storage.state import StateFilter
 
@@ -84,7 +84,7 @@ class EventContext:
             incomplete state.
     """
 
-    _storage: "Storage"
+    _storage: "StorageControllers"
     rejected: Union[Literal[False], str] = False
     _state_group: Optional[int] = None
     state_group_before_event: Optional[int] = None
@@ -97,7 +97,7 @@ class EventContext:
 
     @staticmethod
     def with_state(
-        storage: "Storage",
+        storage: "StorageControllers",
         state_group: Optional[int],
         state_group_before_event: Optional[int],
         state_delta_due_to_event: Optional[StateMap[str]],
@@ -117,7 +117,7 @@ class EventContext:
 
     @staticmethod
     def for_outlier(
-        storage: "Storage",
+        storage: "StorageControllers",
     ) -> "EventContext":
         """Return an EventContext instance suitable for persisting an outlier event"""
         return EventContext(storage=storage)
@@ -147,7 +147,7 @@ class EventContext:
         }
 
     @staticmethod
-    def deserialize(storage: "Storage", input: JsonDict) -> "EventContext":
+    def deserialize(storage: "StorageControllers", input: JsonDict) -> "EventContext":
         """Converts a dict that was produced by `serialize` back into a
         EventContext.
 

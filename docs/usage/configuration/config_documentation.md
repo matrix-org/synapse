@@ -575,6 +575,18 @@ Example configuration:
 dummy_events_threshold: 5
 ```
 ---
+Config option `delete_stale_devices_after`
+
+An optional duration. If set, Synapse will run a daily background task to log out and
+delete any device that hasn't been accessed for more than the specified amount of time.
+
+Defaults to no duration, which means devices are never pruned.
+
+Example configuration:
+```yaml
+delete_stale_devices_after: 1y
+```
+
 ## Homeserver blocking ##
 Useful options for Synapse admins.
 
@@ -1447,7 +1459,7 @@ federation_rr_transactions_per_room_per_second: 40
 ```
 ---
 ## Media Store ##
-Config options relating to Synapse media store.
+Config options related to Synapse's media store.
 
 ---
 Config option: `enable_media_repo` 
@@ -1551,6 +1563,39 @@ thumbnail_sizes:
     height: 600
     method: scale
 ```
+---
+Config option: `media_retention`
+
+Controls whether local media and entries in the remote media cache
+(media that is downloaded from other homeservers) should be removed
+under certain conditions, typically for the purpose of saving space.
+
+Purging media files will be the carried out by the media worker
+(that is, the worker that has the `enable_media_repo` homeserver config
+option set to 'true'). This may be the main process.
+
+The `media_retention.local_media_lifetime` and
+`media_retention.remote_media_lifetime` config options control whether
+media will be purged if it has not been accessed in a given amount of
+time. Note that media is 'accessed' when loaded in a room in a client, or
+otherwise downloaded by a local or remote user. If the media has never
+been accessed, the media's creation time is used instead. Both thumbnails
+and the original media will be removed. If either of these options are unset,
+then media of that type will not be purged.
+
+Local or cached remote media that has been
+[quarantined](../../admin_api/media_admin_api.md#quarantining-media-in-a-room)
+will not be deleted. Similarly, local media that has been marked as
+[protected from quarantine](../../admin_api/media_admin_api.md#protecting-media-from-being-quarantined)
+will not be deleted.
+
+Example configuration:
+```yaml
+media_retention:
+    local_media_lifetime: 90d
+    remote_media_lifetime: 14d
+```
+---
 Config option: `url_preview_enabled`
 
 This setting determines whether the preview URL API is enabled.
@@ -2930,6 +2975,9 @@ Use this setting to enable password-based logins.
 
 This setting has the following sub-options:
 * `enabled`: Defaults to true.
+   Set to false to disable password authentication.
+   Set to `only_for_reauth` to allow users with existing passwords to use them
+   to log in and reauthenticate, whilst preventing new users from setting passwords.
 * `localdb_enabled`: Set to false to disable authentication against the local password
    database. This is ignored if `enabled` is false, and is only useful
    if you have other `password_providers`. Defaults to true. 
@@ -3143,25 +3191,6 @@ will also not affect rooms created by other servers.
 Example configuration:
 ```yaml
 encryption_enabled_by_default_for_room_type: invite
-```
----
-Config option: `enable_group_creation`
-
-Set to true to allow non-server-admin users to create groups on this server
-
-Example configuration:
-```yaml
-enable_group_creation: true
-```
----
-Config option: `group_creation_prefix`
-
-If enabled/present, non-server admins can only create groups with local parts
-starting with this prefix.
-
-Example configuration:
-```yaml
-group_creation_prefix: "unofficial_"
 ```
 ---
 Config option: `user_directory`

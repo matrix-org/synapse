@@ -46,7 +46,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.events_worker import EventCacheEntry
 from synapse.storage.databases.main.search import SearchEntry
-from synapse.storage.engines.postgres import PostgresEngine
+from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import AbstractStreamIdGenerator
 from synapse.storage.util.sequence import SequenceGenerator
 from synapse.types import JsonDict, StateMap, get_domain_from_id
@@ -1828,6 +1828,10 @@ class PersistEventsStore:
             self.store.get_aggregation_groups_for_event.invalidate,
             (relation.parent_id,),
         )
+        txn.call_after(
+            self.store.get_mutual_event_relations_for_rel_type.invalidate,
+            (relation.parent_id,),
+        )
 
         if relation.rel_type == RelationTypes.REPLACE:
             txn.call_after(
@@ -2003,6 +2007,11 @@ class PersistEventsStore:
             )
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_thread_participated, (redacted_relates_to,)
+            )
+            self.store._invalidate_cache_and_stream(
+                txn,
+                self.store.get_mutual_event_relations_for_rel_type,
+                (redacted_relates_to,),
             )
 
         self.db_pool.simple_delete_txn(

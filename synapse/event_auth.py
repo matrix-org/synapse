@@ -45,9 +45,7 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def validate_event_for_room_version(
-    room_version_obj: RoomVersion, event: "EventBase"
-) -> None:
+def validate_event_for_room_version(event: "EventBase") -> None:
     """Ensure that the event complies with the limits, and has the right signatures
 
     NB: does not *validate* the signatures - it assumes that any signatures present
@@ -60,12 +58,10 @@ def validate_event_for_room_version(
     NB: This is used to check events that have been received over federation. As such,
     it can only enforce the checks specified in the relevant room version, to avoid
     a split-brain situation where some servers accept such events, and others reject
-    them.
-
-    TODO: consider moving this into EventValidator
+    them. See also EventValidator, which contains extra checks which are applied only to
+    locally-generated events.
 
     Args:
-        room_version_obj: the version of the room which contains this event
         event: the event to be checked
 
     Raises:
@@ -103,7 +99,7 @@ def validate_event_for_room_version(
             raise AuthError(403, "Event not signed by sending server")
 
     is_invite_via_allow_rule = (
-        room_version_obj.msc3083_join_rules
+        event.room_version.msc3083_join_rules
         and event.type == EventTypes.Member
         and event.membership == Membership.JOIN
         and EventContentFields.AUTHORISING_USER in event.content
@@ -117,7 +113,6 @@ def validate_event_for_room_version(
 
 
 def check_auth_rules_for_event(
-    room_version_obj: RoomVersion,
     event: "EventBase",
     auth_events: Iterable["EventBase"],
 ) -> None:
@@ -136,7 +131,6 @@ def check_auth_rules_for_event(
        a bunch of other tests.
 
     Args:
-        room_version_obj: the version of the room
         event: the event being checked.
         auth_events: the room state to check the events against.
 
@@ -205,7 +199,10 @@ def check_auth_rules_for_event(
             raise AuthError(403, "This room has been marked as unfederatable.")
 
     # 4. If type is m.room.aliases
-    if event.type == EventTypes.Aliases and room_version_obj.special_case_aliases_auth:
+    if (
+        event.type == EventTypes.Aliases
+        and event.room_version.special_case_aliases_auth
+    ):
         # 4a. If event has no state_key, reject
         if not event.is_state():
             raise AuthError(403, "Alias event must be a state event")
@@ -225,7 +222,7 @@ def check_auth_rules_for_event(
 
     # 5. If type is m.room.membership
     if event.type == EventTypes.Member:
-        _is_membership_change_allowed(room_version_obj, event, auth_dict)
+        _is_membership_change_allowed(event.room_version, event, auth_dict)
         logger.debug("Allowing! %s", event)
         return
 
@@ -247,17 +244,17 @@ def check_auth_rules_for_event(
     _can_send_event(event, auth_dict)
 
     if event.type == EventTypes.PowerLevels:
-        _check_power_levels(room_version_obj, event, auth_dict)
+        _check_power_levels(event.room_version, event, auth_dict)
 
     if event.type == EventTypes.Redaction:
-        check_redaction(room_version_obj, event, auth_dict)
+        check_redaction(event.room_version, event, auth_dict)
 
     if (
         event.type == EventTypes.MSC2716_INSERTION
         or event.type == EventTypes.MSC2716_BATCH
         or event.type == EventTypes.MSC2716_MARKER
     ):
-        check_historical(room_version_obj, event, auth_dict)
+        check_historical(event.room_version, event, auth_dict)
 
     logger.debug("Allowing! %s", event)
 
