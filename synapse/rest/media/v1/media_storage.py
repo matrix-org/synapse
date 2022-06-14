@@ -154,7 +154,9 @@ class MediaStorage:
                         # Note that we'll delete the stored media, due to the
                         # try/except below. The media also won't be stored in
                         # the DB.
-                        raise SpamMediaException(errcode=spam_check)
+                        # We currently ignore any additional field returned by
+                        # the spam-check API.
+                        raise SpamMediaException(errcode=spam_check[0])
 
                     for provider in self.storage_providers:
                         await provider.store_file(path, file_info)

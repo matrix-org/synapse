@@ -71,6 +71,11 @@ USER_MAY_JOIN_ROOM_CALLBACK = Callable[
         Union[
             Literal["NOT_SPAM"],
             "synapse.api.errors.Codes",
+            # Highly experimental, not officially part of the spamchecker API, may
+            # disappear without warning depending on the results of ongoing
+            # experiments.
+            # Use this to return additional information as part of an error.
+            Tuple["synapse.api.errors.Codes", Dict],
             # Deprecated
             bool,
         ]
@@ -82,6 +87,11 @@ USER_MAY_INVITE_CALLBACK = Callable[
         Union[
             Literal["NOT_SPAM"],
             "synapse.api.errors.Codes",
+            # Highly experimental, not officially part of the spamchecker API, may
+            # disappear without warning depending on the results of ongoing
+            # experiments.
+            # Use this to return additional information as part of an error.
+            Tuple["synapse.api.errors.Codes", Dict],
             # Deprecated
             bool,
         ]
@@ -93,6 +103,11 @@ USER_MAY_SEND_3PID_INVITE_CALLBACK = Callable[
         Union[
             Literal["NOT_SPAM"],
             "synapse.api.errors.Codes",
+            # Highly experimental, not officially part of the spamchecker API, may
+            # disappear without warning depending on the results of ongoing
+            # experiments.
+            # Use this to return additional information as part of an error.
+            Tuple["synapse.api.errors.Codes", Dict],
             # Deprecated
             bool,
         ]
@@ -104,6 +119,11 @@ USER_MAY_CREATE_ROOM_CALLBACK = Callable[
         Union[
             Literal["NOT_SPAM"],
             "synapse.api.errors.Codes",
+            # Highly experimental, not officially part of the spamchecker API, may
+            # disappear without warning depending on the results of ongoing
+            # experiments.
+            # Use this to return additional information as part of an error.
+            Tuple["synapse.api.errors.Codes", Dict],
             # Deprecated
             bool,
         ]
@@ -115,6 +135,11 @@ USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[
         Union[
             Literal["NOT_SPAM"],
             "synapse.api.errors.Codes",
+            # Highly experimental, not officially part of the spamchecker API, may
+            # disappear without warning depending on the results of ongoing
+            # experiments.
+            # Use this to return additional information as part of an error.
+            Tuple["synapse.api.errors.Codes", Dict],
             # Deprecated
             bool,
         ]
@@ -126,6 +151,11 @@ USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[
         Union[
             Literal["NOT_SPAM"],
             "synapse.api.errors.Codes",
+            # Highly experimental, not officially part of the spamchecker API, may
+            # disappear without warning depending on the results of ongoing
+            # experiments.
+            # Use this to return additional information as part of an error.
+            Tuple["synapse.api.errors.Codes", Dict],
             # Deprecated
             bool,
         ]
@@ -155,6 +185,11 @@ CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK = Callable[
         Union[
             Literal["NOT_SPAM"],
             "synapse.api.errors.Codes",
+            # Highly experimental, not officially part of the spamchecker API, may
+            # disappear without warning depending on the results of ongoing
+            # experiments.
+            # Use this to return additional information as part of an error.
+            Tuple["synapse.api.errors.Codes", Dict],
             # Deprecated
             bool,
         ]
@@ -422,7 +457,7 @@ class SpamChecker:
 
     async def user_may_join_room(
         self, user_id: str, room_id: str, is_invited: bool
-    ) -> Union["synapse.api.errors.Codes", Literal["NOT_SPAM"]]:
+    ) -> Union[Tuple["synapse.api.errors.Codes", Dict], Literal["NOT_SPAM"]]:
         """Checks if a given users is allowed to join a room.
         Not called when a user creates a room.
 
@@ -432,7 +467,7 @@ class SpamChecker:
             is_invited: Whether the user is invited into the room
 
         Returns:
-            NOT_SPAM if the operation is permitted, Codes otherwise.
+            NOT_SPAM if the operation is permitted, [Codes, Dict] otherwise.
         """
         for callback in self._user_may_join_room_callbacks:
             with Measure(
@@ -443,8 +478,10 @@ class SpamChecker:
                 if res is True or res is self.NOT_SPAM:
                     continue
                 elif res is False:
-                    return synapse.api.errors.Codes.FORBIDDEN
+                    return (synapse.api.errors.Codes.FORBIDDEN, {})
                 elif isinstance(res, synapse.api.errors.Codes):
+                    return (res, {})
+                elif isinstance(res, Tuple) and len(res) == 2 and isinstance(res[0], synapse.api.errors.Codes) and isinstance(res[1], dict):
                     return res
                 else:
                     logger.warning(
@@ -457,7 +494,7 @@ class SpamChecker:
 
     async def user_may_invite(
         self, inviter_userid: str, invitee_userid: str, room_id: str
-    ) -> Union["synapse.api.errors.Codes", Literal["NOT_SPAM"]]:
+    ) -> Union[Tuple["synapse.api.errors.Codes", dict], Literal["NOT_SPAM"]]:
         """Checks if a given user may send an invite
 
         Args:
@@ -479,8 +516,10 @@ class SpamChecker:
                 if res is True or res is self.NOT_SPAM:
                     continue
                 elif res is False:
-                    return synapse.api.errors.Codes.FORBIDDEN
+                    return (synapse.api.errors.Codes.FORBIDDEN, {})
                 elif isinstance(res, synapse.api.errors.Codes):
+                    return (res, {})
+                elif isinstance(res, Tuple) and len(res) == 2 and isinstance(res[0], synapse.api.errors.Codes) and isinstance(res[1], dict):
                     return res
                 else:
                     logger.warning(
@@ -493,7 +532,7 @@ class SpamChecker:
 
     async def user_may_send_3pid_invite(
         self, inviter_userid: str, medium: str, address: str, room_id: str
-    ) -> Union["synapse.api.errors.Codes", Literal["NOT_SPAM"]]:
+    ) -> Union[Tuple["synapse.api.errors.Codes", dict], Literal["NOT_SPAM"]]:
         """Checks if a given user may invite a given threepid into the room
 
         Note that if the threepid is already associated with a Matrix user ID, Synapse
@@ -519,8 +558,10 @@ class SpamChecker:
                 if res is True or res is self.NOT_SPAM:
                     continue
                 elif res is False:
-                    return synapse.api.errors.Codes.FORBIDDEN
+                    return (synapse.api.errors.Codes.FORBIDDEN, {})
                 elif isinstance(res, synapse.api.errors.Codes):
+                    return (res, {})
+                elif isinstance(res, Tuple) and len(res) == 2 and isinstance(res[0], synapse.api.errors.Codes) and isinstance(res[1], dict):
                     return res
                 else:
                     logger.warning(
@@ -532,7 +573,7 @@ class SpamChecker:
 
     async def user_may_create_room(
         self, userid: str
-    ) -> Union["synapse.api.errors.Codes", Literal["NOT_SPAM"]]:
+    ) -> Union[Tuple["synapse.api.errors.Codes", dict], Literal["NOT_SPAM"]]:
         """Checks if a given user may create a room
 
         Args:
@@ -546,8 +587,10 @@ class SpamChecker:
                 if res is True or res is self.NOT_SPAM:
                     continue
                 elif res is False:
-                    return synapse.api.errors.Codes.FORBIDDEN
+                    return (synapse.api.errors.Codes.FORBIDDEN, {})
                 elif isinstance(res, synapse.api.errors.Codes):
+                    return (res, {})
+                elif isinstance(res, Tuple) and len(res) == 2 and isinstance(res[0], synapse.api.errors.Codes) and isinstance(res[1], dict):
                     return res
                 else:
                     logger.warning(
@@ -559,7 +602,7 @@ class SpamChecker:
 
     async def user_may_create_room_alias(
         self, userid: str, room_alias: RoomAlias
-    ) -> Union["synapse.api.errors.Codes", Literal["NOT_SPAM"]]:
+    ) -> Union[Tuple["synapse.api.errors.Codes", dict], Literal["NOT_SPAM"]]:
         """Checks if a given user may create a room alias
 
         Args:
@@ -575,8 +618,10 @@ class SpamChecker:
                 if res is True or res is self.NOT_SPAM:
                     continue
                 elif res is False:
-                    return synapse.api.errors.Codes.FORBIDDEN
+                    return (synapse.api.errors.Codes.FORBIDDEN, {})
                 elif isinstance(res, synapse.api.errors.Codes):
+                    return (res, {})
+                elif isinstance(res, Tuple) and len(res) == 2 and isinstance(res[0], synapse.api.errors.Codes) and isinstance(res[1], dict):
                     return res
                 else:
                     logger.warning(
@@ -588,7 +633,7 @@ class SpamChecker:
 
     async def user_may_publish_room(
         self, userid: str, room_id: str
-    ) -> Union["synapse.api.errors.Codes", Literal["NOT_SPAM"]]:
+    ) -> Union[Tuple["synapse.api.errors.Codes", dict], Literal["NOT_SPAM"]]:
         """Checks if a given user may publish a room to the directory
 
         Args:
@@ -603,8 +648,10 @@ class SpamChecker:
                 if res is True or res is self.NOT_SPAM:
                     continue
                 elif res is False:
-                    return synapse.api.errors.Codes.FORBIDDEN
+                    return (synapse.api.errors.Codes.FORBIDDEN, {})
                 elif isinstance(res, synapse.api.errors.Codes):
+                    return (res, {})
+                elif isinstance(res, Tuple) and len(res) == 2 and isinstance(res[0], synapse.api.errors.Codes) and isinstance(res[1], dict):
                     return res
                 else:
                     logger.warning(
@@ -678,7 +725,7 @@ class SpamChecker:
 
     async def check_media_file_for_spam(
         self, file_wrapper: ReadableFileWrapper, file_info: FileInfo
-    ) -> Union["synapse.api.errors.Codes", Literal["NOT_SPAM"]]:
+    ) -> Union[Tuple["synapse.api.errors.Codes", dict], Literal["NOT_SPAM"]]:
         """Checks if a piece of newly uploaded media should be blocked.
 
         This will be called for local uploads, downloads of remote media, each
@@ -715,8 +762,10 @@ class SpamChecker:
                 if res is False or res is self.NOT_SPAM:
                     continue
                 elif res is True:
-                    return synapse.api.errors.Codes.FORBIDDEN
+                    return (synapse.api.errors.Codes.FORBIDDEN, {})
                 elif isinstance(res, synapse.api.errors.Codes):
+                    return (res, {})
+                elif isinstance(res, Tuple) and len(res) == 2 and isinstance(res[0], synapse.api.errors.Codes) and isinstance(res[1], dict):
                     return res
                 else:
                     logger.warning(

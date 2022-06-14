@@ -828,7 +828,8 @@ class FederationHandler:
             raise SynapseError(
                 403,
                 "This user is not permitted to send invites to this server/user",
-                spam_check,
+                errcode = spam_check[0],
+                additional_fields = spam_check[1]
             )
 
         membership = event.content.get("membership")
