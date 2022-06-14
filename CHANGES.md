@@ -1,3 +1,12 @@
+Synapse 1.61.0 (2022-06-14)
+===========================
+
+Improved Documentation
+----------------------
+
+- Mention removed community/group worker endpoints in upgrade.md. Contributed by @olmari. ([\#13023](https://github.com/matrix-org/synapse/issues/13023))
+
+
 Synapse 1.61.0rc1 (2022-06-07)
 ==============================
 
