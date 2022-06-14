@@ -16,7 +16,7 @@ import shutil
 import tempfile
 from binascii import unhexlify
 from io import BytesIO
-from typing import Any, BinaryIO, Dict, List, Optional, Union
+from typing import Any, BinaryIO, Dict, List, Literal, Optional, Union
 from unittest.mock import Mock
 from urllib import parse
 
@@ -27,6 +27,7 @@ from PIL import Image as Image
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
 from twisted.test.proto_helpers import MemoryReactor
+from synapse.api.errors import Codes
 
 from synapse.events import EventBase
 from synapse.events.spamcheck import load_legacy_spam_checkers
@@ -550,9 +551,11 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         )
 
 
-class TestSpamChecker:
+class TestSpamCheckerDeprecated:
     """A spam checker module that rejects all media that includes the bytes
     `evil`.
+
+    Uses the deprecated Spam-Checker API.
     """
 
     def __init__(self, config: Dict[str, Any], api: ModuleApi) -> None:
@@ -593,7 +596,7 @@ class TestSpamChecker:
         return b"evil" in buf.getvalue()
 
 
-class SpamCheckerTestCase(unittest.HomeserverTestCase):
+class SpamCheckerTestCaseDeprecated(unittest.HomeserverTestCase):
     servlets = [
         login.register_servlets,
         admin.register_servlets,
@@ -617,7 +620,7 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
             {
                 "spam_checker": [
                     {
-                        "module": TestSpamChecker.__module__ + ".TestSpamChecker",
+                        "module": TestSpamCheckerDeprecated.__module__ + ".TestSpamChecker",
                         "config": {},
                     }
                 ]
@@ -641,4 +644,56 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
 
         self.helper.upload_media(
             self.upload_resource, data, tok=self.tok, expect_code=400
+        )
+
+class SpamCheckerTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        login.register_servlets,
+        admin.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.user = self.register_user("user", "pass")
+        self.tok = self.login("user", "pass")
+
+        # Allow for uploading and downloading to/from the media repo
+        self.media_repo = hs.get_media_repository_resource()
+        self.download_resource = self.media_repo.children[b"download"]
+        self.upload_resource = self.media_repo.children[b"upload"]
+
+        hs.get_module_api().register_spam_checker_callbacks(
+            check_media_file_for_spam=self.check_media_file_for_spam
+        )
+
+    async def check_media_file_for_spam(
+        self, file_wrapper: ReadableFileWrapper, file_info: FileInfo
+    ) -> Union[Codes, Literal["NOT_SPAM"]]:
+        buf = BytesIO()
+        await file_wrapper.write_chunks_to(buf.write)
+
+        if b"evil" in buf.getvalue():
+            return Codes.FORBIDDEN
+        elif b"experimental" in buf.getvalue():
+            return (Codes.FORBIDDEN, {})
+        else:
+            return "NOT_SPAM"
+
+
+    def test_upload_innocent(self) -> None:
+        """Attempt to upload some innocent data that should be allowed."""
+        self.helper.upload_media(
+            self.upload_resource, SMALL_PNG, tok=self.tok, expect_code=200
+        )
+
+    def test_upload_ban(self) -> None:
+        """Attempt to upload some data that includes bytes "evil", which should
+        get rejected by the spam checker.
+        """
+
+        self.helper.upload_media(
+            self.upload_resource, b"Some evil data", tok=self.tok, expect_code=400
+        )
+
+        self.helper.upload_media(
+            self.upload_resource, b"Let's try the experimental API", tok=self.tok, expect_code=400
         )

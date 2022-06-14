@@ -813,15 +813,34 @@ class RoomsCreateTestCase(RoomBase):
         In this test, we use the more recent API in which callbacks return a `Union[Codes, Literal["NOT_SPAM"]]`.
         """
 
-        async def user_may_join_room(
+        async def user_may_join_room_codes(
             mxid: str,
             room_id: str,
             is_invite: bool,
         ) -> Codes:
             return Codes.CONSENT_NOT_GIVEN
 
-        join_mock = Mock(side_effect=user_may_join_room)
+        join_mock = Mock(side_effect=user_may_join_room_codes)
         self.hs.get_spam_checker()._user_may_join_room_callbacks.append(join_mock)
+
+        channel = self.make_request(
+            "POST",
+            "/createRoom",
+            {},
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        self.assertEqual(join_mock.call_count, 0)
+
+        async def user_may_join_room_tuple(
+            mxid: str,
+            room_id: str,
+            is_invite: bool,
+        ) -> Codes:
+            return [Codes.CONSENT_NOT_GIVEN, {}]
+
+        join_mock = Mock(side_effect=user_may_join_room_codes)
+        self.hs.get_spam_checker()._user_may_join_room_callbacks = [join_mock]
 
         channel = self.make_request(
             "POST",
@@ -3151,6 +3170,24 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         # Now change the return value of the callback to deny any invite and test that
         # we can't send the invite.
         mock.return_value = make_awaitable(Codes.CONSENT_NOT_GIVEN)
+        channel = self.make_request(
+            method="POST",
+            path="/rooms/" + self.room_id + "/invite",
+            content={
+                "id_server": "example.com",
+                "id_access_token": "sometoken",
+                "medium": "email",
+                "address": email_to_invite,
+            },
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 403)
+
+        # Also check that it stopped before calling _make_and_store_3pid_invite.
+        make_invite_mock.assert_called_once()
+
+        # Run variant with `Tuple[Codes, dict]`.
+        mock.return_value = make_awaitable((Codes.CONSENT_NOT_GIVEN, {}))
         channel = self.make_request(
             method="POST",
             path="/rooms/" + self.room_id + "/invite",
