@@ -38,9 +38,8 @@ class UserIDTestCase(unittest.HomeserverTestCase):
         with self.assertRaises(SynapseError):
             UserID.from_string("@alice.example.com")
 
-    def test_parse_rejects_missing_domain(self):
-        with self.assertRaises(SynapseError):
-            UserID.from_string("@alice:")
+    def test_validation_rejects_missing_domain(self):
+        self.assertFalse(UserID.is_valid("@alice:"))
 
     def test_build(self):
         user = UserID("5678efgh", "my.domain")

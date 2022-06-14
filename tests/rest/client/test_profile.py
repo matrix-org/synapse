@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Tests REST events for /profile paths."""
+import urllib.parse
 from http import HTTPStatus
 from typing import Any, Dict, Optional
 
@@ -52,7 +53,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
     def test_get_displayname_rejects_bad_username(self) -> None:
         channel = self.make_request(
-            "GET", "/profile/notanmxid%40example.com/displayname"
+            "GET", f"/profile/{urllib.parse.quote('@alice:')}/displayname"
         )
         self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
 
