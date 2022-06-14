@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, TypeVar, U
 from urllib.parse import urlencode, urlparse
 
 import attr
-import pymacaroons
 from authlib.common.security import generate_token
 from authlib.jose import JsonWebToken, jwt
 from authlib.oauth2.auth import ClientAuth
@@ -44,7 +43,7 @@ from synapse.logging.context import make_deferred_yieldable
 from synapse.types import JsonDict, UserID, map_username_to_mxid_localpart
 from synapse.util import Clock, json_decoder
 from synapse.util.caches.cached_call import RetryOnExceptionCachedCall
-from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
+from synapse.util.macaroons import MacaroonGenerator, OidcSessionData
 from synapse.util.templates import _localpart_from_email_filter
 
 if TYPE_CHECKING:
@@ -105,9 +104,10 @@ class OidcHandler:
         # we should not have been instantiated if there is no configured provider.
         assert provider_confs
 
-        self._token_generator = OidcSessionTokenGenerator(hs)
+        self._macaroon_generator = hs.get_macaroon_generator()
         self._providers: Dict[str, "OidcProvider"] = {
-            p.idp_id: OidcProvider(hs, self._token_generator, p) for p in provider_confs
+            p.idp_id: OidcProvider(hs, self._macaroon_generator, p)
+            for p in provider_confs
         }
 
     async def load_metadata(self) -> None:
@@ -216,7 +216,7 @@ class OidcHandler:
 
         # Deserialize the session token and verify it.
         try:
-            session_data = self._token_generator.verify_oidc_session_token(
+            session_data = self._macaroon_generator.verify_oidc_session_token(
                 session, state
             )
         except (MacaroonInitException, MacaroonDeserializationException, KeyError) as e:
@@ -271,12 +271,12 @@ class OidcProvider:
     def __init__(
         self,
         hs: "HomeServer",
-        token_generator: "OidcSessionTokenGenerator",
+        macaroon_generator: MacaroonGenerator,
         provider: OidcProviderConfig,
     ):
         self._store = hs.get_datastores().main
 
-        self._token_generator = token_generator
+        self._macaroon_generaton = macaroon_generator
 
         self._config = provider
         self._callback_url: str = hs.config.oidc.oidc_callback_url
@@ -761,7 +761,7 @@ class OidcProvider:
         if not client_redirect_url:
             client_redirect_url = b""
 
-        cookie = self._token_generator.generate_oidc_session_token(
+        cookie = self._macaroon_generaton.generate_oidc_session_token(
             state=state,
             session_data=OidcSessionData(
                 idp_id=self.idp_id,
@@ -1110,121 +1110,6 @@ class JwtClientSecret:
             expires_at - CLIENT_SECRET_MIN_VALIDITY_SECONDS
         )
         return self._cached_secret
-
-
-class OidcSessionTokenGenerator:
-    """Methods for generating and checking OIDC Session cookies."""
-
-    def __init__(self, hs: "HomeServer"):
-        self._clock = hs.get_clock()
-        self._server_name = hs.hostname
-        self._macaroon_secret_key = hs.config.key.macaroon_secret_key
-
-    def generate_oidc_session_token(
-        self,
-        state: str,
-        session_data: "OidcSessionData",
-        duration_in_ms: int = (60 * 60 * 1000),
-    ) -> str:
-        """Generates a signed token storing data about an OIDC session.
-
-        When Synapse initiates an authorization flow, it creates a random state
-        and a random nonce. Those parameters are given to the provider and
-        should be verified when the client comes back from the provider.
-        It is also used to store the client_redirect_url, which is used to
-        complete the SSO login flow.
-
-        Args:
-            state: The ``state`` parameter passed to the OIDC provider.
-            session_data: data to include in the session token.
-            duration_in_ms: An optional duration for the token in milliseconds.
-                Defaults to an hour.
-
-        Returns:
-            A signed macaroon token with the session information.
-        """
-        macaroon = pymacaroons.Macaroon(
-            location=self._server_name,
-            identifier="key",
-            key=self._macaroon_secret_key,
-        )
-        macaroon.add_first_party_caveat("gen = 1")
-        macaroon.add_first_party_caveat("type = session")
-        macaroon.add_first_party_caveat("state = %s" % (state,))
-        macaroon.add_first_party_caveat("idp_id = %s" % (session_data.idp_id,))
-        macaroon.add_first_party_caveat("nonce = %s" % (session_data.nonce,))
-        macaroon.add_first_party_caveat(
-            "client_redirect_url = %s" % (session_data.client_redirect_url,)
-        )
-        macaroon.add_first_party_caveat(
-            "ui_auth_session_id = %s" % (session_data.ui_auth_session_id,)
-        )
-        now = self._clock.time_msec()
-        expiry = now + duration_in_ms
-        macaroon.add_first_party_caveat("time < %d" % (expiry,))
-
-        return macaroon.serialize()
-
-    def verify_oidc_session_token(
-        self, session: bytes, state: str
-    ) -> "OidcSessionData":
-        """Verifies and extract an OIDC session token.
-
-        This verifies that a given session token was issued by this homeserver
-        and extract the nonce and client_redirect_url caveats.
-
-        Args:
-            session: The session token to verify
-            state: The state the OIDC provider gave back
-
-        Returns:
-            The data extracted from the session cookie
-
-        Raises:
-            KeyError if an expected caveat is missing from the macaroon.
-        """
-        macaroon = pymacaroons.Macaroon.deserialize(session)
-
-        v = pymacaroons.Verifier()
-        v.satisfy_exact("gen = 1")
-        v.satisfy_exact("type = session")
-        v.satisfy_exact("state = %s" % (state,))
-        v.satisfy_general(lambda c: c.startswith("nonce = "))
-        v.satisfy_general(lambda c: c.startswith("idp_id = "))
-        v.satisfy_general(lambda c: c.startswith("client_redirect_url = "))
-        v.satisfy_general(lambda c: c.startswith("ui_auth_session_id = "))
-        satisfy_expiry(v, self._clock.time_msec)
-
-        v.verify(macaroon, self._macaroon_secret_key)
-
-        # Extract the session data from the token.
-        nonce = get_value_from_macaroon(macaroon, "nonce")
-        idp_id = get_value_from_macaroon(macaroon, "idp_id")
-        client_redirect_url = get_value_from_macaroon(macaroon, "client_redirect_url")
-        ui_auth_session_id = get_value_from_macaroon(macaroon, "ui_auth_session_id")
-        return OidcSessionData(
-            nonce=nonce,
-            idp_id=idp_id,
-            client_redirect_url=client_redirect_url,
-            ui_auth_session_id=ui_auth_session_id,
-        )
-
-
-@attr.s(frozen=True, slots=True, auto_attribs=True)
-class OidcSessionData:
-    """The attributes which are stored in a OIDC session cookie"""
-
-    # the Identity Provider being used
-    idp_id: str
-
-    # The `nonce` parameter passed to the OIDC provider.
-    nonce: str
-
-    # The URL the client gave when it initiated the flow. ("" if this is a UI Auth)
-    client_redirect_url: str
-
-    # The session ID of the ongoing UI Auth ("" if this is a login)
-    ui_auth_session_id: str
 
 
 class UserAttributeDict(TypedDict):
