@@ -146,6 +146,38 @@ def decode_body(
     return etree.fromstring(body, parser)
 
 
+def _get_meta_tags(
+    tree: "etree.Element", property: str, prefix: str
+) -> Dict[str, Optional[str]]:
+    """
+    Search for meta tags prefixed with a particular string.
+
+    Args:
+        tree: The parsed HTML document.
+        property: The name of the property which contains the tag name, e.g.
+            "property" for Open Graph.
+        prefix: The prefix on the property to search for, e.g. "og" for Open Graph.
+
+    Returns:
+        A map of tag name to value.
+    """
+    results: Dict[str, Optional[str]] = {}
+    for tag in tree.xpath(
+        f"//*/meta[starts-with(@{property}, '{prefix}:')][@content][not(@content='')]"
+    ):
+        # if we've got more than 50 tags, someone is taking the piss
+        if len(results) >= 50:
+            logger.warning(
+                "Skipping parsing of Open Graph for page with too many '%s:' tags",
+                prefix,
+            )
+            return {}
+
+        results[tag.attrib[property]] = tag.attrib["content"]
+
+    return results
+
+
 def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
     """
     Parse the HTML document into an Open Graph response.
@@ -160,10 +192,8 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
         The Open Graph response as a dictionary.
     """
 
-    # if we see any image URLs in the OG response, then spider them
-    # (although the client could choose to do this by asking for previews of those
-    # URLs to avoid DoSing the server)
-
+    # Search for Open Graph (og:) meta tags, e.g.:
+    #
     # "og:type"         : "video",
     # "og:url"          : "https://www.youtube.com/watch?v=LXDBoHyjmtw",
     # "og:site_name"    : "YouTube",
@@ -176,16 +206,7 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
     # "og:video:height" : "720",
     # "og:video:secure_url": "https://www.youtube.com/v/LXDBoHyjmtw?version=3",
 
-    og: Dict[str, Optional[str]] = {}
-    for tag in tree.xpath(
-        "//*/meta[starts-with(@property, 'og:')][@content][not(@content='')]"
-    ):
-        # if we've got more than 50 tags, someone is taking the piss
-        if len(og) >= 50:
-            logger.warning("Skipping OG for page with too many 'og:' tags")
-            return {}
-
-        og[tag.attrib["property"]] = tag.attrib["content"]
+    og = _get_meta_tags(tree, "property", "og")
 
     # TODO: grab article: meta tags too, e.g.:
 
