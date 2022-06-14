@@ -347,7 +347,7 @@ jobs:
 
       - run: |
           set -o pipefail
-          POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | gotestfmt
+          POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | gotestfmt | python3 synapse/.ci/scripts/collapse_complement_logs.py
         shell: bash
         name: Run Complement Tests
 
@@ -386,7 +386,7 @@ jobs:
 
       - run: |
           set -o pipefail
-          WORKERS=1 COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | gotestfmt
+          WORKERS=1 COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | gotestfmt | python3 synapse/.ci/scripts/collapse_complement_logs.py
         shell: bash
         name: Run Complement Tests
 
