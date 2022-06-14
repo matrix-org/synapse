@@ -1899,7 +1899,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 [],
             )
 
-        # is a StreamIdGenerator, or SlavedDataStore where it is a SlavedIdTracker.
         async with self._device_list_id_gen.get_next_mult(len(hosts)) as stream_ids:  # type: ignore[attr-defined]
             return await self.db_pool.runInteraction(
                 "add_device_list_outbound_pokes",
