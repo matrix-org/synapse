@@ -217,6 +217,23 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
     # "article:published_time" content="2016-03-31T19:58:24+00:00" />
     # "article:modified_time" content="2016-04-01T18:31:53+00:00" />
 
+    # Search for Twitter Card (twitter:) meta tags, e.g.:
+    #
+    # "twitter:site"    : "@matrixdotorg"
+    # "twitter:creator" : "@matrixdotorg"
+    #
+    # Twitter cards tags also duplicate Open Graph tags.
+    #
+    # See https://developer.twitter.com/en/docs/twitter-for-websites/cards/guides/getting-started
+    twitter = _get_meta_tags(tree, "name", "twitter")
+    # Merge the Twitter values with the Open Graph values, but do not overwrite
+    # information from Open Graph tags.
+    for key, value in twitter.items():
+        # Convert from Twitter to Open Graph properties.
+        key = "og" + key[7:]
+        if key not in og:
+            og[key] = value
+
     if "og:title" not in og:
         # Attempt to find a title from the title tag, or the biggest header on the page.
         title = tree.xpath("((//title)[1] | (//h1)[1] | (//h2)[1] | (//h3)[1])/text()")
