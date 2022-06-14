@@ -51,8 +51,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         self.assertEqual(res, "owner")
 
     def test_get_displayname_rejects_bad_username(self) -> None:
-        # Note: probably ought to urlencode the userid here, since it contains an `@`
-        channel = self.make_request("GET", "/profile/notanmxid@example.com/displayname")
+        channel = self.make_request("GET", "/profile/notanmxid%40example.com/displayname")
         self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
 
     def test_set_displayname(self) -> None:
