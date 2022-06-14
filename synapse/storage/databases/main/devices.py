@@ -603,7 +603,7 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
             txn=txn,
             table="device_lists_outbound_last_success",
             key_names=("destination", "user_id"),
-            key_values=tuple((destination, user_id) for user_id, _ in rows),
+            key_values=[destination, user_id) for user_id, _ in rows],
             value_names=("stream_id",),
             value_values=((stream_id,) for _, stream_id in rows),
         )
