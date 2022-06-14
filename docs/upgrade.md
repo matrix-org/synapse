@@ -146,7 +146,6 @@ async def user_may_join_room(self, user_id: str, room_id: str, is_invited: bool)
     return synapse.module_api.NOT_SPAM
 ```
 
-
 # Upgrading to v1.60.0
 
 ## Adding a new unique index to `state_group_edges` could fail if your database is corrupted
