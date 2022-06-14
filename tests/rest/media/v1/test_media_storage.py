@@ -16,7 +16,9 @@ import shutil
 import tempfile
 from binascii import unhexlify
 from io import BytesIO
-from typing import Any, BinaryIO, Dict, List, Literal, Optional, Union
+from typing import Any, BinaryIO, Dict, List, Optional, Union
+# `Literal` appears with Python 3.8.
+from typing_extensions import Literal
 from unittest.mock import Mock
 from urllib import parse
 
