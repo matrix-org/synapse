@@ -1,16 +1,19 @@
 Synapse 1.61.0 (2022-06-14)
 ===========================
 
+This release removes support for the non-standard feature known both as 'groups' and as 'communities', which have been superseded by *Spaces*.
+
+See [the upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1610)
+for more details.
+
 Improved Documentation
 ----------------------
 
-- Mention removed community/group worker endpoints in upgrade.md. Contributed by @olmari. ([\#13023](https://github.com/matrix-org/synapse/issues/13023))
+- Mention removed community/group worker endpoints in [upgrade.md](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1610s). Contributed by @olmari. ([\#13023](https://github.com/matrix-org/synapse/issues/13023))
 
 
 Synapse 1.61.0rc1 (2022-06-07)
 ==============================
-
-This release removes support for the non-standard feature known both as 'groups' and as 'communities', which have been superseded by *Spaces*.
 
 Features
 --------
