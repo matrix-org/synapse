@@ -27,8 +27,8 @@ from PIL import Image as Image
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
 from twisted.test.proto_helpers import MemoryReactor
-from synapse.api.errors import Codes
 
+from synapse.api.errors import Codes
 from synapse.events import EventBase
 from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.logging.context import make_deferred_yieldable
@@ -620,7 +620,8 @@ class SpamCheckerTestCaseDeprecated(unittest.HomeserverTestCase):
             {
                 "spam_checker": [
                     {
-                        "module": TestSpamCheckerDeprecated.__module__ + ".TestSpamChecker",
+                        "module": TestSpamCheckerDeprecated.__module__
+                        + ".TestSpamChecker",
                         "config": {},
                     }
                 ]
@@ -645,6 +646,7 @@ class SpamCheckerTestCaseDeprecated(unittest.HomeserverTestCase):
         self.helper.upload_media(
             self.upload_resource, data, tok=self.tok, expect_code=400
         )
+
 
 class SpamCheckerTestCase(unittest.HomeserverTestCase):
     servlets = [
@@ -678,7 +680,6 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
         else:
             return "NOT_SPAM"
 
-
     def test_upload_innocent(self) -> None:
         """Attempt to upload some innocent data that should be allowed."""
         self.helper.upload_media(
@@ -695,5 +696,8 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
         )
 
         self.helper.upload_media(
-            self.upload_resource, b"Let's try the experimental API", tok=self.tok, expect_code=400
+            self.upload_resource,
+            b"Let's try the experimental API",
+            tok=self.tok,
+            expect_code=400,
         )

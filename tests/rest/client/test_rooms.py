@@ -18,7 +18,7 @@
 """Tests REST events for /rooms paths."""
 
 import json
-from typing import Any, Dict, Iterable, List, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 from unittest.mock import Mock, call
 from urllib import parse as urlparse
 
@@ -836,8 +836,8 @@ class RoomsCreateTestCase(RoomBase):
             mxid: str,
             room_id: str,
             is_invite: bool,
-        ) -> Codes:
-            return [Codes.CONSENT_NOT_GIVEN, {}]
+        ) -> Tuple[Codes, dict]:
+            return (Codes.CONSENT_NOT_GIVEN, {})
 
         join_mock = Mock(side_effect=user_may_join_room_codes)
         self.hs.get_spam_checker()._user_may_join_room_callbacks = [join_mock]
