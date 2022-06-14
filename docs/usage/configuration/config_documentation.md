@@ -230,9 +230,9 @@ Example configuration:
 serve_server_wellknown: true
 ```
 ---
-Config option: `custom_wellknown`
+Config option: `custom_well_known`
 
-This option allows the server to define arbitrary payload in addition to the default wellknown.
+This option allows server runners to add arbitrary key-value pairsto the [client-facing `.well-known` response](https://spec.matrix.org/latest/client-server-api/#well-known-uri).
 
 If this option is provided, it parses the given yaml to json and 
 serves it on `/.well-known/matrix/client` endpoint
