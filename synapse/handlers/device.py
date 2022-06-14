@@ -124,11 +124,26 @@ class DeviceWorkerHandler:
         return device
 
     async def get_device_changes_in_shared_rooms(
-        self, user_id: str, from_token: StreamToken
+        self, user_id: str, room_ids: Collection[str], from_token: StreamToken
     ) -> Collection[str]:
         """Get the set of users whose devices have changed who share a room with
         the given user.
         """
+        changed_users = await self.store.get_device_list_changes_in_rooms(
+            room_ids, from_token.device_list_key
+        )
+
+        if changed_users is not None:
+            # We also check if the given user has changed their device. If
+            # they're in no rooms then the above query won't include them.
+            changed = await self.store.get_users_whose_devices_changed(
+                from_token.device_list_key, [user_id]
+            )
+            changed_users.update(changed)
+            return changed_users
+
+        # If the DB returned None then the `from_token` is too old, so we fall
+        # back on looking for device updates for all users.
 
         users_who_share_room = await self.store.get_users_who_share_room_with_user(
             user_id
@@ -160,7 +175,9 @@ class DeviceWorkerHandler:
 
         room_ids = await self.store.get_rooms_for_user(user_id)
 
-        changed = await self.get_device_changes_in_shared_rooms(user_id, from_token)
+        changed = await self.get_device_changes_in_shared_rooms(
+            user_id, room_ids, from_token
+        )
 
         # Then work out if any users have since joined
         rooms_changed = self.store.get_rooms_that_changed(room_ids, from_token.room_key)
