@@ -297,7 +297,13 @@ class AuthError(SynapseError):
     other poorly-defined times.
     """
 
-    def __init__(self, code: int, msg: str, errcode: str = Codes.FORBIDDEN, additional_fields: Optional[dict] = None):
+    def __init__(
+        self,
+        code: int,
+        msg: str,
+        errcode: str = Codes.FORBIDDEN,
+        additional_fields: Optional[dict] = None,
+    ):
         super().__init__(code, msg, errcode, additional_fields)
 
 

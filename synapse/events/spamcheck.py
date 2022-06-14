@@ -481,7 +481,12 @@ class SpamChecker:
                     return (synapse.api.errors.Codes.FORBIDDEN, {})
                 elif isinstance(res, synapse.api.errors.Codes):
                     return (res, {})
-                elif isinstance(res, Tuple) and len(res) == 2 and isinstance(res[0], synapse.api.errors.Codes) and isinstance(res[1], dict):
+                elif (
+                    isinstance(res, Tuple)
+                    and len(res) == 2
+                    and isinstance(res[0], synapse.api.errors.Codes)
+                    and isinstance(res[1], dict)
+                ):
                     return res
                 else:
                     logger.warning(
@@ -519,7 +524,12 @@ class SpamChecker:
                     return (synapse.api.errors.Codes.FORBIDDEN, {})
                 elif isinstance(res, synapse.api.errors.Codes):
                     return (res, {})
-                elif isinstance(res, Tuple) and len(res) == 2 and isinstance(res[0], synapse.api.errors.Codes) and isinstance(res[1], dict):
+                elif (
+                    isinstance(res, Tuple)
+                    and len(res) == 2
+                    and isinstance(res[0], synapse.api.errors.Codes)
+                    and isinstance(res[1], dict)
+                ):
                     return res
                 else:
                     logger.warning(
@@ -561,7 +571,12 @@ class SpamChecker:
                     return (synapse.api.errors.Codes.FORBIDDEN, {})
                 elif isinstance(res, synapse.api.errors.Codes):
                     return (res, {})
-                elif isinstance(res, Tuple) and len(res) == 2 and isinstance(res[0], synapse.api.errors.Codes) and isinstance(res[1], dict):
+                elif (
+                    isinstance(res, Tuple)
+                    and len(res) == 2
+                    and isinstance(res[0], synapse.api.errors.Codes)
+                    and isinstance(res[1], dict)
+                ):
                     return res
                 else:
                     logger.warning(
@@ -590,7 +605,12 @@ class SpamChecker:
                     return (synapse.api.errors.Codes.FORBIDDEN, {})
                 elif isinstance(res, synapse.api.errors.Codes):
                     return (res, {})
-                elif isinstance(res, Tuple) and len(res) == 2 and isinstance(res[0], synapse.api.errors.Codes) and isinstance(res[1], dict):
+                elif (
+                    isinstance(res, Tuple)
+                    and len(res) == 2
+                    and isinstance(res[0], synapse.api.errors.Codes)
+                    and isinstance(res[1], dict)
+                ):
                     return res
                 else:
                     logger.warning(
@@ -621,7 +641,12 @@ class SpamChecker:
                     return (synapse.api.errors.Codes.FORBIDDEN, {})
                 elif isinstance(res, synapse.api.errors.Codes):
                     return (res, {})
-                elif isinstance(res, Tuple) and len(res) == 2 and isinstance(res[0], synapse.api.errors.Codes) and isinstance(res[1], dict):
+                elif (
+                    isinstance(res, Tuple)
+                    and len(res) == 2
+                    and isinstance(res[0], synapse.api.errors.Codes)
+                    and isinstance(res[1], dict)
+                ):
                     return res
                 else:
                     logger.warning(
@@ -651,7 +676,12 @@ class SpamChecker:
                     return (synapse.api.errors.Codes.FORBIDDEN, {})
                 elif isinstance(res, synapse.api.errors.Codes):
                     return (res, {})
-                elif isinstance(res, Tuple) and len(res) == 2 and isinstance(res[0], synapse.api.errors.Codes) and isinstance(res[1], dict):
+                elif (
+                    isinstance(res, Tuple)
+                    and len(res) == 2
+                    and isinstance(res[0], synapse.api.errors.Codes)
+                    and isinstance(res[1], dict)
+                ):
                     return res
                 else:
                     logger.warning(
@@ -765,7 +795,12 @@ class SpamChecker:
                     return (synapse.api.errors.Codes.FORBIDDEN, {})
                 elif isinstance(res, synapse.api.errors.Codes):
                     return (res, {})
-                elif isinstance(res, Tuple) and len(res) == 2 and isinstance(res[0], synapse.api.errors.Codes) and isinstance(res[1], dict):
+                elif (
+                    isinstance(res, Tuple)
+                    and len(res) == 2
+                    and isinstance(res[0], synapse.api.errors.Codes)
+                    and isinstance(res[1], dict)
+                ):
                     return res
                 else:
                     logger.warning(

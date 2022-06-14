@@ -149,8 +149,8 @@ class DirectoryHandler:
                 raise AuthError(
                     403,
                     "This user is not permitted to create this alias",
-                    errcode = spam_check[0],
-                    additional_fields = spam_check[1]
+                    errcode=spam_check[0],
+                    additional_fields=spam_check[1],
                 )
 
             if not self.config.roomdirectory.is_alias_creation_allowed(
@@ -442,8 +442,8 @@ class DirectoryHandler:
             raise AuthError(
                 403,
                 "This user is not permitted to publish rooms to the room list",
-                errcode = spam_check[0],
-                additional_fields = spam_check[1]
+                errcode=spam_check[0],
+                additional_fields=spam_check[1],
             )
 
         if requester.is_guest:

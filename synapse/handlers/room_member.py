@@ -713,7 +713,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
             if block_invite_result is not None:
                 raise SynapseError(
-                    403, "Invites have been disabled on this server", errcode = block_invite_result[0], additional_fields = block_invite_result[1]
+                    403,
+                    "Invites have been disabled on this server",
+                    errcode=block_invite_result[0],
+                    additional_fields=block_invite_result[1],
                 )
 
         # An empty prev_events list is allowed as long as the auth_event_ids are present
@@ -827,7 +830,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     target.to_string(), room_id, is_invited=inviter is not None
                 )
                 if spam_check != NOT_SPAM:
-                    raise SynapseError(403, "Not allowed to join this room", errcode = spam_check[0], additional_fields = spam_check[1])
+                    raise SynapseError(
+                        403,
+                        "Not allowed to join this room",
+                        errcode=spam_check[0],
+                        additional_fields=spam_check[1],
+                    )
 
             # Check if a remote join should be performed.
             remote_join, remote_room_hosts = await self._should_perform_remote_join(
@@ -1381,7 +1389,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 room_id=room_id,
             )
             if spam_check != NOT_SPAM:
-                raise SynapseError(403, "Cannot send threepid invite", errcode=spam_check[0], additional_fields=spam_check[1])
+                raise SynapseError(
+                    403,
+                    "Cannot send threepid invite",
+                    errcode=spam_check[0],
+                    additional_fields=spam_check[1],
+                )
 
             stream_id = await self._make_and_store_3pid_invite(
                 requester,
