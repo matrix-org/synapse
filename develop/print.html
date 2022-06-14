@@ -1632,6 +1632,19 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </li>
 </ul>
 <h1 id="upgrading-to-v1610"><a class="header" href="#upgrading-to-v1610">Upgrading to v1.61.0</a></h1>
+<h2 id="removal-of-depracated-communitygroups"><a class="header" href="#removal-of-depracated-communitygroups">Removal of depracated community/groups</a></h2>
+<p>This release of Synapse will remove deprecated community/groups from codebase.</p>
+<h3 id="worker-endpoints"><a class="header" href="#worker-endpoints">Worker endpoints</a></h3>
+<p>For those who have deployed workers, following worker endpoints will no longer be existing
+and they are expected to be removed from reverse proxy config:</p>
+<ul>
+<li><code>^/_matrix/federation/v1/get_groups_publicised$</code></li>
+<li><code>^/_matrix/client/(r0|v3|unstable)/joined_groups$</code></li>
+<li><code>^/_matrix/client/(r0|v3|unstable)/publicised_groups$</code></li>
+<li><code>^/_matrix/client/(r0|v3|unstable)/publicised_groups/</code></li>
+<li><code>^/_matrix/federation/v1/groups/</code></li>
+<li><code>^/_matrix/client/(r0|v3|unstable)/groups/</code></li>
+</ul>
 <h2 id="new-signatures-for-spam-checker-callbacks"><a class="header" href="#new-signatures-for-spam-checker-callbacks">New signatures for spam checker callbacks</a></h2>
 <p>As a followup to changes in v1.60.0, the following spam-checker callbacks have changed signature:</p>
 <ul>
