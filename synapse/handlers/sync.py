@@ -240,6 +240,7 @@ class SyncHandler:
         self.auth_blocking = hs.get_auth_blocking()
         self._storage_controllers = hs.get_storage_controllers()
         self._state_storage_controller = self._storage_controllers.state
+        self._device_handler = hs.get_device_handler()
 
         # TODO: flush cache entries on subsequent sync request.
         #    Once we get the next /sync request (ie, one with the same access token
@@ -1272,21 +1273,11 @@ class SyncHandler:
                     ):
                         users_that_have_changed.add(changed_user_id)
             else:
-                users_who_share_room = (
-                    await self.store.get_users_who_share_room_with_user(user_id)
-                )
-
-                # Always tell the user about their own devices. We check as the user
-                # ID is almost certainly already included (unless they're not in any
-                # rooms) and taking a copy of the set is relatively expensive.
-                if user_id not in users_who_share_room:
-                    users_who_share_room = set(users_who_share_room)
-                    users_who_share_room.add(user_id)
-
-                tracked_users = users_who_share_room
                 users_that_have_changed = (
-                    await self.store.get_users_whose_devices_changed(
-                        since_token.device_list_key, tracked_users
+                    await self._device_handler.get_device_changes_in_shared_rooms(
+                        user_id,
+                        sync_result_builder.joined_room_ids,
+                        from_token=since_token,
                     )
                 )
 
