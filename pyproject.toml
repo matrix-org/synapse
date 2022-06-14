@@ -195,6 +195,7 @@ systemd = ["systemd-python"]
 url_preview = ["lxml"]
 sentry = ["sentry-sdk"]
 opentracing = ["jaeger-client", "opentracing"]
+jwt = ["authlib"]
 # hiredis is not a *strict* dependency, but it makes things much faster.
 # (if it is not installed, we fall back to slow code.)
 redis = ["txredisapi", "hiredis"]
@@ -220,7 +221,7 @@ all = [
     "psycopg2", "psycopg2cffi", "psycopg2cffi-compat",
     # saml2
     "pysaml2",
-    # oidc
+    # oidc and jwt
     "authlib",
     # url_preview
     "lxml",

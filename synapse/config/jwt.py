@@ -76,7 +76,9 @@ class JWTConfig(Config):
             # The algorithm used to sign the JSON web token.
             #
             # Supported algorithms are listed at
-            # https://docs.authlib.org/en/latest/specs/rfc7518.html
+            # https://docs.authlib.org/en/latest/specs/rfc7518.html (section JWS).
+            # (Although you could use an "encrypted JWT" (JWE) this doesn't make
+            # sense for authentication.)
             #
             # Required if 'enabled' is true.
             #

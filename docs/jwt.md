@@ -36,7 +36,20 @@ As with other login types, there are additional fields (e.g. `device_id` and
 
 ## Preparing Synapse
 
-To enable the JSON web token integration, you should add a `jwt_config` section
+The JSON Web Token integration in Synapse uses the
+[`Authlib`](https://docs.authlib.org/en/latest/index.html) library, which must be installed
+as follows:
+
+* The relevant libraries are included in the Docker images and Debian packages
+  provided by `matrix.org` so no further action is needed.
+
+* If you installed Synapse into a virtualenv, run `/path/to/env/bin/pip
+  install synapse[jwt]` to install the necessary dependencies.
+
+* For other installation mechanisms, see the documentation provided by the
+  maintainer.
+
+To enable the JSON web token integration, you should then add a `jwt_config` section
 to your configuration file (or uncomment the `enabled: true` line in the
 existing section). See [sample_config.yaml](./sample_config.yaml) for some
 sample settings.
@@ -57,14 +70,21 @@ example below uses a locally generated JWT.
     ```
 2.  Generate a JSON web token:
 
-    There's a small script for doing so locally:
-    `scripts-dev/build_custom_jwt.py`. Have a look inside and set key/secret
-    and the algorithm to be used (`HS256` or `RS256`) as well as the payload
+    You can use the following short Python snippet to generate a JWT
+    protected by an HMAC.
+    Take care that the `secret` and the algorithm given in the `header` match
+    the entries from `jwt_config` above.
 
-    ```bash
-    $ poetry run scripts-dev/build_custom_jwt.py 
-    eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyMSIsImF1ZCI6WyJhdWRpZW5jZSJdfQ.fRrThuWvok5_gOYKyiIVtKTqZuFhYffiiBLTsIIZPwD-cqwICcSNkLtdhfzfau2Yje48XUiqh19VqP17MnnjGbjBTlotyHonXeXRtIKi5nK1DdKoibUkY8ILeXcDfhHe_lCItzjVtmZm7t4ePe6861Y3TQnbCgM2PBQszYOh1KU
+    ```python
+    from authlib.jose import jwt
+
+    header = {"alg": "HS256"}
+    payload = {"sub": "user1", "aud": ["audience"]}
+    secret = "my-secret-token"
+    result = jwt.encode(header, payload, secret)
+    print(result.decode("ascii"))
     ```
+
 3.  Query for the login types and ensure `org.matrix.login.jwt` is there:
 
     ```bash
