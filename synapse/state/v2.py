@@ -574,7 +574,6 @@ async def _iterative_auth_checks(
 
         try:
             event_auth.check_auth_rules_for_event(
-                room_version,
                 event,
                 auth_events.values(),
             )

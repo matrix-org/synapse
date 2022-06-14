@@ -1,3 +1,9 @@
+matrix-synapse-py3 (1.61.0) stable; urgency=medium
+
+  * New Synapse release 1.61.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 14 Jun 2022 11:44:19 +0100
+
 matrix-synapse-py3 (1.61.0~rc1) stable; urgency=medium
 
   * Remove unused `jitsimeetbridge` experiment from `contrib` directory.

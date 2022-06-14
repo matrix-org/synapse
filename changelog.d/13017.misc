@@ -1,0 +1,1 @@
+Remove redundant `room_version` parameters from event auth functions.

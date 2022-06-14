@@ -20,58 +20,6 @@ from synapse.types import JsonDict
 
 from ._base import Config
 
-DEFAULT_CONFIG = """\
-# User Consent configuration
-#
-# for detailed instructions, see
-# https://matrix-org.github.io/synapse/latest/consent_tracking.html
-#
-# Parts of this section are required if enabling the 'consent' resource under
-# 'listeners', in particular 'template_dir' and 'version'.
-#
-# 'template_dir' gives the location of the templates for the HTML forms.
-# This directory should contain one subdirectory per language (eg, 'en', 'fr'),
-# and each language directory should contain the policy document (named as
-# '<version>.html') and a success page (success.html).
-#
-# 'version' specifies the 'current' version of the policy document. It defines
-# the version to be served by the consent resource if there is no 'v'
-# parameter.
-#
-# 'server_notice_content', if enabled, will send a user a "Server Notice"
-# asking them to consent to the privacy policy. The 'server_notices' section
-# must also be configured for this to work. Notices will *not* be sent to
-# guest users unless 'send_server_notice_to_guests' is set to true.
-#
-# 'block_events_error', if set, will block any attempts to send events
-# until the user consents to the privacy policy. The value of the setting is
-# used as the text of the error.
-#
-# 'require_at_registration', if enabled, will add a step to the registration
-# process, similar to how captcha works. Users will be required to accept the
-# policy before their account is created.
-#
-# 'policy_name' is the display name of the policy users will see when registering
-# for an account. Has no effect unless `require_at_registration` is enabled.
-# Defaults to "Privacy Policy".
-#
-#user_consent:
-#  template_dir: res/templates/privacy
-#  version: 1.0
-#  server_notice_content:
-#    msgtype: m.text
-#    body: >-
-#      To continue using this homeserver you must review and agree to the
-#      terms and conditions at %(consent_uri)s
-#  send_server_notice_to_guests: true
-#  block_events_error: >-
-#    To continue using this homeserver you must review and agree to the
-#    terms and conditions at %(consent_uri)s
-#  require_at_registration: false
-#  policy_name: Privacy Policy
-#
-"""
-
 
 class ConsentConfig(Config):
 
@@ -118,6 +66,3 @@ class ConsentConfig(Config):
         self.user_consent_policy_name = consent_config.get(
             "policy_name", "Privacy Policy"
         )
-
-    def generate_config_section(self, **kwargs: Any) -> str:
-        return DEFAULT_CONFIG

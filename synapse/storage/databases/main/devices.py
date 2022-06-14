@@ -1240,15 +1240,6 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             self._remove_duplicate_outbound_pokes,
         )
 
-        # a pair of background updates that were added during the 1.14 release cycle,
-        # but replaced with 58/06dlols_unique_idx.py
-        self.db_pool.updates.register_noop_background_update(
-            "device_lists_outbound_last_success_unique_idx",
-        )
-        self.db_pool.updates.register_noop_background_update(
-            "drop_device_lists_outbound_last_success_non_unique_idx",
-        )
-
     async def _drop_device_list_streams_non_unique_indexes(
         self, progress: JsonDict, batch_size: int
     ) -> int:

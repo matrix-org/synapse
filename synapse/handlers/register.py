@@ -91,6 +91,7 @@ class RegistrationHandler:
         self.clock = hs.get_clock()
         self.hs = hs
         self.auth = hs.get_auth()
+        self.auth_blocking = hs.get_auth_blocking()
         self._auth_handler = hs.get_auth_handler()
         self.profile_handler = hs.get_profile_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
@@ -276,7 +277,7 @@ class RegistrationHandler:
 
         # do not check_auth_blocking if the call is coming through the Admin API
         if not by_admin:
-            await self.auth.check_auth_blocking(threepid=threepid)
+            await self.auth_blocking.check_auth_blocking(threepid=threepid)
 
         if localpart is not None:
             await self.check_username(localpart, guest_access_token=guest_access_token)

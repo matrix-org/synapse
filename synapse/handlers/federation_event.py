@@ -1430,9 +1430,6 @@ class FederationEventHandler:
             allow_rejected=True,
         )
 
-        room_version = await self._store.get_room_version_id(room_id)
-        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
-
         def prep(event: EventBase) -> Optional[Tuple[EventBase, EventContext]]:
             with nested_logging_context(suffix=event.event_id):
                 auth = []
@@ -1455,8 +1452,8 @@ class FederationEventHandler:
 
                 context = EventContext.for_outlier(self._storage_controllers)
                 try:
-                    validate_event_for_room_version(room_version_obj, event)
-                    check_auth_rules_for_event(room_version_obj, event, auth)
+                    validate_event_for_room_version(event)
+                    check_auth_rules_for_event(event, auth)
                 except AuthError as e:
                     logger.warning("Rejecting %r because %s", event, e)
                     context.rejected = RejectedReason.AUTH_ERROR
@@ -1499,11 +1496,8 @@ class FederationEventHandler:
         assert not event.internal_metadata.outlier
 
         # first of all, check that the event itself is valid.
-        room_version = await self._store.get_room_version_id(event.room_id)
-        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
-
         try:
-            validate_event_for_room_version(room_version_obj, event)
+            validate_event_for_room_version(event)
         except AuthError as e:
             logger.warning("While validating received event %r: %s", event, e)
             # TODO: use a different rejected reason here?
@@ -1521,7 +1515,7 @@ class FederationEventHandler:
 
         # ... and check that the event passes auth at those auth events.
         try:
-            check_auth_rules_for_event(room_version_obj, event, claimed_auth_events)
+            check_auth_rules_for_event(event, claimed_auth_events)
         except AuthError as e:
             logger.warning(
                 "While checking auth of %r against auth_events: %s", event, e
@@ -1569,9 +1563,7 @@ class FederationEventHandler:
             auth_events_for_auth = calculated_auth_event_map
 
         try:
-            check_auth_rules_for_event(
-                room_version_obj, event, auth_events_for_auth.values()
-            )
+            check_auth_rules_for_event(event, auth_events_for_auth.values())
         except AuthError as e:
             logger.warning("Failed auth resolution for %r because %s", event, e)
             context.rejected = RejectedReason.AUTH_ERROR
@@ -1671,7 +1663,7 @@ class FederationEventHandler:
         )
 
         try:
-            check_auth_rules_for_event(room_version_obj, event, current_auth_events)
+            check_auth_rules_for_event(event, current_auth_events)
         except AuthError as e:
             logger.warning(
                 "Soft-failing %r (from %s) because %s",

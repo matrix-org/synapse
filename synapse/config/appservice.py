@@ -35,20 +35,6 @@ class AppServiceConfig(Config):
         self.app_service_config_files = config.get("app_service_config_files", [])
         self.track_appservice_user_ips = config.get("track_appservice_user_ips", False)
 
-    def generate_config_section(cls, **kwargs: Any) -> str:
-        return """\
-        # A list of application service config files to use
-        #
-        #app_service_config_files:
-        #  - app_service_1.yaml
-        #  - app_service_2.yaml
-
-        # Uncomment to enable tracking of application service IP addresses. Implicitly
-        # enables MAU tracking for application service users.
-        #
-        #track_appservice_user_ips: true
-        """
-
 
 def load_appservices(
     hostname: str, config_files: List[str]
