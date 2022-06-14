@@ -123,6 +123,28 @@ class DeviceWorkerHandler:
 
         return device
 
+    async def get_device_changes_in_shared_rooms(
+        self, user_id: str, from_token: StreamToken
+    ) -> Collection[str]:
+        """Get the set of users whose devices have changed who share a room with
+        the given user.
+        """
+
+        users_who_share_room = await self.store.get_users_who_share_room_with_user(
+            user_id
+        )
+
+        tracked_users = set(users_who_share_room)
+
+        # Always tell the user about their own devices
+        tracked_users.add(user_id)
+
+        changed = await self.store.get_users_whose_devices_changed(
+            from_token.device_list_key, tracked_users
+        )
+
+        return changed
+
     @trace
     @measure_func("device.get_user_ids_changed")
     async def get_user_ids_changed(
@@ -138,20 +160,7 @@ class DeviceWorkerHandler:
 
         room_ids = await self.store.get_rooms_for_user(user_id)
 
-        # First we check if any devices have changed for users that we share
-        # rooms with.
-        users_who_share_room = await self.store.get_users_who_share_room_with_user(
-            user_id
-        )
-
-        tracked_users = set(users_who_share_room)
-
-        # Always tell the user about their own devices
-        tracked_users.add(user_id)
-
-        changed = await self.store.get_users_whose_devices_changed(
-            from_token.device_list_key, tracked_users
-        )
+        changed = await self.get_device_changes_in_shared_rooms(user_id, from_token)
 
         # Then work out if any users have since joined
         rooms_changed = self.store.get_rooms_that_changed(room_ids, from_token.room_key)
@@ -237,10 +246,19 @@ class DeviceWorkerHandler:
                         break
 
         if possibly_changed or possibly_left:
-            # Take the intersection of the users whose devices may have changed
-            # and those that actually still share a room with the user
-            possibly_joined = possibly_changed & users_who_share_room
-            possibly_left = (possibly_changed | possibly_left) - users_who_share_room
+            possibly_joined = possibly_changed
+            possibly_left = possibly_changed | possibly_left
+
+            # Double check if we still share rooms with the given user.
+            users_rooms = await self.store.get_rooms_for_users_with_stream_ordering(
+                possibly_left
+            )
+            for changed_user_id, entries in users_rooms.items():
+                if any(e.room_id in room_ids for e in entries):
+                    possibly_left.discard(changed_user_id)
+                else:
+                    possibly_joined.discard(changed_user_id)
+
         else:
             possibly_joined = set()
             possibly_left = set()
