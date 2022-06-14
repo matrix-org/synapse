@@ -267,6 +267,14 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
             )
 
         domain = parts[1]
+        if not domain:
+            raise SynapseError(
+                400,
+                f"{cls.__name__} must have a domain after the colon",
+                Codes.INVALID_PARAM,
+            )
+        # TODO: this does not reject an empty localpart or an overly-long string.
+        # See https://spec.matrix.org/v1.2/appendices/#identifier-grammar
 
         # This code will need changing if we want to support multiple domain
         # names on one HS
