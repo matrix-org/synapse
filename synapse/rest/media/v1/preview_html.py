@@ -208,8 +208,9 @@ def parse_html_to_open_graph(tree: "etree.Element") -> Dict[str, Optional[str]]:
 
     og = _get_meta_tags(tree, "property", "og")
 
-    # TODO: grab article: meta tags too, e.g.:
-
+    # TODO: Search for properties specific to the different Open Graph types,
+    # such as article: meta tags, e.g.:
+    #
     # "article:publisher" : "https://www.facebook.com/thethudonline" />
     # "article:author" content="https://www.facebook.com/thethudonline" />
     # "article:tag" content="baby" />
