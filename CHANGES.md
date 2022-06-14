@@ -9,7 +9,7 @@ for more details.
 Improved Documentation
 ----------------------
 
-- Mention removed community/group worker endpoints in [upgrade.md](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1610s). Contributed by @olmari. ([\#13023](https://github.com/matrix-org/synapse/issues/13023))
+- Mention removed community/group worker endpoints in [the upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1610). Contributed by @olmari. ([\#13023](https://github.com/matrix-org/synapse/issues/13023))
 
 
 Synapse 1.61.0rc1 (2022-06-07)
