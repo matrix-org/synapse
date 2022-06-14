@@ -735,7 +735,10 @@ class RoomCreationHandler:
             spam_check = await self.spam_checker.user_may_create_room(user_id)
             if spam_check != NOT_SPAM:
                 raise SynapseError(
-                    403, "You are not permitted to create rooms", spam_check
+                    403,
+                    "You are not permitted to create rooms",
+                    errcode=spam_check[0],
+                    additional_fields=spam_check[1],
                 )
 
         if ratelimit:

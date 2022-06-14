@@ -482,7 +482,7 @@ class SpamChecker:
                 elif isinstance(res, synapse.api.errors.Codes):
                     return (res, {})
                 elif (
-                    isinstance(res, Tuple)
+                    isinstance(res, tuple)
                     and len(res) == 2
                     and isinstance(res[0], synapse.api.errors.Codes)
                     and isinstance(res[1], dict)
@@ -492,7 +492,7 @@ class SpamChecker:
                     logger.warning(
                         "Module returned invalid value, rejecting join as spam"
                     )
-                    return synapse.api.errors.Codes.FORBIDDEN
+                    return (synapse.api.errors.Codes.FORBIDDEN, {})
 
         # No spam-checker has rejected the request, let it pass.
         return self.NOT_SPAM
@@ -525,7 +525,7 @@ class SpamChecker:
                 elif isinstance(res, synapse.api.errors.Codes):
                     return (res, {})
                 elif (
-                    isinstance(res, Tuple)
+                    isinstance(res, tuple)
                     and len(res) == 2
                     and isinstance(res[0], synapse.api.errors.Codes)
                     and isinstance(res[1], dict)
@@ -535,7 +535,7 @@ class SpamChecker:
                     logger.warning(
                         "Module returned invalid value, rejecting invite as spam"
                     )
-                    return synapse.api.errors.Codes.FORBIDDEN
+                    return (synapse.api.errors.Codes.FORBIDDEN, {})
 
         # No spam-checker has rejected the request, let it pass.
         return self.NOT_SPAM
@@ -572,7 +572,7 @@ class SpamChecker:
                 elif isinstance(res, synapse.api.errors.Codes):
                     return (res, {})
                 elif (
-                    isinstance(res, Tuple)
+                    isinstance(res, tuple)
                     and len(res) == 2
                     and isinstance(res[0], synapse.api.errors.Codes)
                     and isinstance(res[1], dict)
@@ -582,7 +582,7 @@ class SpamChecker:
                     logger.warning(
                         "Module returned invalid value, rejecting 3pid invite as spam"
                     )
-                    return synapse.api.errors.Codes.FORBIDDEN
+                    return (synapse.api.errors.Codes.FORBIDDEN, {})
 
         return self.NOT_SPAM
 
@@ -606,7 +606,7 @@ class SpamChecker:
                 elif isinstance(res, synapse.api.errors.Codes):
                     return (res, {})
                 elif (
-                    isinstance(res, Tuple)
+                    isinstance(res, tuple)
                     and len(res) == 2
                     and isinstance(res[0], synapse.api.errors.Codes)
                     and isinstance(res[1], dict)
@@ -616,7 +616,7 @@ class SpamChecker:
                     logger.warning(
                         "Module returned invalid value, rejecting room creation as spam"
                     )
-                    return synapse.api.errors.Codes.FORBIDDEN
+                    return (synapse.api.errors.Codes.FORBIDDEN, {})
 
         return self.NOT_SPAM
 
@@ -642,7 +642,7 @@ class SpamChecker:
                 elif isinstance(res, synapse.api.errors.Codes):
                     return (res, {})
                 elif (
-                    isinstance(res, Tuple)
+                    isinstance(res, tuple)
                     and len(res) == 2
                     and isinstance(res[0], synapse.api.errors.Codes)
                     and isinstance(res[1], dict)
@@ -652,7 +652,7 @@ class SpamChecker:
                     logger.warning(
                         "Module returned invalid value, rejecting room create as spam"
                     )
-                    return synapse.api.errors.Codes.FORBIDDEN
+                    return (synapse.api.errors.Codes.FORBIDDEN, {})
 
         return self.NOT_SPAM
 
@@ -677,7 +677,7 @@ class SpamChecker:
                 elif isinstance(res, synapse.api.errors.Codes):
                     return (res, {})
                 elif (
-                    isinstance(res, Tuple)
+                    isinstance(res, tuple)
                     and len(res) == 2
                     and isinstance(res[0], synapse.api.errors.Codes)
                     and isinstance(res[1], dict)
@@ -687,7 +687,7 @@ class SpamChecker:
                     logger.warning(
                         "Module returned invalid value, rejecting room publication as spam"
                     )
-                    return synapse.api.errors.Codes.FORBIDDEN
+                    return (synapse.api.errors.Codes.FORBIDDEN, {})
 
         return self.NOT_SPAM
 
@@ -796,7 +796,7 @@ class SpamChecker:
                 elif isinstance(res, synapse.api.errors.Codes):
                     return (res, {})
                 elif (
-                    isinstance(res, Tuple)
+                    isinstance(res, tuple)
                     and len(res) == 2
                     and isinstance(res[0], synapse.api.errors.Codes)
                     and isinstance(res[1], dict)
@@ -806,6 +806,6 @@ class SpamChecker:
                     logger.warning(
                         "Module returned invalid value, rejecting media file as spam"
                     )
-                    return synapse.api.errors.Codes.FORBIDDEN
+                    return (synapse.api.errors.Codes.FORBIDDEN, {})
 
         return self.NOT_SPAM
