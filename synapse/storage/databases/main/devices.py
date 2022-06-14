@@ -1815,7 +1815,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
 
     async def get_uncoverted_outbound_room_pokes(
         self, limit: int = 10
-    ) -> List[Tuple[str, str, str, int, Dict[str, str]]]:
+    ) -> List[Tuple[str, str, str, int, Optional[Dict[str, str]]]]:
         """Get device list changes by room that have not yet been handled and
         written to `device_lists_outbound_pokes`.
 
@@ -1833,7 +1833,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
 
         def get_uncoverted_outbound_room_pokes_txn(
             txn: LoggingTransaction,
-        ) -> List[Tuple[str, str, str, int, Dict[str, str]]]:
+        ) -> List[Tuple[str, str, str, int, Optional[Dict[str, str]]]]:
             txn.execute(sql, (limit,))
 
             return [
@@ -1842,7 +1842,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                     device_id,
                     room_id,
                     stream_id,
-                    db_to_json(opentracing_context) or {},
+                    db_to_json(opentracing_context),
                 )
                 for user_id, device_id, room_id, stream_id, opentracing_context in txn
             ]
@@ -1858,7 +1858,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         room_id: str,
         stream_id: int,
         hosts: Collection[str],
-        context: Dict[str, str],
+        context: Optional[Dict[str, str]],
     ) -> None:
         """Queue the device update to be sent to the given set of hosts,
         calculated from the room ID.
