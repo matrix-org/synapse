@@ -157,9 +157,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
         with one of the given receipt types.
 
         Args:
-            user_id: The user to fetch receipts for. room_id: The room ID to
-            fetch the receipt for. receipt_type: The receipt types to fetch.
-            Earlier receipt types
+            user_id: The user to fetch receipts for.
+            room_id: The room ID to fetch the receipt for.
+            receipt_type: The receipt types to fetch. Earlier receipt types
                 are given priority if multiple receipts point to the same event.
 
         Returns:

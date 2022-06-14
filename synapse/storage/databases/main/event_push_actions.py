@@ -969,7 +969,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
     async def _remove_old_push_actions_that_have_rotated(
         self,
     ) -> None:
-        """Clear out old push actions that rotated been summarized."""
+        """Clear out old push actions that have been summarized."""
 
         # We want to clear out anything that older than a day that *has* already
         # been rotated.
