@@ -60,6 +60,9 @@ test_tags="synapse_blacklist,msc2716,msc3030,msc3787"
 # (The prefix is stripped off before reaching the container.)
 export COMPLEMENT_SHARE_ENV_PREFIX=PASS_
 
+# It takes longer than 10m to run the whole suite.
+extra_test_args+=("-timeout=60m")
+
 if [[ -n "$WORKERS" ]]; then
   # Use workers.
   export PASS_SYNAPSE_COMPLEMENT_USE_WORKERS=true
@@ -73,9 +76,6 @@ if [[ -n "$WORKERS" ]]; then
   # time (the main problem is that we start 14 python processes for each test,
   # and complement likes to do two of them in parallel).
   export COMPLEMENT_SPAWN_HS_TIMEOUT_SECS=120
-
-  # ... and it takes longer than 10m to run the whole suite.
-  extra_test_args+=("-timeout=60m")
 else
   export PASS_SYNAPSE_COMPLEMENT_USE_WORKERS=
   if [[ -n "$POSTGRES" ]]; then
