@@ -56,7 +56,7 @@ from synapse.handlers.account_data import AccountDataHandler
 from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.admin import AdminHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
-from synapse.handlers.auth import AuthHandler, MacaroonGenerator, PasswordAuthProvider
+from synapse.handlers.auth import AuthHandler, PasswordAuthProvider
 from synapse.handlers.cas import CasHandler
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
 from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
@@ -130,6 +130,7 @@ from synapse.streams.events import EventSources
 from synapse.types import DomainSpecificString, ISynapseReactor
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
+from synapse.util.macaroons import MacaroonGenerator
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import random_string
 
@@ -492,7 +493,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_macaroon_generator(self) -> MacaroonGenerator:
-        return MacaroonGenerator(self)
+        return MacaroonGenerator(
+            self.get_clock(), self.hostname, self.config.key.macaroon_secret_key
+        )
 
     @cache_in_self
     def get_device_handler(self):
