@@ -621,7 +621,7 @@ class SpamCheckerTestCaseDeprecated(unittest.HomeserverTestCase):
                 "spam_checker": [
                     {
                         "module": TestSpamCheckerDeprecated.__module__
-                        + ".TestSpamChecker",
+                        + ".TestSpamCheckerDeprecated",
                         "config": {},
                     }
                 ]
