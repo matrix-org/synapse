@@ -91,6 +91,22 @@ process, for example:
 
 # Upgrading to v1.61.0
 
+## Removal of depracated community/groups
+
+This release of Synapse will remove deprecated community/groups from codebase.
+
+### Worker endpoints
+
+For those who have deployed workers, following worker endpoints will no longer be existing
+and they are expected to be removed from reverse proxy config:
+
+-   `^/_matrix/federation/v1/get_groups_publicised$`
+-   `^/_matrix/client/(r0|v3|unstable)/joined_groups$`
+-   `^/_matrix/client/(r0|v3|unstable)/publicised_groups$`
+-   `^/_matrix/client/(r0|v3|unstable)/publicised_groups/`
+-   `^/_matrix/federation/v1/groups/`
+-   `^/_matrix/client/(r0|v3|unstable)/groups/`
+
 ## New signatures for spam checker callbacks
 
 As a followup to changes in v1.60.0, the following spam-checker callbacks have changed signature:
