@@ -1,0 +1,15 @@
+{% for worker in workers %}
+[program:synapse_{{ worker.name }}]
+command=/usr/local/bin/prefix-log /usr/local/bin/python -m {{ worker.app }} \
+    --config-path="{{ main_config_path }}" \
+    --config-path=/conf/workers/shared.yaml \
+    --config-path=/conf/workers/{{ worker.name }}.yaml
+autorestart=unexpected
+priority=500
+exitcodes=0
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+
+{% endfor %}
