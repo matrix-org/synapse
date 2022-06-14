@@ -59,6 +59,7 @@ from synapse.federation.federation_client import InvalidResponseError
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import nested_logging_context
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.module_api import NOT_SPAM
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationStoreRoomOnOutlierMembershipRestServlet,
@@ -800,9 +801,7 @@ class FederationHandler:
 
         # The remote hasn't signed it yet, obviously. We'll do the full checks
         # when we get the event back in `on_send_join_request`
-        await self._event_auth_handler.check_auth_rules_from_context(
-            room_version, event, context
-        )
+        await self._event_auth_handler.check_auth_rules_from_context(event, context)
         return event
 
     async def on_invite_request(
@@ -822,11 +821,14 @@ class FederationHandler:
         if self.hs.config.server.block_non_admin_invites:
             raise SynapseError(403, "This server does not accept room invites")
 
-        if not await self.spam_checker.user_may_invite(
+        spam_check = await self.spam_checker.user_may_invite(
             event.sender, event.state_key, event.room_id
-        ):
+        )
+        if spam_check != NOT_SPAM:
             raise SynapseError(
-                403, "This user is not permitted to send invites to this server/user"
+                403,
+                "This user is not permitted to send invites to this server/user",
+                spam_check,
             )
 
         membership = event.content.get("membership")
@@ -973,9 +975,7 @@ class FederationHandler:
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_leave_request`
-            await self._event_auth_handler.check_auth_rules_from_context(
-                room_version_obj, event, context
-            )
+            await self._event_auth_handler.check_auth_rules_from_context(event, context)
         except AuthError as e:
             logger.warning("Failed to create new leave %r because %s", event, e)
             raise e
@@ -1034,9 +1034,7 @@ class FederationHandler:
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_knock_request`
-            await self._event_auth_handler.check_auth_rules_from_context(
-                room_version_obj, event, context
-            )
+            await self._event_auth_handler.check_auth_rules_from_context(event, context)
         except AuthError as e:
             logger.warning("Failed to create new knock %r because %s", event, e)
             raise e
@@ -1207,9 +1205,9 @@ class FederationHandler:
             event.internal_metadata.send_on_behalf_of = self.hs.hostname
 
             try:
-                validate_event_for_room_version(room_version_obj, event)
+                validate_event_for_room_version(event)
                 await self._event_auth_handler.check_auth_rules_from_context(
-                    room_version_obj, event, context
+                    event, context
                 )
             except AuthError as e:
                 logger.warning("Denying new third party invite %r because %s", event, e)
@@ -1259,10 +1257,8 @@ class FederationHandler:
         )
 
         try:
-            validate_event_for_room_version(room_version_obj, event)
-            await self._event_auth_handler.check_auth_rules_from_context(
-                room_version_obj, event, context
-            )
+            validate_event_for_room_version(event)
+            await self._event_auth_handler.check_auth_rules_from_context(event, context)
         except AuthError as e:
             logger.warning("Denying third party invite %r because %s", event, e)
             raise e

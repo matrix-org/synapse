@@ -199,6 +199,7 @@ class AuthHandler:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
+        self.auth_blocking = hs.get_auth_blocking()
         self.clock = hs.get_clock()
         self.checkers: Dict[str, UserInteractiveAuthChecker] = {}
         for auth_checker_class in INTERACTIVE_AUTH_CHECKERS:
@@ -985,7 +986,7 @@ class AuthHandler:
             not is_appservice_ghost
             or self.hs.config.appservice.track_appservice_user_ips
         ):
-            await self.auth.check_auth_blocking(user_id)
+            await self.auth_blocking.check_auth_blocking(user_id)
 
         access_token = self.generate_access_token(target_user_id_obj)
         await self.store.add_access_token_to_user(
@@ -1439,7 +1440,7 @@ class AuthHandler:
         except Exception:
             raise AuthError(403, "Invalid login token", errcode=Codes.FORBIDDEN)
 
-        await self.auth.check_auth_blocking(res.user_id)
+        await self.auth_blocking.check_auth_blocking(res.user_id)
         return res
 
     async def delete_access_token(self, access_token: str) -> None:

@@ -29,6 +29,7 @@ from twisted.web.iweb import IPolicyForHTTPS
 from twisted.web.resource import Resource
 
 from synapse.api.auth import Auth
+from synapse.api.auth_blocking import AuthBlocking
 from synapse.api.filtering import Filtering
 from synapse.api.ratelimiting import Ratelimiter, RequestRatelimiter
 from synapse.appservice.api import ApplicationServiceApi
@@ -378,6 +379,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_auth(self) -> Auth:
         return Auth(self)
+
+    @cache_in_self
+    def get_auth_blocking(self) -> AuthBlocking:
+        return AuthBlocking(self)
 
     @cache_in_self
     def get_http_client_context_factory(self) -> IPolicyForHTTPS:
