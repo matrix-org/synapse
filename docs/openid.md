@@ -46,7 +46,7 @@ as follows:
 
 To enable the OpenID integration, you should then add a section to the `oidc_providers`
 setting in your configuration file.
-See the [configuration manual](usage/configuration/config_documentation.md) for some sample settings, as well as
+See the [configuration manual](usage/configuration/config_documentation.md#oidc_providers) for some sample settings, as well as
 the text below for example configurations for specific providers.
 
 ## Sample configs

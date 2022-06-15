@@ -49,8 +49,8 @@ as follows:
 * For other installation mechanisms, see the documentation provided by the
   maintainer.
 
-To enable the JSON web token integration, you should then add a `jwt_config` section
-to your configuration file. See the [configuration manual](usage/configuration/config_documentation.md) for some
+To enable the JSON web token integration, you should then add a `jwt_config` option
+to your configuration file. See the [configuration manual](usage/configuration/config_documentation.md#jwt_config) for some
 sample settings.
 
 ## How to test JWT as a developer

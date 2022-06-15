@@ -725,7 +725,7 @@ of Synapse.
 
 The `room_invite_state_types` configuration setting has been deprecated
 and replaced with `room_prejoin_state`. See the [sample configuration
-](https://github.com/matrix-org/synapse/blob/v1.34.0/docs/sample_config.yaml#L1515).
+file](https://github.com/matrix-org/synapse/blob/v1.34.0/docs/sample_config.yaml#L1515).
 
 If you have set `room_invite_state_types` to the default value you
 should simply remove it from your configuration file. The default value

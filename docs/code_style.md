@@ -75,7 +75,7 @@ on save as they take a while and can be very resource intensive.
 The [configuration manual](usage/configuration/config_documentation.md) acts as a
 reference to Synapse's configuration options for server administrators.
 Remember that many readers will be unfamiliar with YAML and server
-administration in general, so that it is important that that when you add
+administration in general, so it is important that when you add
 a configuration option the documentation be as easy to understand as possible, which 
 includes following a consistent format.
 
