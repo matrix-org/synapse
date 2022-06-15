@@ -444,7 +444,7 @@ class LoginRestServlet(RestServlet):
                 "JWT validation failed: Signature verification failed",
                 errcode=Codes.FORBIDDEN,
             )
-        except Exception as e:
+        except JoseError as e:
             # A JWT error occurred, return some info back to the client.
             raise LoginError(
                 403,
