@@ -230,9 +230,10 @@ Example configuration:
 serve_server_wellknown: true
 ```
 ---
-Config option: `extra_well_known_content`
+Config option: `extra_well_known_client_content `
 
 This option allows server runners to add arbitrary key-value pairs to the [client-facing `.well-known` response](https://spec.matrix.org/latest/client-server-api/#well-known-uri).
+Note that the `public_baseurl` config option must be provided for Synapse to serve a response to `/.well-known/matrix/client` at all.
 
 If this option is provided, it parses the given yaml to json and 
 serves it on `/.well-known/matrix/client` endpoint
@@ -240,7 +241,7 @@ alongside the standard properties.
 
 Example configuration:
 ```yaml
-extra_well_known_content: 
+extra_well_known_client_content : 
   option1: value1
   option2: value2
 ```
