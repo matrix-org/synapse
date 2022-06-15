@@ -16,7 +16,7 @@ from typing import Any
 
 from synapse.types import JsonDict
 
-from ._base import Config
+from ._base import Config, ConfigError
 
 MISSING_AUTHLIB = """Missing authlib library. This is required for jwt login.
 
@@ -45,7 +45,7 @@ class JWTConfig(Config):
             try:
                 from authlib.jose import JsonWebToken
 
-                JsonWebToken # To stop unused lint.
+                JsonWebToken  # To stop unused lint.
             except ImportError:
                 raise ConfigError(MISSING_AUTHLIB)
         else:
