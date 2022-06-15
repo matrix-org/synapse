@@ -438,6 +438,7 @@ class LoginRestServlet(RestServlet):
                 claims_options=claim_options,
             )
         except BadSignatureError:
+            # We handle this case separately to provide a better error message
             raise LoginError(
                 403,
                 "JWT validation failed: Signature verification failed",
