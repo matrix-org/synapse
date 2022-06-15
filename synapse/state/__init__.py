@@ -445,18 +445,12 @@ _biggest_room_by_db_counter = Counter(
 )
 
 _cpu_times = Histogram(
-    "cpu",
+    "synapse_state_res_cpu_for_all_rooms_seconds",
     "CPU time (utime+stime) spent computing a single state resolution",
-    namespace="synapse",
-    subsystem="state_res",
-    unit="seconds",
 )
 _db_times = Histogram(
-    "db",
+    "synapse_state_res_db_for_all_rooms_seconds",
     "Database time spent computing a single state resolution",
-    namespace="synapse",
-    subsystem="state_res",
-    unit="seconds",
 )
 
 
