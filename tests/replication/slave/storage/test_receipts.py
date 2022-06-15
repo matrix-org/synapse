@@ -29,6 +29,8 @@ class SlavedReceiptTestCase(BaseSlavedStoreTestCase):
     STORE_TYPE = SlavedReceiptsStore
 
     def prepare(self, reactor, clock, homeserver):
+        self.clock._reactor.advance(1)
+
         super().prepare(reactor, clock, homeserver)
         self.room_creator = homeserver.get_room_creation_handler()
         self.persist_event_storage_controller = (

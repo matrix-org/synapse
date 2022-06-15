@@ -35,6 +35,7 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
         self.event_creation_handler = self.hs.get_event_creation_handler()
         self.event_builder_factory = self.hs.get_event_builder_factory()
         self._storage_controllers = self.hs.get_storage_controllers()
+        self.clock._reactor.advance(1)
 
         self.get_success(create_room(self.hs, TEST_ROOM_ID, "@someone:ROOM"))
 
@@ -258,6 +259,10 @@ class FilterEventsForServerTestCase(unittest.HomeserverTestCase):
 
 
 class FilterEventsForClientTestCase(unittest.FederatingHomeserverTestCase):
+    def setUp(self) -> None:
+        super(FilterEventsForClientTestCase, self).setUp()
+        self.clock._reactor.advance(1)
+
     def test_out_of_band_invite_rejection(self):
         # this is where we have received an invite event over federation, and then
         # rejected it.

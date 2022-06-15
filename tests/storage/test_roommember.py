@@ -47,6 +47,8 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         # User elsewhere on another host
         self.u_charlie = UserID.from_string("@charlie:elsewhere")
 
+        self.clock._reactor.advance(1)
+
     def test_one_member(self) -> None:
 
         # Alice creates the room, and is automatically joined
@@ -217,6 +219,8 @@ class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
         self.room_creator = hs.get_room_creation_handler()
+
+        self.clock._reactor.advance(1)
 
     def test_can_rerun_update(self) -> None:
         # First make sure we have completed all updates.

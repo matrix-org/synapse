@@ -30,6 +30,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         return config
 
     def prepare(self, reactor, clock, hs):
+        self.clock._reactor.advance(1)
         self.store = hs.get_datastores().main
         self._storage = hs.get_storage_controllers()
         self.event_builder_factory = hs.get_event_builder_factory()

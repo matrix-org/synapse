@@ -36,6 +36,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         self.http_client = Mock()
         self.reactor = ThreadedMemoryReactorClock()
         self.hs_clock = Clock(self.reactor)
+        self.reactor.advance(1)
         self.homeserver = setup_test_homeserver(
             self.addCleanup,
             federation_http_client=self.http_client,

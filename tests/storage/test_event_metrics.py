@@ -19,6 +19,9 @@ from tests.unittest import HomeserverTestCase
 
 
 class ExtremStatisticsTestCase(HomeserverTestCase):
+    def prepare(self, reactor, clock, hs):
+        self.clock._reactor.advance(1)
+
     def test_exposed_to_prometheus(self):
         """
         Forward extremity counts are exposed via Prometheus.

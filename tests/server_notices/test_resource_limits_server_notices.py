@@ -53,6 +53,8 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         return config
 
     def prepare(self, reactor, clock, hs):
+        self.clock._reactor.advance(1)
+
         self.server_notices_sender = self.hs.get_server_notices_sender()
 
         # relying on [1] is far from ideal, but the only case where
@@ -246,6 +248,8 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         return c
 
     def prepare(self, reactor, clock, hs):
+        self.clock._reactor.advance(1)
+
         self.store = self.hs.get_datastores().main
         self.server_notices_sender = self.hs.get_server_notices_sender()
         self.server_notices_manager = self.hs.get_server_notices_manager()

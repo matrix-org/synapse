@@ -30,6 +30,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
     """
 
     def prepare(self, reactor, clock, homeserver):
+        self.clock._reactor.advance(1)
         self.store = homeserver.get_datastores().main
         self.room_creator = homeserver.get_room_creation_handler()
 
