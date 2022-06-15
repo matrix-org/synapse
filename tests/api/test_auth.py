@@ -284,7 +284,9 @@ class AuthTestCase(unittest.HomeserverTestCase):
             TokenLookupResult(
                 user_id="@baldrick:matrix.org",
                 device_id="device",
+                token_id=5,
                 token_owner="@admin:matrix.org",
+                token_used=True,
             )
         )
         self.store.insert_client_ip = simple_async_mock(None)
@@ -301,7 +303,9 @@ class AuthTestCase(unittest.HomeserverTestCase):
             TokenLookupResult(
                 user_id="@baldrick:matrix.org",
                 device_id="device",
+                token_id=5,
                 token_owner="@admin:matrix.org",
+                token_used=True,
             )
         )
         self.store.insert_client_ip = simple_async_mock(None)
@@ -347,7 +351,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         serialized = macaroon.serialize()
 
         user_info = self.get_success(self.auth.get_user_by_access_token(serialized))
-        self.assertEqual(user_id, user_info.user_id)
+        self.assertEqual(user_id, user_info.user.to_string())
         self.assertTrue(user_info.is_guest)
         self.store.get_user_by_id.assert_called_with(user_id)
 

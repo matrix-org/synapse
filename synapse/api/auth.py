@@ -37,7 +37,6 @@ from synapse.logging.opentracing import (
     start_active_span,
     trace,
 )
-from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import Requester, create_requester
 
 if TYPE_CHECKING:
@@ -183,41 +182,29 @@ class Auth:
 
             access_token = self.get_access_token_from_request(request)
 
-            (
-                user_id,
-                device_id,
-                app_service,
-            ) = await self._get_appservice_user_id_and_device_id(request)
-            if user_id and app_service:
+            # First check if it could be a request from an appservice
+            requester = await self._get_appservice_user(request)
+            if requester:
                 if ip_addr and self._track_appservice_user_ips:
                     await self.store.insert_client_ip(
-                        user_id=user_id,
+                        user_id=requester.user.to_string(),
                         access_token=access_token,
                         ip=ip_addr,
                         user_agent=user_agent,
-                        device_id="dummy-device"
-                        if device_id is None
-                        else device_id,  # stubbed
+                        device_id=requester.device_id,
                     )
 
-                requester = create_requester(
-                    user_id, app_service=app_service, device_id=device_id
-                )
-
-                request.requester = user_id
+                request.requester = requester
                 return requester
 
-            user_info = await self.get_user_by_access_token(
-                access_token, allow_expired=allow_expired
+            requester = await self.get_user_by_access_token(
+                access_token, allow_expired=allow_expired, mark_as_used=True
             )
-            token_id = user_info.token_id
-            is_guest = user_info.is_guest
-            shadow_banned = user_info.shadow_banned
 
             # Deny the request if the user account has expired.
             if not allow_expired:
                 if await self._account_validity_handler.is_user_expired(
-                    user_info.user_id
+                    requester.user.to_string()
                 ):
                     # Raise the error if either an account validity module has determined
                     # the account has expired, or the legacy account validity
@@ -228,50 +215,33 @@ class Auth:
                         errcode=Codes.EXPIRED_ACCOUNT,
                     )
 
-            device_id = user_info.device_id
-
-            if access_token and ip_addr:
+            if ip_addr:
                 await self.store.insert_client_ip(
-                    user_id=user_info.token_owner,
+                    user_id=requester.authenticated_entity,
                     access_token=access_token,
                     ip=ip_addr,
                     user_agent=user_agent,
-                    device_id=device_id,
+                    device_id=requester.device_id,
                 )
                 # Track also the puppeted user client IP if enabled and the user is puppeting
                 if (
-                    user_info.user_id != user_info.token_owner
+                    requester.user.to_string() != requester.authenticated_entity
                     and self._track_puppeted_user_ips
                 ):
                     await self.store.insert_client_ip(
-                        user_id=user_info.user_id,
+                        user_id=requester.user.to_string(),
                         access_token=access_token,
                         ip=ip_addr,
                         user_agent=user_agent,
-                        device_id=device_id,
+                        device_id=requester.device_id,
                     )
 
-            if is_guest and not allow_guest:
+            if requester.is_guest and not allow_guest:
                 raise AuthError(
                     403,
                     "Guest access not allowed",
                     errcode=Codes.GUEST_ACCESS_FORBIDDEN,
                 )
-
-            # Mark the token as used. This is used to invalidate old refresh
-            # tokens after some time.
-            if not user_info.token_used and token_id is not None:
-                await self.store.mark_access_token_as_used(token_id)
-
-            requester = create_requester(
-                user_info.user_id,
-                token_id,
-                is_guest,
-                shadow_banned,
-                device_id,
-                app_service=app_service,
-                authenticated_entity=user_info.token_owner,
-            )
 
             request.requester = requester
             return requester
@@ -309,9 +279,7 @@ class Auth:
                 403, "Application service has not registered this user (%s)" % user_id
             )
 
-    async def _get_appservice_user_id_and_device_id(
-        self, request: Request
-    ) -> Tuple[Optional[str], Optional[str], Optional[ApplicationService]]:
+    async def _get_appservice_user(self, request: Request) -> Optional[Requester]:
         """
         Given a request, reads the request parameters to determine:
         - whether it's an application service that's making this request
@@ -326,8 +294,7 @@ class Auth:
              Must use `org.matrix.msc3202.device_id` in place of `device_id` for now.
 
         Returns:
-            3-tuple of
-            (user ID?, device ID?, application service?)
+            the application service ``Requester`` of that request
 
         Postconditions:
         - If an application service is returned, so is a user ID
@@ -344,12 +311,12 @@ class Auth:
             self.get_access_token_from_request(request)
         )
         if app_service is None:
-            return None, None, None
+            return None
 
         if app_service.ip_range_whitelist:
             ip_address = IPAddress(request.getClientAddress().host)
             if ip_address not in app_service.ip_range_whitelist:
-                return None, None, None
+                return None
 
         # This will always be set by the time Twisted calls us.
         assert request.args is not None
@@ -383,19 +350,24 @@ class Auth:
                     Codes.EXCLUSIVE,
                 )
 
-        return effective_user_id, effective_device_id, app_service
+        return create_requester(
+            effective_user_id, app_service=app_service, device_id=effective_device_id
+        )
 
     async def get_user_by_access_token(
         self,
         token: str,
         allow_expired: bool = False,
-    ) -> TokenLookupResult:
+        mark_as_used: bool = False,
+    ) -> Requester:
         """Validate access token and get user_id from it
 
         Args:
             token: The access token to get the user by
             allow_expired: If False, raises an InvalidClientTokenError
                 if the token is expired
+            mark_as_used: Mark the token as used, if it was used to
+                authenticate a regular C-S API request
 
         Raises:
             InvalidClientTokenError if a user by that token exists, but the token is
@@ -406,9 +378,9 @@ class Auth:
 
         # First look in the database to see if the access token is present
         # as an opaque token.
-        r = await self.store.get_user_by_access_token(token)
-        if r:
-            valid_until_ms = r.valid_until_ms
+        user_info = await self.store.get_user_by_access_token(token)
+        if user_info:
+            valid_until_ms = user_info.valid_until_ms
             if (
                 not allow_expired
                 and valid_until_ms is not None
@@ -420,7 +392,21 @@ class Auth:
                     msg="Access token has expired", soft_logout=True
                 )
 
-            return r
+            # Mark the token as used. This is used to invalidate old refresh
+            # tokens after some time.
+            if mark_as_used and not user_info.token_used:
+                await self.store.mark_access_token_as_used(user_info.token_id)
+
+            requester = create_requester(
+                user_id=user_info.user_id,
+                access_token_id=user_info.token_id,
+                is_guest=user_info.is_guest,
+                shadow_banned=user_info.shadow_banned,
+                device_id=user_info.device_id,
+                authenticated_entity=user_info.token_owner,
+            )
+
+            return requester
 
         # If the token isn't found in the database, then it could still be a
         # macaroon for a guest, so we check that here.
@@ -446,7 +432,7 @@ class Auth:
                     "Guest access token used for regular user"
                 )
 
-            return TokenLookupResult(
+            return create_requester(
                 user_id=user_id,
                 is_guest=True,
                 # all guests get the same device id
