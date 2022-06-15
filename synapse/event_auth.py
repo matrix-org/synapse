@@ -209,7 +209,7 @@ async def check_state_independent_auth_rules(
         raise AuthError(403, "No create event in auth events")
 
 
-def check_auth_rules_for_event(
+def check_state_dependent_auth_rules(
     event: "EventBase",
     auth_events: Iterable["EventBase"],
 ) -> None:
