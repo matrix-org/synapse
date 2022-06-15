@@ -284,7 +284,12 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         stream_ordering: int,
         max_stream_ordering: Optional[int] = None,
     ) -> Tuple[int, int]:
-        """Returns the notify and unread counts for the given user/room."""
+        """Returns the notify and unread counts from `event_push_actions` for
+        the given user/room in the given range.
+
+        Does not consult `event_push_summary` table, which may include push
+        actions that have been deleted from `event_push_actions` table.
+        """
 
         clause = ""
         args = [user_id, room_id, stream_ordering]
