@@ -672,11 +672,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         return ret
 
     async def get_recent_events_for_room(
-        self,
-        room_id: str,
-        limit: int,
-        end_token: RoomStreamToken,
-        order_by: str = "topological",
+        self, room_id: str, limit: int, end_token: RoomStreamToken
     ) -> Tuple[List[EventBase], RoomStreamToken]:
         """Get the most recent events in the room in topological ordering.
 
@@ -684,8 +680,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             room_id
             limit
             end_token: The stream token representing now.
-            order_by: Either 'topological' or 'stream' to indicate the order in
-                which results should be returned.
 
         Returns:
             A list of events and a token pointing to the start of the returned
@@ -693,10 +687,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         """
 
         rows, token = await self.get_recent_event_ids_for_room(
-            room_id,
-            limit,
-            end_token,
-            order_by,
+            room_id, limit, end_token
         )
 
         events = await self.get_events_as_list(
@@ -708,11 +699,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         return events, token
 
     async def get_recent_event_ids_for_room(
-        self,
-        room_id: str,
-        limit: int,
-        end_token: RoomStreamToken,
-        order_by: str = "topological",
+        self, room_id: str, limit: int, end_token: RoomStreamToken
     ) -> Tuple[List[_EventDictReturn], RoomStreamToken]:
         """Get the most recent events in the room in topological ordering.
 
@@ -720,8 +707,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             room_id
             limit
             end_token: The stream token representing now.
-            order_by: Either 'topological' or 'stream' to indicate the order in
-                which results should be returned.
 
         Returns:
             A list of _EventDictReturn and a token pointing to the start of the
@@ -736,7 +721,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             self._paginate_room_events_txn,
             room_id,
             from_token=end_token,
-            order_by=order_by,
             limit=limit,
         )
 
@@ -1164,7 +1148,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         from_token: RoomStreamToken,
         to_token: Optional[RoomStreamToken] = None,
         direction: str = "b",
-        order_by: str = "topological",
         limit: int = -1,
         event_filter: Optional[Filter] = None,
     ) -> Tuple[List[_EventDictReturn], RoomStreamToken]:
@@ -1177,8 +1160,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             to_token: A token which if given limits the results to only those before
             direction: Either 'b' or 'f' to indicate whether we are paginating
                 forwards or backwards from `from_key`.
-            order_by: Either 'topological' or 'stream' to indicate the order in
-                which results should be returned.
             limit: The maximum number of events to return.
             event_filter: If provided filters the events to
                 those that match the filter.
@@ -1191,7 +1172,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         """
 
         assert int(limit) >= 0
-        assert order_by in ("topological", "stream")
 
         # Tokens really represent positions between elements, but we use
         # the convention of pointing to the event before the gap. Hence
@@ -1201,12 +1181,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             order = "DESC"
         else:
             order = "ASC"
-
-        order_clause = """ORDER BY event.topological_ordering %(order)s, event.stream_ordering %(order)s"""
-        if order_by == "stream":
-            order_clause = """ORDER BY event.stream_ordering %(order)s, event.topological_ordering %(order)s"""
-
-        order_clause = order_clause % {"order": order}
 
         # The bounds for the stream tokens are complicated by the fact
         # that we need to handle the instance_map part of the tokens. We do this
@@ -1303,13 +1277,13 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             FROM events AS event
             %(join_clause)s
             WHERE event.outlier = ? AND event.room_id = ? AND %(bounds)s
-            %(order_clause)s
-            LIMIT ?
+            ORDER BY event.topological_ordering %(order)s,
+            event.stream_ordering %(order)s LIMIT ?
         """ % {
             "select_keywords": select_keywords,
             "join_clause": join_clause,
             "bounds": bounds,
-            "order_clause": order_clause,
+            "order": order,
         }
 
         txn.execute(sql, args)
@@ -1350,7 +1324,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         from_key: RoomStreamToken,
         to_key: Optional[RoomStreamToken] = None,
         direction: str = "b",
-        order_by: str = "topological",
         limit: int = -1,
         event_filter: Optional[Filter] = None,
     ) -> Tuple[List[EventBase], RoomStreamToken]:
@@ -1362,8 +1335,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             to_key: A token which if given limits the results to only those before
             direction: Either 'b' or 'f' to indicate whether we are paginating
                 forwards or backwards from `from_key`.
-            order_by: Either 'topological' or 'stream' to indicate the order in
-                which results should be returned.
             limit: The maximum number of events to return.
             event_filter: If provided filters the events to those that match the filter.
 
@@ -1381,7 +1352,6 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             from_key,
             to_key,
             direction,
-            order_by,
             limit,
             event_filter,
         )
