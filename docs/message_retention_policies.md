@@ -49,9 +49,9 @@ clients.
 
 ## Server configuration
 
-Support for this feature can be enabled and configured in the
-`retention` section of the Synapse configuration file (see the
-[sample file](https://github.com/matrix-org/synapse/blob/v1.36.0/docs/sample_config.yaml#L451-L518)).
+Support for this feature can be enabled and configured by adding a the
+`retention` in the Synapse configuration file (see
+[configuration manual](usage/configuration/config_documentation.md#retention)).
 
 To enable support for message retention policies, set the setting
 `enabled` in this section to `true`.
@@ -65,8 +65,8 @@ message retention policy configured in its state. This allows server
 admins to ensure that messages are never kept indefinitely in a server's
 database. 
 
-A default policy can be defined as such, in the `retention` section of
-the configuration file:
+A default policy can be defined as such, by adding the `retention` option in
+the configuration file and adding these sub-options:
 
 ```yaml
 default_policy:
@@ -86,8 +86,8 @@ Purge jobs are the jobs that Synapse runs in the background to purge
 expired events from the database. They are only run if support for
 message retention policies is enabled in the server's configuration. If
 no configuration for purge jobs is configured by the server admin,
-Synapse will use a default configuration, which is described in the
-[sample configuration file](https://github.com/matrix-org/synapse/blob/v1.36.0/docs/sample_config.yaml#L451-L518).
+Synapse will use a default configuration, which is described here in the
+[configuration manual](usage/configuration/config_documentation.md#retention).
 
 Some server admins might want a finer control on when events are removed
 depending on an event's room's policy. This can be done by setting the
@@ -137,8 +137,8 @@ the server's database.
 ### Lifetime limits
 
 Server admins can set limits on the values of `max_lifetime` to use when
-purging old events in a room. These limits can be defined as such in the
-`retention` section of the configuration file:
+purging old events in a room. These limits can be defined under the
+`retention` option in the configuration file:
 
 ```yaml
 allowed_lifetime_min: 1d

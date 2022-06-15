@@ -2983,7 +2983,7 @@ This setting has the following sub-options:
 * `localdb_enabled`: Set to false to disable authentication against the local password
    database. This is ignored if `enabled` is false, and is only useful
    if you have other `password_providers`. Defaults to true. 
-* `pepper`: Set the value here to a secret random string for extra security. # Uncomment and change to a secret random string for extra security.
+* `pepper`: Set the value here to a secret random string for extra security.
    DO NOT CHANGE THIS AFTER INITIAL SETUP!
 * `policy`: Define and enforce a password policy, such as minimum lengths for passwords, etc. 
    Each parameter is optional. This is an implementation of MSC2000. Parameters are as follows:

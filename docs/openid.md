@@ -45,8 +45,8 @@ as follows:
    maintainer.
 
 To enable the OpenID integration, you should then add a section to the `oidc_providers`
-setting in your configuration file (or uncomment one of the existing examples).
-See [sample_config.yaml](./sample_config.yaml) for some sample settings, as well as
+setting in your configuration file.
+See the [configuration manual](usage/configuration/config_documentation.md) for some sample settings, as well as
 the text below for example configurations for specific providers.
 
 ## Sample configs
