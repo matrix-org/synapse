@@ -287,7 +287,9 @@ class StateStorageController:
         self, event_id: str, state_filter: Optional[StateFilter] = None
     ) -> StateMap[str]:
         """
-        Get the state dict corresponding to a particular event
+        Get the state dict corresponding to a particular event.
+        Note that this is the state *after* the event: the event's changes have
+        already taken effect.
 
         Args:
             event_id: event whose state should be returned
