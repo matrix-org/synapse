@@ -4060,8 +4060,8 @@ Defaults to 30m. </p>
 <p><code>sync_response_cache_duration</code>: Controls how long the results of a /sync request are
 cached for after a successful response is returned. A higher duration can help clients
 with intermittent connections, at the cost of higher memory usage.
-By default, this is zero, which means that sync responses are not cached
-at all.</p>
+A value of zero means that sync responses are not cached.
+Defaults to 2m.</p>
 </li>
 <li>
 <p><code>cache_autotuning</code> and its sub-options <code>max_cache_memory_usage</code>, <code>target_cache_memory_usage</code>, and
