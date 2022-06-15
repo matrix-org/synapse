@@ -15,6 +15,7 @@ import logging
 from typing import Iterable, Optional
 
 from canonicaljson import encode_canonical_json
+from parameterized import parameterized
 
 from synapse.api.constants import ReceiptTypes
 from synapse.api.room_versions import RoomVersions
@@ -157,20 +158,22 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             ],
         )
 
-    def test_push_actions_for_user(self):
+    @parameterized.expand([(True,), (False,)])
+    def test_push_actions_for_user(self, send_receipt: bool):
         self.persist(type="m.room.create", key="", creator=USER_ID)
-        self.persist(type="m.room.join", key=USER_ID, membership="join")
+        self.persist(type="m.room.member", key=USER_ID, membership="join")
         self.persist(
-            type="m.room.join", sender=USER_ID, key=USER_ID_2, membership="join"
+            type="m.room.member", sender=USER_ID, key=USER_ID_2, membership="join"
         )
         event1 = self.persist(type="m.room.message", msgtype="m.text", body="hello")
         self.replicate()
 
-        self.get_success(
-            self.master_store.insert_receipt(
-                ROOM_ID, ReceiptTypes.READ, USER_ID_2, [event1.event_id], {}
+        if send_receipt:
+            self.get_success(
+                self.master_store.insert_receipt(
+                    ROOM_ID, ReceiptTypes.READ, USER_ID_2, [event1.event_id], {}
+                )
             )
-        )
 
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
