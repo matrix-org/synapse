@@ -207,7 +207,7 @@ is an option that Synapse doesn't recognize and thus ignores.</p>
 enabled: false
 </code></pre>
 <p>In this manual, all top-level settings (ones with no indentation) are identified 
-at the beginning of their section (i.e. &quot;Config option: <code>example_setting</code>&quot;) and 
+at the beginning of their section (i.e. &quot;### <code>example_setting</code>&quot;) and 
 the sub-options, if any, are identified and listed in the body of the section. 
 In addition, each setting has an example of its usage, with the proper indentation
 shown. </p>
@@ -240,7 +240,7 @@ shown. </p>
 <p>See <a href="../../modules/index.html">here</a> for more
 documentation on how to configure or create custom modules for Synapse.</p>
 <hr />
-<p>Config option: <code>modules</code></p>
+<h3 id="modules-1"><a class="header" href="#modules-1"><code>modules</code></a></h3>
 <p>Use the <code>module</code> sub-option to add modules under this option to extend functionality. 
 The <code>module</code> setting then has a sub-option, <code>config</code>, which can be used to define some configuration
 for the <code>module</code>.</p>
@@ -257,7 +257,7 @@ for the <code>module</code>.</p>
 <h2 id="server"><a class="header" href="#server">Server</a></h2>
 <p>Define your homeserver name and other base options.</p>
 <hr />
-<p>Config option: <code>server_name</code></p>
+<h3 id="server_name"><a class="header" href="#server_name"><code>server_name</code></a></h3>
 <p>This sets the public-facing domain of the server.</p>
 <p>The <code>server_name</code> name will appear at the end of usernames and room addresses
 created on your server. For example if the <code>server_name</code> was example.com,
@@ -279,19 +279,19 @@ lowercase and may contain an explicit port.</p>
 <pre><code class="language-yaml">server_name: localhost:8080
 </code></pre>
 <hr />
-<p>Config option: <code>pid_file</code></p>
+<h3 id="pid_file"><a class="header" href="#pid_file"><code>pid_file</code></a></h3>
 <p>When running Synapse as a daemon, the file to store the pid in. Defaults to none.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">pid_file: DATADIR/homeserver.pid
 </code></pre>
 <hr />
-<p>Config option: <code>web_client_location</code></p>
+<h3 id="web_client_location"><a class="header" href="#web_client_location"><code>web_client_location</code></a></h3>
 <p>The absolute URL to the web client which <code>/</code> will redirect to. Defaults to none. </p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">web_client_location: https://riot.example.com/
 </code></pre>
 <hr />
-<p>Config option: <code>public_baseurl</code></p>
+<h3 id="public_baseurl"><a class="header" href="#public_baseurl"><code>public_baseurl</code></a></h3>
 <p>The public-facing base URL that clients use to access this Homeserver (not
 including _matrix/...). This is the same URL a user might enter into the
 'Custom Homeserver URL' field on their client. If you use Synapse with a
@@ -303,7 +303,7 @@ Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
 <pre><code class="language-yaml">public_baseurl: https://example.com/
 </code></pre>
 <hr />
-<p>Config option: <code>serve_server_wellknown</code></p>
+<h3 id="serve_server_wellknown"><a class="header" href="#serve_server_wellknown"><code>serve_server_wellknown</code></a></h3>
 <p>By default, other servers will try to reach our server on port 8448, which can
 be inconvenient in some environments.</p>
 <p>Provided <code>https://&lt;server_name&gt;/</code> on port 443 is routed to Synapse, this
@@ -316,7 +316,7 @@ information.</p>
 <pre><code class="language-yaml">serve_server_wellknown: true
 </code></pre>
 <hr />
-<p>Config option: <code>soft_file_limit</code></p>
+<h3 id="soft_file_limit"><a class="header" href="#soft_file_limit"><code>soft_file_limit</code></a></h3>
 <p>Set the soft limit on the number of file descriptors synapse can use.
 Zero is used to indicate synapse should set the soft limit to the hard limit.
 Defaults to 0. </p>
@@ -324,7 +324,7 @@ Defaults to 0. </p>
 <pre><code class="language-yaml">soft_file_limit: 3
 </code></pre>
 <hr />
-<p>Config option: <code>presence</code></p>
+<h3 id="presence"><a class="header" href="#presence"><code>presence</code></a></h3>
 <p>Presence tracking allows users to see the state (e.g online/offline)
 of other local and remote users. Set the <code>enabled</code> sub-option to false to<br />
 disable presence tracking on this homeserver. Defaults to true. 
@@ -334,7 +334,7 @@ This option replaces the previous top-level 'use_presence' option.</p>
   enabled: false
 </code></pre>
 <hr />
-<p>Config option: <code>require_auth_for_profile_requests</code></p>
+<h3 id="require_auth_for_profile_requests"><a class="header" href="#require_auth_for_profile_requests"><code>require_auth_for_profile_requests</code></a></h3>
 <p>Whether to require authentication to retrieve profile data (avatars, display names) of other 
 users through the client API. Defaults to false. Note that profile data is also available 
 via the federation API, unless <code>allow_profile_lookup_over_federation</code> is set to false.</p>
@@ -342,7 +342,7 @@ via the federation API, unless <code>allow_profile_lookup_over_federation</code>
 <pre><code class="language-yaml">require_auth_for_profile_requests: true
 </code></pre>
 <hr />
-<p>Config option: <code>limit_profile_requests_to_users_who_share_rooms</code></p>
+<h3 id="limit_profile_requests_to_users_who_share_rooms"><a class="header" href="#limit_profile_requests_to_users_who_share_rooms"><code>limit_profile_requests_to_users_who_share_rooms</code></a></h3>
 <p>Use this option to require a user to share a room with another user in order
 to retrieve their profile information. Only checked on Client-Server 
 requests. Profile requests from other servers should be checked by the
@@ -351,7 +351,7 @@ requesting server. Defaults to false.</p>
 <pre><code class="language-yaml">limit_profile_requests_to_users_who_share_rooms: true
 </code></pre>
 <hr />
-<p>Config option: <code>include_profile_data_on_invite</code></p>
+<h3 id="include_profile_data_on_invite"><a class="header" href="#include_profile_data_on_invite"><code>include_profile_data_on_invite</code></a></h3>
 <p>Use this option to prevent a user's profile data from being retrieved and
 displayed in a room until they have joined it. By default, a user's
 profile data is included in an invite event, regardless of the values
@@ -361,7 +361,7 @@ Defaults to true.</p>
 <pre><code class="language-yaml">include_profile_data_on_invite: false
 </code></pre>
 <hr />
-<p>Config option: <code>allow_public_rooms_without_auth</code></p>
+<h3 id="allow_public_rooms_without_auth"><a class="header" href="#allow_public_rooms_without_auth"><code>allow_public_rooms_without_auth</code></a></h3>
 <p>If set to true, removes the need for authentication to access the server's
 public rooms directory through the client API, meaning that anyone can
 query the room directory. Defaults to false.</p>
@@ -369,14 +369,14 @@ query the room directory. Defaults to false.</p>
 <pre><code class="language-yaml">allow_public_rooms_without_auth: true
 </code></pre>
 <hr />
-<p>Config option: <code>allow_public_rooms_without_auth</code></p>
+<h3 id="allow_public_rooms_without_auth-1"><a class="header" href="#allow_public_rooms_without_auth-1"><code>allow_public_rooms_without_auth</code></a></h3>
 <p>If set to true, allows any other homeserver to fetch the server's public
 rooms directory via federation. Defaults to false.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">allow_public_rooms_over_federation: true
 </code></pre>
 <hr />
-<p>Config option: <code>default_room_version</code></p>
+<h3 id="default_room_version"><a class="header" href="#default_room_version"><code>default_room_version</code></a></h3>
 <p>The default room version for newly created rooms on this server.</p>
 <p>Known room versions are listed <a href="https://spec.matrix.org/latest/rooms/#complete-list-of-room-versions">here</a></p>
 <p>For example, for room version 1, <code>default_room_version</code> should be set
@@ -386,14 +386,14 @@ to &quot;1&quot;. </p>
 <pre><code class="language-yaml">default_room_version: &quot;8&quot;
 </code></pre>
 <hr />
-<p>Config option: <code>gc_thresholds</code></p>
+<h3 id="gc_thresholds"><a class="header" href="#gc_thresholds"><code>gc_thresholds</code></a></h3>
 <p>The garbage collection threshold parameters to pass to <code>gc.set_threshold</code>, if defined.
 Defaults to none. </p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">gc_thresholds: [700, 10, 10]
 </code></pre>
 <hr />
-<p>Config option: <code>gc_min_interval</code></p>
+<h3 id="gc_min_interval"><a class="header" href="#gc_min_interval"><code>gc_min_interval</code></a></h3>
 <p>The minimum time in seconds between each GC for a generation, regardless of
 the GC thresholds. This ensures that we don't do GC too frequently. A value of <code>[1s, 10s, 30s]</code> 
 indicates that a second must pass between consecutive generation 0 GCs, etc.</p>
@@ -402,28 +402,28 @@ indicates that a second must pass between consecutive generation 0 GCs, etc.</p>
 <pre><code class="language-yaml">gc_min_interval: [0.5s, 30s, 1m]
 </code></pre>
 <hr />
-<p>Config option: <code>filter_timeline_limit</code></p>
+<h3 id="filter_timeline_limit"><a class="header" href="#filter_timeline_limit"><code>filter_timeline_limit</code></a></h3>
 <p>Set the limit on the returned events in the timeline in the get
 and sync operations. Defaults to 100. A value of -1 means no upper limit.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">filter_timeline_limit: 5000
 </code></pre>
 <hr />
-<p>Config option: <code>block_non_admin_invites</code></p>
+<h3 id="block_non_admin_invites"><a class="header" href="#block_non_admin_invites"><code>block_non_admin_invites</code></a></h3>
 <p>Whether room invites to users on this server should be blocked
 (except those sent by local server admins). Defaults to false.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">block_non_admin_invites: true
 </code></pre>
 <hr />
-<p>Config option: <code>enable_search</code></p>
+<h3 id="enable_search"><a class="header" href="#enable_search"><code>enable_search</code></a></h3>
 <p>If set to false, new messages will not be indexed for searching and users
 will receive errors when searching for messages. Defaults to true.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">enable_search: false
 </code></pre>
 <hr />
-<p>Config option: <code>ip_range_blacklist</code></p>
+<h3 id="ip_range_blacklist"><a class="header" href="#ip_range_blacklist"><code>ip_range_blacklist</code></a></h3>
 <p>This option prevents outgoing requests from being sent to the specified blacklisted IP address
 CIDR ranges. If this option is not specified then it defaults to private IP
 address ranges (see the example below).</p>
@@ -456,7 +456,7 @@ listed here, since they correspond to unroutable addresses.)</p>
   - 'fec0::/10'
 </code></pre>
 <hr />
-<p>Config option: <code>ip_range_whitelist</code></p>
+<h3 id="ip_range_whitelist"><a class="header" href="#ip_range_whitelist"><code>ip_range_whitelist</code></a></h3>
 <p>List of IP address CIDR ranges that should be allowed for federation,
 identity servers, push servers, and for checking key validity for
 third-party invite events. This is useful for specifying exceptions to
@@ -469,7 +469,7 @@ list.</p>
    - '192.168.1.1'
 </code></pre>
 <hr />
-<p>Config option: <code>listeners</code></p>
+<h3 id="listeners"><a class="header" href="#listeners"><code>listeners</code></a></h3>
 <p>List of ports that Synapse should listen on, their purpose and their
 configuration.</p>
 <p>Sub-options for each listener include:</p>
@@ -593,7 +593,7 @@ additional endpoints which should be loaded via dynamic modules.</p>
     type: manhole
 </code></pre>
 <hr />
-<p>Config option: <code>manhole_settings</code></p>
+<h3 id="manhole_settings"><a class="header" href="#manhole_settings"><code>manhole_settings</code></a></h3>
 <p>Connection settings for the manhole. You can find more information
 on the manhole <a href="../../manhole.html">here</a>. Manhole sub-options include:</p>
 <ul>
@@ -611,7 +611,7 @@ which could allow traffic to be intercepted if sent over a public network.</li>
   ssh_pub_key_path: CONFDIR/id_rsa.pub
 </code></pre>
 <hr />
-<p>Config option: <code>dummy_events_threshold</code></p>
+<h3 id="dummy_events_threshold"><a class="header" href="#dummy_events_threshold"><code>dummy_events_threshold</code></a></h3>
 <p>Forward extremities can build up in a room due to networking delays between
 homeservers. Once this happens in a large room, calculation of the state of
 that room can become quite expensive. To mitigate this, once the number of
@@ -634,13 +634,13 @@ delete any device that hasn't been accessed for more than the specified amount o
 <h2 id="homeserver-blocking"><a class="header" href="#homeserver-blocking">Homeserver blocking</a></h2>
 <p>Useful options for Synapse admins.</p>
 <hr />
-<p>Config option: <code>admin_contact</code></p>
+<h3 id="admin_contact"><a class="header" href="#admin_contact"><code>admin_contact</code></a></h3>
 <p>How to reach the server admin, used in <code>ResourceLimitError</code>. Defaults to none. </p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">admin_contact: 'mailto:admin@server.com'
 </code></pre>
 <hr />
-<p>Config option: <code>hs_disabled</code> and <code>hs_disabled_message</code></p>
+<h3 id="hs_disabled-and-hs_disabled_message"><a class="header" href="#hs_disabled-and-hs_disabled_message"><code>hs_disabled</code> and <code>hs_disabled_message</code></a></h3>
 <p>Blocks users from connecting to the homeserver and provides a human-readable reason
 why the connection was blocked. Defaults to false. </p>
 <p>Example configuration:</p>
@@ -648,7 +648,7 @@ why the connection was blocked. Defaults to false. </p>
 hs_disabled_message: 'Reason for why the HS is blocked'
 </code></pre>
 <hr />
-<p>Config option: <code>limit_usage_by_mau</code></p>
+<h3 id="limit_usage_by_mau"><a class="header" href="#limit_usage_by_mau"><code>limit_usage_by_mau</code></a></h3>
 <p>This option disables/enables monthly active user blocking. Used in cases where the admin or 
 server owner wants to limit to the number of monthly active users. When enabled and a limit is 
 reached the server returns a <code>ResourceLimitError</code> with error type <code>Codes.RESOURCE_LIMIT_EXCEEDED</code>.
@@ -657,14 +657,14 @@ Defaults to false. If this is enabled, a value for <code>max_mau_value</code> mu
 <pre><code class="language-yaml">limit_usage_by_mau: true 
 </code></pre>
 <hr />
-<p>Config option: <code>max_mau_value</code></p>
+<h3 id="max_mau_value"><a class="header" href="#max_mau_value"><code>max_mau_value</code></a></h3>
 <p>This option sets the hard limit of monthly active users above which the server will start 
 blocking user actions if <code>limit_usage_by_mau</code> is enabled. Defaults to 0.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">max_mau_value: 50
 </code></pre>
 <hr />
-<p>Config option: <code>mau_trial_days</code></p>
+<h3 id="mau_trial_days"><a class="header" href="#mau_trial_days"><code>mau_trial_days</code></a></h3>
 <p>The option <code>mau_trial_days</code> is a means to add a grace period for active users. It
 means that users must be active for the specified number of days before they
 can be considered active and guards against the case where lots of users
@@ -674,7 +674,7 @@ session. Defaults to 0. </p>
 <pre><code class="language-yaml">mau_trial_days: 5
 </code></pre>
 <hr />
-<p>Config option: <code>mau_appservice_trial_days</code></p>
+<h3 id="mau_appservice_trial_days"><a class="header" href="#mau_appservice_trial_days"><code>mau_appservice_trial_days</code></a></h3>
 <p>The option <code>mau_appservice_trial_days</code> is similar to <code>mau_trial_days</code>, but applies a different
 trial number if the user was registered by an appservice. A value
 of 0 means no trial days are applied. Appservices not listed in this dictionary
@@ -685,7 +685,7 @@ use the value of <code>mau_trial_days</code> instead.</p>
   another_appservice_id: 6
 </code></pre>
 <hr />
-<p>Config option: <code>mau_limit_alerting</code></p>
+<h3 id="mau_limit_alerting"><a class="header" href="#mau_limit_alerting"><code>mau_limit_alerting</code></a></h3>
 <p>The option <code>mau_limit_alerting</code> is a means of limiting client-side alerting
 should the mau limit be reached. This is useful for small instances
 where the admin has 5 mau seats (say) for 5 specific people and no
@@ -695,7 +695,7 @@ means that alerting is enabled.</p>
 <pre><code class="language-yaml">mau_limit_alerting: false
 </code></pre>
 <hr />
-<p>Config option: <code>mau_stats_only</code></p>
+<h3 id="mau_stats_only"><a class="header" href="#mau_stats_only"><code>mau_stats_only</code></a></h3>
 <p>If enabled, the metrics for the number of monthly active users will
 be populated, however no one will be limited based on these numbers. If <code>limit_usage_by_mau</code>
 is true, this is implied to be true. Defaults to false. </p>
@@ -703,7 +703,7 @@ is true, this is implied to be true. Defaults to false. </p>
 <pre><code class="language-yaml">mau_stats_only: true
 </code></pre>
 <hr />
-<p>Config option: <code>mau_limit_reserved_threepids</code></p>
+<h3 id="mau_limit_reserved_threepids"><a class="header" href="#mau_limit_reserved_threepids"><code>mau_limit_reserved_threepids</code></a></h3>
 <p>Sometimes the server admin will want to ensure certain accounts are
 never blocked by mau checking. These accounts are specified by this option.
 Defaults to none. Add accounts by specifying the <code>medium</code> and <code>address</code> of the
@@ -714,14 +714,14 @@ reserved threepid (3rd party identifier).</p>
     address: 'reserved_user@example.com'
 </code></pre>
 <hr />
-<p>Config option: <code>server_context</code></p>
+<h3 id="server_context"><a class="header" href="#server_context"><code>server_context</code></a></h3>
 <p>This option is used by phonehome stats to group together related servers.
 Defaults to none. </p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">server_context: context
 </code></pre>
 <hr />
-<p>Config option: <code>limit_remote_rooms</code></p>
+<h3 id="limit_remote_rooms"><a class="header" href="#limit_remote_rooms"><code>limit_remote_rooms</code></a></h3>
 <p>When this option is enabled, the room &quot;complexity&quot; will be checked before a user
 joins a new remote room. If it is above the complexity limit, the server will
 disallow joining, or will instantly leave. This is useful for homeservers that are
@@ -743,14 +743,14 @@ users in the room. </p>
   admins_can_join: true
 </code></pre>
 <hr />
-<p>Config option: <code>require_membership_for_aliases</code></p>
+<h3 id="require_membership_for_aliases"><a class="header" href="#require_membership_for_aliases"><code>require_membership_for_aliases</code></a></h3>
 <p>Whether to require a user to be in the room to add an alias to it.
 Defaults to true.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">require_membership_for_aliases: false
 </code></pre>
 <hr />
-<p>Config option: <code>allow_per_room_profiles</code></p>
+<h3 id="allow_per_room_profiles"><a class="header" href="#allow_per_room_profiles"><code>allow_per_room_profiles</code></a></h3>
 <p>Whether to allow per-room membership profiles through the sending of membership
 events with profile information that differs from the target's global profile.
 Defaults to true.</p>
@@ -758,7 +758,7 @@ Defaults to true.</p>
 <pre><code class="language-yaml">allow_per_room_profiles: false
 </code></pre>
 <hr />
-<p>Config option: <code>max_avatar_size</code></p>
+<h3 id="max_avatar_size"><a class="header" href="#max_avatar_size"><code>max_avatar_size</code></a></h3>
 <p>The largest permissible file size in bytes for a user avatar. Defaults to no restriction.
 Use M for MB and K for KB. </p>
 <p>Note that user avatar changes will not work if this is set without using Synapse's media repository.</p>
@@ -766,7 +766,7 @@ Use M for MB and K for KB. </p>
 <pre><code class="language-yaml">max_avatar_size: 10M
 </code></pre>
 <hr />
-<p>Config option: <code>allowed_avatar_mimetypes</code></p>
+<h3 id="allowed_avatar_mimetypes"><a class="header" href="#allowed_avatar_mimetypes"><code>allowed_avatar_mimetypes</code></a></h3>
 <p>The MIME types allowed for user avatars. Defaults to no restriction.</p>
 <p>Note that user avatar changes will not work if this is set without
 using Synapse's media repository.</p>
@@ -774,7 +774,7 @@ using Synapse's media repository.</p>
 <pre><code class="language-yaml">allowed_avatar_mimetypes: [&quot;image/png&quot;, &quot;image/jpeg&quot;, &quot;image/gif&quot;]
 </code></pre>
 <hr />
-<p>Config option: <code>redaction_retention_period</code></p>
+<h3 id="redaction_retention_period"><a class="header" href="#redaction_retention_period"><code>redaction_retention_period</code></a></h3>
 <p>How long to keep redacted events in unredacted form in the database. After
 this period redacted events get replaced with their redacted form in the DB.</p>
 <p>Defaults to <code>7d</code>. Set to <code>null</code> to disable.</p>
@@ -782,14 +782,14 @@ this period redacted events get replaced with their redacted form in the DB.</p>
 <pre><code class="language-yaml">redaction_retention_period: 28d
 </code></pre>
 <hr />
-<p>Config option: <code>user_ips_max_age</code> </p>
+<h3 id="user_ips_max_age"><a class="header" href="#user_ips_max_age"><code>user_ips_max_age</code></a></h3>
 <p>How long to track users' last seen time and IPs in the database.</p>
 <p>Defaults to <code>28d</code>. Set to <code>null</code> to disable clearing out of old rows.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">user_ips_max_age: 14d
 </code></pre>
 <hr />
-<p>Config option: <code>request_token_inhibit_3pid_errors</code></p>
+<h3 id="request_token_inhibit_3pid_errors"><a class="header" href="#request_token_inhibit_3pid_errors"><code>request_token_inhibit_3pid_errors</code></a></h3>
 <p>Inhibits the <code>/requestToken</code> endpoints from returning an error that might leak
 information about whether an e-mail address is in use or not on this
 homeserver. Defaults to false. 
@@ -801,7 +801,7 @@ act as if no error happened and return a fake session ID ('sid') to clients.</p>
 <pre><code class="language-yaml">request_token_inhibit_3pid_errors: true
 </code></pre>
 <hr />
-<p>Config option: <code>next_link_domain_whitelist</code></p>
+<h3 id="next_link_domain_whitelist"><a class="header" href="#next_link_domain_whitelist"><code>next_link_domain_whitelist</code></a></h3>
 <p>A list of domains that the domain portion of <code>next_link</code> parameters
 must match.</p>
 <p>This parameter is optionally provided by clients while requesting
@@ -817,7 +817,7 @@ all domains.</p>
 <pre><code class="language-yaml">next_link_domain_whitelist: [&quot;matrix.org&quot;]
 </code></pre>
 <hr />
-<p>Config option: <code>templates</code> and <code>custom_template_directory</code></p>
+<h3 id="templates-and-custom_template_directory"><a class="header" href="#templates-and-custom_template_directory"><code>templates</code> and <code>custom_template_directory</code></a></h3>
 <p>These options define templates to use when generating email or HTML page contents.
 The <code>custom_template_directory</code> determines which directory Synapse will try to 
 find template files in to use to generate email or HTML page contents.
@@ -830,7 +830,7 @@ information about using custom templates.</p>
   custom_template_directory: /path/to/custom/templates/
 </code></pre>
 <hr />
-<p>Config option: <code>retention</code></p>
+<h3 id="retention"><a class="header" href="#retention"><code>retention</code></a></h3>
 <p>This option and the associated options determine message retention policy at the
 server level.</p>
 <p>Room admins and mods can define a retention period for their rooms using the
@@ -902,7 +902,7 @@ configuration).</p>
 <h2 id="tls"><a class="header" href="#tls">TLS</a></h2>
 <p>Options related to TLS.</p>
 <hr />
-<p>Config option: <code>tls_certificate_path</code></p>
+<h3 id="tls_certificate_path"><a class="header" href="#tls_certificate_path"><code>tls_certificate_path</code></a></h3>
 <p>This option specifies a PEM-encoded X509 certificate for TLS.
 This certificate, as of Synapse 1.0, will need to be a valid and verifiable
 certificate, signed by a recognised Certificate Authority. Defaults to none. </p>
@@ -913,20 +913,20 @@ any intermediate certificates (for instance, if using certbot, use
 <pre><code class="language-yaml">tls_certificate_path: &quot;CONFDIR/SERVERNAME.tls.crt&quot;
 </code></pre>
 <hr />
-<p>Config option: <code>tls_private_key_path</code></p>
+<h3 id="tls_private_key_path"><a class="header" href="#tls_private_key_path"><code>tls_private_key_path</code></a></h3>
 <p>PEM-encoded private key for TLS. Defaults to none. </p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">tls_private_key_path: &quot;CONFDIR/SERVERNAME.tls.key&quot;
 </code></pre>
 <hr />
-<p>Config option: <code>federation_verify_certificates</code>
-Whether to verify TLS server certificates for outbound federation requests.</p>
+<h3 id="federation_verify_certificates"><a class="header" href="#federation_verify_certificates"><code>federation_verify_certificates</code></a></h3>
+<p>Whether to verify TLS server certificates for outbound federation requests.</p>
 <p>Defaults to true. To disable certificate verification, set the option to false.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">federation_verify_certificates: false
 </code></pre>
 <hr />
-<p>Config option: <code>federation_client_minimum_tls_version</code></p>
+<h3 id="federation_client_minimum_tls_version"><a class="header" href="#federation_client_minimum_tls_version"><code>federation_client_minimum_tls_version</code></a></h3>
 <p>The minimum TLS version that will be used for outbound federation requests.</p>
 <p>Defaults to <code>1</code>. Configurable to <code>1</code>, <code>1.1</code>, <code>1.2</code>, or <code>1.3</code>. Note
 that setting this value higher than <code>1.2</code> will prevent federation to most
@@ -936,7 +936,7 @@ entirely private federation setup and you can ensure TLS 1.3 support.</p>
 <pre><code class="language-yaml">federation_client_minimum_tls_version: 1.2
 </code></pre>
 <hr />
-<p>Config option: <code>federation_certificate_verification_whitelist</code></p>
+<h3 id="federation_certificate_verification_whitelist"><a class="header" href="#federation_certificate_verification_whitelist"><code>federation_certificate_verification_whitelist</code></a></h3>
 <p>Skip federation certificate verification on a given whitelist
 of domains.</p>
 <p>This setting should only be used in very specific cases, such as
@@ -950,7 +950,7 @@ of homeservers, you likely want to use a private CA instead.</p>
   - &quot;*.onion&quot;
 </code></pre>
 <hr />
-<p>Config option: <code>federation_custom_ca_list</code></p>
+<h3 id="federation_custom_ca_list"><a class="header" href="#federation_custom_ca_list"><code>federation_custom_ca_list</code></a></h3>
 <p>List of custom certificate authorities for federation traffic.</p>
 <p>This setting should only normally be used within a private network of
 homeservers.</p>
@@ -966,7 +966,7 @@ operating environment. Certificates must be in PEM format.</p>
 <h2 id="federation"><a class="header" href="#federation">Federation</a></h2>
 <p>Options related to federation.</p>
 <hr />
-<p>Config option: <code>federation_domain_whitelist</code></p>
+<h3 id="federation_domain_whitelist"><a class="header" href="#federation_domain_whitelist"><code>federation_domain_whitelist</code></a></h3>
 <p>Restrict federation to the given whitelist of domains.
 N.B. we recommend also firewalling your federation listener to limit
 inbound federation traffic as early as possible, rather than relying
@@ -979,7 +979,7 @@ default is to whitelist everything.</p>
   - syd.example.com
 </code></pre>
 <hr />
-<p>Config option: <code>federation_metrics_domains</code></p>
+<h3 id="federation_metrics_domains"><a class="header" href="#federation_metrics_domains"><code>federation_metrics_domains</code></a></h3>
 <p>Report prometheus metrics on the age of PDUs being sent to and received from
 the given domains. This can be used to give an idea of &quot;delay&quot; on inbound
 and outbound federation, though be aware that any delay can be due to problems
@@ -991,7 +991,7 @@ at either end or with the intermediate network.</p>
   - example.com
 </code></pre>
 <hr />
-<p>Config option: <code>allow_profile_lookup_over_federation</code></p>
+<h3 id="allow_profile_lookup_over_federation"><a class="header" href="#allow_profile_lookup_over_federation"><code>allow_profile_lookup_over_federation</code></a></h3>
 <p>Set to false to disable profile lookup over federation. By default, the
 Federation API allows other homeservers to obtain profile data of any user
 on this homeserver.</p>
@@ -999,7 +999,7 @@ on this homeserver.</p>
 <pre><code class="language-yaml">allow_profile_lookup_over_federation: false
 </code></pre>
 <hr />
-<p>Config option: <code>allow_device_name_lookup_over_federation</code></p>
+<h3 id="allow_device_name_lookup_over_federation"><a class="header" href="#allow_device_name_lookup_over_federation"><code>allow_device_name_lookup_over_federation</code></a></h3>
 <p>Set this option to true to allow device display name lookup over federation. By default, the
 Federation API prevents other homeservers from obtaining the display names of any user devices
 on this homeserver.</p>
@@ -1010,14 +1010,14 @@ on this homeserver.</p>
 <h2 id="caching"><a class="header" href="#caching">Caching</a></h2>
 <p>Options related to caching</p>
 <hr />
-<p>Config option: <code>event_cache_size</code></p>
+<h3 id="event_cache_size"><a class="header" href="#event_cache_size"><code>event_cache_size</code></a></h3>
 <p>The number of events to cache in memory. Not affected by
 <code>caches.global_factor</code>. Defaults to 10K.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">event_cache_size: 15K
 </code></pre>
 <hr />
-<p>Config option: <code>cache</code> and associated values</p>
+<h3 id="cache-and-associated-values"><a class="header" href="#cache-and-associated-values"><code>cache</code> and associated values</a></h3>
 <p>A cache 'factor' is a multiplier that can be applied to each of
 Synapse's caches in order to increase or decrease the maximum
 number of entries that can be stored.</p>
@@ -1109,7 +1109,7 @@ file in Synapse's <code>contrib</code> directory, you can send a <code>SIGHUP</c
 <h2 id="database"><a class="header" href="#database">Database</a></h2>
 <p>Config options related to database settings.</p>
 <hr />
-<p>Config option: <code>database</code></p>
+<h3 id="database-1"><a class="header" href="#database-1"><code>database</code></a></h3>
 <p>The <code>database</code> setting defines the database that synapse uses to store all of
 its data.</p>
 <p>Associated sub-options:</p>
@@ -1164,7 +1164,7 @@ see <a href="../../postgres.html">here</a>.</p>
 <h2 id="logging"><a class="header" href="#logging">Logging</a></h2>
 <p>Config options related to logging. </p>
 <hr />
-<p>Config option: <code>log_config</code></p>
+<h3 id="log_config"><a class="header" href="#log_config"><code>log_config</code></a></h3>
 <p>This option specifies a yaml python logging config file as described <a href="https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema">here</a>.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">log_config: &quot;CONFDIR/SERVERNAME.log.config&quot;
@@ -1178,7 +1178,7 @@ see <a href="../../postgres.html">here</a>.</p>
 <li><code>burst_count</code>: number of requests a client can send before being throttled.</li>
 </ul>
 <hr />
-<p>Config option: <code>rc_message</code></p>
+<h3 id="rc_message"><a class="header" href="#rc_message"><code>rc_message</code></a></h3>
 <p>Ratelimiting settings for client messaging.</p>
 <p>This is a ratelimiting option for messages that ratelimits sending based on the account the client
 is using. It defaults to: <code>per_second: 0.2</code>, <code>burst_count: 10</code>.</p>
@@ -1188,7 +1188,7 @@ is using. It defaults to: <code>per_second: 0.2</code>, <code>burst_count: 10</c
   burst_count: 15
 </code></pre>
 <hr />
-<p>Config option: <code>rc_registration</code></p>
+<h3 id="rc_registration"><a class="header" href="#rc_registration"><code>rc_registration</code></a></h3>
 <p>This option ratelimits registration requests based on the client's IP address.
 It defaults to <code>per_second: 0.17</code>, <code>burst_count: 3</code>. </p>
 <p>Example configuration:</p>
@@ -1197,7 +1197,7 @@ It defaults to <code>per_second: 0.17</code>, <code>burst_count: 3</code>. </p>
   burst_count: 2
 </code></pre>
 <hr />
-<p>Config option: <code>rc_registration_token_validity</code></p>
+<h3 id="rc_registration_token_validity"><a class="header" href="#rc_registration_token_validity"><code>rc_registration_token_validity</code></a></h3>
 <p>This option checks the validity of registration tokens that ratelimits requests based on 
 the client's IP address.
 Defaults to <code>per_second: 0.1</code>, <code>burst_count: 5</code>.</p>
@@ -1207,7 +1207,7 @@ Defaults to <code>per_second: 0.1</code>, <code>burst_count: 5</code>.</p>
   burst_count: 6
 </code></pre>
 <hr />
-<p>Config option: <code>rc_login</code></p>
+<h3 id="rc_login"><a class="header" href="#rc_login"><code>rc_login</code></a></h3>
 <p>This option specifies several limits for login:</p>
 <ul>
 <li>
@@ -1238,7 +1238,7 @@ attempts for this account. Defaults to <code>per_second: 0.17</code>, <code>burs
     burst_count: 7
 </code></pre>
 <hr />
-<p>Config option: <code>rc_admin_redaction</code></p>
+<h3 id="rc_admin_redaction"><a class="header" href="#rc_admin_redaction"><code>rc_admin_redaction</code></a></h3>
 <p>This option sets ratelimiting redactions by room admins. If this is not explicitly 
 set then it uses the same ratelimiting as per <code>rc_message</code>. This is useful
 to allow room admins to deal with abuse quickly. </p>
@@ -1248,7 +1248,7 @@ to allow room admins to deal with abuse quickly. </p>
   burst_count: 50
 </code></pre>
 <hr />
-<p>Config option: <code>rc_joins</code></p>
+<h3 id="rc_joins"><a class="header" href="#rc_joins"><code>rc_joins</code></a></h3>
 <p>This option allows for ratelimiting number of rooms a user can join. This setting has the following sub-options:</p>
 <ul>
 <li>
@@ -1271,7 +1271,7 @@ can be more computationally expensive than restricting locally). Defaults to
     burst_count: 12
 </code></pre>
 <hr />
-<p>Config option: <code>rc_3pid_validation</code></p>
+<h3 id="rc_3pid_validation"><a class="header" href="#rc_3pid_validation"><code>rc_3pid_validation</code></a></h3>
 <p>This option ratelimits how often a user or IP can attempt to validate a 3PID.
 Defaults to <code>per_second: 0.003</code>, <code>burst_count: 5</code>.</p>
 <p>Example configuration:</p>
@@ -1280,7 +1280,7 @@ Defaults to <code>per_second: 0.003</code>, <code>burst_count: 5</code>.</p>
   burst_count: 5
 </code></pre>
 <hr />
-<p>Config option: <code>rc_invites</code></p>
+<h3 id="rc_invites"><a class="header" href="#rc_invites"><code>rc_invites</code></a></h3>
 <p>This option sets ratelimiting how often invites can be sent in a room or to a 
 specific user. <code>per_room</code> defaults to <code>per_second: 0.3</code>, <code>burst_count: 10</code> and
 <code>per_user</code> defaults to <code>per_second: 0.003</code>, <code>burst_count: 5</code>. </p>
@@ -1305,7 +1305,7 @@ cannot <em>receive</em> more than a burst of 5 invites at a time.</p>
     burst_count: 3
 </code></pre>
 <hr />
-<p>Config option: <code>rc_third_party_invite</code></p>
+<h3 id="rc_third_party_invite"><a class="header" href="#rc_third_party_invite"><code>rc_third_party_invite</code></a></h3>
 <p>This option ratelimits 3PID invites (i.e. invites sent to a third-party ID
 such as an email address or a phone number) based on the account that's
 sending the invite. Defaults to <code>per_second: 0.2</code>, <code>burst_count: 10</code>.</p>
@@ -1315,7 +1315,7 @@ sending the invite. Defaults to <code>per_second: 0.2</code>, <code>burst_count:
   burst_count: 10
 </code></pre>
 <hr />
-<p>Config option: <code>rc_federation</code></p>
+<h3 id="rc_federation"><a class="header" href="#rc_federation"><code>rc_federation</code></a></h3>
 <p>Defines limits on federation requests. </p>
 <p>The <code>rc_federation</code> configuration has the following sub-options:</p>
 <ul>
@@ -1338,7 +1338,7 @@ from a single server. Defaults to 3.</li>
   concurrent: 5
 </code></pre>
 <hr />
-<p>Config option: <code>federation_rr_transactions_per_room_per_second</code></p>
+<h3 id="federation_rr_transactions_per_room_per_second"><a class="header" href="#federation_rr_transactions_per_room_per_second"><code>federation_rr_transactions_per_room_per_second</code></a></h3>
 <p>Sets outgoing federation transaction frequency for sending read-receipts,
 per-room.</p>
 <p>If we end up trying to send out more read-receipts, they will get buffered up
@@ -1350,20 +1350,20 @@ into fewer transactions. Defaults to 50. </p>
 <h2 id="media-store"><a class="header" href="#media-store">Media Store</a></h2>
 <p>Config options related to Synapse's media store.</p>
 <hr />
-<p>Config option: <code>enable_media_repo</code> </p>
+<h3 id="enable_media_repo"><a class="header" href="#enable_media_repo"><code>enable_media_repo</code></a></h3>
 <p>Enable the media store service in the Synapse master. Defaults to true. 
 Set to false if you are using a separate media store worker.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">enable_media_repo: false
 </code></pre>
 <hr />
-<p>Config option: <code>media_store_path</code></p>
+<h3 id="media_store_path"><a class="header" href="#media_store_path"><code>media_store_path</code></a></h3>
 <p>Directory where uploaded images and attachments are stored.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">media_store_path: &quot;DATADIR/media_store&quot;
 </code></pre>
 <hr />
-<p>Config option: <code>media_storage_providers</code></p>
+<h3 id="media_storage_providers"><a class="header" href="#media_storage_providers"><code>media_storage_providers</code></a></h3>
 <p>Media storage providers allow media to be stored in different
 locations. Defaults to none. Associated sub-options are:</p>
 <ul>
@@ -1383,7 +1383,7 @@ locations. Defaults to none. Associated sub-options are:</p>
        directory: /mnt/some/other/directory
 </code></pre>
 <hr />
-<p>Config option: <code>max_upload_size</code></p>
+<h3 id="max_upload_size"><a class="header" href="#max_upload_size"><code>max_upload_size</code></a></h3>
 <p>The largest allowed upload size in bytes.</p>
 <p>If you are using a reverse proxy you may also need to set this value in
 your reverse proxy's config. Defaults to 50M. Notably Nginx has a small max body size by default.
@@ -1392,13 +1392,13 @@ See <a href="../../reverse_proxy.html">here</a> for more on using a reverse prox
 <pre><code class="language-yaml">max_upload_size: 60M
 </code></pre>
 <hr />
-<p>Config option: <code>max_image_pixels</code></p>
+<h3 id="max_image_pixels"><a class="header" href="#max_image_pixels"><code>max_image_pixels</code></a></h3>
 <p>Maximum number of pixels that will be thumbnailed. Defaults to 32M.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">max_image_pixels: 35M
 </code></pre>
 <hr />
-<p>Config option: <code>dynamic_thumbnails</code></p>
+<h3 id="dynamic_thumbnails"><a class="header" href="#dynamic_thumbnails"><code>dynamic_thumbnails</code></a></h3>
 <p>Whether to generate new thumbnails on the fly to precisely match
 the resolution requested by the client. If true then whenever
 a new resolution is requested by the client the server will
@@ -1408,7 +1408,7 @@ from a precalculated list. Defaults to false. </p>
 <pre><code class="language-yaml">dynamic_thumbnails: true
 </code></pre>
 <hr />
-<p>Config option: <code>thumbnail_sizes</code></p>
+<h3 id="thumbnail_sizes"><a class="header" href="#thumbnail_sizes"><code>thumbnail_sizes</code></a></h3>
 <p>List of thumbnails to precalculate when an image is uploaded. Associated sub-options are:</p>
 <ul>
 <li><code>width</code></li>
@@ -1434,7 +1434,7 @@ from a precalculated list. Defaults to false. </p>
     method: scale
 </code></pre>
 <hr />
-<p>Config option: <code>media_retention</code></p>
+<h3 id="media_retention"><a class="header" href="#media_retention"><code>media_retention</code></a></h3>
 <p>Controls whether local media and entries in the remote media cache
 (media that is downloaded from other homeservers) should be removed
 under certain conditions, typically for the purpose of saving space.</p>
@@ -1460,7 +1460,7 @@ will not be deleted.</p>
     remote_media_lifetime: 14d
 </code></pre>
 <hr />
-<p>Config option: <code>url_preview_enabled</code></p>
+<h3 id="url_preview_enabled"><a class="header" href="#url_preview_enabled"><code>url_preview_enabled</code></a></h3>
 <p>This setting determines whether the preview URL API is enabled.
 It is disabled by default. Set to true to enable. If enabled you must specify a
 <code>url_preview_ip_range_blacklist</code> blacklist.</p>
@@ -1468,7 +1468,7 @@ It is disabled by default. Set to true to enable. If enabled you must specify a
 <pre><code class="language-yaml">url_preview_enabled: true
 </code></pre>
 <hr />
-<p>Config option: <code>url_preview_ip_range_blacklist</code></p>
+<h3 id="url_preview_ip_range_blacklist"><a class="header" href="#url_preview_ip_range_blacklist"><code>url_preview_ip_range_blacklist</code></a></h3>
 <p>List of IP address CIDR ranges that the URL preview spider is denied
 from accessing.  There are no defaults: you must explicitly
 specify a list for URL previewing to work.  You should specify any
@@ -1504,7 +1504,7 @@ you use the following example list as a starting point.</p>
   - 'fec0::/10'
 </code></pre>
 <hr />
-<p>Config option: <code>url_preview_ip_range_whitelist</code></p>
+<h3 id="url_preview_ip_range_whitelist"><a class="header" href="#url_preview_ip_range_whitelist"><code>url_preview_ip_range_whitelist</code></a></h3>
 <p>This option sets a list of IP address CIDR ranges that the URL preview spider is allowed
 to access even if they are specified in <code>url_preview_ip_range_blacklist</code>.
 This is useful for specifying exceptions to wide-ranging blacklisted
@@ -1515,7 +1515,7 @@ website only visible in your network. Defaults to none. </p>
    - '192.168.1.1'
 </code></pre>
 <hr />
-<p>Config option: <code>url_preview_url_blacklist</code></p>
+<h3 id="url_preview_url_blacklist"><a class="header" href="#url_preview_url_blacklist"><code>url_preview_url_blacklist</code></a></h3>
 <p>Optional list of URL matches that the URL preview spider is
 denied from accessing.  You should use <code>url_preview_ip_range_blacklist</code>
 in preference to this, otherwise someone could define a public DNS
@@ -1557,13 +1557,13 @@ blacklisted.</p>
   - netloc: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
 </code></pre>
 <hr />
-<p>Config option: <code>max_spider_size</code></p>
+<h3 id="max_spider_size"><a class="header" href="#max_spider_size"><code>max_spider_size</code></a></h3>
 <p>The largest allowed URL preview spidering size in bytes. Defaults to 10M.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">max_spider_size: 8M
 </code></pre>
 <hr />
-<p>Config option: <code>url_preview_language</code></p>
+<h3 id="url_preview_language"><a class="header" href="#url_preview_language"><code>url_preview_language</code></a></h3>
 <p>A list of values for the Accept-Language HTTP header used when
 downloading webpages during URL preview generation. This allows
 Synapse to specify the preferred languages that URL previews should
@@ -1582,7 +1582,7 @@ using quality value syntax (;q=). '*' translates to any language.</p>
    - '*;q=0.7'
 </code></pre>
 <hr />
-<p>Config option: <code>oembed</code></p>
+<h3 id="oembed"><a class="header" href="#oembed"><code>oembed</code></a></h3>
 <p>oEmbed allows for easier embedding content from a website. It can be
 used for generating URLs previews of services which support it. A default list of oEmbed providers
 is included with Synapse. Set <code>disable_default_providers</code> to true to disable using
@@ -1598,21 +1598,21 @@ should be in the form of providers.json). By default this list is empty. </p>
 <h2 id="captcha"><a class="header" href="#captcha">Captcha</a></h2>
 <p>See <a href="../../CAPTCHA_SETUP.html">here</a> for full details on setting up captcha.</p>
 <hr />
-<p>Config option: <code>recaptcha_public_key</code></p>
+<h3 id="recaptcha_public_key"><a class="header" href="#recaptcha_public_key"><code>recaptcha_public_key</code></a></h3>
 <p>This homeserver's ReCAPTCHA public key. Must be specified if <code>enable_registration_captcha</code> is 
 enabled.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">recaptcha_public_key: &quot;YOUR_PUBLIC_KEY&quot;
 </code></pre>
 <hr />
-<p>Config option: <code>recaptcha_private_key</code> </p>
+<h3 id="recaptcha_private_key"><a class="header" href="#recaptcha_private_key"><code>recaptcha_private_key</code></a></h3>
 <p>This homeserver's ReCAPTCHA private key. Must be specified if <code>enable_registration_captcha</code> is 
 enabled.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">recaptcha_private_key: &quot;YOUR_PRIVATE_KEY&quot;
 </code></pre>
 <hr />
-<p>Config option: <code>enable_registration_captcha</code></p>
+<h3 id="enable_registration_captcha"><a class="header" href="#enable_registration_captcha"><code>enable_registration_captcha</code></a></h3>
 <p>Set to true to enable ReCaptcha checks when registering, preventing signup
 unless a captcha is answered. Requires a valid ReCaptcha public/private key. 
 Defaults to false.</p>
@@ -1620,7 +1620,7 @@ Defaults to false.</p>
 <pre><code class="language-yaml">enable_registration_captcha: true
 </code></pre>
 <hr />
-<p>Config option: <code>recaptcha_siteverify_api</code></p>
+<h3 id="recaptcha_siteverify_api"><a class="header" href="#recaptcha_siteverify_api"><code>recaptcha_siteverify_api</code></a></h3>
 <p>The API endpoint to use for verifying <code>m.login.recaptcha</code> responses.
 Defaults to <code>https://www.recaptcha.net/recaptcha/api/siteverify</code>.</p>
 <p>Example configuration:</p>
@@ -1630,13 +1630,13 @@ Defaults to <code>https://www.recaptcha.net/recaptcha/api/siteverify</code>.</p>
 <h2 id="turn"><a class="header" href="#turn">TURN</a></h2>
 <p>Options related to adding a TURN server to Synapse.</p>
 <hr />
-<p>Config option: <code>turn_uris</code></p>
+<h3 id="turn_uris"><a class="header" href="#turn_uris"><code>turn_uris</code></a></h3>
 <p>The public URIs of the TURN server to give to clients.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">turn_uris: [turn:example.org]
 </code></pre>
 <hr />
-<p>Config option: <code>turn_shared_secret</code></p>
+<h3 id="turn_shared_secret"><a class="header" href="#turn_shared_secret"><code>turn_shared_secret</code></a></h3>
 <p>The shared secret used to compute passwords for the TURN server.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">turn_shared_secret: &quot;YOUR_SHARED_SECRET&quot;
@@ -1649,13 +1649,13 @@ Defaults to <code>https://www.recaptcha.net/recaptcha/api/siteverify</code>.</p>
 turn_password: &quot;TURNSERVER_PASSWORD&quot;
 </code></pre>
 <hr />
-<p>Config option: <code>turn_user_lifetime</code></p>
+<h3 id="turn_user_lifetime"><a class="header" href="#turn_user_lifetime"><code>turn_user_lifetime</code></a></h3>
 <p>How long generated TURN credentials last. Defaults to 1h.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">turn_user_lifetime: 2h
 </code></pre>
 <hr />
-<p>Config option: <code>turn_allow_guests</code></p>
+<h3 id="turn_allow_guests"><a class="header" href="#turn_allow_guests"><code>turn_allow_guests</code></a></h3>
 <p>Whether guests should be allowed to use the TURN server. This defaults to true, otherwise
 VoIP will be unreliable for guests. However, it does introduce a slight security risk as
 it allows users to connect to arbitrary endpoints without having first signed up for a valid account (e.g. by passing a CAPTCHA).</p>
@@ -1666,7 +1666,7 @@ it allows users to connect to arbitrary endpoints without having first signed up
 <h2 id="registration"><a class="header" href="#registration">Registration</a></h2>
 <p>Registration can be rate-limited using the parameters in the <a href="#ratelimiting">Ratelimiting</a> section of this manual.</p>
 <hr />
-<p>Config option: <code>enable_registration</code></p>
+<h3 id="enable_registration"><a class="header" href="#enable_registration"><code>enable_registration</code></a></h3>
 <p>Enable registration for new users. Defaults to false. It is highly recommended that if you enable registration,
 you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration 
 without any verification, you must also set <code>enable_registration_without_verification</code> to true.</p>
@@ -1674,15 +1674,15 @@ without any verification, you must also set <code>enable_registration_without_ve
 <pre><code class="language-yaml">enable_registration: true
 </code></pre>
 <hr />
-<p>Config option: <code>enable_registration_without_verification</code>
-Enable registration without email or captcha verification. Note: this option is <em>not</em> recommended,
+<h3 id="enable_registration_without_verification"><a class="header" href="#enable_registration_without_verification"><code>enable_registration_without_verification</code></a></h3>
+<p>Enable registration without email or captcha verification. Note: this option is <em>not</em> recommended,
 as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
 unless <code>enable_registration</code> is also enabled.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">enable_registration_without_verification: true
 </code></pre>
 <hr />
-<p>Config option: <code>session_lifetime</code></p>
+<h3 id="session_lifetime"><a class="header" href="#session_lifetime"><code>session_lifetime</code></a></h3>
 <p>Time that a user's session remains valid for, after they log in.</p>
 <p>Note that this is not currently compatible with guest logins.</p>
 <p>Note also that this is calculated at login time: changes are not applied retrospectively to users who have already 
@@ -1692,7 +1692,7 @@ logged in.</p>
 <pre><code class="language-yaml">session_lifetime: 24h
 </code></pre>
 <hr />
-<p>Config option: <code>refresh_access_token_lifetime</code></p>
+<h3 id="refresh_access_token_lifetime"><a class="header" href="#refresh_access_token_lifetime"><code>refresh_access_token_lifetime</code></a></h3>
 <p>Time that an access token remains valid for, if the session is using refresh tokens.</p>
 <p>For more information about refresh tokens, please see the <a href="user_authentication/refresh_tokens.html">manual</a>.</p>
 <p>Note that this only applies to clients which advertise support for refresh tokens.</p>
@@ -1703,7 +1703,7 @@ existing sessions until they are refreshed.</p>
 <pre><code class="language-yaml">refreshable_access_token_lifetime: 10m
 </code></pre>
 <hr />
-<p>Config option: <code>refresh_token_lifetime: 24h</code></p>
+<h3 id="refresh_token_lifetime-24h"><a class="header" href="#refresh_token_lifetime-24h"><code>refresh_token_lifetime: 24h</code></a></h3>
 <p>Time that a refresh token remains valid for (provided that it is not
 exchanged for another one first).
 This option can be used to automatically log-out inactive sessions.
@@ -1715,7 +1715,7 @@ changes are not applied to existing sessions until they are refreshed.</p>
 <pre><code class="language-yaml">refresh_token_lifetime: 24h
 </code></pre>
 <hr />
-<p>Config option: <code>nonrefreshable_access_token_lifetime</code></p>
+<h3 id="nonrefreshable_access_token_lifetime"><a class="header" href="#nonrefreshable_access_token_lifetime"><code>nonrefreshable_access_token_lifetime</code></a></h3>
 <p>Time that an access token remains valid for, if the session is NOT
 using refresh tokens.</p>
 <p>Please note that not all clients support refresh tokens, so setting
@@ -1728,7 +1728,7 @@ retrospectively to existing sessions for users that have already logged in.</p>
 <pre><code class="language-yaml">nonrefreshable_access_token_lifetime: 24h
 </code></pre>
 <hr />
-<p>Config option: <code>registrations_require_3pid</code></p>
+<h3 id="registrations_require_3pid"><a class="header" href="#registrations_require_3pid"><code>registrations_require_3pid</code></a></h3>
 <p>If this is set, the user must provide all of the specified types of 3PID when registering.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">registrations_require_3pid:
@@ -1736,14 +1736,14 @@ retrospectively to existing sessions for users that have already logged in.</p>
   - msisdn
 </code></pre>
 <hr />
-<p>Config option: <code>disable_msisdn_registration</code></p>
+<h3 id="disable_msisdn_registration"><a class="header" href="#disable_msisdn_registration"><code>disable_msisdn_registration</code></a></h3>
 <p>Explicitly disable asking for MSISDNs from the registration
 flow (overrides <code>registrations_require_3pid</code> if MSISDNs are set as required).</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">disable_msisdn_registration: true
 </code></pre>
 <hr />
-<p>Config option: <code>allowed_local_3pids</code></p>
+<h3 id="allowed_local_3pids"><a class="header" href="#allowed_local_3pids"><code>allowed_local_3pids</code></a></h3>
 <p>Mandate that users are only allowed to associate certain formats of
 3PIDs with accounts on this server, as specified by the <code>medium</code> and <code>pattern</code> sub-options.</p>
 <p>Example configuration:</p>
@@ -1756,13 +1756,13 @@ flow (overrides <code>registrations_require_3pid</code> if MSISDNs are set as re
     pattern: '\+44'
 </code></pre>
 <hr />
-<p>Config option: <code>enable_3pid_lookup</code></p>
+<h3 id="enable_3pid_lookup"><a class="header" href="#enable_3pid_lookup"><code>enable_3pid_lookup</code></a></h3>
 <p>Enable 3PIDs lookup requests to identity servers from this server. Defaults to true.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">enable_3pid_lookup: false
 </code></pre>
 <hr />
-<p>Config option: <code>registration_requires_token</code></p>
+<h3 id="registration_requires_token"><a class="header" href="#registration_requires_token"><code>registration_requires_token</code></a></h3>
 <p>Require users to submit a token during registration.
 Tokens can be managed using the admin <a href="../administration/admin_api/registration_tokens.html">API</a>.
 Note that <code>enable_registration</code> must be set to true.
@@ -1772,14 +1772,14 @@ Defaults to false. Set to true to enable.</p>
 <pre><code class="language-yaml">registration_requires_token: true
 </code></pre>
 <hr />
-<p>Config option: <code>registration_shared_secret</code></p>
+<h3 id="registration_shared_secret"><a class="header" href="#registration_shared_secret"><code>registration_shared_secret</code></a></h3>
 <p>If set, allows registration of standard or admin accounts by anyone who
 has the shared secret, even if registration is otherwise disabled.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">registration_shared_secret: &lt;PRIVATE STRING&gt;
 </code></pre>
 <hr />
-<p>Config option: <code>bcrypt_rounds</code></p>
+<h3 id="bcrypt_rounds"><a class="header" href="#bcrypt_rounds"><code>bcrypt_rounds</code></a></h3>
 <p>Set the number of bcrypt rounds used to generate password hash.
 Larger numbers increase the work factor needed to generate the hash.
 The default number is 12 (which equates to 2^12 rounds).
@@ -1789,7 +1789,7 @@ Example configuration:</p>
 <pre><code class="language-yaml">bcrypt_rounds: 14
 </code></pre>
 <hr />
-<p>Config option: <code>allow_guest_access</code></p>
+<h3 id="allow_guest_access"><a class="header" href="#allow_guest_access"><code>allow_guest_access</code></a></h3>
 <p>Allows users to register as guests without a password/email/etc, and
 participate in rooms hosted on this server which have been made
 accessible to anonymous users. Defaults to false.</p>
@@ -1797,7 +1797,7 @@ accessible to anonymous users. Defaults to false.</p>
 <pre><code class="language-yaml">allow_guest_access: true
 </code></pre>
 <hr />
-<p>Config option: <code>default_identity_server</code></p>
+<h3 id="default_identity_server"><a class="header" href="#default_identity_server"><code>default_identity_server</code></a></h3>
 <p>The identity server which we suggest that clients should use when users log
 in on this server.</p>
 <p>(By default, no suggestion is made, so it is left up to the client.
@@ -1806,7 +1806,7 @@ This setting is ignored unless <code>public_baseurl</code> is also explicitly se
 <pre><code class="language-yaml">default_identity_server: https://matrix.org
 </code></pre>
 <hr />
-<p>Config option: <code>account_threepid_delegates</code></p>
+<h3 id="account_threepid_delegates"><a class="header" href="#account_threepid_delegates"><code>account_threepid_delegates</code></a></h3>
 <p>Handle threepid (email/phone etc) registration and password resets through a set of
 <em>trusted</em> identity servers. Note that this allows the configured identity server to
 reset passwords for accounts!</p>
@@ -1828,7 +1828,7 @@ by the Matrix Identity Service API <a href="https://matrix.org/docs/spec/identit
     msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 </code></pre>
 <hr />
-<p>Config option: <code>enable_set_displayname</code></p>
+<h3 id="enable_set_displayname"><a class="header" href="#enable_set_displayname"><code>enable_set_displayname</code></a></h3>
 <p>Whether users are allowed to change their displayname after it has
 been initially set. Useful when provisioning users based on the
 contents of a third-party directory.</p>
@@ -1837,7 +1837,7 @@ contents of a third-party directory.</p>
 <pre><code class="language-yaml">enable_set_displayname: false
 </code></pre>
 <hr />
-<p>Config option: <code>enable_set_avatar_url</code></p>
+<h3 id="enable_set_avatar_url"><a class="header" href="#enable_set_avatar_url"><code>enable_set_avatar_url</code></a></h3>
 <p>Whether users are allowed to change their avatar after it has been
 initially set. Useful when provisioning users based on the contents
 of a third-party directory.</p>
@@ -1846,7 +1846,7 @@ of a third-party directory.</p>
 <pre><code class="language-yaml">enable_set_avatar_url: false
 </code></pre>
 <hr />
-<p>Config option: <code>enable_3pid_changes</code></p>
+<h3 id="enable_3pid_changes"><a class="header" href="#enable_3pid_changes"><code>enable_3pid_changes</code></a></h3>
 <p>Whether users can change the third-party IDs associated with their accounts
 (email address and msisdn).</p>
 <p>Defaults to true.</p>
@@ -1854,7 +1854,7 @@ of a third-party directory.</p>
 <pre><code class="language-yaml">enable_3pid_changes: false
 </code></pre>
 <hr />
-<p>Config option: <code>auto_join_rooms</code></p>
+<h3 id="auto_join_rooms"><a class="header" href="#auto_join_rooms"><code>auto_join_rooms</code></a></h3>
 <p>Users who register on this homeserver will automatically be joined
 to the rooms listed under this option.</p>
 <p>By default, any room aliases included in this list will be created
@@ -1868,7 +1868,7 @@ relating to auto-joining rooms below. </p>
   - &quot;#anotherexampleroom:example.com&quot;
 </code></pre>
 <hr />
-<p>Config option: <code>autocreate_auto_join_rooms</code></p>
+<h3 id="autocreate_auto_join_rooms"><a class="header" href="#autocreate_auto_join_rooms"><code>autocreate_auto_join_rooms</code></a></h3>
 <p>Where <code>auto_join_rooms</code> are specified, setting this flag ensures that
 the rooms exist by creating them when the first user on the
 homeserver registers.</p>
@@ -1882,7 +1882,7 @@ users cannot be auto-joined since they do not exist.</p>
 <pre><code class="language-yaml">autocreate_auto_join_rooms: false
 </code></pre>
 <hr />
-<p>Config option: <code>autocreate_auto_join_rooms_federated</code></p>
+<h3 id="autocreate_auto_join_rooms_federated"><a class="header" href="#autocreate_auto_join_rooms_federated"><code>autocreate_auto_join_rooms_federated</code></a></h3>
 <p>Whether the rooms listen in <code>auto_join_rooms</code> that are auto-created are available
 via federation. Only has an effect if <code>autocreate_auto_join_rooms</code> is true.</p>
 <p>Note that whether a room is federated cannot be modified after
@@ -1894,7 +1894,7 @@ joining these rooms.</p>
 <pre><code class="language-yaml">autocreate_auto_join_rooms_federated: false
 </code></pre>
 <hr />
-<p>Config option: <code>autocreate_auto_join_room_preset</code></p>
+<h3 id="autocreate_auto_join_room_preset"><a class="header" href="#autocreate_auto_join_room_preset"><code>autocreate_auto_join_room_preset</code></a></h3>
 <p>The room preset to use when auto-creating one of <code>auto_join_rooms</code>. Only has an
 effect if <code>autocreate_auto_join_rooms</code> is true.</p>
 <p>Possible values for this option are:</p>
@@ -1912,7 +1912,7 @@ assigned a power level of 100 upon joining the room. </li>
 <pre><code class="language-yaml">autocreate_auto_join_room_preset: private_chat
 </code></pre>
 <hr />
-<p>Config option: <code>auto_join_mxid_localpart</code></p>
+<h3 id="auto_join_mxid_localpart"><a class="header" href="#auto_join_mxid_localpart"><code>auto_join_mxid_localpart</code></a></h3>
 <p>The local part of the user id which is used to create <code>auto_join_rooms</code> if
 <code>autocreate_auto_join_rooms</code> is true. If this is not provided then the
 initial user account that registers will be used to create the rooms.</p>
@@ -1929,7 +1929,7 @@ have the appropriate permissions to invite new members.</p>
 <pre><code class="language-yaml">auto_join_mxid_localpart: system
 </code></pre>
 <hr />
-<p>Config option: <code>auto_join_rooms_for_guests</code></p>
+<h3 id="auto_join_rooms_for_guests"><a class="header" href="#auto_join_rooms_for_guests"><code>auto_join_rooms_for_guests</code></a></h3>
 <p>When <code>auto_join_rooms</code> is specified, setting this flag to false prevents
 guest accounts from being automatically joined to the rooms.</p>
 <p>Defaults to true.</p>
@@ -1937,7 +1937,7 @@ guest accounts from being automatically joined to the rooms.</p>
 <pre><code class="language-yaml">auto_join_rooms_for_guests: false
 </code></pre>
 <hr />
-<p>Config option: <code>inhibit_user_in_use_error</code></p>
+<h3 id="inhibit_user_in_use_error"><a class="header" href="#inhibit_user_in_use_error"><code>inhibit_user_in_use_error</code></a></h3>
 <p>Whether to inhibit errors raised when registering a new account if the user ID
 already exists. If turned on, requests to <code>/register/available</code> will always
 show a user ID as available, and Synapse won't raise an error when starting
@@ -1951,14 +1951,14 @@ raise an error if the registration completes and the username conflicts.</p>
 <h2 id="metrics"><a class="header" href="#metrics">Metrics</a></h2>
 <p>Config options related to metrics.</p>
 <hr />
-<p>Config option: <code>enable_metrics</code></p>
+<h3 id="enable_metrics"><a class="header" href="#enable_metrics"><code>enable_metrics</code></a></h3>
 <p>Set to true to enable collection and rendering of performance metrics. 
 Defaults to false.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">enable_metrics: true
 </code></pre>
 <hr />
-<p>Config option: <code>sentry</code></p>
+<h3 id="sentry"><a class="header" href="#sentry"><code>sentry</code></a></h3>
 <p>Use this option to enable sentry integration. Provide the DSN assigned to you by sentry
 with the <code>dsn</code> setting. </p>
 <p>NOTE: While attempts are made to ensure that the logs don't contain
@@ -1971,7 +1971,7 @@ through insecure notification channels if so configured.</p>
     dsn: &quot;...&quot;
 </code></pre>
 <hr />
-<p>Config option: <code>metrics_flags</code></p>
+<h3 id="metrics_flags"><a class="header" href="#metrics_flags"><code>metrics_flags</code></a></h3>
 <p>Flags to enable Prometheus metrics which are not suitable to be
 enabled by default, either for performance reasons or limited use.
 Currently the only option is <code>known_servers</code>, which publishes 
@@ -1983,7 +1983,7 @@ performance problems on large homeservers.</p>
     known_servers: true
 </code></pre>
 <hr />
-<p>Config option: <code>report_stats</code></p>
+<h3 id="report_stats"><a class="header" href="#report_stats"><code>report_stats</code></a></h3>
 <p>Whether or not to report anonymized homeserver usage statistics. This is originally
 set when generating the config. Set this option to true or false to change the current
 behavior. </p>
@@ -1991,7 +1991,7 @@ behavior. </p>
 <pre><code class="language-yaml">report_stats: true
 </code></pre>
 <hr />
-<p>Config option: <code>report_stats_endpoint</code></p>
+<h3 id="report_stats_endpoint"><a class="header" href="#report_stats_endpoint"><code>report_stats_endpoint</code></a></h3>
 <p>The endpoint to report the anonymized homeserver usage statistics to.
 Defaults to https://matrix.org/report-usage-stats/push</p>
 <p>Example configuration:</p>
@@ -2001,7 +2001,7 @@ Defaults to https://matrix.org/report-usage-stats/push</p>
 <h2 id="api-configuration"><a class="header" href="#api-configuration">API Configuration</a></h2>
 <p>Config settings related to the client/server API</p>
 <hr />
-<p>Config option: <code>room_prejoin_state:</code></p>
+<h3 id="room_prejoin_state"><a class="header" href="#room_prejoin_state"><code>room_prejoin_state:</code></a></h3>
 <p>Controls for the state that is shared with users who receive an invite
 to a room. By default, the following state event types are shared with users who 
 receive invites to the room:</p>
@@ -2030,7 +2030,7 @@ to a room. By default, this list is empty (so only the default event types are s
      - m.room.join_rules
 </code></pre>
 <hr />
-<p>Config option: <code>track_puppeted_user_ips</code></p>
+<h3 id="track_puppeted_user_ips"><a class="header" href="#track_puppeted_user_ips"><code>track_puppeted_user_ips</code></a></h3>
 <p>We record the IP address of clients used to access the API for various
 reasons, including displaying it to the user in the &quot;Where you're signed in&quot;
 dialog.</p>
@@ -2045,7 +2045,7 @@ above.)</p>
 <pre><code class="language-yaml">track_puppeted_user_ips: true
 </code></pre>
 <hr />
-<p>Config option: <code>app_service_config_files</code></p>
+<h3 id="app_service_config_files"><a class="header" href="#app_service_config_files"><code>app_service_config_files</code></a></h3>
 <p>A list of application service config files to use.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">app_service_config_files:
@@ -2053,14 +2053,14 @@ above.)</p>
   - app_service_2.yaml
 </code></pre>
 <hr />
-<p>Config option: <code>track_appservice_user_ips</code></p>
+<h3 id="track_appservice_user_ips"><a class="header" href="#track_appservice_user_ips"><code>track_appservice_user_ips</code></a></h3>
 <p>Defaults to false. Set to true to enable tracking of application service IP addresses.
 Implicitly enables MAU tracking for application service users.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">track_appservice_user_ips: true
 </code></pre>
 <hr />
-<p>Config option: <code>macaroon_secret_key</code></p>
+<h3 id="macaroon_secret_key"><a class="header" href="#macaroon_secret_key"><code>macaroon_secret_key</code></a></h3>
 <p>A secret which is used to sign access tokens. If none is specified,
 the <code>registration_shared_secret</code> is used, if one is given; otherwise,
 a secret key is derived from the signing key.</p>
@@ -2068,7 +2068,7 @@ a secret key is derived from the signing key.</p>
 <pre><code class="language-yaml">macaroon_secret_key: &lt;PRIVATE STRING&gt;
 </code></pre>
 <hr />
-<p>Config option: <code>form_secret</code></p>
+<h3 id="form_secret"><a class="header" href="#form_secret"><code>form_secret</code></a></h3>
 <p>A secret which is used to calculate HMACs for form values, to stop
 falsification of values. Must be specified for the User Consent
 forms to work.</p>
@@ -2079,13 +2079,13 @@ forms to work.</p>
 <h2 id="signing-keys"><a class="header" href="#signing-keys">Signing Keys</a></h2>
 <p>Config options relating to signing keys</p>
 <hr />
-<p>Config option: <code>signing_key_path</code></p>
+<h3 id="signing_key_path"><a class="header" href="#signing_key_path"><code>signing_key_path</code></a></h3>
 <p>Path to the signing key to sign messages with.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">signing_key_path: &quot;CONFDIR/SERVERNAME.signing.key&quot;
 </code></pre>
 <hr />
-<p>Config option: <code>old_signing_keys</code></p>
+<h3 id="old_signing_keys"><a class="header" href="#old_signing_keys"><code>old_signing_keys</code></a></h3>
 <p>The keys that the server used to sign messages with but won't use
 to sign new messages. For each key, <code>key</code> should be the base64-encoded public key, and
 <code>expired_ts</code>should be the time (in milliseconds since the unix epoch) that
@@ -2097,7 +2097,7 @@ it was last used.</p>
   &quot;ed25519:id&quot;: { key: &quot;base64string&quot;, expired_ts: 123456789123 }
 </code></pre>
 <hr />
-<p>Config option: <code>key_refresh_interval</code></p>
+<h3 id="key_refresh_interval"><a class="header" href="#key_refresh_interval"><code>key_refresh_interval</code></a></h3>
 <p>How long key response published by this server is valid for.
 Used to set the <code>valid_until_ts</code> in <code>/key/v2</code> APIs.
 Determines how quickly servers will query to check which keys
@@ -2106,7 +2106,7 @@ are still valid. Defaults to 1d.</p>
 <pre><code class="language-yaml">key_refresh_interval: 2d
 </code></pre>
 <hr />
-<p>Config option: <code>trusted_key_servers:</code></p>
+<h3 id="trusted_key_servers"><a class="header" href="#trusted_key_servers"><code>trusted_key_servers:</code></a></h3>
 <p>The trusted servers to download signing keys from.</p>
 <p>When we need to fetch a signing key, each server is tried in parallel.</p>
 <p>Normally, the connection to the key server is validated via TLS certificates.
@@ -2142,14 +2142,14 @@ to the key server, you can set this to <code>true</code> to override this behavi
   - server_name: &quot;matrix.org&quot;
 </code></pre>
 <hr />
-<p>Config option: <code>suppress_key_server_warning</code></p>
+<h3 id="suppress_key_server_warning"><a class="header" href="#suppress_key_server_warning"><code>suppress_key_server_warning</code></a></h3>
 <p>Set the following to true to disable the warning that is emitted when the
 <code>trusted_key_servers</code> include 'matrix.org'. See above.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">suppress_key_server_warning: true
 </code></pre>
 <hr />
-<p>Config option: <code>key_server_signing_keys_path</code></p>
+<h3 id="key_server_signing_keys_path"><a class="header" href="#key_server_signing_keys_path"><code>key_server_signing_keys_path</code></a></h3>
 <p>The signing keys to use when acting as a trusted key server. If not specified
 defaults to the server signing key.</p>
 <p>Can contain multiple keys, one per line.</p>
@@ -2169,7 +2169,7 @@ disable the regular login/registration flows:</p>
 <p>You will also want to investigate the settings under the &quot;sso&quot; configuration
 section below.</p>
 <hr />
-<p>Config option: <code>saml2_config</code></p>
+<h3 id="saml2_config"><a class="header" href="#saml2_config"><code>saml2_config</code></a></h3>
 <p>Enable SAML2 for registration and login. Uses pysaml2. To learn more about pysaml and
 to find a full list options for configuring pysaml, read the docs <a href="https://pysaml2.readthedocs.io/en/latest/">here</a>.</p>
 <p>At least one of <code>sp_config</code> or <code>config_path</code> must be set in this section to
@@ -2310,7 +2310,7 @@ the IdP to use an ACS location of
   idp_entityid: 'https://our_idp/entityid'
 </code></pre>
 <hr />
-<p>Config option: <code>oidc_providers</code></p>
+<h3 id="oidc_providers"><a class="header" href="#oidc_providers"><code>oidc_providers</code></a></h3>
 <p>List of OpenID Connect (OIDC) / OAuth 2.0 identity providers, for registration
 and login. See <a href="../../openid.html">here</a>
 for information on how to configure these options.</p>
@@ -2527,7 +2527,7 @@ claim MUST contain &quot;admin&quot;.</p>
         value: &quot;synapseUsers&quot;
 </code></pre>
 <hr />
-<p>Config option: <code>cas_config</code></p>
+<h3 id="cas_config"><a class="header" href="#cas_config"><code>cas_config</code></a></h3>
 <p>Enable Central Authentication Service (CAS) for registration and login.
 Has the following sub-options:</p>
 <ul>
@@ -2552,7 +2552,7 @@ All of the listed attributes must match for the login to be permitted.</li>
     department: None
 </code></pre>
 <hr />
-<p>Config option: <code>sso</code></p>
+<h3 id="sso"><a class="header" href="#sso"><code>sso</code></a></h3>
 <p>Additional settings to use with single-sign on systems such as OpenID Connect,
 SAML2 and CAS.</p>
 <p>Server admins can configure custom templates for pages related to SSO. See 
@@ -2585,7 +2585,7 @@ information when first signing in. Defaults to false.</li>
     update_profile_information: true
 </code></pre>
 <hr />
-<p>Config option: <code>jwt_config</code></p>
+<h3 id="jwt_config"><a class="header" href="#jwt_config"><code>jwt_config</code></a></h3>
 <p>JSON web token integration. The following settings can be used to make
 Synapse JSON web tokens for authentication, instead of its internal
 password database.</p>
@@ -2626,7 +2626,7 @@ validation will fail without configuring audiences.</li>
         - &quot;provided-by-your-issuer&quot;
 </code></pre>
 <hr />
-<p>Config option: <code>password_config</code></p>
+<h3 id="password_config"><a class="header" href="#password_config"><code>password_config</code></a></h3>
 <p>Use this setting to enable password-based logins. </p>
 <p>This setting has the following sub-options:</p>
 <ul>
@@ -2670,7 +2670,7 @@ Defaults to false.</li>
       require_uppercase: true
 </code></pre>
 <hr />
-<p>Config option: <code>ui_auth</code></p>
+<h3 id="ui_auth"><a class="header" href="#ui_auth"><code>ui_auth</code></a></h3>
 <p>The amount of time to allow a user-interactive authentication session to be active.</p>
 <p>This defaults to 0, meaning the user is queried for their credentials 
 before every action, but this can be overridden to allow a single
@@ -2686,7 +2686,7 @@ adding a 3PID).</p>
     session_timeout: &quot;15s&quot;
 </code></pre>
 <hr />
-<p>Config option: <code>email</code></p>
+<h3 id="email"><a class="header" href="#email"><code>email</code></a></h3>
 <p>Configuration for sending emails from Synapse.</p>
 <p>Server admins can configure custom templates for email content. See
 <a href="../../templates.html">here</a> for more information.</p>
@@ -2812,7 +2812,7 @@ ownership. Defaults to &quot;[%(server_name)s] Validate your email&quot;</li>
 <h2 id="push"><a class="header" href="#push">Push</a></h2>
 <p>Configuration settings related to push notifications</p>
 <hr />
-<p>Config option: <code>push</code></p>
+<h3 id="push-1"><a class="header" href="#push-1"><code>push</code></a></h3>
 <p>This setting defines options for push notifications. </p>
 <p>This option has a number of sub-options. They are as follows:</p>
 <ul>
@@ -2842,7 +2842,7 @@ of unread messages.</li>
 <h2 id="rooms"><a class="header" href="#rooms">Rooms</a></h2>
 <p>Config options relating to rooms.</p>
 <hr />
-<p>Config option: <code>encryption_enabled_by_default</code></p>
+<h3 id="encryption_enabled_by_default"><a class="header" href="#encryption_enabled_by_default"><code>encryption_enabled_by_default</code></a></h3>
 <p>Controls whether locally-created rooms should be end-to-end encrypted by
 default.</p>
 <p>Possible options are &quot;all&quot;, &quot;invite&quot;, and &quot;off&quot;. They are defined as:</p>
@@ -2859,7 +2859,7 @@ will also not affect rooms created by other servers.</p>
 <pre><code class="language-yaml">encryption_enabled_by_default_for_room_type: invite
 </code></pre>
 <hr />
-<p>Config option: <code>user_directory</code></p>
+<h3 id="user_directory"><a class="header" href="#user_directory"><code>user_directory</code></a></h3>
 <p>This setting defines options related to the user directory. </p>
 <p>This option has the following sub-options:</p>
 <ul>
@@ -2888,7 +2888,7 @@ user directory. Defaults to false.</li>
     prefer_local_users: true
 </code></pre>
 <hr />
-<p>Config option: <code>user_consent</code></p>
+<h3 id="user_consent"><a class="header" href="#user_consent"><code>user_consent</code></a></h3>
 <p>For detailed instructions on user consent configuration, see <a href="../../consent_tracking.html">here</a>.</p>
 <p>Parts of this section are required if enabling the <code>consent</code> resource under
 <code>listeners</code>, in particular <code>template_dir</code> and <code>version</code>. # TODO: link <code>listeners</code></p>
@@ -2943,7 +2943,7 @@ Defaults to &quot;Privacy Policy&quot;.</p>
   policy_name: Privacy Policy
 </code></pre>
 <hr />
-<p>Config option: <code>stats</code></p>
+<h3 id="stats"><a class="header" href="#stats"><code>stats</code></a></h3>
 <p>Settings for local room and user statistics collection. See <a href="../../room_and_user_statistics.html">here</a>
 for more. </p>
 <ul>
@@ -2956,7 +2956,7 @@ correctly. Defaults to true. </li>
   enabled: false
 </code></pre>
 <hr />
-<p>Config option: <code>server_notices</code></p>
+<h3 id="server_notices"><a class="header" href="#server_notices"><code>server_notices</code></a></h3>
 <p>Use this setting to enable a room which can be used to send notices
 from the server to users. It is a special room which users cannot leave; notices
 in the room come from a special &quot;notices&quot; user id.</p>
@@ -2977,7 +2977,7 @@ notices.</p>
   room_name: &quot;Server Notices&quot;
 </code></pre>
 <hr />
-<p>Config option: <code>enable_room_list_search</code></p>
+<h3 id="enable_room_list_search"><a class="header" href="#enable_room_list_search"><code>enable_room_list_search</code></a></h3>
 <p>Set to false to disable searching the public room list. When disabled
 blocks searching local and remote room lists for local and remote
 users by always returning an empty list for all queries. Defaults to true. </p>
@@ -2985,7 +2985,7 @@ users by always returning an empty list for all queries. Defaults to true. </p>
 <pre><code class="language-yaml">enable_room_list_search: false
 </code></pre>
 <hr />
-<p>Config option: <code>alias_creation</code></p>
+<h3 id="alias_creation"><a class="header" href="#alias_creation"><code>alias_creation</code></a></h3>
 <p>The <code>alias_creation</code> option controls who is allowed to create aliases
 on this server.</p>
 <p>The format of this option is a list of rules that contain globs that
@@ -3035,7 +3035,7 @@ can publish rooms.</p>
     action: allow
 </code></pre>
 <hr />
-<p>Config option: <code>default_power_level_content_override</code></p>
+<h3 id="default_power_level_content_override"><a class="header" href="#default_power_level_content_override"><code>default_power_level_content_override</code></a></h3>
 <p>The <code>default_power_level_content_override</code> option controls the default power
 levels for rooms.</p>
 <p>Useful if you know that your users need special permissions in rooms
@@ -3057,7 +3057,7 @@ except <code>com.example.foo</code>.</p>
 <h2 id="opentracing"><a class="header" href="#opentracing">Opentracing</a></h2>
 <p>Configuration options related to Opentracing support.</p>
 <hr />
-<p>Config option: <code>opentracing</code></p>
+<h3 id="opentracing-1"><a class="header" href="#opentracing-1"><code>opentracing</code></a></h3>
 <p>These settings enable and configure opentracing, which implements distributed tracing.
 This allows you to observe the causal chains of events across servers
 including requests, key lookups etc., across any server running
@@ -3097,14 +3097,14 @@ mostly related to trace sampling which is documented <a href="https://www.jaeger
 <h2 id="workers"><a class="header" href="#workers">Workers</a></h2>
 <p>Configuration options related to workers.</p>
 <hr />
-<p>Config option: <code>send_federation</code></p>
+<h3 id="send_federation"><a class="header" href="#send_federation"><code>send_federation</code></a></h3>
 <p>Controls sending of outbound federation transactions on the main process.
 Set to false if using a federation sender worker. Defaults to true. </p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">send_federation: false
 </code></pre>
 <hr />
-<p>Config option: <code>federation_sender_instances</code></p>
+<h3 id="federation_sender_instances"><a class="header" href="#federation_sender_instances"><code>federation_sender_instances</code></a></h3>
 <p>It is possible to run multiple federation sender workers, in which case the
 work is balanced across them. Use this setting to list the senders. </p>
 <p>This configuration setting must be shared between all federation sender workers, and if
@@ -3116,7 +3116,7 @@ events may be dropped). </p>
   - federation_sender1
 </code></pre>
 <hr />
-<p>Config option: <code>instance_map</code></p>
+<h3 id="instance_map"><a class="header" href="#instance_map"><code>instance_map</code></a></h3>
 <p>When using workers this should be a map from worker name to the
 HTTP replication listener of the worker, if configured. </p>
 <p>Example configuration:</p>
@@ -3126,7 +3126,7 @@ HTTP replication listener of the worker, if configured. </p>
     port: 8034
 </code></pre>
 <hr />
-<p>Config option: <code>stream_writers</code></p>
+<h3 id="stream_writers"><a class="header" href="#stream_writers"><code>stream_writers</code></a></h3>
 <p>Experimental: When using workers you can define which workers should
 handle event persistence and typing notifications. Any worker
 specified here must also be in the <code>instance_map</code>.</p>
@@ -3136,21 +3136,21 @@ specified here must also be in the <code>instance_map</code>.</p>
   typing: worker1
 </code></pre>
 <hr />
-<p>Config option: <code>run_background_tasks_on</code></p>
+<h3 id="run_background_tasks_on"><a class="header" href="#run_background_tasks_on"><code>run_background_tasks_on</code></a></h3>
 <p>The worker that is used to run background tasks (e.g. cleaning up expired
 data). If not provided this defaults to the main process.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">run_background_tasks_on: worker1
 </code></pre>
 <hr />
-<p>Config option: <code>worker_replication_secret</code></p>
+<h3 id="worker_replication_secret"><a class="header" href="#worker_replication_secret"><code>worker_replication_secret</code></a></h3>
 <p>A shared secret used by the replication APIs to authenticate HTTP requests
 from workers.</p>
 <p>By default this is unused and traffic is not authenticated.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">worker_replication_secret: &quot;secret_secret&quot;
 </code></pre>
-<p>Config option: <code>redis</code></p>
+<h3 id="redis"><a class="header" href="#redis"><code>redis</code></a></h3>
 <p>Configuration for Redis when using workers. This <em>must</em> be enabled when
 using workers (unless using old style direct TCP configuration).
 This setting has the following sub-options:</p>
@@ -3170,7 +3170,7 @@ localhost and 6379</li>
 <h2 id="background-updates"><a class="header" href="#background-updates">Background Updates</a></h2>
 <p>Configuration settings related to background updates. </p>
 <hr />
-<p>Config option: <code>background_updates</code></p>
+<h3 id="background_updates"><a class="header" href="#background_updates"><code>background_updates</code></a></h3>
 <p>Background updates are database updates that are run in the background in batches.
 The duration, minimum batch size, default batch size, whether to sleep between batches and if so, how long to
 sleep can all be configured. This is helpful to speed up or slow down the updates.
