@@ -143,29 +143,6 @@ class OembedConfig(Config):
         )
         return re.compile(pattern)
 
-    def generate_config_section(self, **kwargs: Any) -> str:
-        return """\
-        # oEmbed allows for easier embedding content from a website. It can be
-        # used for generating URLs previews of services which support it.
-        #
-        oembed:
-          # A default list of oEmbed providers is included with Synapse.
-          #
-          # Uncomment the following to disable using these default oEmbed URLs.
-          # Defaults to 'false'.
-          #
-          #disable_default_providers: true
-
-          # Additional files with oEmbed configuration (each should be in the
-          # form of providers.json).
-          #
-          # By default, this list is empty (so only the default providers.json
-          # is used).
-          #
-          #additional_providers:
-          #  - oembed/my_providers.json
-        """
-
 
 _OEMBED_PROVIDER_SCHEMA = {
     "type": "array",

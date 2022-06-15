@@ -860,13 +860,14 @@ class Mailer:
              A link to unsubscribe from email notifications.
         """
         params = {
-            "access_token": self.macaroon_gen.generate_delete_pusher_token(user_id),
+            "access_token": self.macaroon_gen.generate_delete_pusher_token(
+                user_id, app_id, email_address
+            ),
             "app_id": app_id,
             "pushkey": email_address,
         }
 
-        # XXX: make r0 once API is stable
-        return "%s_matrix/client/unstable/pushers/remove?%s" % (
+        return "%s_synapse/client/unsubscribe?%s" % (
             self.hs.config.server.public_baseurl,
             urllib.parse.urlencode(params),
         )
