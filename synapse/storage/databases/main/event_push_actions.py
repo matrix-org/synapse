@@ -1089,7 +1089,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
             values={
                 "notif_count": notif_count,
                 "unread_count": unread_count,
-                "stream_ordering": stream_ordering,
+                "stream_ordering": old_rotate_stream_ordering,
             },
         )
 
