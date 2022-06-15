@@ -371,7 +371,7 @@ jobs:
 
       - name: "Install Complement Dependencies"
         run: |
-          sudo apt-get update && sudo apt-get install -y libolm3 libolm-dev
+          sudo apt-get -qq update && sudo apt-get install -qqy libolm3 libolm-dev
           go get -v github.com/haveyoudebuggedit/gotestfmt/v2/cmd/gotestfmt@latest
 
       - name: Run actions/checkout@v2 for synapse
