@@ -186,6 +186,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
             "url",
             "protocol",
             "user_agent",
+            "beeper_bridge",
         ]
         self.assertCountEqual(log.keys(), expected_log_keys)
         self.assertEqual(log["log"], "Hello there, wally!")
