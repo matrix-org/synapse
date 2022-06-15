@@ -159,95 +159,10 @@ async def filter_events_for_client(
             return None
 
         state = event_id_to_state[event.event_id]
-
-        # get the room_visibility at the time of the event.
-        visibility = get_effective_room_visibility_from_state(state)
-
-        # Always allow history visibility events on boundaries. This is done
-        # by setting the effective visibility to the least restrictive
-        # of the old vs new.
-        if event.type == EventTypes.RoomHistoryVisibility:
-            prev_content = event.unsigned.get("prev_content", {})
-            prev_visibility = prev_content.get("history_visibility", None)
-
-            if prev_visibility not in VISIBILITY_PRIORITY:
-                prev_visibility = HistoryVisibility.SHARED
-
-            new_priority = VISIBILITY_PRIORITY.index(visibility)
-            old_priority = VISIBILITY_PRIORITY.index(prev_visibility)
-            if old_priority < new_priority:
-                visibility = prev_visibility
-
-        # likewise, if the event is the user's own membership event, use
-        # the 'most joined' membership
-        membership = None
-        if event.type == EventTypes.Member and event.state_key == user_id:
-            membership = event.content.get("membership", None)
-            if membership not in MEMBERSHIP_PRIORITY:
-                membership = "leave"
-
-            prev_content = event.unsigned.get("prev_content", {})
-            prev_membership = prev_content.get("membership", None)
-            if prev_membership not in MEMBERSHIP_PRIORITY:
-                prev_membership = "leave"
-
-            # Always allow the user to see their own leave events, otherwise
-            # they won't see the room disappear if they reject the invite
-            #
-            # (Note this doesn't work for out-of-band invite rejections, which don't
-            # have prev_state populated. They are handled above in the outlier code.)
-            if membership == "leave" and (
-                prev_membership == "join" or prev_membership == "invite"
-            ):
-                return event
-
-            new_priority = MEMBERSHIP_PRIORITY.index(membership)
-            old_priority = MEMBERSHIP_PRIORITY.index(prev_membership)
-            if old_priority < new_priority:
-                membership = prev_membership
-
-        # otherwise, get the user's membership at the time of the event.
-        if membership is None:
-            membership_event = state.get((EventTypes.Member, user_id), None)
-            if membership_event:
-                membership = membership_event.membership
-
-        # if the user was a member of the room at the time of the event,
-        # they can see it.
-        if membership == Membership.JOIN:
-            return event
-
-        # otherwise, it depends on the room visibility.
-
-        if visibility == HistoryVisibility.JOINED:
-            # we weren't a member at the time of the event, so we can't
-            # see this event.
-            return None
-
-        elif visibility == HistoryVisibility.INVITED:
-            # user can also see the event if they were *invited* at the time
-            # of the event.
-            return event if membership == Membership.INVITE else None
-
-        elif visibility == HistoryVisibility.SHARED and is_peeking:
-            # if the visibility is shared, users cannot see the event unless
-            # they have *subsequently* joined the room (or were members at the
-            # time, of course)
-            #
-            # XXX: if the user has subsequently joined and then left again,
-            # ideally we would share history up to the point they left. But
-            # we don't know when they left. We just treat it as though they
-            # never joined, and restrict access.
-            return None
-
-        # the visibility is either shared or world_readable, and the user was
-        # not a member at the time. We allow it, provided the original sender
-        # has not requested their data to be erased, in which case, we return
-        # a redacted version.
-        if erased_senders[event.sender]:
-            return prune_event(event)
-
-        return event
+        visible_event = _check_visibility(
+            user_id, event, state, is_peeking, erased_senders
+        )
+        return visible_event
 
     # Check each event: gives an iterable of None or (a potentially modified)
     # EventBase.
@@ -284,17 +199,25 @@ async def filter_events_for_client_with_state(
         # Add current event to updated_state_map, we need to do this here as it may not have been persisted to the db yet
         updated_state_map[current_state_key] = event
 
-    filtered_event = await _check_visibility(user_id, event, updated_state_map)
+    filtered_event = _check_visibility(user_id, event, updated_state_map)
     return filtered_event
 
 
-async def _check_visibility(
-    user_id: str, event: EventBase, state_map: StateMap, is_peeking=False
+def _check_visibility(
+    user_id: str,
+    event: EventBase,
+    state_map: StateMap,
+    is_peeking: bool = False,
+    erased_senders: Optional[dict] = None,
 ) -> Optional[EventBase]:
     """
     Checks whether the room history should be visible to the user at the time of this event.
     Args:
-
+        user_id: user_id for the user to be checked
+        event: the event to be checked
+        state_map: state at the event to be checked
+        is_peeking: whether the user in question is peeking
+        erased_senders: optional dict matching a user id to a boolean representing whether the user has requested erasure
     Returns: the event if the room history is visible to the user at the time of the event, None if not
     """
     # Get the room_visibility at the time of the event.
@@ -379,6 +302,14 @@ async def _check_visibility(
         # we don't know when they left. We just treat it as though they
         # never joined, and restrict access.
         return None
+
+    # the visibility is either shared or world_readable, and the user was
+    # not a member at the time. We allow it, provided the original sender
+    # has not requested their data to be erased, in which case, we return
+    # a redacted version.
+    if erased_senders:
+        if erased_senders[event.sender]:
+            return prune_event(event)
 
     return event
 
