@@ -15,11 +15,12 @@
 
 import logging
 import typing
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import Any, Collection, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import SignatureVerifyException, verify_signed_json
+from typing_extensions import Protocol
 from unpaddedbase64 import decode_base64
 
 from synapse.api.constants import (
@@ -35,7 +36,8 @@ from synapse.api.room_versions import (
     EventFormatVersions,
     RoomVersion,
 )
-from synapse.types import StateMap, UserID, get_domain_from_id
+from synapse.storage.databases.main.events_worker import EventRedactBehaviour
+from synapse.types import MutableStateMap, StateMap, UserID, get_domain_from_id
 
 if typing.TYPE_CHECKING:
     # conditional imports to avoid import cycle
@@ -43,6 +45,17 @@ if typing.TYPE_CHECKING:
     from synapse.events.builder import EventBuilder
 
 logger = logging.getLogger(__name__)
+
+
+class _EventSourceStore(Protocol):
+    async def get_events(
+        self,
+        event_ids: Collection[str],
+        redact_behaviour: EventRedactBehaviour,
+        get_prev_content: bool = False,
+        allow_rejected: bool = False,
+    ) -> Dict[str, "EventBase"]:
+        ...
 
 
 def validate_event_for_room_version(event: "EventBase") -> None:
@@ -112,53 +125,60 @@ def validate_event_for_room_version(event: "EventBase") -> None:
             raise AuthError(403, "Event not signed by authorising server")
 
 
-def check_auth_rules_for_event(
+async def check_state_independent_auth_rules(
+    store: _EventSourceStore,
     event: "EventBase",
-    auth_events: Iterable["EventBase"],
 ) -> None:
-    """Check that an event complies with the auth rules
+    """Check that an event complies with auth rules that are independent of room state
 
-    Checks whether an event passes the auth rules with a given set of state events
-
-    Assumes that we have already checked that the event is the right shape (it has
-    enough signatures, has a room ID, etc). In other words:
-
-     - it's fine for use in state resolution, when we have already decided whether to
-       accept the event or not, and are now trying to decide whether it should make it
-       into the room state
-
-     - when we're doing the initial event auth, it is only suitable in combination with
-       a bunch of other tests.
+    Runs through the first few auth rules, which are independent of room state. (Which
+    means that we only need to them once for each received event)
 
     Args:
+        store: the datastore; used to fetch the auth events for validation
         event: the event being checked.
-        auth_events: the room state to check the events against.
 
     Raises:
         AuthError if the checks fail
     """
-    # We need to ensure that the auth events are actually for the same room, to
-    # stop people from using powers they've been granted in other rooms for
-    # example.
-    #
-    # Arguably we don't need to do this when we're just doing state res, as presumably
-    # the state res algorithm isn't silly enough to give us events from different rooms.
-    # Still, it's easier to do it anyway.
+    # Check the auth events.
+    auth_events = await store.get_events(
+        event.auth_event_ids(),
+        redact_behaviour=EventRedactBehaviour.as_is,
+        allow_rejected=True,
+    )
     room_id = event.room_id
-    for auth_event in auth_events:
+    auth_dict: MutableStateMap[str] = {}
+    for auth_event_id in event.auth_event_ids():
+        auth_event = auth_events.get(auth_event_id)
+
+        # we should have all the auth events by now, so if we do not, that suggests
+        # a synapse programming error
+        if auth_event is None:
+            raise RuntimeError(
+                f"Event {event.event_id} has unknown auth event {auth_event_id}"
+            )
+
+        # We need to ensure that the auth events are actually for the same room, to
+        # stop people from using powers they've been granted in other rooms for
+        # example.
         if auth_event.room_id != room_id:
             raise AuthError(
                 403,
                 "During auth for event %s in room %s, found event %s in the state "
                 "which is in room %s"
-                % (event.event_id, room_id, auth_event.event_id, auth_event.room_id),
+                % (event.event_id, room_id, auth_event_id, auth_event.room_id),
             )
+
+        # We also need to check that the auth event itself is not rejected.
         if auth_event.rejected_reason:
             raise AuthError(
                 403,
                 "During auth for event %s: found rejected event %s in the state"
                 % (event.event_id, auth_event.event_id),
             )
+
+        auth_dict[(auth_event.type, auth_event.state_key)] = auth_event_id
 
     # Implementation of https://matrix.org/docs/spec/rooms/v1#authorization-rules
     #
@@ -181,15 +201,45 @@ def check_auth_rules_for_event(
                 "room appears to have unsupported version %s" % (room_version_prop,),
             )
 
-        logger.debug("Allowing! %s", event)
         return
-
-    auth_dict = {(e.type, e.state_key): e for e in auth_events}
 
     # 3. If event does not have a m.room.create in its auth_events, reject.
     creation_event = auth_dict.get((EventTypes.Create, ""), None)
     if not creation_event:
         raise AuthError(403, "No create event in auth events")
+
+
+def check_state_dependent_auth_rules(
+    event: "EventBase",
+    auth_events: Iterable["EventBase"],
+) -> None:
+    """Check that an event complies with auth rules that depend on room state
+
+    Runs through the parts of the auth rules that check an event against bits of room
+    state.
+
+    Note:
+
+     - it's fine for use in state resolution, when we have already decided whether to
+       accept the event or not, and are now trying to decide whether it should make it
+       into the room state
+
+     - when we're doing the initial event auth, it is only suitable in combination with
+       a bunch of other tests (including, but not limited to, check_state_independent_auth_rules).
+
+    Args:
+        event: the event being checked.
+        auth_events: the room state to check the events against.
+
+    Raises:
+        AuthError if the checks fail
+    """
+    # there are no state-dependent auth rules for create events.
+    if event.type == EventTypes.Create:
+        logger.debug("Allowing! %s", event)
+        return
+
+    auth_dict = {(e.type, e.state_key): e for e in auth_events}
 
     # additional check for m.federate
     creating_domain = get_domain_from_id(event.room_id)
