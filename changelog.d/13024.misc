@@ -1,0 +1,1 @@
+Refactor methods in `synapse.api.auth.Auth` to use `Requester` objects everywhere instead of user IDs.
