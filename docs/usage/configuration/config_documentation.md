@@ -1153,8 +1153,8 @@ Caching can be configured through the following sub-options:
 * `sync_response_cache_duration`: Controls how long the results of a /sync request are
   cached for after a successful response is returned. A higher duration can help clients
   with intermittent connections, at the cost of higher memory usage.
-  By default, this is zero, which means that sync responses are not cached
-  at all.
+  A value of zero means that sync responses are not cached.
+  Defaults to 2m.
 * `cache_autotuning` and its sub-options `max_cache_memory_usage`, `target_cache_memory_usage`, and
    `min_cache_ttl` work in conjunction with each other to maintain a balance between cache memory 
    usage and cache entry availability. You must be using [jemalloc](https://github.com/matrix-org/synapse#help-synapse-is-slow-and-eats-all-my-ramcpu) 
@@ -2962,8 +2962,10 @@ Additional sub-options for this setting include:
    tokens. Defaults to false.
 * `secret`: This is either the private shared secret or the public key used to
    decode the contents of the JSON web token. Required if `enabled` is set to true.
-* `algorithm`: The algorithm used to sign the JSON web token. Supported algorithms are listed at
-   https://pyjwt.readthedocs.io/en/latest/algorithms.html Required if `enabled` is set to true.
+* `algorithm`: The algorithm used to sign (or HMAC) the JSON web token.
+   Supported algorithms are listed
+   [here (section JWS)](https://docs.authlib.org/en/latest/specs/rfc7518.html).
+   Required if `enabled` is set to true.
 * `subject_claim`: Name of the claim containing a unique identifier for the user.
    Optional, defaults to `sub`.
 * `issuer`: The issuer to validate the "iss" claim against. Optional. If provided the 

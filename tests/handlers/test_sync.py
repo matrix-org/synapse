@@ -45,7 +45,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
 
         # AuthBlocking reads from the hs' config on initialization. We need to
         # modify its config instead of the hs'
-        self.auth_blocking = self.hs.get_auth()._auth_blocking
+        self.auth_blocking = self.hs.get_auth_blocking()
 
     def test_wait_for_sync_for_user_auth_blocking(self):
         user_id1 = "@user1:test"
