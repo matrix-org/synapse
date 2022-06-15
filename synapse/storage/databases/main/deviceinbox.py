@@ -834,8 +834,6 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
 class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
     DEVICE_INBOX_STREAM_ID = "device_inbox_stream_drop"
-    REMOVE_DELETED_DEVICES = "remove_deleted_devices_from_device_inbox"
-    REMOVE_HIDDEN_DEVICES = "remove_hidden_devices_from_device_inbox"
     REMOVE_DEAD_DEVICES_FROM_INBOX = "remove_dead_devices_from_device_inbox"
 
     def __init__(
@@ -856,15 +854,6 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
         self.db_pool.updates.register_background_update_handler(
             self.DEVICE_INBOX_STREAM_ID, self._background_drop_index_device_inbox
         )
-
-        # Used to be a background update that deletes all device_inboxes for deleted
-        # devices.
-        self.db_pool.updates.register_noop_background_update(
-            self.REMOVE_DELETED_DEVICES
-        )
-        # Used to be a background update that deletes all device_inboxes for hidden
-        # devices.
-        self.db_pool.updates.register_noop_background_update(self.REMOVE_HIDDEN_DEVICES)
 
         self.db_pool.updates.register_background_update_handler(
             self.REMOVE_DEAD_DEVICES_FROM_INBOX,

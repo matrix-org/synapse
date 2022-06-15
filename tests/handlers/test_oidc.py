@@ -25,7 +25,7 @@ from synapse.handlers.sso import MappingException
 from synapse.server import HomeServer
 from synapse.types import JsonDict, UserID
 from synapse.util import Clock
-from synapse.util.macaroons import get_value_from_macaroon
+from synapse.util.macaroons import OidcSessionData, get_value_from_macaroon
 
 from tests.test_utils import FakeResponse, get_awaitable_result, simple_async_mock
 from tests.unittest import HomeserverTestCase, override_config
@@ -1227,7 +1227,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
     ) -> str:
         from synapse.handlers.oidc import OidcSessionData
 
-        return self.handler._token_generator.generate_oidc_session_token(
+        return self.handler._macaroon_generator.generate_oidc_session_token(
             state=state,
             session_data=OidcSessionData(
                 idp_id="oidc",
@@ -1251,7 +1251,6 @@ async def _make_callback_with_userinfo(
         userinfo: the OIDC userinfo dict
         client_redirect_url: the URL to redirect to on success.
     """
-    from synapse.handlers.oidc import OidcSessionData
 
     handler = hs.get_oidc_handler()
     provider = handler._providers["oidc"]
@@ -1260,7 +1259,7 @@ async def _make_callback_with_userinfo(
     provider._fetch_userinfo = simple_async_mock(return_value=userinfo)  # type: ignore[assignment]
 
     state = "state"
-    session = handler._token_generator.generate_oidc_session_token(
+    session = handler._macaroon_generator.generate_oidc_session_token(
         state=state,
         session_data=OidcSessionData(
             idp_id="oidc",

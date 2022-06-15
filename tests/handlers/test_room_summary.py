@@ -178,7 +178,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             result_room_ids.append(result_room["room_id"])
             result_children_ids.append(
                 [
-                    (cs["room_id"], cs["state_key"])
+                    (result_room["room_id"], cs["state_key"])
                     for cs in result_room["children_state"]
                 ]
             )
