@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import typing
 import unittest
-from typing import Iterable, List, Optional
+from typing import Collection, Dict, Iterable, List, Optional
 
 from parameterized import parameterized
 
@@ -33,22 +32,22 @@ class _StubEventSourceStore:
     """A stub implementation of the EventSourceStore"""
 
     def __init__(self):
-        self._store: typing.Dict[str, EventBase] = {}
+        self._store: Dict[str, EventBase] = {}
 
     def add_event(self, event: EventBase):
         self._store[event.event_id] = event
 
-    def add_events(self, events: typing.Iterable[EventBase]):
+    def add_events(self, events: Iterable[EventBase]):
         for event in events:
             self._store[event.event_id] = event
 
     async def get_events(
         self,
-        event_ids: typing.Collection[str],
+        event_ids: Collection[str],
         redact_behaviour: EventRedactBehaviour,
         get_prev_content: bool = False,
         allow_rejected: bool = False,
-    ) -> typing.Dict[str, EventBase]:
+    ) -> Dict[str, EventBase]:
         assert allow_rejected
         assert not get_prev_content
         assert redact_behaviour == EventRedactBehaviour.as_is
