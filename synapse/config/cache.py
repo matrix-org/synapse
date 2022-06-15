@@ -206,7 +206,7 @@ class CacheConfig(Config):
             self.cache_autotuning["min_cache_ttl"] = self.parse_duration(min_cache_ttl)
 
         self.sync_response_cache_duration = self.parse_duration(
-            cache_config.get("sync_response_cache_duration", 0)
+            cache_config.get("sync_response_cache_duration", "2m")
         )
 
     def resize_all_caches(self) -> None:

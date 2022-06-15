@@ -1137,8 +1137,8 @@ Caching can be configured through the following sub-options:
 * `sync_response_cache_duration`: Controls how long the results of a /sync request are
   cached for after a successful response is returned. A higher duration can help clients
   with intermittent connections, at the cost of higher memory usage.
-  By default, this is zero, which means that sync responses are not cached
-  at all.
+  A value of zero means that sync responses are not cached.
+  Defaults to 2m.
 * `cache_autotuning` and its sub-options `max_cache_memory_usage`, `target_cache_memory_usage`, and
    `min_cache_ttl` work in conjunction with each other to maintain a balance between cache memory 
    usage and cache entry availability. You must be using [jemalloc](https://github.com/matrix-org/synapse#help-synapse-is-slow-and-eats-all-my-ramcpu) 
