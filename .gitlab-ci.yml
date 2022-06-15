@@ -1,3 +1,16 @@
+stages:
+  - test
+  - build
+
+test:
+  stage: test
+  image:
+    name: $CI_REGISTRY_IMAGE:latest
+    entrypoint: [""]
+  script:
+    - pip install -e ".[all]"
+    - trial -j 4 tests
+
 build:
   stage: build
   image: docker:latest
