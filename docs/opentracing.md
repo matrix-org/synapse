@@ -57,8 +57,9 @@ https://www.jaegertracing.io/docs/latest/getting-started.
 ## Enable OpenTracing in Synapse
 
 OpenTracing is not enabled by default. It must be enabled in the
-homeserver config by uncommenting the config options under `opentracing`
-as shown in the [sample config](./sample_config.yaml). For example:
+homeserver config by adding the `opentracing` option to your config file. You can find 
+documentation about how to do this in the [config manual](usage/configuration/config_documentation.md) 
+under the header `opentracing`. See below for an example opentracing configuration: 
 
 ```yaml
 opentracing:
