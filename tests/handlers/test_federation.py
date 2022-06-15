@@ -119,7 +119,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         join_event = self._build_and_send_join_event(OTHER_SERVER, OTHER_USER, room_id)
 
         # check the state group
-        sg = self.successResultOf(
+        sg = self.get_success(
             self.store._get_state_group_for_event(join_event.event_id)
         )
 
@@ -149,7 +149,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         self.assertIsNotNone(e.rejected_reason)
 
         # ... and the state group should be the same as before
-        sg2 = self.successResultOf(self.store._get_state_group_for_event(ev.event_id))
+        sg2 = self.get_success(self.store._get_state_group_for_event(ev.event_id))
 
         self.assertEqual(sg, sg2)
 
@@ -172,7 +172,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         join_event = self._build_and_send_join_event(OTHER_SERVER, OTHER_USER, room_id)
 
         # check the state group
-        sg = self.successResultOf(
+        sg = self.get_success(
             self.store._get_state_group_for_event(join_event.event_id)
         )
 
@@ -203,7 +203,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         self.assertIsNotNone(e.rejected_reason)
 
         # ... and the state group should be the same as before
-        sg2 = self.successResultOf(self.store._get_state_group_for_event(ev.event_id))
+        sg2 = self.get_success(self.store._get_state_group_for_event(ev.event_id))
 
         self.assertEqual(sg, sg2)
 
