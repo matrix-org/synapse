@@ -9,7 +9,7 @@ FROM matrixdotorg/synapse-workers:$SYNAPSE_VERSION
 
 # Install postgresql
 RUN apt-get update && \
-  DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y postgresql-13
+  DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -yqq postgresql-13
 
 # Configure a user and create a database for Synapse
 RUN pg_ctlcluster 13 main start &&  su postgres -c "echo \

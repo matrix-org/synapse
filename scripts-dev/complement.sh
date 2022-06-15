@@ -24,6 +24,15 @@
 # Exit if a line returns a non-zero exit code
 set -e
 
+
+# Helper to emit annotations that collapse portions of the log in GitHub Actions
+echo_if_github() {
+  if [[ -n "$GITHUB_WORKFLOW" ]]; then
+    echo $*
+  fi
+}
+
+
 # enable buildkit for the docker builds
 export DOCKER_BUILDKIT=1
 
@@ -41,14 +50,20 @@ if [[ -z "$COMPLEMENT_DIR" ]]; then
 fi
 
 # Build the base Synapse image from the local checkout
+echo_if_github "::group::Build Docker image: matrixdotorg/synapse"
 docker build -t matrixdotorg/synapse -f "docker/Dockerfile" .
+echo_if_github "::endgroup::"
 
 # Build the workers docker image (from the base Synapse image we just built).
+echo_if_github "::group::Build Docker image: matrixdotorg/synapse-workers"
 docker build -t matrixdotorg/synapse-workers -f "docker/Dockerfile-workers" .
+echo_if_github "::endgroup::"
 
 # Build the unified Complement image (from the worker Synapse image we just built).
+echo_if_github "::group::Build Docker image: complement/Dockerfile"
 docker build -t complement-synapse \
   -f "docker/complement/Dockerfile" "docker/complement"
+echo_if_github "::endgroup::"
 
 export COMPLEMENT_BASE_IMAGE=complement-synapse
 
