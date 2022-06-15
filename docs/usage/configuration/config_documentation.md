@@ -230,9 +230,9 @@ Example configuration:
 serve_server_wellknown: true
 ```
 ---
-Config option: `custom_well_known`
+Config option: `extra_well_known_content`
 
-This option allows server runners to add arbitrary key-value pairsto the [client-facing `.well-known` response](https://spec.matrix.org/latest/client-server-api/#well-known-uri).
+This option allows server runners to add arbitrary key-value pairs to the [client-facing `.well-known` response](https://spec.matrix.org/latest/client-server-api/#well-known-uri).
 
 If this option is provided, it parses the given yaml to json and 
 serves it on `/.well-known/matrix/client` endpoint
@@ -240,7 +240,7 @@ alongside the standard properties.
 
 Example configuration:
 ```yaml
-custom_well_known: 
+extra_well_known_content: 
   option1: value1
   option2: value2
 ```

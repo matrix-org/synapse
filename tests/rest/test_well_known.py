@@ -63,7 +63,7 @@ class WellKnownTests(unittest.HomeserverTestCase):
         {
             "public_baseurl": "https://tesths",
             "default_identity_server": "https://testis",
-            "custom_well_known": {"custom": False},
+            "extra_well_known_content": {"custom": False},
         }
     )
     def test_client_well_known_custom(self) -> None:

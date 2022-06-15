@@ -302,7 +302,23 @@ class ServerConfig(Config):
                 "public_baseurl cannot contain query parameters or a #-fragment"
             )
 
-        self.custom_well_known = config.get("custom_well_known")
+        self.extra_well_known_content = config.get("extra_well_known_content")
+
+        if type(self.extra_well_known_content) is not dict:
+            raise ConfigError(
+                "extra_well_known_content must be a dictionary of key-value pairs"
+            )
+
+        if "m.homeserver" in self.extra_well_known_content.keys():
+            raise ConfigError(
+                "m.homeserver is not supported in extra_well_known_content, "
+                "use public_baseurl in base config instead."
+            )
+        if "m.identity_server" in self.extra_well_known_content.keys():
+            raise ConfigError(
+                "m.identity_server is not supported in extra_well_known_content, "
+                "use default_identity_server in base config instead."
+            )
 
         # Whether to enable user presence.
         presence_config = config.get("presence") or {}
