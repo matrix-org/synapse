@@ -634,23 +634,28 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         # Check that the unread counter is back to 0.
         self._check_unread_count(0)
 
+        # Beeper: disabled unread for room name/topic changes
         # Check that room name changes increase the unread counter.
-        self.helper.send_state(
-            self.room_id,
-            "m.room.name",
-            {"name": "my super room"},
-            tok=self.tok2,
-        )
-        self._check_unread_count(1)
+        # self.helper.send_state(
+        #     self.room_id,
+        #     "m.room.name",
+        #     {"name": "my super room"},
+        #     tok=self.tok2,
+        # )
+        # self._check_unread_count(1)
 
         # Check that room topic changes increase the unread counter.
-        self.helper.send_state(
-            self.room_id,
-            "m.room.topic",
-            {"topic": "welcome!!!"},
-            tok=self.tok2,
-        )
-        self._check_unread_count(2)
+        # self.helper.send_state(
+        #     self.room_id,
+        #     "m.room.topic",
+        #     {"topic": "welcome!!!"},
+        #     tok=self.tok2,
+        # )
+        # self._check_unread_count(2)
+
+        # Beeper: replacing the two events above
+        self.helper.send_event(self.room_id, EventTypes.Encrypted, {}, tok=self.tok2)
+        self.helper.send_event(self.room_id, EventTypes.Encrypted, {}, tok=self.tok2)
 
         # Check that encrypted messages increase the unread counter.
         self.helper.send_event(self.room_id, EventTypes.Encrypted, {}, tok=self.tok2)
@@ -664,6 +669,10 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             tok=self.tok2,
         )
         event_id = result["event_id"]
+
+        # Beeper: fake event to bump event count, we don't count custom events
+        # as unread currently.
+        self.helper.send_event(self.room_id, EventTypes.Encrypted, {}, tok=self.tok2)
         self._check_unread_count(4)
 
         # Check that edits don't increase the unread counter.
@@ -683,13 +692,14 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(4)
 
         # Check that notices don't increase the unread counter.
-        self.helper.send_event(
-            room_id=self.room_id,
-            type=EventTypes.Message,
-            content={"body": "hello", "msgtype": "m.notice"},
-            tok=self.tok2,
-        )
-        self._check_unread_count(4)
+        # Beeper: notices count as unread
+        # self.helper.send_event(
+        #     room_id=self.room_id,
+        #     type=EventTypes.Message,
+        #     content={"body": "hello", "msgtype": "m.notice"},
+        #     tok=self.tok2,
+        # )
+        # self._check_unread_count(4)
 
         # Check that tombstone events changes increase the unread counter.
         res1 = self.helper.send_state(
@@ -698,7 +708,8 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             {"replacement_room": "!someroom:test"},
             tok=self.tok2,
         )
-        self._check_unread_count(5)
+        # Beeper: don't count tombston events as unread
+        # self._check_unread_count(5)
         res2 = self.helper.send(self.room_id, "hello", tok=self.tok2)
 
         # Make sure both m.read and org.matrix.msc2285.read.private advance
