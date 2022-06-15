@@ -80,8 +80,8 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
 
         # Check that the tombstone event points to the new room.
         tombstone_event = self.get_success(
-            self.hs.get_state_handler().get_current_state(
-                self.room_id, EventTypes.Tombstone
+            self.hs.get_storage_controllers().state.get_current_state_event(
+                self.room_id, EventTypes.Tombstone, ""
             )
         )
         self.assertIsNotNone(tombstone_event)
