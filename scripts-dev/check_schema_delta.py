@@ -12,9 +12,19 @@ SCHEMA_FILE_REGEX = re.compile(r"^synapse/storage/schema/(.*)/delta/(.*)/(.*)$")
 
 
 @click.command()
-def main() -> None:
+@click.option(
+    "--force-colors",
+    is_flag=True,
+    flag_value=True,
+    default=None,
+    help="Always output ANSI colours",
+)
+def main(force_colors: bool) -> None:
     click.secho(
-        "+++ Checking schema deltas are in the right folder", fg="green", bold=True
+        "+++ Checking schema deltas are in the right folder",
+        fg="green",
+        bold=True,
+        color=force_colors,
     )
 
     click.secho("Updating repo...")
@@ -52,7 +62,12 @@ def main() -> None:
             bad_files.append(diff.b_path)
 
     if not seen_deltas:
-        click.secho("No deltas found.", fg="green", bold=True)
+        click.secho(
+            "No deltas found.",
+            fg="green",
+            bold=True,
+            color=force_colors,
+        )
         return
 
     if not bad_files:
@@ -60,21 +75,33 @@ def main() -> None:
             f"All deltas are in the correct folder: {current_schema_version}!",
             fg="green",
             bold=True,
+            color=force_colors,
         )
         return
 
     bad_files.sort()
 
-    click.secho("Found deltas in the wrong folder!", fg="red", bold=True)
+    click.secho(
+        "Found deltas in the wrong folder!",
+        fg="red",
+        bold=True,
+        color=force_colors,
+    )
 
     for f in bad_files:
-        click.secho(f"\t{f}", fg="red", bold=True)
+        click.secho(
+            f"\t{f}",
+            fg="red",
+            bold=True,
+            color=force_colors,
+        )
 
     click.secho()
     click.secho(
         f"Please move these files to delta/{current_schema_version}/",
         fg="red",
         bold=True,
+        color=force_colors,
     )
 
     click.get_current_context().exit(1)
