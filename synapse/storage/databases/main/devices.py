@@ -1728,7 +1728,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         device_ids: Iterable[str],
         hosts: Collection[str],
         stream_ids: List[int],
-        context: Dict[str, str],
+        context: Optional[Dict[str, str]],
     ) -> None:
         for host in hosts:
             txn.call_after(
