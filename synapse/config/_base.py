@@ -18,6 +18,7 @@ import argparse
 import errno
 import logging
 import os
+import re
 from collections import OrderedDict
 from hashlib import sha256
 from textwrap import dedent
@@ -123,7 +124,10 @@ CONFIG_FILE_HEADER = """\
 # should have the same indentation.
 #
 # [1] https://docs.ansible.com/ansible/latest/reference_appendices/YAMLSyntax.html
-
+#
+# For more information on how to configure Synapse, including a complete accounting of
+# each option, go to docs/usage/configuration/config_documentation.md or
+# https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html
 """
 
 
@@ -470,7 +474,7 @@ class RootConfig:
             The yaml config file
         """
 
-        return CONFIG_FILE_HEADER + "\n\n".join(
+        conf = CONFIG_FILE_HEADER + "\n".join(
             dedent(conf)
             for conf in self.invoke_all(
                 "generate_config_section",
@@ -485,6 +489,8 @@ class RootConfig:
                 tls_private_key_path=tls_private_key_path,
             ).values()
         )
+        conf = re.sub("\n{2,}", "\n", conf)
+        return conf
 
     @classmethod
     def load_config(

@@ -731,8 +731,11 @@ class MatrixFederationHttpClient:
         Returns:
             A list of headers to be added as "Authorization:" headers
         """
-        if destination is None and destination_is is None:
-            raise ValueError("destination and destination_is cannot both be None!")
+        if not destination and not destination_is:
+            raise ValueError(
+                "At least one of the arguments destination and destination_is "
+                "must be a nonempty bytestring."
+            )
 
         request: JsonDict = {
             "method": method.decode("ascii"),

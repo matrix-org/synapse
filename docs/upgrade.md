@@ -89,7 +89,7 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
-# Upgrading to v1.61.0
+# Upgrading to v1.62.0
 
 ## New signatures for spam checker callbacks
 
@@ -129,6 +129,24 @@ async def user_may_join_room(self, user_id: str, room_id: str, is_invited: bool)
     # Request is not spam, mark it as such.
     return synapse.module_api.NOT_SPAM
 ```
+
+# Upgrading to v1.61.0
+
+## Removal of deprecated community/groups
+
+This release of Synapse will remove deprecated community/groups from codebase.
+
+### Worker endpoints
+
+For those who have deployed workers, following worker endpoints will no longer
+exist and they can be removed from the reverse proxy configuration:
+
+-   `^/_matrix/federation/v1/get_groups_publicised$`
+-   `^/_matrix/client/(r0|v3|unstable)/joined_groups$`
+-   `^/_matrix/client/(r0|v3|unstable)/publicised_groups$`
+-   `^/_matrix/client/(r0|v3|unstable)/publicised_groups/`
+-   `^/_matrix/federation/v1/groups/`
+-   `^/_matrix/client/(r0|v3|unstable)/groups/`
 
 # Upgrading to v1.60.0
 

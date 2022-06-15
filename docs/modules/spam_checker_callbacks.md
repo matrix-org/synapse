@@ -70,7 +70,7 @@ this callback.
 
 _First introduced in Synapse v1.37.0_
 
-_Changed in Synapse v1.61.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean is now deprecated._ 
+_Changed in Synapse v1.62.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean is now deprecated._ 
 
 ```python
 async def user_may_invite(inviter: str, invitee: str, room_id: str) -> Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
@@ -100,7 +100,7 @@ this callback.
 
 _First introduced in Synapse v1.45.0_
 
-_Changed in Synapse v1.61.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean is now deprecated._ 
+_Changed in Synapse v1.62.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean is now deprecated._ 
 
 ```python
 async def user_may_send_3pid_invite(
@@ -154,7 +154,7 @@ this callback.
 
 _First introduced in Synapse v1.37.0_
 
-_Changed in Synapse v1.61.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean is now deprecated._ 
+_Changed in Synapse v1.62.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean is now deprecated._ 
 
 ```python
 async def user_may_create_room(user_id: str) -> Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
@@ -183,7 +183,7 @@ this callback.
 
 _First introduced in Synapse v1.37.0_
 
-_Changed in Synapse v1.61.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean is now deprecated._ 
+_Changed in Synapse v1.62.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean is now deprecated._ 
 
 ```python
 async def user_may_create_room_alias(user_id: str, room_alias: "synapse.module_api.RoomAlias") -> Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
@@ -212,7 +212,7 @@ this callback.
 
 _First introduced in Synapse v1.37.0_
 
-_Changed in Synapse v1.61.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean is now deprecated._ 
+_Changed in Synapse v1.62.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean is now deprecated._ 
 
 ```python
 async def user_may_publish_room(user_id: str, room_id: str) -> Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes", bool]
@@ -303,7 +303,7 @@ this callback.
 
 _First introduced in Synapse v1.37.0_
 
-_Changed in Synapse v1.61.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean is now deprecated._ 
+_Changed in Synapse v1.62.0: `synapse.module_api.NOT_SPAM` and `synapse.module_api.errors.Codes` can be returned by this callback. Returning a boolean is now deprecated._ 
 
 ```python
 async def check_media_file_for_spam(
