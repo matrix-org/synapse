@@ -266,7 +266,7 @@ class BulkPushRuleEvaluator:
 
         related_event_id = event.content.get("m.relates_to", {}).get("event_id")
         related_event = (
-            (await self.store.get_event(related_event_id)) if related_event_id else None
+            (await self.store.get_event(related_event_id, allow_none=True)) if related_event_id else None
         )
 
         non_bot_room_members = [x for x in room_members if not BOT_PATTERN.match(x)]
