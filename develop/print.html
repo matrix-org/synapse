@@ -5602,8 +5602,10 @@ expected to be non-existent.</p>
 tokens. Defaults to false.</li>
 <li><code>secret</code>: This is either the private shared secret or the public key used to
 decode the contents of the JSON web token. Required if <code>enabled</code> is set to true.</li>
-<li><code>algorithm</code>: The algorithm used to sign the JSON web token. Supported algorithms are listed at
-https://pyjwt.readthedocs.io/en/latest/algorithms.html Required if <code>enabled</code> is set to true.</li>
+<li><code>algorithm</code>: The algorithm used to sign (or HMAC) the JSON web token.
+Supported algorithms are listed
+<a href="https://docs.authlib.org/en/latest/specs/rfc7518.html">here (section JWS)</a>.
+Required if <code>enabled</code> is set to true.</li>
 <li><code>subject_claim</code>: Name of the claim containing a unique identifier for the user.
 Optional, defaults to <code>sub</code>.</li>
 <li><code>issuer</code>: The issuer to validate the &quot;iss&quot; claim against. Optional. If provided the 
@@ -7623,7 +7625,7 @@ Providing the audience claim when not configured will cause validation to fail.<
 <code>initial_device_display_name</code>) which can be included in the above request.</p>
 <h2 id="preparing-synapse-1"><a class="header" href="#preparing-synapse-1">Preparing Synapse</a></h2>
 <p>The JSON Web Token integration in Synapse uses the
-<a href="https://pypi.org/project/pyjwt/"><code>PyJWT</code></a> library, which must be installed
+<a href="https://docs.authlib.org/en/latest/index.html"><code>Authlib</code></a> library, which must be installed
 as follows:</p>
 <ul>
 <li>
@@ -7631,20 +7633,20 @@ as follows:</p>
 provided by <code>matrix.org</code> so no further action is needed.</p>
 </li>
 <li>
-<p>If you installed Synapse into a virtualenv, run <code>/path/to/env/bin/pip install synapse[pyjwt]</code> to install the necessary dependencies.</p>
+<p>If you installed Synapse into a virtualenv, run <code>/path/to/env/bin/pip install synapse[jwt]</code> to install the necessary dependencies.</p>
 </li>
 <li>
 <p>For other installation mechanisms, see the documentation provided by the
 maintainer.</p>
 </li>
 </ul>
-<p>To enable the JSON web token integration, you should then add an <code>jwt_config</code> section
+<p>To enable the JSON web token integration, you should then add a <code>jwt_config</code> section
 to your configuration file (or uncomment the <code>enabled: true</code> line in the
 existing section). See <a href="./sample_config.yaml">sample_config.yaml</a> for some
 sample settings.</p>
 <h2 id="how-to-test-jwt-as-a-developer"><a class="header" href="#how-to-test-jwt-as-a-developer">How to test JWT as a developer</a></h2>
 <p>Although JSON Web Tokens are typically generated from an external server, the
-examples below use <a href="https://pyjwt.readthedocs.io/en/latest/">PyJWT</a> directly.</p>
+example below uses a locally generated JWT.</p>
 <ol>
 <li>
 <p>Configure Synapse with JWT logins, note that this example uses a pre-shared
@@ -7657,8 +7659,17 @@ secret and an algorithm of HS256:</p>
 </li>
 <li>
 <p>Generate a JSON web token:</p>
-<pre><code class="language-bash">$ pyjwt --key=my-secret-token --alg=HS256 encode sub=test-user
-eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0LXVzZXIifQ.Ag71GT8v01UO3w80aqRPTeuVPBIBZkYhNTJJ-_-zQIc
+<p>You can use the following short Python snippet to generate a JWT
+protected by an HMAC.
+Take care that the <code>secret</code> and the algorithm given in the <code>header</code> match
+the entries from <code>jwt_config</code> above.</p>
+<pre><code class="language-python">from authlib.jose import jwt
+
+header = {&quot;alg&quot;: &quot;HS256&quot;}
+payload = {&quot;sub&quot;: &quot;user1&quot;, &quot;aud&quot;: [&quot;audience&quot;]}
+secret = &quot;my-secret-token&quot;
+result = jwt.encode(header, payload, secret)
+print(result.decode(&quot;ascii&quot;))
 </code></pre>
 </li>
 <li>

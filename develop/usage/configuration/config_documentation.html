@@ -2602,8 +2602,10 @@ expected to be non-existent.</p>
 tokens. Defaults to false.</li>
 <li><code>secret</code>: This is either the private shared secret or the public key used to
 decode the contents of the JSON web token. Required if <code>enabled</code> is set to true.</li>
-<li><code>algorithm</code>: The algorithm used to sign the JSON web token. Supported algorithms are listed at
-https://pyjwt.readthedocs.io/en/latest/algorithms.html Required if <code>enabled</code> is set to true.</li>
+<li><code>algorithm</code>: The algorithm used to sign (or HMAC) the JSON web token.
+Supported algorithms are listed
+<a href="https://docs.authlib.org/en/latest/specs/rfc7518.html">here (section JWS)</a>.
+Required if <code>enabled</code> is set to true.</li>
 <li><code>subject_claim</code>: Name of the claim containing a unique identifier for the user.
 Optional, defaults to <code>sub</code>.</li>
 <li><code>issuer</code>: The issuer to validate the &quot;iss&quot; claim against. Optional. If provided the 
