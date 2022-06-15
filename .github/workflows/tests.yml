@@ -391,7 +391,7 @@ jobs:
 
       - run: |
           set -o pipefail
-          WORKERS=1 COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | gotestfmt | python3 synapse/.ci/scripts/collapse_complement_logs.py
+          WORKERS=1 COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | gotestfmt
         shell: bash
         name: Run Complement Tests
 
