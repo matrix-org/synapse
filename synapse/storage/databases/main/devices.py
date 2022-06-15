@@ -1865,8 +1865,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
 
         Marks the associated row in `device_lists_changes_in_room` as handled.
         """
-        if context is None:
-            context = {}
 
         def add_device_list_outbound_pokes_txn(
             txn: LoggingTransaction, stream_ids: List[int]
@@ -1878,9 +1876,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                     device_ids=[device_id],
                     hosts=hosts,
                     stream_ids=stream_ids,
-                    # mypy doesn't know that `context` is never None here, see
-                    # https://mypy.readthedocs.io/en/stable/common_issues.html#narrowing-and-inner-functions
-                    context=context,  # type: ignore[arg-type]
+                    context=context,
                 )
 
             self.db_pool.simple_update_txn(
