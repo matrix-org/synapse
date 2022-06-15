@@ -381,16 +381,18 @@ async def _get_auth_chain_difference(
 def _seperate(
     state_sets: Iterable[StateMap[str]],
 ) -> Tuple[StateMap[str], Set[str]]:
-    """Return the unconflicted and conflicted state. This is different than in
-    the original algorithm, as this defines a key to be conflicted if one of
-    the state sets doesn't have that key.
+    """Return the unconflicted state map and the conflicted state set. This differs
+    from the v1 algorithm: v2 additionally considers a key to be conflicted if one
+    of the state sets doesn't have that key.
 
     Args:
         state_sets
 
     Returns:
-        A tuple of unconflicted and conflicted state. The conflicted state dict
-        is a map from type/state_key to set of event IDs
+        A tuple containing the unconflicted state map and the conflicted state set.
+        The unconflicted state map is a dict from (type, state_key) to event IDs.
+        The conflicted state set is an unordered set of event IDs. It may contain
+        multiple events with the same (type, state_key) pair.
     """
     unconflicted_state: MutableStateMap[str] = {}
     conflicted_state: Set[str] = set()
