@@ -815,7 +815,7 @@ python-versions = ">=3.5"
 name = "pyjwt"
 version = "2.4.0"
 description = "JSON Web Token implementation in Python"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.6"
 
@@ -1546,9 +1546,9 @@ docs = ["sphinx", "repoze.sphinx.autointerface"]
 test = ["zope.i18nmessageid", "zope.testing", "zope.testrunner"]
 
 [extras]
-all = ["matrix-synapse-ldap3", "psycopg2", "psycopg2cffi", "psycopg2cffi-compat", "pysaml2", "authlib", "lxml", "sentry-sdk", "jaeger-client", "opentracing", "pyjwt", "txredisapi", "hiredis", "Pympler"]
+all = ["matrix-synapse-ldap3", "psycopg2", "psycopg2cffi", "psycopg2cffi-compat", "pysaml2", "authlib", "lxml", "sentry-sdk", "jaeger-client", "opentracing", "txredisapi", "hiredis", "Pympler"]
 cache_memory = ["Pympler"]
-jwt = ["pyjwt"]
+jwt = ["authlib"]
 matrix-synapse-ldap3 = ["matrix-synapse-ldap3"]
 oidc = ["authlib"]
 opentracing = ["jaeger-client", "opentracing"]
@@ -1563,7 +1563,7 @@ url_preview = ["lxml"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7.1"
-content-hash = "37bd4bccfdb5a869635f2135a85bea4a0729af7375a27de153b4fd9a4aebc195"
+content-hash = "73882e279e0379482f2fc7414cb71addfd408ca48ad508ff8a02b0cb544762af"
 
 [metadata.files]
 attrs = [
