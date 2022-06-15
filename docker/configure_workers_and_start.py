@@ -52,12 +52,12 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "worker_extra_conf": "",
     },
     "user_dir": {
-        "app": "synapse.app.user_dir",
+        "app": "synapse.app.generic_worker",
         "listener_resources": ["client"],
         "endpoint_patterns": [
             "^/_matrix/client/(api/v1|r0|v3|unstable)/user_directory/search$"
         ],
-        "shared_extra_conf": {"update_user_directory": False},
+        "shared_extra_conf": {"update_user_directory_from_worker": "user_dir1"},
         "worker_extra_conf": "",
     },
     "media_repository": {
@@ -78,7 +78,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "app": "synapse.app.generic_worker",
         "listener_resources": [],
         "endpoint_patterns": [],
-        "shared_extra_conf": {"notify_appservices_from_worker": "appservice"},
+        "shared_extra_conf": {"notify_appservices_from_worker": "appservice1"},
         "worker_extra_conf": "",
     },
     "federation_sender": {
