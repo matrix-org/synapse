@@ -384,6 +384,11 @@ jobs:
         with:
           path: synapse
 
+      - name: "Install custom gotestfmt template"
+        run: |
+          mkdir .gotestfmt/github -p
+          cp synapse/.ci/complement_package.gotpl .gotestfmt/github/package.gotpl
+
       # Attempt to check out the same branch of Complement as the PR. If it
       # doesn't exist, fallback to HEAD.
       - name: Checkout complement
