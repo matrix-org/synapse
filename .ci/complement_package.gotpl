@@ -65,7 +65,7 @@ we are creating a stylized header for each package.
             {{- end -}}
         {{- end -}}
 
-
+        ::group::[0;32m✅ Passing Tests{{ "\n" }}
         {{- /* Then passing tests are last */ -}}
         {{- range . -}}
             {{- if eq .Result "PASS" -}}
@@ -85,6 +85,7 @@ we are creating a stylized header for each package.
                 ::endgroup::{{- "\n" -}}
             {{- end -}}
         {{- end -}}
+        ::endgroup::{{ "\n" }}
     {{- end -}}
     {{- "\n" -}}
 {{- end -}}
