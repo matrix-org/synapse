@@ -313,9 +313,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertEqual(self.store.insert_client_ip.call_count, 2)
 
     def test_get_user_from_macaroon(self):
-        self.store.get_user_by_access_token = simple_async_mock(
-            TokenLookupResult(user_id="@baldrick:matrix.org", device_id="device")
-        )
+        self.store.get_user_by_access_token = simple_async_mock(None)
 
         user_id = "@baldrick:matrix.org"
         macaroon = pymacaroons.Macaroon(
@@ -323,17 +321,14 @@ class AuthTestCase(unittest.HomeserverTestCase):
             identifier="key",
             key=self.hs.config.key.macaroon_secret_key,
         )
+        # "Legacy" macaroons should not work for regular users not in the database
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("type = access")
         macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
-        user_info = self.get_success(
-            self.auth.get_user_by_access_token(macaroon.serialize())
+        serialized = macaroon.serialize()
+        self.get_failure(
+            self.auth.get_user_by_access_token(serialized), InvalidClientTokenError
         )
-        self.assertEqual(user_id, user_info.user_id)
-
-        # TODO: device_id should come from the macaroon, but currently comes
-        # from the db.
-        self.assertEqual(user_info.device_id, "device")
 
     def test_get_guest_user_from_macaroon(self):
         self.store.get_user_by_id = simple_async_mock({"is_guest": True})
