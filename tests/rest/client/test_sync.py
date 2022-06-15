@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+from http import HTTPStatus
 from typing import List, Optional
 
 from parameterized import parameterized
@@ -21,6 +22,7 @@ from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.api.constants import (
+    EduTypes,
     EventContentFields,
     EventTypes,
     ReceiptTypes,
@@ -485,30 +487,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         # Test that we didn't override the public read receipt
         self.assertIsNone(self._get_read_receipt())
 
-    @parameterized.expand(
-        [
-            # Old Element version, expected to send an empty body
-            (
-                "agent1",
-                "Element/1.2.2 (Linux; U; Android 9; MatrixAndroidSDK_X 0.0.1)",
-                200,
-            ),
-            # Old SchildiChat version, expected to send an empty body
-            ("agent2", "SchildiChat/1.2.1 (Android 10)", 200),
-            # Expected 400: Denies empty body starting at version 1.3+
-            ("agent3", "Element/1.3.6 (Android 10)", 400),
-            ("agent4", "SchildiChat/1.3.6 (Android 11)", 400),
-            # Contains "Riot": Receipts with empty bodies expected
-            ("agent5", "Element (Riot.im) (Android 9)", 200),
-            # Expected 400: Does not contain "Android"
-            ("agent6", "Element/1.2.1", 400),
-            # Expected 400: Different format, missing "/" after Element; existing build that should allow empty bodies, but minimal ongoing usage
-            ("agent7", "Element dbg/1.1.8-dev (Android)", 400),
-        ]
-    )
-    def test_read_receipt_with_empty_body(
-        self, name: str, user_agent: str, expected_status_code: int
-    ) -> None:
+    def test_read_receipt_with_empty_body_is_rejected(self) -> None:
         # Send a message as the first user
         res = self.helper.send(self.room_id, body="hello", tok=self.tok)
 
@@ -517,16 +496,16 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
             "POST",
             f"/rooms/{self.room_id}/receipt/m.read/{res['event_id']}",
             access_token=self.tok2,
-            custom_headers=[("User-Agent", user_agent)],
         )
-        self.assertEqual(channel.code, expected_status_code)
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST)
+        self.assertEqual(channel.json_body["errcode"], "M_NOT_JSON", channel.json_body)
 
     def _get_read_receipt(self) -> Optional[JsonDict]:
         """Syncs and returns the read receipt."""
 
         # Checks if event is a read receipt
         def is_read_receipt(event: JsonDict) -> bool:
-            return event["type"] == "m.receipt"
+            return event["type"] == EduTypes.RECEIPT
 
         # Sync
         channel = self.make_request(
@@ -678,12 +657,13 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(3)
 
         # Check that custom events with a body increase the unread counter.
-        self.helper.send_event(
+        result = self.helper.send_event(
             self.room_id,
             "org.matrix.custom_type",
             {"body": "hello"},
             tok=self.tok2,
         )
+        event_id = result["event_id"]
         self._check_unread_count(4)
 
         # Check that edits don't increase the unread counter.
@@ -693,7 +673,10 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             content={
                 "body": "hello",
                 "msgtype": "m.text",
-                "m.relates_to": {"rel_type": RelationTypes.REPLACE},
+                "m.relates_to": {
+                    "rel_type": RelationTypes.REPLACE,
+                    "event_id": event_id,
+                },
             },
             tok=self.tok2,
         )

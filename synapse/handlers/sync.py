@@ -37,6 +37,7 @@ from synapse.types import (
     Requester,
     RoomStreamToken,
     StateMap,
+    StreamKeyType,
     StreamToken,
     UserID,
 )
@@ -165,16 +166,6 @@ class KnockedSyncResult:
         return True
 
 
-@attr.s(slots=True, frozen=True, auto_attribs=True)
-class GroupsSyncResult:
-    join: JsonDict
-    invite: JsonDict
-    leave: JsonDict
-
-    def __bool__(self) -> bool:
-        return bool(self.join or self.invite or self.leave)
-
-
 @attr.s(slots=True, auto_attribs=True)
 class _RoomChanges:
     """The set of room entries to include in the sync, plus the set of joined
@@ -205,7 +196,6 @@ class SyncResult:
             for this device
         device_unused_fallback_key_types: List of key types that have an unused fallback
             key
-        groups: Group updates, if any
     """
 
     next_batch: StreamToken
@@ -219,7 +209,6 @@ class SyncResult:
     device_lists: DeviceListUpdates
     device_one_time_keys_count: JsonDict
     device_unused_fallback_key_types: List[str]
-    groups: Optional[GroupsSyncResult]
 
     def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
@@ -235,7 +224,6 @@ class SyncResult:
             or self.account_data
             or self.to_device
             or self.device_lists
-            or self.groups
         )
 
 
@@ -250,8 +238,8 @@ class SyncHandler:
         self.clock = hs.get_clock()
         self.state = hs.get_state_handler()
         self.auth = hs.get_auth()
-        self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self._storage_controllers = hs.get_storage_controllers()
+        self._state_storage_controller = self._storage_controllers.state
 
         # TODO: flush cache entries on subsequent sync request.
         #    Once we get the next /sync request (ie, one with the same access token
@@ -410,10 +398,10 @@ class SyncHandler:
             set_tag(SynapseTags.SYNC_RESULT, bool(sync_result))
             return sync_result
 
-    async def push_rules_for_user(self, user: UserID) -> JsonDict:
+    async def push_rules_for_user(self, user: UserID) -> Dict[str, Dict[str, list]]:
         user_id = user.to_string()
-        rules = await self.store.get_push_rules_for_user(user_id)
-        rules = format_push_rules_for_user(user, rules)
+        rules_raw = await self.store.get_push_rules_for_user(user_id)
+        rules = format_push_rules_for_user(user, rules_raw)
         return rules
 
     async def ephemeral_by_room(
@@ -449,7 +437,7 @@ class SyncHandler:
                 room_ids=room_ids,
                 is_guest=sync_config.is_guest,
             )
-            now_token = now_token.copy_and_replace("typing_key", typing_key)
+            now_token = now_token.copy_and_replace(StreamKeyType.TYPING, typing_key)
 
             ephemeral_by_room: JsonDict = {}
 
@@ -471,7 +459,7 @@ class SyncHandler:
                 room_ids=room_ids,
                 is_guest=sync_config.is_guest,
             )
-            now_token = now_token.copy_and_replace("receipt_key", receipt_key)
+            now_token = now_token.copy_and_replace(StreamKeyType.RECEIPT, receipt_key)
 
             for event in receipts:
                 room_id = event["room_id"]
@@ -518,13 +506,15 @@ class SyncHandler:
                 # ensure that we always include current state in the timeline
                 current_state_ids: FrozenSet[str] = frozenset()
                 if any(e.is_state() for e in recents):
-                    current_state_ids_map = await self.store.get_current_state_ids(
-                        room_id
+                    current_state_ids_map = (
+                        await self._state_storage_controller.get_current_state_ids(
+                            room_id
+                        )
                     )
                     current_state_ids = frozenset(current_state_ids_map.values())
 
                 recents = await filter_events_for_client(
-                    self.storage,
+                    self._storage_controllers,
                     sync_config.user.to_string(),
                     recents,
                     always_include_ids=current_state_ids,
@@ -537,7 +527,9 @@ class SyncHandler:
                 prev_batch_token = now_token
                 if recents:
                     room_key = recents[0].internal_metadata.before
-                    prev_batch_token = now_token.copy_and_replace("room_key", room_key)
+                    prev_batch_token = now_token.copy_and_replace(
+                        StreamKeyType.ROOM, room_key
+                    )
 
                 return TimelineBatch(
                     events=recents, prev_batch=prev_batch_token, limited=False
@@ -584,13 +576,16 @@ class SyncHandler:
                 # ensure that we always include current state in the timeline
                 current_state_ids = frozenset()
                 if any(e.is_state() for e in loaded_recents):
-                    current_state_ids_map = await self.store.get_current_state_ids(
-                        room_id
+                    # FIXME(faster_joins): We use the partial state here as
+                    # we don't want to block `/sync` on finishing a lazy join.
+                    # Is this the correct way of doing it?
+                    current_state_ids_map = (
+                        await self.store.get_partial_current_state_ids(room_id)
                     )
                     current_state_ids = frozenset(current_state_ids_map.values())
 
                 loaded_recents = await filter_events_for_client(
-                    self.storage,
+                    self._storage_controllers,
                     sync_config.user.to_string(),
                     loaded_recents,
                     always_include_ids=current_state_ids,
@@ -611,7 +606,7 @@ class SyncHandler:
                 recents = recents[-timeline_limit:]
                 room_key = recents[0].internal_metadata.before
 
-            prev_batch_token = now_token.copy_and_replace("room_key", room_key)
+            prev_batch_token = now_token.copy_and_replace(StreamKeyType.ROOM, room_key)
 
         # Don't bother to bundle aggregations if the timeline is unlimited,
         # as clients will have all the necessary information.
@@ -631,21 +626,32 @@ class SyncHandler:
         )
 
     async def get_state_after_event(
-        self, event: EventBase, state_filter: Optional[StateFilter] = None
+        self, event_id: str, state_filter: Optional[StateFilter] = None
     ) -> StateMap[str]:
         """
         Get the room state after the given event
 
         Args:
-            event: event of interest
+            event_id: event of interest
             state_filter: The state filter used to fetch state from the database.
         """
-        state_ids = await self.state_store.get_state_ids_for_event(
-            event.event_id, state_filter=state_filter or StateFilter.all()
+        state_ids = await self._state_storage_controller.get_state_ids_for_event(
+            event_id, state_filter=state_filter or StateFilter.all()
         )
-        if event.is_state():
+
+        # using get_metadata_for_events here (instead of get_event) sidesteps an issue
+        # with redactions: if `event_id` is a redaction event, and we don't have the
+        # original (possibly because it got purged), get_event will refuse to return
+        # the redaction event, which isn't terribly helpful here.
+        #
+        # (To be fair, in that case we could assume it's *not* a state event, and
+        # therefore we don't need to worry about it. But still, it seems cleaner just
+        # to pull the metadata.)
+        m = (await self.store.get_metadata_for_events([event_id]))[event_id]
+        if m.state_key is not None and m.rejection_reason is None:
             state_ids = dict(state_ids)
-            state_ids[(event.type, event.state_key)] = event.event_id
+            state_ids[(m.event_type, m.state_key)] = event_id
+
         return state_ids
 
     async def get_state_at(
@@ -664,14 +670,14 @@ class SyncHandler:
         # FIXME: This gets the state at the latest event before the stream ordering,
         # which might not be the same as the "current state" of the room at the time
         # of the stream token if there were multiple forward extremities at the time.
-        last_event = await self.store.get_last_event_in_room_before_stream_ordering(
+        last_event_id = await self.store.get_last_event_in_room_before_stream_ordering(
             room_id,
             end_token=stream_position.room_key,
         )
 
-        if last_event:
+        if last_event_id:
             state = await self.get_state_after_event(
-                last_event, state_filter=state_filter or StateFilter.all()
+                last_event_id, state_filter=state_filter or StateFilter.all()
             )
 
         else:
@@ -720,7 +726,7 @@ class SyncHandler:
             return None
 
         last_event = last_events[-1]
-        state_ids = await self.state_store.get_state_ids_for_event(
+        state_ids = await self._state_storage_controller.get_state_ids_for_event(
             last_event.event_id,
             state_filter=StateFilter.from_types(
                 [(EventTypes.Name, ""), (EventTypes.CanonicalAlias, "")]
@@ -898,12 +904,16 @@ class SyncHandler:
 
             if full_state:
                 if batch:
-                    current_state_ids = await self.state_store.get_state_ids_for_event(
-                        batch.events[-1].event_id, state_filter=state_filter
+                    current_state_ids = (
+                        await self._state_storage_controller.get_state_ids_for_event(
+                            batch.events[-1].event_id, state_filter=state_filter
+                        )
                     )
 
-                    state_ids = await self.state_store.get_state_ids_for_event(
-                        batch.events[0].event_id, state_filter=state_filter
+                    state_ids = (
+                        await self._state_storage_controller.get_state_ids_for_event(
+                            batch.events[0].event_id, state_filter=state_filter
+                        )
                     )
 
                 else:
@@ -923,7 +933,7 @@ class SyncHandler:
             elif batch.limited:
                 if batch:
                     state_at_timeline_start = (
-                        await self.state_store.get_state_ids_for_event(
+                        await self._state_storage_controller.get_state_ids_for_event(
                             batch.events[0].event_id, state_filter=state_filter
                         )
                     )
@@ -957,8 +967,10 @@ class SyncHandler:
                 )
 
                 if batch:
-                    current_state_ids = await self.state_store.get_state_ids_for_event(
-                        batch.events[-1].event_id, state_filter=state_filter
+                    current_state_ids = (
+                        await self._state_storage_controller.get_state_ids_for_event(
+                            batch.events[-1].event_id, state_filter=state_filter
+                        )
                     )
                 else:
                     # Its not clear how we get here, but empirically we do
@@ -988,7 +1000,7 @@ class SyncHandler:
                         # So we fish out all the member events corresponding to the
                         # timeline here, and then dedupe any redundant ones below.
 
-                        state_ids = await self.state_store.get_state_ids_for_event(
+                        state_ids = await self._state_storage_controller.get_state_ids_for_event(
                             batch.events[0].event_id,
                             # we only want members!
                             state_filter=StateFilter.from_types(
@@ -1154,10 +1166,6 @@ class SyncHandler:
                 await self.store.get_e2e_unused_fallback_key_types(user_id, device_id)
             )
 
-        if self.hs_config.experimental.groups_enabled:
-            logger.debug("Fetching group data")
-            await self._generate_sync_entry_for_groups(sync_result_builder)
-
         num_events = 0
 
         # debug for https://github.com/matrix-org/synapse/issues/9424
@@ -1181,55 +1189,9 @@ class SyncHandler:
             archived=sync_result_builder.archived,
             to_device=sync_result_builder.to_device,
             device_lists=device_lists,
-            groups=sync_result_builder.groups,
             device_one_time_keys_count=one_time_key_counts,
             device_unused_fallback_key_types=unused_fallback_key_types,
             next_batch=sync_result_builder.now_token,
-        )
-
-    @measure_func("_generate_sync_entry_for_groups")
-    async def _generate_sync_entry_for_groups(
-        self, sync_result_builder: "SyncResultBuilder"
-    ) -> None:
-        user_id = sync_result_builder.sync_config.user.to_string()
-        since_token = sync_result_builder.since_token
-        now_token = sync_result_builder.now_token
-
-        if since_token and since_token.groups_key:
-            results = await self.store.get_groups_changes_for_user(
-                user_id, since_token.groups_key, now_token.groups_key
-            )
-        else:
-            results = await self.store.get_all_groups_for_user(
-                user_id, now_token.groups_key
-            )
-
-        invited = {}
-        joined = {}
-        left = {}
-        for result in results:
-            membership = result["membership"]
-            group_id = result["group_id"]
-            gtype = result["type"]
-            content = result["content"]
-
-            if membership == "join":
-                if gtype == "membership":
-                    # TODO: Add profile
-                    content.pop("membership", None)
-                    joined[group_id] = content["content"]
-                else:
-                    joined.setdefault(group_id, {})[gtype] = content
-            elif membership == "invite":
-                if gtype == "membership":
-                    content.pop("membership", None)
-                    invited[group_id] = content["content"]
-            else:
-                if gtype == "membership":
-                    left[group_id] = content["content"]
-
-        sync_result_builder.groups = GroupsSyncResult(
-            join=joined, invite=invited, leave=left
         )
 
     @measure_func("_generate_sync_entry_for_device_list")
@@ -1398,7 +1360,7 @@ class SyncHandler:
                 now_token.to_device_key,
             )
             sync_result_builder.now_token = now_token.copy_and_replace(
-                "to_device_key", stream_id
+                StreamKeyType.TO_DEVICE, stream_id
             )
             sync_result_builder.to_device = messages
         else:
@@ -1503,7 +1465,7 @@ class SyncHandler:
         )
         assert presence_key
         sync_result_builder.now_token = now_token.copy_and_replace(
-            "presence_key", presence_key
+            StreamKeyType.PRESENCE, presence_key
         )
 
         extra_users_ids = set(newly_joined_or_invited_users)
@@ -1826,7 +1788,7 @@ class SyncHandler:
                 # stream token as it'll only be used in the context of this
                 # room. (c.f. the docstring of `to_room_stream_token`).
                 leave_token = since_token.copy_and_replace(
-                    "room_key", leave_position.to_room_stream_token()
+                    StreamKeyType.ROOM, leave_position.to_room_stream_token()
                 )
 
                 # If this is an out of band message, like a remote invite
@@ -1875,7 +1837,9 @@ class SyncHandler:
             if room_entry:
                 events, start_key = room_entry
 
-                prev_batch_token = now_token.copy_and_replace("room_key", start_key)
+                prev_batch_token = now_token.copy_and_replace(
+                    StreamKeyType.ROOM, start_key
+                )
 
                 entry = RoomSyncResultBuilder(
                     room_id=room_id,
@@ -1972,7 +1936,7 @@ class SyncHandler:
                             continue
 
                 leave_token = now_token.copy_and_replace(
-                    "room_key", RoomStreamToken(None, event.stream_ordering)
+                    StreamKeyType.ROOM, RoomStreamToken(None, event.stream_ordering)
                 )
                 room_entries.append(
                     RoomSyncResultBuilder(
@@ -2328,7 +2292,6 @@ class SyncResultBuilder:
         invited
         knocked
         archived
-        groups
         to_device
     """
 
@@ -2344,7 +2307,6 @@ class SyncResultBuilder:
     invited: List[InvitedSyncResult] = attr.Factory(list)
     knocked: List[KnockedSyncResult] = attr.Factory(list)
     archived: List[ArchivedSyncResult] = attr.Factory(list)
-    groups: Optional[GroupsSyncResult] = None
     to_device: List[JsonDict] = attr.Factory(list)
 
     def calculate_user_changes(self) -> Tuple[Set[str], Set[str]]:

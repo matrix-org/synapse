@@ -58,7 +58,6 @@ from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.directory import DirectoryStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.filtering import SlavedFilteringStore
-from synapse.replication.slave.storage.groups import SlavedGroupServerStore
 from synapse.replication.slave.storage.keys import SlavedKeyStore
 from synapse.replication.slave.storage.profile import SlavedProfileStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
@@ -69,7 +68,6 @@ from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.client import (
     account_data,
     events,
-    groups,
     initial_sync,
     login,
     presence,
@@ -234,7 +232,6 @@ class GenericWorkerSlavedStore(
     SlavedDeviceStore,
     SlavedReceiptsStore,
     SlavedPushRuleStore,
-    SlavedGroupServerStore,
     SlavedAccountDataStore,
     SlavedPusherStore,
     CensorEventsStore,
@@ -322,9 +319,6 @@ class GenericWorkerServer(HomeServer):
                     user_directory.register_servlets(self, resource)
 
                     presence.register_servlets(self, resource)
-
-                    if self.config.experimental.groups_enabled:
-                        groups.register_servlets(self, resource)
 
                     resources.update({CLIENT_API_PREFIX: resource})
 

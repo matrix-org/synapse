@@ -781,15 +781,16 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         self,
         room_id: str,
         end_token: RoomStreamToken,
-    ) -> Optional[EventBase]:
-        """Returns the last event in a room at or before a stream ordering
+    ) -> Optional[str]:
+        """Returns the ID of the last event in a room at or before a stream ordering
 
         Args:
             room_id
             end_token: The token used to stream from
 
         Returns:
-            The most recent event.
+            The ID of the most recent event, or None if there are no events in the room
+            before this stream ordering.
         """
 
         last_row = await self.get_room_event_before_stream_ordering(
@@ -797,10 +798,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             stream_ordering=end_token.stream,
         )
         if last_row:
-            _, _, event_id = last_row
-            event = await self.get_event(event_id, get_prev_content=True)
-            return event
-
+            return last_row[2]
         return None
 
     async def get_current_room_stream_token_for_room_id(
@@ -817,9 +815,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         self,
         txn: LoggingTransaction,
         event_id: str,
-        allow_none=False,
-    ) -> int:
-        return self.db_pool.simple_select_one_onecol_txn(
+        allow_none: bool = False,
+    ) -> Optional[int]:
+        # Type ignore: we pass keyvalues a Dict[str, str]; the function wants
+        # Dict[str, Any]. I think mypy is unhappy because Dict is invariant?
+        return self.db_pool.simple_select_one_onecol_txn(  # type: ignore[call-overload]
             txn=txn,
             table="events",
             keyvalues={"event_id": event_id},

@@ -69,11 +69,11 @@ def _canonicalise_cache_name(cache_name: str) -> str:
 def add_resizable_cache(
     cache_name: str, cache_resize_callback: Callable[[float], None]
 ) -> None:
-    """Register a cache that's size can dynamically change
+    """Register a cache whose size can dynamically change
 
     Args:
         cache_name: A reference to the cache
-        cache_resize_callback: A callback function that will be ran whenever
+        cache_resize_callback: A callback function that will run whenever
             the cache needs to be resized
     """
     # Some caches have '*' in them which we strip out.
@@ -96,6 +96,13 @@ class CacheConfig(Config):
     section = "caches"
     _environ = os.environ
 
+    event_cache_size: int
+    cache_factors: Dict[str, float]
+    global_factor: float
+    track_memory_usage: bool
+    expiry_time_msec: Optional[int]
+    sync_response_cache_duration: int
+
     @staticmethod
     def reset() -> None:
         """Resets the caches to their defaults. Used for tests."""
@@ -115,6 +122,12 @@ class CacheConfig(Config):
         # A cache 'factor' is a multiplier that can be applied to each of
         # Synapse's caches in order to increase or decrease the maximum
         # number of entries that can be stored.
+        #
+        # The configuration for cache factors (caches.global_factor and
+        # caches.per_cache_factors) can be reloaded while the application is running,
+        # by sending a SIGHUP signal to the Synapse process. Changes to other parts of
+        # the caching config will NOT be applied after a SIGHUP is received; a restart
+        # is necessary.
 
         # The number of events to cache in memory. Not affected by
         # caches.global_factor.
@@ -163,6 +176,24 @@ class CacheConfig(Config):
           #
           #cache_entry_ttl: 30m
 
+          # This flag enables cache autotuning, and is further specified by the sub-options `max_cache_memory_usage`,
+          # `target_cache_memory_usage`, `min_cache_ttl`. These flags work in conjunction with each other to maintain
+          # a balance between cache memory usage and cache entry availability. You must be using jemalloc to utilize
+          # this option, and all three of the options must be specified for this feature to work.
+          #cache_autotuning:
+            # This flag sets a ceiling on much memory the cache can use before caches begin to be continuously evicted.
+            # They will continue to be evicted until the memory usage drops below the `target_memory_usage`, set in
+            # the flag below, or until the `min_cache_ttl` is hit.
+            #max_cache_memory_usage: 1024M
+
+            # This flag sets a rough target for the desired memory usage of the caches.
+            #target_cache_memory_usage: 758M
+
+            # 'min_cache_ttl` sets a limit under which newer cache entries are not evicted and is only applied when
+            # caches are actively being evicted/`max_cache_memory_usage` has been exceeded. This is to protect hot caches
+            # from being emptied while Synapse is evicting due to memory.
+            #min_cache_ttl: 5m
+
           # Controls how long the results of a /sync request are cached for after
           # a successful response is returned. A higher duration can help clients with
           # intermittent connections, at the cost of higher memory usage.
@@ -174,20 +205,20 @@ class CacheConfig(Config):
         """
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
+        """Populate this config object with values from `config`.
+
+        This method does NOT resize existing or future caches: use `resize_all_caches`.
+        We use two separate methods so that we can reject bad config before applying it.
+        """
         self.event_cache_size = self.parse_size(
             config.get("event_cache_size", _DEFAULT_EVENT_CACHE_SIZE)
         )
-        self.cache_factors: Dict[str, float] = {}
+        self.cache_factors = {}
 
         cache_config = config.get("caches") or {}
-        self.global_factor = cache_config.get(
-            "global_factor", properties.default_factor_size
-        )
+        self.global_factor = cache_config.get("global_factor", _DEFAULT_FACTOR_SIZE)
         if not isinstance(self.global_factor, (int, float)):
             raise ConfigError("caches.global_factor must be a number.")
-
-        # Set the global one so that it's reflected in new caches
-        properties.default_factor_size = self.global_factor
 
         # Load cache factors from the config
         individual_factors = cache_config.get("per_cache_factors") or {}
@@ -230,7 +261,7 @@ class CacheConfig(Config):
         cache_entry_ttl = cache_config.get("cache_entry_ttl", "30m")
 
         if expire_caches:
-            self.expiry_time_msec: Optional[int] = self.parse_duration(cache_entry_ttl)
+            self.expiry_time_msec = self.parse_duration(cache_entry_ttl)
         else:
             self.expiry_time_msec = None
 
@@ -250,23 +281,38 @@ class CacheConfig(Config):
             )
             self.expiry_time_msec = self.parse_duration(expiry_time)
 
+        self.cache_autotuning = cache_config.get("cache_autotuning")
+        if self.cache_autotuning:
+            max_memory_usage = self.cache_autotuning.get("max_cache_memory_usage")
+            self.cache_autotuning["max_cache_memory_usage"] = self.parse_size(
+                max_memory_usage
+            )
+
+            target_mem_size = self.cache_autotuning.get("target_cache_memory_usage")
+            self.cache_autotuning["target_cache_memory_usage"] = self.parse_size(
+                target_mem_size
+            )
+
+            min_cache_ttl = self.cache_autotuning.get("min_cache_ttl")
+            self.cache_autotuning["min_cache_ttl"] = self.parse_duration(min_cache_ttl)
+
         self.sync_response_cache_duration = self.parse_duration(
             cache_config.get("sync_response_cache_duration", 0)
         )
 
-        # Resize all caches (if necessary) with the new factors we've loaded
-        self.resize_all_caches()
-
-        # Store this function so that it can be called from other classes without
-        # needing an instance of Config
-        properties.resize_all_caches_func = self.resize_all_caches
-
     def resize_all_caches(self) -> None:
-        """Ensure all cache sizes are up to date
+        """Ensure all cache sizes are up-to-date.
 
         For each cache, run the mapped callback function with either
         a specific cache factor or the default, global one.
         """
+        # Set the global factor size, so that new caches are appropriately sized.
+        properties.default_factor_size = self.global_factor
+
+        # Store this function so that it can be called from other classes without
+        # needing an instance of CacheConfig
+        properties.resize_all_caches_func = self.resize_all_caches
+
         # block other threads from modifying _CACHES while we iterate it.
         with _CACHES_LOCK:
             for cache_name, callback in _CACHES.items():

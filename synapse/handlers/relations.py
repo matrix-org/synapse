@@ -11,24 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import collections.abc
 import logging
-from typing import (
-    TYPE_CHECKING,
-    Collection,
-    Dict,
-    FrozenSet,
-    Iterable,
-    List,
-    Optional,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Dict, FrozenSet, Iterable, List, Optional, Tuple
 
 import attr
 
 from synapse.api.constants import RelationTypes
 from synapse.api.errors import SynapseError
-from synapse.events import EventBase
+from synapse.events import EventBase, relation_from_event
 from synapse.storage.databases.main.relations import _RelatedEvent
 from synapse.types import JsonDict, Requester, StreamToken, UserID
 from synapse.visibility import filter_events_for_client
@@ -70,7 +60,7 @@ class BundledAggregations:
 class RelationsHandler:
     def __init__(self, hs: "HomeServer"):
         self._main_store = hs.get_datastores().main
-        self._storage = hs.get_storage()
+        self._storage_controllers = hs.get_storage_controllers()
         self._auth = hs.get_auth()
         self._clock = hs.get_clock()
         self._event_handler = hs.get_event_handler()
@@ -144,7 +134,10 @@ class RelationsHandler:
         )
 
         events = await filter_events_for_client(
-            self._storage, user_id, events, is_peeking=(member_event_id is None)
+            self._storage_controllers,
+            user_id,
+            events,
+            is_peeking=(member_event_id is None),
         )
 
         now = self._clock.time_msec()
@@ -254,13 +247,19 @@ class RelationsHandler:
 
         return filtered_results
 
-    async def get_threads_for_events(
-        self, event_ids: Collection[str], user_id: str, ignored_users: FrozenSet[str]
+    async def _get_threads_for_events(
+        self,
+        events_by_id: Dict[str, EventBase],
+        relations_by_id: Dict[str, str],
+        user_id: str,
+        ignored_users: FrozenSet[str],
     ) -> Dict[str, _ThreadAggregation]:
         """Get the bundled aggregations for threads for the requested events.
 
         Args:
-            event_ids: Events to get aggregations for threads.
+            events_by_id: A map of event_id to events to get aggregations for threads.
+            relations_by_id: A map of event_id to the relation type, if one exists
+                for that event.
             user_id: The user requesting the bundled aggregations.
             ignored_users: The users ignored by the requesting user.
 
@@ -271,16 +270,34 @@ class RelationsHandler:
         """
         user = UserID.from_string(user_id)
 
+        # It is not valid to start a thread on an event which itself relates to another event.
+        event_ids = [eid for eid in events_by_id.keys() if eid not in relations_by_id]
+
         # Fetch thread summaries.
         summaries = await self._main_store.get_thread_summaries(event_ids)
 
-        # Only fetch participated for a limited selection based on what had
-        # summaries.
+        # Limit fetching whether the requester has participated in a thread to
+        # events which are thread roots.
         thread_event_ids = [
             event_id for event_id, summary in summaries.items() if summary
         ]
-        participated = await self._main_store.get_threads_participated(
-            thread_event_ids, user_id
+
+        # Pre-seed thread participation with whether the requester sent the event.
+        participated = {
+            event_id: events_by_id[event_id].sender == user_id
+            for event_id in thread_event_ids
+        }
+        # For events the requester did not send, check the database for whether
+        # the requester sent a threaded reply.
+        participated.update(
+            await self._main_store.get_threads_participated(
+                [
+                    event_id
+                    for event_id in thread_event_ids
+                    if not participated[event_id]
+                ],
+                user_id,
+            )
         )
 
         # Then subtract off the results for any ignored users.
@@ -341,7 +358,8 @@ class RelationsHandler:
                     count=thread_count,
                     # If there's a thread summary it must also exist in the
                     # participated dictionary.
-                    current_user_participated=participated[event_id],
+                    current_user_participated=events_by_id[event_id].sender == user_id
+                    or participated[event_id],
                 )
 
         return results
@@ -373,20 +391,21 @@ class RelationsHandler:
             if event.is_state():
                 continue
 
-            relates_to = event.content.get("m.relates_to")
-            relation_type = None
-            if isinstance(relates_to, collections.abc.Mapping):
-                relation_type = relates_to.get("rel_type")
+            relates_to = relation_from_event(event)
+            if relates_to:
                 # An event which is a replacement (ie edit) or annotation (ie,
                 # reaction) may not have any other event related to it.
-                if relation_type in (RelationTypes.ANNOTATION, RelationTypes.REPLACE):
+                if relates_to.rel_type in (
+                    RelationTypes.ANNOTATION,
+                    RelationTypes.REPLACE,
+                ):
                     continue
+
+                # Track the event's relation information for later.
+                relations_by_id[event.event_id] = relates_to.rel_type
 
             # The event should get bundled aggregations.
             events_by_id[event.event_id] = event
-            # Track the event's relation information for later.
-            if isinstance(relation_type, str):
-                relations_by_id[event.event_id] = relation_type
 
         # event ID -> bundled aggregation in non-serialized form.
         results: Dict[str, BundledAggregations] = {}
@@ -398,9 +417,9 @@ class RelationsHandler:
         # events to be fetched. Thus, we check those first!
 
         # Fetch thread summaries (but only for the directly requested events).
-        threads = await self.get_threads_for_events(
-            # It is not valid to start a thread on an event which itself relates to another event.
-            [eid for eid in events_by_id.keys() if eid not in relations_by_id],
+        threads = await self._get_threads_for_events(
+            events_by_id,
+            relations_by_id,
             user_id,
             ignored_users,
         )

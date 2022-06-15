@@ -89,6 +89,143 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.61.0
+
+## Removal of deprecated community/groups
+
+This release of Synapse will remove deprecated community/groups from codebase.
+
+### Worker endpoints
+
+For those who have deployed workers, following worker endpoints will no longer
+exist and they can be removed from the reverse proxy configuration:
+
+-   `^/_matrix/federation/v1/get_groups_publicised$`
+-   `^/_matrix/client/(r0|v3|unstable)/joined_groups$`
+-   `^/_matrix/client/(r0|v3|unstable)/publicised_groups$`
+-   `^/_matrix/client/(r0|v3|unstable)/publicised_groups/`
+-   `^/_matrix/federation/v1/groups/`
+-   `^/_matrix/client/(r0|v3|unstable)/groups/`
+
+# Upgrading to v1.60.0
+
+## Adding a new unique index to `state_group_edges` could fail if your database is corrupted
+
+This release of Synapse will add a unique index to the `state_group_edges` table, in order
+to prevent accidentally introducing duplicate information (for example, because a database
+backup was restored multiple times).
+
+Duplicate rows being present in this table could cause drastic performance problems; see
+[issue 11779](https://github.com/matrix-org/synapse/issues/11779) for more details.
+
+If your Synapse database already has had duplicate rows introduced into this table,
+this could fail, with either of these errors:
+
+
+**On Postgres:**
+```
+synapse.storage.background_updates - 623 - INFO - background_updates-0 - Adding index state_group_edges_unique_idx to state_group_edges
+synapse.storage.background_updates - 282 - ERROR - background_updates-0 - Error doing update
+...
+psycopg2.errors.UniqueViolation: could not create unique index "state_group_edges_unique_idx"
+DETAIL:  Key (state_group, prev_state_group)=(2, 1) is duplicated.
+```
+(The numbers may be different.)
+
+**On SQLite:**
+```
+synapse.storage.background_updates - 623 - INFO - background_updates-0 - Adding index state_group_edges_unique_idx to state_group_edges
+synapse.storage.background_updates - 282 - ERROR - background_updates-0 - Error doing update
+...
+sqlite3.IntegrityError: UNIQUE constraint failed: state_group_edges.state_group, state_group_edges.prev_state_group
+```
+
+
+<details>
+<summary><b>Expand this section for steps to resolve this problem</b></summary>
+
+### On Postgres
+
+Connect to your database with `psql`.
+
+```sql
+BEGIN;
+DELETE FROM state_group_edges WHERE (ctid, state_group, prev_state_group) IN (
+  SELECT row_id, state_group, prev_state_group
+  FROM (
+    SELECT
+      ctid AS row_id,
+      MIN(ctid) OVER (PARTITION BY state_group, prev_state_group) AS min_row_id,
+      state_group,
+      prev_state_group
+    FROM state_group_edges
+  ) AS t1
+  WHERE row_id <> min_row_id
+);
+COMMIT;
+```
+
+
+### On SQLite
+
+At the command-line, use `sqlite3 path/to/your-homeserver-database.db`:
+
+```sql
+BEGIN;
+DELETE FROM state_group_edges WHERE (rowid, state_group, prev_state_group) IN (
+  SELECT row_id, state_group, prev_state_group
+  FROM (
+    SELECT
+      rowid AS row_id,
+      MIN(rowid) OVER (PARTITION BY state_group, prev_state_group) AS min_row_id,
+      state_group,
+      prev_state_group
+    FROM state_group_edges
+  )
+  WHERE row_id <> min_row_id
+);
+COMMIT;
+```
+
+
+### For more details
+
+[This comment on issue 11779](https://github.com/matrix-org/synapse/issues/11779#issuecomment-1131545970)
+has queries that can be used to check a database for this problem in advance.
+
+</details>
+
+## New signature for the spam checker callback `check_event_for_spam`
+
+The previous signature has been deprecated.
+
+Whereas `check_event_for_spam` callbacks used to return `Union[str, bool]`, they should now return `Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes"]`.
+
+This is part of an ongoing refactoring of the SpamChecker API to make it less ambiguous and more powerful.
+
+If your module implements `check_event_for_spam` as follows:
+
+```python
+async def check_event_for_spam(event):
+    if ...:
+        # Event is spam
+        return True
+    # Event is not spam
+    return False
+```
+
+you should rewrite it as follows:
+
+```python
+async def check_event_for_spam(event):
+    if ...:
+        # Event is spam, mark it as forbidden (you may use some more precise error
+        # code if it is useful).
+        return synapse.module_api.errors.Codes.FORBIDDEN
+    # Event is not spam, mark it as such.
+    return synapse.module_api.NOT_SPAM
+```
+
 # Upgrading to v1.59.0
 
 ## Device name lookup over federation has been disabled by default

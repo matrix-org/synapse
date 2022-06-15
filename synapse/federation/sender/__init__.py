@@ -15,7 +15,17 @@
 import abc
 import logging
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    Hashable,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+)
 
 import attr
 from prometheus_client import Counter
@@ -235,6 +245,8 @@ class FederationSender(AbstractFederationSender):
         self.store = hs.get_datastores().main
         self.state = hs.get_state_handler()
 
+        self._storage_controllers = hs.get_storage_controllers()
+
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
 
@@ -409,7 +421,7 @@ class FederationSender(AbstractFederationSender):
                         )
                         return
 
-                    destinations: Optional[Set[str]] = None
+                    destinations: Optional[Collection[str]] = None
                     if not event.prev_event_ids():
                         # If there are no prev event IDs then the state is empty
                         # and so no remote servers in the room
@@ -444,7 +456,7 @@ class FederationSender(AbstractFederationSender):
                             )
                             return
 
-                    destinations = {
+                    sharded_destinations = {
                         d
                         for d in destinations
                         if self._federation_shard_config.should_handle(
@@ -456,12 +468,12 @@ class FederationSender(AbstractFederationSender):
                         # If we are sending the event on behalf of another server
                         # then it already has the event and there is no reason to
                         # send the event to it.
-                        destinations.discard(send_on_behalf_of)
+                        sharded_destinations.discard(send_on_behalf_of)
 
-                    logger.debug("Sending %s to %r", event, destinations)
+                    logger.debug("Sending %s to %r", event, sharded_destinations)
 
-                    if destinations:
-                        await self._send_pdu(event, destinations)
+                    if sharded_destinations:
+                        await self._send_pdu(event, sharded_destinations)
 
                         now = self.clock.time_msec()
                         ts = await self.store.get_received_ts(event.event_id)
@@ -592,7 +604,9 @@ class FederationSender(AbstractFederationSender):
         room_id = receipt.room_id
 
         # Work out which remote servers should be poked and poke them.
-        domains_set = await self.state.get_current_hosts_in_room(room_id)
+        domains_set = await self._storage_controllers.state.get_current_hosts_in_room(
+            room_id
+        )
         domains = [
             d
             for d in domains_set

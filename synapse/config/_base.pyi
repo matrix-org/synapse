@@ -1,15 +1,19 @@
 import argparse
 from typing import (
     Any,
+    Collection,
     Dict,
     Iterable,
+    Iterator,
     List,
+    Literal,
     MutableMapping,
     Optional,
     Tuple,
     Type,
     TypeVar,
     Union,
+    overload,
 )
 
 import jinja2
@@ -28,7 +32,6 @@ from synapse.config import (
     emailconfig,
     experimental,
     federation,
-    groups,
     jwt,
     key,
     logger,
@@ -63,6 +66,8 @@ class ConfigError(Exception):
     def __init__(self, msg: str, path: Optional[Iterable[str]] = None):
         self.msg = msg
         self.path = path
+
+def format_config_error(e: ConfigError) -> Iterator[str]: ...
 
 MISSING_REPORT_STATS_CONFIG_INSTRUCTIONS: str
 MISSING_REPORT_STATS_SPIEL: str
@@ -101,7 +106,6 @@ class RootConfig:
     push: push.PushConfig
     spamchecker: spam_checker.SpamCheckerConfig
     room: room.RoomConfig
-    groups: groups.GroupsConfig
     userdirectory: user_directory.UserDirectoryConfig
     consent: consent.ConsentConfig
     stats: stats.StatsConfig
@@ -117,7 +121,8 @@ class RootConfig:
     background_updates: background_updates.BackgroundUpdateConfig
 
     config_classes: List[Type["Config"]] = ...
-    def __init__(self) -> None: ...
+    config_files: List[str]
+    def __init__(self, config_files: Collection[str] = ...) -> None: ...
     def invoke_all(
         self, func_name: str, *args: Any, **kwargs: Any
     ) -> MutableMapping[str, Any]: ...
@@ -157,6 +162,12 @@ class RootConfig:
     def generate_missing_files(
         self, config_dict: dict, config_dir_path: str
     ) -> None: ...
+    @overload
+    def reload_config_section(
+        self, section_name: Literal["caches"]
+    ) -> cache.CacheConfig: ...
+    @overload
+    def reload_config_section(self, section_name: str) -> Config: ...
 
 class Config:
     root: RootConfig

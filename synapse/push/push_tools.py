@@ -16,7 +16,7 @@ from typing import Dict
 from synapse.api.constants import ReceiptTypes
 from synapse.events import EventBase
 from synapse.push.presentable_names import calculate_room_name, name_from_member_event
-from synapse.storage import Storage
+from synapse.storage.controllers import StorageControllers
 from synapse.storage.databases.main import DataStore
 
 
@@ -55,7 +55,7 @@ async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -
 
 
 async def get_context_for_event(
-    storage: Storage, ev: EventBase, user_id: str
+    storage: StorageControllers, ev: EventBase, user_id: str
 ) -> Dict[str, str]:
     ctx = {}
 

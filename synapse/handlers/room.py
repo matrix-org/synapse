@@ -35,6 +35,7 @@ import attr
 from typing_extensions import TypedDict
 from prometheus_client import Histogram
 
+import synapse.events.snapshot
 from synapse.api.constants import (
     EventContentFields,
     EventTypes,
@@ -74,12 +75,12 @@ from synapse.types import (
     RoomID,
     RoomStreamToken,
     StateMap,
+    StreamKeyType,
     StreamToken,
     UserID,
     create_requester,
 )
 from synapse.util import stringutils
-from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import parse_and_validate_server_name
 from synapse.visibility import filter_events_for_client
@@ -118,6 +119,7 @@ class EventContext:
 class RoomCreationHandler:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.hs = hs
@@ -162,10 +164,11 @@ class RoomCreationHandler:
             )
             preset_config["encrypted"] = encrypted
 
-        self._replication = hs.get_replication_data_handler()
+        self._default_power_level_content_override = (
+            self.config.room.default_power_level_content_override
+        )
 
-        # linearizer to stop two upgrades happening at once
-        self._upgrade_linearizer = Linearizer("room_upgrade_linearizer")
+        self._replication = hs.get_replication_data_handler()
 
         # If a user tries to update the same room multiple times in quick
         # succession, only process the first attempt and return its result to
@@ -209,50 +212,17 @@ class RoomCreationHandler:
                     400, "An upgrade for this room is currently in progress"
                 )
 
-        # Upgrade the room
-        #
-        # If this user has sent multiple upgrade requests for the same room
-        # and one of them is not complete yet, cache the response and
-        # return it to all subsequent requests
-        ret = await self._upgrade_response_cache.wrap(
-            (old_room_id, user_id),
-            self._upgrade_room,
-            requester,
-            old_room_id,
-            new_version,  # args for _upgrade_room
-        )
-
-        return ret
-
-    async def _upgrade_room(
-        self, requester: Requester, old_room_id: str, new_version: RoomVersion
-    ) -> str:
-        """
-        Args:
-            requester: the user requesting the upgrade
-            old_room_id: the id of the room to be replaced
-            new_versions: the version to upgrade the room to
-
-        Raises:
-            ShadowBanError if the requester is shadow-banned.
-        """
-        user_id = requester.user.to_string()
-        assert self.hs.is_mine_id(user_id), "User must be our own: %s" % (user_id,)
-
-        # start by allocating a new room id
-        r = await self.store.get_room(old_room_id)
-        if r is None:
+        # Check whether the room exists and 404 if it doesn't.
+        # We could go straight for the auth check, but that will raise a 403 instead.
+        old_room = await self.store.get_room(old_room_id)
+        if old_room is None:
             raise NotFoundError("Unknown room id %s" % (old_room_id,))
-        new_room_id = await self._generate_room_id(
-            creator_id=user_id,
-            is_public=r["is_public"],
-            room_version=new_version,
-        )
 
-        logger.info("Creating new room %s to replace %s", new_room_id, old_room_id)
+        new_room_id = self._generate_room_id()
 
-        # we create and auth the tombstone event before properly creating the new
-        # room, to check our user has perms in the old room.
+        # Check whether the user has the power level to carry out the upgrade.
+        # `check_auth_rules_from_context` will check that they are in the room and have
+        # the required power level to send the tombstone event.
         (
             tombstone_event,
             tombstone_context,
@@ -275,6 +245,63 @@ class RoomCreationHandler:
             old_room_version, tombstone_event, tombstone_context
         )
 
+        # Upgrade the room
+        #
+        # If this user has sent multiple upgrade requests for the same room
+        # and one of them is not complete yet, cache the response and
+        # return it to all subsequent requests
+        ret = await self._upgrade_response_cache.wrap(
+            (old_room_id, user_id),
+            self._upgrade_room,
+            requester,
+            old_room_id,
+            old_room,  # args for _upgrade_room
+            new_room_id,
+            new_version,
+            tombstone_event,
+            tombstone_context,
+        )
+
+        return ret
+
+    async def _upgrade_room(
+        self,
+        requester: Requester,
+        old_room_id: str,
+        old_room: Dict[str, Any],
+        new_room_id: str,
+        new_version: RoomVersion,
+        tombstone_event: EventBase,
+        tombstone_context: synapse.events.snapshot.EventContext,
+    ) -> str:
+        """
+        Args:
+            requester: the user requesting the upgrade
+            old_room_id: the id of the room to be replaced
+            old_room: a dict containing room information for the room to be replaced,
+                as returned by `RoomWorkerStore.get_room`.
+            new_room_id: the id of the replacement room
+            new_version: the version to upgrade the room to
+            tombstone_event: the tombstone event to send to the old room
+            tombstone_context: the context for the tombstone event
+
+        Raises:
+            ShadowBanError if the requester is shadow-banned.
+        """
+        user_id = requester.user.to_string()
+        assert self.hs.is_mine_id(user_id), "User must be our own: %s" % (user_id,)
+
+        logger.info("Creating new room %s to replace %s", new_room_id, old_room_id)
+
+        # create the new room. may raise a `StoreError` in the exceedingly unlikely
+        # event of a room ID collision.
+        await self.store.store_room(
+            room_id=new_room_id,
+            room_creator_user_id=user_id,
+            is_public=old_room["is_public"],
+            room_version=new_version,
+        )
+
         await self.clone_existing_room(
             requester,
             old_room_id=old_room_id,
@@ -290,7 +317,10 @@ class RoomCreationHandler:
             context=tombstone_context,
         )
 
-        old_room_state = await tombstone_context.get_current_state_ids()
+        state_filter = StateFilter.from_types(
+            [(EventTypes.CanonicalAlias, ""), (EventTypes.PowerLevels, "")]
+        )
+        old_room_state = await tombstone_context.get_current_state_ids(state_filter)
 
         # We know the tombstone event isn't an outlier so it has current state.
         assert old_room_state is not None
@@ -414,7 +444,7 @@ class RoomCreationHandler:
             requester: the user requesting the upgrade
             old_room_id : the id of the room to be replaced
             new_room_id: the id to give the new room (should already have been
-                created with _gemerate_room_id())
+                created with _generate_room_id())
             new_room_version: the new room version to use
             tombstone_event_id: the ID of the tombstone event in the old room.
         """
@@ -452,21 +482,22 @@ class RoomCreationHandler:
             (EventTypes.RoomAvatar, ""),
             (EventTypes.RoomEncryption, ""),
             (EventTypes.ServerACL, ""),
-            (EventTypes.RelatedGroups, ""),
             (EventTypes.PowerLevels, ""),
         ]
 
-        # If the old room was a space, copy over the room type and the rooms in
-        # the space.
-        if (
-            old_room_create_event.content.get(EventContentFields.ROOM_TYPE)
-            == RoomTypes.SPACE
-        ):
-            creation_content[EventContentFields.ROOM_TYPE] = RoomTypes.SPACE
-            types_to_copy.append((EventTypes.SpaceChild, None))
+        # Copy the room type as per MSC3818.
+        room_type = old_room_create_event.content.get(EventContentFields.ROOM_TYPE)
+        if room_type is not None:
+            creation_content[EventContentFields.ROOM_TYPE] = room_type
 
-        old_room_state_ids = await self.store.get_filtered_current_state_ids(
-            old_room_id, StateFilter.from_types(types_to_copy)
+            # If the old room was a space, copy over the rooms in the space.
+            if room_type == RoomTypes.SPACE:
+                types_to_copy.append((EventTypes.SpaceChild, None))
+
+        old_room_state_ids = (
+            await self._storage_controllers.state.get_current_state_ids(
+                old_room_id, StateFilter.from_types(types_to_copy)
+            )
         )
         # map from event_id to BaseEvent
         old_room_state_events = await self.store.get_events(old_room_state_ids.values())
@@ -543,8 +574,10 @@ class RoomCreationHandler:
         )
 
         # Transfer membership events
-        old_room_member_state_ids = await self.store.get_filtered_current_state_ids(
-            old_room_id, StateFilter.from_types([(EventTypes.Member, None)])
+        old_room_member_state_ids = (
+            await self._storage_controllers.state.get_current_state_ids(
+                old_room_id, StateFilter.from_types([(EventTypes.Member, None)])
+            )
         )
 
         # map from event_id to BaseEvent
@@ -738,6 +771,21 @@ class RoomCreationHandler:
                 if wchar in config["room_alias_name"]:
                     raise SynapseError(400, "Invalid characters in room alias")
 
+            if ":" in config["room_alias_name"]:
+                # Prevent someone from trying to pass in a full alias here.
+                # Note that it's permissible for a room alias to have multiple
+                # hash symbols at the start (notably bridged over from IRC, too),
+                # but the first colon in the alias is defined to separate the local
+                # part from the server name.
+                # (remember server names can contain port numbers, also separated
+                # by a colon. But under no circumstances should the local part be
+                # allowed to contain a colon!)
+                raise SynapseError(
+                    400,
+                    "':' is not permitted in the room alias name. "
+                    "Please note this expects a local part — 'wombat', not '#wombat:example.com'.",
+                )
+
             room_alias = RoomAlias(config["room_alias_name"], self.hs.hostname)
             mapping = await self.store.get_association_from_room_alias(room_alias)
 
@@ -791,7 +839,7 @@ class RoomCreationHandler:
         visibility = config.get("visibility", "private")
         is_public = visibility == "public"
 
-        room_id = await self._generate_room_id(
+        room_id = await self._generate_and_create_room_id(
             creator_id=user_id,
             is_public=is_public,
             room_version=room_version,
@@ -1058,9 +1106,19 @@ class RoomCreationHandler:
                 for invitee in invite_list:
                     power_level_content["users"][invitee] = 100
 
-            # Power levels overrides are defined per chat preset
+            # If the user supplied a preset name e.g. "private_chat",
+            # we apply that preset
             power_level_content.update(config["power_level_content_override"])
 
+            # If the server config contains default_power_level_content_override,
+            # and that contains information for this room preset, apply it.
+            if self._default_power_level_content_override:
+                override = self._default_power_level_content_override.get(preset_config)
+                if override is not None:
+                    power_level_content.update(override)
+
+            # Finally, if the user supplied specific permissions for this room,
+            # apply those.
             if power_level_content_override:
                 power_level_content.update(power_level_content_override)
 
@@ -1106,7 +1164,26 @@ class RoomCreationHandler:
 
         return last_sent_stream_id
 
-    async def _generate_room_id(
+    def _generate_room_id(self) -> str:
+        """Generates a random room ID.
+
+        Room IDs look like "!opaque_id:domain" and are case-sensitive as per the spec
+        at https://spec.matrix.org/v1.2/appendices/#room-ids-and-event-ids.
+
+        Does not check for collisions with existing rooms or prevent future calls from
+        returning the same room ID. To ensure the uniqueness of a new room ID, use
+        `_generate_and_create_room_id` instead.
+
+        Synapse's room IDs are 18 [a-zA-Z] characters long, which comes out to around
+        102 bits.
+
+        Returns:
+            A random room ID of the form "!opaque_id:domain".
+        """
+        random_string = stringutils.random_string(18)
+        return RoomID(random_string, self.hs.hostname).to_string()
+
+    async def _generate_and_create_room_id(
         self,
         creator_id: str,
         is_public: bool,
@@ -1117,8 +1194,7 @@ class RoomCreationHandler:
         attempts = 0
         while attempts < 5:
             try:
-                random_string = stringutils.random_string(18)
-                gen_room_id = RoomID(random_string, self.hs.hostname).to_string()
+                gen_room_id = self._generate_room_id()
                 await self.store.store_room(
                     room_id=gen_room_id,
                     room_creator_user_id=creator_id,
@@ -1136,8 +1212,8 @@ class RoomContextHandler:
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self._storage_controllers = hs.get_storage_controllers()
+        self._state_storage_controller = self._storage_controllers.state
         self._relations_handler = hs.get_relations_handler()
 
     async def get_event_context(
@@ -1180,7 +1256,10 @@ class RoomContextHandler:
             if use_admin_priviledge:
                 return events
             return await filter_events_for_client(
-                self.storage, user.to_string(), events, is_peeking=is_peeking
+                self._storage_controllers,
+                user.to_string(),
+                events,
+                is_peeking=is_peeking,
             )
 
         event = await self.store.get_event(
@@ -1237,7 +1316,7 @@ class RoomContextHandler:
         # first? Shouldn't we be consistent with /sync?
         # https://github.com/matrix-org/matrix-doc/issues/687
 
-        state = await self.state_store.get_state_for_events(
+        state = await self._state_storage_controller.get_state_for_events(
             [last_event_id], state_filter=state_filter
         )
 
@@ -1255,10 +1334,10 @@ class RoomContextHandler:
             events_after=events_after,
             state=await filter_evts(state_events),
             aggregations=aggregations,
-            start=await token.copy_and_replace("room_key", results.start).to_string(
-                self.store
-            ),
-            end=await token.copy_and_replace("room_key", results.end).to_string(
+            start=await token.copy_and_replace(
+                StreamKeyType.ROOM, results.start
+            ).to_string(self.store),
+            end=await token.copy_and_replace(StreamKeyType.ROOM, results.end).to_string(
                 self.store
             ),
         )
@@ -1270,6 +1349,7 @@ class TimestampLookupHandler:
         self.store = hs.get_datastores().main
         self.state_handler = hs.get_state_handler()
         self.federation_client = hs.get_federation_client()
+        self._storage_controllers = hs.get_storage_controllers()
 
     async def get_event_for_timestamp(
         self,
@@ -1343,7 +1423,9 @@ class TimestampLookupHandler:
             )
 
             # Find other homeservers from the given state in the room
-            curr_state = await self.state_handler.get_current_state(room_id)
+            curr_state = await self._storage_controllers.state.get_current_state(
+                room_id
+            )
             curr_domains = get_domains_from_state(curr_state)
             likely_domains = [
                 domain for domain, depth in curr_domains if domain != self.server_name
