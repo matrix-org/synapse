@@ -184,38 +184,30 @@ class Auth:
 
             # First check if it could be a request from an appservice
             requester = await self._get_appservice_user(request)
-            if requester:
-                if ip_addr and self._track_appservice_user_ips:
-                    await self.store.insert_client_ip(
-                        user_id=requester.user.to_string(),
-                        access_token=access_token,
-                        ip=ip_addr,
-                        user_agent=user_agent,
-                        device_id=requester.device_id,
-                    )
+            if not requester:
+                # If not, it should be from a regular user
+                requester = await self.get_user_by_access_token(
+                    access_token, allow_expired=allow_expired, mark_as_used=True
+                )
 
-                request.requester = requester
-                return requester
+                # Deny the request if the user account has expired.
+                # This check is only done for regular users, not appservice ones.
+                if not allow_expired:
+                    if await self._account_validity_handler.is_user_expired(
+                        requester.user.to_string()
+                    ):
+                        # Raise the error if either an account validity module has determined
+                        # the account has expired, or the legacy account validity
+                        # implementation is enabled and determined the account has expired
+                        raise AuthError(
+                            403,
+                            "User account has expired",
+                            errcode=Codes.EXPIRED_ACCOUNT,
+                        )
 
-            requester = await self.get_user_by_access_token(
-                access_token, allow_expired=allow_expired, mark_as_used=True
-            )
-
-            # Deny the request if the user account has expired.
-            if not allow_expired:
-                if await self._account_validity_handler.is_user_expired(
-                    requester.user.to_string()
-                ):
-                    # Raise the error if either an account validity module has determined
-                    # the account has expired, or the legacy account validity
-                    # implementation is enabled and determined the account has expired
-                    raise AuthError(
-                        403,
-                        "User account has expired",
-                        errcode=Codes.EXPIRED_ACCOUNT,
-                    )
-
-            if ip_addr:
+            if ip_addr and (
+                not requester.app_service or self._track_appservice_user_ips
+            ):
                 await self.store.insert_client_ip(
                     user_id=requester.authenticated_entity,
                     access_token=access_token,
@@ -223,6 +215,7 @@ class Auth:
                     user_agent=user_agent,
                     device_id=requester.device_id,
                 )
+
                 # Track also the puppeted user client IP if enabled and the user is puppeting
                 if (
                     requester.user.to_string() != requester.authenticated_entity
@@ -437,6 +430,7 @@ class Auth:
                 is_guest=True,
                 # all guests get the same device id
                 device_id=GUEST_DEVICE_ID,
+                authenticated_entity=user_id,
             )
         except (
             pymacaroons.exceptions.MacaroonException,
