@@ -24,17 +24,52 @@ we are creating a stylized header for each package.
         {{- . -}}{{- "\n" -}}
     {{- end -}}
     {{- with .TestCases -}}
+        {{- /* Failing tests are first */ -}}
         {{- range . -}}
-            {{- if or (not $settings.HideSuccessfulTests) (ne .Result "PASS") -}}
-                ::group::
-                {{- if eq .Result "PASS" -}}
-                    {{ "\033" }}[0;32m✅
-                {{- else if eq .Result "SKIP" -}}
-                    {{ "\033" }}[0;33m🚧
-                {{- else -}}
-                    {{ "\033" }}[0;31m❌
+            {{- if and (ne .Result "PASS") (ne .Result "SKIP") -}}
+                ::group::{{ "\033" }}[0;31m❌{{ " " }}{{- .Name -}}
+                {{- "\033" -}}[0;37m ({{if $settings.ShowTestStatus}}{{.Result}}; {{end}}{{ .Duration -}}
+                {{- with .Coverage -}}
+                    , coverage: {{ . }}%
+                {{- end -}})
+                {{- "\033" -}}[0m
+                {{- "\n" -}}
+
+                {{- with .Output -}}
+                    {{- formatTestOutput . $settings -}}
+                    {{- "\n" -}}
                 {{- end -}}
-                {{ " " }}{{- .Name -}}
+
+                ::endgroup::{{- "\n" -}}
+            {{- end -}}
+        {{- end -}}
+
+
+        {{- /* Then skipped tests are second */ -}}
+        {{- range . -}}
+            {{- if eq .Result "SKIP" -}}
+                ::group::{{ "\033" }}[0;33m🚧{{ " " }}{{- .Name -}}
+                {{- "\033" -}}[0;37m ({{if $settings.ShowTestStatus}}{{.Result}}; {{end}}{{ .Duration -}}
+                {{- with .Coverage -}}
+                    , coverage: {{ . }}%
+                {{- end -}})
+                {{- "\033" -}}[0m
+                {{- "\n" -}}
+
+                {{- with .Output -}}
+                    {{- formatTestOutput . $settings -}}
+                    {{- "\n" -}}
+                {{- end -}}
+
+                ::endgroup::{{- "\n" -}}
+            {{- end -}}
+        {{- end -}}
+
+
+        {{- /* Then passing tests are last */ -}}
+        {{- range . -}}
+            {{- if eq .Result "PASS" -}}
+                ::group::{{ "\033" }}[0;32m✅{{ " " }}{{- .Name -}}
                 {{- "\033" -}}[0;37m ({{if $settings.ShowTestStatus}}{{.Result}}; {{end}}{{ .Duration -}}
                 {{- with .Coverage -}}
                     , coverage: {{ . }}%
