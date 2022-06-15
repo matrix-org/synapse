@@ -358,6 +358,8 @@ jobs:
     if: "${{ !failure() && !cancelled() && (github.ref == 'refs/heads/develop') }}"
     needs: linting-done
     runs-on: ubuntu-latest
+    
+    name: "Complement Workers (develop only)"
 
     steps:
       # The path is set via a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on the path to run Complement.
