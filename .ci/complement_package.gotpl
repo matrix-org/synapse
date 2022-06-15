@@ -2,6 +2,9 @@
 {{- /*
 This template contains the format for an individual package. GitHub actions does not currently support nested groups so
 we are creating a stylized header for each package.
+
+This template is based on https://github.com/haveyoudebuggedit/gotestfmt/blob/f179b0e462a9dcf7101515d87eec4e4d7e58b92a/.gotestfmt/github/package.gotpl
+which is under the Unlicense licence.
 */ -}}
 {{- $settings := .Settings -}}
 {{- if and (or (not $settings.HideSuccessfulPackages) (ne .Result "PASS")) (or (not $settings.HideEmptyPackages) (ne .Result "SKIP") (ne (len .TestCases) 0)) -}}
