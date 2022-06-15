@@ -2,9 +2,10 @@
 import argparse
 import logging
 import sys
-from collections import defaultdict
+from collections import defaultdict, Counter
+from graphlib import TopologicalSorter
 from pprint import pformat
-from typing import Mapping
+from typing import Mapping, Sequence, Dict, List, Tuple
 from unittest.mock import MagicMock, patch
 
 import dictdiffer
@@ -25,7 +26,7 @@ from synapse.storage.databases.main.event_federation import EventFederationWorke
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.room import RoomWorkerStore
 from synapse.storage.databases.main.state import StateGroupWorkerStore
-from synapse.types import ISynapseReactor, StateMap
+from synapse.types import ISynapseReactor, StateMap, MutableStateMap
 
 logger = logging.getLogger(sys.argv[0])
 
@@ -86,13 +87,13 @@ async def dump_auth_chains(
     # Key: event id
     # Value: bitmaps. ith bit is set iff this belongs to the auth chain of the ith
     # starting event.
-    seen = defaultdict(int)
+    seen: Dict[str, int] = defaultdict(int)
     edges = set()
 
     for i, start in enumerate(state_after_parents):
         bitmask = 1 << i
-        # DFS starting at `start`. Entries are [event, auth event index].
-        stack = [[start, 0]]
+        # DFS starting at `start`. Entries are (event, auth event index).
+        stack: List[Tuple[str, int]] = [(start, 0)]
         while stack:
             # Fetch the event we're considering and our progress through its auth events.
             eid, pindex = stack[-1]
@@ -110,11 +111,11 @@ async def dump_auth_chains(
             edges.add((eid, pid))
             # If we've already marked that `start` can see `pid`, try the next auth event
             if seen.get(pid, 0) & bitmask:
-                stack[-1][1] += 1
+                stack[-1] = (eid, pindex + 1)
                 continue
 
             # Otherwise, continue DFS at pid
-            stack.append([pid, 0])
+            stack.append((pid, 0))
 
     for eid, bitmask in seen.items():
         event = await hs.get_datastores().main.get_event(eid, allow_none=True)
@@ -128,36 +129,39 @@ async def dump_auth_chains(
     graph.write_svg("auth_chains.svg")
 
 
-async def main(reactor: ISynapseReactor, args: argparse.Namespace) -> None:
-    config = load_config(args.config_file)
-    hs = MockHomeserver(config)
-    with patch("synapse.storage.databases.prepare_database"), patch(
-        "synapse.storage.database.BackgroundUpdater"
-    ), patch("synapse.storage.databases.main.events_worker.MultiWriterIdGenerator"):
-        hs.setup()
+parser = argparse.ArgumentParser(
+    description="Explain the calculation which resolves state prior before an event"
+)
+parser.add_argument(
+    "config_file", help="Synapse config file", type=argparse.FileType("r")
+)
+parser.add_argument("--verbose", "-v", help="Log verbosely", action="store_true")
+parser.add_argument(
+    "--debug", "-d", help="Enter debugger after state is resolved", action="store_true"
+)
+subparsers = parser.add_subparsers()
 
+
+async def debug_specific_stateres(
+    reactor: ISynapseReactor, hs: MockHomeserver, args: argparse.Namespace
+) -> None:
     # Fetch the event in question.
     event = await hs.get_datastores().main.get_event(args.event_id)
     assert event is not None
     logger.info("event %s has %d parents", event.event_id, len(event.prev_event_ids()))
 
-    state_after_parents = {}
-    for i, prev_event_id in enumerate(event.prev_event_ids()):
-        # TODO: check this is the state after parents :)
-        state_after_parents[
-            prev_event_id
-        ] = await hs.get_storage_controllers().state.get_state_ids_for_event(
-            prev_event_id
-        )
-        logger.info("parent %d: %s", i, prev_event_id)
+    state_after_parents = [
+        await hs.get_storage_controllers().state.get_state_ids_for_event(prev_event_id)
+        for prev_event_id in event.prev_event_ids()
+    ]
 
-    await dump_auth_chains(hs, state_after_parents)
+    # await dump_auth_chains(hs, state_after_parents)
     # return
 
     result = await hs.get_state_resolution_handler().resolve_events_with_store(
         event.room_id,
         event.room_version.identifier,
-        state_after_parents.values(),
+        state_after_parents,
         event_map=None,
         state_res_store=StateResolutionStore(hs.get_datastores().main),
     )
@@ -184,17 +188,98 @@ async def main(reactor: ISynapseReactor, args: argparse.Namespace) -> None:
         breakpoint()
 
 
-parser = argparse.ArgumentParser(
-    description="Explain the calculation which resolves state prior before an event"
+debug_parser = subparsers.add_parser(
+    "debug",
+    description="debug the stateres calculation of a specific event",
 )
-parser.add_argument("event_id", help="the event ID to be resolved")
-parser.add_argument(
-    "config_file", help="Synapse config file", type=argparse.FileType("r")
+debug_parser.add_argument("event_id", help="the event ID to be resolved")
+debug_parser.set_defaults(func=debug_specific_stateres)
+
+
+async def debug_specific_room(
+    reactor: ISynapseReactor, hs: MockHomeserver, args: argparse.Namespace
+) -> None:
+    main = hs.get_datastores().main
+    event_ids = await main.db_pool.simple_select_onecol(
+        "events",
+        {"room_id": args.room_id},
+        "event_id",
+    )
+
+    starting_points: Sequence[str] = await main.db_pool.simple_select_onecol(
+        "event_backward_extremities",
+        {"room_id": args.room_id},
+        "event_id",
+    )
+    if not starting_points:
+        starting_points = [
+            await main.db_pool.simple_select_one_onecol(
+                "events",
+                {"room_id": args.room_id, "type": "m.room.create", "state_key": ""},
+                "event_id",
+            )
+        ]
+
+    logger.info("starting points are %s", starting_points)
+    state_after: Dict[str, StateMap[str]] = {
+        e: await hs.get_storage_controllers().state.get_state_ids_for_event(e)
+        for e in starting_points
+    }
+
+    events = await main.get_events(event_ids)
+    sorter: TopologicalSorter[str] = TopologicalSorter()
+    for event in events.values():
+        sorter.add(event.event_id, *event.prev_event_ids())
+
+    frequency_of_state_res_by_size: Dict[int, int] = defaultdict(int)
+
+    for eid in sorter.static_order():
+        if eid in state_after:
+            logger.debug("Skip %s", eid)
+            continue
+        logger.debug("Consider %s", eid)
+
+        event = events[eid]
+        state_after_parents = [state_after[pid] for pid in event.prev_event_ids()]
+        frequency_of_state_res_by_size[len(state_after_parents)] += 1
+
+        # The state before
+        state_at = dict(
+            await hs.get_state_resolution_handler().resolve_events_with_store(
+                event.room_id,
+                event.room_version.identifier,
+                state_after_parents,
+                event_map=None,
+                state_res_store=StateResolutionStore(hs.get_datastores().main),
+            )
+        )
+
+        ## Extra dict above is to keep mypy happy
+
+        state_delta = (
+            {(event.type, event.state_key): event.event_id}
+            if event.is_state() and event.rejected_reason is None
+            else {}
+        )
+        # The state after
+        state_at.update(state_delta)
+        state_after[event.event_id] = state_at
+
+        # Retrieve the stored state
+        stored_state = await hs.get_storage_controllers().state.get_state_ids_for_event(
+            event.event_id
+        )
+        assert stored_state == state_at
+    logger.info(
+        "state res sizes -> frequency: %s", pformat(frequency_of_state_res_by_size)
+    )
+
+
+room_parser = subparsers.add_parser(
+    "room", description="debug the stateres calculation of an entire room"
 )
-parser.add_argument("--verbose", "-v", help="Log verbosely", action="store_true")
-parser.add_argument(
-    "--debug", "-d", help="Enter debugger after state is resolved", action="store_true"
-)
+room_parser.add_argument("room_id", help="the room ID to be interrogated")
+room_parser.set_defaults(func=debug_specific_room)
 
 
 if __name__ == "__main__":
@@ -206,4 +291,12 @@ if __name__ == "__main__":
     )
     logging.getLogger("synapse.util").setLevel(logging.ERROR)
     logging.getLogger("synapse.storage").setLevel(logging.ERROR)
-    task.react(main, [parser.parse_args()])
+
+    config = load_config(args.config_file)
+    hs = MockHomeserver(config)
+    with patch("synapse.storage.databases.prepare_database"), patch(
+        "synapse.storage.database.BackgroundUpdater"
+    ), patch("synapse.storage.databases.main.events_worker.MultiWriterIdGenerator"):
+        hs.setup()
+
+    task.react(args.func, [hs, parser.parse_args()])
