@@ -23,7 +23,6 @@ from urllib import parse
 import attr
 from parameterized import parameterized, parameterized_class
 from PIL import Image as Image
-# `Literal` appears with Python 3.8.
 from typing_extensions import Literal
 
 from twisted.internet import defer
