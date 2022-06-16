@@ -20,6 +20,9 @@
 #
 # ./complement.sh -run "TestOutboundFederation(Profile|Send)"
 #
+# Specifying TEST_ONLY_SKIP_DEP_HASH_VERIFICATION=1 will cause `poetry export`
+# to not emit any hashes when building the Docker image. This then means that
+# you can use 'unverifiable' sources such as git repositories as dependencies.
 
 # Exit if a line returns a non-zero exit code
 set -e
@@ -51,7 +54,9 @@ fi
 
 # Build the base Synapse image from the local checkout
 echo_if_github "::group::Build Docker image: matrixdotorg/synapse"
-docker build -t matrixdotorg/synapse -f "docker/Dockerfile" .
+docker build -t matrixdotorg/synapse \
+  --build-arg TEST_ONLY_SKIP_DEP_HASH_VERIFICATION \
+  -f "docker/Dockerfile" .
 echo_if_github "::endgroup::"
 
 # Build the workers docker image (from the base Synapse image we just built).
