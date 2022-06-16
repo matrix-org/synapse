@@ -649,6 +649,10 @@ class SpamCheckerTestCaseDeprecated(unittest.HomeserverTestCase):
         )
 
 
+EVIL_DATA = b"Some evil data"
+EVIL_DATA_EXPERIMENT = b"Some evil data to trigger the experimental tuple API"
+
+
 class SpamCheckerTestCase(unittest.HomeserverTestCase):
     servlets = [
         login.register_servlets,
@@ -674,9 +678,9 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
         buf = BytesIO()
         await file_wrapper.write_chunks_to(buf.write)
 
-        if b"evil" in buf.getvalue():
+        if buf.getvalue() == EVIL_DATA:
             return Codes.FORBIDDEN
-        elif b"experimental" in buf.getvalue():
+        elif buf.getvalue() == EVIL_DATA_EXPERIMENT:
             return (Codes.FORBIDDEN, {})
         else:
             return "NOT_SPAM"
@@ -693,12 +697,12 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
         """
 
         self.helper.upload_media(
-            self.upload_resource, b"Some evil data", tok=self.tok, expect_code=400
+            self.upload_resource, EVIL_DATA, tok=self.tok, expect_code=400
         )
 
         self.helper.upload_media(
             self.upload_resource,
-            b"Let's try the experimental API",
+            EVIL_DATA_EXPERIMENT,
             tok=self.tok,
             expect_code=400,
         )

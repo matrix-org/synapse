@@ -1,1 +1,1 @@
-Experimental: expand Spam-Checker API callbacks of `user_may_join_room`, `user_may_invite`, `user_may_send_3pid_invite`, `user_may_create_room`, `user_may_create_room_alias`, `user_may_publish_room`, `check_media_file_for_spam` with ability to return additional fields. This enables spam-checker implementations to experiment with mechanisms to give users more information about why they are blocked and whether any action is needed from them to be unblocked.
+Support temporary experimental return values for spam checker module callbacks.

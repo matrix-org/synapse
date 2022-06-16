@@ -21,7 +21,6 @@ from typing import (
     Awaitable,
     Callable,
     Collection,
-    Dict,
     List,
     Optional,
     Tuple,
@@ -35,7 +34,7 @@ import synapse
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
 from synapse.spam_checker_api import RegistrationBehaviour
-from synapse.types import RoomAlias, UserProfile
+from synapse.types import JsonDict, RoomAlias, UserProfile
 from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 from synapse.util.metrics import Measure
 
@@ -55,7 +54,7 @@ CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
             # disappear without warning depending on the results of ongoing
             # experiments.
             # Use this to return additional information as part of an error.
-            Tuple["synapse.api.errors.Codes", Dict],
+            Tuple["synapse.api.errors.Codes", JsonDict],
             # Deprecated
             bool,
         ]
@@ -75,7 +74,7 @@ USER_MAY_JOIN_ROOM_CALLBACK = Callable[
             # disappear without warning depending on the results of ongoing
             # experiments.
             # Use this to return additional information as part of an error.
-            Tuple["synapse.api.errors.Codes", Dict],
+            Tuple["synapse.api.errors.Codes", JsonDict],
             # Deprecated
             bool,
         ]
@@ -91,7 +90,7 @@ USER_MAY_INVITE_CALLBACK = Callable[
             # disappear without warning depending on the results of ongoing
             # experiments.
             # Use this to return additional information as part of an error.
-            Tuple["synapse.api.errors.Codes", Dict],
+            Tuple["synapse.api.errors.Codes", JsonDict],
             # Deprecated
             bool,
         ]
@@ -107,7 +106,7 @@ USER_MAY_SEND_3PID_INVITE_CALLBACK = Callable[
             # disappear without warning depending on the results of ongoing
             # experiments.
             # Use this to return additional information as part of an error.
-            Tuple["synapse.api.errors.Codes", Dict],
+            Tuple["synapse.api.errors.Codes", JsonDict],
             # Deprecated
             bool,
         ]
@@ -123,7 +122,7 @@ USER_MAY_CREATE_ROOM_CALLBACK = Callable[
             # disappear without warning depending on the results of ongoing
             # experiments.
             # Use this to return additional information as part of an error.
-            Tuple["synapse.api.errors.Codes", Dict],
+            Tuple["synapse.api.errors.Codes", JsonDict],
             # Deprecated
             bool,
         ]
@@ -139,7 +138,7 @@ USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[
             # disappear without warning depending on the results of ongoing
             # experiments.
             # Use this to return additional information as part of an error.
-            Tuple["synapse.api.errors.Codes", Dict],
+            Tuple["synapse.api.errors.Codes", JsonDict],
             # Deprecated
             bool,
         ]
@@ -155,7 +154,7 @@ USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[
             # disappear without warning depending on the results of ongoing
             # experiments.
             # Use this to return additional information as part of an error.
-            Tuple["synapse.api.errors.Codes", Dict],
+            Tuple["synapse.api.errors.Codes", JsonDict],
             # Deprecated
             bool,
         ]
@@ -189,7 +188,7 @@ CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK = Callable[
             # disappear without warning depending on the results of ongoing
             # experiments.
             # Use this to return additional information as part of an error.
-            Tuple["synapse.api.errors.Codes", Dict],
+            Tuple["synapse.api.errors.Codes", JsonDict],
             # Deprecated
             bool,
         ]
@@ -380,7 +379,7 @@ class SpamChecker:
 
     async def check_event_for_spam(
         self, event: "synapse.events.EventBase"
-    ) -> Union[Tuple["synapse.api.errors.Codes", Dict], str]:
+    ) -> Union[Tuple["synapse.api.errors.Codes", JsonDict], str]:
         """Checks if a given event is considered "spammy" by this server.
 
         If the server considers an event spammy, then it will be rejected if
@@ -464,7 +463,7 @@ class SpamChecker:
 
     async def user_may_join_room(
         self, user_id: str, room_id: str, is_invited: bool
-    ) -> Union[Tuple["synapse.api.errors.Codes", Dict], Literal["NOT_SPAM"]]:
+    ) -> Union[Tuple["synapse.api.errors.Codes", JsonDict], Literal["NOT_SPAM"]]:
         """Checks if a given users is allowed to join a room.
         Not called when a user creates a room.
 

@@ -839,8 +839,7 @@ class RoomsCreateTestCase(RoomBase):
         ) -> Tuple[Codes, dict]:
             return (Codes.CONSENT_NOT_GIVEN, {})
 
-        join_mock = Mock(side_effect=user_may_join_room_codes)
-        self.hs.get_spam_checker()._user_may_join_room_callbacks = [join_mock]
+        join_mock.side_effect = user_may_join_room_tuple
 
         channel = self.make_request(
             "POST",
@@ -3182,12 +3181,13 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.json_body.errcode, Codes.CONSENT_NOT_GIVEN)
 
         # Also check that it stopped before calling _make_and_store_3pid_invite.
         make_invite_mock.assert_called_once()
 
         # Run variant with `Tuple[Codes, dict]`.
-        mock.return_value = make_awaitable((Codes.CONSENT_NOT_GIVEN, {}))
+        mock.return_value = make_awaitable((Codes.EXPIRED_ACCOUNT, {"field": "value"}))
         channel = self.make_request(
             method="POST",
             path="/rooms/" + self.room_id + "/invite",
@@ -3200,6 +3200,8 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.json_body.errcode, Codes.EXPIRED_ACCOUNT)
+        self.assertEqual(channel.json_body.field, "value")
 
         # Also check that it stopped before calling _make_and_store_3pid_invite.
         make_invite_mock.assert_called_once()
