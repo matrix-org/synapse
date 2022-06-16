@@ -67,7 +67,7 @@ apply if you want your config file to be read properly. A few helpful things to 
   enabled: false
   ```
   In this manual, all top-level settings (ones with no indentation) are identified 
-  at the beginning of their section (i.e. "Config option: `example_setting`") and 
+  at the beginning of their section (i.e. "### `example_setting`") and 
   the sub-options, if any, are identified and listed in the body of the section. 
   In addition, each setting has an example of its usage, with the proper indentation
   shown. 
@@ -124,7 +124,7 @@ documentation on how to configure or create custom modules for Synapse.
 
 
 ---
-Config option: `modules`
+### `modules`
 
 Use the `module` sub-option to add modules under this option to extend functionality. 
 The `module` setting then has a sub-option, `config`, which can be used to define some configuration
@@ -147,7 +147,7 @@ modules:
 Define your homeserver name and other base options.
 
 ---
-Config option: `server_name`
+### `server_name`
 
 This sets the public-facing domain of the server.
 
@@ -177,7 +177,7 @@ Example configuration #2:
 server_name: localhost:8080
 ```
 ---
-Config option: `pid_file`
+### `pid_file`
 
 When running Synapse as a daemon, the file to store the pid in. Defaults to none.
 
@@ -186,7 +186,7 @@ Example configuration:
 pid_file: DATADIR/homeserver.pid
 ```
 ---
-Config option: `web_client_location`
+### `web_client_location`
 
 The absolute URL to the web client which `/` will redirect to. Defaults to none. 
 
@@ -195,7 +195,7 @@ Example configuration:
 web_client_location: https://riot.example.com/
 ```
 ---
-Config option: `public_baseurl`
+### `public_baseurl`
 
 The public-facing base URL that clients use to access this Homeserver (not
 including _matrix/...). This is the same URL a user might enter into the
@@ -211,7 +211,7 @@ Example configuration:
 public_baseurl: https://example.com/
 ```
 ---
-Config option: `serve_server_wellknown`
+### `serve_server_wellknown`
 
 By default, other servers will try to reach our server on port 8448, which can
 be inconvenient in some environments.
@@ -230,7 +230,7 @@ Example configuration:
 serve_server_wellknown: true
 ```
 ---
-Config option: `extra_well_known_client_content `
+### `extra_well_known_client_content `
 
 This option allows server runners to add arbitrary key-value pairs to the [client-facing `.well-known` response](https://spec.matrix.org/latest/client-server-api/#well-known-uri).
 Note that the `public_baseurl` config option must be provided for Synapse to serve a response to `/.well-known/matrix/client` at all.
@@ -246,7 +246,7 @@ extra_well_known_client_content :
   option2: value2
 ```
 ---
-Config option: `soft_file_limit`
+### `soft_file_limit`
  
 Set the soft limit on the number of file descriptors synapse can use.
 Zero is used to indicate synapse should set the soft limit to the hard limit.
@@ -257,7 +257,7 @@ Example configuration:
 soft_file_limit: 3
 ```
 ---
-Config option: `presence`
+### `presence`
 
 Presence tracking allows users to see the state (e.g online/offline)
 of other local and remote users. Set the `enabled` sub-option to false to  
@@ -270,7 +270,7 @@ presence:
   enabled: false
 ```
 ---
-Config option: `require_auth_for_profile_requests`
+### `require_auth_for_profile_requests`
 
 Whether to require authentication to retrieve profile data (avatars, display names) of other 
 users through the client API. Defaults to false. Note that profile data is also available 
@@ -281,7 +281,7 @@ Example configuration:
 require_auth_for_profile_requests: true
 ```
 ---
-Config option: `limit_profile_requests_to_users_who_share_rooms`
+### `limit_profile_requests_to_users_who_share_rooms`
 
 Use this option to require a user to share a room with another user in order
 to retrieve their profile information. Only checked on Client-Server 
@@ -293,7 +293,7 @@ Example configuration:
 limit_profile_requests_to_users_who_share_rooms: true
 ```
 ---
-Config option: `include_profile_data_on_invite`
+### `include_profile_data_on_invite`
 
 Use this option to prevent a user's profile data from being retrieved and
 displayed in a room until they have joined it. By default, a user's
@@ -306,7 +306,7 @@ Example configuration:
 include_profile_data_on_invite: false
 ```
 ---
-Config option: `allow_public_rooms_without_auth`
+### `allow_public_rooms_without_auth`
 
 If set to true, removes the need for authentication to access the server's
 public rooms directory through the client API, meaning that anyone can
@@ -317,7 +317,7 @@ Example configuration:
 allow_public_rooms_without_auth: true
 ```
 ---
-Config option: `allow_public_rooms_without_auth`
+### `allow_public_rooms_without_auth`
 
 If set to true, allows any other homeserver to fetch the server's public
 rooms directory via federation. Defaults to false.
@@ -327,7 +327,7 @@ Example configuration:
 allow_public_rooms_over_federation: true
 ```
 ---
-Config option: `default_room_version`
+### `default_room_version`
 
 The default room version for newly created rooms on this server.
 
@@ -343,7 +343,7 @@ Example configuration:
 default_room_version: "8"
 ```
 ---
-Config option: `gc_thresholds`
+### `gc_thresholds`
 
 The garbage collection threshold parameters to pass to `gc.set_threshold`, if defined.
 Defaults to none. 
@@ -353,7 +353,7 @@ Example configuration:
 gc_thresholds: [700, 10, 10]
 ```
 ---
-Config option: `gc_min_interval`
+### `gc_min_interval`
 
 The minimum time in seconds between each GC for a generation, regardless of
 the GC thresholds. This ensures that we don't do GC too frequently. A value of `[1s, 10s, 30s]` 
@@ -366,7 +366,7 @@ Example configuration:
 gc_min_interval: [0.5s, 30s, 1m]
 ```
 ---
-Config option: `filter_timeline_limit`
+### `filter_timeline_limit`
 
 Set the limit on the returned events in the timeline in the get
 and sync operations. Defaults to 100. A value of -1 means no upper limit.
@@ -377,7 +377,7 @@ Example configuration:
 filter_timeline_limit: 5000
 ```
 ---
-Config option: `block_non_admin_invites`
+### `block_non_admin_invites`
 
 Whether room invites to users on this server should be blocked
 (except those sent by local server admins). Defaults to false.
@@ -387,7 +387,7 @@ Example configuration:
 block_non_admin_invites: true
 ```
 ---
-Config option: `enable_search`
+### `enable_search`
 
 If set to false, new messages will not be indexed for searching and users
 will receive errors when searching for messages. Defaults to true.
@@ -397,7 +397,7 @@ Example configuration:
 enable_search: false
 ```
 ---
-Config option: `ip_range_blacklist`
+### `ip_range_blacklist`
  
 This option prevents outgoing requests from being sent to the specified blacklisted IP address
 CIDR ranges. If this option is not specified then it defaults to private IP
@@ -437,7 +437,7 @@ ip_range_blacklist:
   - 'fec0::/10'
 ```
 ---
-Config option: `ip_range_whitelist`
+### `ip_range_whitelist`
 
 List of IP address CIDR ranges that should be allowed for federation,
 identity servers, push servers, and for checking key validity for
@@ -454,7 +454,7 @@ ip_range_whitelist:
    - '192.168.1.1'
 ```
 ---
-Config option: `listeners`
+### `listeners`
 
 List of ports that Synapse should listen on, their purpose and their
 configuration.
@@ -555,7 +555,7 @@ listeners:
     type: manhole
 ```
 ---
-Config option: `manhole_settings`
+### `manhole_settings`
 
 Connection settings for the manhole. You can find more information
 on the manhole [here](../../manhole.md). Manhole sub-options include:
@@ -574,7 +574,7 @@ manhole_settings:
   ssh_pub_key_path: CONFDIR/id_rsa.pub
 ```
 ---
-Config option: `dummy_events_threshold`
+### `dummy_events_threshold`
 
 Forward extremities can build up in a room due to networking delays between
 homeservers. Once this happens in a large room, calculation of the state of
@@ -608,7 +608,7 @@ Useful options for Synapse admins.
 
 ---
 
-Config option: `admin_contact`
+### `admin_contact`
 
 How to reach the server admin, used in `ResourceLimitError`. Defaults to none. 
 
@@ -617,7 +617,7 @@ Example configuration:
 admin_contact: 'mailto:admin@server.com'
 ```
 ---
-Config option: `hs_disabled` and `hs_disabled_message`
+### `hs_disabled` and `hs_disabled_message`
 
 Blocks users from connecting to the homeserver and provides a human-readable reason
 why the connection was blocked. Defaults to false. 
@@ -628,7 +628,7 @@ hs_disabled: true
 hs_disabled_message: 'Reason for why the HS is blocked'
 ```
 ---
-Config option: `limit_usage_by_mau`
+### `limit_usage_by_mau`
 
 This option disables/enables monthly active user blocking. Used in cases where the admin or 
 server owner wants to limit to the number of monthly active users. When enabled and a limit is 
@@ -640,7 +640,7 @@ Example configuration:
 limit_usage_by_mau: true 
 ```
 ---
-Config option: `max_mau_value`
+### `max_mau_value`
 
 This option sets the hard limit of monthly active users above which the server will start 
 blocking user actions if `limit_usage_by_mau` is enabled. Defaults to 0.  
@@ -650,7 +650,7 @@ Example configuration:
 max_mau_value: 50
 ```
 ---
-Config option: `mau_trial_days`
+### `mau_trial_days`
 
 The option `mau_trial_days` is a means to add a grace period for active users. It
 means that users must be active for the specified number of days before they
@@ -663,7 +663,7 @@ Example configuration:
 mau_trial_days: 5
 ```
 ---
-Config option: `mau_appservice_trial_days`
+### `mau_appservice_trial_days`
 
 The option `mau_appservice_trial_days` is similar to `mau_trial_days`, but applies a different
 trial number if the user was registered by an appservice. A value
@@ -677,7 +677,7 @@ mau_appservice_trial_days:
   another_appservice_id: 6
 ```
 ---
-Config option: `mau_limit_alerting`
+### `mau_limit_alerting`
 
 The option `mau_limit_alerting` is a means of limiting client-side alerting
 should the mau limit be reached. This is useful for small instances
@@ -690,7 +690,7 @@ Example configuration:
 mau_limit_alerting: false
 ```
 ---
-Config option: `mau_stats_only`
+### `mau_stats_only`
 
 If enabled, the metrics for the number of monthly active users will
 be populated, however no one will be limited based on these numbers. If `limit_usage_by_mau`
@@ -701,7 +701,7 @@ Example configuration:
 mau_stats_only: true
 ```
 ---
-Config option: `mau_limit_reserved_threepids`
+### `mau_limit_reserved_threepids`
 
 Sometimes the server admin will want to ensure certain accounts are
 never blocked by mau checking. These accounts are specified by this option.
@@ -715,7 +715,7 @@ mau_limit_reserved_threepids:
     address: 'reserved_user@example.com'
 ```
 ---
-Config option: `server_context`
+### `server_context`
 
 This option is used by phonehome stats to group together related servers.
 Defaults to none. 
@@ -725,7 +725,7 @@ Example configuration:
 server_context: context
 ```
 ---
-Config option: `limit_remote_rooms`
+### `limit_remote_rooms`
 
 When this option is enabled, the room "complexity" will be checked before a user
 joins a new remote room. If it is above the complexity limit, the server will
@@ -749,7 +749,7 @@ limit_remote_rooms:
   admins_can_join: true
 ```
 ---
-Config option: `require_membership_for_aliases`
+### `require_membership_for_aliases`
 
 Whether to require a user to be in the room to add an alias to it.
 Defaults to true.
@@ -759,7 +759,7 @@ Example configuration:
 require_membership_for_aliases: false
 ```
 ---
-Config option: `allow_per_room_profiles`
+### `allow_per_room_profiles`
 
 Whether to allow per-room membership profiles through the sending of membership
 events with profile information that differs from the target's global profile.
@@ -770,7 +770,7 @@ Example configuration:
 allow_per_room_profiles: false
 ```
 ---
-Config option: `max_avatar_size`
+### `max_avatar_size`
 
 The largest permissible file size in bytes for a user avatar. Defaults to no restriction.
 Use M for MB and K for KB. 
@@ -782,7 +782,7 @@ Example configuration:
 max_avatar_size: 10M
 ```
 ---
-Config option: `allowed_avatar_mimetypes`
+### `allowed_avatar_mimetypes`
 
 The MIME types allowed for user avatars. Defaults to no restriction.
 
@@ -794,7 +794,7 @@ Example configuration:
 allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
 ```
 ---
-Config option: `redaction_retention_period`
+### `redaction_retention_period`
 
 How long to keep redacted events in unredacted form in the database. After
 this period redacted events get replaced with their redacted form in the DB.
@@ -806,7 +806,7 @@ Example configuration:
 redaction_retention_period: 28d
 ```
 ---
-Config option: `user_ips_max_age` 
+### `user_ips_max_age` 
 
 How long to track users' last seen time and IPs in the database.
 
@@ -817,7 +817,7 @@ Example configuration:
 user_ips_max_age: 14d
 ```
 ---
-Config option: `request_token_inhibit_3pid_errors`
+### `request_token_inhibit_3pid_errors`
 
 Inhibits the `/requestToken` endpoints from returning an error that might leak
 information about whether an e-mail address is in use or not on this
@@ -832,7 +832,7 @@ Example configuration:
 request_token_inhibit_3pid_errors: true
 ```
 ---
-Config option: `next_link_domain_whitelist`
+### `next_link_domain_whitelist`
 
 A list of domains that the domain portion of `next_link` parameters
 must match.
@@ -854,7 +854,7 @@ Example configuration:
 next_link_domain_whitelist: ["matrix.org"]
 ```
 ---
-Config option: `templates` and `custom_template_directory`
+### `templates` and `custom_template_directory`
 
 These options define templates to use when generating email or HTML page contents.
 The `custom_template_directory` determines which directory Synapse will try to 
@@ -871,7 +871,7 @@ templates:
   custom_template_directory: /path/to/custom/templates/
 ```
 ---
-Config option: `retention`
+### `retention`
 
 This option and the associated options determine message retention policy at the
 server level.
@@ -950,7 +950,7 @@ retention:
 Options related to TLS.
 
 ---
-Config option: `tls_certificate_path`
+### `tls_certificate_path`
 
 This option specifies a PEM-encoded X509 certificate for TLS.
 This certificate, as of Synapse 1.0, will need to be a valid and verifiable
@@ -965,7 +965,7 @@ Example configuration:
 tls_certificate_path: "CONFDIR/SERVERNAME.tls.crt"
 ```
 ---
-Config option: `tls_private_key_path`
+### `tls_private_key_path`
 
 PEM-encoded private key for TLS. Defaults to none. 
 
@@ -974,7 +974,7 @@ Example configuration:
 tls_private_key_path: "CONFDIR/SERVERNAME.tls.key"
 ```
 ---
-Config option: `federation_verify_certificates`
+### `federation_verify_certificates`
 Whether to verify TLS server certificates for outbound federation requests.
 
 Defaults to true. To disable certificate verification, set the option to false.
@@ -984,7 +984,7 @@ Example configuration:
 federation_verify_certificates: false
 ```
 ---
-Config option: `federation_client_minimum_tls_version`
+### `federation_client_minimum_tls_version`
 
 The minimum TLS version that will be used for outbound federation requests.
 
@@ -998,7 +998,7 @@ Example configuration:
 federation_client_minimum_tls_version: 1.2
 ```
 ---
-Config option: `federation_certificate_verification_whitelist`
+### `federation_certificate_verification_whitelist`
 
 Skip federation certificate verification on a given whitelist
 of domains.
@@ -1017,7 +1017,7 @@ federation_certificate_verification_whitelist:
   - "*.onion"
 ```
 ---
-Config option: `federation_custom_ca_list`
+### `federation_custom_ca_list`
 
 List of custom certificate authorities for federation traffic.
 
@@ -1040,7 +1040,7 @@ federation_custom_ca_list:
 Options related to federation.
 
 ---
-Config option: `federation_domain_whitelist`
+### `federation_domain_whitelist`
 
 Restrict federation to the given whitelist of domains.
 N.B. we recommend also firewalling your federation listener to limit
@@ -1056,7 +1056,7 @@ federation_domain_whitelist:
   - syd.example.com
 ```
 ---
-Config option: `federation_metrics_domains`
+### `federation_metrics_domains`
 
 Report prometheus metrics on the age of PDUs being sent to and received from
 the given domains. This can be used to give an idea of "delay" on inbound
@@ -1072,7 +1072,7 @@ federation_metrics_domains:
   - example.com
 ```
 ---
-Config option: `allow_profile_lookup_over_federation`
+### `allow_profile_lookup_over_federation`
 
 Set to false to disable profile lookup over federation. By default, the
 Federation API allows other homeservers to obtain profile data of any user
@@ -1083,7 +1083,7 @@ Example configuration:
 allow_profile_lookup_over_federation: false
 ```
 ---
-Config option: `allow_device_name_lookup_over_federation`
+### `allow_device_name_lookup_over_federation`
 
 Set this option to true to allow device display name lookup over federation. By default, the
 Federation API prevents other homeservers from obtaining the display names of any user devices
@@ -1099,7 +1099,7 @@ allow_device_name_lookup_over_federation: true
 Options related to caching
 
 ---
-Config option: `event_cache_size`
+### `event_cache_size`
 
 The number of events to cache in memory. Not affected by
 `caches.global_factor`. Defaults to 10K.
@@ -1109,7 +1109,7 @@ Example configuration:
 event_cache_size: 15K
 ```
 ---
-Config option: `cache` and associated values
+### `cache` and associated values
 
 A cache 'factor' is a multiplier that can be applied to each of
 Synapse's caches in order to increase or decrease the maximum
@@ -1206,7 +1206,7 @@ file in Synapse's `contrib` directory, you can send a `SIGHUP` signal by using
 Config options related to database settings.
 
 ---
-Config option: `database`
+### `database`
 
 The `database` setting defines the database that synapse uses to store all of
 its data.
@@ -1261,7 +1261,7 @@ database:
 Config options related to logging. 
 
 ---
-Config option: `log_config`
+### `log_config`
 
 This option specifies a yaml python logging config file as described [here](https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema).
 
@@ -1277,7 +1277,7 @@ Each ratelimiting configuration is made of two parameters:
    - `per_second`: number of requests a client can send per second.
    - `burst_count`: number of requests a client can send before being throttled.
 ---
-Config option: `rc_message`
+### `rc_message`
 
 
 Ratelimiting settings for client messaging.
@@ -1292,7 +1292,7 @@ rc_message:
   burst_count: 15
 ```
 ---
-Config option: `rc_registration`
+### `rc_registration`
 
 This option ratelimits registration requests based on the client's IP address.
 It defaults to `per_second: 0.17`, `burst_count: 3`. 
@@ -1304,7 +1304,7 @@ rc_registration:
   burst_count: 2
 ```
 ---
-Config option: `rc_registration_token_validity`
+### `rc_registration_token_validity`
 
 This option checks the validity of registration tokens that ratelimits requests based on 
 the client's IP address.
@@ -1317,7 +1317,7 @@ rc_registration_token_validity:
   burst_count: 6
 ```   
 ---
-Config option: `rc_login`
+### `rc_login`
 
 This option specifies several limits for login:
 * `address` ratelimits login requests based on the client's IP
@@ -1345,7 +1345,7 @@ rc_login:
     burst_count: 7
 ```
 ---
-Config option: `rc_admin_redaction`
+### `rc_admin_redaction`
 
 This option sets ratelimiting redactions by room admins. If this is not explicitly 
 set then it uses the same ratelimiting as per `rc_message`. This is useful
@@ -1358,7 +1358,7 @@ rc_admin_redaction:
   burst_count: 50
 ```
 ---
-Config option: `rc_joins`
+### `rc_joins`
 
 This option allows for ratelimiting number of rooms a user can join. This setting has the following sub-options:
 
@@ -1380,7 +1380,7 @@ rc_joins:
     burst_count: 12
 ```
 ---
-Config option: `rc_3pid_validation`
+### `rc_3pid_validation`
 
 This option ratelimits how often a user or IP can attempt to validate a 3PID.
 Defaults to `per_second: 0.003`, `burst_count: 5`.
@@ -1392,7 +1392,7 @@ rc_3pid_validation:
   burst_count: 5
 ```
 ---
-Config option: `rc_invites`
+### `rc_invites`
 
 This option sets ratelimiting how often invites can be sent in a room or to a 
 specific user. `per_room` defaults to `per_second: 0.3`, `burst_count: 10` and
@@ -1423,7 +1423,7 @@ rc_invites:
     burst_count: 3
 ```
 ---
-Config option: `rc_third_party_invite`
+### `rc_third_party_invite`
 
 This option ratelimits 3PID invites (i.e. invites sent to a third-party ID
 such as an email address or a phone number) based on the account that's
@@ -1436,7 +1436,7 @@ rc_third_party_invite:
   burst_count: 10
 ```
 ---
-Config option: `rc_federation`
+### `rc_federation`
 
 Defines limits on federation requests. 
 
@@ -1461,7 +1461,7 @@ rc_federation:
   concurrent: 5
 ```
 ---
-Config option: `federation_rr_transactions_per_room_per_second`
+### `federation_rr_transactions_per_room_per_second`
 
 Sets outgoing federation transaction frequency for sending read-receipts,
 per-room.
@@ -1478,7 +1478,7 @@ federation_rr_transactions_per_room_per_second: 40
 Config options related to Synapse's media store.
 
 ---
-Config option: `enable_media_repo` 
+### `enable_media_repo` 
 
 Enable the media store service in the Synapse master. Defaults to true. 
 Set to false if you are using a separate media store worker.
@@ -1488,7 +1488,7 @@ Example configuration:
 enable_media_repo: false
 ```
 ---
-Config option: `media_store_path`
+### `media_store_path`
 
 Directory where uploaded images and attachments are stored.
 
@@ -1497,7 +1497,7 @@ Example configuration:
 media_store_path: "DATADIR/media_store"
 ```
 ---
-Config option: `media_storage_providers`
+### `media_storage_providers`
 
 Media storage providers allow media to be stored in different
 locations. Defaults to none. Associated sub-options are:
@@ -1518,7 +1518,7 @@ media_storage_providers:
        directory: /mnt/some/other/directory
 ```
 ---
-Config option: `max_upload_size`
+### `max_upload_size`
 
 The largest allowed upload size in bytes.
 
@@ -1531,7 +1531,7 @@ Example configuration:
 max_upload_size: 60M
 ```
 ---
-Config option: `max_image_pixels`
+### `max_image_pixels`
 
 Maximum number of pixels that will be thumbnailed. Defaults to 32M.
 
@@ -1540,7 +1540,7 @@ Example configuration:
 max_image_pixels: 35M
 ```
 ---
-Config option: `dynamic_thumbnails`
+### `dynamic_thumbnails`
 
 Whether to generate new thumbnails on the fly to precisely match
 the resolution requested by the client. If true then whenever
@@ -1553,7 +1553,7 @@ Example configuration:
 dynamic_thumbnails: true
 ```
 ---
-Config option: `thumbnail_sizes`  
+### `thumbnail_sizes`  
 
 List of thumbnails to precalculate when an image is uploaded. Associated sub-options are:
 * `width`
@@ -1580,7 +1580,7 @@ thumbnail_sizes:
     method: scale
 ```
 ---
-Config option: `media_retention`
+### `media_retention`
 
 Controls whether local media and entries in the remote media cache
 (media that is downloaded from other homeservers) should be removed
@@ -1612,7 +1612,7 @@ media_retention:
     remote_media_lifetime: 14d
 ```
 ---
-Config option: `url_preview_enabled`
+### `url_preview_enabled`
 
 This setting determines whether the preview URL API is enabled.
 It is disabled by default. Set to true to enable. If enabled you must specify a
@@ -1623,7 +1623,7 @@ Example configuration:
 url_preview_enabled: true
 ```
 ---
-Config option: `url_preview_ip_range_blacklist`
+### `url_preview_ip_range_blacklist`
 
 List of IP address CIDR ranges that the URL preview spider is denied
 from accessing.  There are no defaults: you must explicitly
@@ -1665,7 +1665,7 @@ url_preview_ip_range_blacklist:
   - 'fec0::/10'
 ```
 ----
-Config option: `url_preview_ip_range_whitelist`
+### `url_preview_ip_range_whitelist`
 
 This option sets a list of IP address CIDR ranges that the URL preview spider is allowed
 to access even if they are specified in `url_preview_ip_range_blacklist`.
@@ -1679,7 +1679,7 @@ url_preview_ip_range_whitelist:
    - '192.168.1.1'
 ```
 ---
-Config option: `url_preview_url_blacklist`
+### `url_preview_url_blacklist`
 
 Optional list of URL matches that the URL preview spider is
 denied from accessing.  You should use `url_preview_ip_range_blacklist`
@@ -1725,7 +1725,7 @@ url_preview_url_blacklist:
   - netloc: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
 ```
 ---
-Config option: `max_spider_size`
+### `max_spider_size`
 
 The largest allowed URL preview spidering size in bytes. Defaults to 10M.
 
@@ -1734,7 +1734,7 @@ Example configuration:
 max_spider_size: 8M
 ```
 ---
-Config option: `url_preview_language`
+### `url_preview_language`
 
 A list of values for the Accept-Language HTTP header used when
 downloading webpages during URL preview generation. This allows
@@ -1759,7 +1759,7 @@ Example configuration:
    - '*;q=0.7'
 ```
 ----
-Config option: `oembed`
+### `oembed`
 
 oEmbed allows for easier embedding content from a website. It can be
 used for generating URLs previews of services which support it. A default list of oEmbed providers
@@ -1780,7 +1780,7 @@ oembed:
 See [here](../../CAPTCHA_SETUP.md) for full details on setting up captcha.
 
 ---
-Config option: `recaptcha_public_key`
+### `recaptcha_public_key`
 
 This homeserver's ReCAPTCHA public key. Must be specified if `enable_registration_captcha` is 
 enabled.
@@ -1790,7 +1790,7 @@ Example configuration:
 recaptcha_public_key: "YOUR_PUBLIC_KEY"
 ```
 ---
-Config option: `recaptcha_private_key` 
+### `recaptcha_private_key` 
 
 This homeserver's ReCAPTCHA private key. Must be specified if `enable_registration_captcha` is 
 enabled.
@@ -1800,7 +1800,7 @@ Example configuration:
 recaptcha_private_key: "YOUR_PRIVATE_KEY"
 ```
 ---
-Config option: `enable_registration_captcha`
+### `enable_registration_captcha`
 
 Set to true to enable ReCaptcha checks when registering, preventing signup
 unless a captcha is answered. Requires a valid ReCaptcha public/private key. 
@@ -1811,7 +1811,7 @@ Example configuration:
 enable_registration_captcha: true
 ```
 ---
-Config option: `recaptcha_siteverify_api`
+### `recaptcha_siteverify_api`
 
 The API endpoint to use for verifying `m.login.recaptcha` responses.
 Defaults to `https://www.recaptcha.net/recaptcha/api/siteverify`.
@@ -1825,7 +1825,7 @@ recaptcha_siteverify_api: "https://my.recaptcha.site"
 Options related to adding a TURN server to Synapse.
 
 ---
-Config option: `turn_uris`
+### `turn_uris`
 
 The public URIs of the TURN server to give to clients.
 
@@ -1834,7 +1834,7 @@ Example configuration:
 turn_uris: [turn:example.org]
 ```
 ---
-Config option: `turn_shared_secret`
+### `turn_shared_secret`
 
 The shared secret used to compute passwords for the TURN server.
 
@@ -1853,7 +1853,7 @@ turn_username: "TURNSERVER_USERNAME"
 turn_password: "TURNSERVER_PASSWORD"
 ```
 ---
-Config option: `turn_user_lifetime`
+### `turn_user_lifetime`
 
 How long generated TURN credentials last. Defaults to 1h.
 
@@ -1862,7 +1862,7 @@ Example configuration:
 turn_user_lifetime: 2h
 ```
 ---
-Config option: `turn_allow_guests`
+### `turn_allow_guests`
 
 Whether guests should be allowed to use the TURN server. This defaults to true, otherwise
 VoIP will be unreliable for guests. However, it does introduce a slight security risk as
@@ -1878,7 +1878,7 @@ turn_allow_guests: false
 Registration can be rate-limited using the parameters in the [Ratelimiting](#ratelimiting) section of this manual.
 
 ---
-Config option: `enable_registration`
+### `enable_registration`
 
 Enable registration for new users. Defaults to false. It is highly recommended that if you enable registration,
 you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration 
@@ -1889,7 +1889,7 @@ Example configuration:
 enable_registration: true
 ```
 ---
-Config option: `enable_registration_without_verification`
+### `enable_registration_without_verification`
 Enable registration without email or captcha verification. Note: this option is *not* recommended,
 as registration without verification is a known vector for spam and abuse. Defaults to false. Has no effect
 unless `enable_registration` is also enabled.
@@ -1899,7 +1899,7 @@ Example configuration:
 enable_registration_without_verification: true
 ```
 ---
-Config option: `session_lifetime`
+### `session_lifetime`
 
 Time that a user's session remains valid for, after they log in.
 
@@ -1915,7 +1915,7 @@ Example configuration:
 session_lifetime: 24h
 ```
 ----
-Config option: `refresh_access_token_lifetime`
+### `refresh_access_token_lifetime`
 
 Time that an access token remains valid for, if the session is using refresh tokens.
 
@@ -1933,7 +1933,7 @@ Example configuration:
 refreshable_access_token_lifetime: 10m
 ```
 ---
-Config option: `refresh_token_lifetime: 24h`
+### `refresh_token_lifetime: 24h`
 
 Time that a refresh token remains valid for (provided that it is not
 exchanged for another one first).
@@ -1950,7 +1950,7 @@ Example configuration:
 refresh_token_lifetime: 24h
 ```
 ---
-Config option: `nonrefreshable_access_token_lifetime`
+### `nonrefreshable_access_token_lifetime`
 
 Time that an access token remains valid for, if the session is NOT
 using refresh tokens.
@@ -1969,7 +1969,7 @@ Example configuration:
 nonrefreshable_access_token_lifetime: 24h
 ```
 ---
-Config option: `registrations_require_3pid`
+### `registrations_require_3pid`
 
 If this is set, the user must provide all of the specified types of 3PID when registering.
 
@@ -1980,7 +1980,7 @@ registrations_require_3pid:
   - msisdn
 ```
 ---
-Config option: `disable_msisdn_registration`
+### `disable_msisdn_registration`
 
 Explicitly disable asking for MSISDNs from the registration
 flow (overrides `registrations_require_3pid` if MSISDNs are set as required).
@@ -1990,7 +1990,7 @@ Example configuration:
 disable_msisdn_registration: true
 ```
 ---
-Config option: `allowed_local_3pids`
+### `allowed_local_3pids`
 
 Mandate that users are only allowed to associate certain formats of
 3PIDs with accounts on this server, as specified by the `medium` and `pattern` sub-options.
@@ -2006,7 +2006,7 @@ allowed_local_3pids:
     pattern: '\+44'
 ```
 ---
-Config option: `enable_3pid_lookup`
+### `enable_3pid_lookup`
 
 Enable 3PIDs lookup requests to identity servers from this server. Defaults to true.
 
@@ -2015,7 +2015,7 @@ Example configuration:
 enable_3pid_lookup: false
 ```
 ---
-Config option: `registration_requires_token`
+### `registration_requires_token`
 
 Require users to submit a token during registration.
 Tokens can be managed using the admin [API](../administration/admin_api/registration_tokens.md).
@@ -2028,7 +2028,7 @@ Example configuration:
 registration_requires_token: true
 ```
 ---
-Config option: `registration_shared_secret`
+### `registration_shared_secret`
 
 If set, allows registration of standard or admin accounts by anyone who
 has the shared secret, even if registration is otherwise disabled.
@@ -2038,7 +2038,7 @@ Example configuration:
 registration_shared_secret: <PRIVATE STRING>
 ```
 ---
-Config option: `bcrypt_rounds`
+### `bcrypt_rounds`
 
 Set the number of bcrypt rounds used to generate password hash.
 Larger numbers increase the work factor needed to generate the hash.
@@ -2050,7 +2050,7 @@ Example configuration:
 bcrypt_rounds: 14
 ```
 ---
-Config option: `allow_guest_access`
+### `allow_guest_access`
 
 Allows users to register as guests without a password/email/etc, and
 participate in rooms hosted on this server which have been made
@@ -2061,7 +2061,7 @@ Example configuration:
 allow_guest_access: true
 ```
 ---
-Config option: `default_identity_server`
+### `default_identity_server`
 
 The identity server which we suggest that clients should use when users log
 in on this server.
@@ -2074,7 +2074,7 @@ Example configuration:
 default_identity_server: https://matrix.org
 ```
 ---
-Config option: `account_threepid_delegates`
+### `account_threepid_delegates`
 
 Handle threepid (email/phone etc) registration and password resets through a set of
 *trusted* identity servers. Note that this allows the configured identity server to
@@ -2103,7 +2103,7 @@ account_threepid_delegates:
     msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 ```
 ---
-Config option: `enable_set_displayname`
+### `enable_set_displayname`
 
 Whether users are allowed to change their displayname after it has
 been initially set. Useful when provisioning users based on the
@@ -2116,7 +2116,7 @@ Example configuration:
 enable_set_displayname: false
 ```
 ---
-Config option: `enable_set_avatar_url`
+### `enable_set_avatar_url`
 
 Whether users are allowed to change their avatar after it has been
 initially set. Useful when provisioning users based on the contents
@@ -2129,7 +2129,7 @@ Example configuration:
 enable_set_avatar_url: false
 ```
 ---
-Config option: `enable_3pid_changes`
+### `enable_3pid_changes`
 
 Whether users can change the third-party IDs associated with their accounts
 (email address and msisdn).
@@ -2141,7 +2141,7 @@ Example configuration:
 enable_3pid_changes: false
 ```
 ---
-Config option: `auto_join_rooms`
+### `auto_join_rooms`
 
 Users who register on this homeserver will automatically be joined
 to the rooms listed under this option.
@@ -2159,7 +2159,7 @@ auto_join_rooms:
   - "#anotherexampleroom:example.com"
 ```
 ---
-Config option: `autocreate_auto_join_rooms`
+### `autocreate_auto_join_rooms`
 
 Where `auto_join_rooms` are specified, setting this flag ensures that
 the rooms exist by creating them when the first user on the
@@ -2179,7 +2179,7 @@ Example configuration:
 autocreate_auto_join_rooms: false
 ```
 ---
-Config option: `autocreate_auto_join_rooms_federated`
+### `autocreate_auto_join_rooms_federated`
 
 Whether the rooms listen in `auto_join_rooms` that are auto-created are available
 via federation. Only has an effect if `autocreate_auto_join_rooms` is true.
@@ -2196,7 +2196,7 @@ Example configuration:
 autocreate_auto_join_rooms_federated: false
 ```
 ---
-Config option: `autocreate_auto_join_room_preset`
+### `autocreate_auto_join_room_preset`
 
 The room preset to use when auto-creating one of `auto_join_rooms`. Only has an
 effect if `autocreate_auto_join_rooms` is true.
@@ -2218,7 +2218,7 @@ Example configuration:
 autocreate_auto_join_room_preset: private_chat
 ```
 ---
-Config option: `auto_join_mxid_localpart`
+### `auto_join_mxid_localpart`
 
 The local part of the user id which is used to create `auto_join_rooms` if
 `autocreate_auto_join_rooms` is true. If this is not provided then the
@@ -2242,7 +2242,7 @@ Example configuration:
 auto_join_mxid_localpart: system
 ```
 ---
-Config option: `auto_join_rooms_for_guests`
+### `auto_join_rooms_for_guests`
  
 When `auto_join_rooms` is specified, setting this flag to false prevents
 guest accounts from being automatically joined to the rooms.
@@ -2254,7 +2254,7 @@ Example configuration:
 auto_join_rooms_for_guests: false
 ```
 ---
-Config option: `inhibit_user_in_use_error`
+### `inhibit_user_in_use_error`
  
 Whether to inhibit errors raised when registering a new account if the user ID
 already exists. If turned on, requests to `/register/available` will always
@@ -2273,7 +2273,7 @@ inhibit_user_in_use_error: true
 Config options related to metrics.
 
 ---
-Config option: `enable_metrics`
+### `enable_metrics`
 
 Set to true to enable collection and rendering of performance metrics. 
 Defaults to false.
@@ -2283,7 +2283,7 @@ Example configuration:
 enable_metrics: true
 ```
 ---
-Config option: `sentry`
+### `sentry`
 
 Use this option to enable sentry integration. Provide the DSN assigned to you by sentry
 with the `dsn` setting. 
@@ -2300,7 +2300,7 @@ sentry:
     dsn: "..."
 ```
 ---
-Config option: `metrics_flags`
+### `metrics_flags`
 
 Flags to enable Prometheus metrics which are not suitable to be
 enabled by default, either for performance reasons or limited use.
@@ -2315,7 +2315,7 @@ metrics_flags:
     known_servers: true
 ```
 ---
-Config option: `report_stats`
+### `report_stats`
 
 Whether or not to report anonymized homeserver usage statistics. This is originally
 set when generating the config. Set this option to true or false to change the current
@@ -2326,7 +2326,7 @@ Example configuration:
 report_stats: true
 ```
 ---
-Config option: `report_stats_endpoint`
+### `report_stats_endpoint`
 
 The endpoint to report the anonymized homeserver usage statistics to.
 Defaults to https://matrix.org/report-usage-stats/push
@@ -2340,7 +2340,7 @@ report_stats_endpoint: https://example.com/report-usage-stats/push
 Config settings related to the client/server API
 
 ---
-Config option: `room_prejoin_state:`
+### `room_prejoin_state:`
 
 Controls for the state that is shared with users who receive an invite
 to a room. By default, the following state event types are shared with users who 
@@ -2369,7 +2369,7 @@ room_prejoin_state:
      - m.room.join_rules
 ```
 ---
-Config option: `track_puppeted_user_ips`
+### `track_puppeted_user_ips`
 
 We record the IP address of clients used to access the API for various
 reasons, including displaying it to the user in the "Where you're signed in"
@@ -2389,7 +2389,7 @@ Example configuration:
 track_puppeted_user_ips: true
 ```
 ---
-Config option: `app_service_config_files`
+### `app_service_config_files`
 
 A list of application service config files to use.
 
@@ -2400,7 +2400,7 @@ app_service_config_files:
   - app_service_2.yaml
 ```
 ---
-Config option: `track_appservice_user_ips`
+### `track_appservice_user_ips`
 
 Defaults to false. Set to true to enable tracking of application service IP addresses.
 Implicitly enables MAU tracking for application service users.
@@ -2410,7 +2410,7 @@ Example configuration:
 track_appservice_user_ips: true
 ```
 ---
-Config option: `macaroon_secret_key`
+### `macaroon_secret_key`
 
 A secret which is used to sign access tokens. If none is specified,
 the `registration_shared_secret` is used, if one is given; otherwise,
@@ -2421,7 +2421,7 @@ Example configuration:
 macaroon_secret_key: <PRIVATE STRING>
 ```
 ---
-Config option: `form_secret`
+### `form_secret`
 
 A secret which is used to calculate HMACs for form values, to stop
 falsification of values. Must be specified for the User Consent
@@ -2436,7 +2436,7 @@ form_secret: <PRIVATE STRING>
 Config options relating to signing keys
 
 ---
-Config option: `signing_key_path`
+### `signing_key_path`
 
 Path to the signing key to sign messages with.
 
@@ -2445,7 +2445,7 @@ Example configuration:
 signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 ```
 --- 
-Config option: `old_signing_keys`
+### `old_signing_keys`
 
 The keys that the server used to sign messages with but won't use
 to sign new messages. For each key, `key` should be the base64-encoded public key, and
@@ -2461,7 +2461,7 @@ old_signing_keys:
   "ed25519:id": { key: "base64string", expired_ts: 123456789123 }
 ```
 ---
-Config option: `key_refresh_interval`
+### `key_refresh_interval`
 
 How long key response published by this server is valid for.
 Used to set the `valid_until_ts` in `/key/v2` APIs.
@@ -2473,7 +2473,7 @@ Example configuration:
 key_refresh_interval: 2d
 ```
 ---
-Config option: `trusted_key_servers:`
+### `trusted_key_servers:`
 
 The trusted servers to download signing keys from.
 
@@ -2516,7 +2516,7 @@ trusted_key_servers:
   - server_name: "matrix.org"
 ```
 ---
-Config option: `suppress_key_server_warning`
+### `suppress_key_server_warning`
 
 Set the following to true to disable the warning that is emitted when the
 `trusted_key_servers` include 'matrix.org'. See above.
@@ -2526,7 +2526,7 @@ Example configuration:
 suppress_key_server_warning: true
 ```
 ---
-Config option: `key_server_signing_keys_path`
+### `key_server_signing_keys_path`
 
 The signing keys to use when acting as a trusted key server. If not specified
 defaults to the server signing key.
@@ -2552,7 +2552,7 @@ You will also want to investigate the settings under the "sso" configuration
 section below.
 
 ---
-Config option: `saml2_config`
+### `saml2_config`
 
 Enable SAML2 for registration and login. Uses pysaml2. To learn more about pysaml and
 to find a full list options for configuring pysaml, read the docs [here](https://pysaml2.readthedocs.io/en/latest/).
@@ -2689,7 +2689,7 @@ saml2_config:
   idp_entityid: 'https://our_idp/entityid'
 ```
 ---
-Config option: `oidc_providers`
+### `oidc_providers`
 
 List of OpenID Connect (OIDC) / OAuth 2.0 identity providers, for registration
 and login. See [here](../../openid.md)
@@ -2877,7 +2877,7 @@ oidc_providers:
         value: "synapseUsers"
 ```
 ---
-Config option: `cas_config`
+### `cas_config`
 
 Enable Central Authentication Service (CAS) for registration and login.
 Has the following sub-options:
@@ -2903,7 +2903,7 @@ cas_config:
     department: None
 ```
 ---
-Config option: `sso`
+### `sso`
 
 Additional settings to use with single-sign on systems such as OpenID Connect,
 SAML2 and CAS.
@@ -2940,7 +2940,7 @@ sso:
     update_profile_information: true
 ```
 ---
-Config option: `jwt_config`
+### `jwt_config`
 
 JSON web token integration. The following settings can be used to make
 Synapse JSON web tokens for authentication, instead of its internal
@@ -2987,7 +2987,7 @@ jwt_config:
         - "provided-by-your-issuer"
 ```
 ---
-Config option: `password_config`
+### `password_config`
 
 Use this setting to enable password-based logins. 
 
@@ -3031,7 +3031,7 @@ password_config:
       require_uppercase: true
 ```
 ---
-Config option: `ui_auth`
+### `ui_auth`
 
 The amount of time to allow a user-interactive authentication session to be active.
 
@@ -3053,7 +3053,7 @@ ui_auth:
     session_timeout: "15s"
 ```
 ---
-Config option: `email`
+### `email`
 
 Configuration for sending emails from Synapse.
 
@@ -3156,7 +3156,7 @@ email:
 Configuration settings related to push notifications
 
 ---
-Config option: `push`
+### `push`
 
 This setting defines options for push notifications. 
 
@@ -3189,7 +3189,7 @@ push:
 Config options relating to rooms.
 
 ---
-Config option: `encryption_enabled_by_default`
+### `encryption_enabled_by_default`
 
 Controls whether locally-created rooms should be end-to-end encrypted by
 default.
@@ -3211,7 +3211,7 @@ Example configuration:
 encryption_enabled_by_default_for_room_type: invite
 ```
 ---
-Config option: `user_directory`
+### `user_directory`
 
 This setting defines options related to the user directory. 
 
@@ -3242,7 +3242,7 @@ user_directory:
     prefer_local_users: true
 ```
 ---
-Config option: `user_consent`
+### `user_consent`
 
 For detailed instructions on user consent configuration, see [here](../../consent_tracking.md).
 
@@ -3293,7 +3293,7 @@ user_consent:
   policy_name: Privacy Policy
 ```
 ---
-Config option: `stats`
+### `stats`
 
 Settings for local room and user statistics collection. See [here](../../room_and_user_statistics.md)
 for more. 
@@ -3308,7 +3308,7 @@ stats:
   enabled: false
 ```
 ---
-Config option: `server_notices`
+### `server_notices`
 
 Use this setting to enable a room which can be used to send notices
 from the server to users. It is a special room which users cannot leave; notices
@@ -3332,7 +3332,7 @@ server_notices:
   room_name: "Server Notices"
 ```
 ---
-Config option: `enable_room_list_search`
+### `enable_room_list_search`
 
 Set to false to disable searching the public room list. When disabled
 blocks searching local and remote room lists for local and remote
@@ -3343,7 +3343,7 @@ Example configuration:
 enable_room_list_search: false
 ```
 ---
-Config option: `alias_creation`
+### `alias_creation`
 
 The `alias_creation` option controls who is allowed to create aliases
 on this server.
@@ -3404,7 +3404,7 @@ room_list_publication_rules:
 ```
 
 ---
-Config option: `default_power_level_content_override`
+### `default_power_level_content_override`
 
 The `default_power_level_content_override` option controls the default power
 levels for rooms.
@@ -3433,7 +3433,7 @@ default_power_level_content_override:
 Configuration options related to Opentracing support.
 
 ---
-Config option: `opentracing`
+### `opentracing`
 
 These settings enable and configure opentracing, which implements distributed tracing.
 This allows you to observe the causal chains of events across servers
@@ -3476,7 +3476,7 @@ opentracing:
 Configuration options related to workers.
 
 ---
-Config option: `send_federation`
+### `send_federation`
 
 Controls sending of outbound federation transactions on the main process.
 Set to false if using a federation sender worker. Defaults to true. 
@@ -3486,7 +3486,7 @@ Example configuration:
 send_federation: false
 ```
 ---
-Config option: `federation_sender_instances`
+### `federation_sender_instances`
 
 It is possible to run multiple federation sender workers, in which case the
 work is balanced across them. Use this setting to list the senders. 
@@ -3502,7 +3502,7 @@ federation_sender_instances:
   - federation_sender1
 ```
 ---
-Config option: `instance_map`
+### `instance_map`
 
 When using workers this should be a map from worker name to the
 HTTP replication listener of the worker, if configured. 
@@ -3515,7 +3515,7 @@ instance_map:
     port: 8034
 ```
 ---
-Config option: `stream_writers`
+### `stream_writers`
 
 Experimental: When using workers you can define which workers should
 handle event persistence and typing notifications. Any worker
@@ -3528,7 +3528,7 @@ stream_writers:
   typing: worker1
 ```
 ---
-Config option: `run_background_tasks_on`
+### `run_background_tasks_on`
 
 The worker that is used to run background tasks (e.g. cleaning up expired
 data). If not provided this defaults to the main process.
@@ -3538,7 +3538,7 @@ Example configuration:
 run_background_tasks_on: worker1
 ```
 ---
-Config option: `worker_replication_secret`
+### `worker_replication_secret`
 
 A shared secret used by the replication APIs to authenticate HTTP requests
 from workers.
@@ -3549,7 +3549,7 @@ Example configuration:
 ```yaml
 worker_replication_secret: "secret_secret"
 ```
-Config option: `redis`
+### `redis`
 
 Configuration for Redis when using workers. This *must* be enabled when
 using workers (unless using old style direct TCP configuration).
@@ -3571,7 +3571,7 @@ redis:
 Configuration settings related to background updates. 
 
 ---
-Config option: `background_updates`
+### `background_updates`
 
 Background updates are database updates that are run in the background in batches.
 The duration, minimum batch size, default batch size, whether to sleep between batches and if so, how long to
