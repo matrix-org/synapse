@@ -230,6 +230,22 @@ Example configuration:
 serve_server_wellknown: true
 ```
 ---
+### `extra_well_known_client_content `
+
+This option allows server runners to add arbitrary key-value pairs to the [client-facing `.well-known` response](https://spec.matrix.org/latest/client-server-api/#well-known-uri).
+Note that the `public_baseurl` config option must be provided for Synapse to serve a response to `/.well-known/matrix/client` at all.
+
+If this option is provided, it parses the given yaml to json and 
+serves it on `/.well-known/matrix/client` endpoint
+alongside the standard properties.
+
+Example configuration:
+```yaml
+extra_well_known_client_content : 
+  option1: value1
+  option2: value2
+```
+---
 ### `soft_file_limit`
  
 Set the soft limit on the number of file descriptors synapse can use.
@@ -3580,3 +3596,4 @@ background_updates:
     min_batch_size: 10
     default_batch_size: 50
 ```
+
