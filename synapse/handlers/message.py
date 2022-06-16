@@ -1248,6 +1248,8 @@ class EventCreationHandler:
 
         Raises:
             ShadowBanError if the requester has been shadow-banned.
+            SynapseError(503) if attempting to persist a partial state event in
+                a room that has been un-partial stated.
         """
         extra_users = extra_users or []
 
@@ -1298,24 +1300,35 @@ class EventCreationHandler:
 
         # We now persist the event (and update the cache in parallel, since we
         # don't want to block on it).
-        result, _ = await make_deferred_yieldable(
-            gather_results(
-                (
-                    run_in_background(
-                        self._persist_event,
-                        requester=requester,
-                        event=event,
-                        context=context,
-                        ratelimit=ratelimit,
-                        extra_users=extra_users,
+        try:
+            result, _ = await make_deferred_yieldable(
+                gather_results(
+                    (
+                        run_in_background(
+                            self._persist_event,
+                            requester=requester,
+                            event=event,
+                            context=context,
+                            ratelimit=ratelimit,
+                            extra_users=extra_users,
+                        ),
+                        run_in_background(
+                            self.cache_joined_hosts_for_event, event, context
+                        ).addErrback(
+                            log_failure, "cache_joined_hosts_for_event failed"
+                        ),
                     ),
-                    run_in_background(
-                        self.cache_joined_hosts_for_event, event, context
-                    ).addErrback(log_failure, "cache_joined_hosts_for_event failed"),
-                ),
-                consumeErrors=True,
+                    consumeErrors=True,
+                )
+            ).addErrback(unwrapFirstError)
+        except PartialStateConflictError as e:
+            # The event context needs to be recomputed.
+            # Turn the error into a 503, as a hint to the client to try again.
+            logger.info(
+                "Room %s was un-partial stated while persisting client event.",
+                event.room_id,
             )
-        ).addErrback(unwrapFirstError)
+            raise SynapseError(HTTPStatus.SERVICE_UNAVAILABLE, e.msg, e.errcode)
 
         return result
 
