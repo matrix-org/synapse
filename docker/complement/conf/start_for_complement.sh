@@ -31,7 +31,7 @@ case "$SYNAPSE_COMPLEMENT_DATABASE" in
     export START_POSTGRES=true
     ;;
 
-  sqlite)
+  sqlite|"")
     # Configure supervisord not to start Postgres, as we don't need it
     export START_POSTGRES=false
     ;;
