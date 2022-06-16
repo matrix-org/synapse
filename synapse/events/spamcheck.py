@@ -412,6 +412,13 @@ class SpamChecker:
                     # This spam-checker rejects the event with deprecated
                     # return value `True`
                     return (synapse.api.errors.Codes.FORBIDDEN, {})
+                elif (
+                    isinstance(res, tuple)
+                    and len(res) == 2
+                    and isinstance(res[0], synapse.api.errors.Codes)
+                    and isinstance(res[1], dict)
+                ):
+                    return res
                 elif not isinstance(res, str):
                     # mypy complains that we can't reach this code because of the
                     # return type in CHECK_EVENT_FOR_SPAM_CALLBACK, but we don't know
