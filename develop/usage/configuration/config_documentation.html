@@ -316,6 +316,18 @@ information.</p>
 <pre><code class="language-yaml">serve_server_wellknown: true
 </code></pre>
 <hr />
+<h3 id="extra_well_known_client_content"><a class="header" href="#extra_well_known_client_content"><code>extra_well_known_client_content </code></a></h3>
+<p>This option allows server runners to add arbitrary key-value pairs to the <a href="https://spec.matrix.org/latest/client-server-api/#well-known-uri">client-facing <code>.well-known</code> response</a>.
+Note that the <code>public_baseurl</code> config option must be provided for Synapse to serve a response to <code>/.well-known/matrix/client</code> at all.</p>
+<p>If this option is provided, it parses the given yaml to json and 
+serves it on <code>/.well-known/matrix/client</code> endpoint
+alongside the standard properties.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">extra_well_known_client_content : 
+  option1: value1
+  option2: value2
+</code></pre>
+<hr />
 <h3 id="soft_file_limit"><a class="header" href="#soft_file_limit"><code>soft_file_limit</code></a></h3>
 <p>Set the soft limit on the number of file descriptors synapse can use.
 Zero is used to indicate synapse should set the soft limit to the hard limit.
