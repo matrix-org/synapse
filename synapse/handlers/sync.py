@@ -115,6 +115,7 @@ class JoinedSyncResult:
     ephemeral: List[JsonDict]
     account_data: List[JsonDict]
     unread_notifications: JsonDict
+    unread_thread_notifications: JsonDict
     summary: Optional[JsonDict]
     unread_count: int
 
@@ -1053,7 +1054,7 @@ class SyncHandler:
 
     async def unread_notifs_for_room_id(
         self, room_id: str, sync_config: SyncConfig
-    ) -> NotifCounts:
+    ) -> Tuple[NotifCounts, Dict[str, NotifCounts]]:
         with Measure(self.clock, "unread_notifs_for_room_id"):
 
             return await self.store.get_unread_event_push_actions_by_room_for_user(
@@ -2115,17 +2116,31 @@ class SyncHandler:
                     ephemeral=ephemeral,
                     account_data=account_data_events,
                     unread_notifications=unread_notifications,
+                    unread_thread_notifications={},
                     summary=summary,
                     unread_count=0,
                 )
 
                 if room_sync or always_include:
-                    notifs = await self.unread_notifs_for_room_id(room_id, sync_config)
+                    notifs, thread_notifs = await self.unread_notifs_for_room_id(
+                        room_id, sync_config
+                    )
 
+                    # Notifications for the main timeline.
                     unread_notifications["notification_count"] = notifs.notify_count
                     unread_notifications["highlight_count"] = notifs.highlight_count
 
                     room_sync.unread_count = notifs.unread_count
+
+                    # And add info for each thread.
+                    room_sync.unread_thread_notifications = {
+                        thread_id: {
+                            "notification_count": thread_notifs.notify_count,
+                            "highlight_count": thread_notifs.highlight_count,
+                        }
+                        for thread_id, thread_notifs in thread_notifs.items()
+                        if thread_id is not None
+                    }
 
                     sync_result_builder.joined.append(room_sync)
 

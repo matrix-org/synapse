@@ -178,7 +178,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2],
-            NotifCounts(highlight_count=0, unread_count=0, notify_count=0),
+            (NotifCounts(highlight_count=0, unread_count=0, notify_count=0), {}),
         )
 
         self.persist(
@@ -191,7 +191,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2],
-            NotifCounts(highlight_count=0, unread_count=0, notify_count=1),
+            (NotifCounts(highlight_count=0, unread_count=0, notify_count=1), {}),
         )
 
         self.persist(
@@ -206,7 +206,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2],
-            NotifCounts(highlight_count=1, unread_count=0, notify_count=2),
+            (NotifCounts(highlight_count=1, unread_count=0, notify_count=2), {}),
         )
 
     def test_get_rooms_for_user_with_stream_ordering(self):
