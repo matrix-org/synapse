@@ -1482,6 +1482,10 @@ class EventCreationHandler:
             The persisted event. This may be different than the given event if
             it was de-duplicated (e.g. because we had already persisted an
             event with the same transaction ID.)
+
+        Raises:
+            PartialStateConflictError: if attempting to persist a partial state event in
+                a room that has been un-partial stated.
         """
         extra_users = extra_users or []
 
