@@ -53,6 +53,7 @@ from synapse.handlers.directory import DirectoryHandler
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
+from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import (
@@ -1329,6 +1330,9 @@ class EventCreationHandler:
         """Actually persists the event. Should only be called by
         `handle_new_client_event`, and see its docstring for documentation of
         the arguments.
+
+        PartialStateConflictError: if attempting to persist a partial state event in
+            a room that has been un-partial stated.
         """
 
         # Skip push notification actions for historical messages
@@ -1345,16 +1349,21 @@ class EventCreationHandler:
             # If we're a worker we need to hit out to the master.
             writer_instance = self._events_shard_config.get_instance(event.room_id)
             if writer_instance != self._instance_name:
-                result = await self.send_event(
-                    instance_name=writer_instance,
-                    event_id=event.event_id,
-                    store=self.store,
-                    requester=requester,
-                    event=event,
-                    context=context,
-                    ratelimit=ratelimit,
-                    extra_users=extra_users,
-                )
+                try:
+                    result = await self.send_event(
+                        instance_name=writer_instance,
+                        event_id=event.event_id,
+                        store=self.store,
+                        requester=requester,
+                        event=event,
+                        context=context,
+                        ratelimit=ratelimit,
+                        extra_users=extra_users,
+                    )
+                except SynapseError as e:
+                    if e.code == HTTPStatus.CONFLICT:
+                        raise PartialStateConflictError()
+                    raise
                 stream_id = result["stream_id"]
                 event_id = result["event_id"]
                 if event_id != event.event_id:
