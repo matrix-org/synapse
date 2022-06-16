@@ -317,8 +317,8 @@ class SerializeEventConfig:
     as_client_event: bool = True
     # Function to convert from federation format to client format
     event_format: Callable[[JsonDict], JsonDict] = format_event_for_client_v1
-    # ID of the user's auth token - used for namespacing of transaction IDs
-    token_id: Optional[int] = None
+    # The user's device ID which did that request - used for namespacing of transaction IDs
+    device_id: Optional[str] = None
     # List of event fields to include. If empty, all fields will be returned.
     only_event_fields: Optional[List[str]] = None
     # Some events can have stripped room state stored in the `unsigned` field.
@@ -368,11 +368,12 @@ def serialize_event(
             e.unsigned["redacted_because"], time_now_ms, config=config
         )
 
-    if config.token_id is not None:
-        if config.token_id == getattr(e.internal_metadata, "token_id", None):
-            txn_id = getattr(e.internal_metadata, "txn_id", None)
-            if txn_id is not None:
-                d["unsigned"]["transaction_id"] = txn_id
+    if config.device_id is not None and config.device_id == getattr(
+        e.internal_metadata, "device_id", None
+    ):
+        txn_id = getattr(e.internal_metadata, "txn_id", None)
+        if txn_id is not None:
+            d["unsigned"]["transaction_id"] = txn_id
 
     # invite_room_state and knock_room_state are a list of stripped room state events
     # that are meant to provide metadata about a room to an invitee/knocker. They are

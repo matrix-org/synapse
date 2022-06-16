@@ -49,15 +49,9 @@ class EventCreationTestCase(unittest.HomeserverTestCase):
         self.access_token = self.login("tester", "foobar")
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.access_token)
 
-        info = self.get_success(
-            self.hs.get_datastores().main.get_user_by_access_token(
-                self.access_token,
-            )
+        self.requester = create_requester(
+            self.user_id, device_id="unittest-dummy-device"
         )
-        assert info is not None
-        self.token_id = info.token_id
-
-        self.requester = create_requester(self.user_id, access_token_id=self.token_id)
 
     def _create_and_persist_member_event(self) -> Tuple[EventBase, EventContext]:
         # Create a member event we can use as an auth_event

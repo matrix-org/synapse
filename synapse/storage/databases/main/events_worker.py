@@ -2025,7 +2025,7 @@ class EventsWorkerStore(SQLBaseStore):
         )
 
     async def get_event_id_from_transaction_id(
-        self, room_id: str, user_id: str, token_id: int, txn_id: str
+        self, room_id: str, user_id: str, device_id: str, txn_id: str
     ) -> Optional[str]:
         """Look up if we have already persisted an event for the transaction ID,
         returning the event ID if so.
@@ -2035,7 +2035,7 @@ class EventsWorkerStore(SQLBaseStore):
             keyvalues={
                 "room_id": room_id,
                 "user_id": user_id,
-                "token_id": token_id,
+                "device_id": device_id,
                 "txn_id": txn_id,
             },
             retcol="event_id",
@@ -2055,15 +2055,16 @@ class EventsWorkerStore(SQLBaseStore):
         """
 
         mapping = {}
-        txn_id_to_event: Dict[Tuple[str, int, str], str] = {}
+        txn_id_to_event: Dict[Tuple[str, str, str, str], str] = {}
 
         for event in events:
-            token_id = getattr(event.internal_metadata, "token_id", None)
             txn_id = getattr(event.internal_metadata, "txn_id", None)
+            device_id = getattr(event.internal_metadata, "device_id", None)
 
-            if token_id and txn_id:
-                # Check if this is a duplicate of an event in the given events.
-                existing = txn_id_to_event.get((event.room_id, token_id, txn_id))
+            if device_id and txn_id:
+                existing = txn_id_to_event.get(
+                    (event.room_id, event.sender, device_id, txn_id)
+                )
                 if existing:
                     mapping[event.event_id] = existing
                     continue
@@ -2071,13 +2072,17 @@ class EventsWorkerStore(SQLBaseStore):
                 # Check if this is a duplicate of an event we've already
                 # persisted.
                 existing = await self.get_event_id_from_transaction_id(
-                    event.room_id, event.sender, token_id, txn_id
+                    event.room_id, event.sender, device_id, txn_id
                 )
                 if existing:
                     mapping[event.event_id] = existing
-                    txn_id_to_event[(event.room_id, token_id, txn_id)] = existing
+                    txn_id_to_event[
+                        (event.room_id, event.sender, device_id, txn_id)
+                    ] = existing
                 else:
-                    txn_id_to_event[(event.room_id, token_id, txn_id)] = event.event_id
+                    txn_id_to_event[
+                        (event.room_id, event.sender, device_id, txn_id)
+                    ] = event.event_id
 
         return mapping
 

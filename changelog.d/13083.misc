@@ -1,0 +1,1 @@
+Make the event `txnId` mapping rely on the `device_id` instead of the `access_token_id`.

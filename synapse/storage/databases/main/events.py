@@ -978,14 +978,16 @@ class PersistEventsStore:
 
         to_insert = []
         for event, _ in events_and_contexts:
+            device_id = getattr(event.internal_metadata, "device_id", None)
             token_id = getattr(event.internal_metadata, "token_id", None)
             txn_id = getattr(event.internal_metadata, "txn_id", None)
-            if token_id and txn_id:
+            if device_id and txn_id:
                 to_insert.append(
                     (
                         event.event_id,
                         event.room_id,
                         event.sender,
+                        device_id,
                         token_id,
                         txn_id,
                         self._clock.time_msec(),
@@ -1000,6 +1002,7 @@ class PersistEventsStore:
                     "event_id",
                     "room_id",
                     "user_id",
+                    "device_id",
                     "token_id",
                     "txn_id",
                     "inserted_ts",

@@ -1,0 +1,53 @@
+/* Copyright 2022 The Matrix.org Foundation C.I.C
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+CREATE TABLE event_txn_id2 (
+  event_id TEXT NOT NULL REFERENCES events (event_id) ON DELETE CASCADE, 
+  room_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  device_id TEXT NOT NULL,
+  token_id TEXT, -- Keep this field in case we're rolling back
+  txn_id TEXT NOT NULL,
+  inserted_ts BIGINT NOT NULL
+);
+
+DROP INDEX event_txn_id_event_id;
+DROP INDEX event_txn_id_txn_id;
+DROP INDEX event_txn_id_ts;
+
+CREATE UNIQUE INDEX event_txn_id_event_id ON event_txn_id2(event_id);
+CREATE UNIQUE INDEX event_txn_id_txn_id ON event_txn_id2(room_id, user_id, device_id, txn_id);
+-- Keep this index in case we're rolling back
+CREATE INDEX event_txn_id_txn_id_token_id ON event_txn_id2(room_id, user_id, token_id, txn_id);
+
+INSERT INTO event_txn_id2 
+SELECT
+  event_txn_id.event_id,
+  event_txn_id.room_id,
+  event_txn_id.user_id,
+  event_txn_id.token_id,
+  access_tokens.device_id,
+  event_txn_id.txn_id,
+  event_txn_id.inserted_ts
+FROM event_txn_id
+INNER JOIN access_tokens
+  ON access_tokens.id = event_txn_id.token_id
+WHERE device_id IS NOT NULL;
+
+CREATE INDEX event_txn_id_ts ON event_txn_id2(inserted_ts);
+
+DROP TABLE event_txn_id;
+
+ALTER TABLE event_txn_id2 RENAME TO event_txn_id;

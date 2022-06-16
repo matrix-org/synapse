@@ -205,7 +205,7 @@ class SyncRestServlet(RestServlet):
         # We know that the the requester has an access token since appservices
         # cannot use sync.
         response_content = await self.encode_response(
-            time_now, sync_result, requester.access_token_id, filter_collection
+            time_now, sync_result, requester.device_id, filter_collection
         )
 
         logger.debug("Event formatting complete")
@@ -216,7 +216,7 @@ class SyncRestServlet(RestServlet):
         self,
         time_now: int,
         sync_result: SyncResult,
-        access_token_id: Optional[int],
+        device_id: Optional[str],
         filter: FilterCollection,
     ) -> JsonDict:
         logger.debug("Formatting events in sync response")
@@ -229,12 +229,12 @@ class SyncRestServlet(RestServlet):
 
         serialize_options = SerializeEventConfig(
             event_format=event_formatter,
-            token_id=access_token_id,
+            device_id=device_id,
             only_event_fields=filter.event_fields,
         )
         stripped_serialize_options = SerializeEventConfig(
             event_format=event_formatter,
-            token_id=access_token_id,
+            device_id=device_id,
             include_stripped_room_state=True,
         )
 
@@ -457,13 +457,9 @@ class SyncRestServlet(RestServlet):
         Args:
             room: sync result for a single room
             time_now: current time - used as a baseline for age calculations
-            token_id: ID of the user's auth token - used for namespacing
-                of transaction IDs
             joined: True if the user is joined to this room - will mean
                 we handle ephemeral events
-            only_fields: Optional. The list of event fields to include.
-            event_formatter: function to convert from federation format
-                to client format
+            serialize_options: Event serializer options
         Returns:
             The room, encoded in our response format
         """

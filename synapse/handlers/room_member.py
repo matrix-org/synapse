@@ -398,12 +398,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # Check if we already have an event with a matching transaction ID. (We
         # do this check just before we persist an event as well, but may as well
         # do it up front for efficiency.)
-        if txn_id and requester.access_token_id:
+        if txn_id and requester.device_id:
             existing_event_id = await self.store.get_event_id_from_transaction_id(
-                room_id,
-                requester.user.to_string(),
-                requester.access_token_id,
-                txn_id,
+                room_id=room_id,
+                user_id=requester.user.to_string(),
+                device_id=requester.device_id,
+                txn_id=txn_id,
             )
             if existing_event_id:
                 event_pos = await self.store.get_position_for_event(existing_event_id)

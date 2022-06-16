@@ -698,6 +698,10 @@ class EventCreationHandler:
         if require_consent and not is_exempt:
             await self.assert_accepted_privacy_policy(requester)
 
+        if requester.device_id is not None:
+            builder.internal_metadata.device_id = requester.device_id
+
+        # We're still inserting the access_token_id in case we're rolling back
         if requester.access_token_id is not None:
             builder.internal_metadata.token_id = requester.access_token_id
 
@@ -894,12 +898,12 @@ class EventCreationHandler:
         Returns:
             An event if one could be found, None otherwise.
         """
-        if requester.access_token_id:
+        if requester.device_id:
             existing_event_id = await self.store.get_event_id_from_transaction_id(
-                room_id,
-                requester.user.to_string(),
-                requester.access_token_id,
-                txn_id,
+                room_id=room_id,
+                user_id=requester.user.to_string(),
+                device_id=requester.device_id,
+                txn_id=txn_id,
             )
             if existing_event_id:
                 return await self.store.get_event(existing_event_id)

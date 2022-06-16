@@ -199,7 +199,8 @@ class _EventInternalMetadata:
     proactively_send: DictProperty[bool] = DictProperty("proactively_send")
     redacted: DictProperty[bool] = DictProperty("redacted")
     txn_id: DictProperty[str] = DictProperty("txn_id")
-    token_id: DictProperty[int] = DictProperty("token_id")
+    device_id: DictProperty[str] = DictProperty("device_id")
+    token_id: DictProperty[Optional[int]] = DefaultDictProperty("token_id", None)
     historical: DictProperty[bool] = DictProperty("historical")
 
     # XXX: These are set by StreamWorkerStore._set_before_and_after.
