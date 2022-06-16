@@ -5,7 +5,7 @@ import sys
 from collections import defaultdict, Counter
 from graphlib import TopologicalSorter
 from pprint import pformat
-from typing import Mapping, Sequence, Dict, List, Tuple
+from typing import Mapping, Sequence, Dict, List, Tuple, Iterable, Collection
 from unittest.mock import MagicMock, patch
 
 import dictdiffer
@@ -77,6 +77,14 @@ def node(event: EventBase, **kwargs) -> pydot.Node:
     return pydot.Node(q(event.event_id), **kwargs)
 
 
+def edge(source: EventBase, target: EventBase, **kwargs) -> pydot.Edge:
+    return pydot.Edge(
+        pydot.quote_if_necessary(source.event_id),
+        pydot.quote_if_necessary(target.event_id),
+        **kwargs,
+    )
+
+
 async def dump_auth_chains(
     hs: MockHomeserver, state_after_parents: Mapping[str, StateMap[str]]
 ):
@@ -129,6 +137,59 @@ async def dump_auth_chains(
     graph.write_svg("auth_chains.svg")
 
 
+async def dump_mainlines(
+    hs: MockHomeserver,
+    starting_event: EventBase,
+    extras: Collection[EventBase] = tuple(),
+):
+    graph = pydot.Dot(rankdir="BT")
+    graph.set_node_defaults(shape="box", style="filled")
+
+    graph.add_node(node(starting_event, fillcolor="#6699cc"))
+    seen = {starting_event.event_id}
+
+    todo = []
+    for extra in extras:
+        graph.add_node(node(extra, fillcolor="#cc9966"))
+        seen.add(extra.event_id)
+        todo.append(extra)
+
+    for pid in starting_event.prev_event_ids():
+        parent = await hs.get_datastores().main.get_event(pid)
+        graph.add_node(node(parent, fillcolor="#6699cc"))
+        seen.add(pid)
+        graph.add_edge(edge(starting_event, parent, style="dashed"))
+        todo.append(parent)
+
+    while todo:
+        event = todo.pop()
+        auth_events = {
+            (e.type, e.state_key): e
+            for e in (
+                await hs.get_datastores().main.get_events(event.auth_event_ids())
+            ).values()
+        }
+
+        for key, style in [
+            (("m.room.power_levels", ""), "dashed"),
+            (("m.room.join_rules", ""), "dashed"),
+            (("m.room.member", event.sender), "dotted"),
+        ]:
+            auth_event = auth_events.get(key)
+            if auth_event:
+                if auth_event.event_id not in seen:
+                    if key[0] == "m.room.power_levels":
+                        graph.add_node(node(auth_event, fillcolor="#ffcccc"))
+                    else:
+                        graph.add_node(node(auth_event))
+                    seen.add(auth_event.event_id)
+                    todo.append(auth_event)
+                graph.add_edge(edge(event, auth_event))
+
+    graph.write_raw("mainlines.dot")
+    graph.write_svg("mainlines.svg")
+
+
 parser = argparse.ArgumentParser(
     description="Explain the calculation which resolves state prior before an event"
 )
@@ -156,7 +217,13 @@ async def debug_specific_stateres(
     ]
 
     # await dump_auth_chains(hs, state_after_parents)
-    # return
+    extras = await hs.get_datastores().main.get_events(
+        [
+            "$SIRWGpXP-CV6XtCdeHgFY_PIJXUzOHkaCUMsRN6RFes",
+            "$LgVDro6FUgz-qQJhGgeLGmvgc9xFZRJlyiHuia_VH78",
+        ]
+    )
+    await dump_mainlines(hs, event, extras.values())
 
     result = await hs.get_state_resolution_handler().resolve_events_with_store(
         event.room_id,

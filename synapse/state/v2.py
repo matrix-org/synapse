@@ -15,6 +15,7 @@
 import heapq
 import itertools
 import logging
+from collections import Counter
 from pprint import pformat
 from typing import (
     Any,
@@ -78,6 +79,12 @@ __all__ = [
 ]
 
 
+def summarise(event_map, eids: Iterable[str]) -> Dict[str, int]:
+    return Counter(
+        event_map[eid].type  for eid in eids
+    )
+
+
 async def resolve_events_with_store(
     clock: Clock,
     room_id: str,
@@ -121,6 +128,7 @@ async def resolve_events_with_store(
     if not conflicted_state:
         return unconflicted_state
 
+    logger.debug("%d unconflicted state entries", len(unconflicted_state))
     logger.debug("%d conflicted state entries", len(conflicted_state))
     logger.debug("Calculating auth chain difference")
 
@@ -143,8 +151,8 @@ async def resolve_events_with_store(
     )
     event_map.update(events)
 
-    for eid in auth_diff:
-        logger.debug("%s", event_map[eid])
+    logger.debug("conflicted_state_set: %s", summarise(event_map, {eid for k, v in conflicted_state.items() for eid in v }))
+    logger.debug("auth_diff: %s", summarise(event_map, auth_diff))
 
     # everything in the event map should be in the right room
     for event in event_map.values():
