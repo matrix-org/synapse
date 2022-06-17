@@ -1346,7 +1346,7 @@ class RoomMessagesTestCase(RoomBase):
             event: synapse.events.EventBase,
         ) -> Union[str, Codes, Tuple[Codes, JsonDict], bool]:
             mock_event = event
-            _ = mock_event # We get a spurious warning that mock_event is unused
+            _ = mock_event  # We get a spurious warning that mock_event is unused
             return mock_return_value
 
         # `spec` argument is needed for this function mock to have `__qualname__`, which
