@@ -141,6 +141,15 @@ async def check_state_independent_auth_rules(
     Raises:
         AuthError if the checks fail
     """
+    # Implementation of https://spec.matrix.org/v1.2/rooms/v9/#authorization-rules
+
+    # 1. If type is m.room.create:
+    if event.type == EventTypes.Create:
+        _check_create(event)
+
+        # 1.5 Otherwise, allow
+        return
+
     # Check the auth events.
     auth_events = await store.get_events(
         event.auth_event_ids(),
@@ -179,29 +188,6 @@ async def check_state_independent_auth_rules(
             )
 
         auth_dict[(auth_event.type, auth_event.state_key)] = auth_event_id
-
-    # Implementation of https://matrix.org/docs/spec/rooms/v1#authorization-rules
-    #
-    # 1. If type is m.room.create:
-    if event.type == EventTypes.Create:
-        # 1b. If the domain of the room_id does not match the domain of the sender,
-        # reject.
-        sender_domain = get_domain_from_id(event.sender)
-        room_id_domain = get_domain_from_id(event.room_id)
-        if room_id_domain != sender_domain:
-            raise AuthError(
-                403, "Creation event's room_id domain does not match sender's"
-            )
-
-        # 1c. If content.room_version is present and is not a recognised version, reject
-        room_version_prop = event.content.get("room_version", "1")
-        if room_version_prop not in KNOWN_ROOM_VERSIONS:
-            raise AuthError(
-                403,
-                "room appears to have unsupported version %s" % (room_version_prop,),
-            )
-
-        return
 
     # 3. If event does not have a m.room.create in its auth_events, reject.
     creation_event = auth_dict.get((EventTypes.Create, ""), None)
@@ -322,6 +308,41 @@ def _check_size_limits(event: "EventBase") -> None:
         raise EventSizeError("'event_id' too large")
     if len(encode_canonical_json(event.get_pdu_json())) > MAX_PDU_SIZE:
         raise EventSizeError("event too large")
+
+
+def _check_create(event: "EventBase") -> None:
+    """Implementation of the auth rules for m.room.create events
+
+    Args:
+        event: The `m.room.create` event to be checked
+
+    Raises:
+        AuthError if the event does not pass the auth rules
+    """
+    assert event.type == EventTypes.Create
+
+    #  1.1 If it has any previous events, reject.
+    if event.prev_event_ids():
+        raise AuthError(403, "Create event has prev events")
+
+    # 1.2 If the domain of the room_id does not match the domain of the sender,
+    # reject.
+    sender_domain = get_domain_from_id(event.sender)
+    room_id_domain = get_domain_from_id(event.room_id)
+    if room_id_domain != sender_domain:
+        raise AuthError(403, "Creation event's room_id domain does not match sender's")
+
+    # 1.3 If content.room_version is present and is not a recognised version, reject
+    room_version_prop = event.content.get("room_version", "1")
+    if room_version_prop not in KNOWN_ROOM_VERSIONS:
+        raise AuthError(
+            403,
+            "room appears to have unsupported version %s" % (room_version_prop,),
+        )
+
+    # 1.4 If content has no creator field, reject.
+    if EventContentFields.ROOM_CREATOR not in event.content:
+        raise AuthError(403, "Create event lacks a 'creator' property")
 
 
 def _can_federate(event: "EventBase", auth_events: StateMap["EventBase"]) -> bool:
