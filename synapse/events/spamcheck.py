@@ -419,6 +419,8 @@ class SpamChecker:
                     and isinstance(res[1], dict)
                 ):
                     return res
+                elif isinstance(res, synapse.api.errors.Codes):
+                    return res, {}
                 elif not isinstance(res, str):
                     # mypy complains that we can't reach this code because of the
                     # return type in CHECK_EVENT_FOR_SPAM_CALLBACK, but we don't know
