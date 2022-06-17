@@ -176,7 +176,9 @@ class LoginRestServlet(RestServlet):
                 appservice = requester.app_service
 
                 if appservice is None:
-                    raise InvalidClientTokenError("This login method is only valid for application services")
+                    raise InvalidClientTokenError(
+                        "This login method is only valid for application services"
+                    )
 
                 if appservice.is_rate_limited():
                     await self._address_ratelimiter.ratelimit(
