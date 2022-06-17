@@ -225,9 +225,10 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
 
         # we need a user on the remote server to be a member, so that we can send
         # extremity-causing events.
+        remote_server_user_id = f"@user:{self.OTHER_SERVER_NAME}"
         self.get_success(
             event_injection.inject_member_event(
-                self.hs, room_id, f"@user:{self.OTHER_SERVER_NAME}", "join"
+                self.hs, room_id, remote_server_user_id, "join"
             )
         )
 
@@ -247,6 +248,12 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         # create more than is 5 which corresponds to the number of backward
         # extremities we slice off in `_maybe_backfill_inner`
         federation_event_handler = self.hs.get_federation_event_handler()
+        auth_events = [
+            ev
+            for ev in current_state
+            if (ev.type, ev.state_key)
+            in {("m.room.create", ""), ("m.room.member", remote_server_user_id)}
+        ]
         for _ in range(0, 8):
             event = make_event_from_dict(
                 self.add_hashes_and_signatures(
@@ -258,15 +265,14 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
                             "body": "message connected to fake event",
                         },
                         "room_id": room_id,
-                        "sender": f"@user:{self.OTHER_SERVER_NAME}",
+                        "sender": remote_server_user_id,
                         "prev_events": [
                             ev1.event_id,
                             # We're creating an backward extremity each time thanks
                             # to this fake event
                             generate_fake_event_id(),
                         ],
-                        # lazy: *everything* is an auth event
-                        "auth_events": [ev.event_id for ev in current_state],
+                        "auth_events": [ev.event_id for ev in auth_events],
                         "depth": ev1.depth + 1,
                     },
                     room_version,
