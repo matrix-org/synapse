@@ -1521,6 +1521,9 @@ class FederationEventHandler:
         )
 
         # ... and check that the event passes auth at those auth events.
+        # https://spec.matrix.org/v1.3/server-server-api/#checks-performed-on-receipt-of-a-pdu:
+        #   4. Passes authorization rules based on the event’s auth events,
+        #      otherwise it is rejected.
         try:
             await check_state_independent_auth_rules(self._store, event)
             check_state_dependent_auth_rules(event, claimed_auth_events)
@@ -1531,7 +1534,10 @@ class FederationEventHandler:
             context.rejected = RejectedReason.AUTH_ERROR
             return context
 
-        # now check auth against what we think the auth events *should* be.
+        # now check the auth rules pass against the room state before the event
+        # https://spec.matrix.org/v1.3/server-server-api/#checks-performed-on-receipt-of-a-pdu:
+        #   5. Passes authorization rules based on the state before the event,
+        #      otherwise it is rejected.
         event_types = event_auth.auth_types_for_event(event.room_version, event)
         prev_state_ids = await context.get_prev_state_ids(
             StateFilter.from_types(event_types)
