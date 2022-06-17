@@ -191,8 +191,9 @@ using docker like so:</p>
 https://www.jaegertracing.io/docs/latest/getting-started.</p>
 <h2 id="enable-opentracing-in-synapse"><a class="header" href="#enable-opentracing-in-synapse">Enable OpenTracing in Synapse</a></h2>
 <p>OpenTracing is not enabled by default. It must be enabled in the
-homeserver config by uncommenting the config options under <code>opentracing</code>
-as shown in the <a href="./sample_config.yaml">sample config</a>. For example:</p>
+homeserver config by adding the <code>opentracing</code> option to your config file. You can find 
+documentation about how to do this in the <a href="usage/configuration/config_documentation.html#opentracing">config manual under the header 'Opentracing'</a>.
+See below for an example Opentracing configuration: </p>
 <pre><code class="language-yaml">opentracing:
   enabled: true
   homeserver_whitelist:
