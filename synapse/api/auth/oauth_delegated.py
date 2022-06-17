@@ -224,4 +224,5 @@ class OAuthDelegatedAuth(BaseAuth):
         return create_requester(
             user_id=user_id,
             device_id=device_id,
+            scope=scope,
         )
