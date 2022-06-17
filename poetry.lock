@@ -139,7 +139,7 @@ unicode_backport = ["unicodedata2"]
 
 [[package]]
 name = "click"
-version = "8.1.0"
+version = "8.1.1"
 description = "Composable command line interface toolkit"
 category = "dev"
 optional = false
@@ -524,7 +524,7 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "matrix-common"
-version = "1.1.0"
+version = "1.2.1"
 description = "Common utilities for Synapse, Sydent and Sygnal"
 category = "main"
 optional = false
@@ -535,7 +535,7 @@ attrs = "*"
 importlib-metadata = {version = ">=1.4", markers = "python_version < \"3.8\""}
 
 [package.extras]
-dev = ["tox", "twisted", "aiounittest", "mypy (==0.910)", "black (==21.9b0)", "flake8 (==4.0.1)", "isort (==5.9.3)"]
+dev = ["tox", "twisted", "aiounittest", "mypy (==0.910)", "black (==22.3.0)", "flake8 (==4.0.1)", "isort (==5.9.3)", "build (==0.8.0)", "twine (==4.0.1)"]
 test = ["tox", "twisted", "aiounittest"]
 
 [[package]]
@@ -815,7 +815,7 @@ python-versions = ">=3.5"
 name = "pyjwt"
 version = "2.4.0"
 description = "JSON Web Token implementation in Python"
-category = "main"
+category = "dev"
 optional = false
 python-versions = ">=3.6"
 
@@ -1546,9 +1546,9 @@ docs = ["sphinx", "repoze.sphinx.autointerface"]
 test = ["zope.i18nmessageid", "zope.testing", "zope.testrunner"]
 
 [extras]
-all = ["matrix-synapse-ldap3", "psycopg2", "psycopg2cffi", "psycopg2cffi-compat", "pysaml2", "authlib", "lxml", "sentry-sdk", "jaeger-client", "opentracing", "pyjwt", "txredisapi", "hiredis", "Pympler"]
+all = ["matrix-synapse-ldap3", "psycopg2", "psycopg2cffi", "psycopg2cffi-compat", "pysaml2", "authlib", "lxml", "sentry-sdk", "jaeger-client", "opentracing", "txredisapi", "hiredis", "Pympler"]
 cache_memory = ["Pympler"]
-jwt = ["pyjwt"]
+jwt = ["authlib"]
 matrix-synapse-ldap3 = ["matrix-synapse-ldap3"]
 oidc = ["authlib"]
 opentracing = ["jaeger-client", "opentracing"]
@@ -1563,7 +1563,7 @@ url_preview = ["lxml"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7.1"
-content-hash = "539e5326f401472d1ffc8325d53d72e544cd70156b3f43f32f1285c4c131f831"
+content-hash = "73882e279e0379482f2fc7414cb71addfd408ca48ad508ff8a02b0cb544762af"
 
 [metadata.files]
 attrs = [
@@ -1684,8 +1684,8 @@ charset-normalizer = [
     {file = "charset_normalizer-2.0.12-py3-none-any.whl", hash = "sha256:6881edbebdb17b39b4eaaa821b438bf6eddffb4468cf344f09f89def34a8b1df"},
 ]
 click = [
-    {file = "click-8.1.0-py3-none-any.whl", hash = "sha256:19a4baa64da924c5e0cd889aba8e947f280309f1a2ce0947a3e3a7bcb7cc72d6"},
-    {file = "click-8.1.0.tar.gz", hash = "sha256:977c213473c7665d3aa092b41ff12063227751c41d7b17165013e10069cc5cd2"},
+    {file = "click-8.1.1-py3-none-any.whl", hash = "sha256:5e0d195c2067da3136efb897449ec1e9e6c98282fbf30d7f9e164af9be901a6b"},
+    {file = "click-8.1.1.tar.gz", hash = "sha256:7ab900e38149c9872376e8f9b5986ddcaf68c0f413cf73678a0bca5547e6f976"},
 ]
 click-default-group = [
     {file = "click-default-group-1.2.2.tar.gz", hash = "sha256:d9560e8e8dfa44b3562fbc9425042a0fd6d21956fcc2db0077f63f34253ab904"},
@@ -2042,8 +2042,8 @@ markupsafe = [
     {file = "MarkupSafe-2.1.0.tar.gz", hash = "sha256:80beaf63ddfbc64a0452b841d8036ca0611e049650e20afcb882f5d3c266d65f"},
 ]
 matrix-common = [
-    {file = "matrix_common-1.1.0-py3-none-any.whl", hash = "sha256:5d6dfd777503b2f3a031b566e6af25b6e95f9c0818ef57d954c3190fce5eb407"},
-    {file = "matrix_common-1.1.0.tar.gz", hash = "sha256:a8238748afc2b37079818367fed5156f355771b07c8ff0a175934f47e0ff3276"},
+    {file = "matrix_common-1.2.1-py3-none-any.whl", hash = "sha256:946709c405944a0d4b1d73207b77eb064b6dbfc5d70a69471320b06d8ce98b20"},
+    {file = "matrix_common-1.2.1.tar.gz", hash = "sha256:a99dcf02a6bd95b24a5a61b354888a2ac92bf2b4b839c727b8dd9da2cdfa3853"},
 ]
 matrix-synapse-ldap3 = [
     {file = "matrix-synapse-ldap3-0.2.0.tar.gz", hash = "sha256:91a0715b43a41ec3033244174fca20846836da98fda711fb01687f7199eecd2e"},

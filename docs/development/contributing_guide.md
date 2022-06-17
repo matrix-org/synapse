@@ -304,6 +304,25 @@ To run a specific test, you can specify the whole name structure:
 COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages/parallel/Historical_events_resolve_in_the_correct_order
 ```
 
+The above will run a monolithic (single-process) Synapse with SQLite as the database. For other configurations, try:
+
+- Passing `POSTGRES=1` as an environment variable to use the Postgres database instead.
+- Passing `WORKERS=1` as an environment variable to use a workerised setup instead. This option implies the use of Postgres.
+
+
+### Prettier formatting with `gotestfmt`
+
+If you want to format the output of the tests the same way as it looks in CI,
+install [gotestfmt](https://github.com/haveyoudebuggedit/gotestfmt).
+
+You can then use this incantation to format the tests appropriately:
+
+```sh
+COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -json | gotestfmt -hide successful-tests
+```
+
+(Remove `-hide successful-tests` if you don't want to hide successful tests.)
+
 
 ### Access database for homeserver after Complement test runs.
 

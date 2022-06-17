@@ -37,8 +37,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, MutableMapping, NoReturn, Set
 
-import jinja2
 import yaml
+from jinja2 import Environment, FileSystemLoader
 
 MAIN_PROCESS_HTTP_LISTENER_PORT = 8080
 
@@ -52,12 +52,12 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "worker_extra_conf": "",
     },
     "user_dir": {
-        "app": "synapse.app.user_dir",
+        "app": "synapse.app.generic_worker",
         "listener_resources": ["client"],
         "endpoint_patterns": [
             "^/_matrix/client/(api/v1|r0|v3|unstable)/user_directory/search$"
         ],
-        "shared_extra_conf": {"update_user_directory": False},
+        "shared_extra_conf": {"update_user_directory_from_worker": "user_dir1"},
         "worker_extra_conf": "",
     },
     "media_repository": {
@@ -78,7 +78,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "app": "synapse.app.generic_worker",
         "listener_resources": [],
         "endpoint_patterns": [],
-        "shared_extra_conf": {"notify_appservices_from_worker": "appservice"},
+        "shared_extra_conf": {"notify_appservices_from_worker": "appservice1"},
         "worker_extra_conf": "",
     },
     "federation_sender": {
@@ -236,12 +236,13 @@ def convert(src: str, dst: str, **template_vars: object) -> None:
         template_vars: The arguments to replace placeholder variables in the template with.
     """
     # Read the template file
-    with open(src) as infile:
-        template = infile.read()
+    # We disable autoescape to prevent template variables from being escaped,
+    # as we're not using HTML.
+    env = Environment(loader=FileSystemLoader(os.path.dirname(src)), autoescape=False)
+    template = env.get_template(os.path.basename(src))
 
-    # Generate a string from the template. We disable autoescape to prevent template
-    # variables from being escaped.
-    rendered = jinja2.Template(template, autoescape=False).render(**template_vars)
+    # Generate a string from the template.
+    rendered = template.render(**template_vars)
 
     # Write the generated contents to a file
     #
@@ -378,8 +379,8 @@ def generate_worker_files(
     nginx_locations = {}
 
     # Read the desired worker configuration from the environment
-    worker_types_env = environ.get("SYNAPSE_WORKER_TYPES")
-    if worker_types_env is None:
+    worker_types_env = environ.get("SYNAPSE_WORKER_TYPES", "").strip()
+    if not worker_types_env:
         # No workers, just the main process
         worker_types = []
     else:
@@ -506,12 +507,16 @@ def generate_worker_files(
             if reg_path.suffix.lower() in (".yaml", ".yml")
         ]
 
+    workers_in_use = len(worker_types) > 0
+
     # Shared homeserver config
     convert(
         "/conf/shared.yaml.j2",
         "/conf/workers/shared.yaml",
         shared_worker_config=yaml.dump(shared_config),
         appservice_registrations=appservice_registrations,
+        enable_redis=workers_in_use,
+        workers_in_use=workers_in_use,
     )
 
     # Nginx config
@@ -531,6 +536,7 @@ def generate_worker_files(
         "/etc/supervisor/supervisord.conf",
         main_config_path=config_path,
         worker_config=supervisord_config,
+        enable_redis=workers_in_use,
     )
 
     # healthcheck config

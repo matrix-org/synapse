@@ -1,0 +1,1 @@
+Decouple `synapse.api.auth_blocking.AuthBlocking` from `synapse.api.auth.Auth`.

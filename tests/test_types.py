@@ -26,9 +26,20 @@ class UserIDTestCase(unittest.HomeserverTestCase):
         self.assertEqual("test", user.domain)
         self.assertEqual(True, self.hs.is_mine(user))
 
-    def test_pase_empty(self):
+    def test_parse_rejects_empty_id(self):
         with self.assertRaises(SynapseError):
             UserID.from_string("")
+
+    def test_parse_rejects_missing_sigil(self):
+        with self.assertRaises(SynapseError):
+            UserID.from_string("alice:example.com")
+
+    def test_parse_rejects_missing_separator(self):
+        with self.assertRaises(SynapseError):
+            UserID.from_string("@alice.example.com")
+
+    def test_validation_rejects_missing_domain(self):
+        self.assertFalse(UserID.is_valid("@alice:"))
 
     def test_build(self):
         user = UserID("5678efgh", "my.domain")

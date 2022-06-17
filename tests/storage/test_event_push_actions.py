@@ -51,10 +51,16 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         room_id = "!foo:example.com"
         user_id = "@user1235:example.com"
 
+        last_read_stream_ordering = [0]
+
         def _assert_counts(noitf_count, highlight_count):
             counts = self.get_success(
                 self.store.db_pool.runInteraction(
-                    "", self.store._get_unread_counts_by_pos_txn, room_id, user_id, 0
+                    "",
+                    self.store._get_unread_counts_by_pos_txn,
+                    room_id,
+                    user_id,
+                    last_read_stream_ordering[0],
                 )
             )
             self.assertEqual(
@@ -98,6 +104,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             )
 
         def _mark_read(stream, depth):
+            last_read_stream_ordering[0] = stream
             self.get_success(
                 self.store.db_pool.runInteraction(
                     "",
@@ -144,8 +151,19 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _assert_counts(1, 1)
         _rotate(9)
         _assert_counts(1, 1)
-        _rotate(10)
-        _assert_counts(1, 1)
+
+        # Check that adding another notification and rotating after highlight
+        # works.
+        _inject_actions(10, PlAIN_NOTIF)
+        _rotate(11)
+        _assert_counts(2, 1)
+
+        # Check that sending read receipts at different points results in the
+        # right counts.
+        _mark_read(8, 8)
+        _assert_counts(1, 0)
+        _mark_read(10, 10)
+        _assert_counts(0, 0)
 
     def test_find_first_stream_ordering_after_ts(self):
         def add_event(so, ts):

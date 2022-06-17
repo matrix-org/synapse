@@ -1,3 +1,11 @@
+{#
+  This file extends the default 'shared' configuration file (from the 'synapse-workers'
+  docker image) with Complement-specific  tweak.
+
+  The base configuration is moved out of the default path to `shared-orig.yaml.j2`
+  in the Complement Dockerfile and below we include that original file.
+#}
+
 ## Server ##
 report_stats: False
 trusted_key_servers: []
@@ -76,10 +84,16 @@ federation_rr_transactions_per_room_per_second: 9999
 ## Experimental Features ##
 
 experimental_features:
-  # Enable history backfilling support
-  msc2716_enabled: true
   # Enable spaces support
   spaces_enabled: true
+  # Enable history backfilling support
+  msc2716_enabled: true
+  # server-side support for partial state in /send_join responses
+  msc3706_enabled: true
+  {% if not workers_in_use %}
+  # client-side support for partial state in /send_join responses
+  faster_joins: true
+  {% endif %}
   # Enable jump to date endpoint
   msc3030_enabled: true
 
@@ -88,3 +102,11 @@ server_notices:
   system_mxid_display_name: "Server Alert"
   system_mxid_avatar_url: ""
   room_name: "Server Alert"
+
+
+# Disable sync cache so that initial `/sync` requests are up-to-date.
+caches:
+  sync_response_cache_duration: 0
+
+
+{% include "shared-orig.yaml.j2" %}
