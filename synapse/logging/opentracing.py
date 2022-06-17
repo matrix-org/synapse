@@ -617,23 +617,25 @@ def set_operation_name(operation_name: str) -> None:
 
 
 @only_if_tracing
-def force_tracing(span: "opentracing.Span" = Sentinel) -> None:
+def force_tracing(span: "opentracing.Span" = Sentinel) -> None:  # type: ignore[assignment]
     """Force sampling for the active/given span and its children.
 
     Args:
         span: span to force tracing for. By default, the active span.
     """
     if span is Sentinel:
-        span = opentracing.tracer.active_span
-    if span is None:
+        span_to_trace = opentracing.tracer.active_span
+    else:
+        span_to_trace = span
+    if span_to_trace is None:
         logger.error("No active span in force_tracing")
         return
 
-    span.set_tag(opentracing.tags.SAMPLING_PRIORITY, 1)
+    span_to_trace.set_tag(opentracing.tags.SAMPLING_PRIORITY, 1)
 
     # also set a bit of baggage, so that we have a way of figuring out if
     # it is enabled later
-    span.set_baggage_item(SynapseBaggage.FORCE_TRACING, "1")
+    span_to_trace.set_baggage_item(SynapseBaggage.FORCE_TRACING, "1")
 
 
 def is_context_forced_tracing(
