@@ -1341,17 +1341,22 @@ class RoomMessagesTestCase(RoomBase):
     def test_spam_checker_check_event_for_spam(self) -> None:
         mock_return_value: Union[str, Codes, Tuple[Codes, JsonDict], bool] = "NOT_SPAM"
         mock_event: Optional[synapse.events.EventBase] = None
+
         async def check_event_for_spam(
-            event: synapse.events.EventBase
+            event: synapse.events.EventBase,
         ) -> Union[str, Codes, Tuple[Codes, JsonDict], bool]:
             mock_event = event
+            _ = mock_event # We get a spurious warning that mock_event is unused
             return mock_return_value
+
         # `spec` argument is needed for this function mock to have `__qualname__`, which
         # is needed for `Measure` metrics buried in SpamChecker.
         callback_mock = Mock(side_effect=check_event_for_spam, spec=lambda *x: None)
         self.hs.get_spam_checker()._check_event_for_spam_callbacks.append(callback_mock)
 
-        for i, (value, expected_code, expected_dict) in enumerate([
+        SAMPLES: List[
+            Tuple[Union[str, Codes, Tuple[Codes, JsonDict], bool], int, dict]
+        ] = [
             # Allow
             ("NOT_SPAM", 200, {}),
             (False, 200, {}),
@@ -1359,22 +1364,40 @@ class RoomMessagesTestCase(RoomBase):
             ("ANY OTHER STRING", 400, {"errcode": "M_FORBIDDEN"}),
             (True, 400, {"errcode": "M_FORBIDDEN"}),
             (Codes.LIMIT_EXCEEDED, 400, {"errcode": "M_LIMIT_EXCEEDED"}),
-            ((Codes.SERVER_NOT_TRUSTED, {"additional_field": "12345"}), 400, {"errcode": "M_SERVER_NOT_TRUSTED", "additional_field": "12345"})
-        ]):
+            (
+                (Codes.SERVER_NOT_TRUSTED, {"additional_field": "12345"}),
+                400,
+                {"errcode": "M_SERVER_NOT_TRUSTED", "additional_field": "12345"},
+            ),
+        ]
+        for i, (value, expected_code, expected_dict) in enumerate(SAMPLES):
             # Inject `value` as mock_return_value
             mock_return_value = value
-            path = "/rooms/%s/send/m.room.message/check_event_for_spam_%s" % (urlparse.quote(self.room_id), i)
+            path = "/rooms/%s/send/m.room.message/check_event_for_spam_%s" % (
+                urlparse.quote(self.room_id),
+                i,
+            )
             body = b"test-%s" % i
             content = b'{"body":%s,"msgtype":"m.text"}' % body
             channel = self.make_request("PUT", path, content)
 
             # Check that the callback has witnessed the correct event.
-            self.assertEqual(mock_event.get_dict()["body"], body, mock_event.get_dict())
+            self.assertIsNotNone(mock_event)
+            if (
+                mock_event is not None
+            ):  # Checked just above, but mypy doesn't know about that.
+                self.assertEqual(
+                    mock_event.get_dict()["body"], body, mock_event.get_dict()
+                )
 
             # Check that we have the correct result.
             self.assertEqual(expected_code, channel.code, msg=channel.result["body"])
             for expected_field, expected_value in expected_dict.items():
-                self.assertEqual(channel.json_body.get(expected_field, None), expected_value, "Field %s absent or invalid " % expected_field)
+                self.assertEqual(
+                    channel.json_body.get(expected_field, None),
+                    expected_value,
+                    "Field %s absent or invalid " % expected_field,
+                )
 
 
 class RoomPowerLevelOverridesTestCase(RoomBase):
