@@ -1,4 +1,4 @@
-# Copyright 2014 - 2016 OpenMarket Ltd
+# Copyright 2023 The Matrix.org Foundation.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,33 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Optional
 
 import pymacaroons
 from netaddr import IPAddress
 
 from twisted.web.server import Request
 
-from synapse import event_auth
-from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
     InvalidClientTokenError,
     MissingClientTokenError,
-    UnstableSpecAuthError,
 )
-from synapse.appservice import ApplicationService
 from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
-from synapse.logging.opentracing import (
-    active_span,
-    force_tracing,
-    start_active_span,
-    trace,
-)
+from synapse.logging.opentracing import active_span, force_tracing, start_active_span
 from synapse.types import Requester, create_requester
 from synapse.util.cancellation import cancellable
+
+from . import GUEST_DEVICE_ID
+from .base import BaseAuth
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -46,78 +40,20 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# guests always get this device id.
-GUEST_DEVICE_ID = "guest_device"
-
-
-class Auth:
+class InternalAuth(BaseAuth):
     """
     This class contains functions for authenticating users of our client-server API.
     """
 
     def __init__(self, hs: "HomeServer"):
-        self.hs = hs
+        super().__init__(hs)
         self.clock = hs.get_clock()
-        self.store = hs.get_datastores().main
         self._account_validity_handler = hs.get_account_validity_handler()
-        self._storage_controllers = hs.get_storage_controllers()
         self._macaroon_generator = hs.get_macaroon_generator()
 
         self._track_appservice_user_ips = hs.config.appservice.track_appservice_user_ips
         self._track_puppeted_user_ips = hs.config.api.track_puppeted_user_ips
         self._force_tracing_for_users = hs.config.tracing.force_tracing_for_users
-
-    async def check_user_in_room(
-        self,
-        room_id: str,
-        requester: Requester,
-        allow_departed_users: bool = False,
-    ) -> Tuple[str, Optional[str]]:
-        """Check if the user is in the room, or was at some point.
-        Args:
-            room_id: The room to check.
-
-            requester: The user making the request, according to the access token.
-
-            current_state: Optional map of the current state of the room.
-                If provided then that map is used to check whether they are a
-                member of the room. Otherwise the current membership is
-                loaded from the database.
-
-            allow_departed_users: if True, accept users that were previously
-                members but have now departed.
-
-        Raises:
-            AuthError if the user is/was not in the room.
-        Returns:
-            The current membership of the user in the room and the
-            membership event ID of the user.
-        """
-
-        user_id = requester.user.to_string()
-        (
-            membership,
-            member_event_id,
-        ) = await self.store.get_local_current_membership_for_user_in_room(
-            user_id=user_id,
-            room_id=room_id,
-        )
-
-        if membership:
-            if membership == Membership.JOIN:
-                return membership, member_event_id
-
-            # XXX this looks totally bogus. Why do we not allow users who have been banned,
-            # or those who were members previously and have been re-invited?
-            if allow_departed_users and membership == Membership.LEAVE:
-                forgot = await self.store.did_forget(user_id, room_id)
-                if not forgot:
-                    return membership, member_event_id
-        raise UnstableSpecAuthError(
-            403,
-            "User %s not in room %s" % (user_id, room_id),
-            errcode=Codes.NOT_JOINED,
-        )
 
     @cancellable
     async def get_user_by_req(
@@ -252,37 +188,6 @@ class Auth:
             return requester
         except KeyError:
             raise MissingClientTokenError()
-
-    async def validate_appservice_can_control_user_id(
-        self, app_service: ApplicationService, user_id: str
-    ) -> None:
-        """Validates that the app service is allowed to control
-        the given user.
-
-        Args:
-            app_service: The app service that controls the user
-            user_id: The author MXID that the app service is controlling
-
-        Raises:
-            AuthError: If the application service is not allowed to control the user
-                (user namespace regex does not match, wrong homeserver, etc)
-                or if the user has not been registered yet.
-        """
-
-        # It's ok if the app service is trying to use the sender from their registration
-        if app_service.sender == user_id:
-            pass
-        # Check to make sure the app service is allowed to control the user
-        elif not app_service.is_interested_in_user(user_id):
-            raise AuthError(
-                403,
-                "Application service cannot masquerade as this user (%s)." % user_id,
-            )
-        # Check to make sure the user is already registered on the homeserver
-        elif not (await self.store.get_user_by_id(user_id)):
-            raise AuthError(
-                403, "Application service has not registered this user (%s)" % user_id
-            )
 
     @cancellable
     async def _get_appservice_user(self, request: Request) -> Optional[Requester]:
@@ -462,141 +367,3 @@ class Auth:
             True if the user is an admin
         """
         return await self.store.is_server_admin(requester.user)
-
-    async def check_can_change_room_list(
-        self, room_id: str, requester: Requester
-    ) -> bool:
-        """Determine whether the user is allowed to edit the room's entry in the
-        published room list.
-
-        Args:
-            room_id: The room to check.
-            requester: The user making the request, according to the access token.
-        """
-
-        is_admin = await self.is_server_admin(requester)
-        if is_admin:
-            return True
-
-        await self.check_user_in_room(room_id, requester)
-
-        # We currently require the user is a "moderator" in the room. We do this
-        # by checking if they would (theoretically) be able to change the
-        # m.room.canonical_alias events
-
-        power_level_event = (
-            await self._storage_controllers.state.get_current_state_event(
-                room_id, EventTypes.PowerLevels, ""
-            )
-        )
-
-        auth_events = {}
-        if power_level_event:
-            auth_events[(EventTypes.PowerLevels, "")] = power_level_event
-
-        send_level = event_auth.get_send_level(
-            EventTypes.CanonicalAlias, "", power_level_event
-        )
-        user_level = event_auth.get_user_power_level(
-            requester.user.to_string(), auth_events
-        )
-
-        return user_level >= send_level
-
-    @staticmethod
-    def has_access_token(request: Request) -> bool:
-        """Checks if the request has an access_token.
-
-        Returns:
-            False if no access_token was given, True otherwise.
-        """
-        # This will always be set by the time Twisted calls us.
-        assert request.args is not None
-
-        query_params = request.args.get(b"access_token")
-        auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
-        return bool(query_params) or bool(auth_headers)
-
-    @staticmethod
-    @cancellable
-    def get_access_token_from_request(request: Request) -> str:
-        """Extracts the access_token from the request.
-
-        Args:
-            request: The http request.
-        Returns:
-            The access_token
-        Raises:
-            MissingClientTokenError: If there isn't a single access_token in the
-                request
-        """
-        # This will always be set by the time Twisted calls us.
-        assert request.args is not None
-
-        auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
-        query_params = request.args.get(b"access_token")
-        if auth_headers:
-            # Try the get the access_token from a "Authorization: Bearer"
-            # header
-            if query_params is not None:
-                raise MissingClientTokenError(
-                    "Mixing Authorization headers and access_token query parameters."
-                )
-            if len(auth_headers) > 1:
-                raise MissingClientTokenError("Too many Authorization headers.")
-            parts = auth_headers[0].split(b" ")
-            if parts[0] == b"Bearer" and len(parts) == 2:
-                return parts[1].decode("ascii")
-            else:
-                raise MissingClientTokenError("Invalid Authorization header.")
-        else:
-            # Try to get the access_token from the query params.
-            if not query_params:
-                raise MissingClientTokenError()
-
-            return query_params[0].decode("ascii")
-
-    @trace
-    async def check_user_in_room_or_world_readable(
-        self, room_id: str, requester: Requester, allow_departed_users: bool = False
-    ) -> Tuple[str, Optional[str]]:
-        """Checks that the user is or was in the room or the room is world
-        readable. If it isn't then an exception is raised.
-
-        Args:
-            room_id: The room to check.
-            requester: The user making the request, according to the access token.
-            allow_departed_users: If True, accept users that were previously
-                members but have now departed.
-
-        Returns:
-            Resolves to the current membership of the user in the room and the
-            membership event ID of the user. If the user is not in the room and
-            never has been, then `(Membership.JOIN, None)` is returned.
-        """
-
-        try:
-            # check_user_in_room will return the most recent membership
-            # event for the user if:
-            #  * The user is a non-guest user, and was ever in the room
-            #  * The user is a guest user, and has joined the room
-            # else it will throw.
-            return await self.check_user_in_room(
-                room_id, requester, allow_departed_users=allow_departed_users
-            )
-        except AuthError:
-            visibility = await self._storage_controllers.state.get_current_state_event(
-                room_id, EventTypes.RoomHistoryVisibility, ""
-            )
-            if (
-                visibility
-                and visibility.content.get("history_visibility")
-                == HistoryVisibility.WORLD_READABLE
-            ):
-                return Membership.JOIN, None
-            raise UnstableSpecAuthError(
-                403,
-                "User %s not in room %s, and room previews are disabled"
-                % (requester.user, room_id),
-                errcode=Codes.NOT_JOINED,
-            )
