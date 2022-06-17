@@ -17,13 +17,7 @@ from typing import TYPE_CHECKING, Tuple
 
 from twisted.web.server import Request
 
-from synapse.api.errors import (
-    AuthError,
-    Codes,
-    InvalidClientCredentialsError,
-    NotFoundError,
-    SynapseError,
-)
+from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -96,30 +90,27 @@ class ClientDirectoryServer(RestServlet):
         self, request: SynapseRequest, room_alias: str
     ) -> Tuple[int, JsonDict]:
         room_alias_obj = RoomAlias.from_string(room_alias)
+        requester = await self.auth.get_user_by_req(request)
 
-        try:
-            service = self.auth.get_appservice_by_req(request)
+        if requester.app_service:
             await self.directory_handler.delete_appservice_association(
-                service, room_alias_obj
+                requester.app_service, room_alias_obj
             )
+
             logger.info(
                 "Application service at %s deleted alias %s",
-                service.url,
+                requester.app_service.url,
                 room_alias_obj.to_string(),
             )
-            return 200, {}
-        except InvalidClientCredentialsError:
-            # fallback to default user behaviour if they aren't an AS
-            pass
 
-        requester = await self.auth.get_user_by_req(request)
-        user = requester.user
+        else:
+            await self.directory_handler.delete_association(requester, room_alias_obj)
 
-        await self.directory_handler.delete_association(requester, room_alias_obj)
-
-        logger.info(
-            "User %s deleted alias %s", user.to_string(), room_alias_obj.to_string()
-        )
+            logger.info(
+                "User %s deleted alias %s",
+                requester.user.to_string(),
+                room_alias_obj.to_string(),
+            )
 
         return 200, {}
 
