@@ -84,19 +84,18 @@ file when you upgrade the Debian package to a later version.
 
 ##### Downstream Debian packages
 
-We do not recommend using the packages from the default Debian `buster`
-repository at this time, as they are old and suffer from known security
-vulnerabilities. You can install the latest version of Synapse from
-[our repository](#matrixorg-packages) or from `buster-backports`. Please
-see the [Debian documentation](https://backports.debian.org/Instructions/)
-for information on how to use backports.
-
-If you are using Debian `sid` or testing, Synapse is available in the default
-repositories and it should be possible to install it simply with:
+Andrej Shadura maintains a `matrix-synapse` package in the Debian repositories.
+For `bookworm` and `sid`, it can be installed simply with:
 
 ```sh
 sudo apt install matrix-synapse
 ```
+
+Synapse is also avaliable in `bullseye-backports`.  Please
+see the [Debian documentation](https://backports.debian.org/Instructions/)
+for information on how to use backports.
+
+`matrix-synapse` is no longer maintained for `buster` and older.
 
 ##### Downstream Ubuntu packages
 

@@ -14,7 +14,11 @@
 
 from unittest.mock import Mock
 
+from twisted.test.proto_helpers import MemoryReactor
+
+from synapse.server import HomeServer
 from synapse.storage.databases.main.event_push_actions import NotifCounts
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
@@ -29,31 +33,33 @@ HIGHLIGHT = [
 
 
 class EventPushActionsStoreTestCase(HomeserverTestCase):
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
-        self.persist_events_store = hs.get_datastores().persist_events
+        persist_events_store = hs.get_datastores().persist_events
+        assert persist_events_store is not None
+        self.persist_events_store = persist_events_store
 
-    def test_get_unread_push_actions_for_user_in_range_for_http(self):
+    def test_get_unread_push_actions_for_user_in_range_for_http(self) -> None:
         self.get_success(
             self.store.get_unread_push_actions_for_user_in_range_for_http(
                 USER_ID, 0, 1000, 20
             )
         )
 
-    def test_get_unread_push_actions_for_user_in_range_for_email(self):
+    def test_get_unread_push_actions_for_user_in_range_for_email(self) -> None:
         self.get_success(
             self.store.get_unread_push_actions_for_user_in_range_for_email(
                 USER_ID, 0, 1000, 20
             )
         )
 
-    def test_count_aggregation(self):
+    def test_count_aggregation(self) -> None:
         room_id = "!foo:example.com"
         user_id = "@user1235:example.com"
 
         last_read_stream_ordering = [0]
 
-        def _assert_counts(noitf_count, highlight_count):
+        def _assert_counts(noitf_count: int, highlight_count: int) -> None:
             counts = self.get_success(
                 self.store.db_pool.runInteraction(
                     "",
@@ -72,7 +78,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 ),
             )
 
-        def _inject_actions(stream, action):
+        def _inject_actions(stream: int, action: list) -> None:
             event = Mock()
             event.room_id = room_id
             event.event_id = "$test:example.com"
@@ -96,14 +102,14 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 )
             )
 
-        def _rotate(stream):
+        def _rotate(stream: int) -> None:
             self.get_success(
                 self.store.db_pool.runInteraction(
                     "", self.store._rotate_notifs_before_txn, stream
                 )
             )
 
-        def _mark_read(stream, depth):
+        def _mark_read(stream: int, depth: int) -> None:
             last_read_stream_ordering[0] = stream
             self.get_success(
                 self.store.db_pool.runInteraction(
@@ -165,8 +171,8 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _mark_read(10, 10)
         _assert_counts(0, 0)
 
-    def test_find_first_stream_ordering_after_ts(self):
-        def add_event(so, ts):
+    def test_find_first_stream_ordering_after_ts(self) -> None:
+        def add_event(so: int, ts: int) -> None:
             self.get_success(
                 self.store.db_pool.simple_insert(
                     "events",
