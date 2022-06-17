@@ -832,12 +832,15 @@ class RoomsCreateTestCase(RoomBase):
 
         self.assertEqual(join_mock.call_count, 0)
 
+        # Now change the return value of the callback to deny any joinn and test that
+        # we can't join. We pick an arbitrary error code to be able to check
+        # that the same code has been returned
         async def user_may_join_room_tuple(
             mxid: str,
             room_id: str,
             is_invite: bool,
         ) -> Tuple[Codes, dict]:
-            return (Codes.CONSENT_NOT_GIVEN, {})
+            return (Codes.INCOMPATIBLE_ROOM_VERSION, {})
 
         join_mock.side_effect = user_may_join_room_tuple
 
@@ -847,6 +850,11 @@ class RoomsCreateTestCase(RoomBase):
             {},
         )
         self.assertEqual(channel.code, 200, channel.json_body)
+        self.assertEqual(
+            channel.json_body["errcode"],
+            Codes.INCOMPATIBLE_ROOM_VERSION,
+            channel.json_body,
+        )
 
         self.assertEqual(join_mock.call_count, 0)
 
@@ -3167,7 +3175,8 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         make_invite_mock.assert_called_once()
 
         # Now change the return value of the callback to deny any invite and test that
-        # we can't send the invite.
+        # we can't send the invite. We pick an arbitrary error code to be able to check
+        # that the same code has been returned
         mock.return_value = make_awaitable(Codes.CONSENT_NOT_GIVEN)
         channel = self.make_request(
             method="POST",
@@ -3181,7 +3190,7 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 403)
-        self.assertEqual(channel.json_body.errcode, Codes.CONSENT_NOT_GIVEN)
+        self.assertEqual(channel.json_body["errcode"], Codes.CONSENT_NOT_GIVEN)
 
         # Also check that it stopped before calling _make_and_store_3pid_invite.
         make_invite_mock.assert_called_once()
@@ -3200,8 +3209,8 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 403)
-        self.assertEqual(channel.json_body.errcode, Codes.EXPIRED_ACCOUNT)
-        self.assertEqual(channel.json_body.field, "value")
+        self.assertEqual(channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT)
+        self.assertEqual(channel.json_body["field"], "value")
 
         # Also check that it stopped before calling _make_and_store_3pid_invite.
         make_invite_mock.assert_called_once()
