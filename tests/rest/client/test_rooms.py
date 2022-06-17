@@ -850,12 +850,6 @@ class RoomsCreateTestCase(RoomBase):
             {},
         )
         self.assertEqual(channel.code, 200, channel.json_body)
-        self.assertEqual(
-            channel.json_body["errcode"],
-            Codes.INCOMPATIBLE_ROOM_VERSION,
-            channel.json_body,
-        )
-
         self.assertEqual(join_mock.call_count, 0)
 
 
@@ -1137,13 +1131,15 @@ class RoomJoinTestCase(RoomBase):
         """
 
         # Register a dummy callback. Make it allow all room joins for now.
-        return_value: Union[Literal["NOT_SPAM"], Codes] = synapse.module_api.NOT_SPAM
+        return_value: Union[
+            Literal["NOT_SPAM"], Tuple[Codes, dict], Codes
+        ] = synapse.module_api.NOT_SPAM
 
         async def user_may_join_room(
             userid: str,
             room_id: str,
             is_invited: bool,
-        ) -> Union[Literal["NOT_SPAM"], Codes]:
+        ) -> Union[Literal["NOT_SPAM"], Tuple[Codes, dict], Codes]:
             return return_value
 
         # `spec` argument is needed for this function mock to have `__qualname__`, which
@@ -1187,8 +1183,28 @@ class RoomJoinTestCase(RoomBase):
         )
 
         # Now make the callback deny all room joins, and check that a join actually fails.
+        # We pick an arbitrary Codes rather than the default `Codes.FORBIDDEN`.
         return_value = Codes.CONSENT_NOT_GIVEN
-        self.helper.join(self.room3, self.user2, expect_code=403, tok=self.tok2)
+        self.helper.invite(self.room3, self.user1, self.user2, tok=self.tok1)
+        self.helper.join(
+            self.room3,
+            self.user2,
+            expect_code=403,
+            expect_errcode=return_value,
+            tok=self.tok2,
+        )
+
+        # Now make the callback deny all room joins, and check that a join actually fails.
+        # As above, with the experimental extension that lets us return dictionaries.
+        return_value = Codes.BAD_ALIAS, {"another_field": "12345"}
+        self.helper.join(
+            self.room3,
+            self.user2,
+            expect_code=403,
+            expect_errcode=return_value[0],
+            tok=self.tok2,
+            expect_additional_fields=return_value[1],
+        )
 
 
 class RoomJoinRatelimitTestCase(RoomBase):
