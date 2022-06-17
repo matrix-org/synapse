@@ -330,7 +330,7 @@ def _resolve_auth_events(
         auth_events[(prev_event.type, prev_event.state_key)] = prev_event
         try:
             # The signatures have already been checked at this point
-            event_auth.check_auth_rules_for_event(
+            event_auth.check_state_dependent_auth_rules(
                 event,
                 auth_events.values(),
             )
@@ -347,7 +347,7 @@ def _resolve_normal_events(
     for event in _ordered_events(events):
         try:
             # The signatures have already been checked at this point
-            event_auth.check_auth_rules_for_event(
+            event_auth.check_state_dependent_auth_rules(
                 event,
                 auth_events.values(),
             )

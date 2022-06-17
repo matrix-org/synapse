@@ -104,13 +104,14 @@ class DataStore(
     PusherStore,
     PushRuleStore,
     ApplicationServiceTransactionStore,
+    EventPushActionsStore,
+    ServerMetricsStore,
     ReceiptsStore,
     EndToEndKeyStore,
     EndToEndRoomKeyStore,
     SearchStore,
     TagsStore,
     AccountDataStore,
-    EventPushActionsStore,
     OpenIdStore,
     ClientIpWorkerStore,
     DeviceStore,
@@ -124,7 +125,6 @@ class DataStore(
     UIAuthStore,
     EventForwardExtremitiesStore,
     CacheInvalidationWorkerStore,
-    ServerMetricsStore,
     LockStore,
     SessionStore,
 ):
@@ -195,6 +195,7 @@ class DataStore(
         self._min_stream_order_on_start = self.get_room_min_stream_ordering()
 
     def get_device_stream_token(self) -> int:
+        # TODO: shouldn't this be moved to `DeviceWorkerStore`?
         return self._device_list_id_gen.get_current_token()
 
     async def get_users(self) -> List[JsonDict]:

@@ -26,13 +26,7 @@ from synapse.api.constants import (
     GuestAccess,
     Membership,
 )
-from synapse.api.errors import (
-    AuthError,
-    Codes,
-    LimitExceededError,
-    ShadowBanError,
-    SynapseError,
-)
+from synapse.api.errors import AuthError, Codes, ShadowBanError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.event_auth import get_named_level, get_power_level_event
 from synapse.events import EventBase
@@ -380,16 +374,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             # Only rate-limit if the user actually joined the room, otherwise we'll end
             # up blocking profile updates.
             if newly_joined and ratelimit:
-                time_now_s = self.clock.time()
-                (
-                    allowed,
-                    time_allowed,
-                ) = await self._join_rate_limiter_local.can_do_action(requester)
-
-                if not allowed:
-                    raise LimitExceededError(
-                        retry_after_ms=int(1000 * (time_allowed - time_now_s))
-                    )
+                await self._join_rate_limiter_local.ratelimit(requester)
 
         result_event = await self.event_creation_handler.handle_new_client_event(
             requester,
@@ -843,18 +828,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             )
             if remote_join:
                 if ratelimit:
-                    time_now_s = self.clock.time()
-                    (
-                        allowed,
-                        time_allowed,
-                    ) = await self._join_rate_limiter_remote.can_do_action(
+                    await self._join_rate_limiter_remote.ratelimit(
                         requester,
                     )
-
-                    if not allowed:
-                        raise LimitExceededError(
-                            retry_after_ms=int(1000 * (time_allowed - time_now_s))
-                        )
 
                 inviter = await self._get_inviter(target.to_string(), room_id)
                 if inviter and not self.hs.is_mine(inviter):

@@ -370,6 +370,47 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         og = parse_html_to_open_graph(tree)
         self.assertEqual(og, {"og:title": "ó", "og:description": "Some text."})
 
+    def test_twitter_tag(self) -> None:
+        """Twitter card tags should be used if nothing else is available."""
+        html = b"""
+        <html>
+        <meta name="twitter:card" content="summary">
+        <meta name="twitter:description" content="Description">
+        <meta name="twitter:site" content="@matrixdotorg">
+        </html>
+        """
+        tree = decode_body(html, "http://example.com/test.html")
+        og = parse_html_to_open_graph(tree)
+        self.assertEqual(
+            og,
+            {
+                "og:title": None,
+                "og:description": "Description",
+                "og:site_name": "@matrixdotorg",
+            },
+        )
+
+        # But they shouldn't override Open Graph values.
+        html = b"""
+        <html>
+        <meta name="twitter:card" content="summary">
+        <meta name="twitter:description" content="Description">
+        <meta property="og:description" content="Real Description">
+        <meta name="twitter:site" content="@matrixdotorg">
+        <meta property="og:site_name" content="matrix.org">
+        </html>
+        """
+        tree = decode_body(html, "http://example.com/test.html")
+        og = parse_html_to_open_graph(tree)
+        self.assertEqual(
+            og,
+            {
+                "og:title": None,
+                "og:description": "Real Description",
+                "og:site_name": "matrix.org",
+            },
+        )
+
 
 class MediaEncodingTestCase(unittest.TestCase):
     def test_meta_charset(self) -> None:
