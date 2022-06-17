@@ -19,6 +19,14 @@ jobs:
       - run: scripts-dev/generate_sample_config.sh --check
       - run: scripts-dev/config-lint.sh
 
+  check-schema-delta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - run: "pip install 'click==8.1.1' 'GitPython>=3.1.20'"
+      - run: scripts-dev/check_schema_delta.py --force-colors
+
   lint:
     uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v1"
     with:
@@ -48,7 +56,7 @@ jobs:
   # Dummy step to gate other tests on without repeating the whole list
   linting-done:
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
-    needs: [lint, lint-crlf, lint-newsfile, check-sampleconfig]
+    needs: [lint, lint-crlf, lint-newsfile, check-sampleconfig, check-schema-delta]
     runs-on: ubuntu-latest
     steps:
       - run: "true"
@@ -340,6 +348,11 @@ jobs:
         with:
           path: synapse
 
+      - name: "Install custom gotestfmt template"
+        run: |
+          mkdir .gotestfmt/github -p
+          cp synapse/.ci/complement_package.gotpl .gotestfmt/github/package.gotpl
+
       # Attempt to check out the same branch of Complement as the PR. If it
       # doesn't exist, fallback to HEAD.
       - name: Checkout complement
@@ -358,6 +371,8 @@ jobs:
     if: "${{ !failure() && !cancelled() && (github.ref == 'refs/heads/develop') }}"
     needs: linting-done
     runs-on: ubuntu-latest
+    
+    name: "Complement Workers (develop only)"
 
     steps:
       # The path is set via a file given by $GITHUB_PATH. We need both Go 1.17 and GOPATH on the path to run Complement.
@@ -371,13 +386,18 @@ jobs:
 
       - name: "Install Complement Dependencies"
         run: |
-          sudo apt-get update && sudo apt-get install -y libolm3 libolm-dev
+          sudo apt-get -qq update && sudo apt-get install -qqy libolm3 libolm-dev
           go get -v github.com/haveyoudebuggedit/gotestfmt/v2/cmd/gotestfmt@latest
 
       - name: Run actions/checkout@v2 for synapse
         uses: actions/checkout@v2
         with:
           path: synapse
+
+      - name: "Install custom gotestfmt template"
+        run: |
+          mkdir .gotestfmt/github -p
+          cp synapse/.ci/complement_package.gotpl .gotestfmt/github/package.gotpl
 
       # Attempt to check out the same branch of Complement as the PR. If it
       # doesn't exist, fallback to HEAD.

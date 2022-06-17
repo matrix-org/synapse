@@ -295,6 +295,7 @@ class StatsStore(StateDeltasStore):
             keyvalues={id_col: id},
             retcol="completed_delta_stream_id",
             allow_none=True,
+            desc="get_earliest_token_for_stats",
         )
 
     async def bulk_update_stats_delta(
