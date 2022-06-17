@@ -314,7 +314,7 @@ def _check_create(event: "EventBase") -> None:
     """Implementation of the auth rules for m.room.create events
 
     Args:
-        event:  The event to be checked
+        event: The `m.room.create` event to be checked
 
     Raises:
         AuthError if the event does not pass the auth rules
