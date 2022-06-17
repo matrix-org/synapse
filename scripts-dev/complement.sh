@@ -24,6 +24,15 @@
 # Exit if a line returns a non-zero exit code
 set -e
 
+
+# Helper to emit annotations that collapse portions of the log in GitHub Actions
+echo_if_github() {
+  if [[ -n "$GITHUB_WORKFLOW" ]]; then
+    echo $*
+  fi
+}
+
+
 # enable buildkit for the docker builds
 export DOCKER_BUILDKIT=1
 
@@ -41,14 +50,20 @@ if [[ -z "$COMPLEMENT_DIR" ]]; then
 fi
 
 # Build the base Synapse image from the local checkout
+echo_if_github "::group::Build Docker image: matrixdotorg/synapse"
 docker build -t matrixdotorg/synapse -f "docker/Dockerfile" .
+echo_if_github "::endgroup::"
 
 # Build the workers docker image (from the base Synapse image we just built).
+echo_if_github "::group::Build Docker image: matrixdotorg/synapse-workers"
 docker build -t matrixdotorg/synapse-workers -f "docker/Dockerfile-workers" .
+echo_if_github "::endgroup::"
 
 # Build the unified Complement image (from the worker Synapse image we just built).
+echo_if_github "::group::Build Docker image: complement/Dockerfile"
 docker build -t complement-synapse \
   -f "docker/complement/Dockerfile" "docker/complement"
+echo_if_github "::endgroup::"
 
 export COMPLEMENT_BASE_IMAGE=complement-synapse
 
@@ -59,6 +74,9 @@ test_tags="synapse_blacklist,msc2716,msc3030,msc3787"
 # All environment variables starting with PASS_ will be shared.
 # (The prefix is stripped off before reaching the container.)
 export COMPLEMENT_SHARE_ENV_PREFIX=PASS_
+
+# It takes longer than 10m to run the whole suite.
+extra_test_args+=("-timeout=60m")
 
 if [[ -n "$WORKERS" ]]; then
   # Use workers.
@@ -73,9 +91,6 @@ if [[ -n "$WORKERS" ]]; then
   # time (the main problem is that we start 14 python processes for each test,
   # and complement likes to do two of them in parallel).
   export COMPLEMENT_SPAWN_HS_TIMEOUT_SECS=120
-
-  # ... and it takes longer than 10m to run the whole suite.
-  extra_test_args+=("-timeout=60m")
 else
   export PASS_SYNAPSE_COMPLEMENT_USE_WORKERS=
   if [[ -n "$POSTGRES" ]]; then

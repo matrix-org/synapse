@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Collection, Dict, List, Optional
+from typing import Collection, Dict, List, Optional, cast
 from unittest.mock import Mock
 
 from twisted.internet import defer
@@ -22,6 +22,8 @@ from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.state import StateHandler, StateResolutionHandler
+from synapse.util import Clock
+from synapse.util.macaroons import MacaroonGenerator
 
 from tests import unittest
 
@@ -190,13 +192,18 @@ class StateTestCase(unittest.TestCase):
                 "get_clock",
                 "get_state_resolution_handler",
                 "get_account_validity_handler",
+                "get_macaroon_generator",
                 "hostname",
             ]
         )
+        clock = cast(Clock, MockClock())
         hs.config = default_config("tesths", True)
         hs.get_datastores.return_value = Mock(main=self.dummy_store)
         hs.get_state_handler.return_value = None
-        hs.get_clock.return_value = MockClock()
+        hs.get_clock.return_value = clock
+        hs.get_macaroon_generator.return_value = MacaroonGenerator(
+            clock, "tesths", b"verysecret"
+        )
         hs.get_auth.return_value = Auth(hs)
         hs.get_state_resolution_handler = lambda: StateResolutionHandler(hs)
         hs.get_storage_controllers.return_value = storage_controllers

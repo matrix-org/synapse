@@ -444,7 +444,7 @@ _DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY = 7 * 24 * 60 * 60 * 1000
 class EventCreationHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.auth = hs.get_auth()
+        self.auth_blocking = hs.get_auth_blocking()
         self._event_auth_handler = hs.get_event_auth_handler()
         self.store = hs.get_datastores().main
         self._storage_controllers = hs.get_storage_controllers()
@@ -605,7 +605,7 @@ class EventCreationHandler:
         Returns:
             Tuple of created event, Context
         """
-        await self.auth.check_auth_blocking(requester=requester)
+        await self.auth_blocking.check_auth_blocking(requester=requester)
 
         if event_dict["type"] == EventTypes.Create and event_dict["state_key"] == "":
             room_version_id = event_dict["content"]["room_version"]
@@ -954,14 +954,12 @@ class EventCreationHandler:
                             "Spam-check module returned invalid error value. Expecting [code, dict], got %s",
                             spam_check_result,
                         )
-                        spam_check_result = Codes.FORBIDDEN
 
-                if isinstance(spam_check_result, Codes):
-                    raise SynapseError(
-                        403,
-                        "This message has been rejected as probable spam",
-                        spam_check_result,
-                    )
+                        raise SynapseError(
+                            403,
+                            "This message has been rejected as probable spam",
+                            Codes.FORBIDDEN,
+                        )
 
                 # Backwards compatibility: if the return value is not an error code, it
                 # means the module returned an error message to be included in the

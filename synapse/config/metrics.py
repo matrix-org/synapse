@@ -73,46 +73,8 @@ class MetricsConfig(Config):
     def generate_config_section(
         self, report_stats: Optional[bool] = None, **kwargs: Any
     ) -> str:
-        res = """\
-        ## Metrics ###
-
-        # Enable collection and rendering of performance metrics
-        #
-        #enable_metrics: false
-
-        # Enable sentry integration
-        # NOTE: While attempts are made to ensure that the logs don't contain
-        # any sensitive information, this cannot be guaranteed. By enabling
-        # this option the sentry server may therefore receive sensitive
-        # information, and it in turn may then diseminate sensitive information
-        # through insecure notification channels if so configured.
-        #
-        #sentry:
-        #    dsn: "..."
-
-        # Flags to enable Prometheus metrics which are not suitable to be
-        # enabled by default, either for performance reasons or limited use.
-        #
-        metrics_flags:
-            # Publish synapse_federation_known_servers, a gauge of the number of
-            # servers this homeserver knows about, including itself. May cause
-            # performance problems on large homeservers.
-            #
-            #known_servers: true
-
-        # Whether or not to report anonymized homeserver usage statistics.
-        #
-        """
-
-        if report_stats is None:
-            res += "#report_stats: true|false\n"
+        if report_stats is not None:
+            res = "report_stats: %s\n" % ("true" if report_stats else "false")
         else:
-            res += "report_stats: %s\n" % ("true" if report_stats else "false")
-
-        res += """
-        # The endpoint to report the anonymized homeserver usage statistics to.
-        # Defaults to https://matrix.org/report-usage-stats/push
-        #
-        #report_stats_endpoint: https://example.com/report-usage-stats/push
-        """
+            res = "\n"
         return res

@@ -310,6 +310,20 @@ The above will run a monolithic (single-process) Synapse with SQLite as the data
 - Passing `WORKERS=1` as an environment variable to use a workerised setup instead. This option implies the use of Postgres.
 
 
+### Prettier formatting with `gotestfmt`
+
+If you want to format the output of the tests the same way as it looks in CI,
+install [gotestfmt](https://github.com/haveyoudebuggedit/gotestfmt).
+
+You can then use this incantation to format the tests appropriately:
+
+```sh
+COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -json | gotestfmt -hide successful-tests
+```
+
+(Remove `-hide successful-tests` if you don't want to hide successful tests.)
+
+
 ### Access database for homeserver after Complement test runs.
 
 If you're curious what the database looks like after you run some tests, here are some steps to get you going in Synapse:
