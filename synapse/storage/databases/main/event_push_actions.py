@@ -148,7 +148,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         self._doing_notif_rotation = False
         if hs.config.worker.run_background_tasks:
             self._rotate_notif_loop = self._clock.looping_call(
-                self._rotate_notifs, 30 * 60 * 1000
+                self._rotate_notifs, 30 * 1000
             )
 
         self.db_pool.updates.register_background_index_update(
