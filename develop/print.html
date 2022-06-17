@@ -290,16 +290,14 @@ the main configuration file at <code>/etc/matrix-synapse/homeserver.yaml</code>.
 By doing that, you won't be asked if you want to replace your configuration
 file when you upgrade the Debian package to a later version.</p>
 <h5 id="downstream-debian-packages"><a class="header" href="#downstream-debian-packages">Downstream Debian packages</a></h5>
-<p>We do not recommend using the packages from the default Debian <code>buster</code>
-repository at this time, as they are old and suffer from known security
-vulnerabilities. You can install the latest version of Synapse from
-<a href="setup/installation.html#matrixorg-packages">our repository</a> or from <code>buster-backports</code>. Please
-see the <a href="https://backports.debian.org/Instructions/">Debian documentation</a>
-for information on how to use backports.</p>
-<p>If you are using Debian <code>sid</code> or testing, Synapse is available in the default
-repositories and it should be possible to install it simply with:</p>
+<p>Andrej Shadura maintains a <code>matrix-synapse</code> package in the Debian repositories.
+For <code>bookworm</code> and <code>sid</code>, it can be installed simply with:</p>
 <pre><code class="language-sh">sudo apt install matrix-synapse
 </code></pre>
+<p>Synapse is also avaliable in <code>bullseye-backports</code>.  Please
+see the <a href="https://backports.debian.org/Instructions/">Debian documentation</a>
+for information on how to use backports.</p>
+<p><code>matrix-synapse</code> is no longer maintained for <code>buster</code> and older.</p>
 <h5 id="downstream-ubuntu-packages"><a class="header" href="#downstream-ubuntu-packages">Downstream Ubuntu packages</a></h5>
 <p>We do not recommend using the packages in the default Ubuntu repository
 at this time, as they are old and suffer from known security vulnerabilities.
