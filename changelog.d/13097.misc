@@ -1,0 +1,1 @@
+Move methods to extract the access token outside of the `Auth` class.

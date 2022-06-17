@@ -28,7 +28,7 @@ from synapse.api.errors import (
     MissingClientTokenError,
 )
 from synapse.appservice import ApplicationService
-from synapse.http import get_request_user_agent
+from synapse.http import get_request_access_token, get_request_user_agent
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import active_span, force_tracing, start_active_span
 from synapse.storage.databases.main.registration import TokenLookupResult
@@ -170,8 +170,7 @@ class Auth:
         try:
             ip_addr = request.getClientAddress().host
             user_agent = get_request_user_agent(request)
-
-            access_token = self.get_access_token_from_request(request)
+            access_token = get_request_access_token(request)
 
             (
                 user_id,
@@ -331,7 +330,7 @@ class Auth:
         DEVICE_ID_ARG_NAME = b"org.matrix.msc3202.device_id"
 
         app_service = self.store.get_app_service_by_token(
-            self.get_access_token_from_request(request)
+            get_request_access_token(request)
         )
         if app_service is None:
             return None, None, None
@@ -455,7 +454,7 @@ class Auth:
             raise InvalidClientTokenError("Invalid access token passed.")
 
     def get_appservice_by_req(self, request: SynapseRequest) -> ApplicationService:
-        token = self.get_access_token_from_request(request)
+        token = get_request_access_token(request)
         service = self.store.get_app_service_by_token(token)
         if not service:
             logger.warning("Unrecognised appservice access token.")
@@ -510,58 +509,6 @@ class Auth:
         user_level = event_auth.get_user_power_level(user_id, auth_events)
 
         return user_level >= send_level
-
-    @staticmethod
-    def has_access_token(request: Request) -> bool:
-        """Checks if the request has an access_token.
-
-        Returns:
-            False if no access_token was given, True otherwise.
-        """
-        # This will always be set by the time Twisted calls us.
-        assert request.args is not None
-
-        query_params = request.args.get(b"access_token")
-        auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
-        return bool(query_params) or bool(auth_headers)
-
-    @staticmethod
-    def get_access_token_from_request(request: Request) -> str:
-        """Extracts the access_token from the request.
-
-        Args:
-            request: The http request.
-        Returns:
-            The access_token
-        Raises:
-            MissingClientTokenError: If there isn't a single access_token in the
-                request
-        """
-        # This will always be set by the time Twisted calls us.
-        assert request.args is not None
-
-        auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
-        query_params = request.args.get(b"access_token")
-        if auth_headers:
-            # Try the get the access_token from a "Authorization: Bearer"
-            # header
-            if query_params is not None:
-                raise MissingClientTokenError(
-                    "Mixing Authorization headers and access_token query parameters."
-                )
-            if len(auth_headers) > 1:
-                raise MissingClientTokenError("Too many Authorization headers.")
-            parts = auth_headers[0].split(b" ")
-            if parts[0] == b"Bearer" and len(parts) == 2:
-                return parts[1].decode("ascii")
-            else:
-                raise MissingClientTokenError("Invalid Authorization header.")
-        else:
-            # Try to get the access_token from the query params.
-            if not query_params:
-                raise MissingClientTokenError()
-
-            return query_params[0].decode("ascii")
 
     async def check_user_in_room_or_world_readable(
         self, room_id: str, user_id: str, allow_departed_users: bool = False

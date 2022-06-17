@@ -19,7 +19,7 @@ from twisted.internet import address, task
 from twisted.web.client import FileBodyProducer
 from twisted.web.iweb import IRequest
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import MissingClientTokenError, SynapseError
 
 
 class RequestTimedOutError(SynapseError):
@@ -98,3 +98,55 @@ def get_request_user_agent(request: IRequest, default: str = "") -> str:
 
     h = request.getHeader(b"User-Agent")
     return h.decode("ascii", "replace") if h else default
+
+
+def request_has_access_token(request: IRequest) -> bool:
+    """Checks if the request has an access_token.
+
+    Returns:
+        False if no access_token was given, True otherwise.
+    """
+    # This will always be set by the time Twisted calls us.
+    assert request.args is not None
+
+    query_params = request.args.get(b"access_token")
+    auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
+    return bool(query_params) or bool(auth_headers)
+
+
+def get_request_access_token(request: IRequest) -> str:
+    """Extracts the access_token from the request.
+
+    Args:
+        request: The http request.
+    Returns:
+        The access_token
+    Raises:
+        MissingClientTokenError: If there isn't a single access_token in the
+            request
+    """
+    # This will always be set by the time Twisted calls us.
+    assert request.args is not None
+
+    auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
+    query_params = request.args.get(b"access_token")
+    if auth_headers:
+        # Try the get the access_token from a "Authorization: Bearer"
+        # header
+        if query_params is not None:
+            raise MissingClientTokenError(
+                "Mixing Authorization headers and access_token query parameters."
+            )
+        if len(auth_headers) > 1:
+            raise MissingClientTokenError("Too many Authorization headers.")
+        parts = auth_headers[0].split(b" ")
+        if parts[0] == b"Bearer" and len(parts) == 2:
+            return parts[1].decode("ascii")
+        else:
+            raise MissingClientTokenError("Invalid Authorization header.")
+    else:
+        # Try to get the access_token from the query params.
+        if not query_params:
+            raise MissingClientTokenError()
+
+        return query_params[0].decode("ascii")

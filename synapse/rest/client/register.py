@@ -20,6 +20,7 @@ from twisted.web.server import Request
 
 import synapse
 import synapse.api.auth
+from synapse.http import get_request_access_token, request_has_access_token
 import synapse.types
 from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
 from synapse.api.errors import (
@@ -478,7 +479,7 @@ class RegisterRestServlet(RestServlet):
 
         # == Application Service Registration ==
         if body.get("type") == APP_SERVICE_REGISTRATION_TYPE:
-            if not self.auth.has_access_token(request):
+            if not request_has_access_token(request):
                 raise SynapseError(
                     400,
                     "Appservice token must be provided when using a type of m.login.application_service",
@@ -497,7 +498,7 @@ class RegisterRestServlet(RestServlet):
             # because the IRC bridges rely on being able to register stupid
             # IDs.
 
-            access_token = self.auth.get_access_token_from_request(request)
+            access_token = get_request_access_token(request)
 
             if not isinstance(desired_username, str):
                 raise SynapseError(400, "Desired Username is missing or not a string")
@@ -510,7 +511,7 @@ class RegisterRestServlet(RestServlet):
             )
 
             return 200, result
-        elif self.auth.has_access_token(request):
+        elif request_has_access_token(request):
             raise SynapseError(
                 400,
                 "An access token should not be provided on requests to /register (except if type is m.login.application_service)",

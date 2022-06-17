@@ -21,6 +21,7 @@ from typing_extensions import ParamSpec
 
 from twisted.python.failure import Failure
 from twisted.web.server import Request
+from synapse.http import get_request_access_token
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import JsonDict
@@ -40,7 +41,6 @@ P = ParamSpec("P")
 class HttpTransactionCache:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.auth = self.hs.get_auth()
         self.clock = self.hs.get_clock()
         # $txn_key: (ObservableDeferred<(res_code, res_json_body)>, timestamp)
         self.transactions: Dict[
@@ -64,7 +64,7 @@ class HttpTransactionCache:
             A transaction key
         """
         assert request.path is not None
-        token = self.auth.get_access_token_from_request(request)
+        token = get_request_access_token(request)
         return request.path.decode("utf8") + "/" + token
 
     def fetch_or_execute_request(

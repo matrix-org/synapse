@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Tuple
 
 from synapse.api import errors
 from synapse.api.errors import NotFoundError
+from synapse.http import get_request_access_token
 from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
@@ -293,7 +294,7 @@ class ClaimDehydratedDeviceServlet(RestServlet):
 
         result = await self.device_handler.rehydrate_device(
             requester.user.to_string(),
-            self.auth.get_access_token_from_request(request),
+            get_request_access_token(request),
             submission["device_id"],
         )
 
