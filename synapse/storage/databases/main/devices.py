@@ -1245,8 +1245,8 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
 
         def _get_device_list_changes_in_rooms_txn(
             txn: LoggingTransaction,
-            clause,
-            args,
+            clause: str,
+            args: List[Any],
         ) -> Set[str]:
             txn.execute(sql.format(clause=clause), args)
             return {user_id for user_id, in txn}
