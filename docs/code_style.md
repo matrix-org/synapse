@@ -70,7 +70,10 @@ on save as they take a while and can be very resource intensive.
     -   Avoid wildcard imports (`from synapse.types import *`) and
         relative imports (`from .types import UserID`).
 
-## Configuration documentation format
+## Configuration code and documentation format
+
+When adding a configuration option to the code, if several settings are grouped into a single dict, ensure that your code
+correctly handles the top-level option being set to `None` (as it will be if no sub-options are enabled).
 
 The [configuration manual](usage/configuration/config_documentation.md) acts as a
 reference to Synapse's configuration options for server administrators.
@@ -83,9 +86,9 @@ Some guidelines follow:
 
 - Each option should be listed in the config manual with the following format:
       
-    - The name of the option, prefixed by "###". 
+    - The name of the option, prefixed by `###`. 
 
-    - A comment which describes the default behaviour (ie, what
+    - A comment which describes the default behaviour (i.e. what
         happens if the setting is omitted), as well as what the effect
         will be if the setting is changed.
     - An example setting, using backticks to define the code block
@@ -94,11 +97,8 @@ Some guidelines follow:
         should be the *opposite* to the default. For other options, the example should give
         some non-default value which is likely to be useful to the reader.
 
-- There should be a line between each option, which can be achieved by adding --- before and
+- There should be a horizontal rule between each option, which can be achieved by adding `---` before and
   after the option.
-- Where several settings are grouped into a single dict, ensure that your code
-    correctly handles the top-level option being set to `None` (as it
-    will be if no sub-options are enabled).
 - `true` and `false` are spelt thus (as opposed to `True`, etc.)
 
 Example:
@@ -106,7 +106,7 @@ Example:
 ---
 ### `modules`
 
-Use the `module` sub-option to add modules under this option to extend functionality. 
+Use the `module` sub-option to add a module under `modules` to extend functionality. 
 The `module` setting then has a sub-option, `config`, which can be used to define some configuration
 for the `module`.
 
@@ -123,8 +123,8 @@ modules:
 ```
 ---
 
-
 Note that the sample configuration is generated from the synapse code
 and is maintained by a script, `scripts-dev/generate_sample_config.sh`.
 Making sure that the output from this script matches the desired format
 is left as an exercise for the reader!
+
