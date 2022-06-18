@@ -33,6 +33,7 @@ from synapse.api.constants import (
     EventContentFields,
     EventTypes,
     Membership,
+    PublicRoomsFilterFields,
     RelationTypes,
 )
 from synapse.api.errors import Codes, HttpResponseException
@@ -1882,7 +1883,7 @@ class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
         "Simple test for searching rooms over federation"
         self.federation_client.get_public_rooms.return_value = make_awaitable({})  # type: ignore[attr-defined]
 
-        search_filter = {"generic_search_term": "foobar"}
+        search_filter = {PublicRoomsFilterFields.GENERIC_SEARCH_TERM: "foobar"}
 
         channel = self.make_request(
             "POST",
@@ -1911,7 +1912,7 @@ class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
             make_awaitable({}),
         )
 
-        search_filter = {"generic_search_term": "foobar"}
+        search_filter = {PublicRoomsFilterFields.GENERIC_SEARCH_TERM: "foobar"}
 
         channel = self.make_request(
             "POST",

@@ -25,6 +25,7 @@ from synapse.api.constants import (
     GuestAccess,
     HistoryVisibility,
     JoinRules,
+    PublicRoomsFilterFields,
 )
 from synapse.api.errors import (
     Codes,
@@ -511,8 +512,12 @@ class RoomListNextBatch:
 
 
 def _matches_room_entry(room_entry: JsonDict, search_filter: dict) -> bool:
-    if search_filter and search_filter.get("generic_search_term", None):
-        generic_search_term = search_filter["generic_search_term"].upper()
+    if search_filter and search_filter.get(
+        PublicRoomsFilterFields.GENERIC_SEARCH_TERM, None
+    ):
+        generic_search_term = search_filter[
+            PublicRoomsFilterFields.GENERIC_SEARCH_TERM
+        ].upper()
         if generic_search_term in room_entry.get("name", "").upper():
             return True
         elif generic_search_term in room_entry.get("topic", "").upper():

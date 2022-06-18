@@ -32,7 +32,12 @@ from typing import (
 
 import attr
 
-from synapse.api.constants import EventContentFields, EventTypes, JoinRules
+from synapse.api.constants import (
+    EventContentFields,
+    EventTypes,
+    JoinRules,
+    PublicRoomsFilterFields,
+)
 from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.config.homeserver import HomeServerConfig
@@ -238,16 +243,16 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             if (
                 not self.config.experimental.msc3827_enabled
                 or not search_filter
-                or search_filter.get("room_types", None) is None
+                or search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None) is None
             ):
                 where_clause = "AND room_type IS NULL"
             elif (
                 self.config.experimental.msc3827_enabled
                 and search_filter
-                and search_filter.get("room_types", None)
+                and search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None)
             ):
                 clause, args = self._construct_room_type_where_clause(
-                    search_filter["room_types"]
+                    search_filter[PublicRoomsFilterFields.ROOM_TYPES]
                 )
                 where_clause = f" AND {clause}"
                 query_args += args
@@ -385,8 +390,12 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         if ignore_non_federatable:
             where_clauses.append("is_federatable")
 
-        if search_filter and search_filter.get("generic_search_term", None):
-            search_term = "%" + search_filter["generic_search_term"] + "%"
+        if search_filter and search_filter.get(
+            PublicRoomsFilterFields.GENERIC_SEARCH_TERM, None
+        ):
+            search_term = (
+                "%" + search_filter[PublicRoomsFilterFields.GENERIC_SEARCH_TERM] + "%"
+            )
 
             where_clauses.append(
                 """
@@ -406,16 +415,16 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         if (
             not self.config.experimental.msc3827_enabled
             or not search_filter
-            or search_filter.get("room_types", None) is None
+            or search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None) is None
         ):
             where_clauses.append("room_type IS NULL")
         elif (
             self.config.experimental.msc3827_enabled
             and search_filter
-            and search_filter.get("room_types", None)
+            and search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None)
         ):
             clause, args = self._construct_room_type_where_clause(
-                search_filter["room_types"]
+                search_filter[PublicRoomsFilterFields.ROOM_TYPES]
             )
             where_clauses.append(clause)
             query_args += args
