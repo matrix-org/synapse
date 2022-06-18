@@ -238,16 +238,16 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             if (
                 not self.config.experimental.msc3827_enabled
                 or not search_filter
-                or search_filter.get("room_type", None) is None
+                or search_filter.get("room_types", None) is None
             ):
                 where_clause = "AND room_type IS NULL"
             elif (
                 self.config.experimental.msc3827_enabled
                 and search_filter
-                and search_filter.get("room_type", None)
+                and search_filter.get("room_types", None)
             ):
                 clause, args = self._construct_room_type_where_clause(
-                    search_filter["room_type"]
+                    search_filter["room_types"]
                 )
                 where_clause = f" AND {clause}"
                 query_args += args
@@ -406,16 +406,16 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         if (
             not self.config.experimental.msc3827_enabled
             or not search_filter
-            or search_filter.get("room_type", None) is None
+            or search_filter.get("room_types", None) is None
         ):
             where_clauses.append("room_type IS NULL")
         elif (
             self.config.experimental.msc3827_enabled
             and search_filter
-            and search_filter.get("room_type", None)
+            and search_filter.get("room_types", None)
         ):
             clause, args = self._construct_room_type_where_clause(
-                search_filter["room_type"]
+                search_filter["room_types"]
             )
             where_clauses.append(clause)
             query_args += args
