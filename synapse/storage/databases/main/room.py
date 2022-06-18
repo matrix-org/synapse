@@ -206,7 +206,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
         # We use None when we want get rooms without a type
         isNullClause = ""
-        if (None in room_types_copy):
+        if None in room_types_copy:
             isNullClause = "OR room_type IS NULL"
             room_types_copy.remove(None)
 
@@ -235,8 +235,20 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             query_args = []
 
             where_clause = ""
-            if search_filter and search_filter.get("room_type", None):
-                clause, args = self._construct_room_type_where_clause(search_filter["room_type"])
+            if (
+                not self.config.experimental.msc3827_enabled
+                or not search_filter
+                or search_filter.get("room_type", None) is None
+            ):
+                where_clause = "AND room_type IS NULL"
+            elif (
+                self.config.experimental.msc3827_enabled
+                and search_filter
+                and search_filter.get("room_type", None)
+            ):
+                clause, args = self._construct_room_type_where_clause(
+                    search_filter["room_type"]
+                )
                 where_clause = f" AND {clause}"
                 query_args += args
 
@@ -391,8 +403,20 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 search_term.lower(),
             ]
 
-        if search_filter and search_filter.get("room_type", None):
-            clause, args = self._construct_room_type_where_clause(search_filter["room_type"])
+        if (
+            not self.config.experimental.msc3827_enabled
+            or not search_filter
+            or search_filter.get("room_type", None) is None
+        ):
+            where_clauses.append("room_type IS NULL")
+        elif (
+            self.config.experimental.msc3827_enabled
+            and search_filter
+            and search_filter.get("room_type", None)
+        ):
+            clause, args = self._construct_room_type_where_clause(
+                search_filter["room_type"]
+            )
             where_clauses.append(clause)
             query_args += args
 
