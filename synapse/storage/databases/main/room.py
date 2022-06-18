@@ -199,6 +199,23 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             desc="get_public_room_ids",
         )
 
+    def _construct_room_type_where_clause(
+        self, room_types: List[Union[str, None]]
+    ) -> Tuple[str, List[str]]:
+        room_types_copy = room_types.copy()
+
+        # We use None when we want get rooms without a type
+        isNullClause = ""
+        if (None in room_types_copy):
+            isNullClause = "OR room_type IS NULL"
+            room_types_copy.remove(None)
+
+        listClause, args = make_in_list_sql_clause(
+            self.database_engine, "room_type", room_types_copy
+        )
+
+        return f"({listClause} {isNullClause})", args
+
     async def count_public_rooms(
         self,
         network_tuple: Optional[ThirdPartyInstanceID],
@@ -219,11 +236,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
             where_clause = ""
             if search_filter and search_filter.get("room_type", None):
-                room_type = search_filter["room_type"]
-                clause, args = make_in_list_sql_clause(
-                    self.database_engine, "room_type", room_type
-                )
-
+                clause, args = self._construct_room_type_where_clause(search_filter["room_type"])
                 where_clause = f" AND {clause}"
                 query_args += args
 
@@ -379,11 +392,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             ]
 
         if search_filter and search_filter.get("room_type", None):
-            room_type = search_filter["room_type"]
-            clause, args = make_in_list_sql_clause(
-                self.database_engine, "room_type", room_type
-            )
-
+            clause, args = self._construct_room_type_where_clause(search_filter["room_type"])
             where_clauses.append(clause)
             query_args += args
 
