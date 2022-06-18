@@ -14,3 +14,6 @@
  */
 
 ALTER TABLE room_stats_state ADD room_type TEXT;
+
+INSERT INTO background_updates (update_name, progress_json)
+    VALUES ('add_room_type_column', '{}');
