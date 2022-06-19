@@ -18,7 +18,7 @@
 """Tests REST events for /rooms paths."""
 
 import json
-from typing import Any, Dict, Iterable, List, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 from unittest.mock import Mock, call
 from urllib import parse as urlparse
 
@@ -35,6 +35,7 @@ from synapse.api.constants import (
     Membership,
     PublicRoomsFilterFields,
     RelationTypes,
+    RoomTypes,
 )
 from synapse.api.errors import Codes, HttpResponseException
 from synapse.handlers.pagination import PurgeStatus
@@ -48,6 +49,7 @@ from synapse.util.stringutils import random_string
 from tests import unittest
 from tests.http.server._base import make_request_with_cancellation_test
 from tests.test_utils import make_awaitable
+from tests.unittest import override_config
 
 PATH_PREFIX = b"/_matrix/client/api/v1"
 
@@ -1857,6 +1859,97 @@ class PublicRoomsRestrictedTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request("GET", self.url, access_token=tok)
         self.assertEqual(channel.code, 200, channel.result)
+
+
+class PublicRoomsRoomTypeFilterTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+
+        config = self.default_config()
+        config["allow_public_rooms_without_auth"] = True
+        self.hs = self.setup_test_homeserver(config=config)
+        self.url = b"/_matrix/client/r0/publicRooms"
+
+        return self.hs
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        user = self.register_user("alice", "pass")
+        self.token = self.login(user, "pass")
+
+        # Create a room
+        self.helper.create_room_as(
+            user,
+            is_public=True,
+            extra_content={"visibility": "public"},
+            tok=self.token,
+        )
+        # Create a space
+        self.helper.create_room_as(
+            user,
+            is_public=True,
+            extra_content={
+                "visibility": "public",
+                "creation_content": {EventContentFields.ROOM_TYPE: RoomTypes.SPACE},
+            },
+            tok=self.token,
+        )
+
+    def make_public_rooms_request(
+        self, room_types: Union[List[Union[str, None]], None]
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        channel = self.make_request(
+            "POST",
+            self.url,
+            {"filter": {PublicRoomsFilterFields.ROOM_TYPES: room_types}},
+            self.token,
+        )
+        body = json.loads(channel.result["body"].decode("utf8"))
+        chunk = body["chunk"]
+        count = body["total_room_count_estimate"]
+
+        self.assertEqual(len(chunk), count)
+
+        return chunk, count
+
+    @override_config({"experimental_features": {"msc3827_enabled": False}})
+    def test_returns_only_rooms_if_feature_disabled(self) -> None:
+        chunk, count = self.make_public_rooms_request(["m.space"])
+
+        self.assertEqual(count, 1)
+        self.assertEqual(chunk[0].get("room_type", None), None)
+
+    @override_config({"experimental_features": {"msc3827_enabled": True}})
+    def test_returns_only_rooms_if_no_filter(self) -> None:
+        chunk, count = self.make_public_rooms_request(None)
+
+        self.assertEqual(count, 1)
+        self.assertEqual(chunk[0].get("room_type", None), None)
+
+    @override_config({"experimental_features": {"msc3827_enabled": True}})
+    def test_returns_only_rooms_based_on_filter(self) -> None:
+        chunk, count = self.make_public_rooms_request([None])
+
+        self.assertEqual(count, 1)
+        self.assertEqual(chunk[0].get("room_type", None), None)
+
+    @override_config({"experimental_features": {"msc3827_enabled": True}})
+    def test_returns_only_space_based_on_filter(self) -> None:
+        chunk, count = self.make_public_rooms_request(["m.space"])
+
+        self.assertEqual(count, 1)
+        self.assertEqual(chunk[0].get("room_type", None), "m.space")
+
+    @override_config({"experimental_features": {"msc3827_enabled": True}})
+    def test_returns_both_rooms_and_space_based_on_filter(self) -> None:
+        chunk, count = self.make_public_rooms_request(["m.space", None])
+
+        self.assertEqual(count, 2)
 
 
 class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
