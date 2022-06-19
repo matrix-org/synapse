@@ -46,6 +46,8 @@ class ClientDirectoryServer(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_GET(self, request: Request, room_alias: str) -> Tuple[int, JsonDict]:
+        if not RoomAlias.is_valid(room_alias):
+            raise SynapseError(400, 'Room alias invalid', errcode=Codes.BAD_JSON)
         room_alias_obj = RoomAlias.from_string(room_alias)
 
         res = await self.directory_handler.get_association(room_alias_obj)
@@ -55,6 +57,8 @@ class ClientDirectoryServer(RestServlet):
     async def on_PUT(
         self, request: SynapseRequest, room_alias: str
     ) -> Tuple[int, JsonDict]:
+        if not RoomAlias.is_valid(room_alias):
+            raise SynapseError(400, 'Room alias invalid', errcode=Codes.BAD_JSON)
         room_alias_obj = RoomAlias.from_string(room_alias)
 
         content = parse_json_object_from_request(request)
@@ -89,6 +93,8 @@ class ClientDirectoryServer(RestServlet):
     async def on_DELETE(
         self, request: SynapseRequest, room_alias: str
     ) -> Tuple[int, JsonDict]:
+        if not RoomAlias.is_valid(room_alias):
+            raise SynapseError(400, 'Room alias invalid', errcode=Codes.BAD_JSON)
         room_alias_obj = RoomAlias.from_string(room_alias)
         requester = await self.auth.get_user_by_req(request)
 
