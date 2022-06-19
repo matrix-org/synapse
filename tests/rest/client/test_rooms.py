@@ -1922,28 +1922,28 @@ class PublicRoomsRoomTypeFilterTestCase(unittest.HomeserverTestCase):
         chunk, count = self.make_public_rooms_request(["m.space"])
 
         self.assertEqual(count, 1)
-        self.assertEqual(chunk[0].get("room_type", None), None)
+        self.assertEqual(chunk[0].get("org.matrix.msc3827.room_type", None), None)
 
     @override_config({"experimental_features": {"msc3827_enabled": True}})
     def test_returns_only_rooms_if_no_filter(self) -> None:
         chunk, count = self.make_public_rooms_request(None)
 
         self.assertEqual(count, 1)
-        self.assertEqual(chunk[0].get("room_type", None), None)
+        self.assertEqual(chunk[0].get("org.matrix.msc3827.room_type", None), None)
 
     @override_config({"experimental_features": {"msc3827_enabled": True}})
     def test_returns_only_rooms_based_on_filter(self) -> None:
         chunk, count = self.make_public_rooms_request([None])
 
         self.assertEqual(count, 1)
-        self.assertEqual(chunk[0].get("room_type", None), None)
+        self.assertEqual(chunk[0].get("org.matrix.msc3827.room_type", None), None)
 
     @override_config({"experimental_features": {"msc3827_enabled": True}})
     def test_returns_only_space_based_on_filter(self) -> None:
         chunk, count = self.make_public_rooms_request(["m.space"])
 
         self.assertEqual(count, 1)
-        self.assertEqual(chunk[0].get("room_type", None), "m.space")
+        self.assertEqual(chunk[0].get("org.matrix.msc3827.room_type", None), "m.space")
 
     @override_config({"experimental_features": {"msc3827_enabled": True}})
     def test_returns_both_rooms_and_space_based_on_filter(self) -> None:

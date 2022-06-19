@@ -182,7 +182,7 @@ class RoomListHandler:
                 == HistoryVisibility.WORLD_READABLE,
                 "guest_can_join": room["guest_access"] == "can_join",
                 "join_rule": room["join_rules"],
-                "room_type": room["room_type"],
+                "org.matrix.msc3827.room_type": room["room_type"],
             }
 
             # Filter out Nones – rather omit the field altogether
