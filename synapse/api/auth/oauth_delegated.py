@@ -140,6 +140,9 @@ class OAuthDelegatedAuth(BaseAuth):
         resp = json_decoder.decode(resp_body.decode("utf-8"))
         return IntrospectionToken(**resp)
 
+    async def is_server_admin(self, requester: Requester) -> bool:
+        return "urn:synapse:admin:*" in requester.scope
+
     async def get_user_by_req(
         self,
         request: SynapseRequest,
