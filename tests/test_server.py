@@ -54,7 +54,7 @@ class JsonResourceTests(unittest.TestCase):
             reactor=self.reactor,
         )
 
-    def test_handler_for_request(self):
+    def test_handler_for_request(self) -> None:
         """
         JsonResource.handler_for_request gives correctly decoded URL args to
         the callback, while Twisted will give the raw bytes of URL query
@@ -83,7 +83,7 @@ class JsonResourceTests(unittest.TestCase):
 
         self.assertEqual(got_kwargs, {"room_id": "\N{SNOWMAN}"})
 
-    def test_callback_direct_exception(self):
+    def test_callback_direct_exception(self) -> None:
         """
         If the web callback raises an uncaught exception, it will be translated
         into a 500.
@@ -103,7 +103,7 @@ class JsonResourceTests(unittest.TestCase):
 
         self.assertEqual(channel.result["code"], b"500")
 
-    def test_callback_indirect_exception(self):
+    def test_callback_indirect_exception(self) -> None:
         """
         If the web callback raises an uncaught exception in a Deferred, it will
         be translated into a 500.
@@ -129,7 +129,7 @@ class JsonResourceTests(unittest.TestCase):
 
         self.assertEqual(channel.result["code"], b"500")
 
-    def test_callback_synapseerror(self):
+    def test_callback_synapseerror(self) -> None:
         """
         If the web callback raises a SynapseError, it returns the appropriate
         status code and message set in it.
@@ -151,7 +151,7 @@ class JsonResourceTests(unittest.TestCase):
         self.assertEqual(channel.json_body["error"], "Forbidden!!one!")
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
 
-    def test_no_handler(self):
+    def test_no_handler(self) -> None:
         """
         If there is no handler to process the request, Synapse will return 400.
         """
@@ -175,7 +175,7 @@ class JsonResourceTests(unittest.TestCase):
         self.assertEqual(channel.json_body["error"], "Unrecognized request")
         self.assertEqual(channel.json_body["errcode"], "M_UNRECOGNIZED")
 
-    def test_head_request(self):
+    def test_head_request(self) -> None:
         """
         JsonResource.handler_for_request gives correctly decoded URL args to
         the callback, while Twisted will give the raw bytes of URL query
@@ -233,7 +233,7 @@ class OptionsResourceTests(unittest.TestCase):
         channel = make_request(self.reactor, site, method, path, shorthand=False)
         return channel
 
-    def test_unknown_options_request(self):
+    def test_unknown_options_request(self) -> None:
         """An OPTIONS requests to an unknown URL still returns 204 No Content."""
         channel = self._make_request(b"OPTIONS", b"/foo/")
         self.assertEqual(channel.result["code"], b"204")
@@ -253,7 +253,7 @@ class OptionsResourceTests(unittest.TestCase):
             "has CORS Headers header",
         )
 
-    def test_known_options_request(self):
+    def test_known_options_request(self) -> None:
         """An OPTIONS requests to an known URL still returns 204 No Content."""
         channel = self._make_request(b"OPTIONS", b"/res/")
         self.assertEqual(channel.result["code"], b"204")
@@ -273,12 +273,12 @@ class OptionsResourceTests(unittest.TestCase):
             "has CORS Headers header",
         )
 
-    def test_unknown_request(self):
+    def test_unknown_request(self) -> None:
         """A non-OPTIONS request to an unknown URL should 404."""
         channel = self._make_request(b"GET", b"/foo/")
         self.assertEqual(channel.result["code"], b"404")
 
-    def test_known_request(self):
+    def test_known_request(self) -> None:
         """A non-OPTIONS request to an known URL should query the proper resource."""
         channel = self._make_request(b"GET", b"/res/")
         self.assertEqual(channel.result["code"], b"200")
@@ -295,7 +295,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
     def setUp(self):
         self.reactor = ThreadedMemoryReactorClock()
 
-    def test_good_response(self):
+    def test_good_response(self) -> None:
         async def callback(request):
             request.write(b"response")
             request.finish()
@@ -311,7 +311,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
         body = channel.result["body"]
         self.assertEqual(body, b"response")
 
-    def test_redirect_exception(self):
+    def test_redirect_exception(self) -> None:
         """
         If the callback raises a RedirectException, it is turned into a 30x
         with the right location.
@@ -332,7 +332,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
         location_headers = [v for k, v in headers if k == b"Location"]
         self.assertEqual(location_headers, [b"/look/an/eagle"])
 
-    def test_redirect_exception_with_cookie(self):
+    def test_redirect_exception_with_cookie(self) -> None:
         """
         If the callback raises a RedirectException which sets a cookie, that is
         returned too
@@ -357,7 +357,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
         cookies_headers = [v for k, v in headers if k == b"Set-Cookie"]
         self.assertEqual(cookies_headers, [b"session=yespls"])
 
-    def test_head_request(self):
+    def test_head_request(self) -> None:
         """A head request should work by being turned into a GET request."""
 
         async def callback(request):
