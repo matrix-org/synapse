@@ -14,7 +14,7 @@
 
 import re
 from http import HTTPStatus
-from typing import Tuple
+from typing import Awaitable, Callable, Dict, NoReturn, Optional, Tuple
 
 from twisted.internet.defer import Deferred
 from twisted.web.resource import Resource
@@ -36,6 +36,7 @@ from synapse.util import Clock
 from tests import unittest
 from tests.http.server._base import test_disconnect
 from tests.server import (
+    FakeChannel,
     FakeSite,
     ThreadedMemoryReactorClock,
     make_request,
@@ -44,7 +45,7 @@ from tests.server import (
 
 
 class JsonResourceTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.reactor = ThreadedMemoryReactorClock()
         self.hs_clock = Clock(self.reactor)
         self.homeserver = setup_test_homeserver(
@@ -62,7 +63,9 @@ class JsonResourceTests(unittest.TestCase):
         """
         got_kwargs = {}
 
-        def _callback(request, **kwargs):
+        def _callback(
+            request: SynapseRequest, **kwargs: object
+        ) -> Tuple[int, Dict[str, object]]:
             got_kwargs.update(kwargs)
             return 200, kwargs
 
@@ -89,7 +92,7 @@ class JsonResourceTests(unittest.TestCase):
         into a 500.
         """
 
-        def _callback(request, **kwargs):
+        def _callback(request: SynapseRequest, **kwargs: object) -> NoReturn:
             raise Exception("boo")
 
         res = JsonResource(self.homeserver)
@@ -109,11 +112,11 @@ class JsonResourceTests(unittest.TestCase):
         be translated into a 500.
         """
 
-        def _throw(*args):
+        def _throw(*args: object) -> NoReturn:
             raise Exception("boo")
 
-        def _callback(request, **kwargs):
-            d = Deferred()
+        def _callback(request: SynapseRequest, **kwargs: object) -> "Deferred[None]":
+            d: "Deferred[None]" = Deferred()
             d.addCallback(_throw)
             self.reactor.callLater(0.5, d.callback, True)
             return make_deferred_yieldable(d)
@@ -135,7 +138,7 @@ class JsonResourceTests(unittest.TestCase):
         status code and message set in it.
         """
 
-        def _callback(request, **kwargs):
+        def _callback(request: SynapseRequest, **kwargs: object) -> NoReturn:
             raise SynapseError(403, "Forbidden!!one!", Codes.FORBIDDEN)
 
         res = JsonResource(self.homeserver)
@@ -156,7 +159,7 @@ class JsonResourceTests(unittest.TestCase):
         If there is no handler to process the request, Synapse will return 400.
         """
 
-        def _callback(request, **kwargs):
+        def _callback(request: SynapseRequest, **kwargs: object) -> None:
             """
             Not ever actually called!
             """
@@ -182,7 +185,9 @@ class JsonResourceTests(unittest.TestCase):
         arguments.
         """
 
-        def _callback(request, **kwargs):
+        def _callback(
+            request: SynapseRequest, **kwargs: object
+        ) -> Tuple[int, Dict[str, object]]:
             return 200, {"result": True}
 
         res = JsonResource(self.homeserver)
@@ -203,20 +208,21 @@ class JsonResourceTests(unittest.TestCase):
 
 
 class OptionsResourceTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.reactor = ThreadedMemoryReactorClock()
 
         class DummyResource(Resource):
             isLeaf = True
 
-            def render(self, request):
-                return request.path
+            def render(self, request: SynapseRequest) -> bytes:
+                # Type-ignore: mypy thinks request.path is Optional[Any], not bytes.
+                return request.path  # type: ignore[return-value]
 
         # Setup a resource with some children.
         self.resource = OptionsResource()
         self.resource.putChild(b"res", DummyResource())
 
-    def _make_request(self, method, path):
+    def _make_request(self, method: bytes, path: bytes) -> FakeChannel:
         """Create a request from the method/path and return a channel with the response."""
         # Create a site and query for the resource.
         site = SynapseSite(
@@ -287,16 +293,17 @@ class OptionsResourceTests(unittest.TestCase):
 
 class WrapHtmlRequestHandlerTests(unittest.TestCase):
     class TestResource(DirectServeHtmlResource):
-        callback = None
+        callback: Optional[Callable[..., Awaitable[None]]]
 
-        async def _async_render_GET(self, request):
+        async def _async_render_GET(self, request: SynapseRequest) -> None:
+            assert self.callback is not None
             await self.callback(request)
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.reactor = ThreadedMemoryReactorClock()
 
     def test_good_response(self) -> None:
-        async def callback(request):
+        async def callback(request: SynapseRequest) -> None:
             request.write(b"response")
             request.finish()
 
@@ -317,7 +324,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
         with the right location.
         """
 
-        async def callback(request, **kwargs):
+        async def callback(request: SynapseRequest, **kwargs: object) -> None:
             raise RedirectException(b"/look/an/eagle", 301)
 
         res = WrapHtmlRequestHandlerTests.TestResource()
@@ -338,7 +345,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
         returned too
         """
 
-        async def callback(request, **kwargs):
+        async def callback(request: SynapseRequest, **kwargs: object) -> NoReturn:
             e = RedirectException(b"/no/over/there", 304)
             e.cookies.append(b"session=yespls")
             raise e
@@ -360,7 +367,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
     def test_head_request(self) -> None:
         """A head request should work by being turned into a GET request."""
 
-        async def callback(request):
+        async def callback(request: SynapseRequest) -> None:
             request.write(b"response")
             request.finish()
 
@@ -410,7 +417,7 @@ class CancellableDirectServeHtmlResource(DirectServeHtmlResource):
 class DirectServeJsonResourceCancellationTests(unittest.TestCase):
     """Tests for `DirectServeJsonResource` cancellation."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.reactor = ThreadedMemoryReactorClock()
         self.clock = Clock(self.reactor)
         self.resource = CancellableDirectServeJsonResource(self.clock)
@@ -444,7 +451,7 @@ class DirectServeJsonResourceCancellationTests(unittest.TestCase):
 class DirectServeHtmlResourceCancellationTests(unittest.TestCase):
     """Tests for `DirectServeHtmlResource` cancellation."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.reactor = ThreadedMemoryReactorClock()
         self.clock = Clock(self.reactor)
         self.resource = CancellableDirectServeHtmlResource(self.clock)
