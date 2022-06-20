@@ -1,1 +1,1 @@
-Validates room alias before calling internal functions
+Fix a long-standing bug where room directory requests would cause an internal server error if given a malformed room alias.
