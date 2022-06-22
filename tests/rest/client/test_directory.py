@@ -215,6 +215,19 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, expected_code, channel.result)
         return alias
 
+    def test_invalid_alias(self) -> None:
+        alias = "#potato"
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/r0/directory/room/{alias}",
+            access_token=self.user_tok,
+        )
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
+        self.assertIn("error", channel.json_body, channel.json_body)
+        self.assertEqual(
+            channel.json_body["errcode"], "M_INVALID_PARAM", channel.json_body
+        )
+
     def random_alias(self, length: int) -> str:
         return RoomAlias(random_string(length), self.hs.hostname).to_string()
 
