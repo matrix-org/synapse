@@ -1582,11 +1582,6 @@ class FederationHandler:
 
                 # we raced against more events arriving with partial state. Go round
                 # the loop again. We've already logged a warning, so no need for more.
-                # TODO(faster_joins): there is still a race here, whereby incoming events which raced
-                #   with us will fail to be persisted after the call to `clear_partial_state_room` due to
-                #   having partial state.
-                #   https://github.com/matrix-org/synapse/issues/12988
-                #
                 continue
 
             events = await self.store.get_events_as_list(
