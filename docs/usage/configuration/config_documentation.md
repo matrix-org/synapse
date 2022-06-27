@@ -317,7 +317,7 @@ Example configuration:
 allow_public_rooms_without_auth: true
 ```
 ---
-### `allow_public_rooms_without_auth`
+### `allow_public_rooms_over_federation`
 
 If set to true, allows any other homeserver to fetch the server's public
 rooms directory via federation. Defaults to false.
