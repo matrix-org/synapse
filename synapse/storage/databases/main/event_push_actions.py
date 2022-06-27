@@ -865,6 +865,16 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         rows = txn.fetchall()
 
         if not rows:
+            # We always update `event_push_summary_last_receipt_stream_id` to
+            # ensure that we don't rescan the same receipts for remote users.
+            #
+            # This requires repeatable read to be safe.
+            txn.execute(
+                """
+                UPDATE event_push_summary_last_receipt_stream_id
+                SET stream_id = (SELECT COALESCE(MAX(stream_id), 0) FROM receipts_linearized)
+                """
+            )
             return True
 
         # For each new read receipt we delete push actions from before it and
@@ -908,13 +918,15 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
                 },
             )
 
-        last_stream_id = rows[-1][0]
-
-        self.db_pool.simple_update_one_txn(
-            txn,
-            table="event_push_summary_last_receipt_stream_id",
-            keyvalues={},
-            updatevalues={"stream_id": last_stream_id},
+        # We always update `event_push_summary_last_receipt_stream_id` to
+        # ensure that we don't rescan the same receipts for remote users.
+        #
+        # This requires repeatable read to be safe.
+        txn.execute(
+            """
+            UPDATE event_push_summary_last_receipt_stream_id
+            SET stream_id = (SELECT COALESCE(MAX(stream_id), 0) FROM receipts_linearized)
+            """
         )
 
         return len(rows) < limit
