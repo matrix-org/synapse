@@ -46,10 +46,12 @@ from typing import (
     Set,
     Tuple,
     cast,
+    overload,
 )
 
 import attr
 from frozendict import frozendict
+from typing_extensions import Literal
 
 from twisted.internet import defer
 
@@ -794,6 +796,32 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             "_get_max_topological_txn", self._get_max_topological_txn, room_id
         )
         return RoomStreamToken(topo, stream_ordering)
+
+    @overload
+    def get_stream_id_for_event_txn(
+        self,
+        txn: LoggingTransaction,
+        event_id: str,
+        allow_none: Literal[True],
+    ) -> int:
+        ...
+
+    @overload
+    def get_stream_id_for_event_txn(
+        self,
+        txn: LoggingTransaction,
+        event_id: str,
+    ) -> int:
+        ...
+
+    @overload
+    def get_stream_id_for_event_txn(
+        self,
+        txn: LoggingTransaction,
+        event_id: str,
+        allow_none: bool = False,
+    ) -> Optional[int]:
+        ...
 
     def get_stream_id_for_event_txn(
         self,
