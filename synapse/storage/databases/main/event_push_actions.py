@@ -843,10 +843,18 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
 
         limit = 100
 
+        min_stream_id = self.db_pool.simple_select_one_onecol_txn(
+            txn,
+            table="event_push_summary_last_receipt_stream_id",
+            keyvalues={},
+            retcol="stream_id",
+        )
+
         sql = """
             SELECT r.stream_id, r.room_id, r.user_id, e.stream_ordering
-            FROM receipts_linearized AS r, event_push_summary_last_receipt_stream_id AS eps, events AS e
-            WHERE r.stream_id > eps.stream_id AND r.event_id = e.event_id AND user_id LIKE ?
+            FROM receipts_linearized AS r
+            INNER JOIN events AS e USING (event_id)
+            WHERE r.stream_id > ? AND user_id LIKE ?
             ORDER BY r.stream_id ASC
             LIMIT ?
         """
@@ -858,6 +866,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         txn.execute(
             sql,
             (
+                min_stream_id,
                 user_filter,
                 limit,
             ),
