@@ -1,1 +1,1 @@
-Fix wrong section headline in the homeserver config documentation
+Fix wrong section headline for `allow_public_rooms_over_federation` in the homeserver config documentation
