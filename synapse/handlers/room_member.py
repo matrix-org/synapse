@@ -26,18 +26,13 @@ from synapse.api.constants import (
     GuestAccess,
     Membership,
 )
-from synapse.api.errors import (
-    AuthError,
-    Codes,
-    LimitExceededError,
-    ShadowBanError,
-    SynapseError,
-)
+from synapse.api.errors import AuthError, Codes, ShadowBanError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.event_auth import get_named_level, get_power_level_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
+from synapse.module_api import NOT_SPAM
 from synapse.storage.state import StateFilter
 from synapse.types import (
     JsonDict,
@@ -379,16 +374,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             # Only rate-limit if the user actually joined the room, otherwise we'll end
             # up blocking profile updates.
             if newly_joined and ratelimit:
-                time_now_s = self.clock.time()
-                (
-                    allowed,
-                    time_allowed,
-                ) = await self._join_rate_limiter_local.can_do_action(requester)
-
-                if not allowed:
-                    raise LimitExceededError(
-                        retry_after_ms=int(1000 * (time_allowed - time_now_s))
-                    )
+                await self._join_rate_limiter_local.ratelimit(requester)
 
         result_event = await self.event_creation_handler.handle_new_client_event(
             requester,
@@ -683,7 +669,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             if target_id == self._server_notices_mxid:
                 raise SynapseError(HTTPStatus.FORBIDDEN, "Cannot invite this user")
 
-            block_invite = False
+            block_invite_code = None
 
             if (
                 self._server_notices_mxid is not None
@@ -701,16 +687,19 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                         "Blocking invite: user is not admin and non-admin "
                         "invites disabled"
                     )
-                    block_invite = True
+                    block_invite_code = Codes.FORBIDDEN
 
-                if not await self.spam_checker.user_may_invite(
+                spam_check = await self.spam_checker.user_may_invite(
                     requester.user.to_string(), target_id, room_id
-                ):
+                )
+                if spam_check != NOT_SPAM:
                     logger.info("Blocking invite due to spam checker")
-                    block_invite = True
+                    block_invite_code = spam_check
 
-            if block_invite:
-                raise SynapseError(403, "Invites have been disabled on this server")
+            if block_invite_code is not None:
+                raise SynapseError(
+                    403, "Invites have been disabled on this server", block_invite_code
+                )
 
         # An empty prev_events list is allowed as long as the auth_event_ids are present
         if prev_event_ids is not None:
@@ -818,11 +807,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 # We assume that if the spam checker allowed the user to create
                 # a room then they're allowed to join it.
                 and not new_room
-                and not await self.spam_checker.user_may_join_room(
+            ):
+                spam_check = await self.spam_checker.user_may_join_room(
                     target.to_string(), room_id, is_invited=inviter is not None
                 )
-            ):
-                raise SynapseError(403, "Not allowed to join this room")
+                if spam_check != NOT_SPAM:
+                    raise SynapseError(403, "Not allowed to join this room", spam_check)
 
             # Check if a remote join should be performed.
             remote_join, remote_room_hosts = await self._should_perform_remote_join(
@@ -830,18 +820,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             )
             if remote_join:
                 if ratelimit:
-                    time_now_s = self.clock.time()
-                    (
-                        allowed,
-                        time_allowed,
-                    ) = await self._join_rate_limiter_remote.can_do_action(
+                    await self._join_rate_limiter_remote.ratelimit(
                         requester,
                     )
-
-                    if not allowed:
-                        raise LimitExceededError(
-                            retry_after_ms=int(1000 * (time_allowed - time_now_s))
-                        )
 
                 inviter = await self._get_inviter(target.to_string(), room_id)
                 if inviter and not self.hs.is_mine(inviter):
@@ -1369,13 +1350,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             )
         else:
             # Check if the spamchecker(s) allow this invite to go through.
-            if not await self.spam_checker.user_may_send_3pid_invite(
+            spam_check = await self.spam_checker.user_may_send_3pid_invite(
                 inviter_userid=requester.user.to_string(),
                 medium=medium,
                 address=address,
                 room_id=room_id,
-            ):
-                raise SynapseError(403, "Cannot send threepid invite")
+            )
+            if spam_check != NOT_SPAM:
+                raise SynapseError(403, "Cannot send threepid invite", spam_check)
 
             stream_id = await self._make_and_store_3pid_invite(
                 requester,
@@ -1401,7 +1383,19 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         txn_id: Optional[str],
         id_access_token: Optional[str] = None,
     ) -> int:
-        room_state = await self.state_handler.get_current_state(room_id)
+        room_state = await self._storage_controllers.state.get_current_state(
+            room_id,
+            StateFilter.from_types(
+                [
+                    (EventTypes.Member, user.to_string()),
+                    (EventTypes.CanonicalAlias, ""),
+                    (EventTypes.Name, ""),
+                    (EventTypes.Create, ""),
+                    (EventTypes.JoinRules, ""),
+                    (EventTypes.RoomAvatar, ""),
+                ]
+            ),
+        )
 
         inviter_display_name = ""
         inviter_avatar_url = ""
@@ -1797,7 +1791,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
     async def forget(self, user: UserID, room_id: str) -> None:
         user_id = user.to_string()
 
-        member = await self.state_handler.get_current_state(
+        member = await self._storage_controllers.state.get_current_state_event(
             room_id=room_id, event_type=EventTypes.Member, state_key=user_id
         )
         membership = member.membership if member else None

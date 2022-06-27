@@ -45,7 +45,6 @@ from .event_push_actions import EventPushActionsStore
 from .events_bg_updates import EventsBackgroundUpdatesStore
 from .events_forward_extremities import EventForwardExtremitiesStore
 from .filtering import FilteringStore
-from .group_server import GroupServerStore
 from .keys import KeyStore
 from .lock import LockStore
 from .media_repository import MediaRepositoryStore
@@ -105,19 +104,19 @@ class DataStore(
     PusherStore,
     PushRuleStore,
     ApplicationServiceTransactionStore,
+    EventPushActionsStore,
+    ServerMetricsStore,
     ReceiptsStore,
     EndToEndKeyStore,
     EndToEndRoomKeyStore,
     SearchStore,
     TagsStore,
     AccountDataStore,
-    EventPushActionsStore,
     OpenIdStore,
     ClientIpWorkerStore,
     DeviceStore,
     DeviceInboxStore,
     UserDirectoryStore,
-    GroupServerStore,
     UserErasureStore,
     MonthlyActiveUsersWorkerStore,
     StatsStore,
@@ -126,7 +125,6 @@ class DataStore(
     UIAuthStore,
     EventForwardExtremitiesStore,
     CacheInvalidationWorkerStore,
-    ServerMetricsStore,
     LockStore,
     SessionStore,
 ):
@@ -149,10 +147,6 @@ class DataStore(
                 ("device_lists_outbound_pokes", "stream_id"),
                 ("device_lists_changes_in_room", "stream_id"),
             ],
-        )
-
-        self._group_updates_id_gen = StreamIdGenerator(
-            db_conn, "local_group_updates", "stream_id"
         )
 
         self._cache_id_gen: Optional[MultiWriterIdGenerator]
@@ -197,24 +191,11 @@ class DataStore(
             prefilled_cache=curr_state_delta_prefill,
         )
 
-        _group_updates_prefill, min_group_updates_id = self.db_pool.get_cache_dict(
-            db_conn,
-            "local_group_updates",
-            entity_column="user_id",
-            stream_column="stream_id",
-            max_value=self._group_updates_id_gen.get_current_token(),
-            limit=1000,
-        )
-        self._group_updates_stream_cache = StreamChangeCache(
-            "_group_updates_stream_cache",
-            min_group_updates_id,
-            prefilled_cache=_group_updates_prefill,
-        )
-
         self._stream_order_on_start = self.get_room_max_stream_ordering()
         self._min_stream_order_on_start = self.get_room_min_stream_ordering()
 
     def get_device_stream_token(self) -> int:
+        # TODO: shouldn't this be moved to `DeviceWorkerStore`?
         return self._device_list_id_gen.get_current_token()
 
     async def get_users(self) -> List[JsonDict]:

@@ -59,6 +59,7 @@ class FollowerTypingHandler:
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.server_name = hs.config.server.server_name
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
@@ -131,7 +132,6 @@ class FollowerTypingHandler:
             return
 
         try:
-            users = await self.store.get_users_in_room(member.room_id)
             self._member_last_federation_poke[member] = self.clock.time_msec()
 
             now = self.clock.time_msec()
@@ -139,7 +139,10 @@ class FollowerTypingHandler:
                 now=now, obj=member, then=now + FEDERATION_PING_INTERVAL
             )
 
-            for domain in {get_domain_from_id(u) for u in users}:
+            hosts = await self._storage_controllers.state.get_current_hosts_in_room(
+                member.room_id
+            )
+            for domain in hosts:
                 if domain != self.server_name:
                     logger.debug("sending typing update to %s", domain)
                     self.federation.build_and_send_edu(

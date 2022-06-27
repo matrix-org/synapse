@@ -1805,19 +1805,8 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
             columns=["creation_ts"],
         )
 
-        # we no longer use refresh tokens, but it's possible that some people
-        # might have a background update queued to build this index. Just
-        # clear the background update.
-        self.db_pool.updates.register_noop_background_update(
-            "refresh_tokens_device_index"
-        )
-
         self.db_pool.updates.register_background_update_handler(
             "users_set_deactivated_flag", self._background_update_set_deactivated_flag
-        )
-
-        self.db_pool.updates.register_noop_background_update(
-            "user_threepids_grandfather"
         )
 
         self.db_pool.updates.register_background_index_update(

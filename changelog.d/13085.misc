@@ -1,0 +1,1 @@
+Correctly report prometheus DB stats for `get_earliest_token_for_stats`.

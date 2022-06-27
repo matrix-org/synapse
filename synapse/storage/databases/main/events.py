@@ -46,7 +46,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.databases.main.events_worker import EventCacheEntry
 from synapse.storage.databases.main.search import SearchEntry
-from synapse.storage.engines.postgres import PostgresEngine
+from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import AbstractStreamIdGenerator
 from synapse.storage.util.sequence import SequenceGenerator
 from synapse.types import JsonDict, StateMap, get_domain_from_id
@@ -2296,11 +2296,9 @@ class PersistEventsStore:
         self.db_pool.simple_insert_many_txn(
             txn,
             table="event_edges",
-            keys=("event_id", "prev_event_id", "room_id", "is_state"),
+            keys=("event_id", "prev_event_id"),
             values=[
-                (ev.event_id, e_id, ev.room_id, False)
-                for ev in events
-                for e_id in ev.prev_event_ids()
+                (ev.event_id, e_id) for ev in events for e_id in ev.prev_event_ids()
             ],
         )
 

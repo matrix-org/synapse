@@ -28,6 +28,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.appservice import ApplicationService
+from synapse.module_api import NOT_SPAM
 from synapse.storage.databases.main.directory import RoomAliasMapping
 from synapse.types import JsonDict, Requester, RoomAlias, UserID, get_domain_from_id
 
@@ -141,10 +142,15 @@ class DirectoryHandler:
                         403, "You must be in the room to create an alias for it"
                     )
 
-            if not await self.spam_checker.user_may_create_room_alias(
+            spam_check = await self.spam_checker.user_may_create_room_alias(
                 user_id, room_alias
-            ):
-                raise AuthError(403, "This user is not permitted to create this alias")
+            )
+            if spam_check != self.spam_checker.NOT_SPAM:
+                raise AuthError(
+                    403,
+                    "This user is not permitted to create this alias",
+                    spam_check,
+                )
 
             if not self.config.roomdirectory.is_alias_creation_allowed(
                 user_id, room_id, room_alias_str
@@ -320,7 +326,7 @@ class DirectoryHandler:
         Raises:
             ShadowBanError if the requester has been shadow-banned.
         """
-        alias_event = await self.state.get_current_state(
+        alias_event = await self._storage_controllers.state.get_current_state_event(
             room_id, EventTypes.CanonicalAlias, ""
         )
 
@@ -430,9 +436,12 @@ class DirectoryHandler:
         """
         user_id = requester.user.to_string()
 
-        if not await self.spam_checker.user_may_publish_room(user_id, room_id):
+        spam_check = await self.spam_checker.user_may_publish_room(user_id, room_id)
+        if spam_check != NOT_SPAM:
             raise AuthError(
-                403, "This user is not permitted to publish rooms to the room list"
+                403,
+                "This user is not permitted to publish rooms to the room list",
+                spam_check,
             )
 
         if requester.is_guest:

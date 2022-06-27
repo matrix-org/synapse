@@ -1,0 +1,112 @@
+{#
+  This file extends the default 'shared' configuration file (from the 'synapse-workers'
+  docker image) with Complement-specific  tweak.
+
+  The base configuration is moved out of the default path to `shared-orig.yaml.j2`
+  in the Complement Dockerfile and below we include that original file.
+#}
+
+## Server ##
+report_stats: False
+trusted_key_servers: []
+enable_registration: true
+enable_registration_without_verification: true
+bcrypt_rounds: 4
+
+## Registration ##
+
+# Needed by Complement to register admin users
+# DO NOT USE in a production configuration! This should be a random secret.
+registration_shared_secret: complement
+
+## Federation ##
+
+# trust certs signed by Complement's CA
+federation_custom_ca_list:
+- /complement/ca/ca.crt
+
+# unblacklist RFC1918 addresses
+federation_ip_range_blacklist: []
+
+# Disable server rate-limiting
+rc_federation:
+  window_size: 1000
+  sleep_limit: 10
+  sleep_delay: 500
+  reject_limit: 99999
+  concurrent: 3
+
+rc_message:
+  per_second: 9999
+  burst_count: 9999
+
+rc_registration:
+  per_second: 9999
+  burst_count: 9999
+
+rc_login:
+  address:
+    per_second: 9999
+    burst_count: 9999
+  account:
+    per_second: 9999
+    burst_count: 9999
+  failed_attempts:
+    per_second: 9999
+    burst_count: 9999
+
+rc_admin_redaction:
+  per_second: 9999
+  burst_count: 9999
+
+rc_joins:
+  local:
+    per_second: 9999
+    burst_count: 9999
+  remote:
+    per_second: 9999
+    burst_count: 9999
+
+rc_3pid_validation:
+  per_second: 1000
+  burst_count: 1000
+
+rc_invites:
+  per_room:
+    per_second: 1000
+    burst_count: 1000
+  per_user:
+    per_second: 1000
+    burst_count: 1000
+
+federation_rr_transactions_per_room_per_second: 9999
+
+## Experimental Features ##
+
+experimental_features:
+  # Enable spaces support
+  spaces_enabled: true
+  # Enable history backfilling support
+  msc2716_enabled: true
+  # server-side support for partial state in /send_join responses
+  msc3706_enabled: true
+  {% if not workers_in_use %}
+  # client-side support for partial state in /send_join responses
+  faster_joins: true
+  {% endif %}
+  # Enable jump to date endpoint
+  msc3030_enabled: true
+
+server_notices:
+  system_mxid_localpart: _server
+  system_mxid_display_name: "Server Alert"
+  system_mxid_avatar_url: ""
+  room_name: "Server Alert"
+
+
+# Disable sync cache so that initial `/sync` requests are up-to-date.
+caches:
+  sync_response_cache_duration: 0
+
+
+{% include "shared-orig.yaml.j2" %}

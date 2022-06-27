@@ -1,1 +1,0 @@
-Check if we are in a virtual environment before overriding the `PYTHONPATH` environment variable in the demo script.
