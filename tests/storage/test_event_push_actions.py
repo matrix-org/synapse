@@ -55,7 +55,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
 
     def test_count_aggregation(self) -> None:
         room_id = "!foo:example.com"
-        user_id = "@user1235:example.com"
+        user_id = "@user1235:test"
 
         last_read_stream_ordering = [0]
 

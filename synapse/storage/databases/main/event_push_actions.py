@@ -846,12 +846,22 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         sql = """
             SELECT r.stream_id, r.room_id, r.user_id, e.stream_ordering
             FROM receipts_linearized AS r, event_push_summary_last_receipt_stream_id AS eps, events AS e
-            WHERE r.stream_id > eps.stream_id AND r.event_id = e.event_id
+            WHERE r.stream_id > eps.stream_id AND r.event_id = e.event_id AND user_id LIKE ?
             ORDER BY r.stream_id ASC
             LIMIT ?
         """
 
-        txn.execute(sql, (limit,))
+        # We only want local users, so we add a dodgy filter to the above query
+        # and recheck it below.
+        user_filter = "%:" + self.hs.hostname
+
+        txn.execute(
+            sql,
+            (
+                user_filter,
+                limit,
+            ),
+        )
         rows = txn.fetchall()
 
         if not rows:
@@ -860,6 +870,10 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         # For each new read receipt we delete push actions from before it and
         # recalculate the summary.
         for _, room_id, user_id, stream_ordering in rows:
+            # Only handle our own read receipts.
+            if not self.hs.is_mine_id(user_id):
+                continue
+
             txn.execute(
                 """
                 DELETE FROM event_push_actions
