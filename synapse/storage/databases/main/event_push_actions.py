@@ -233,14 +233,25 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
 
         counts = NotifCounts()
 
-        # First we pull the counts from the summary table
+        # First we pull the counts from the summary table.
+        #
+        # We check that `last_receipt_stream_ordering` matches the stream
+        # ordering given, if it doesn't then a new read receipt hasn't been
+        # handled yet and so we the data in the table is stale.
+        #
+        # If `last_receipt_stream_ordering` is null then that means its up to
+        # date.
         txn.execute(
             """
                 SELECT stream_ordering, notif_count, COALESCE(unread_count, 0)
                 FROM event_push_summary
-                WHERE room_id = ? AND user_id = ? AND stream_ordering > ?
+                WHERE room_id = ? AND user_id = ?
+                AND (
+                    (last_receipt_stream_ordering IS NULL AND stream_ordering > ?)
+                    OR last_receipt_stream_ordering = ?
+                )
             """,
-            (room_id, user_id, stream_ordering),
+            (room_id, user_id, stream_ordering, stream_ordering),
         )
         row = txn.fetchone()
 
@@ -800,6 +811,18 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         self._doing_notif_rotation = True
 
         try:
+            # First we handle any new receipts that have happened.
+            while True:
+                logger.info("Handling new receipts")
+
+                caught_up = await self.db_pool.runInteraction(
+                    "_handle_new_receipts_for_notifs_txn",
+                    self._handle_new_receipts_for_notifs_txn,
+                )
+                if caught_up:
+                    break
+
+            # Then we update the event push summaries for any new events
             while True:
                 logger.info("Rotating notifications")
 
@@ -810,9 +833,77 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
                     break
                 await self.hs.get_clock().sleep(self._rotate_delay)
 
+            # Finally we clear out old event push actions.
             await self._remove_old_push_actions_that_have_rotated()
         finally:
             self._doing_notif_rotation = False
+
+    def _handle_new_receipts_for_notifs_txn(self, txn: LoggingTransaction) -> bool:
+        """Check for new read receipts and delete from event push actions."""
+
+        limit = 100
+
+        sql = """
+            SELECT r.stream_id, r.room_id, r.user_id, e.stream_ordering
+            FROM receipts_linearized AS r, event_push_summary_last_receipt_stream_id AS eps, events AS e
+            WHERE r.stream_id > eps.stream_id AND r.event_id = e.event_id
+            ORDER BY r.stream_id ASC
+            LIMIT ?
+        """
+
+        txn.execute(sql, (limit,))
+        rows = txn.fetchall()
+
+        if not rows:
+            return True
+
+        # For each new read receipt we delete push actions from before it and
+        # recalculate the summary.
+        for _, room_id, user_id, stream_ordering in rows:
+            txn.execute(
+                """
+                DELETE FROM event_push_actions
+                WHERE room_id = ?
+                    AND user_id = ?
+                    AND stream_ordering <= ?
+                    AND highlight = 0
+                """,
+                (room_id, user_id, stream_ordering),
+            )
+
+            old_rotate_stream_ordering = self.db_pool.simple_select_one_onecol_txn(
+                txn,
+                table="event_push_summary_stream_ordering",
+                keyvalues={},
+                retcol="stream_ordering",
+            )
+
+            notif_count, unread_count = self._get_notif_unread_count_for_user_room(
+                txn, room_id, user_id, stream_ordering, old_rotate_stream_ordering
+            )
+
+            self.db_pool.simple_upsert_txn(
+                txn,
+                table="event_push_summary",
+                keyvalues={"room_id": room_id, "user_id": user_id},
+                values={
+                    "notif_count": notif_count,
+                    "unread_count": unread_count,
+                    "stream_ordering": old_rotate_stream_ordering,
+                    "last_receipt_stream_ordering": stream_ordering,
+                },
+            )
+
+        last_stream_id = rows[-1][0]
+
+        self.db_pool.simple_update_one_txn(
+            txn,
+            table="event_push_summary_last_receipt_stream_id",
+            keyvalues={},
+            updatevalues={"stream_id": last_stream_id},
+        )
+
+        return len(rows) < limit
 
     def _rotate_notifs_txn(self, txn: LoggingTransaction) -> bool:
         """Archives older notifications into event_push_summary. Returns whether
@@ -1053,44 +1144,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         txn.call_after(
             self.get_unread_event_push_actions_by_room_for_user.invalidate,
             (room_id, user_id),
-        )
-
-        # We need to join on the events table to get the received_ts for
-        # event_push_actions and sqlite won't let us use a join in a delete so
-        # we can't just delete where received_ts < x. Furthermore we can
-        # only identify event_push_actions by a tuple of room_id, event_id
-        # we we can't use a subquery.
-        # Instead, we look up the stream ordering for the last event in that
-        # room received before the threshold time and delete event_push_actions
-        # in the room with a stream_odering before that.
-        txn.execute(
-            "DELETE FROM event_push_actions "
-            " WHERE user_id = ? AND room_id = ? AND "
-            " stream_ordering <= ?"
-            " AND ((stream_ordering < ? AND highlight = 1) or highlight = 0)",
-            (user_id, room_id, stream_ordering, self.stream_ordering_month_ago),
-        )
-
-        old_rotate_stream_ordering = self.db_pool.simple_select_one_onecol_txn(
-            txn,
-            table="event_push_summary_stream_ordering",
-            keyvalues={},
-            retcol="stream_ordering",
-        )
-
-        notif_count, unread_count = self._get_notif_unread_count_for_user_room(
-            txn, room_id, user_id, stream_ordering, old_rotate_stream_ordering
-        )
-
-        self.db_pool.simple_upsert_txn(
-            txn,
-            table="event_push_summary",
-            keyvalues={"room_id": room_id, "user_id": user_id},
-            values={
-                "notif_count": notif_count,
-                "unread_count": unread_count,
-                "stream_ordering": old_rotate_stream_ordering,
-            },
         )
 
 
