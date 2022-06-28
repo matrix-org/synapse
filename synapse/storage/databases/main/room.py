@@ -241,14 +241,12 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
 
             room_type_clause = ""
             if (
-                not self.config.experimental.msc3827_enabled
-                or not search_filter
+                not search_filter
                 or search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None) is None
             ):
                 room_type_clause = "AND room_type IS NULL"
             elif (
-                self.config.experimental.msc3827_enabled
-                and search_filter
+                search_filter
                 and search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None)
             ):
                 clause, args = self._construct_room_type_where_clause(
@@ -413,14 +411,12 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             ]
 
         if (
-            not self.config.experimental.msc3827_enabled
-            or not search_filter
+            not search_filter
             or search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None) is None
         ):
             where_clauses.append("room_type IS NULL")
         elif (
-            self.config.experimental.msc3827_enabled
-            and search_filter
+            search_filter
             and search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None)
         ):
             clause, args = self._construct_room_type_where_clause(
