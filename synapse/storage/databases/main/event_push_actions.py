@@ -236,8 +236,10 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         # First we pull the counts from the summary table.
         #
         # We check that `last_receipt_stream_ordering` matches the stream
-        # ordering given, if it doesn't then a new read receipt hasn't been
-        # handled yet and so we the data in the table is stale.
+        # ordering given, if it doesn't then a new read receipt has arrived and
+        # we haven't yet updated the counts in `event_push_summary` to reflect
+        # that. In the latter case we simply ignore `event_push_summary` counts
+        # and do a manual count of rows in `event_push_actions` table below.
         #
         # If `last_receipt_stream_ordering` is null then that means its up to
         # date.
@@ -274,9 +276,9 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         if row:
             counts.highlight_count += row[0]
 
-        # Finally we need to count push actions that haven't been summarized
-        # yet.
-        # We only want to pull out push actions that we haven't summarized yet.
+        # Finally we need to count push actions that aren't included in the
+        # summary returned above, e.g. recent events that haven't been
+        # summarized yet, or the summary is empty due to a recent read receipt.
         stream_ordering = max(stream_ordering, summary_stream_ordering)
         notify_count, unread_count = self._get_notif_unread_count_for_user_room(
             txn, room_id, user_id, stream_ordering
