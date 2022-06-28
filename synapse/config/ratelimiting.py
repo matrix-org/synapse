@@ -136,6 +136,11 @@ class RatelimitConfig(Config):
             defaults={"per_second": 0.003, "burst_count": 5},
         )
 
+        self.rc_invites_per_issuer = RateLimitConfig(
+            config.get("rc_invites", {}).get("per_issuer", {}),
+            defaults={"per_second": 0.003, "burst_count": 5},
+        )
+
         self.rc_third_party_invite = RateLimitConfig(
             config.get("rc_third_party_invite", {}),
             defaults={
