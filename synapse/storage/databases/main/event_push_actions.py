@@ -813,7 +813,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         try:
             # First we handle any new receipts that have happened.
             while True:
-                logger.info("Handling new receipts")
+                logger.debug("Handling new receipts")
 
                 caught_up = await self.db_pool.runInteraction(
                     "_handle_new_receipts_for_notifs_txn",
