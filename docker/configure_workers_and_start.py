@@ -26,6 +26,9 @@
 #   * SYNAPSE_TLS_CERT: Path to a TLS certificate in PEM format.
 #   * SYNAPSE_TLS_KEY: Path to a TLS key. If this and SYNAPSE_TLS_CERT are specified,
 #         Nginx will be configured to serve TLS on port 8448.
+#   * SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER: Whether to use the forking launcher,
+#         only intended for usage in Complement at the moment.
+#         No stability guarantees are provided.
 #
 # NOTE: According to Complement's ENTRYPOINT expectations for a homeserver image (as defined
 # in the project's README), this script may be run multiple times, and functionality should
@@ -525,7 +528,7 @@ def generate_worker_files(
         "/etc/supervisor/conf.d/synapse.conf",
         workers=worker_descriptors,
         main_config_path=config_path,
-        use_forking_launcher=True,
+        use_forking_launcher=environ.get("SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER"),
     )
 
     # healthcheck config
@@ -561,7 +564,9 @@ def generate_worker_log_config(
         log_config_filepath,
         worker_name=worker_name,
         **extra_log_template_args,
-        include_worker_name_in_log_line=True,
+        include_worker_name_in_log_line=environ.get(
+            "SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER"
+        ),
     )
     return log_config_filepath
 
