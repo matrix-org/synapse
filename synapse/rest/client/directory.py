@@ -151,17 +151,6 @@ class ClientDirectoryListServer(RestServlet):
 
         return 200, {}
 
-    async def on_DELETE(
-        self, request: SynapseRequest, room_id: str
-    ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-
-        await self.directory_handler.edit_published_room_list(
-            requester, room_id, "private"
-        )
-
-        return 200, {}
-
 
 class ClientAppserviceDirectoryListServer(RestServlet):
     PATTERNS = client_patterns(
