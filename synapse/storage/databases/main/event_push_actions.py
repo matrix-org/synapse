@@ -917,7 +917,12 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         # We always update `event_push_summary_last_receipt_stream_id` to
         # ensure that we don't rescan the same receipts for remote users.
         #
-        # This requires repeatable read to be safe.
+        # This requires repeatable read to be safe, as we need the
+        # `MAX(stream_id)` to not include any new rows that have been committed
+        # since the start of the transaction (since those rows won't have been
+        # returned by the query above). Alternatively we could query the max
+        # stream ID at the start of the transaction and bound everything by
+        # that.
         txn.execute(
             """
             UPDATE event_push_summary_last_receipt_stream_id
