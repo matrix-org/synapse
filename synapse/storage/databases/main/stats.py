@@ -583,6 +583,7 @@ class StatsStore(StateDeltasStore):
             "avatar": None,
             "canonical_alias": None,
             "is_federatable": True,
+            "room_type": None,
         }
 
         for event in state_event_map.values():
@@ -606,9 +607,7 @@ class StatsStore(StateDeltasStore):
                 room_state["is_federatable"] = (
                     event.content.get(EventContentFields.FEDERATE, True) is True
                 )
-                room_type = event.content.get(EventContentFields.ROOM_TYPE)
-                if isinstance(room_type, str):
-                    room_state["room_type"] = room_type
+                room_state["room_type"] = event.content.get(EventContentFields.ROOM_TYPE)
 
         await self.update_room_state(room_id, room_state)
 
