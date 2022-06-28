@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import codecs
-import itertools
 import logging
 import re
-from typing import TYPE_CHECKING, Dict, Generator, Iterable, Optional, Set, Union
+from typing import TYPE_CHECKING, Dict, Generator, Iterable, List, Optional, Set, Union
 
 if TYPE_CHECKING:
     from lxml import etree
@@ -276,7 +275,7 @@ def parse_html_description(tree: "etree.Element") -> Optional[str]:
 
     from lxml import etree
 
-    TAGS_TO_REMOVE = (
+    TAGS_TO_REMOVE = {
         "header",
         "nav",
         "aside",
@@ -291,31 +290,42 @@ def parse_html_description(tree: "etree.Element") -> Optional[str]:
         "img",
         "picture",
         etree.Comment,
-    )
+    }
 
     # Split all the text nodes into paragraphs (by splitting on new
     # lines)
     text_nodes = (
         re.sub(r"\s+", "\n", el).strip()
-        for el in _iterate_over_text(tree.find("body"), *TAGS_TO_REMOVE)
+        for el in _iterate_over_text(tree.find("body"), TAGS_TO_REMOVE)
     )
     return summarize_paragraphs(text_nodes)
 
 
 def _iterate_over_text(
-    tree: "etree.Element", *tags_to_ignore: Union[str, "etree.Comment"]
+    tree: Optional["etree.Element"],
+    tags_to_ignore: Set[Union[str, "etree.Comment"]],
+    stack_limit: int = 1024,
 ) -> Generator[str, None, None]:
     """Iterate over the tree returning text nodes in a depth first fashion,
     skipping text nodes inside certain tags.
+
+    Args:
+        tree: The parent element to iterate. Can be None if there isn't one.
+        tags_to_ignore: Set of tags to ignore
+        stack_limit: Maximum stack size limit for depth-first traversal.
+            Nodes will be dropped if this limit is hit, which may truncate the
+            textual result.
+            Intended to limit the maximum working memory when generating a preview.
     """
-    # This is basically a stack that we extend using itertools.chain.
-    # This will either consist of an element to iterate over *or* a string
+
+    if tree is None:
+        return
+
+    # This is a stack whose items are elements to iterate over *or* strings
     # to be returned.
-    elements = iter([tree])
-    while True:
-        el = next(elements, None)
-        if el is None:
-            return
+    elements: List[Union[str, "etree.Element"]] = [tree]
+    while elements:
+        el = elements.pop()
 
         if isinstance(el, str):
             yield el
@@ -329,17 +339,22 @@ def _iterate_over_text(
             if el.text:
                 yield el.text
 
-            # We add to the stack all the elements children, interspersed with
-            # each child's tail text (if it exists). The tail text of a node
-            # is text that comes *after* the node, so we always include it even
-            # if we ignore the child node.
-            elements = itertools.chain(
-                itertools.chain.from_iterable(  # Basically a flatmap
-                    [child, child.tail] if child.tail else [child]
-                    for child in el.iterchildren()
-                ),
-                elements,
-            )
+            # We add to the stack all the element's children, interspersed with
+            # each child's tail text (if it exists).
+            #
+            # We iterate in reverse order so that earlier pieces of text appear
+            # closer to the top of the stack.
+            for child in el.iterchildren(reversed=True):
+                if len(elements) > stack_limit:
+                    # We've hit our limit for working memory
+                    break
+
+                if child.tail:
+                    # The tail text of a node is text that comes *after* the node,
+                    # so we always include it even if we ignore the child node.
+                    elements.append(child.tail)
+
+                elements.append(child)
 
 
 def summarize_paragraphs(
