@@ -261,6 +261,7 @@ class ReceiptTypes:
     FULLY_READ: Final = "m.fully_read"
 
 
+# As defined in https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3publicrooms
 class PublicRoomsFilterFields:
     GENERIC_SEARCH_TERM: Final = "generic_search_term"
     ROOM_TYPES: Final = "org.matrix.msc3827.room_types"
