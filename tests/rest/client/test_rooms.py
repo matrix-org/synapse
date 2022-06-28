@@ -1951,6 +1951,12 @@ class PublicRoomsRoomTypeFilterTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(count, 2)
 
+    @override_config({"experimental_features": {"msc3827_enabled": True}})
+    def test_returns_both_rooms_and_spaces_if_array_is_empty(self) -> None:
+        chunk, count = self.make_public_rooms_request([])
+
+        self.assertEqual(count, 2)
+
 
 class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
     """Test that we correctly fallback to local filtering if a remote server
