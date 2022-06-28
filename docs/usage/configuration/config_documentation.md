@@ -1380,6 +1380,22 @@ rc_joins:
     burst_count: 12
 ```
 ---
+### `rc_joins_per_room`
+
+This option allows for ratelimiting joins to a room based on the number of recent
+joins (local or remote) to that room. It is intended to mitigate mass-join spam
+waves which target multiple homeservers.
+
+Sensible values for this option are provided by default; most server admins
+won't need to adjust this setting.
+
+Example configuration:
+```yaml
+rc_joins_per_room:
+  per_second: 1
+  burst_count: 10
+```
+---
 ### `rc_3pid_validation`
 
 This option ratelimits how often a user or IP can attempt to validate a 3PID.
