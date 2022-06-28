@@ -218,7 +218,9 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             isNullClause = ""
             if None in room_types_copy:
                 isNullClause = "OR room_type IS NULL"
-                room_types_copy = [value for value in room_types_copy if value is not None]
+                room_types_copy = [
+                    value for value in room_types_copy if value is not None
+                ]
 
             listClause, args = make_in_list_sql_clause(
                 self.database_engine, "room_type", room_types_copy
@@ -245,7 +247,9 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             query_args = []
 
             room_type_clause, args = self._construct_room_type_where_clause(
-                search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None) if search_filter else None
+                search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None)
+                if search_filter
+                else None
             )
             room_type_clause = f" AND {room_type_clause}" if room_type_clause else ""
             query_args += args
@@ -406,7 +410,9 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
             ]
 
         room_type_clause, args = self._construct_room_type_where_clause(
-            search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None) if search_filter else None
+            search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None)
+            if search_filter
+            else None
         )
         if room_type_clause:
             where_clauses.append(room_type_clause)
