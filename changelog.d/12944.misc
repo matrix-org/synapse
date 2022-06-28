@@ -1,1 +1,0 @@
-Add `Cross-Origin-Resource-Policy: cross-origin` header to content repository's thumbnail and download endpoints.
