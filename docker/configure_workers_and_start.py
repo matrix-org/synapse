@@ -561,6 +561,7 @@ def generate_worker_log_config(
         log_config_filepath,
         worker_name=worker_name,
         **extra_log_template_args,
+        include_worker_name_in_log_line=True,
     )
     return log_config_filepath
 
