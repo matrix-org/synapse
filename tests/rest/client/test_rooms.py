@@ -1909,9 +1909,8 @@ class PublicRoomsRoomTypeFilterTestCase(unittest.HomeserverTestCase):
             {"filter": {PublicRoomsFilterFields.ROOM_TYPES: room_types}},
             self.token,
         )
-        body = json.loads(channel.result["body"].decode("utf8"))
-        chunk = body["chunk"]
-        count = body["total_room_count_estimate"]
+        chunk = channel.json_body["chunk"]
+        count = channel.json_body["total_room_count_estimate"]
 
         self.assertEqual(len(chunk), count)
 
