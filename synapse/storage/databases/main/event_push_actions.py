@@ -840,7 +840,12 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
             self._doing_notif_rotation = False
 
     def _handle_new_receipts_for_notifs_txn(self, txn: LoggingTransaction) -> bool:
-        """Check for new read receipts and delete from event push actions."""
+        """Check for new read receipts and delete from event push actions.
+
+        Any push actions which predate the user's most recent read receipt are
+        now redundant, so we can remove them from `event_push_actions` and
+        update `event_push_summary`.
+        """
 
         limit = 100
 
