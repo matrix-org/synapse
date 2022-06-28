@@ -15,8 +15,11 @@
 
 -- Add a column that records the position of the read receipt for the user at
 -- the time we summarised the push actions. This is used to check if the counts
--- are up to date after a new read receipt has been sent. Null means that we can
--- skip that check.
+-- are up to date after a new read receipt has been sent.
+--
+-- Null means that we can skip that check, as the row was written by an older
+-- version of Synapse that updated `event_push_summary` synchronously when
+-- persisting a new read receipt
 ALTER TABLE event_push_summary ADD COLUMN last_receipt_stream_ordering BIGINT;
 
 

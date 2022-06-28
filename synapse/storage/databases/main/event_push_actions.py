@@ -242,7 +242,9 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         # and do a manual count of rows in `event_push_actions` table below.
         #
         # If `last_receipt_stream_ordering` is null then that means its up to
-        # date.
+        # date (as the row was written by an older version of Synapse that
+        # updated `event_push_summary` synchronously when persisting a new read
+        # receipt).
         txn.execute(
             """
                 SELECT stream_ordering, notif_count, COALESCE(unread_count, 0)
