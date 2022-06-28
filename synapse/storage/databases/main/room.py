@@ -213,7 +213,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         isNullClause = ""
         if None in room_types_copy:
             isNullClause = "OR room_type IS NULL"
-            room_types_copy.remove(None)
+            room_types_copy = [value for value in room_types_copy if value is not None]
 
         listClause, args = make_in_list_sql_clause(
             self.database_engine, "room_type", room_types_copy
