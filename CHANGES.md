@@ -17,7 +17,7 @@ The following issue is fixed in 1.61.1.
 
   Homeservers with the `url_preview_enabled` configuration option set to `false` (the default) are unaffected. Instances with the `enable_media_repo` configuration option set to `false` are also unaffected, as this also disables URL preview functionality.
 
-  Fixed by fa1308061802ac7b7d20e954ba7372c5ac292333.
+  Fixed by [fa1308061802ac7b7d20e954ba7372c5ac292333](https://github.com/matrix-org/synapse/commit/fa1308061802ac7b7d20e954ba7372c5ac292333).
 
 Synapse 1.61.0 (2022-06-14)
 ===========================
