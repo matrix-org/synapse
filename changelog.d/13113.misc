@@ -1,1 +1,1 @@
-Raise dependency error on missing packages instead of a config error.
+Raise a `DependencyError` on missing dependencies instead of a `ConfigError`.
