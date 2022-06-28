@@ -370,6 +370,23 @@ class OpenGraphFromHtmlTestCase(unittest.TestCase):
         og = parse_html_to_open_graph(tree)
         self.assertEqual(og, {"og:title": "ó", "og:description": "Some text."})
 
+    def test_nested_nodes(self) -> None:
+        """A body with some nested nodes. Tests that we iterate over children
+        in the right order (and don't reverse the order of the text)."""
+        html = b"""
+        <a href="somewhere">Welcome <b>the bold <u>and underlined text <svg>
+        with a cheeky SVG</svg></u> and <strong>some</strong> tail text</b></a>
+        """
+        tree = decode_body(html, "http://example.com/test.html")
+        og = parse_html_to_open_graph(tree)
+        self.assertEqual(
+            og,
+            {
+                "og:title": None,
+                "og:description": "Welcome\n\nthe bold\n\nand underlined text\n\nand\n\nsome\n\ntail text",
+            },
+        )
+
 
 class MediaEncodingTestCase(unittest.TestCase):
     def test_meta_charset(self) -> None:
