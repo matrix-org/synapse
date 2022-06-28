@@ -109,6 +109,133 @@ class EventAuthTestCase(unittest.TestCase):
                 )
             )
 
+    def test_create_event_with_prev_events(self):
+        """A create event with prev_events should be rejected
+
+        https://spec.matrix.org/v1.3/rooms/v9/#authorization-rules
+        1: If type is m.room.create:
+            1. If it has any previous events, reject.
+        """
+        creator = f"@creator:{TEST_DOMAIN}"
+
+        # we make both a good event and a bad event, to check that we are rejecting
+        # the bad event for the reason we think we are.
+        good_event = make_event_from_dict(
+            {
+                "room_id": TEST_ROOM_ID,
+                "type": "m.room.create",
+                "state_key": "",
+                "sender": creator,
+                "content": {
+                    "creator": creator,
+                    "room_version": RoomVersions.V9.identifier,
+                },
+                "auth_events": [],
+                "prev_events": [],
+            },
+            room_version=RoomVersions.V9,
+        )
+        bad_event = make_event_from_dict(
+            {**good_event.get_dict(), "prev_events": ["$fakeevent"]},
+            room_version=RoomVersions.V9,
+        )
+
+        event_store = _StubEventSourceStore()
+
+        get_awaitable_result(
+            event_auth.check_state_independent_auth_rules(event_store, good_event)
+        )
+        with self.assertRaises(AuthError):
+            get_awaitable_result(
+                event_auth.check_state_independent_auth_rules(event_store, bad_event)
+            )
+
+    def test_duplicate_auth_events(self):
+        """Events with duplicate auth_events should be rejected
+
+        https://spec.matrix.org/v1.3/rooms/v9/#authorization-rules
+        2. Reject if event has auth_events that:
+            1. have duplicate entries for a given type and state_key pair
+        """
+        creator = "@creator:example.com"
+
+        create_event = _create_event(RoomVersions.V9, creator)
+        join_event1 = _join_event(RoomVersions.V9, creator)
+        pl_event = _power_levels_event(
+            RoomVersions.V9,
+            creator,
+            {"state_default": 30, "users": {"creator": 100}},
+        )
+
+        # create a second join event, so that we can make a duplicate
+        join_event2 = _join_event(RoomVersions.V9, creator)
+
+        event_store = _StubEventSourceStore()
+        event_store.add_events([create_event, join_event1, join_event2, pl_event])
+
+        good_event = _random_state_event(
+            RoomVersions.V9, creator, [create_event, join_event2, pl_event]
+        )
+        bad_event = _random_state_event(
+            RoomVersions.V9, creator, [create_event, join_event1, join_event2, pl_event]
+        )
+        # a variation: two instances of the *same* event
+        bad_event2 = _random_state_event(
+            RoomVersions.V9, creator, [create_event, join_event2, join_event2, pl_event]
+        )
+
+        get_awaitable_result(
+            event_auth.check_state_independent_auth_rules(event_store, good_event)
+        )
+        with self.assertRaises(AuthError):
+            get_awaitable_result(
+                event_auth.check_state_independent_auth_rules(event_store, bad_event)
+            )
+        with self.assertRaises(AuthError):
+            get_awaitable_result(
+                event_auth.check_state_independent_auth_rules(event_store, bad_event2)
+            )
+
+    def test_unexpected_auth_events(self):
+        """Events with excess auth_events should be rejected
+
+        https://spec.matrix.org/v1.3/rooms/v9/#authorization-rules
+        2. Reject if event has auth_events that:
+           2. have entries whose type and state_key don’t match those specified by the
+              auth events selection algorithm described in the server specification.
+        """
+        creator = "@creator:example.com"
+
+        create_event = _create_event(RoomVersions.V9, creator)
+        join_event = _join_event(RoomVersions.V9, creator)
+        pl_event = _power_levels_event(
+            RoomVersions.V9,
+            creator,
+            {"state_default": 30, "users": {"creator": 100}},
+        )
+        join_rules_event = _join_rules_event(RoomVersions.V9, creator, "public")
+
+        event_store = _StubEventSourceStore()
+        event_store.add_events([create_event, join_event, pl_event, join_rules_event])
+
+        good_event = _random_state_event(
+            RoomVersions.V9, creator, [create_event, join_event, pl_event]
+        )
+        # join rules should *not* be included in the auth events.
+        bad_event = _random_state_event(
+            RoomVersions.V9,
+            creator,
+            [create_event, join_event, pl_event, join_rules_event],
+        )
+
+        get_awaitable_result(
+            event_auth.check_state_independent_auth_rules(event_store, good_event)
+        )
+        with self.assertRaises(AuthError):
+            get_awaitable_result(
+                event_auth.check_state_independent_auth_rules(event_store, bad_event)
+            )
+
     def test_random_users_cannot_send_state_before_first_pl(self):
         """
         Check that, before the first PL lands, the creator is the only user
@@ -564,8 +691,8 @@ class EventAuthTestCase(unittest.TestCase):
 
 
 # helpers for making events
-
-TEST_ROOM_ID = "!test:room"
+TEST_DOMAIN = "example.com"
+TEST_ROOM_ID = f"!test_room:{TEST_DOMAIN}"
 
 
 def _create_event(
