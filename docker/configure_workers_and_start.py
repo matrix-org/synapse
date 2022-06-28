@@ -525,6 +525,7 @@ def generate_worker_files(
         "/etc/supervisor/conf.d/synapse.conf",
         workers=worker_descriptors,
         main_config_path=config_path,
+        use_forking_launcher=True,
     )
 
     # healthcheck config
