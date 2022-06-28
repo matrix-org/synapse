@@ -1662,7 +1662,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
             txn.execute(sql, (last_room_id, batch_size))
             room_id_to_create_event_results = txn.fetchall()
 
-            new_last_room_id = ""
+            new_last_room_id = None
             for room_id, event_json in room_id_to_create_event_results:
                 event_dict = db_to_json(event_json)
 
@@ -1679,7 +1679,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
 
                 new_last_room_id = room_id
 
-            if new_last_room_id == "":
+            if new_last_room_id is None:
                 return True
 
             self.db_pool.updates._background_update_progress_txn(
