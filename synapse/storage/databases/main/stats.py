@@ -606,7 +606,6 @@ class StatsStore(StateDeltasStore):
                 room_state["is_federatable"] = (
                     event.content.get(EventContentFields.FEDERATE, True) is True
                 )
-            elif event.state["room_type"]:
                 room_state["room_type"] = event.content.get(
                     EventContentFields.ROOM_TYPE
                 )
