@@ -1,3 +1,24 @@
+Synapse 1.61.1 (2022-06-28)
+===========================
+
+This patch release fixes a security issue regarding URL previews, affecting all prior versions of Synapse. Server administrators are encouraged to update Synapse as soon as possible. We are not aware of these vulnerabilities being exploited in the wild.
+
+Server administrators who are unable to update Synapse may use the workarounds described in the linked GitHub Security Advisory below.
+
+## Security advisory
+
+The following issue is fixed in 1.61.1.
+
+* [GHSA-22p3-qrh9-cx32](https://github.com/matrix-org/synapse/security/advisories/GHSA-22p3-qrh9-cx32) / [CVE-2022-31052](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-31052)
+
+  Synapse instances with the [`url_preview_enabled`](https://matrix-org.github.io/synapse/v1.61/usage/configuration/config_documentation.html#media-store) homeserver config option set to `true` are affected. URL previews of some web pages can lead to unbounded recursion, causing the request to either fail, or in some cases crash the running Synapse process.
+
+  Requesting URL previews requires authentication. Nevertheless, it is possible to exploit this maliciously, either by malicious users on the homeserver, or by remote users sending URLs that a local user's client may automatically request a URL preview for.
+
+  Homeservers with the `url_preview_enabled` configuration option set to `false` (the default) are unaffected. Instances with the `enable_media_repo` configuration option set to `false` are also unaffected, as this also disables URL preview functionality.
+
+  Fixed by [fa1308061802ac7b7d20e954ba7372c5ac292333](https://github.com/matrix-org/synapse/commit/fa1308061802ac7b7d20e954ba7372c5ac292333).
+
 Synapse 1.61.0 (2022-06-14)
 ===========================
 

@@ -1,0 +1,1 @@
+Refactor the Dockerfile-workers configuration script to use Jinja2 templates in Synapse workers' Supervisord blocks.

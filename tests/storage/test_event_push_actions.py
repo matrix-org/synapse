@@ -55,7 +55,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
 
     def test_count_aggregation(self) -> None:
         room_id = "!foo:example.com"
-        user_id = "@user1235:example.com"
+        user_id = "@user1235:test"
 
         last_read_stream_ordering = [0]
 
@@ -81,10 +81,25 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         def _inject_actions(stream: int, action: list) -> None:
             event = Mock()
             event.room_id = room_id
-            event.event_id = "$test:example.com"
+            event.event_id = f"$test{stream}:example.com"
             event.internal_metadata.stream_ordering = stream
             event.internal_metadata.is_outlier.return_value = False
             event.depth = stream
+
+            self.get_success(
+                self.store.db_pool.simple_insert(
+                    table="events",
+                    values={
+                        "stream_ordering": stream,
+                        "topological_ordering": stream,
+                        "type": "m.room.message",
+                        "room_id": room_id,
+                        "processed": True,
+                        "outlier": False,
+                        "event_id": event.event_id,
+                    },
+                )
+            )
 
             self.get_success(
                 self.store.add_push_actions_to_staging(
@@ -105,18 +120,28 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         def _rotate(stream: int) -> None:
             self.get_success(
                 self.store.db_pool.runInteraction(
-                    "", self.store._rotate_notifs_before_txn, stream
+                    "rotate-receipts", self.store._handle_new_receipts_for_notifs_txn
+                )
+            )
+
+            self.get_success(
+                self.store.db_pool.runInteraction(
+                    "rotate-notifs", self.store._rotate_notifs_before_txn, stream
                 )
             )
 
         def _mark_read(stream: int, depth: int) -> None:
             last_read_stream_ordering[0] = stream
+
             self.get_success(
                 self.store.db_pool.runInteraction(
                     "",
-                    self.store._remove_old_push_actions_before_txn,
+                    self.store._insert_linearized_receipt_txn,
                     room_id,
+                    "m.read",
                     user_id,
+                    f"$test{stream}:example.com",
+                    {},
                     stream,
                 )
             )
@@ -150,7 +175,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
 
         _assert_counts(1, 0)
 
-        _mark_read(7, 7)
+        _mark_read(6, 6)
         _assert_counts(0, 0)
 
         _inject_actions(8, HIGHLIGHT)
