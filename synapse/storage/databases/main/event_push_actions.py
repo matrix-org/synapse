@@ -236,12 +236,13 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         # First we pull the counts from the summary table.
         #
         # We check that `last_receipt_stream_ordering` matches the stream
-        # ordering given, if it doesn't then a new read receipt has arrived and
+        # ordering given. If it doesn't match then a new read receipt has arrived and
         # we haven't yet updated the counts in `event_push_summary` to reflect
-        # that. In the latter case we simply ignore `event_push_summary` counts
-        # and do a manual count of rows in `event_push_actions` table below.
+        # that; in that case we simply ignore `event_push_summary` counts
+        # and do a manual count of all of the rows in the `event_push_actions` table
+        # for this user/room.
         #
-        # If `last_receipt_stream_ordering` is null then that means its up to
+        # If `last_receipt_stream_ordering` is null then that means it's up to
         # date (as the row was written by an older version of Synapse that
         # updated `event_push_summary` synchronously when persisting a new read
         # receipt).
