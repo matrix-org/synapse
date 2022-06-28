@@ -16,13 +16,8 @@ from typing import Any
 
 from synapse.types import JsonDict
 
-from ._base import Config, ConfigError
-
-MISSING_AUTHLIB = """Missing authlib library. This is required for jwt login.
-
-    Install by running:
-        pip install synapse[jwt]
-    """
+from ..util.check_dependencies import check_requirements
+from ._base import Config
 
 
 class JWTConfig(Config):
@@ -41,13 +36,7 @@ class JWTConfig(Config):
             # that the claims exist on the JWT.
             self.jwt_issuer = jwt_config.get("issuer")
             self.jwt_audiences = jwt_config.get("audiences")
-
-            try:
-                from authlib.jose import JsonWebToken
-
-                JsonWebToken  # To stop unused lint.
-            except ImportError:
-                raise ConfigError(MISSING_AUTHLIB)
+            check_requirements("authlib")
         else:
             self.jwt_enabled = False
             self.jwt_secret = None
