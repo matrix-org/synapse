@@ -811,7 +811,8 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         self._doing_notif_rotation = True
 
         try:
-            # First we handle any new receipts that have happened.
+            # First we recalculate push summaries and delete stale push actions
+            # for rooms/users with new receipts.
             while True:
                 logger.debug("Handling new receipts")
 
