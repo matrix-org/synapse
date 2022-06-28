@@ -239,13 +239,13 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         def _count_public_rooms_txn(txn: LoggingTransaction) -> int:
             query_args = []
 
-            where_clause = ""
+            room_type_clause = ""
             if (
                 not self.config.experimental.msc3827_enabled
                 or not search_filter
                 or search_filter.get(PublicRoomsFilterFields.ROOM_TYPES, None) is None
             ):
-                where_clause = "AND room_type IS NULL"
+                room_type_clause = "AND room_type IS NULL"
             elif (
                 self.config.experimental.msc3827_enabled
                 and search_filter
@@ -254,7 +254,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                 clause, args = self._construct_room_type_where_clause(
                     search_filter[PublicRoomsFilterFields.ROOM_TYPES]
                 )
-                where_clause = f" AND {clause}"
+                room_type_clause = f" AND {clause}"
                 query_args += args
 
             if network_tuple:
@@ -291,7 +291,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                         OR join_rules = '{JoinRules.KNOCK_RESTRICTED}'
                         OR history_visibility = 'world_readable'
                     )
-                    {where_clause}
+                    {room_type_clause}
                     AND joined_members > 0
             """
 
