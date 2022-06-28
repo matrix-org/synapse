@@ -873,19 +873,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         )
         rows = txn.fetchall()
 
-        if not rows:
-            # We always update `event_push_summary_last_receipt_stream_id` to
-            # ensure that we don't rescan the same receipts for remote users.
-            #
-            # This requires repeatable read to be safe.
-            txn.execute(
-                """
-                UPDATE event_push_summary_last_receipt_stream_id
-                SET stream_id = (SELECT COALESCE(MAX(stream_id), 0) FROM receipts_linearized)
-                """
-            )
-            return True
-
         # For each new read receipt we delete push actions from before it and
         # recalculate the summary.
         for _, room_id, user_id, stream_ordering in rows:
