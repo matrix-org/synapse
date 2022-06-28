@@ -167,6 +167,7 @@ def default_config(
             "local": {"per_second": 10000, "burst_count": 10000},
             "remote": {"per_second": 10000, "burst_count": 10000},
         },
+        "rc_joins_per_room": {"per_second": 10000, "burst_count": 10000},
         "rc_invites": {
             "per_room": {"per_second": 10000, "burst_count": 10000},
             "per_user": {"per_second": 10000, "burst_count": 10000},

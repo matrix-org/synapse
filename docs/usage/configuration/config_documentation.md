@@ -1472,6 +1472,25 @@ rc_joins:
     burst_count: 12
 ```
 ---
+### `rc_joins_per_room`
+
+This option allows admins to ratelimit joins to a room based on the number of recent
+joins (local or remote) to that room. It is intended to mitigate mass-join spam
+waves which target multiple homeservers.
+
+By default, one join is permitted to a room every second, with an accumulating
+buffer of up to ten instantaneous joins.
+
+Example configuration (default values):
+```yaml
+rc_joins_per_room:
+  per_second: 1
+  burst_count: 10
+```
+
+_Added in Synapse 1.64.0._
+
+---
 ### `rc_3pid_validation`
 
 This option ratelimits how often a user or IP can attempt to validate a 3PID.
