@@ -1654,7 +1654,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
                 room_type = event_dict.get("content", {}).get(
                     EventContentFields.ROOM_TYPE, None
                 )
-                if room_type:
+                if isinstance(room_type, str):
                     self.db_pool.simple_update_txn(
                         txn,
                         table="room_stats_state",
