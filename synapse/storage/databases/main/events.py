@@ -77,7 +77,8 @@ class PartialStateConflictError(SynapseError):
 
     This error should be handled by recomputing the event context and trying again.
 
-    This error should not be exposed to clients.
+    This error has an HTTP status code so that it can be transported over replication.
+    It should not be exposed to clients.
     """
 
     def __init__(self) -> None:
