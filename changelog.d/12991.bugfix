@@ -1,2 +1,0 @@
-Fix a bug where non-standard information was required when requesting the `/hierarchy` API over federation. Introduced 
-in Synapse v1.41.0.

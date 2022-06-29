@@ -1,1 +1,0 @@
-Remove the unspecced `DELETE /directory/list/room/{roomId}` endpoint, which hid rooms from the [public room directory](https://spec.matrix.org/v1.3/client-server-api/#listing-rooms). Instead, `PUT` to the same URL with a visibility of `"private"`.

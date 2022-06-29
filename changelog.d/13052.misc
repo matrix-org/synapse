@@ -1,1 +1,0 @@
-Refactor entry points so that they all have a `main` function.
