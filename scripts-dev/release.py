@@ -95,7 +95,7 @@ def prepare() -> None:
     synapse_repo = get_repo_and_check_clean_checkout()
     sytest_repo = get_repo_and_check_clean_checkout("../sytest", "sytest")
 
-    click.secho("Updating git repo...")
+    click.secho("Updating Synapse and Sytest git repos...")
     synapse_repo.remote().fetch()
     sytest_repo.remote().fetch()
 
