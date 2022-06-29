@@ -212,21 +212,17 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         elif room_types == []:
             return None, []
         else:
-            room_types_copy = room_types.copy()
-
             # We use None when we want get rooms without a type
-            isNullClause = ""
-            if None in room_types_copy:
-                isNullClause = "OR room_type IS NULL"
-                room_types_copy = [
-                    value for value in room_types_copy if value is not None
-                ]
+            is_null_clause = ""
+            if None in room_types:
+                is_null_clause = "OR room_type IS NULL"
+                room_types = [value for value in room_types if value is not None]
 
-            listClause, args = make_in_list_sql_clause(
-                self.database_engine, "room_type", room_types_copy
+            list_clause, args = make_in_list_sql_clause(
+                self.database_engine, "room_type", room_types
             )
 
-            return f"({listClause} {isNullClause})", args
+            return f"({list_clause} {is_null_clause})", args
 
     async def count_public_rooms(
         self,
