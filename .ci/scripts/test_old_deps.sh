@@ -27,9 +27,10 @@ export VIRTUALENV_NO_DOWNLOAD=1
 
 # Patch the project definitions in-place:
 # - Replace all lower and tilde bounds with exact bounds
-# - Make the pyopenssl 17.0, which is the oldest version that works with
-#   a `cryptography` compiled against OpenSSL 1.1.
+# - Replace all caret bounds---but not the one that defines the supported Python version!
 # - Delete all lines referring to psycopg2 --- so no testing of postgres support.
+# - Use pyopenssl 17.0, which is the oldest version that works with
+#   a `cryptography` compiled against OpenSSL 1.1.
 # - Omit systemd: we're not logging to journal here.
 
 # TODO: also replace caret bounds, see https://python-poetry.org/docs/dependency-specification/#version-constraints
@@ -40,6 +41,7 @@ export VIRTUALENV_NO_DOWNLOAD=1
 
 sed -i \
    -e "s/[~>]=/==/g" \
+   -e '/^python = "^/!s/\^/==/g' \
    -e "/psycopg2/d" \
    -e 's/pyOpenSSL = "==16.0.0"/pyOpenSSL = "==17.0.0"/' \
    -e '/systemd/d' \

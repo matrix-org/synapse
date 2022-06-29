@@ -54,7 +54,7 @@ skip_gitignore = true
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.61.0"
+version = "1.62.0rc1"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -110,9 +110,9 @@ jsonschema = ">=3.0.0"
 frozendict = ">=1,!=2.1.2"
 # We require 2.1.0 or higher for type hints. Previous guard was >= 1.1.0
 unpaddedbase64 = ">=2.1.0"
-canonicaljson = ">=1.4.0"
+canonicaljson = "^1.4.0"
 # we use the type definitions added in signedjson 1.1.
-signedjson = ">=1.1.0"
+signedjson = "^1.1.0"
 # validating SSL certs for IP addresses requires service_identity 18.1.
 service-identity = ">=18.1.0"
 # Twisted 18.9 introduces some logger improvements that the structured
@@ -150,7 +150,7 @@ typing-extensions = ">=3.10.0.1"
 cryptography = ">=3.4.7"
 # ijson 3.1.4 fixes a bug with "." in property names
 ijson = ">=3.1.4"
-matrix-common = "~=1.2.1"
+matrix-common = "^1.2.1"
 # We need packaging.requirements.Requirement, added in 16.1.
 packaging = ">=16.1"
 # At the time of writing, we only use functions from the version `importlib.metadata`

@@ -26,7 +26,7 @@ from typing import (
     cast,
 )
 
-from synapse.api.constants import EduTypes, ReceiptTypes
+from synapse.api.constants import EduTypes
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import ReceiptsStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
@@ -681,17 +681,6 @@ class ReceiptsWorkerStore(SQLBaseStore):
             # (user_id, room_id, receipt_type), so no need to lock
             lock=False,
         )
-
-        # When updating a local users read receipt, remove any push actions
-        # which resulted from the receipt's event and all earlier events.
-        if (
-            self.hs.is_mine_id(user_id)
-            and receipt_type in (ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE)
-            and stream_ordering is not None
-        ):
-            self._remove_old_push_actions_before_txn(  # type: ignore[attr-defined]
-                txn, room_id=room_id, user_id=user_id, stream_ordering=stream_ordering
-            )
 
         return rx_ts
 
