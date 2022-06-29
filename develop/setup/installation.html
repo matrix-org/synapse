@@ -303,7 +303,9 @@ python -m synapse.app.homeserver \
     --generate-config \
     --report-stats=[yes|no]
 </code></pre>
-<p>... substituting an appropriate value for <code>--server-name</code>.</p>
+<p>... substituting an appropriate value for <code>--server-name</code> and choosing whether
+or not to report usage statistics (hostname, Synapse version, uptime, total
+users, etc.) to the developers via the <code>--report-stats</code> argument.</p>
 <p>This command will generate you a config file that you can then customise, but it will
 also generate a set of keys for you. These keys will allow your homeserver to
 identify itself to other homeserver, so don't lose or delete them. It would be
