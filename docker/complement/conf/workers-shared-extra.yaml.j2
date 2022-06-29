@@ -103,4 +103,10 @@ server_notices:
   system_mxid_avatar_url: ""
   room_name: "Server Alert"
 
+
+# Disable sync cache so that initial `/sync` requests are up-to-date.
+caches:
+  sync_response_cache_duration: 0
+
+
 {% include "shared-orig.yaml.j2" %}

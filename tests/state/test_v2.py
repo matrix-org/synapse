@@ -495,6 +495,7 @@ class StateTestCase(unittest.TestCase):
 
             prev_events = list(graph[node_id])
 
+            state_before: StateMap[str]
             if len(prev_events) == 0:
                 state_before = {}
             elif len(prev_events) == 1:

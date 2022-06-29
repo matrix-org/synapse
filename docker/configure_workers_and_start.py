@@ -52,12 +52,12 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "worker_extra_conf": "",
     },
     "user_dir": {
-        "app": "synapse.app.user_dir",
+        "app": "synapse.app.generic_worker",
         "listener_resources": ["client"],
         "endpoint_patterns": [
             "^/_matrix/client/(api/v1|r0|v3|unstable)/user_directory/search$"
         ],
-        "shared_extra_conf": {"update_user_directory": False},
+        "shared_extra_conf": {"update_user_directory_from_worker": "user_dir1"},
         "worker_extra_conf": "",
     },
     "media_repository": {
@@ -78,7 +78,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "app": "synapse.app.generic_worker",
         "listener_resources": [],
         "endpoint_patterns": [],
-        "shared_extra_conf": {"notify_appservices_from_worker": "appservice"},
+        "shared_extra_conf": {"notify_appservices_from_worker": "appservice1"},
         "worker_extra_conf": "",
     },
     "federation_sender": {
@@ -176,21 +176,6 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
 }
 
 # Templates for sections that may be inserted multiple times in config files
-SUPERVISORD_PROCESS_CONFIG_BLOCK = """
-[program:synapse_{name}]
-command=/usr/local/bin/prefix-log /usr/local/bin/python -m {app} \
-    --config-path="{config_path}" \
-    --config-path=/conf/workers/shared.yaml \
-    --config-path=/conf/workers/{name}.yaml
-autorestart=unexpected
-priority=500
-exitcodes=0
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-"""
-
 NGINX_LOCATION_CONFIG_BLOCK = """
     location ~* {endpoint} {{
         proxy_pass {upstream};
@@ -353,13 +338,10 @@ def generate_worker_files(
     # This config file will be passed to all workers, included Synapse's main process.
     shared_config: Dict[str, Any] = {"listeners": listeners}
 
-    # The supervisord config. The contents of which will be inserted into the
-    # base supervisord jinja2 template.
-    #
-    # Supervisord will be in charge of running everything, from redis to nginx to Synapse
-    # and all of its worker processes. Load the config template, which defines a few
-    # services that are necessary to run.
-    supervisord_config = ""
+    # List of dicts that describe workers.
+    # We pass this to the Supervisor template later to generate the appropriate
+    # program blocks.
+    worker_descriptors: List[Dict[str, Any]] = []
 
     # Upstreams for load-balancing purposes. This dict takes the form of a worker type to the
     # ports of each worker. For example:
@@ -437,7 +419,7 @@ def generate_worker_files(
             )
 
         # Enable the worker in supervisord
-        supervisord_config += SUPERVISORD_PROCESS_CONFIG_BLOCK.format_map(worker_config)
+        worker_descriptors.append(worker_config)
 
         # Add nginx location blocks for this worker's endpoints (if any are defined)
         for pattern in worker_config["endpoint_patterns"]:
@@ -535,8 +517,14 @@ def generate_worker_files(
         "/conf/supervisord.conf.j2",
         "/etc/supervisor/supervisord.conf",
         main_config_path=config_path,
-        worker_config=supervisord_config,
         enable_redis=workers_in_use,
+    )
+
+    convert(
+        "/conf/synapse.supervisord.conf.j2",
+        "/etc/supervisor/conf.d/synapse.conf",
+        workers=worker_descriptors,
+        main_config_path=config_path,
     )
 
     # healthcheck config

@@ -476,7 +476,7 @@ class RulesForRoom:
                 local_users, on_invalidate=self.invalidate_all_cb
             )
 
-            logger.info("Users in room: %s", local_users)
+            logger.debug("Users in room: %s", local_users)
 
             self.update_cache(
                 self.data.sequence,

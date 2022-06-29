@@ -1,0 +1,1 @@
+Fix a long-standing bug where a finished logging context would be re-started when Synapse failed to persist an event from federation.
