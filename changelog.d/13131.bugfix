@@ -1,0 +1,1 @@
+Fix application service not being able to join remote federated room without a profile set.
