@@ -96,8 +96,8 @@ class RoomBackgroundUpdateStoreTestCase(HomeserverTestCase):
         self.assertEqual(room_creator_after, self.user_id)
 
     def test_background_add_room_type_column(self):
-        """Test that the background update to populate the rooms creator column
-        works properly.
+        """Test that the background update to populate the `room_type` column in
+        `room_stats_state` works properly.
         """
 
         # Create a room without a type
