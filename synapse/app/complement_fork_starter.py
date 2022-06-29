@@ -79,12 +79,16 @@ class ProxiedReactor:
     def __init__(self) -> None:
         self.___reactor_target: Any = None
 
-    def ___install(self, new_reactor: Any) -> None:
+    def _install_real_reactor(self, new_reactor: Any) -> None:
+        """
+        Install a real reactor for this ProxiedReactor to forward lookups onto.
+
+        This method is specific to our ProxiedReactor and should not clash with
+        any names used on an actual Twisted reactor.
+        """
         self.___reactor_target = new_reactor
 
     def __getattr__(self, attr_name: str) -> Any:
-        if attr_name == "___install":
-            return self.___install
         return getattr(self.___reactor_target, attr_name)
 
 
@@ -102,7 +106,7 @@ def _worker_entrypoint(
 
     from twisted.internet.epollreactor import EPollReactor
 
-    proxy_reactor.___install(EPollReactor())
+    proxy_reactor._install_real_reactor(EPollReactor())
     func()
 
 
