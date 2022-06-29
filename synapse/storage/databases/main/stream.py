@@ -802,15 +802,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         self,
         txn: LoggingTransaction,
         event_id: str,
-        allow_none: Literal[True],
-    ) -> int:
-        ...
-
-    @overload
-    def get_stream_id_for_event_txn(
-        self,
-        txn: LoggingTransaction,
-        event_id: str,
+        allow_none: Literal[False] = False,
     ) -> int:
         ...
 
