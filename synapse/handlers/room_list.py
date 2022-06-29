@@ -514,10 +514,10 @@ class RoomListNextBatch:
 def _matches_room_entry(room_entry: JsonDict, search_filter: dict) -> bool:
     """Determines whether the given search filter matches a room entry returned over
     federation.
-    
+
     Only used if the remote server does not support MSC2197 remote-filtered search, and
     hence does not support MSC3827 filtering of `/publicRooms` by room type either.
-    
+
     In this case, we cannot apply the `room_type` filter since no `room_type` field is
     returned.
     """
