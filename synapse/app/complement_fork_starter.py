@@ -47,6 +47,7 @@
 #   ...
 #     synapse.app.generic_worker [args..]
 #
+import argparse
 import importlib
 import itertools
 import multiprocessing
@@ -114,13 +115,21 @@ def main() -> None:
     """
     Entrypoint for the forking launcher.
     """
-
-    # First argument is the path to the database config
-    db_config_path = sys.argv[1]
+    parser = argparse.ArgumentParser()
+    parser.add_argument("db_config", help="Path to database config file")
+    parser.add_argument(
+        "args",
+        nargs="...",
+        help="Argument groups separated by `--`. "
+        "The first argument of each group is a Synapse app name. "
+        "Subsequent arguments are passed through.",
+    )
+    ns = parser.parse_args()
+    db_config_path = ns.db_config
+    args = ns.args
 
     # Split up the subsequent arguments into each workers' arguments;
     # `--` is our delimiter of choice.
-    args = sys.argv[2:]
     args_by_worker: List[List[str]] = [
         list(args)
         for cond, args in itertools.groupby(args, lambda ele: ele != "--")
