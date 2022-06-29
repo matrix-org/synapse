@@ -36,7 +36,7 @@ class JWTConfig(Config):
             # that the claims exist on the JWT.
             self.jwt_issuer = jwt_config.get("issuer")
             self.jwt_audiences = jwt_config.get("audiences")
-            check_requirements("authlib")
+            check_requirements("jwt")
         else:
             self.jwt_enabled = False
             self.jwt_secret = None
