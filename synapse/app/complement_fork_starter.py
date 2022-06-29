@@ -41,7 +41,7 @@
 #
 # ## Example
 #
-#   python -m synapse.app._complement_fork_starter path_to_db_config.yaml \
+#   python -m synapse.app.complement_fork_starter path_to_db_config.yaml \
 #     synapse.app.homeserver [args..] -- \
 #     synapse.app.generic_worker [args..] -- \
 #   ...
