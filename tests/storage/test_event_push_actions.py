@@ -86,6 +86,8 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             event.internal_metadata.is_outlier.return_value = False
             event.depth = stream
 
+            self.store._events_stream_cache.entity_has_changed(room_id, stream)
+
             self.get_success(
                 self.store.db_pool.simple_insert(
                     table="events",
