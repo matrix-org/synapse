@@ -173,7 +173,7 @@ def main() -> None:
     # Now we basically just fork() out to create the workers we need.
     # Because we're using fork(), all the workers get a clone of this launcher's
     # memory space and don't need to repeat the work of loading the code!
-    # Instead of using fork() directly, we use the multiprocessing library,#
+    # Instead of using fork() directly, we use the multiprocessing library,
     # which uses fork() on Unix platforms.
     processes = []
     for (func, worker_args) in zip(worker_functions, args_by_worker):
