@@ -89,6 +89,18 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.63.0
+
+## Changes to the event replication streams
+
+Synapse now includes a flag indicating if an event is an outlier when
+replicating it to other workers. This is a forwards- and backwards-incompatible
+change: v1.62 and workers cannot process events replicated by v1.63 workers, and
+vice versa.
+
+Once all workers are upgraded to v1.63 (or downgraded to v1.62), event
+replication will resume as normal.
+
 # Upgrading to v1.62.0
 
 ## New signatures for spam checker callbacks
