@@ -165,7 +165,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
             "GET", "/profile/%s/avatar_url" % (name or self.owner,)
         )
         self.assertEqual(channel.code, 200, channel.result)
-        return channel.json_body.get("avatar_url")
+        return channel.json_body["avatar_url"]
 
     @unittest.override_config({"max_avatar_size": 50})
     def test_avatar_size_limit_global(self) -> None:

@@ -978,7 +978,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
                 channel.result["body"],
             )
 
-        return channel.json_body.get("sid")
+        return channel.json_body["sid"]
 
     def _request_token_invalid_email(
         self,
