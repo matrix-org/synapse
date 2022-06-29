@@ -138,13 +138,6 @@ def main() -> None:
         worker_module = importlib.import_module(worker_args[0])
         worker_functions.append(worker_module.main)
 
-    # At this point, we've imported all the main entrypoints for all the workers.
-    # Now we basically just fork() out to create the workers we need.
-    # Because we're using fork(), all the workers get a clone of this launcher's
-    # memory space and don't need to repeat the work of loading the code!
-    # Instead of using fork() directly, we use the multiprocessing library,#
-    # which uses fork() on Unix platforms.
-
     # We need to prepare the database first as otherwise all the workers will
     # try to create a schema version table and some will crash out.
     from synapse._scripts import update_synapse_database
@@ -167,6 +160,12 @@ def main() -> None:
     update_proc.join()
     print("===== PREPARED DATABASE =====", file=sys.stderr)
 
+    # At this point, we've imported all the main entrypoints for all the workers.
+    # Now we basically just fork() out to create the workers we need.
+    # Because we're using fork(), all the workers get a clone of this launcher's
+    # memory space and don't need to repeat the work of loading the code!
+    # Instead of using fork() directly, we use the multiprocessing library,#
+    # which uses fork() on Unix platforms.
     processes = []
     for (func, worker_args) in zip(worker_functions, args_by_worker):
         process = multiprocessing.Process(
