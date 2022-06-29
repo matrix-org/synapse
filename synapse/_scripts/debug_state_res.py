@@ -209,7 +209,7 @@ async def debug_specific_stateres(
     # Fetch the event in question.
     event = await hs.get_datastores().main.get_event(args.event_id)
     assert event is not None
-    logger.info("event %s has %d parents", event.event_id, len(event.prev_event_ids()))
+    logger.info("event %s has %d parents, %s", event.event_id, len(event.prev_event_ids()), event.prev_event_ids())
 
     state_after_parents = [
         await hs.get_storage_controllers().state.get_state_ids_for_event(prev_event_id)
