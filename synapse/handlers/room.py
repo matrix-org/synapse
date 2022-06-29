@@ -1427,13 +1427,16 @@ class TimestampLookupHandler:
                         remote_response,
                     )
 
-                    # TODO: Do we want to persist this as an extremity?
                     # TODO: I think ideally, we would try to backfill from
                     # this event and run this whole
                     # `get_event_for_timestamp` function again to make sure
                     # they didn't give us an event from their gappy history.
                     remote_event_id = remote_response.event_id
                     origin_server_ts = remote_response.origin_server_ts
+
+                    # Persist this as an extremity so we can backfill from it
+                    # later when calling `/messages`
+                    self.store.insert_backward_extremeties([(room_id, remote_event_id)])
 
                     # Only return the remote event if it's closer than the local event
                     if not local_event or (

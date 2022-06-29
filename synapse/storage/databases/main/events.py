@@ -2304,18 +2304,28 @@ class PersistEventsStore:
 
         self._update_backward_extremeties(txn, events)
 
-    def _update_backward_extremeties(
-        self, txn: LoggingTransaction, events: List[EventBase]
+    async def insert_backward_extremeties(
+        self, room_id_and_event_id_pairs: List[Tuple[str, str]]
     ) -> None:
-        """Updates the event_backward_extremities tables based on the new/updated
-        events being persisted.
+        """TODO
 
-        This is called for new events *and* for events that were outliers, but
-        are now being persisted as non-outliers.
+        Args:
+            room_and_event_id_pairs: Events to mark as backward extremities
 
-        Forward extremities are handled when we first start persisting the events.
+        Returns:
+            xxx
         """
-        # From the events passed in, add all of the prev events as backwards extremities.
+
+        return await self.db_pool.runInteraction(
+            "_insert_backward_extremeties_txn",
+            self._insert_backward_extremeties_txn,
+        )
+
+    def _insert_backward_extremeties_txn(
+        txn: LoggingTransaction, room_id_and_event_id_pairs: List[Tuple[str, str]]
+    ) -> None:
+        """TODO"""
+
         # Ignore any events that are already backwards extrems or outliers.
         query = (
             "INSERT INTO event_backward_extremities (event_id, room_id)"
@@ -2337,7 +2347,28 @@ class PersistEventsStore:
         txn.execute_batch(
             query,
             [
-                (e_id, ev.room_id, e_id, ev.room_id, e_id, ev.room_id, False)
+                (event_id, room_id, event_id, room_id, event_id, room_id, False)
+                for (room_id, event_id) in room_id_and_event_id_pairs
+            ],
+        )
+
+    def _update_backward_extremeties(
+        self, txn: LoggingTransaction, events: List[EventBase]
+    ) -> None:
+        """Updates the event_backward_extremities tables based on the new/updated
+        events being persisted.
+
+        This is called for new events *and* for events that were outliers, but
+        are now being persisted as non-outliers.
+
+        Forward extremities are handled when we first start persisting the events.
+        """
+        # From the events passed in, add all of the prev events as backwards extremities.
+        # Ignore any events that are already backwards extrems or outliers.
+        self._insert_backward_extremeties_txn(
+            txn,
+            [
+                (ev.room_id, e_id)
                 for ev in events
                 for e_id in ev.prev_event_ids()
                 if not ev.internal_metadata.is_outlier()
