@@ -304,7 +304,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
             # If the max stream ordering is less than the min stream ordering,
             # then obviously there are zero push actions in that range.
-            if max_stream_ordering < stream_ordering:
+            if max_stream_ordering <= stream_ordering:
                 return 0, 0
 
         sql = f"""
