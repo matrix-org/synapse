@@ -347,7 +347,7 @@ To prepare a Pull Request, please:
 3. `git push` your commit to your fork of Synapse;
 4. on GitHub, [create the Pull Request](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request);
 5. add a [changelog entry](#changelog) and push it to your Pull Request;
-6. for most contributors, that's all - however, if you are a member of the organization `matrix-org`, on GitHub, please request a review from `matrix.org / Synapse Core`.
+6. that's it for now, a non-draft pull requests will automatically request review from the team;
 7. if you need to update your PR, please avoid rebasing and just add new commits to your branch.
 
 
@@ -523,10 +523,13 @@ From this point, you should:
 1. Look at the results of the CI pipeline.
     - If there is any error, fix the error.
 2. If a developer has requested changes, make these changes and let us know if it is ready for a developer to review again.
+   - A pull request is a conversation, if you disagree with the suggestions, please respond and discuss it.
 3. Create a new commit with the changes.
     - Please do NOT overwrite the history. New commits make the reviewer's life easier.
     - Push this commits to your Pull Request.
 4. Back to 1.
+5. Once the pull request is ready for review again please re-request review from whichever developer did your initial
+  review (or leave a comment in the pull request that you believe all required changes have been done).
 
 Once both the CI and the developers are happy, the patch will be merged into Synapse and released shortly!
 
