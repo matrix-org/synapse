@@ -207,7 +207,7 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
     def _construct_room_type_where_clause(
         self, room_types: Union[List[Union[str, None]], None]
     ) -> Tuple[Union[str, None], List[str]]:
-        if not room_types:
+        if not room_types or not self.config.experimental.msc3827_enabled:
             return None, []
         else:
             # We use None when we want get rooms without a type
