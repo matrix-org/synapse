@@ -49,7 +49,6 @@ from synapse.util.stringutils import random_string
 from tests import unittest
 from tests.http.server._base import make_request_with_cancellation_test
 from tests.test_utils import make_awaitable
-from tests.unittest import override_config
 
 PATH_PREFIX = b"/_matrix/client/api/v1"
 
