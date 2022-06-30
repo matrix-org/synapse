@@ -933,6 +933,9 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
 
         upper_limit = max_receipts_stream_id
         if len(rows) >= limit:
+            # If we pulled out a limited number of rows we only update the
+            # position to the last receipt we processed, so we continue
+            # processing the rest next iteration.
             upper_limit = rows[-1][0]
 
         self.db_pool.simple_update_txn(
