@@ -153,19 +153,23 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 400, channel.result)
 
-    def _get_displayname(self, name: Optional[str] = None) -> str:
+    def _get_displayname(self, name: Optional[str] = None) -> Optional[str]:
         channel = self.make_request(
             "GET", "/profile/%s/displayname" % (name or self.owner,)
         )
         self.assertEqual(channel.code, 200, channel.result)
-        return channel.json_body["displayname"]
+        # FIXME: If a user has no displayname set, Synapse returns 200 and omits a
+        # displayname from the response. This contradicts the spec, see #13137.
+        return channel.json_body.get("displayname")
 
-    def _get_avatar_url(self, name: Optional[str] = None) -> str:
+    def _get_avatar_url(self, name: Optional[str] = None) -> Optional[str]:
         channel = self.make_request(
             "GET", "/profile/%s/avatar_url" % (name or self.owner,)
         )
         self.assertEqual(channel.code, 200, channel.result)
-        return channel.json_body["avatar_url"]
+        # FIXME: If a user has no avatar set, Synapse returns 200 and omits an
+        # avatar_url from the response. This contradicts the spec, see #13137.
+        return channel.json_body.get("avatar_url")
 
     @unittest.override_config({"max_avatar_size": 50})
     def test_avatar_size_limit_global(self) -> None:
