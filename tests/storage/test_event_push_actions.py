@@ -135,7 +135,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
 
             # We need to update the receipts ID gen. We should rewrite this test
             # using proper rooms and receipts.
-            self.store._receipts_id_gen._current = stream
+            self.store._receipts_id_gen._current = stream  # type: ignore
 
             self.get_success(
                 self.store.db_pool.runInteraction(
