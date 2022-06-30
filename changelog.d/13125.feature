@@ -1,1 +1,1 @@
-Rate-limiting local invites by issuer.
+Add a rate limit for local users sending invites.
