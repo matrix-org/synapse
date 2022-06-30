@@ -106,9 +106,8 @@ def register_sighup(func: Callable[P, None], *args: P.args, **kwargs: P.kwargs) 
 def start_worker_reactor(
     appname: str,
     config: HomeServerConfig,
-    # We deliberately bind this later so that we don't rely on the run() method
-    # being available at import time.
-    # (e.g. because synapse.app.complement_fork_starter is being used)
+    # Use a lambda to avoid binding to a given reactor at import time.
+    # (needed when synapse.app.complement_fork_starter is being used)
     run_command: Callable[[], None] = lambda: reactor.run(),
 ) -> None:
     """Run the reactor in the main process
@@ -144,9 +143,8 @@ def start_reactor(
     daemonize: bool,
     print_pidfile: bool,
     logger: logging.Logger,
-    # We deliberately bind this later so that we don't rely on the run() method
-    # being available at import time.
-    # (e.g. because synapse.app.complement_fork_starter is being used)
+    # Use a lambda to avoid binding to a given reactor at import time.
+    # (needed when synapse.app.complement_fork_starter is being used)
     run_command: Callable[[], None] = lambda: reactor.run(),
 ) -> None:
     """Run the reactor in the main process
