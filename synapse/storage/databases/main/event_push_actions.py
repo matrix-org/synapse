@@ -854,7 +854,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
 
         limit = 100
 
-        min_stream_id = self.db_pool.simple_select_one_onecol_txn(
+        min_receipts_stream_id = self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="event_push_summary_last_receipt_stream_id",
             keyvalues={},
@@ -879,7 +879,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         txn.execute(
             sql,
             (
-                min_stream_id,
+                min_receipts_stream_id,
                 max_receipts_stream_id,
                 user_filter,
                 limit,
