@@ -20,7 +20,7 @@ from synapse.server import HomeServer
 from synapse.storage.databases.main.event_push_actions import NotifCounts
 from synapse.util import Clock
 
-from tests.unittest import HomeserverTestCase, override_config
+from tests.unittest import HomeserverTestCase
 
 USER_ID = "@user:example.com"
 
