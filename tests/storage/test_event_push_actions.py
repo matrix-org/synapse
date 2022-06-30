@@ -20,7 +20,7 @@ from synapse.server import HomeServer
 from synapse.storage.databases.main.event_push_actions import NotifCounts
 from synapse.util import Clock
 
-from tests.unittest import HomeserverTestCase
+from tests.unittest import HomeserverTestCase, override_config
 
 USER_ID = "@user:example.com"
 
@@ -133,20 +133,13 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         def _mark_read(stream: int, depth: int) -> None:
             last_read_stream_ordering[0] = stream
 
-            # We need to update the receipts ID gen. We should rewrite this test
-            # using proper rooms and receipts.
-            self.store._receipts_id_gen._current = stream  # type: ignore
-
             self.get_success(
-                self.store.db_pool.runInteraction(
-                    "",
-                    self.store._insert_linearized_receipt_txn,
+                self.store.insert_receipt(
                     room_id,
                     "m.read",
-                    user_id,
-                    f"$test{stream}:example.com",
-                    {},
-                    stream,
+                    user_id=user_id,
+                    event_ids=[f"$test{stream}:example.com"],
+                    data={},
                 )
             )
 
@@ -170,6 +163,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
 
         _inject_actions(6, PlAIN_NOTIF)
         _rotate(7)
+        _assert_counts(1, 0)
 
         self.get_success(
             self.store.db_pool.simple_delete(
