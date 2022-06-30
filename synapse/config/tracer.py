@@ -15,7 +15,7 @@
 from typing import Any, List, Set
 
 from synapse.types import JsonDict
-from synapse.util.check_dependencies import DependencyException, check_requirements
+from synapse.util.check_dependencies import check_requirements
 
 from ._base import Config, ConfigError
 
@@ -40,12 +40,7 @@ class TracerConfig(Config):
         if not self.opentracer_enabled:
             return
 
-        try:
-            check_requirements("opentracing")
-        except DependencyException as e:
-            raise ConfigError(
-                e.message  # noqa: B306, DependencyException.message is a property
-            )
+        check_requirements("opentracing")
 
         # The tracer is enabled so sanitize the config
 
