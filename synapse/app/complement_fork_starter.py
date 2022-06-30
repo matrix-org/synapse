@@ -125,14 +125,12 @@ def main() -> None:
         "Subsequent arguments are passed through.",
     )
     ns = parser.parse_args()
-    db_config_path = ns.db_config
-    args = ns.args
 
     # Split up the subsequent arguments into each workers' arguments;
     # `--` is our delimiter of choice.
     args_by_worker: List[List[str]] = [
         list(args)
-        for cond, args in itertools.groupby(args, lambda ele: ele != "--")
+        for cond, args in itertools.groupby(ns.args, lambda ele: ele != "--")
         if cond and args
     ]
 
@@ -159,7 +157,7 @@ def main() -> None:
             [
                 "update_synapse_database",
                 "--database-config",
-                db_config_path,
+                ns.db_config,
                 "--run-background-updates",
             ],
         ),
