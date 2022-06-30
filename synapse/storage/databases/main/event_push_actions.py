@@ -880,6 +880,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
             sql,
             (
                 min_stream_id,
+                max_receipts_stream_id,
                 user_filter,
                 limit,
             ),
