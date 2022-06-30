@@ -15,8 +15,8 @@
 from typing import Any
 
 from synapse.types import JsonDict
+from synapse.util.check_dependencies import check_requirements
 
-from ..util.check_dependencies import check_requirements
 from ._base import Config
 
 
