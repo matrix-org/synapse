@@ -274,7 +274,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         await self._invites_per_recipient_limiter.ratelimit(requester, invitee_user_id)
         if requester is not None:
-            await self._invites_per_issuer_limiter.ratelimit(requester, requester.user)
+            await self._invites_per_issuer_limiter.ratelimit(requester)
 
     async def _local_membership_update(
         self,
