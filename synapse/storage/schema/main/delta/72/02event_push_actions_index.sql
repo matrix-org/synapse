@@ -16,4 +16,4 @@
 -- Add an index to `event_push_actions` to make deleting old non-highlight push
 -- actions faster.
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-  (7002, 'event_push_actions_stream_highlight_index', '{}');
+  (7202, 'event_push_actions_stream_highlight_index', '{}');
