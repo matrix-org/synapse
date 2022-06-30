@@ -186,9 +186,9 @@ though it will always hide it from clients.</p>
 delete the last message in a room. It will, however, hide it from
 clients.</p>
 <h2 id="server-configuration"><a class="header" href="#server-configuration">Server configuration</a></h2>
-<p>Support for this feature can be enabled and configured in the
-<code>retention</code> section of the Synapse configuration file (see the
-<a href="https://github.com/matrix-org/synapse/blob/v1.36.0/docs/sample_config.yaml#L451-L518">sample file</a>).</p>
+<p>Support for this feature can be enabled and configured by adding a the
+<code>retention</code> in the Synapse configuration file (see
+<a href="usage/configuration/config_documentation.html#retention">configuration manual</a>).</p>
 <p>To enable support for message retention policies, set the setting
 <code>enabled</code> in this section to <code>true</code>.</p>
 <h3 id="default-policy"><a class="header" href="#default-policy">Default policy</a></h3>
@@ -197,8 +197,8 @@ configuration that is used by Synapse for every room that doesn't have a
 message retention policy configured in its state. This allows server
 admins to ensure that messages are never kept indefinitely in a server's
 database. </p>
-<p>A default policy can be defined as such, in the <code>retention</code> section of
-the configuration file:</p>
+<p>A default policy can be defined as such, by adding the <code>retention</code> option in
+the configuration file and adding these sub-options:</p>
 <pre><code class="language-yaml">default_policy:
   min_lifetime: 1d
   max_lifetime: 1y
@@ -212,8 +212,8 @@ duration (using the units <code>s</code> (seconds), <code>m</code> (minutes), <c
 expired events from the database. They are only run if support for
 message retention policies is enabled in the server's configuration. If
 no configuration for purge jobs is configured by the server admin,
-Synapse will use a default configuration, which is described in the
-<a href="https://github.com/matrix-org/synapse/blob/v1.36.0/docs/sample_config.yaml#L451-L518">sample configuration file</a>.</p>
+Synapse will use a default configuration, which is described here in the
+<a href="usage/configuration/config_documentation.html#retention">configuration manual</a>.</p>
 <p>Some server admins might want a finer control on when events are removed
 depending on an event's room's policy. This can be done by setting the
 <code>purge_jobs</code> sub-section in the <code>retention</code> section of the configuration
@@ -254,8 +254,8 @@ local users between its expiry date and the moment it gets purged from
 the server's database.</p>
 <h3 id="lifetime-limits"><a class="header" href="#lifetime-limits">Lifetime limits</a></h3>
 <p>Server admins can set limits on the values of <code>max_lifetime</code> to use when
-purging old events in a room. These limits can be defined as such in the
-<code>retention</code> section of the configuration file:</p>
+purging old events in a room. These limits can be defined under the
+<code>retention</code> option in the configuration file:</p>
 <pre><code class="language-yaml">allowed_lifetime_min: 1d
 allowed_lifetime_max: 1y
 </code></pre>

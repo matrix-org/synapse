@@ -155,8 +155,10 @@ debugging.</p>
 shell access to the server. It should therefore <strong>not</strong> be enabled in
 environments where untrusted users have shell access.</p>
 <h2 id="configuring-the-manhole"><a class="header" href="#configuring-the-manhole">Configuring the manhole</a></h2>
-<p>To enable it, first uncomment the <code>manhole</code> listener configuration in
-<code>homeserver.yaml</code>. The configuration is slightly different if you're using docker.</p>
+<p>To enable it, first add the <code>manhole</code> listener configuration in your
+<code>homeserver.yaml</code>. You can find information on how to do that 
+in the <a href="usage/configuration/config_documentation.html#manhole_settings">configuration manual</a>.
+The configuration is slightly different if you're using docker.</p>
 <h4 id="docker-config"><a class="header" href="#docker-config">Docker config</a></h4>
 <p>If you are using Docker, set <code>bind_addresses</code> to <code>['0.0.0.0']</code> as shown:</p>
 <pre><code class="language-yaml">listeners:

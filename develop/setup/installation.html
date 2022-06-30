@@ -420,11 +420,11 @@ over HTTPS.</p>
 <p>Alternatively, you can configure Synapse to expose an HTTPS port. To do
 so, you will need to edit <code>homeserver.yaml</code>, as follows:</p>
 <ul>
-<li>First, under the <code>listeners</code> section, uncomment the configuration for the
-TLS-enabled listener. (Remove the hash sign (<code>#</code>) at the start of
-each line). The relevant lines are like this:</li>
+<li>First, under the <code>listeners</code> option, add the configuration for the
+TLS-enabled listener like so:</li>
 </ul>
-<pre><code class="language-yaml">  - port: 8448
+<pre><code class="language-yaml">listeners:
+  - port: 8448
     type: http
     tls: true
     resources:
@@ -432,9 +432,13 @@ each line). The relevant lines are like this:</li>
 </code></pre>
 <ul>
 <li>
-<p>You will also need to uncomment the <code>tls_certificate_path</code> and
-<code>tls_private_key_path</code> lines under the <code>TLS</code> section. You will need to manage
-provisioning of these certificates yourself.</p>
+<p>You will also need to add the options <code>tls_certificate_path</code> and
+<code>tls_private_key_path</code>. to your configuration file. You will need to manage provisioning of 
+these certificates yourself.</p>
+</li>
+<li>
+<p>You can find more information about these options as well as how to configure synapse in the 
+<a href="../usage/configuration/config_documentation.html">configuration manual</a>.</p>
 <p>If you are using your own certificate, be sure to use a <code>.pem</code> file that
 includes the full certificate chain including any intermediate certificates
 (for instance, if using certbot, use <code>fullchain.pem</code> as your certificate, not

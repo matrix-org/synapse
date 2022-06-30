@@ -503,11 +503,11 @@ over HTTPS.</p>
 <p>Alternatively, you can configure Synapse to expose an HTTPS port. To do
 so, you will need to edit <code>homeserver.yaml</code>, as follows:</p>
 <ul>
-<li>First, under the <code>listeners</code> section, uncomment the configuration for the
-TLS-enabled listener. (Remove the hash sign (<code>#</code>) at the start of
-each line). The relevant lines are like this:</li>
+<li>First, under the <code>listeners</code> option, add the configuration for the
+TLS-enabled listener like so:</li>
 </ul>
-<pre><code class="language-yaml">  - port: 8448
+<pre><code class="language-yaml">listeners:
+  - port: 8448
     type: http
     tls: true
     resources:
@@ -515,9 +515,13 @@ each line). The relevant lines are like this:</li>
 </code></pre>
 <ul>
 <li>
-<p>You will also need to uncomment the <code>tls_certificate_path</code> and
-<code>tls_private_key_path</code> lines under the <code>TLS</code> section. You will need to manage
-provisioning of these certificates yourself.</p>
+<p>You will also need to add the options <code>tls_certificate_path</code> and
+<code>tls_private_key_path</code>. to your configuration file. You will need to manage provisioning of 
+these certificates yourself.</p>
+</li>
+<li>
+<p>You can find more information about these options as well as how to configure synapse in the 
+<a href="setup/../usage/configuration/config_documentation.html">configuration manual</a>.</p>
 <p>If you are using your own certificate, be sure to use a <code>.pem</code> file that
 includes the full certificate chain including any intermediate certificates
 (for instance, if using certbot, use <code>fullchain.pem</code> as your certificate, not
@@ -1149,8 +1153,8 @@ will apply blacklisting of IP addresses.</p>
 it is most likely due to the proxy's certificates. To test this, the validation
 in Synapse can be deactivated.</p>
 <p><strong>NOTE</strong>: This has an impact on security and is for testing purposes only!</p>
-<p>To deactivate the certificate validation, the following setting must be made in
-<a href="setup/../usage/configuration/homeserver_sample_config.html">homserver.yaml</a>.</p>
+<p>To deactivate the certificate validation, the following setting must be added to
+your <a href="setup/../usage/configuration/homeserver_sample_config.html">homserver.yaml</a>.</p>
 <pre><code class="language-yaml">use_insecure_ssl_client_just_for_testing_do_not_use: true
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="overview-1"><a class="header" href="#overview-1">Overview</a></h1>
@@ -5649,7 +5653,7 @@ to log in and reauthenticate, whilst preventing new users from setting passwords
 <li><code>localdb_enabled</code>: Set to false to disable authentication against the local password
 database. This is ignored if <code>enabled</code> is false, and is only useful
 if you have other <code>password_providers</code>. Defaults to true. </li>
-<li><code>pepper</code>: Set the value here to a secret random string for extra security. # Uncomment and change to a secret random string for extra security.
+<li><code>pepper</code>: Set the value here to a secret random string for extra security.
 DO NOT CHANGE THIS AFTER INITIAL SETUP!</li>
 <li><code>policy</code>: Define and enforce a password policy, such as minimum lengths for passwords, etc. 
 Each parameter is optional. This is an implementation of MSC2000. Parameters are as follows:
@@ -6753,8 +6757,8 @@ maintainer.</p>
 </li>
 </ul>
 <p>To enable the OpenID integration, you should then add a section to the <code>oidc_providers</code>
-setting in your configuration file (or uncomment one of the existing examples).
-See <a href="./sample_config.yaml">sample_config.yaml</a> for some sample settings, as well as
+setting in your configuration file.
+See the <a href="usage/configuration/config_documentation.html#oidc_providers">configuration manual</a> for some sample settings, as well as
 the text below for example configurations for specific providers.</p>
 <h2 id="sample-configs"><a class="header" href="#sample-configs">Sample configs</a></h2>
 <p>Here are a few configs for providers that should work with Synapse.</p>
@@ -7243,8 +7247,8 @@ file</a> for more details.</p>
 <p>Synapse supports authenticating users via the <a href="https://en.wikipedia.org/wiki/Central_Authentication_Service">Central Authentication
 Service protocol</a>
 (CAS) natively.</p>
-<p>Please see the <code>cas_config</code> and <code>sso</code> sections of the <a href="usage/configuration/user_authentication/single_sign_on/../../../configuration/homeserver_sample_config.html">Synapse configuration
-file</a> for more details.</p>
+<p>Please see the <a href="usage/configuration/user_authentication/single_sign_on/../../../configuration/config_documentation.html#cas_config">cas_config</a> and <a href="usage/configuration/user_authentication/single_sign_on/../../../configuration/config_documentation.html#sso">sso</a>
+sections of the configuration manual for more details.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="sso-mapping-providers"><a class="header" href="#sso-mapping-providers">SSO Mapping Providers</a></h1>
 <p>A mapping provider is a Python class (loaded via a Python module) that
 works out how to map attributes of a SSO response to Matrix-specific
@@ -7654,9 +7658,8 @@ provided by <code>matrix.org</code> so no further action is needed.</p>
 maintainer.</p>
 </li>
 </ul>
-<p>To enable the JSON web token integration, you should then add a <code>jwt_config</code> section
-to your configuration file (or uncomment the <code>enabled: true</code> line in the
-existing section). See <a href="./sample_config.yaml">sample_config.yaml</a> for some
+<p>To enable the JSON web token integration, you should then add a <code>jwt_config</code> option
+to your configuration file. See the <a href="usage/configuration/config_documentation.html#jwt_config">configuration manual</a> for some
 sample settings.</p>
 <h2 id="how-to-test-jwt-as-a-developer"><a class="header" href="#how-to-test-jwt-as-a-developer">How to test JWT as a developer</a></h2>
 <p>Although JSON Web Tokens are typically generated from an external server, the
@@ -8272,9 +8275,9 @@ though it will always hide it from clients.</p>
 delete the last message in a room. It will, however, hide it from
 clients.</p>
 <h2 id="server-configuration"><a class="header" href="#server-configuration">Server configuration</a></h2>
-<p>Support for this feature can be enabled and configured in the
-<code>retention</code> section of the Synapse configuration file (see the
-<a href="https://github.com/matrix-org/synapse/blob/v1.36.0/docs/sample_config.yaml#L451-L518">sample file</a>).</p>
+<p>Support for this feature can be enabled and configured by adding a the
+<code>retention</code> in the Synapse configuration file (see
+<a href="usage/configuration/config_documentation.html#retention">configuration manual</a>).</p>
 <p>To enable support for message retention policies, set the setting
 <code>enabled</code> in this section to <code>true</code>.</p>
 <h3 id="default-policy"><a class="header" href="#default-policy">Default policy</a></h3>
@@ -8283,8 +8286,8 @@ configuration that is used by Synapse for every room that doesn't have a
 message retention policy configured in its state. This allows server
 admins to ensure that messages are never kept indefinitely in a server's
 database. </p>
-<p>A default policy can be defined as such, in the <code>retention</code> section of
-the configuration file:</p>
+<p>A default policy can be defined as such, by adding the <code>retention</code> option in
+the configuration file and adding these sub-options:</p>
 <pre><code class="language-yaml">default_policy:
   min_lifetime: 1d
   max_lifetime: 1y
@@ -8298,8 +8301,8 @@ duration (using the units <code>s</code> (seconds), <code>m</code> (minutes), <c
 expired events from the database. They are only run if support for
 message retention policies is enabled in the server's configuration. If
 no configuration for purge jobs is configured by the server admin,
-Synapse will use a default configuration, which is described in the
-<a href="https://github.com/matrix-org/synapse/blob/v1.36.0/docs/sample_config.yaml#L451-L518">sample configuration file</a>.</p>
+Synapse will use a default configuration, which is described here in the
+<a href="usage/configuration/config_documentation.html#retention">configuration manual</a>.</p>
 <p>Some server admins might want a finer control on when events are removed
 depending on an event's room's policy. This can be done by setting the
 <code>purge_jobs</code> sub-section in the <code>retention</code> section of the configuration
@@ -8340,8 +8343,8 @@ local users between its expiry date and the moment it gets purged from
 the server's database.</p>
 <h3 id="lifetime-limits"><a class="header" href="#lifetime-limits">Lifetime limits</a></h3>
 <p>Server admins can set limits on the values of <code>max_lifetime</code> to use when
-purging old events in a room. These limits can be defined as such in the
-<code>retention</code> section of the configuration file:</p>
+purging old events in a room. These limits can be defined under the
+<code>retention</code> option in the configuration file:</p>
 <pre><code class="language-yaml">allowed_lifetime_min: 1d
 allowed_lifetime_max: 1y
 </code></pre>
@@ -12123,9 +12126,8 @@ belonging to a user.</li>
 </ul>
 </li>
 <li><code>external_ids</code> - array, optional. Allow setting the identifier of the external identity
-provider for SSO (Single sign-on). Details in
-<a href="admin_api/../usage/configuration/homeserver_sample_config.html">Sample Configuration File</a>
-section <code>sso</code> and <code>oidc_providers</code>.
+provider for SSO (Single sign-on). Details in the configuration manual under the
+sections <a href="admin_api/../usage/configuration/config_documentation.html#sso">sso</a> and <a href="admin_api/../usage/configuration/config_documentation.html#oidc_providers">oidc_providers</a>.
 <ul>
 <li><code>auth_provider</code> - string. ID of the external identity provider. Value of <code>idp_id</code>
 in the homeserver configuration. Note that no error is raised if the provided
@@ -13187,8 +13189,10 @@ debugging.</p>
 shell access to the server. It should therefore <strong>not</strong> be enabled in
 environments where untrusted users have shell access.</p>
 <h2 id="configuring-the-manhole"><a class="header" href="#configuring-the-manhole">Configuring the manhole</a></h2>
-<p>To enable it, first uncomment the <code>manhole</code> listener configuration in
-<code>homeserver.yaml</code>. The configuration is slightly different if you're using docker.</p>
+<p>To enable it, first add the <code>manhole</code> listener configuration in your
+<code>homeserver.yaml</code>. You can find information on how to do that 
+in the <a href="usage/configuration/config_documentation.html#manhole_settings">configuration manual</a>.
+The configuration is slightly different if you're using docker.</p>
 <h4 id="docker-config"><a class="header" href="#docker-config">Docker config</a></h4>
 <p>If you are using Docker, set <code>bind_addresses</code> to <code>['0.0.0.0']</code> as shown:</p>
 <pre><code class="language-yaml">listeners:
@@ -14290,95 +14294,60 @@ relative imports (<code>from .types import UserID</code>).</p>
 </ul>
 </li>
 </ul>
-<h2 id="configuration-file-format"><a class="header" href="#configuration-file-format">Configuration file format</a></h2>
-<p>The <a href="./sample_config.yaml">sample configuration file</a> acts as a
+<h2 id="configuration-code-and-documentation-format"><a class="header" href="#configuration-code-and-documentation-format">Configuration code and documentation format</a></h2>
+<p>When adding a configuration option to the code, if several settings are grouped into a single dict, ensure that your code
+correctly handles the top-level option being set to <code>None</code> (as it will be if no sub-options are enabled).</p>
+<p>The <a href="usage/configuration/config_documentation.html">configuration manual</a> acts as a
 reference to Synapse's configuration options for server administrators.
 Remember that many readers will be unfamiliar with YAML and server
-administration in general, so that it is important that the file be as
-easy to understand as possible, which includes following a consistent
-format.</p>
+administration in general, so it is important that when you add
+a configuration option the documentation be as easy to understand as possible, which 
+includes following a consistent format.</p>
 <p>Some guidelines follow:</p>
 <ul>
 <li>
-<p>Sections should be separated with a heading consisting of a single
-line prefixed and suffixed with <code>##</code>. There should be <strong>two</strong> blank
-lines before the section header, and <strong>one</strong> after.</p>
-</li>
-<li>
-<p>Each option should be listed in the file with the following format:</p>
+<p>Each option should be listed in the config manual with the following format:</p>
 <ul>
 <li>
-<p>A comment describing the setting. Each line of this comment
-should be prefixed with a hash (<code>#</code>) and a space.</p>
-<p>The comment should describe the default behaviour (ie, what
+<p>The name of the option, prefixed by <code>###</code>. </p>
+</li>
+<li>
+<p>A comment which describes the default behaviour (i.e. what
 happens if the setting is omitted), as well as what the effect
 will be if the setting is changed.</p>
-<p>Often, the comment end with something like &quot;uncomment the
-following to <do action>&quot;.</p>
 </li>
 <li>
-<p>A line consisting of only <code>#</code>.</p>
-</li>
-<li>
-<p>A commented-out example setting, prefixed with only <code>#</code>.</p>
+<p>An example setting, using backticks to define the code block</p>
 <p>For boolean (on/off) options, convention is that this example
-should be the <em>opposite</em> to the default (so the comment will end
-with &quot;Uncomment the following to enable [or disable]
-<feature>.&quot; For other options, the example should give some
-non-default value which is likely to be useful to the reader.</p>
+should be the <em>opposite</em> to the default. For other options, the example should give
+some non-default value which is likely to be useful to the reader.</p>
 </li>
 </ul>
 </li>
 <li>
-<p>There should be a blank line between each option.</p>
-</li>
-<li>
-<p>Where several settings are grouped into a single dict, <em>avoid</em> the
-convention where the whole block is commented out, resulting in
-comment lines starting <code># #</code>, as this is hard to read and confusing
-to edit. Instead, leave the top-level config option uncommented, and
-follow the conventions above for sub-options. Ensure that your code
-correctly handles the top-level option being set to <code>None</code> (as it
-will be if no sub-options are enabled).</p>
-</li>
-<li>
-<p>Lines should be wrapped at 80 characters.</p>
-</li>
-<li>
-<p>Use two-space indents.</p>
+<p>There should be a horizontal rule between each option, which can be achieved by adding <code>---</code> before and
+after the option.</p>
 </li>
 <li>
 <p><code>true</code> and <code>false</code> are spelt thus (as opposed to <code>True</code>, etc.)</p>
 </li>
-<li>
-<p>Use single quotes (<code>'</code>) rather than double-quotes (<code>&quot;</code>) or backticks
-(<code>`</code>) to refer to configuration options.</p>
-</li>
 </ul>
 <p>Example:</p>
-<pre><code class="language-yaml">## Frobnication ##
-
-# The frobnicator will ensure that all requests are fully frobnicated.
-# To enable it, uncomment the following.
-#
-#frobnicator_enabled: true
-
-# By default, the frobnicator will frobnicate with the default frobber.
-# The following will make it use an alternative frobber.
-#
-#frobincator_frobber: special_frobber
-
-# Settings for the frobber
-#
-frobber:
-  # frobbing speed. Defaults to 1.
-  #
-  #speed: 10
-
-  # frobbing distance. Defaults to 1000.
-  #
-  #distance: 100
+<hr />
+<h3 id="modules-3"><a class="header" href="#modules-3"><code>modules</code></a></h3>
+<p>Use the <code>module</code> sub-option to add a module under <code>modules</code> to extend functionality. 
+The <code>module</code> setting then has a sub-option, <code>config</code>, which can be used to define some configuration
+for the <code>module</code>.</p>
+<p>Defaults to none.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">modules:
+  - module: my_super_module.MySuperClass
+    config:
+      do_thing: true
+  - module: my_other_super_module.SomeClass
+    config: {}
 </code></pre>
+<hr />
 <p>Note that the sample configuration is generated from the synapse code
 and is maintained by a script, <code>scripts-dev/generate_sample_config.sh</code>.
 Making sure that the output from this script matches the desired format
