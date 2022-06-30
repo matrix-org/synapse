@@ -1189,6 +1189,16 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             where_clause="highlight=1",
         )
 
+        # Add index to make deleting old push actions faster.
+        self.db_pool.updates.register_background_index_update(
+            "event_push_actions_stream_highlight_index",
+            index_name="event_push_actions_stream_highlight_index",
+            table="event_push_actions",
+            columns=["highlight", "stream_ordering"],
+            where_clause="highlight=0",
+            psql_only=True,
+        )
+
     async def get_push_actions_for_user(
         self,
         user_id: str,
