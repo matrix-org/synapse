@@ -1,3 +1,24 @@
+{% if use_forking_launcher %}
+[program:synapse_fork]
+command=/usr/local/bin/python -m synapse.app.complement_fork_starter
+  {{ main_config_path }}
+  synapse.app.homeserver
+  --config-path="{{ main_config_path }}"
+  --config-path=/conf/workers/shared.yaml
+  {%- for worker in workers %}
+    -- {{ worker.app }}
+    --config-path="{{ main_config_path }}"
+    --config-path=/conf/workers/shared.yaml
+    --config-path=/conf/workers/{{ worker.name }}.yaml
+  {%- endfor %}
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+autorestart=unexpected
+exitcodes=0
+
+{% else %}
 [program:synapse_main]
 command=/usr/local/bin/prefix-log /usr/local/bin/python -m synapse.app.homeserver
   --config-path="{{ main_config_path }}"
@@ -13,7 +34,7 @@ autorestart=unexpected
 exitcodes=0
 
 
-{% for worker in workers %}
+  {% for worker in workers %}
 [program:synapse_{{ worker.name }}]
 command=/usr/local/bin/prefix-log /usr/local/bin/python -m {{ worker.app }}
   --config-path="{{ main_config_path }}"
@@ -27,4 +48,5 @@ stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
 
-{% endfor %}
+  {% endfor %}
+{% endif %}
