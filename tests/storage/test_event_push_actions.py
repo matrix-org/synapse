@@ -133,6 +133,10 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         def _mark_read(stream: int, depth: int) -> None:
             last_read_stream_ordering[0] = stream
 
+            # We need to update the receipts ID gen. We should rewrite this test
+            # using proper rooms and receipts.
+            self.store._receipts_id_gen._current = stream
+
             self.get_success(
                 self.store.db_pool.runInteraction(
                     "",
