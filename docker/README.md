@@ -67,6 +67,13 @@ The following environment variables are supported in `generate` mode:
 * `UID`, `GID`: the user id and group id to use for creating the data
   directories. If unset, and no user is set via `docker run --user`, defaults
   to `991`, `991`.
+* `SYNAPSE_LOG_LEVEL`: the log level to use (one of `DEBUG`, `INFO`, `WARNING` or `ERROR`).
+  Defaults to `INFO`.
+* `SYNAPSE_LOG_SENSITIVE`: if set and the log level is set to `DEBUG`, Synapse
+  will log sensitive information such as access tokens.
+  This should not be needed unless you are a developer attempting to debug something
+  particularly tricky.
+
 
 ## Postgres
 

@@ -108,6 +108,12 @@ fi
 if [[ -n "$SYNAPSE_TEST_LOG_LEVEL" ]]; then
   # Set the log level to what is desired
   export PASS_SYNAPSE_LOG_LEVEL="$SYNAPSE_TEST_LOG_LEVEL"
+
+  # Allow logging sensitive things (currently SQL queries & parameters).
+  # (This won't have any effect if we're not logging at DEBUG level overall.)
+  # Since this is just a test suite, this is fine and won't reveal anyone's
+  # personal information
+  export PASS_SYNAPSE_LOG_SENSITIVE=1
 fi
 
 # Run the tests!
