@@ -104,6 +104,12 @@ else
   test_tags="$test_tags,faster_joins"
 fi
 
+
+if [[ -n "$SYNAPSE_TEST_LOG_LEVEL" ]]; then
+  # Set the log level to what is desired
+  export PASS_SYNAPSE_LOG_LEVEL="$SYNAPSE_TEST_LOG_LEVEL"
+fi
+
 # Run the tests!
 echo "Images built; running complement"
 cd "$COMPLEMENT_DIR"
