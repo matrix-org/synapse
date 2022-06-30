@@ -69,6 +69,7 @@
       - [Federation](usage/administration/admin_api/federation.md)
     - [Manhole](manhole.md)
     - [Monitoring](metrics-howto.md)
+      - [Reporting Anonymised Statistics](usage/administration/monitoring/reporting_anonymised_statistics.md)
     - [Understanding Synapse Through Grafana Graphs](usage/administration/understanding_synapse_through_grafana_graphs.md)
     - [Useful SQL for Admins](usage/administration/useful_sql_for_admins.md)
     - [Database Maintenance Tools](usage/administration/database_maintenance_tools.md)
