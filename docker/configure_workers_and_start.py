@@ -29,6 +29,10 @@
 #   * SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER: Whether to use the forking launcher,
 #         only intended for usage in Complement at the moment.
 #         No stability guarantees are provided.
+#   * SYNAPSE_LOG_LEVEL: Set this to DEBUG, INFO, WARNING or ERROR to change the
+#         log level. INFO is the default.
+#   * SYNAPSE_LOG_SENSITIVE: If unset, SQL and SQL values won't be logged,
+#         regardless of the SYNAPSE_LOG_LEVEL setting.
 #
 # NOTE: According to Complement's ENTRYPOINT expectations for a homeserver image (as defined
 # in the project's README), this script may be run multiple times, and functionality should
