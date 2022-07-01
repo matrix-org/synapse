@@ -35,13 +35,26 @@ echo_if_github() {
   fi
 }
 
+# Helper to print out the usage instructions
+usage() {
+    cat >&2 <<EOF
+Usage: $0 [-f] <go test arguments>...
+Run the complement test suite on Synapse.
+
+  -f    Skip rebuilding the docker images, and just use the most recent
+        'complement-synapse:latest' image
+
+For help on arguments to 'go test', run 'go help testflag'.
+EOF
+}
+
 # parse our arguments
 skip_docker_build=""
 while [ $# -ge 1 ]; do
     arg=$1
     case "$arg" in
         "-h")
-            echo >&2 "Usage: $0 [-f] <go test arguments>"
+            usage
             exit 1
             ;;
         "-f")
