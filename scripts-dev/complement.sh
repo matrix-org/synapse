@@ -44,7 +44,8 @@ usage() {
 Usage: $0 [-f] <go test arguments>...
 Run the complement test suite on Synapse.
 
-  -f    Skip rebuilding the docker images, and just use the most recent
+  -f, --fast
+        Skip rebuilding the docker images, and just use the most recent
         'complement-synapse:latest' image
 
   --build-only
@@ -64,7 +65,7 @@ while [ $# -ge 1 ]; do
             usage
             exit 1
             ;;
-        "-f")
+        "-f"|"--fast")
             skip_docker_build=1
             ;;
         "--build-only")
