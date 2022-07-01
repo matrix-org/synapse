@@ -552,11 +552,11 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         )
 
 
-class TestSpamCheckerDeprecated:
+class TestSpamCheckerLegacy:
     """A spam checker module that rejects all media that includes the bytes
     `evil`.
 
-    Uses the deprecated Spam-Checker API.
+    Uses the legacy Spam-Checker API.
     """
 
     def __init__(self, config: Dict[str, Any], api: ModuleApi) -> None:
@@ -597,7 +597,7 @@ class TestSpamCheckerDeprecated:
         return b"evil" in buf.getvalue()
 
 
-class SpamCheckerTestCaseDeprecated(unittest.HomeserverTestCase):
+class SpamCheckerTestCaseLegacy(unittest.HomeserverTestCase):
     servlets = [
         login.register_servlets,
         admin.register_servlets,
@@ -621,8 +621,8 @@ class SpamCheckerTestCaseDeprecated(unittest.HomeserverTestCase):
             {
                 "spam_checker": [
                     {
-                        "module": TestSpamCheckerDeprecated.__module__
-                        + ".TestSpamCheckerDeprecated",
+                        "module": TestSpamCheckerLegacy.__module__
+                        + ".TestSpamCheckerLegacy",
                         "config": {},
                     }
                 ]

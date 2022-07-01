@@ -840,7 +840,7 @@ class RoomsCreateTestCase(RoomBase):
             room_id: str,
             is_invite: bool,
         ) -> Tuple[Codes, dict]:
-            return (Codes.INCOMPATIBLE_ROOM_VERSION, {})
+            return Codes.INCOMPATIBLE_ROOM_VERSION, {}
 
         join_mock.side_effect = user_may_join_room_tuple
 
@@ -1196,7 +1196,7 @@ class RoomJoinTestCase(RoomBase):
 
         # Now make the callback deny all room joins, and check that a join actually fails.
         # As above, with the experimental extension that lets us return dictionaries.
-        return_value = Codes.BAD_ALIAS, {"another_field": "12345"}
+        return_value = (Codes.BAD_ALIAS, {"another_field": "12345"})
         self.helper.join(
             self.room3,
             self.user2,
