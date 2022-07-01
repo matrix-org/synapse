@@ -86,6 +86,8 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             event.internal_metadata.is_outlier.return_value = False
             event.depth = stream
 
+            self.store._events_stream_cache.entity_has_changed(room_id, stream)
+
             self.get_success(
                 self.store.db_pool.simple_insert(
                     table="events",
@@ -134,15 +136,12 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             last_read_stream_ordering[0] = stream
 
             self.get_success(
-                self.store.db_pool.runInteraction(
-                    "",
-                    self.store._insert_linearized_receipt_txn,
+                self.store.insert_receipt(
                     room_id,
                     "m.read",
-                    user_id,
-                    f"$test{stream}:example.com",
-                    {},
-                    stream,
+                    user_id=user_id,
+                    event_ids=[f"$test{stream}:example.com"],
+                    data={},
                 )
             )
 
@@ -166,6 +165,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
 
         _inject_actions(6, PlAIN_NOTIF)
         _rotate(7)
+        _assert_counts(1, 0)
 
         self.get_success(
             self.store.db_pool.simple_delete(

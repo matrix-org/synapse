@@ -24,7 +24,7 @@ from synapse.types import JsonDict
 from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_mxc_uri
 
-from ..util.check_dependencies import DependencyException, check_requirements
+from ..util.check_dependencies import check_requirements
 from ._base import Config, ConfigError, read_file
 
 DEFAULT_USER_MAPPING_PROVIDER = "synapse.handlers.oidc.JinjaOidcMappingProvider"
@@ -41,12 +41,7 @@ class OIDCConfig(Config):
         if not self.oidc_providers:
             return
 
-        try:
-            check_requirements("oidc")
-        except DependencyException as e:
-            raise ConfigError(
-                e.message  # noqa: B306, DependencyException.message is a property
-            ) from e
+        check_requirements("oidc")
 
         # check we don't have any duplicate idp_ids now. (The SSO handler will also
         # check for duplicates when the REST listeners get registered, but that happens
@@ -145,7 +140,6 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
 OIDC_PROVIDER_CONFIG_WITH_ID_SCHEMA = {
     "allOf": [OIDC_PROVIDER_CONFIG_SCHEMA, {"required": ["idp_id", "idp_name"]}]
 }
-
 
 # the `oidc_providers` list can either be None (as it is in the default config), or
 # a list of provider configs, each of which requires an explicit ID and name.

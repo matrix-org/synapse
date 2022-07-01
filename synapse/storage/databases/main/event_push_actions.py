@@ -25,8 +25,8 @@ from synapse.storage.database import (
     LoggingDatabaseConnection,
     LoggingTransaction,
 )
-from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
+from synapse.storage.databases.main.stream import StreamWorkerStore
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 
@@ -122,7 +122,7 @@ def _deserialize_action(actions: str, is_highlight: bool) -> List[Union[dict, st
         return DEFAULT_NOTIF_ACTION
 
 
-class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBaseStore):
+class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBaseStore):
     def __init__(
         self,
         database: DatabasePool,
@@ -218,7 +218,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
                 retcol="event_id",
             )
 
-            stream_ordering = self.get_stream_id_for_event_txn(txn, event_id)  # type: ignore[attr-defined]
+            stream_ordering = self.get_stream_id_for_event_txn(txn, event_id)
 
         return self._get_unread_counts_by_pos_txn(
             txn, room_id, user_id, stream_ordering
@@ -307,11 +307,21 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         actions that have been deleted from `event_push_actions` table.
         """
 
+        # If there have been no events in the room since the stream ordering,
+        # there can't be any push actions either.
+        if not self._events_stream_cache.has_entity_changed(room_id, stream_ordering):
+            return 0, 0
+
         clause = ""
         args = [user_id, room_id, stream_ordering]
         if max_stream_ordering is not None:
             clause = "AND ea.stream_ordering <= ?"
             args.append(max_stream_ordering)
+
+            # If the max stream ordering is less than the min stream ordering,
+            # then obviously there are zero push actions in that range.
+            if max_stream_ordering <= stream_ordering:
+                return 0, 0
 
         sql = f"""
             SELECT
@@ -854,18 +864,20 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
 
         limit = 100
 
-        min_stream_id = self.db_pool.simple_select_one_onecol_txn(
+        min_receipts_stream_id = self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="event_push_summary_last_receipt_stream_id",
             keyvalues={},
             retcol="stream_id",
         )
 
+        max_receipts_stream_id = self._receipts_id_gen.get_current_token()
+
         sql = """
             SELECT r.stream_id, r.room_id, r.user_id, e.stream_ordering
             FROM receipts_linearized AS r
             INNER JOIN events AS e USING (event_id)
-            WHERE r.stream_id > ? AND user_id LIKE ?
+            WHERE ? < r.stream_id AND r.stream_id <= ? AND user_id LIKE ?
             ORDER BY r.stream_id ASC
             LIMIT ?
         """
@@ -877,12 +889,20 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         txn.execute(
             sql,
             (
-                min_stream_id,
+                min_receipts_stream_id,
+                max_receipts_stream_id,
                 user_filter,
                 limit,
             ),
         )
         rows = txn.fetchall()
+
+        old_rotate_stream_ordering = self.db_pool.simple_select_one_onecol_txn(
+            txn,
+            table="event_push_summary_stream_ordering",
+            keyvalues={},
+            retcol="stream_ordering",
+        )
 
         # For each new read receipt we delete push actions from before it and
         # recalculate the summary.
@@ -900,13 +920,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
                     AND highlight = 0
                 """,
                 (room_id, user_id, stream_ordering),
-            )
-
-            old_rotate_stream_ordering = self.db_pool.simple_select_one_onecol_txn(
-                txn,
-                table="event_push_summary_stream_ordering",
-                keyvalues={},
-                retcol="stream_ordering",
             )
 
             notif_count, unread_count = self._get_notif_unread_count_for_user_room(
@@ -927,18 +940,19 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
 
         # We always update `event_push_summary_last_receipt_stream_id` to
         # ensure that we don't rescan the same receipts for remote users.
-        #
-        # This requires repeatable read to be safe, as we need the
-        # `MAX(stream_id)` to not include any new rows that have been committed
-        # since the start of the transaction (since those rows won't have been
-        # returned by the query above). Alternatively we could query the max
-        # stream ID at the start of the transaction and bound everything by
-        # that.
-        txn.execute(
-            """
-            UPDATE event_push_summary_last_receipt_stream_id
-            SET stream_id = (SELECT COALESCE(MAX(stream_id), 0) FROM receipts_linearized)
-            """
+
+        upper_limit = max_receipts_stream_id
+        if len(rows) >= limit:
+            # If we pulled out a limited number of rows we only update the
+            # position to the last receipt we processed, so we continue
+            # processing the rest next iteration.
+            upper_limit = rows[-1][0]
+
+        self.db_pool.simple_update_txn(
+            txn,
+            table="event_push_summary_last_receipt_stream_id",
+            keyvalues={},
+            updatevalues={"stream_id": upper_limit},
         )
 
         return len(rows) < limit
@@ -1187,6 +1201,16 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             table="event_push_actions",
             columns=["user_id", "room_id", "topological_ordering", "stream_ordering"],
             where_clause="highlight=1",
+        )
+
+        # Add index to make deleting old push actions faster.
+        self.db_pool.updates.register_background_index_update(
+            "event_push_actions_stream_highlight_index",
+            index_name="event_push_actions_stream_highlight_index",
+            table="event_push_actions",
+            columns=["highlight", "stream_ordering"],
+            where_clause="highlight=0",
+            psql_only=True,
         )
 
     async def get_push_actions_for_user(
