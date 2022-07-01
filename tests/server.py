@@ -830,7 +830,6 @@ def setup_test_homeserver(
 
     # Mock TLS
     hs.tls_server_context_factory = Mock()
-    hs.tls_client_options_factory = Mock()
 
     hs.setup()
     if homeserver_to_use == TestHomeServer:
