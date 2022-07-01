@@ -38,7 +38,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, MutableMapping, NoReturn, Set
+from typing import Any, Dict, List, Mapping, MutableMapping, NoReturn, Optional, Set
 
 import yaml
 from jinja2 import Environment, FileSystemLoader
@@ -552,9 +552,15 @@ def generate_worker_log_config(
     Returns: the path to the generated file
     """
     # Check whether we should write worker logs to disk, in addition to the console
-    extra_log_template_args = {}
+    extra_log_template_args: Dict[str, Optional[str]] = {}
     if environ.get("SYNAPSE_WORKERS_WRITE_LOGS_TO_DISK"):
         extra_log_template_args["LOG_FILE_PATH"] = f"{data_dir}/logs/{worker_name}.log"
+
+    extra_log_template_args["SYNAPSE_LOG_LEVEL"] = environ.get("SYNAPSE_LOG_LEVEL")
+    extra_log_template_args["SYNAPSE_LOG_SENSITIVE"] = environ.get(
+        "SYNAPSE_LOG_SENSITIVE"
+    )
+
     # Render and write the file
     log_config_filepath = f"/conf/workers/{worker_name}.log.config"
     convert(
