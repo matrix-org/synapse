@@ -1,3 +1,13 @@
+Synapse 1.62.0rc2 (2022-07-01)
+==============================
+
+Bugfixes
+--------
+
+- Fix unread counts for users on large servers. Introduced in v1.62.0rc1. ([\#13140](https://github.com/matrix-org/synapse/issues/13140))
+- Fix DB performance when deleting old push notifications. Introduced in v1.62.0rc1. ([\#13141](https://github.com/matrix-org/synapse/issues/13141))
+
+
 Synapse 1.62.0rc1 (2022-06-28)
 ==============================
 
