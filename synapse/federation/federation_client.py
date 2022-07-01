@@ -686,6 +686,12 @@ class FederationClient(FederationBase):
         if failover_errcodes is None:
             failover_errcodes = ()
 
+        if not destinations:
+            # Give a bit of a clearer message if no servers were specified at all.
+            raise SynapseError(
+                502, f"Failed to {description} via any server: No servers specified."
+            )
+
         for destination in destinations:
             if destination == self.server_name:
                 continue
