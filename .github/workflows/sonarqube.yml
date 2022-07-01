@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
       - uses: matrix-org/setup-python-poetry@v1
       - name: SonarCloud Scan
-        uses: matrix-org/sonarcloud-workflow-action@v2.1
+        uses: matrix-org/sonarcloud-workflow-action@v2.2
         with:
           is_pr: ${{ github.event.workflow_run.event == 'pull_request' }}
           repository: ${{ github.event.workflow_run.head_repository.full_name }}
