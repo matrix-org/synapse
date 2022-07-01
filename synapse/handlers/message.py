@@ -1323,12 +1323,12 @@ class EventCreationHandler:
             ).addErrback(unwrapFirstError)
         except PartialStateConflictError as e:
             # The event context needs to be recomputed.
-            # Turn the error into a 503, as a hint to the client to try again.
+            # Turn the error into a 429, as a hint to the client to try again.
             logger.info(
                 "Room %s was un-partial stated while persisting client event.",
                 event.room_id,
             )
-            raise SynapseError(HTTPStatus.SERVICE_UNAVAILABLE, e.msg, e.errcode)
+            raise LimitExceededError(msg=e.msg, errcode=e.errcode, retry_after_ms=0)
 
         return result
 

@@ -45,6 +45,7 @@ from synapse.api.errors import (
     FederationDeniedError,
     FederationError,
     HttpResponseException,
+    LimitExceededError,
     NotFoundError,
     RequestSendFailed,
     SynapseError,
@@ -565,14 +566,14 @@ class FederationHandler:
             except PartialStateConflictError as e:
                 # The homeserver was already in the room and it is no longer partial
                 # stated. We ought to be doing a local join instead. Turn the error into
-                # a 503, as a hint to the client to try again.
+                # a 429, as a hint to the client to try again.
                 # TODO(faster_joins): `_should_perform_remote_join` suggests that we may
                 #   do a remote join for restricted rooms even if we have full state.
                 logger.error(
                     "Room %s was un-partial stated while processing remote join.",
                     room_id,
                 )
-                raise SynapseError(HTTPStatus.SERVICE_UNAVAILABLE, e.msg, e.errcode)
+                raise LimitExceededError(msg=e.msg, errcode=e.errcode, retry_after_ms=0)
 
             if ret.partial_state:
                 # Kick off the process of asynchronously fetching the state for this
