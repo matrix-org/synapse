@@ -1,0 +1,1 @@
+Faster joins: skip waiting for full state when processing incoming events over federation.
