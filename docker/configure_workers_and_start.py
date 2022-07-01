@@ -554,11 +554,9 @@ def generate_worker_log_config(
     # Check whether we should write worker logs to disk, in addition to the console
     extra_log_template_args = {}
     if environ.get("SYNAPSE_WORKERS_WRITE_LOGS_TO_DISK"):
-        extra_log_template_args["LOG_FILE_PATH"] = "{dir}/logs/{name}.log".format(
-            dir=data_dir, name=worker_name
-        )
+        extra_log_template_args["LOG_FILE_PATH"] = f"{data_dir}/logs/{worker_name}.log"
     # Render and write the file
-    log_config_filepath = "/conf/workers/{name}.log.config".format(name=worker_name)
+    log_config_filepath = f"/conf/workers/{worker_name}.log.config"
     convert(
         "/conf/log.config",
         log_config_filepath,
