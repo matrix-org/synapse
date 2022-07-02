@@ -212,9 +212,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         txn.execute(sql, (room_id, Membership.JOIN))
         return [r[0] for r in txn]
 
-    @cached(max_entries=100000, iterable=True)
+    @cached(max_entries=100000, iterable=True, uncached_args=["user_ids"])
     async def get_users_in_room_with_profiles(
-        self, room_id: str
+        self, room_id: str, user_ids: Optional[List[str]] = None
     ) -> Dict[str, ProfileInfo]:
         """Get a mapping from user ID to profile information for all users in a given room.
 
@@ -233,15 +233,33 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         def _get_users_in_room_with_profiles(
             txn: LoggingTransaction,
         ) -> Dict[str, ProfileInfo]:
-            sql = """
-                SELECT state_key, display_name, avatar_url FROM room_memberships as m
-                INNER JOIN current_state_events as c
-                ON m.event_id = c.event_id
-                AND m.room_id = c.room_id
-                AND m.user_id = c.state_key
-                WHERE c.type = 'm.room.member' AND c.room_id = ? AND m.membership = ?
-            """
-            txn.execute(sql, (room_id, Membership.JOIN))
+            if user_ids:
+                clause, ids = make_in_list_sql_clause(
+                    self.database_engine, "m.user_id", user_ids
+                )
+
+                sql = """
+                    SELECT state_key, display_name, avatar_url FROM room_memberships as m
+                    INNER JOIN current_state_events as c
+                    ON m.event_id = c.event_id
+                    AND m.room_id = c.room_id
+                    AND m.user_id = c.state_key
+                    WHERE c.type = 'm.room.member' AND c.room_id = ? AND m.membership = ? AND %s
+                """ % (
+                    clause,
+                )
+                txn.execute(sql, (room_id, Membership.JOIN, *ids))
+
+            else:
+                sql = """
+                        SELECT state_key, display_name, avatar_url FROM room_memberships as m
+                        INNER JOIN current_state_events as c
+                        ON m.event_id = c.event_id
+                        AND m.room_id = c.room_id
+                        AND m.user_id = c.state_key
+                        WHERE c.type = 'm.room.member' AND c.room_id = ? AND m.membership = ?
+                      """
+                txn.execute(sql, (room_id, Membership.JOIN))
 
             return {r[0]: ProfileInfo(display_name=r[1], avatar_url=r[2]) for r in txn}
 
