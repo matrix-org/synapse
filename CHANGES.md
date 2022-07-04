@@ -4,8 +4,8 @@ Synapse 1.62.0rc3 (2022-07-04)
 Bugfixes
 --------
 
-- Update the version of the [ldap3 plugin](https://github.com/matrix-org/matrix-synapse-ldap3/) includled in matrix.org docker images and debian packages to 0.2.1. This fixes [problems involving usernames that have uppercase characters](https://github.com/matrix-org/matrix-synapse-ldap3/pull/163). ([\#13156](https://github.com/matrix-org/synapse/issues/13156))
-- Fix unread counts for users on small servers. Introduced in v1.62.0rc1. ([\#13168](https://github.com/matrix-org/synapse/issues/13168))
+- Update the version of the [ldap3 plugin](https://github.com/matrix-org/matrix-synapse-ldap3/) included in the `matrixdotorg/synapse` DockerHub images and the Debian packages hosted on `packages.matrix.org` to 0.2.1. This fixes [a bug](https://github.com/matrix-org/matrix-synapse-ldap3/pull/163) with usernames containing uppercase characters. ([\#13156](https://github.com/matrix-org/synapse/issues/13156))
+- Fix a bug introduced in Synapse 1.62.0rc1 affecting unread counts for users on small servers. ([\#13168](https://github.com/matrix-org/synapse/issues/13168))
 
 
 Synapse 1.62.0rc2 (2022-07-01)
