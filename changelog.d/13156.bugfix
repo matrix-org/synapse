@@ -1,1 +1,0 @@
-Update the version of the [ldap3 plugin](https://github.com/matrix-org/matrix-synapse-ldap3/) includled in matrix.org docker images and debian packages to 0.2.1. This fixes [problems involving usernames that have uppercase characters](https://github.com/matrix-org/matrix-synapse-ldap3/pull/163).
