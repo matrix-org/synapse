@@ -64,7 +64,7 @@ def setupdb():
             password=POSTGRES_PASSWORD,
             dbname=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
         )
-        db_conn.autocommit = True
+        db_engine.attempt_to_set_autocommit(db_conn, autocommit=True)
         cur = db_conn.cursor()
         cur.execute("DROP DATABASE IF EXISTS %s;" % (POSTGRES_BASE_DB,))
         cur.execute(
@@ -94,7 +94,7 @@ def setupdb():
                 password=POSTGRES_PASSWORD,
                 dbname=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
             )
-            db_conn.autocommit = True
+            db_engine.attempt_to_set_autocommit(db_conn, autocommit=True)
             cur = db_conn.cursor()
             cur.execute("DROP DATABASE IF EXISTS %s;" % (POSTGRES_BASE_DB,))
             cur.close()
