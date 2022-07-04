@@ -1,1 +1,0 @@
-Fix DB performance when deleting old push notifications. Introduced in v1.62.0rc1.
