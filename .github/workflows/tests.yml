@@ -28,6 +28,8 @@ jobs:
       - run: scripts-dev/check_schema_delta.py --force-colors
 
   lint:
+    permissions:
+      contents: none
     uses: "matrix-org/backend-meta/.github/workflows/python-poetry-ci.yml@v1"
     with:
       typechecking-extras: "all"
@@ -55,6 +57,8 @@ jobs:
 
   # Dummy step to gate other tests on without repeating the whole list
   linting-done:
+    permissions:
+      contents: none
     if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
     needs: [lint, lint-crlf, lint-newsfile, check-sampleconfig, check-schema-delta]
     runs-on: ubuntu-latest
