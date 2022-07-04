@@ -110,9 +110,7 @@ jsonschema = ">=3.0.0"
 frozendict = ">=1,!=2.1.2"
 # We require 2.1.0 or higher for type hints. Previous guard was >= 1.1.0
 unpaddedbase64 = ">=2.1.0"
-# We require 1.5.0 to work around an issue when running against the C implementation of
-# frozendict: https://github.com/matrix-org/python-canonicaljson/issues/36
-canonicaljson = "^1.5.0"
+canonicaljson = "^1.4.0"
 # we use the type definitions added in signedjson 1.1.
 signedjson = "^1.1.0"
 # validating SSL certs for IP addresses requires service_identity 18.1.
