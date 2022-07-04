@@ -15,9 +15,10 @@
 # limitations under the License.
 import logging
 import random
-from http import HTTPStatus
 from typing import TYPE_CHECKING, Optional, Tuple
 from urllib.parse import urlparse
+
+from pydantic import BaseModel, StrictBool, StrictStr
 
 from twisted.web.server import Request
 
@@ -34,12 +35,14 @@ from synapse.http.server import HttpServer, finish_request, respond_with_html
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
+    parse_and_validate_json_object_from_request,
     parse_json_object_from_request,
     parse_string,
 )
 from synapse.http.site import SynapseRequest
 from synapse.metrics import threepid_send_requests
 from synapse.push.mailer import Mailer
+from synapse.rest.client.models import AuthenticationData
 from synapse.types import JsonDict
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import assert_valid_client_secret, random_string
@@ -289,6 +292,13 @@ class PasswordRestServlet(RestServlet):
         return 200, {}
 
 
+class DeactivateAccountBody(BaseModel):
+    auth: Optional[AuthenticationData] = None
+    id_server: Optional[StrictStr] = None
+    # Not specced, see https://github.com/matrix-org/matrix-spec/issues/297
+    erase: StrictBool = False
+
+
 class DeactivateAccountRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/deactivate$")
 
@@ -301,35 +311,27 @@ class DeactivateAccountRestServlet(RestServlet):
 
     @interactive_auth_handler
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        body = parse_json_object_from_request(request)
-        erase = body.get("erase", False)
-        if not isinstance(erase, bool):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "Param 'erase' must be a boolean, if given",
-                Codes.BAD_JSON,
-            )
+        body = parse_and_validate_json_object_from_request(
+            request, DeactivateAccountBody
+        )
 
         requester = await self.auth.get_user_by_req(request)
 
         # allow ASes to deactivate their own users
         if requester.app_service:
             await self._deactivate_account_handler.deactivate_account(
-                requester.user.to_string(), erase, requester
+                requester.user.to_string(), body.erase, requester
             )
             return 200, {}
 
         await self.auth_handler.validate_user_via_ui_auth(
             requester,
             request,
-            body,
+            body.dict(),
             "deactivate your account",
         )
         result = await self._deactivate_account_handler.deactivate_account(
-            requester.user.to_string(),
-            erase,
-            requester,
-            id_server=body.get("id_server"),
+            requester.user.to_string(), body.erase, requester, id_server=body.id_server
         )
         if result:
             id_server_unbind_result = "success"
