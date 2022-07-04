@@ -540,7 +540,7 @@ test = ["tox", "twisted", "aiounittest"]
 
 [[package]]
 name = "matrix-synapse-ldap3"
-version = "0.2.0"
+version = "0.2.1"
 description = "An LDAP3 auth provider for Synapse"
 category = "main"
 optional = true
@@ -552,7 +552,7 @@ service-identity = "*"
 Twisted = ">=15.1.0"
 
 [package.extras]
-dev = ["matrix-synapse", "tox", "ldaptor", "mypy (==0.910)", "types-setuptools", "black (==21.9b0)", "flake8 (==4.0.1)", "isort (==5.9.3)"]
+dev = ["matrix-synapse", "tox", "ldaptor", "mypy (==0.910)", "types-setuptools", "black (==22.3.0)", "flake8 (==4.0.1)", "isort (==5.9.3)"]
 
 [[package]]
 name = "mccabe"
@@ -2046,8 +2046,8 @@ matrix-common = [
     {file = "matrix_common-1.2.1.tar.gz", hash = "sha256:a99dcf02a6bd95b24a5a61b354888a2ac92bf2b4b839c727b8dd9da2cdfa3853"},
 ]
 matrix-synapse-ldap3 = [
-    {file = "matrix-synapse-ldap3-0.2.0.tar.gz", hash = "sha256:91a0715b43a41ec3033244174fca20846836da98fda711fb01687f7199eecd2e"},
-    {file = "matrix_synapse_ldap3-0.2.0-py3-none-any.whl", hash = "sha256:0128ca7c3058987adc2e8a88463bb46879915bfd3d373309632813b353e30f9f"},
+    {file = "matrix-synapse-ldap3-0.2.1.tar.gz", hash = "sha256:bfb4390f4a262ffb0d6f057ff3aeb1e46d4e52ff420a064d795fb4f555f00285"},
+    {file = "matrix_synapse_ldap3-0.2.1-py3-none-any.whl", hash = "sha256:1b3310a60f1d06466f35905a269b6df95747fd1305f2b7fe638f373963b2aa2c"},
 ]
 mccabe = [
     {file = "mccabe-0.6.1-py2.py3-none-any.whl", hash = "sha256:ab8a6258860da4b6677da4bd2fe5dc2c659cff31b3ee4f7f5d64e79735b80d42"},
