@@ -832,9 +832,8 @@ class RoomsCreateTestCase(RoomBase):
 
         self.assertEqual(join_mock.call_count, 0)
 
-        # Now change the return value of the callback to deny any joinn and test that
-        # we can't join. We pick an arbitrary error code to be able to check
-        # that the same code has been returned
+        # Now change the return value of the callback to deny any join. Since we're
+        # creating the room, despite the return value, we should be able to join.
         async def user_may_join_room_tuple(
             mxid: str,
             room_id: str,
