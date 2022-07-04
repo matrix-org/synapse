@@ -214,10 +214,10 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
 
         # Delete all remote non-state events
         for table in (
+            "event_edges",
             "events",
             "event_json",
             "event_auth",
-            "event_edges",
             "event_forward_extremities",
             "event_relations",
             "event_search",

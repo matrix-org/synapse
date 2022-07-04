@@ -6,8 +6,8 @@ FROM matrixdotorg/synapse:$SYNAPSE_VERSION
 RUN \
    --mount=type=cache,target=/var/cache/apt,sharing=locked \
    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  apt-get update && \
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+  apt-get update -qq && \
+  DEBIAN_FRONTEND=noninteractive apt-get install -yqq --no-install-recommends \
      redis-server nginx-light
 
 # Install supervisord with pip instead of apt, to avoid installing a second

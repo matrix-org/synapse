@@ -85,7 +85,7 @@ def setupdb() -> None:
                 dbname=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
             ),
         )
-        db_conn.autocommit = True
+        db_engine.attempt_to_set_autocommit(db_conn, autocommit=True)
         cur = db_conn.cursor()
         cur.execute("DROP DATABASE IF EXISTS %s;" % (POSTGRES_BASE_DB,))
         cur.execute(
@@ -121,7 +121,7 @@ def setupdb() -> None:
                     dbname=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
                 ),
             )
-            db_conn.autocommit = True
+            db_engine.attempt_to_set_autocommit(db_conn, autocommit=True)
             cur = db_conn.cursor()
             cur.execute("DROP DATABASE IF EXISTS %s;" % (POSTGRES_BASE_DB,))
             cur.close()
@@ -208,7 +208,7 @@ def default_config(
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.
         "update_user_directory": False,
-        "caches": {"global_factor": 1},
+        "caches": {"global_factor": 1, "sync_response_cache_duration": 0},
         "listeners": [{"port": 0, "type": "http"}],
     }
 

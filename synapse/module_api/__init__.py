@@ -115,6 +115,7 @@ from synapse.types import (
     JsonDict,
     JsonMapping,
     Requester,
+    RoomAlias,
     StateMap,
     UserID,
     UserInfo,
@@ -163,6 +164,7 @@ __all__ = [
     "EventBase",
     "StateMap",
     "ProfileInfo",
+    "RoomAlias",
     "UserProfile",
 ]
 

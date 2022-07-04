@@ -58,10 +58,10 @@ from synapse.storage.databases.main.client_ips import ClientIpBackgroundUpdateSt
 from synapse.storage.databases.main.deviceinbox import DeviceInboxBackgroundUpdateStore
 from synapse.storage.databases.main.devices import DeviceBackgroundUpdateStore
 from synapse.storage.databases.main.end_to_end_keys import EndToEndKeyBackgroundStore
+from synapse.storage.databases.main.event_push_actions import EventPushActionsStore
 from synapse.storage.databases.main.events_bg_updates import (
     EventsBackgroundUpdatesStore,
 )
-from synapse.storage.databases.main.group_server import GroupServerStore
 from synapse.storage.databases.main.media_repository import (
     MediaRepositoryBackgroundUpdateStore,
 )
@@ -200,6 +200,7 @@ R = TypeVar("R")
 
 
 class Store(
+    EventPushActionsStore,
     ClientIpBackgroundUpdateStore,
     DeviceInboxBackgroundUpdateStore,
     DeviceBackgroundUpdateStore,
@@ -218,7 +219,6 @@ class Store(
     PushRuleStore,
     PusherWorkerStore,
     PresenceBackgroundUpdateStore,
-    GroupServerStore,
 ):
     def execute(self, f: Callable[..., R], *args: Any, **kwargs: Any) -> Awaitable[R]:
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)
@@ -267,6 +267,9 @@ class MockHomeserver:
 
     def get_instance_name(self) -> str:
         return "master"
+
+    def should_send_federation(self) -> bool:
+        return False
 
 
 class Porter:

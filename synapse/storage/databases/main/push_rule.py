@@ -110,9 +110,9 @@ def _load_rules(
 # the abstract methods being implemented.
 class PushRulesWorkerStore(
     ApplicationServiceWorkerStore,
-    ReceiptsWorkerStore,
     PusherWorkerStore,
     RoomMemberWorkerStore,
+    ReceiptsWorkerStore,
     EventsWorkerStore,
     SQLBaseStore,
     metaclass=abc.ABCMeta,

@@ -106,7 +106,9 @@ def register_sighup(func: Callable[P, None], *args: P.args, **kwargs: P.kwargs) 
 def start_worker_reactor(
     appname: str,
     config: HomeServerConfig,
-    run_command: Callable[[], None] = reactor.run,
+    # Use a lambda to avoid binding to a given reactor at import time.
+    # (needed when synapse.app.complement_fork_starter is being used)
+    run_command: Callable[[], None] = lambda: reactor.run(),
 ) -> None:
     """Run the reactor in the main process
 
@@ -141,7 +143,9 @@ def start_reactor(
     daemonize: bool,
     print_pidfile: bool,
     logger: logging.Logger,
-    run_command: Callable[[], None] = reactor.run,
+    # Use a lambda to avoid binding to a given reactor at import time.
+    # (needed when synapse.app.complement_fork_starter is being used)
+    run_command: Callable[[], None] = lambda: reactor.run(),
 ) -> None:
     """Run the reactor in the main process
 
@@ -450,7 +454,7 @@ async def start(hs: "HomeServer") -> None:
     # before we start the listeners.
     module_api = hs.get_module_api()
     for module, config in hs.config.modules.loaded_modules:
-        m = module(config=config, api=module_api)
+        m = module(config, module_api)
         logger.info("Loaded module %s", m)
 
     load_legacy_spam_checkers(hs)

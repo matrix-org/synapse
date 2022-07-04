@@ -50,13 +50,14 @@ from synapse.api.errors import (
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion, RoomVersions
 from synapse.event_auth import (
     auth_types_for_event,
-    check_auth_rules_for_event,
+    check_state_dependent_auth_rules,
+    check_state_independent_auth_rules,
     validate_event_for_room_version,
 )
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.federation.federation_client import InvalidResponseError
-from synapse.logging.context import nested_logging_context, run_in_background
+from synapse.logging.context import nested_logging_context
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (
@@ -1091,20 +1092,19 @@ class FederationEventHandler:
         logger.debug("Processing event: %s", event)
         assert not event.internal_metadata.outlier
 
+        context = await self._state_handler.compute_event_context(
+            event,
+            state_ids_before_event=state_ids,
+        )
         try:
-            context = await self._state_handler.compute_event_context(
-                event,
-                state_ids_before_event=state_ids,
-            )
             context = await self._check_event_auth(
                 origin,
                 event,
                 context,
             )
         except AuthError as e:
-            # FIXME richvdh 2021/10/07 I don't think this is reachable. Let's log it
-            #   for now
-            logger.exception("Unexpected AuthError from _check_event_auth")
+            # This happens only if we couldn't find the auth events. We'll already have
+            # logged a warning, so now we just convert to a FederationError.
             raise FederationError("ERROR", e.code, e.msg, affected=event.event_id)
 
         if not backfilled and not context.rejected:
@@ -1430,10 +1430,9 @@ class FederationEventHandler:
             allow_rejected=True,
         )
 
-        room_version = await self._store.get_room_version_id(room_id)
-        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+        events_and_contexts_to_persist: List[Tuple[EventBase, EventContext]] = []
 
-        def prep(event: EventBase) -> Optional[Tuple[EventBase, EventContext]]:
+        async def prep(event: EventBase) -> None:
             with nested_logging_context(suffix=event.event_id):
                 auth = []
                 for auth_event_id in event.auth_event_ids():
@@ -1447,7 +1446,7 @@ class FederationEventHandler:
                             event,
                             auth_event_id,
                         )
-                        return None
+                        return
                     auth.append(ae)
 
                 # we're not bothering about room state, so flag the event as an outlier.
@@ -1455,18 +1454,21 @@ class FederationEventHandler:
 
                 context = EventContext.for_outlier(self._storage_controllers)
                 try:
-                    validate_event_for_room_version(room_version_obj, event)
-                    check_auth_rules_for_event(room_version_obj, event, auth)
+                    validate_event_for_room_version(event)
+                    await check_state_independent_auth_rules(self._store, event)
+                    check_state_dependent_auth_rules(event, auth)
                 except AuthError as e:
                     logger.warning("Rejecting %r because %s", event, e)
                     context.rejected = RejectedReason.AUTH_ERROR
 
-            return event, context
+            events_and_contexts_to_persist.append((event, context))
 
-        events_to_persist = (x for x in (prep(event) for event in fetched_events) if x)
+        for event in fetched_events:
+            await prep(event)
+
         await self.persist_events_and_notify(
             room_id,
-            tuple(events_to_persist),
+            events_and_contexts_to_persist,
             # Mark these events backfilled as they're historic events that will
             # eventually be backfilled. For example, missing events we fetch
             # during backfill should be marked as backfilled as well.
@@ -1499,11 +1501,8 @@ class FederationEventHandler:
         assert not event.internal_metadata.outlier
 
         # first of all, check that the event itself is valid.
-        room_version = await self._store.get_room_version_id(event.room_id)
-        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
-
         try:
-            validate_event_for_room_version(room_version_obj, event)
+            validate_event_for_room_version(event)
         except AuthError as e:
             logger.warning("While validating received event %r: %s", event, e)
             # TODO: use a different rejected reason here?
@@ -1521,7 +1520,8 @@ class FederationEventHandler:
 
         # ... and check that the event passes auth at those auth events.
         try:
-            check_auth_rules_for_event(room_version_obj, event, claimed_auth_events)
+            await check_state_independent_auth_rules(self._store, event)
+            check_state_dependent_auth_rules(event, claimed_auth_events)
         except AuthError as e:
             logger.warning(
                 "While checking auth of %r against auth_events: %s", event, e
@@ -1569,9 +1569,7 @@ class FederationEventHandler:
             auth_events_for_auth = calculated_auth_event_map
 
         try:
-            check_auth_rules_for_event(
-                room_version_obj, event, auth_events_for_auth.values()
-            )
+            check_state_dependent_auth_rules(event, auth_events_for_auth.values())
         except AuthError as e:
             logger.warning("Failed auth resolution for %r because %s", event, e)
             context.rejected = RejectedReason.AUTH_ERROR
@@ -1671,7 +1669,7 @@ class FederationEventHandler:
         )
 
         try:
-            check_auth_rules_for_event(room_version_obj, event, current_auth_events)
+            check_state_dependent_auth_rules(event, current_auth_events)
         except AuthError as e:
             logger.warning(
                 "Soft-failing %r (from %s) because %s",
@@ -1965,9 +1963,7 @@ class FederationEventHandler:
                 event.room_id, [(event, context)], backfilled=backfilled
             )
         except Exception:
-            run_in_background(
-                self._store.remove_push_actions_from_staging, event.event_id
-            )
+            await self._store.remove_push_actions_from_staging(event.event_id)
             raise
 
     async def persist_events_and_notify(
