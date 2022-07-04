@@ -972,7 +972,9 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
         stream_row = txn.fetchone()
         if stream_row:
             (offset_stream_ordering,) = stream_row
-            rotate_to_stream_ordering = offset_stream_ordering
+            rotate_to_stream_ordering = min(
+                offset_stream_ordering, self._stream_id_gen.get_current_token()
+            )
             caught_up = False
         else:
             rotate_to_stream_ordering = self._stream_id_gen.get_current_token()
