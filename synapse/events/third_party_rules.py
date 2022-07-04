@@ -469,7 +469,11 @@ class ThirdPartyEventRules:
 
         state_events = {}
         for key, event_id in state_ids.items():
-            state_events[key] = room_state_events[event_id]
+            try:
+                state_events[key] = room_state_events[event_id]
+            except KeyError:
+                # Ignore missing event id
+                pass
 
         return state_events
 
