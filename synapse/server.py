@@ -827,3 +827,12 @@ class HomeServer(metaclass=abc.ABCMeta):
             self.config.ratelimiting.rc_message,
             self.config.ratelimiting.rc_admin_redaction,
         )
+
+    def persists_events_for_room(self, room_id: str) -> bool:
+        """Is this worker responsible for persisting events in the given room?
+
+        Or does it ask another worker to do that for us?"""
+        return (
+            self.get_instance_name()
+            == self.config.worker.events_shard_config.get_instance(room_id)
+        )
