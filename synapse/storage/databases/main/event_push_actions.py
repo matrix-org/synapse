@@ -1004,7 +1004,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, EventsWorkerStore, SQLBas
                 SELECT user_id, room_id, count(*) as cnt,
                     max(stream_ordering) as stream_ordering
                 FROM event_push_actions
-                WHERE ? <= stream_ordering AND stream_ordering < ?
+                WHERE ? < stream_ordering AND stream_ordering <= ?
                     AND %s = 1
                 GROUP BY user_id, room_id
             ) AS upd
