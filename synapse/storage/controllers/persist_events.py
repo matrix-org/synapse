@@ -121,12 +121,27 @@ class _PersistEventsTask:
     events_and_contexts: List[Tuple[EventBase, EventContext]]
     backfilled: bool
 
+    def try_merge(self, task: "_EventPersistQueueTask") -> bool:
+        """Batches events with the same backfilled option together."""
+        if (
+            not isinstance(task, _PersistEventsTask)
+            or self.backfilled != task.backfilled
+        ):
+            return False
+
+        self.events_and_contexts.extend(task.events_and_contexts)
+        return True
+
 
 @attr.s(auto_attribs=True, slots=True)
 class _UpdateCurrentStateTask:
     """A room whose current state needs recalculating."""
 
     name: ClassVar[str] = "update_current_state"  # used for opentracing
+
+    def try_merge(self, task: "_EventPersistQueueTask") -> bool:
+        """Deduplicates consecutive recalculations of current state."""
+        return isinstance(task, _UpdateCurrentStateTask)
 
 
 _EventPersistQueueTask = Union[_PersistEventsTask, _UpdateCurrentStateTask]
@@ -191,17 +206,9 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
         """
         queue = self._event_persist_queues.setdefault(room_id, deque())
 
-        # try to batch `_PersistEventsTask`s with the same `backfilled` setting together.
-        if (
-            queue
-            and isinstance(task, _PersistEventsTask)
-            and isinstance(queue[-1].task, _PersistEventsTask)
-            and queue[-1].task.backfilled == task.backfilled
-        ):
+        if queue and queue[-1].task.try_merge(task):
+            # the new task has been merged into the last task in the queue
             end_item = queue[-1]
-            existing_task = queue[-1].task
-            # add our events to the existing queue item
-            existing_task.events_and_contexts.extend(task.events_and_contexts)
         else:
             deferred: ObservableDeferred[_PersistResult] = ObservableDeferred(
                 defer.Deferred(), consumeErrors=True
