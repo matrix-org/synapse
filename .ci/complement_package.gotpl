@@ -26,6 +26,19 @@ which is under the Unlicense licence.
     {{- with .Output -}}
         {{- . -}}{{- "\n" -}}
     {{- end -}}
+
+    {{- /* Output an error marker if there are any failing tests, so GitHub will skip straight to them */ -}}
+    {{- $anyFailures := false -}}
+	{{- range .TestCases -}}
+        {{- if and (ne .Result "PASS") (ne .Result "SKIP") -}}
+            {{- $anyFailures = true -}}
+        {{- end -}}
+	{{- end -}}
+    {{- if $anyFailures -}}
+        ::error title=Test Failures::At least one test failed
+        {{- printf "\n" -}}
+    {{- end -}}
+
     {{- with .TestCases -}}
         {{- /* Failing tests are first */ -}}
         {{- range . -}}
