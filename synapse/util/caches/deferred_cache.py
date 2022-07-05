@@ -315,7 +315,7 @@ class DeferredCache(Generic[KT, VT]):
         self.cache.del_multi(key)
 
         if self.debug_invalidations:
-            logging.debug("Invalidating key %r in cache %s", key)
+            logging.debug("Invalidating key %r in cache", key)
 
         # if we have a pending lookup for this key, remove it from the
         # _pending_deferred_cache, which will (a) stop it being returned
@@ -333,6 +333,8 @@ class DeferredCache(Generic[KT, VT]):
                 entry.invalidate()
 
     def invalidate_all(self) -> None:
+        if self.debug_invalidations:
+            logging.debug("Invalidating ALL keys")
         self.check_thread()
         self.cache.clear()
         for entry in self._pending_deferred_cache.values():
