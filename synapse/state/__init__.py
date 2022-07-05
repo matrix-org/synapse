@@ -133,7 +133,7 @@ class StateHandler:
         self._events_shard_config = hs.config.worker.events_shard_config
         self._instance_name = hs.get_instance_name()
 
-        self._update_current_state = (
+        self._update_current_state_client = (
             ReplicationUpdateCurrentStateRestServlet.make_client(hs)
         )
 
@@ -433,7 +433,7 @@ class StateHandler:
         """
         writer_instance = self._events_shard_config.get_instance(room_id)
         if writer_instance != self._instance_name:
-            await self._update_current_state(
+            await self._update_current_state_client(
                 instance_name=writer_instance,
                 room_id=room_id,
             )
