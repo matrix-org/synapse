@@ -361,28 +361,16 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                     "Adding emails have been disabled due to lack of an email config"
                 )
             raise SynapseError(
-                400, "Adding an email to your account is disabled on this server"
+                HTTPStatus.NOT_FOUND,
+                "Adding an email to your account is disabled on this server",
+                Codes.NOT_FOUND,
             )
 
-        body = parse_json_object_from_request(request)
-        assert_params_in_dict(body, ["client_secret", "email", "send_attempt"])
-        client_secret = body["client_secret"]
-        assert_valid_client_secret(client_secret)
+        body = parse_and_validate_json_object_from_request(
+            request, EmailRequestTokenBody
+        )
 
-        # Canonicalise the email address. The addresses are all stored canonicalised
-        # in the database.
-        # This ensures that the validation email is sent to the canonicalised address
-        # as it will later be entered into the database.
-        # Otherwise the email will be sent to "FOO@bar.com" and stored as
-        # "foo@bar.com" in database.
-        try:
-            email = validate_email(body["email"])
-        except ValueError as e:
-            raise SynapseError(400, str(e))
-        send_attempt = body["send_attempt"]
-        next_link = body.get("next_link")  # Optional param
-
-        if not await check_3pid_allowed(self.hs, "email", email):
+        if not await check_3pid_allowed(self.hs, "email", body.email):
             raise SynapseError(
                 403,
                 "Your email domain is not authorized on this server",
@@ -390,14 +378,14 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             )
 
         await self.identity_handler.ratelimit_request_token_requests(
-            request, "email", email
+            request, "email", body.email
         )
 
-        if next_link:
+        if body.next_link:
             # Raise if the provided next_link value isn't valid
-            assert_valid_next_link(self.hs, next_link)
+            assert_valid_next_link(self.hs, body.next_link)
 
-        existing_user_id = await self.store.get_user_id_by_threepid("email", email)
+        existing_user_id = await self.store.get_user_id_by_threepid("email", body.email)
 
         if existing_user_id is not None:
             if self.config.server.request_token_inhibit_3pid_errors:
@@ -416,26 +404,26 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             # Have the configured identity server handle the request
             ret = await self.identity_handler.requestEmailToken(
                 self.hs.config.registration.account_threepid_delegate_email,
-                email,
-                client_secret,
-                send_attempt,
-                next_link,
+                body.email,
+                body.client_secret,
+                body.send_attempt,
+                body.next_link,
             )
         else:
             # Send threepid validation emails from Synapse
             sid = await self.identity_handler.send_threepid_validation(
-                email,
-                client_secret,
-                send_attempt,
+                body.email,
+                body.client_secret,
+                body.send_attempt,
                 self.mailer.send_add_threepid_mail,
-                next_link,
+                body.next_link,
             )
 
             # Wrap the session id in a JSON object
             ret = {"sid": sid}
 
         threepid_send_requests.labels(type="email", reason="add_threepid").observe(
-            send_attempt
+            body.send_attempt
         )
 
         return 200, ret
