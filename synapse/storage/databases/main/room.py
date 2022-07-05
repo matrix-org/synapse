@@ -1156,19 +1156,25 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
         return room_servers
 
     async def clear_partial_state_room(self, room_id: str) -> bool:
-        # this can race with incoming events, so we watch out for FK errors.
-        # TODO(faster_joins): this still doesn't completely fix the race, since the persist process
-        #   is not atomic. I fear we need an application-level lock.
-        #   https://github.com/matrix-org/synapse/issues/12988
+        """Clears the partial state flag for a room.
+
+        Args:
+            room_id: The room whose partial state flag is to be cleared.
+
+        Returns:
+            `True` if the partial state flag has been cleared successfully.
+
+            `False` if the partial state flag could not be cleared because the room
+            still contains events with partial state.
+        """
         try:
             await self.db_pool.runInteraction(
                 "clear_partial_state_room", self._clear_partial_state_room_txn, room_id
             )
             return True
-        except self.db_pool.engine.module.DatabaseError as e:
-            # TODO(faster_joins): how do we distinguish between FK errors and other errors?
-            #   https://github.com/matrix-org/synapse/issues/12988
-            logger.warning(
+        except self.db_pool.engine.module.IntegrityError as e:
+            # Assume that any `IntegrityError`s are due to partial state events.
+            logger.info(
                 "Exception while clearing lazy partial-state-room %s, retrying: %s",
                 room_id,
                 e,
