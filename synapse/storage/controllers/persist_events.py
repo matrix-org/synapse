@@ -445,7 +445,7 @@ class EventsPersistenceStorageController:
         )
 
     async def _update_current_state(
-        self, room_id: str, task: _UpdateCurrentStateTask
+        self, room_id: str, _task: _UpdateCurrentStateTask
     ) -> None:
         """Callback for the _event_persist_queue
 
@@ -499,7 +499,7 @@ class EventsPersistenceStorageController:
         return res.state
 
     async def _persist_event_batch(
-        self, room_id: str, task: _PersistEventsTask
+        self, _room_id: str, task: _PersistEventsTask
     ) -> Dict[str, str]:
         """Callback for the _event_persist_queue
 
