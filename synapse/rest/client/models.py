@@ -13,7 +13,7 @@
 # limitations under the License.
 from typing import TYPE_CHECKING, Optional
 
-from pydantic import BaseModel, Extra, StrictStr, constr, validator, StrictInt
+from pydantic import BaseModel, Extra, StrictInt, StrictStr, constr, validator
 
 from synapse.util.threepids import validate_email
 
