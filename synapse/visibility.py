@@ -173,19 +173,19 @@ async def filter_events_for_client(
 
 
 async def filter_events_for_client_with_state(
-    store: DataStore, user_id: str, event: EventBase, context: EventContext
-) -> Optional[EventBase]:
+    store: DataStore, user_ids: List[str], event: EventBase, context: EventContext
+) -> List[str]:
     """
-    Checks to see if an event is visible to the user at the time of the event
+    Checks to see if an event is visible to the users in the list at the time of the event
     Args:
         store: databases
-        user_id: user_id to be checked
+        user_ids: user_ids to be checked
         event: the event to be checked
         context: EventContext for the event to be checked
-    Returns: the event if the room history is visible to the user at the time of the event, None if not
+    Returns: list of uids for whom the event is visible
     """
     filter = StateFilter.from_types(
-        [(EventTypes.Member, user_id), (EventTypes.RoomHistoryVisibility, "")]
+        [(EventTypes.Member, None), (EventTypes.RoomHistoryVisibility, "")]
     )
     state_map = await context.get_prev_state_ids(filter)
 
@@ -199,8 +199,13 @@ async def filter_events_for_client_with_state(
         # Add current event to updated_state_map, we need to do this here as it may not have been persisted to the db yet
         updated_state_map[current_state_key] = event
 
-    filtered_event = _check_visibility(user_id, event, updated_state_map)
-    return filtered_event
+    uids_with_visibility = []
+    for id in user_ids:
+        can_see = _check_visibility(id, event, updated_state_map)
+        if can_see:
+            uids_with_visibility.append(id)
+
+    return uids_with_visibility
 
 
 def _check_visibility(

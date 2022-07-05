@@ -295,6 +295,12 @@ class BulkPushRuleEvaluator:
             event.room_id, users
         )
 
+        # This is a check for the case where user joins a room without being allowed to see history, and then the server
+        # receives a delayed event from before the user joined, which they should not be pushed for
+        uids_with_visibility = await filter_events_for_client_with_state(
+            self.store, users, event, context
+        )
+
         for uid, rules in rules_by_user.items():
             if event.sender == uid:
                 continue
@@ -302,12 +308,7 @@ class BulkPushRuleEvaluator:
             if uid in ignorers:
                 continue
 
-            # This is a check for the case where user joins a room without being allowed to see history, and then the server
-            # receives a delayed event from before the user joined, which they should not be pushed for
-            visible = await filter_events_for_client_with_state(
-                self.store, uid, event, context
-            )
-            if not visible:
+            if uid not in uids_with_visibility:
                 continue
 
             display_name = None
