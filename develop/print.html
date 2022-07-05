@@ -14106,6 +14106,9 @@ Here is how to run your local Synapse checkout against your local Complement che
 <li>Passing <code>POSTGRES=1</code> as an environment variable to use the Postgres database instead.</li>
 <li>Passing <code>WORKERS=1</code> as an environment variable to use a workerised setup instead. This option implies the use of Postgres.</li>
 </ul>
+<p>To increase the log level for the tests, set <code>SYNAPSE_TEST_LOG_LEVEL</code>, e.g:</p>
+<pre><code class="language-sh">SYNAPSE_TEST_LOG_LEVEL=DEBUG COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages
+</code></pre>
 <h3 id="prettier-formatting-with-gotestfmt"><a class="header" href="#prettier-formatting-with-gotestfmt">Prettier formatting with <code>gotestfmt</code></a></h3>
 <p>If you want to format the output of the tests the same way as it looks in CI,
 install <a href="https://github.com/haveyoudebuggedit/gotestfmt">gotestfmt</a>.</p>
