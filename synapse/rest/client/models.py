@@ -13,7 +13,7 @@
 # limitations under the License.
 from typing import TYPE_CHECKING, Optional
 
-from pydantic import BaseModel, Extra, StrictStr, constr, validator
+from pydantic import BaseModel, Extra, StrictStr, constr, validator, StrictInt
 
 from synapse.util.threepids import validate_email
 
@@ -32,13 +32,16 @@ class EmailRequestTokenBody(BaseModel):
     else:
         # See also assert_valid_client_secret()
         client_secret: constr(
-            regex="[0-9a-zA-Z.=_-]", min_length=0, max_length=255  # noqa: F722
+            regex="[0-9a-zA-Z.=_-]",  # noqa: F722
+            min_length=0,
+            max_length=255,
+            strict=True,
         )
-    email: str
-    id_access_token: Optional[str]
-    id_server: Optional[str]
-    next_link: Optional[str]
-    send_attempt: int
+    email: StrictStr
+    id_access_token: Optional[StrictStr]
+    id_server: Optional[StrictStr]
+    next_link: Optional[StrictStr]
+    send_attempt: StrictInt
 
     # Canonicalise the email address. The addresses are all stored canonicalised
     # in the database. This allows the user to reset his password without having to
