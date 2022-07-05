@@ -1534,16 +1534,19 @@ class SyncHandler:
 
         # 3. Work out which rooms need reporting in the sync response.
         ignored_users = await self.store.ignored_users(user_id)
+        # TODO: Make sure the functions below are only called here
+        # otherwise add the self.store.ignored_rooms and concatenation to those callers.
+        ignored_rooms = await self.store.ignored_rooms(user_id)
         if since_token:
             room_changes = await self._get_rooms_changed(
-                sync_result_builder, ignored_users, self.rooms_to_exclude
+                sync_result_builder, ignored_users, self.rooms_to_exclude + ignored_rooms
             )
             tags_by_room = await self.store.get_updated_tags(
                 user_id, since_token.account_data_key
             )
         else:
             room_changes = await self._get_all_rooms(
-                sync_result_builder, ignored_users, self.rooms_to_exclude
+                sync_result_builder, ignored_users, self.rooms_to_exclude + ignored_rooms
             )
             tags_by_room = await self.store.get_tags_for_user(user_id)
 

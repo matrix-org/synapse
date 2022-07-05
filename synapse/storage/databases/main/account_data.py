@@ -414,6 +414,25 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
             )
         )
 
+    @cached(max_entries=5000, iterable=True)
+    async def ignored_rooms(self, user_id: str) -> FrozenSet[str]:
+        """
+        Get rooms which the given user has explicitly ignored.
+        See MSC3840
+        
+        Params:
+            user_id: The user ID which is making the request.
+            
+        Return:
+            The room IDs which are ignored by the given user."""
+        return frozenset(
+            await self.db_pool.simple_select_onecol(
+                table="ignored_rooms",
+                keyvalues={"ignorer_user_id": user_id},
+                retcol="ignored_room_id",
+                desc="ignored_rooms",
+            )
+        )
     def process_replication_rows(
         self,
         stream_name: str,
@@ -537,6 +556,52 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
             values={"stream_id": next_id, "content": content_json},
             lock=False,
         )
+
+        if account_data_type == AccountDataTypes.IGNORED_INVITE_LIST:
+            previously_ignored_rooms = set(
+                self.db_pool.simple_select_onecol_txn(
+                    txn,
+                    table="ignored_rooms",
+                    keyvalues={"ignorer_user_id": user_id},
+                    retcol="ignored_room_id",
+                )
+            )
+            # If the data is invalid, no one is ignored.
+            ignored_users_content = content.get("ignored_rooms", [])
+            if isinstance(ignored_rooms_content, list):
+                room_ids = []
+                for room in ignored_users_content:
+                    room_id = room.get("room_id")
+                    if room_id:
+                        room_ids.append(room_id)
+                currently_ignored_rooms = set(room_ids)
+            else:
+                currently_ignored_rooms = set()
+            
+            # If the data has not changed, nothing to do.
+            if previously_ignored_rooms == currently_ignored_rooms:
+                return
+
+            # Delete entries which are no longer ignored.
+            self.db_pool.simple_delete_many_txn(
+                txn,
+                table="ignored_rooms",
+                column="ignored_room_id",
+                values=previously_ignored_rooms - currently_ignored_rooms,
+                keyvalues={"ignorer_user_id": user_id},
+            )
+
+            # Add entries which are newly ignored.
+            self.db_pool.simple_insert_many_txn(
+                txn,
+                table="ignored_rooms",
+                keys=("ignorer_user_id", "ignored_room_id"),
+                values=[
+                    (user_id, r) for r in currently_ignored_rooms - previously_ignored_rooms
+                ],
+            )
+            # Invalidate cache for the user's ignored rooms.
+            self._invalidate_cache_and_stream(txn, self.ignored_rooms, (user_id,))
 
         # Ignored users get denormalized into a separate table as an optimisation.
         if account_data_type != AccountDataTypes.IGNORED_USER_LIST:

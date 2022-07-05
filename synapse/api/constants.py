@@ -240,6 +240,7 @@ class RoomEncryptionAlgorithms:
 class AccountDataTypes:
     DIRECT: Final = "m.direct"
     IGNORED_USER_LIST: Final = "m.ignored_user_list"
+    IGNORED_INVITE_LIST: Final = "org.matrix.msc3840.ignored_invites"
 
 
 class HistoryVisibility:
