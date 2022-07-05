@@ -35,7 +35,7 @@ jobs:
           set -o pipefail
           synapse/scripts-dev/complement.sh --build-only
           #while :; do
-            POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} WORKERS=${{ (matrix.arrangement == 'workers') && 1 || '' }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -f -json 2>&1 | gotestfmt | tee /tmp/xxx
+            POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} WORKERS=${{ (matrix.arrangement == 'workers') && 1 || '' }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -f -run TestRestrictedRoomsLocalJoin -json 2>&1 | gotestfmt | tee /tmp/xxx
             #if grep FAIL /tmp/xxx; then
             #  break
             #fi
