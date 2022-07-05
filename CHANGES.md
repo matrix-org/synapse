@@ -1,3 +1,11 @@
+Synapse 1.62.0 (2022-07-05)
+===========================
+
+No significant changes since 1.62.0rc3.
+
+Authors of spam-checker plugins should consult the [upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.62/docs/upgrade.md#upgrading-to-v1620) to learn about the enriched signatures for spam checker callbacks, which are supported with this release of Synapse.
+
+
 Synapse 1.62.0rc3 (2022-07-04)
 ==============================
 
