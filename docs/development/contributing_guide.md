@@ -347,7 +347,7 @@ To prepare a Pull Request, please:
 3. `git push` your commit to your fork of Synapse;
 4. on GitHub, [create the Pull Request](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request);
 5. add a [changelog entry](#changelog) and push it to your Pull Request;
-6. that's it for now, a non-draft pull requests will automatically request review from the team;
+6. that's it for now, a non-draft pull request will automatically request review from the team;
 7. if you need to update your PR, please avoid rebasing and just add new commits to your branch.
 
 
