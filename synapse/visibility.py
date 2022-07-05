@@ -184,6 +184,10 @@ async def filter_events_for_client_with_state(
         context: EventContext for the event to be checked
     Returns: list of uids for whom the event is visible
     """
+    # None of the users should see the event if it is soft_failed
+    if event.internal_metadata.is_soft_failed():
+        return []
+
     filter = StateFilter.from_types(
         [(EventTypes.Member, None), (EventTypes.RoomHistoryVisibility, "")]
     )
