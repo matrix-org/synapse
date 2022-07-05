@@ -76,7 +76,7 @@ class SQLBaseStore(metaclass=ABCMeta):
                 "get_users_in_room_with_profiles", (room_id,)
             )
             self._attempt_to_invalidate_cache(
-                "get_number_joined_users_in_room.invalidate", (room_id,)
+                "get_number_joined_users_in_room", (room_id,)
             )
 
         # Purge other caches based on room state.
