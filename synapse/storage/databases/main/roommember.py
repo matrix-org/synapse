@@ -443,6 +443,17 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         user_id: str,
         membership_list: List[str],
     ) -> List[RoomsForUser]:
+        """Get all the rooms for this *local* user where the membership for this user
+            matches one in the membership list.
+
+            Args:
+                user_id: The user ID.
+                membership_list: A list of synapse.api.constants.Membership
+                        values which the user must be in.
+
+            Returns:
+                The RoomsForUser that the user matches the membership types.
+        """
         # Paranoia check.
         if not self.hs.is_mine_id(user_id):
             raise Exception(
@@ -473,6 +484,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cached()
     async def get_local_users_in_room(self, room_id: str) -> List[str]:
+        """
+        Retrieves a list of the current roommembers who are local to the server.
+        """
         return await self.db_pool.simple_select_onecol(
             table="local_current_membership",
             keyvalues={"room_id": room_id, "membership": Membership.JOIN},
