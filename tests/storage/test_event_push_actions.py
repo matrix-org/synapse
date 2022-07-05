@@ -55,7 +55,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
 
     def test_count_aggregation(self) -> None:
         room_id = "!foo:example.com"
-        user_id = "@user1235:example.com"
+        user_id = "@user1235:test"
 
         last_read_stream_ordering = [0]
 
@@ -81,10 +81,27 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         def _inject_actions(stream: int, action: list) -> None:
             event = Mock()
             event.room_id = room_id
-            event.event_id = "$test:example.com"
+            event.event_id = f"$test{stream}:example.com"
             event.internal_metadata.stream_ordering = stream
             event.internal_metadata.is_outlier.return_value = False
             event.depth = stream
+
+            self.store._events_stream_cache.entity_has_changed(room_id, stream)
+
+            self.get_success(
+                self.store.db_pool.simple_insert(
+                    table="events",
+                    values={
+                        "stream_ordering": stream,
+                        "topological_ordering": stream,
+                        "type": "m.room.message",
+                        "room_id": room_id,
+                        "processed": True,
+                        "outlier": False,
+                        "event_id": event.event_id,
+                    },
+                )
+            )
 
             self.get_success(
                 self.store.add_push_actions_to_staging(
@@ -105,31 +122,38 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         def _rotate(stream: int) -> None:
             self.get_success(
                 self.store.db_pool.runInteraction(
-                    "", self.store._rotate_notifs_before_txn, stream
+                    "rotate-receipts", self.store._handle_new_receipts_for_notifs_txn
+                )
+            )
+
+            self.get_success(
+                self.store.db_pool.runInteraction(
+                    "rotate-notifs", self.store._rotate_notifs_before_txn, stream
                 )
             )
 
         def _mark_read(stream: int, depth: int) -> None:
             last_read_stream_ordering[0] = stream
+
             self.get_success(
-                self.store.db_pool.runInteraction(
-                    "",
-                    self.store._remove_old_push_actions_before_txn,
+                self.store.insert_receipt(
                     room_id,
-                    user_id,
-                    stream,
+                    "m.read",
+                    user_id=user_id,
+                    event_ids=[f"$test{stream}:example.com"],
+                    data={},
                 )
             )
 
         _assert_counts(0, 0)
         _inject_actions(1, PlAIN_NOTIF)
         _assert_counts(1, 0)
-        _rotate(2)
+        _rotate(1)
         _assert_counts(1, 0)
 
         _inject_actions(3, PlAIN_NOTIF)
         _assert_counts(2, 0)
-        _rotate(4)
+        _rotate(3)
         _assert_counts(2, 0)
 
         _inject_actions(5, PlAIN_NOTIF)
@@ -140,7 +164,8 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _assert_counts(0, 0)
 
         _inject_actions(6, PlAIN_NOTIF)
-        _rotate(7)
+        _rotate(6)
+        _assert_counts(1, 0)
 
         self.get_success(
             self.store.db_pool.simple_delete(
@@ -150,18 +175,18 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
 
         _assert_counts(1, 0)
 
-        _mark_read(7, 7)
+        _mark_read(6, 6)
         _assert_counts(0, 0)
 
         _inject_actions(8, HIGHLIGHT)
         _assert_counts(1, 1)
-        _rotate(9)
+        _rotate(8)
         _assert_counts(1, 1)
 
         # Check that adding another notification and rotating after highlight
         # works.
         _inject_actions(10, PlAIN_NOTIF)
-        _rotate(11)
+        _rotate(10)
         _assert_counts(2, 1)
 
         # Check that sending read receipts at different points results in the

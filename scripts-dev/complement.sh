@@ -14,12 +14,18 @@
 # By default Synapse is run in monolith mode. This can be overridden by
 # setting the WORKERS environment variable.
 #
-# A regular expression of test method names can be supplied as the first
-# argument to the script. Complement will then only run those tests. If
-# no regex is supplied, all tests are run. For example;
+# You can optionally give a "-f" argument (for "fast") before any to skip
+# rebuilding the docker images, if you just want to rerun the tests.
+#
+# Remaining commandline arguments are passed through to `go test`. For example,
+# you can supply a regular expression of test method names via the "-run"
+# argument:
 #
 # ./complement.sh -run "TestOutboundFederation(Profile|Send)"
 #
+# Specifying TEST_ONLY_SKIP_DEP_HASH_VERIFICATION=1 will cause `poetry export`
+# to not emit any hashes when building the Docker image. This then means that
+# you can use 'unverifiable' sources such as git repositories as dependencies.
 
 # Exit if a line returns a non-zero exit code
 set -e
@@ -32,6 +38,37 @@ echo_if_github() {
   fi
 }
 
+# Helper to print out the usage instructions
+usage() {
+    cat >&2 <<EOF
+Usage: $0 [-f] <go test arguments>...
+Run the complement test suite on Synapse.
+
+  -f    Skip rebuilding the docker images, and just use the most recent
+        'complement-synapse:latest' image
+
+For help on arguments to 'go test', run 'go help testflag'.
+EOF
+}
+
+# parse our arguments
+skip_docker_build=""
+while [ $# -ge 1 ]; do
+    arg=$1
+    case "$arg" in
+        "-h")
+            usage
+            exit 1
+            ;;
+        "-f")
+            skip_docker_build=1
+            ;;
+        *)
+            # unknown arg: presumably an argument to gotest. break the loop.
+            break
+    esac
+    shift
+done
 
 # enable buildkit for the docker builds
 export DOCKER_BUILDKIT=1
@@ -49,21 +86,25 @@ if [[ -z "$COMPLEMENT_DIR" ]]; then
   echo "Checkout available at 'complement-${COMPLEMENT_REF}'"
 fi
 
-# Build the base Synapse image from the local checkout
-echo_if_github "::group::Build Docker image: matrixdotorg/synapse"
-docker build -t matrixdotorg/synapse -f "docker/Dockerfile" .
-echo_if_github "::endgroup::"
+if [ -z "$skip_docker_build" ]; then
+    # Build the base Synapse image from the local checkout
+    echo_if_github "::group::Build Docker image: matrixdotorg/synapse"
+    docker build -t matrixdotorg/synapse \
+      --build-arg TEST_ONLY_SKIP_DEP_HASH_VERIFICATION \
+      -f "docker/Dockerfile" .
+    echo_if_github "::endgroup::"
 
-# Build the workers docker image (from the base Synapse image we just built).
-echo_if_github "::group::Build Docker image: matrixdotorg/synapse-workers"
-docker build -t matrixdotorg/synapse-workers -f "docker/Dockerfile-workers" .
-echo_if_github "::endgroup::"
+    # Build the workers docker image (from the base Synapse image we just built).
+    echo_if_github "::group::Build Docker image: matrixdotorg/synapse-workers"
+    docker build -t matrixdotorg/synapse-workers -f "docker/Dockerfile-workers" .
+    echo_if_github "::endgroup::"
 
-# Build the unified Complement image (from the worker Synapse image we just built).
-echo_if_github "::group::Build Docker image: complement/Dockerfile"
-docker build -t complement-synapse \
-  -f "docker/complement/Dockerfile" "docker/complement"
-echo_if_github "::endgroup::"
+    # Build the unified Complement image (from the worker Synapse image we just built).
+    echo_if_github "::group::Build Docker image: complement/Dockerfile"
+    docker build -t complement-synapse \
+           -f "docker/complement/Dockerfile" "docker/complement"
+    echo_if_github "::endgroup::"
+fi
 
 export COMPLEMENT_BASE_IMAGE=complement-synapse
 
@@ -102,6 +143,18 @@ else
   # We only test faster room joins on monoliths, because they are purposefully
   # being developed without worker support to start with.
   test_tags="$test_tags,faster_joins"
+fi
+
+
+if [[ -n "$SYNAPSE_TEST_LOG_LEVEL" ]]; then
+  # Set the log level to what is desired
+  export PASS_SYNAPSE_LOG_LEVEL="$SYNAPSE_TEST_LOG_LEVEL"
+
+  # Allow logging sensitive things (currently SQL queries & parameters).
+  # (This won't have any effect if we're not logging at DEBUG level overall.)
+  # Since this is just a test suite, this is fine and won't reveal anyone's
+  # personal information
+  export PASS_SYNAPSE_LOG_SENSITIVE=1
 fi
 
 # Run the tests!

@@ -309,6 +309,10 @@ The above will run a monolithic (single-process) Synapse with SQLite as the data
 - Passing `POSTGRES=1` as an environment variable to use the Postgres database instead.
 - Passing `WORKERS=1` as an environment variable to use a workerised setup instead. This option implies the use of Postgres.
 
+To increase the log level for the tests, set `SYNAPSE_TEST_LOG_LEVEL`, e.g:
+```sh
+SYNAPSE_TEST_LOG_LEVEL=DEBUG COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages
+```
 
 ### Prettier formatting with `gotestfmt`
 

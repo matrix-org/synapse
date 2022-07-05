@@ -1,0 +1,1 @@
+Add the ability to set the log level using the `SYNAPSE_TEST_LOG_LEVEL` environment when using `complement.sh`.

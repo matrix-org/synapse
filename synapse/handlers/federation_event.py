@@ -1111,20 +1111,19 @@ class FederationEventHandler:
         logger.debug("Processing event: %s", event)
         assert not event.internal_metadata.outlier
 
+        context = await self._state_handler.compute_event_context(
+            event,
+            state_ids_before_event=state_ids,
+        )
         try:
-            context = await self._state_handler.compute_event_context(
-                event,
-                state_ids_before_event=state_ids,
-            )
             context = await self._check_event_auth(
                 origin,
                 event,
                 context,
             )
         except AuthError as e:
-            # FIXME richvdh 2021/10/07 I don't think this is reachable. Let's log it
-            #   for now
-            logger.exception("Unexpected AuthError from _check_event_auth")
+            # This happens only if we couldn't find the auth events. We'll already have
+            # logged a warning, so now we just convert to a FederationError.
             raise FederationError("ERROR", e.code, e.msg, affected=event.event_id)
 
         if not backfilled and not context.rejected:
