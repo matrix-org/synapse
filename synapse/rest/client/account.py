@@ -19,7 +19,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Optional, Tuple
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, StrictBool, StrictStr, constr, validator
+from pydantic import BaseModel, StrictBool, StrictStr, constr
 
 from twisted.web.server import Request
 
@@ -43,7 +43,7 @@ from synapse.http.servlet import (
 from synapse.http.site import SynapseRequest
 from synapse.metrics import threepid_send_requests
 from synapse.push.mailer import Mailer
-from synapse.rest.client.models import AuthenticationData
+from synapse.rest.client.models import AuthenticationData, EmailRequestTokenBody
 from synapse.types import JsonDict
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import assert_valid_client_secret, random_string
@@ -56,28 +56,6 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
-
-
-class EmailPasswordRequestBody(BaseModel):
-    if TYPE_CHECKING:
-        client_secret: str
-    else:
-        # See also assert_valid_client_secret()
-        client_secret: constr(
-            regex="[0-9a-zA-Z.=_-]", min_length=0, max_length=255  # noqa: F722
-        )
-    email: str
-    id_access_token: Optional[str]
-    id_server: Optional[str]
-    next_link: Optional[str]
-    send_attempt: int
-
-    # Canonicalise the email address. The addresses are all stored canonicalised
-    # in the database. This allows the user to reset his password without having to
-    # know the exact spelling (eg. upper and lower case) of address in the database.
-    # Without this, an email stored in the database as "foo@bar.com" would cause
-    # user requests for "FOO@bar.com" to raise a Not Found error.
-    _email_validator = validator("email", allow_reuse=True)(validate_email)
 
 
 class EmailPasswordRequestTokenRestServlet(RestServlet):
@@ -111,7 +89,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             )
 
         body = parse_and_validate_json_object_from_request(
-            request, EmailPasswordRequestBody
+            request, EmailRequestTokenBody
         )
 
         if body.next_link:
