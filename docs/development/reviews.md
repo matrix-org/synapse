@@ -27,11 +27,13 @@ that ongoing work is finished before starting new work.
 Performing a review
 -------------------
 
-Team members should do the following when reviewing:
+To communicate to the rest of the team the status of each pull request, team
+members should do the following:
 
-* Assigning themselves to the pull request;
-* Review the pull request;
-* Marking the pull request appropriately (as needing changes or accepted).
+* Assign themselves to the pull request (they should be left assigned to the
+  pull request until it is merged, closed, or are no longer the reviewer);
+* Review the pull request by leaving comments, questions, and suggestions;
+* Mark the pull request appropriately (as needing changes or accepted).
 
 If you are unsure about a particular part of the pull request (or are not confident
 in your understanding of part of the code) then ask questions or request review
