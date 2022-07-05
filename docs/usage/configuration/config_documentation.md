@@ -2076,30 +2076,26 @@ default_identity_server: https://matrix.org
 ---
 ### `account_threepid_delegates`
 
-Handle threepid (email/phone etc) registration and password resets through a set of
-*trusted* identity servers. Note that this allows the configured identity server to
-reset passwords for accounts!
+Delegate verification of phone numbers to an identity server.
 
-Be aware that if `email` is not set, and SMTP options have not been
-configured in the email config block, registration and user password resets via
-email will be globally disabled.
+When a user wishes to add a phone number to their account, we need to verify that they
+actually own that phone number, which requires sending them a text message (SMS).
+Currently Synapse does not support sending those texts itself and instead delegates the
+task to an identity server. The base URI for the identity server to be used is
+specified by the `account_threepid_delegates.msisdn` option.
 
-Additionally, if `msisdn` is not set, registration and password resets via msisdn
-will be disabled regardless, and users will not be able to associate an msisdn
-identifier to their account. This is due to Synapse currently not supporting
-any method of sending SMS messages on its own.
+If this is left unspecified, Synapse will not allow users to add phone numbers to
+their account.
 
-To enable using an identity server for operations regarding a particular third-party
-identifier type, set the value to the URL of that identity server as shown in the
-examples below.
+(Servers handling the these requests must answer the `/requestToken` endpoints defined
+by the Matrix Identity Service API
+[specification](https://matrix.org/docs/spec/identity_service/latest).)
 
-Servers handling the these requests must answer the `/requestToken` endpoints defined
-by the Matrix Identity Service API [specification](https://matrix.org/docs/spec/identity_service/latest).
+*Updated in Synapse 1.63.0*: No longer accepts an `email` option.
 
 Example configuration:
 ```yaml
 account_threepid_delegates:
-    email: https://example.com     # Delegate email sending to example.com
     msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 ```
 ---
