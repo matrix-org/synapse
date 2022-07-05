@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import enum
+import logging
 import threading
 from typing import (
     Callable,
@@ -66,6 +67,7 @@ class DeferredCache(Generic[KT, VT]):
         "cache",
         "thread",
         "_pending_deferred_cache",
+        "debug_invalidations"
     )
 
     def __init__(
@@ -76,6 +78,7 @@ class DeferredCache(Generic[KT, VT]):
         iterable: bool = False,
         apply_cache_factor_from_config: bool = True,
         prune_unread_entries: bool = True,
+        debug_invalidations: bool = False,
     ):
         """
         Args:
@@ -119,6 +122,7 @@ class DeferredCache(Generic[KT, VT]):
         )
 
         self.thread: Optional[threading.Thread] = None
+        self.debug_invalidations = debug_invalidations
 
     @property
     def max_entries(self) -> int:
@@ -309,6 +313,9 @@ class DeferredCache(Generic[KT, VT]):
         """
         self.check_thread()
         self.cache.del_multi(key)
+
+        if self.debug_invalidations:
+            logging.debug("Invalidating key %r in cache %s", key)
 
         # if we have a pending lookup for this key, remove it from the
         # _pending_deferred_cache, which will (a) stop it being returned
