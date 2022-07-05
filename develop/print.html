@@ -3640,7 +3640,7 @@ The default value is 10.</p>
 <pre><code class="language-yaml">dummy_events_threshold: 5
 </code></pre>
 <hr />
-<p>Config option <code>delete_stale_devices_after</code></p>
+<h3 id="delete_stale_devices_after"><a class="header" href="#delete_stale_devices_after"><code>delete_stale_devices_after</code></a></h3>
 <p>An optional duration. If set, Synapse will run a daily background task to log out and
 delete any device that hasn't been accessed for more than the specified amount of time.</p>
 <p>Defaults to no duration, which means devices are never pruned.</p>
@@ -4658,7 +4658,7 @@ Defaults to <code>https://www.recaptcha.net/recaptcha/api/siteverify</code>.</p>
 <pre><code class="language-yaml">turn_shared_secret: &quot;YOUR_SHARED_SECRET&quot;
 </code></pre>
 <hr />
-<p>Config options: <code>turn_username</code> and <code>turn_password</code></p>
+<h3 id="turn_username-and-turn_password"><a class="header" href="#turn_username-and-turn_password"><code>turn_username</code> and <code>turn_password</code></a></h3>
 <p>The Username and password if the TURN server needs them and does not use a token.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">turn_username: &quot;TURNSERVER_USERNAME&quot;
@@ -6026,7 +6026,7 @@ can create aliases.</p>
     action: deny
 </code></pre>
 <hr />
-<p>Config options: <code>room_list_publication_rules</code></p>
+<h3 id="room_list_publication_rules"><a class="header" href="#room_list_publication_rules"><code>room_list_publication_rules</code></a></h3>
 <p>The <code>room_list_publication_rules</code> option controls who can publish and
 which rooms can be published in the public room list.</p>
 <p>The format of this option is the same as that for
