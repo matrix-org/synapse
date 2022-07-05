@@ -397,9 +397,7 @@ class ThirdPartyEventRules:
             return
 
         event = await self.store.get_event(event_id)
-        state_events = await self._storage_controllers.state.get_current_state(
-            event.room_id
-        )
+        state_events = await self._get_state_map_for_room(event.room_id)
 
         for callback in self._on_new_event_callbacks:
             try:

@@ -1,0 +1,1 @@
+Fix `_get_state_map_for_room` in third_party_rules to stop breaking when we have in our db an ill-formed event *and* at least one `on_new_event` callback.
