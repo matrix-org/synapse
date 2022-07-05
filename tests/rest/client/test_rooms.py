@@ -22,6 +22,8 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 from unittest.mock import Mock, call
 from urllib import parse as urlparse
 
+from parameterized import param, parameterized
+
 # `Literal` appears with Python 3.8.
 from typing_extensions import Literal
 
@@ -1353,10 +1355,53 @@ class RoomMessagesTestCase(RoomBase):
         channel = self.make_request("PUT", path, content)
         self.assertEqual(200, channel.code, msg=channel.result["body"])
 
-    def test_spam_checker_check_event_for_spam(self) -> None:
+    @parameterized.expand(
+        [
+            # Allow
+            param(
+                name="NOT_SPAM", value="NOT_SPAM", expected_code=200, expected_fields={}
+            ),
+            param(name="False", value=False, expected_code=200, expected_fields={}),
+            # Block
+            param(
+                name="scalene string",
+                value="ANY OTHER STRING",
+                expected_code=403,
+                expected_fields={"errcode": "M_FORBIDDEN"},
+            ),
+            param(
+                name="True",
+                value=True,
+                expected_code=403,
+                expected_fields={"errcode": "M_FORBIDDEN"},
+            ),
+            param(
+                name="Code",
+                value=Codes.LIMIT_EXCEEDED,
+                expected_code=403,
+                expected_fields={"errcode": "M_LIMIT_EXCEEDED"},
+            ),
+            param(
+                name="Tuple",
+                value=(Codes.SERVER_NOT_TRUSTED, {"additional_field": "12345"}),
+                expected_code=403,
+                expected_fields={
+                    "errcode": "M_SERVER_NOT_TRUSTED",
+                    "additional_field": "12345",
+                },
+            ),
+        ]
+    )
+    def test_spam_checker_check_event_for_spam(
+        self,
+        name: str,
+        value: Union[str, bool, Codes, Tuple[Codes, JsonDict]],
+        expected_code: int,
+        expected_fields: dict,
+    ) -> None:
         class SpamCheck:
             mock_return_value: Union[
-                str, Codes, Tuple[Codes, JsonDict], bool
+                str, bool, Codes, Tuple[Codes, JsonDict], bool
             ] = "NOT_SPAM"
             mock_content: Optional[JsonDict] = None
 
@@ -1373,50 +1418,33 @@ class RoomMessagesTestCase(RoomBase):
             spam_checker.check_event_for_spam
         )
 
-        SAMPLES: List[
-            Tuple[Union[str, Codes, Tuple[Codes, JsonDict], bool], int, dict]
-        ] = [
-            # Allow
-            ("NOT_SPAM", 200, {}),
-            (False, 200, {}),
-            # Block
-            ("ANY OTHER STRING", 403, {"errcode": "M_FORBIDDEN"}),
-            (True, 403, {"errcode": "M_FORBIDDEN"}),
-            (Codes.LIMIT_EXCEEDED, 403, {"errcode": "M_LIMIT_EXCEEDED"}),
-            (
-                (Codes.SERVER_NOT_TRUSTED, {"additional_field": "12345"}),
-                403,
-                {"errcode": "M_SERVER_NOT_TRUSTED", "additional_field": "12345"},
-            ),
-        ]
-        for i, (value, expected_code, expected_dict) in enumerate(SAMPLES):
-            # Inject `value` as mock_return_value
-            spam_checker.mock_return_value = value
-            path = "/rooms/%s/send/m.room.message/check_event_for_spam_%s" % (
-                urlparse.quote(self.room_id),
-                i,
+        # Inject `value` as mock_return_value
+        spam_checker.mock_return_value = value
+        path = "/rooms/%s/send/m.room.message/check_event_for_spam_%s" % (
+            urlparse.quote(self.room_id),
+            urlparse.quote(name),
+        )
+        body = "test-%s" % name
+        content = '{"body":"%s","msgtype":"m.text"}' % body
+        channel = self.make_request("PUT", path, content)
+
+        # Check that the callback has witnessed the correct event.
+        self.assertIsNotNone(spam_checker.mock_content)
+        if (
+            spam_checker.mock_content is not None
+        ):  # Checked just above, but mypy doesn't know about that.
+            self.assertEqual(
+                spam_checker.mock_content["body"], body, spam_checker.mock_content
             )
-            body = "test-%s" % i
-            content = '{"body":"%s","msgtype":"m.text"}' % body
-            channel = self.make_request("PUT", path, content)
 
-            # Check that the callback has witnessed the correct event.
-            self.assertIsNotNone(spam_checker.mock_content)
-            if (
-                spam_checker.mock_content is not None
-            ):  # Checked just above, but mypy doesn't know about that.
-                self.assertEqual(
-                    spam_checker.mock_content["body"], body, spam_checker.mock_content
-                )
-
-            # Check that we have the correct result.
-            self.assertEqual(expected_code, channel.code, msg=channel.result["body"])
-            for expected_field, expected_value in expected_dict.items():
-                self.assertEqual(
-                    channel.json_body.get(expected_field, None),
-                    expected_value,
-                    "Field %s absent or invalid " % expected_field,
-                )
+        # Check that we have the correct result.
+        self.assertEqual(expected_code, channel.code, msg=channel.result["body"])
+        for expected_key, expected_value in expected_fields.items():
+            self.assertEqual(
+                channel.json_body.get(expected_key, None),
+                expected_value,
+                "Field %s absent or invalid " % expected_key,
+            )
 
 
 class RoomPowerLevelOverridesTestCase(RoomBase):
