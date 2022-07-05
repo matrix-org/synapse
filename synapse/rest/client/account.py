@@ -19,7 +19,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Optional, Tuple
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, StrictBool, StrictStr, constr
+from pydantic import BaseModel, StrictBool, StrictStr, constr, validator
 
 from twisted.web.server import Request
 
@@ -58,6 +58,28 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class EmailPasswordRequestBody(BaseModel):
+    if TYPE_CHECKING:
+        client_secret: str
+    else:
+        # See also assert_valid_client_secret()
+        client_secret: constr(
+            regex="[0-9a-zA-Z.=_-]", min_length=0, max_length=255  # noqa: F722
+        )
+    email: str
+    id_access_token: Optional[str]
+    id_server: Optional[str]
+    next_link: Optional[str]
+    send_attempt: int
+
+    # Canonicalise the email address. The addresses are all stored canonicalised
+    # in the database. This allows the user to reset his password without having to
+    # know the exact spelling (eg. upper and lower case) of address in the database.
+    # Without this, an email stored in the database as "foo@bar.com" would cause
+    # user requests for "FOO@bar.com" to raise a Not Found error.
+    _email_validator = validator("email", allow_reuse=True)(validate_email)
+
+
 class EmailPasswordRequestTokenRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/password/email/requestToken$")
 
@@ -88,32 +110,16 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
                 Codes.NOT_FOUND,
             )
 
-        body = parse_json_object_from_request(request)
+        body = parse_and_validate_json_object_from_request(
+            request, EmailPasswordRequestBody
+        )
 
-        assert_params_in_dict(body, ["client_secret", "email", "send_attempt"])
-
-        # Extract params from body
-        client_secret = body["client_secret"]
-        assert_valid_client_secret(client_secret)
-
-        # Canonicalise the email address. The addresses are all stored canonicalised
-        # in the database. This allows the user to reset his password without having to
-        # know the exact spelling (eg. upper and lower case) of address in the database.
-        # Stored in the database "foo@bar.com"
-        # User requests with "FOO@bar.com" would raise a Not Found error
-        try:
-            email = validate_email(body["email"])
-        except ValueError as e:
-            raise SynapseError(400, str(e))
-        send_attempt = body["send_attempt"]
-        next_link = body.get("next_link")  # Optional param
-
-        if next_link:
+        if body.next_link:
             # Raise if the provided next_link value isn't valid
-            assert_valid_next_link(self.hs, next_link)
+            assert_valid_next_link(self.hs, body.next_link)
 
         await self.identity_handler.ratelimit_request_token_requests(
-            request, "email", email
+            request, "email", body.email
         )
 
         # The email will be sent to the stored address.
@@ -121,7 +127,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         # an email address which is controlled by the attacker but which, after
         # canonicalisation, matches the one in our database.
         existing_user_id = await self.hs.get_datastores().main.get_user_id_by_threepid(
-            "email", email
+            "email", body.email
         )
 
         if existing_user_id is None:
@@ -141,26 +147,26 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             # Have the configured identity server handle the request
             ret = await self.identity_handler.requestEmailToken(
                 self.hs.config.registration.account_threepid_delegate_email,
-                email,
-                client_secret,
-                send_attempt,
-                next_link,
+                body.email,
+                body.client_secret,
+                body.send_attempt,
+                body.next_link,
             )
         else:
             # Send password reset emails from Synapse
             sid = await self.identity_handler.send_threepid_validation(
-                email,
-                client_secret,
-                send_attempt,
+                body.email,
+                body.client_secret,
+                body.send_attempt,
                 self.mailer.send_password_reset_mail,
-                next_link,
+                body.next_link,
             )
 
             # Wrap the session id in a JSON object
             ret = {"sid": sid}
 
         threepid_send_requests.labels(type="email", reason="password_reset").observe(
-            send_attempt
+            body.send_attempt
         )
 
         return 200, ret
