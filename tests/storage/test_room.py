@@ -73,7 +73,7 @@ class RoomEventsStoreTestCase(HomeserverTestCase):
         # get_room_state()
         self.store = hs.get_datastores().main
         self._storage_controllers = hs.get_storage_controllers()
-        self.event_factory = hs.get_event_factory()
+        self.event_factory = hs.get_event_builder_factory()
 
         self.room = RoomID.from_string("!abcde:test")
 
