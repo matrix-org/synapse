@@ -18,7 +18,7 @@ import random
 from typing import TYPE_CHECKING, Optional, Tuple
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, StrictBool, StrictStr
+from pydantic import BaseModel, StrictBool, StrictStr, constr
 
 from twisted.web.server import Request
 
@@ -163,6 +163,16 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         return 200, ret
 
 
+class PasswordBody(BaseModel):
+    auth: Optional[AuthenticationData] = None
+    logout_devices: StrictBool = True
+    if TYPE_CHECKING:
+        # workaround for https://github.com/samuelcolvin/pydantic/issues/156
+        new_password: Optional[str] = None
+    else:
+        new_password: Optional[constr(max_length=512)] = None
+
+
 class PasswordRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/password$")
 
@@ -177,14 +187,12 @@ class PasswordRestServlet(RestServlet):
 
     @interactive_auth_handler
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        body = parse_json_object_from_request(request)
+        body = parse_and_validate_json_object_from_request(request, PasswordBody)
 
         # we do basic sanity checks here because the auth layer will store these
         # in sessions. Pull out the new password provided to us.
-        new_password = body.pop("new_password", None)
+        new_password = body.new_password
         if new_password is not None:
-            if not isinstance(new_password, str) or len(new_password) > 512:
-                raise SynapseError(400, "Invalid password")
             self.password_policy_handler.validate_password(new_password)
 
         # there are two possibilities here. Either the user does not have an
@@ -204,7 +212,7 @@ class PasswordRestServlet(RestServlet):
                 params, session_id = await self.auth_handler.validate_user_via_ui_auth(
                     requester,
                     request,
-                    body,
+                    body.dict(),
                     "modify your account password",
                 )
             except InteractiveAuthIncompleteError as e:
@@ -227,7 +235,7 @@ class PasswordRestServlet(RestServlet):
                 result, params, session_id = await self.auth_handler.check_ui_auth(
                     [[LoginType.EMAIL_IDENTITY]],
                     request,
-                    body,
+                    body.dict(),
                     "modify your account password",
                 )
             except InteractiveAuthIncompleteError as e:
