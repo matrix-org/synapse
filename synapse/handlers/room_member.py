@@ -846,10 +846,17 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
                 content["membership"] = Membership.JOIN
 
-                profile = self.profile_handler
-                if not content_specified:
-                    content["displayname"] = await profile.get_displayname(target)
-                    content["avatar_url"] = await profile.get_avatar_url(target)
+                try:
+                    profile = self.profile_handler
+                    if not content_specified:
+                        content["displayname"] = await profile.get_displayname(target)
+                        content["avatar_url"] = await profile.get_avatar_url(target)
+                except Exception as e:
+                    logger.info(
+                        "Failed to get profile information while processing remote join for %r: %s",
+                        target,
+                        e,
+                    )
 
                 if requester.is_guest:
                     content["kind"] = "guest"
@@ -926,11 +933,18 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
                 content["membership"] = Membership.KNOCK
 
-                profile = self.profile_handler
-                if "displayname" not in content:
-                    content["displayname"] = await profile.get_displayname(target)
-                if "avatar_url" not in content:
-                    content["avatar_url"] = await profile.get_avatar_url(target)
+                try:
+                    profile = self.profile_handler
+                    if "displayname" not in content:
+                        content["displayname"] = await profile.get_displayname(target)
+                    if "avatar_url" not in content:
+                        content["avatar_url"] = await profile.get_avatar_url(target)
+                except Exception as e:
+                    logger.info(
+                        "Failed to get profile information while processing remote knock for %r: %s",
+                        target,
+                        e,
+                    )
 
                 return await self.remote_knock(
                     remote_room_hosts, room_id, target, content
