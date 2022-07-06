@@ -1,1 +1,1 @@
-Fix bug where rows where not delete from `event_push_actions` table on large servers. Introduced in v1.62.0.
+Fix bug where rows were not deleted from `event_push_actions` table on large servers. Introduced in v1.62.0.
