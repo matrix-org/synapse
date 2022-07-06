@@ -1333,6 +1333,7 @@ class TimestampLookupHandler:
         self.store = hs.get_datastores().main
         self.state_handler = hs.get_state_handler()
         self.federation_client = hs.get_federation_client()
+        self.federation_event_handler = hs.get_federation_event_handler()
         self._storage_controllers = hs.get_storage_controllers()
 
     async def get_event_for_timestamp(
@@ -1365,7 +1366,7 @@ class TimestampLookupHandler:
         local_event_id = await self.store.get_event_id_for_timestamp(
             room_id, timestamp, direction
         )
-        logger.debug(
+        logger.info(
             "get_event_for_timestamp: locally, we found event_id=%s closest to timestamp=%s",
             local_event_id,
             timestamp,
@@ -1375,6 +1376,7 @@ class TimestampLookupHandler:
         # the timestamp given and the event we were able to find locally
         is_event_next_to_backward_gap = False
         is_event_next_to_forward_gap = False
+        local_event = None
         if local_event_id:
             local_event = await self.store.get_event(
                 local_event_id, allow_none=False, allow_rejected=False
@@ -1400,7 +1402,7 @@ class TimestampLookupHandler:
             or is_event_next_to_backward_gap
             or is_event_next_to_forward_gap
         ):
-            logger.debug(
+            logger.info(
                 "get_event_for_timestamp: locally, we found event_id=%s closest to timestamp=%s which is next to a gap in event history so we're asking other homeservers first",
                 local_event_id,
                 timestamp,
@@ -1421,19 +1423,32 @@ class TimestampLookupHandler:
                     remote_response = await self.federation_client.timestamp_to_event(
                         domain, room_id, timestamp, direction
                     )
-                    logger.debug(
+                    logger.info(
                         "get_event_for_timestamp: response from domain(%s)=%s",
                         domain,
                         remote_response,
                     )
+
+                    remote_event_id = remote_response.event_id
+                    origin_server_ts = remote_response.origin_server_ts
 
                     # TODO: Do we want to persist this as an extremity?
                     # TODO: I think ideally, we would try to backfill from
                     # this event and run this whole
                     # `get_event_for_timestamp` function again to make sure
                     # they didn't give us an event from their gappy history.
-                    remote_event_id = remote_response.event_id
-                    origin_server_ts = remote_response.origin_server_ts
+                    # await self.federation_event_handler._get_events_and_persist(
+                    #     domain,
+                    #     room_id,
+                    #     [remote_event_id],
+                    # )
+                    await self.federation_event_handler.backfill_event(
+                        domain, room_id, remote_event_id
+                    )
+                    logger.info(
+                        "get_event_for_timestamp: asdf %s",
+                        remote_event_id,
+                    )
 
                     # Only return the remote event if it's closer than the local event
                     if not local_event or (
@@ -1444,7 +1459,7 @@ class TimestampLookupHandler:
                 except (HttpResponseException, InvalidResponseError) as ex:
                     # Let's not put a high priority on some other homeserver
                     # failing to respond or giving a random response
-                    logger.debug(
+                    logger.info(
                         "Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",
                         domain,
                         type(ex).__name__,
@@ -1461,7 +1476,7 @@ class TimestampLookupHandler:
                         ex.args,
                     )
 
-        if not local_event_id:
+        if not local_event_id or not local_event:
             raise SynapseError(
                 404,
                 "Unable to find event from %s in direction %s" % (timestamp, direction),

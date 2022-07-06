@@ -1315,6 +1315,30 @@ class FederationEventHandler:
             marker_event,
         )
 
+    async def backfill_event(
+        self, destination: str, room_id: str, event_id: str
+    ) -> None:
+        room_version = await self._store.get_room_version(room_id)
+
+        logger.info("backfill_event event_id=%s", event_id)
+
+        event = await self._federation_client.get_pdu(
+            [destination],
+            event_id,
+            room_version,
+        )
+
+        logger.info(
+            "backfill_event event=%s outlier=%s", event, event.internal_metadata.outlier
+        )
+
+        await self._process_pulled_events(
+            destination,
+            [event],
+            # Prevent notifications going to clients
+            backfilled=True,
+        )
+
     async def _get_events_and_persist(
         self, destination: str, room_id: str, event_ids: Collection[str]
     ) -> None:

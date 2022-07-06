@@ -102,7 +102,7 @@ if [ -z "$skip_docker_build" ]; then
     # Build the unified Complement image (from the worker Synapse image we just built).
     echo_if_github "::group::Build Docker image: complement/Dockerfile"
     docker build -t complement-synapse \
-           -f "docker/complement/Dockerfile" "docker/complement"
+          -f "docker/complement/Dockerfile" "docker/complement"
     echo_if_github "::endgroup::"
 fi
 
@@ -161,4 +161,4 @@ fi
 echo "Images built; running complement"
 cd "$COMPLEMENT_DIR"
 
-go test -v -tags $test_tags -count=1 "${extra_test_args[@]}" "$@" ./tests/...
+go test -v -tags $test_tags -count=1 "${extra_test_args[@]}" "$@" ./tests/
