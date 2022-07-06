@@ -18,7 +18,7 @@ from typing import Any, List, Set
 
 from synapse.config.sso import SsoAttributeRequirement
 from synapse.types import JsonDict
-from synapse.util.check_dependencies import DependencyException, check_requirements
+from synapse.util.check_dependencies import check_requirements
 from synapse.util.module_loader import load_module, load_python_module
 
 from ._base import Config, ConfigError
@@ -76,12 +76,7 @@ class SAML2Config(Config):
         if not saml2_config.get("sp_config") and not saml2_config.get("config_path"):
             return
 
-        try:
-            check_requirements("saml2")
-        except DependencyException as e:
-            raise ConfigError(
-                e.message  # noqa: B306, DependencyException.message is a property
-            )
+        check_requirements("saml2")
 
         self.saml2_enabled = True
 

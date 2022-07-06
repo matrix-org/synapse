@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 from typing import TYPE_CHECKING, Optional
 
@@ -43,6 +42,14 @@ class WellKnownBuilder:
             result["m.identity_server"] = {
                 "base_url": self._config.registration.default_identity_server
             }
+
+        if self._config.server.extra_well_known_client_content:
+            for (
+                key,
+                value,
+            ) in self._config.server.extra_well_known_client_content.items():
+                if key not in result:
+                    result[key] = value
 
         return result
 

@@ -1,0 +1,1 @@
+Raise a `DependencyError` on missing dependencies instead of a `ConfigError`.

@@ -54,7 +54,7 @@ skip_gitignore = true
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.61.0"
+version = "1.62.0"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -110,9 +110,9 @@ jsonschema = ">=3.0.0"
 frozendict = ">=1,!=2.1.2"
 # We require 2.1.0 or higher for type hints. Previous guard was >= 1.1.0
 unpaddedbase64 = ">=2.1.0"
-canonicaljson = ">=1.4.0"
+canonicaljson = "^1.4.0"
 # we use the type definitions added in signedjson 1.1.
-signedjson = ">=1.1.0"
+signedjson = "^1.1.0"
 # validating SSL certs for IP addresses requires service_identity 18.1.
 service-identity = ">=18.1.0"
 # Twisted 18.9 introduces some logger improvements that the structured
@@ -150,7 +150,7 @@ typing-extensions = ">=3.10.0.1"
 cryptography = ">=3.4.7"
 # ijson 3.1.4 fixes a bug with "." in property names
 ijson = ">=3.1.4"
-matrix-common = "~=1.2.1"
+matrix-common = "^1.2.1"
 # We need packaging.requirements.Requirement, added in 16.1.
 packaging = ">=16.1"
 # At the time of writing, we only use functions from the version `importlib.metadata`
@@ -175,7 +175,6 @@ lxml = { version = ">=4.2.0", optional = true }
 sentry-sdk = { version = ">=0.7.2", optional = true }
 opentracing = { version = ">=2.2.0", optional = true }
 jaeger-client = { version = ">=4.0.0", optional = true }
-pyjwt = { version = ">=1.6.4", optional = true }
 txredisapi = { version = ">=1.4.7", optional = true }
 hiredis = { version = "*", optional = true }
 Pympler = { version = "*", optional = true }
@@ -196,7 +195,7 @@ systemd = ["systemd-python"]
 url_preview = ["lxml"]
 sentry = ["sentry-sdk"]
 opentracing = ["jaeger-client", "opentracing"]
-jwt = ["pyjwt"]
+jwt = ["authlib"]
 # hiredis is not a *strict* dependency, but it makes things much faster.
 # (if it is not installed, we fall back to slow code.)
 redis = ["txredisapi", "hiredis"]
@@ -222,7 +221,7 @@ all = [
     "psycopg2", "psycopg2cffi", "psycopg2cffi-compat",
     # saml2
     "pysaml2",
-    # oidc
+    # oidc and jwt
     "authlib",
     # url_preview
     "lxml",
@@ -230,8 +229,6 @@ all = [
     "sentry-sdk",
     # opentracing
     "jaeger-client", "opentracing",
-    # jwt
-    "pyjwt",
     # redis
     "txredisapi", "hiredis",
     # cache_memory
@@ -272,7 +269,7 @@ parameterized = ">=0.7.4"
 idna = ">=2.5"
 
 # The following are used by the release script
-click = "==8.1.0"
+click = "==8.1.1"
 # GitPython was == 3.1.14; bumped to 3.1.20, the first release with type hints.
 GitPython = ">=3.1.20"
 commonmark = "==0.9.1"

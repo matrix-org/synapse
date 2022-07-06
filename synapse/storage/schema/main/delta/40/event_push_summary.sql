@@ -13,9 +13,10 @@
  * limitations under the License.
  */
 
--- Aggregate of old notification counts that have been deleted out of the
--- main event_push_actions table. This count does not include those that were
--- highlights, as they remain in the event_push_actions table.
+-- Aggregate of notification counts up to `stream_ordering`, including those
+-- that may have been deleted out of the main event_push_actions table. This
+-- count does not include those that were highlights, as they remain in the
+-- event_push_actions table.
 CREATE TABLE event_push_summary (
     user_id TEXT NOT NULL,
     room_id TEXT NOT NULL,

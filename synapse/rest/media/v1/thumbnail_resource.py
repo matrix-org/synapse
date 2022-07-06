@@ -22,6 +22,7 @@ from synapse.config.repository import THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP
 from synapse.http.server import (
     DirectServeJsonResource,
     respond_with_json,
+    set_corp_headers,
     set_cors_headers,
 )
 from synapse.http.servlet import parse_integer, parse_string
@@ -63,6 +64,7 @@ class ThumbnailResource(DirectServeJsonResource):
 
     async def _async_render_GET(self, request: SynapseRequest) -> None:
         set_cors_headers(request)
+        set_corp_headers(request)
         server_name, media_id, _ = parse_media_id(request)
         width = parse_integer(request, "width", required=True)
         height = parse_integer(request, "height", required=True)

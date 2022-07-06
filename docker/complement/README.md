@@ -7,7 +7,7 @@ so **please don't use this image for a production server**.
 This multi-purpose image is built on top of `Dockerfile-workers` in the parent directory
 and can be switched using environment variables between the following configurations:
 
-- Monolithic Synapse with SQLite (`SYNAPSE_COMPLEMENT_DATABASE=sqlite`)
+- Monolithic Synapse with SQLite (default, or `SYNAPSE_COMPLEMENT_DATABASE=sqlite`)
 - Monolithic Synapse with Postgres (`SYNAPSE_COMPLEMENT_DATABASE=postgres`)
 - Workerised Synapse with Postgres (`SYNAPSE_COMPLEMENT_DATABASE=postgres` and `SYNAPSE_COMPLEMENT_USE_WORKERS=true`)
 
