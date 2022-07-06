@@ -1114,7 +1114,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             txn.execute(
                 """
                 SELECT stream_ordering FROM event_push_actions
-                WHERE stream_ordering < ? AND highlight = 0
+                WHERE stream_ordering <= ? AND highlight = 0
                 ORDER BY stream_ordering ASC LIMIT 1 OFFSET ?
             """,
                 (
@@ -1129,10 +1129,12 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             else:
                 stream_ordering = max_stream_ordering_to_delete
 
+            # We need to use a inclusive bound here to handle the case where a
+            # single stream ordering has more than `batch_size` rows.
             txn.execute(
                 """
                 DELETE FROM event_push_actions
-                WHERE stream_ordering < ? AND highlight = 0
+                WHERE stream_ordering <= ? AND highlight = 0
                 """,
                 (stream_ordering,),
             )
