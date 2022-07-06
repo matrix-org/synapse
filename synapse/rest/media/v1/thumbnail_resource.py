@@ -317,6 +317,11 @@ class ThumbnailResource(DirectServeJsonResource):
             desired_method,
             thumbnail_infos,
         )
+
+        # If `dynamic_thumbnails` is enabled, we expect Synapse to go down a
+        # different code path to handle it.
+        assert not self.dynamic_thumbnails
+
         if thumbnail_infos:
             file_info = self._select_thumbnail(
                 desired_width,
@@ -399,28 +404,18 @@ class ThumbnailResource(DirectServeJsonResource):
             #    when the media was first uploaded (these bugs should be
             #    reported and fixed).
             # 3. `dynamic_thumbnails` is disabled (see `homeserver.yaml`) and we
-            #    can't try to generate one. If this was enabled, Synapse would
+            #    can't generate one. If this was enabled, Synapse would
             #    go down a different code path.
             logger.info("Failed to find any generated thumbnails")
-
-            # We could get away with putting this error text directly in the
-            # error below because it never hits this code path otherwise when
-            # `dynamic_thumbnails` is disabled. But it would be good not to
-            # always assume this will be the case in the future so we provide
-            # accurate information to the user.
-            dynamic_thumbnails_disabled_warning_text = ""
-            if not self.dynamic_thumbnails:
-                dynamic_thumbnails_disabled_warning_text = " We also cannot try to generate a new thumbnail because `dynamic_thumbnails` is disabled (see `homeserver.yaml`)."
 
             respond_with_json(
                 request,
                 400,
                 cs_error(
-                    "Cannot find any thumbnails for the requested media (%r). This might mean the media is not a supported_media_format=(%s) or your media is corrupted and cannot be thumbnailed.%s"
+                    "Cannot find any thumbnails for the requested media (%r). This might mean the media is not a supported_media_format=(%s) or your media is corrupted and cannot be thumbnailed. We also cannot try to generate a new thumbnail because `dynamic_thumbnails` is disabled (see `homeserver.yaml`)."
                     % (
                         request.postpath,
                         ", ".join(THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP.keys()),
-                        dynamic_thumbnails_disabled_warning_text,
                     ),
                     code=Codes.UNKNOWN,
                 ),
