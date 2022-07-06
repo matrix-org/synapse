@@ -495,7 +495,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
         Args:
             method: The thumbnailing method to use (crop, scale).
-            expected_body: The expected bytes from cropped thumbnailing, or None if
+            expected_body: The expected bytes from thumbnailing, or None if
                 test should just check for a valid image.
             expected_found: True if the file should exist on the server, or False if
                 a 404/400 is expected.
