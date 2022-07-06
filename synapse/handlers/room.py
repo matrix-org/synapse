@@ -1462,7 +1462,7 @@ class TimestampLookupHandler:
                         ex.args,
                     )
 
-        if not local_event_id:
+        if not local_event_id or not local_event:
             raise SynapseError(
                 404,
                 "Unable to find event from %s in direction %s" % (timestamp, direction),
