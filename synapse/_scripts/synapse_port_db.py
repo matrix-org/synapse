@@ -268,6 +268,9 @@ class MockHomeserver:
     def get_instance_name(self) -> str:
         return "master"
 
+    def should_send_federation(self) -> bool:
+        return False
+
 
 class Porter:
     def __init__(

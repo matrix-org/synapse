@@ -16,6 +16,7 @@
 import itertools
 import logging
 from collections import OrderedDict
+from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -35,6 +36,7 @@ from prometheus_client import Counter
 
 import synapse.metrics
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
+from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
@@ -67,6 +69,24 @@ event_counter = Counter(
     "",
     ["type", "origin_type", "origin_entity"],
 )
+
+
+class PartialStateConflictError(SynapseError):
+    """An internal error raised when attempting to persist an event with partial state
+    after the room containing the event has been un-partial stated.
+
+    This error should be handled by recomputing the event context and trying again.
+
+    This error has an HTTP status code so that it can be transported over replication.
+    It should not be exposed to clients.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            HTTPStatus.CONFLICT,
+            msg="Cannot persist partial state event in un-partial stated room",
+            errcode=Codes.UNKNOWN,
+        )
 
 
 @attr.s(slots=True, auto_attribs=True)
@@ -154,6 +174,10 @@ class PersistEventsStore:
 
         Returns:
             Resolves when the events have been persisted
+
+        Raises:
+            PartialStateConflictError: if attempting to persist a partial state event in
+                a room that has been un-partial stated.
         """
 
         # We want to calculate the stream orderings as late as possible, as
@@ -354,6 +378,9 @@ class PersistEventsStore:
                 For each room, a list of the event ids which are the forward
                 extremities.
 
+        Raises:
+            PartialStateConflictError: if attempting to persist a partial state event in
+                a room that has been un-partial stated.
         """
         state_delta_for_room = state_delta_for_room or {}
         new_forward_extremities = new_forward_extremities or {}
@@ -1304,6 +1331,10 @@ class PersistEventsStore:
 
         Returns:
             new list, without events which are already in the events table.
+
+        Raises:
+            PartialStateConflictError: if attempting to persist a partial state event in
+                a room that has been un-partial stated.
         """
         txn.execute(
             "SELECT event_id, outlier FROM events WHERE event_id in (%s)"
@@ -2215,6 +2246,11 @@ class PersistEventsStore:
         txn: LoggingTransaction,
         events_and_contexts: Collection[Tuple[EventBase, EventContext]],
     ) -> None:
+        """
+        Raises:
+            PartialStateConflictError: if attempting to persist a partial state event in
+                a room that has been un-partial stated.
+        """
         state_groups = {}
         for event, context in events_and_contexts:
             if event.internal_metadata.is_outlier():
@@ -2239,19 +2275,37 @@ class PersistEventsStore:
         # if we have partial state for these events, record the fact. (This happens
         # here rather than in _store_event_txn because it also needs to happen when
         # we de-outlier an event.)
-        self.db_pool.simple_insert_many_txn(
-            txn,
-            table="partial_state_events",
-            keys=("room_id", "event_id"),
-            values=[
-                (
-                    event.room_id,
-                    event.event_id,
-                )
-                for event, ctx in events_and_contexts
-                if ctx.partial_state
-            ],
-        )
+        try:
+            self.db_pool.simple_insert_many_txn(
+                txn,
+                table="partial_state_events",
+                keys=("room_id", "event_id"),
+                values=[
+                    (
+                        event.room_id,
+                        event.event_id,
+                    )
+                    for event, ctx in events_and_contexts
+                    if ctx.partial_state
+                ],
+            )
+        except self.db_pool.engine.module.IntegrityError:
+            logger.info(
+                "Cannot persist events %s in rooms %s: room has been un-partial stated",
+                [
+                    event.event_id
+                    for event, ctx in events_and_contexts
+                    if ctx.partial_state
+                ],
+                list(
+                    {
+                        event.room_id
+                        for event, ctx in events_and_contexts
+                        if ctx.partial_state
+                    }
+                ),
+            )
+            raise PartialStateConflictError()
 
         self.db_pool.simple_upsert_many_txn(
             txn,

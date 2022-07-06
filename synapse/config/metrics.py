@@ -18,7 +18,7 @@ from typing import Any, Optional
 import attr
 
 from synapse.types import JsonDict
-from synapse.util.check_dependencies import DependencyException, check_requirements
+from synapse.util.check_dependencies import check_requirements
 
 from ._base import Config, ConfigError
 
@@ -57,12 +57,7 @@ class MetricsConfig(Config):
 
         self.sentry_enabled = "sentry" in config
         if self.sentry_enabled:
-            try:
-                check_requirements("sentry")
-            except DependencyException as e:
-                raise ConfigError(
-                    e.message  # noqa: B306, DependencyException.message is a property
-                )
+            check_requirements("sentry")
 
             self.sentry_dsn = config["sentry"].get("dsn")
             if not self.sentry_dsn:

@@ -101,17 +101,31 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             burst_count=hs.config.ratelimiting.rc_joins_remote.burst_count,
         )
 
+        # Ratelimiter for invites, keyed by room (across all issuers, all
+        # recipients).
         self._invites_per_room_limiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
             rate_hz=hs.config.ratelimiting.rc_invites_per_room.per_second,
             burst_count=hs.config.ratelimiting.rc_invites_per_room.burst_count,
         )
-        self._invites_per_user_limiter = Ratelimiter(
+
+        # Ratelimiter for invites, keyed by recipient (across all rooms, all
+        # issuers).
+        self._invites_per_recipient_limiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
             rate_hz=hs.config.ratelimiting.rc_invites_per_user.per_second,
             burst_count=hs.config.ratelimiting.rc_invites_per_user.burst_count,
+        )
+
+        # Ratelimiter for invites, keyed by issuer (across all rooms, all
+        # recipients).
+        self._invites_per_issuer_limiter = Ratelimiter(
+            store=self.store,
+            clock=self.clock,
+            rate_hz=hs.config.ratelimiting.rc_invites_per_issuer.per_second,
+            burst_count=hs.config.ratelimiting.rc_invites_per_issuer.burst_count,
         )
 
         self._third_party_invite_limiter = Ratelimiter(
@@ -258,7 +272,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if room_id:
             await self._invites_per_room_limiter.ratelimit(requester, room_id)
 
-        await self._invites_per_user_limiter.ratelimit(requester, invitee_user_id)
+        await self._invites_per_recipient_limiter.ratelimit(requester, invitee_user_id)
+        if requester is not None:
+            await self._invites_per_issuer_limiter.ratelimit(requester)
 
     async def _local_membership_update(
         self,
@@ -844,10 +860,17 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
                 content["membership"] = Membership.JOIN
 
-                profile = self.profile_handler
-                if not content_specified:
-                    content["displayname"] = await profile.get_displayname(target)
-                    content["avatar_url"] = await profile.get_avatar_url(target)
+                try:
+                    profile = self.profile_handler
+                    if not content_specified:
+                        content["displayname"] = await profile.get_displayname(target)
+                        content["avatar_url"] = await profile.get_avatar_url(target)
+                except Exception as e:
+                    logger.info(
+                        "Failed to get profile information while processing remote join for %r: %s",
+                        target,
+                        e,
+                    )
 
                 if requester.is_guest:
                     content["kind"] = "guest"
@@ -924,11 +947,18 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
                 content["membership"] = Membership.KNOCK
 
-                profile = self.profile_handler
-                if "displayname" not in content:
-                    content["displayname"] = await profile.get_displayname(target)
-                if "avatar_url" not in content:
-                    content["avatar_url"] = await profile.get_avatar_url(target)
+                try:
+                    profile = self.profile_handler
+                    if "displayname" not in content:
+                        content["displayname"] = await profile.get_displayname(target)
+                    if "avatar_url" not in content:
+                        content["avatar_url"] = await profile.get_avatar_url(target)
+                except Exception as e:
+                    logger.info(
+                        "Failed to get profile information while processing remote knock for %r: %s",
+                        target,
+                        e,
+                    )
 
                 return await self.remote_knock(
                     remote_room_hosts, room_id, target, content
