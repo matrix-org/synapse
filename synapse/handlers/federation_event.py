@@ -765,6 +765,11 @@ class FederationEventHandler:
         """
         logger.info("Processing pulled event %s", event)
 
+        # TODO: Why does this matter? The whole point of this function is to
+        # persist random PDU's from backfill. It shouldn't matter whether we saw
+        # them somewhere else first as an outlier, then during backfill. This
+        # function handles de-outliering anyway.
+        #
         # these should not be outliers.
         assert (
             not event.internal_metadata.is_outlier()
@@ -1322,11 +1327,23 @@ class FederationEventHandler:
 
         logger.info("backfill_event event_id=%s", event_id)
 
-        event = await self._federation_client.get_pdu(
+        eventAsdf = await self._federation_client.get_pdu(
             [destination],
             event_id,
             room_version,
         )
+        event = await self._federation_client.get_pdu_from_destination_raw(
+            destination,
+            event_id,
+            room_version,
+        )
+        logger.info(
+            "backfill_event get_pdu=%s get_pdu_from_destination_raw=%s",
+            eventAsdf,
+            event,
+        )
+        # # FIXME: Too sketchy?
+        # event.internal_metadata.outlier = False
 
         logger.info(
             "backfill_event event=%s outlier=%s", event, event.internal_metadata.outlier

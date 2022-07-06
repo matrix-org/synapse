@@ -1455,12 +1455,16 @@ class TimestampLookupHandler:
                         abs(origin_server_ts - timestamp)
                         < abs(local_event.origin_server_ts - timestamp)
                     ):
+                        logger.info(
+                            "get_event_for_timestamp: returning remote_event_id=%s since it's closer",
+                            remote_event_id,
+                        )
                         return remote_event_id, origin_server_ts
                 except (HttpResponseException, InvalidResponseError) as ex:
                     # Let's not put a high priority on some other homeserver
                     # failing to respond or giving a random response
                     logger.info(
-                        "Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",
+                        "get_event_for_timestamp: Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",
                         domain,
                         type(ex).__name__,
                         ex,
@@ -1469,11 +1473,12 @@ class TimestampLookupHandler:
                 except Exception as ex:
                     # But we do want to see some exceptions in our code
                     logger.warning(
-                        "Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",
+                        "get_event_for_timestamp: Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",
                         domain,
                         type(ex).__name__,
                         ex,
                         ex.args,
+                        exc_info=(type(ex), ex, ex.__traceback__),
                     )
 
         if not local_event_id or not local_event:
