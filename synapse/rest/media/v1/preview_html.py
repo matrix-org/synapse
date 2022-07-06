@@ -20,7 +20,8 @@ from typing import (
     Dict,
     Generator,
     Iterable,
-   List, Optional,
+    List,
+    Optional,
     Set,
     Union,
 )

@@ -1,1 +1,0 @@
-Avoid rechecking event auth rules which are independent of room state.

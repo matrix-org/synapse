@@ -1488,7 +1488,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         if channel.code != HTTPStatus.OK:
             raise HttpResponseException(
-                channel.code, channel.result["reason"], channel.json_body
+                channel.code, channel.result["reason"], channel.result["body"]
             )
 
         # Set monthly active users to the limit

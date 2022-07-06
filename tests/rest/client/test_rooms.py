@@ -18,7 +18,7 @@
 """Tests REST events for /rooms paths."""
 
 import json
-from typing import Any, Dict, Iterable, List, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 from unittest.mock import Mock, call
 from urllib import parse as urlparse
 
@@ -33,7 +33,9 @@ from synapse.api.constants import (
     EventContentFields,
     EventTypes,
     Membership,
+    PublicRoomsFilterFields,
     RelationTypes,
+    RoomTypes,
 )
 from synapse.api.errors import Codes, HttpResponseException
 from synapse.handlers.pagination import PurgeStatus
@@ -1858,6 +1860,90 @@ class PublicRoomsRestrictedTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
 
 
+class PublicRoomsRoomTypeFilterTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
+
+        config = self.default_config()
+        config["allow_public_rooms_without_auth"] = True
+        config["experimental_features"] = {"msc3827_enabled": True}
+        self.hs = self.setup_test_homeserver(config=config)
+        self.url = b"/_matrix/client/r0/publicRooms"
+
+        return self.hs
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        user = self.register_user("alice", "pass")
+        self.token = self.login(user, "pass")
+
+        # Create a room
+        self.helper.create_room_as(
+            user,
+            is_public=True,
+            extra_content={"visibility": "public"},
+            tok=self.token,
+        )
+        # Create a space
+        self.helper.create_room_as(
+            user,
+            is_public=True,
+            extra_content={
+                "visibility": "public",
+                "creation_content": {EventContentFields.ROOM_TYPE: RoomTypes.SPACE},
+            },
+            tok=self.token,
+        )
+
+    def make_public_rooms_request(
+        self, room_types: Union[List[Union[str, None]], None]
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        channel = self.make_request(
+            "POST",
+            self.url,
+            {"filter": {PublicRoomsFilterFields.ROOM_TYPES: room_types}},
+            self.token,
+        )
+        chunk = channel.json_body["chunk"]
+        count = channel.json_body["total_room_count_estimate"]
+
+        self.assertEqual(len(chunk), count)
+
+        return chunk, count
+
+    def test_returns_both_rooms_and_spaces_if_no_filter(self) -> None:
+        chunk, count = self.make_public_rooms_request(None)
+
+        self.assertEqual(count, 2)
+
+    def test_returns_only_rooms_based_on_filter(self) -> None:
+        chunk, count = self.make_public_rooms_request([None])
+
+        self.assertEqual(count, 1)
+        self.assertEqual(chunk[0].get("org.matrix.msc3827.room_type", None), None)
+
+    def test_returns_only_space_based_on_filter(self) -> None:
+        chunk, count = self.make_public_rooms_request(["m.space"])
+
+        self.assertEqual(count, 1)
+        self.assertEqual(chunk[0].get("org.matrix.msc3827.room_type", None), "m.space")
+
+    def test_returns_both_rooms_and_space_based_on_filter(self) -> None:
+        chunk, count = self.make_public_rooms_request(["m.space", None])
+
+        self.assertEqual(count, 2)
+
+    def test_returns_both_rooms_and_spaces_if_array_is_empty(self) -> None:
+        chunk, count = self.make_public_rooms_request([])
+
+        self.assertEqual(count, 2)
+
+
 class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
     """Test that we correctly fallback to local filtering if a remote server
     doesn't support search.
@@ -1882,7 +1968,7 @@ class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
         "Simple test for searching rooms over federation"
         self.federation_client.get_public_rooms.return_value = make_awaitable({})  # type: ignore[attr-defined]
 
-        search_filter = {"generic_search_term": "foobar"}
+        search_filter = {PublicRoomsFilterFields.GENERIC_SEARCH_TERM: "foobar"}
 
         channel = self.make_request(
             "POST",
@@ -1911,7 +1997,7 @@ class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
             make_awaitable({}),
         )
 
-        search_filter = {"generic_search_term": "foobar"}
+        search_filter = {PublicRoomsFilterFields.GENERIC_SEARCH_TERM: "foobar"}
 
         channel = self.make_request(
             "POST",

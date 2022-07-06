@@ -59,6 +59,9 @@ if [[ -n "$SYNAPSE_COMPLEMENT_USE_WORKERS" ]]; then
       synchrotron, \
       appservice, \
       pusher"
+
+  # Improve startup times by using a launcher based on fork()
+  export SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER=1
 else
   # Empty string here means 'main process only'
   export SYNAPSE_WORKER_TYPES=""

@@ -1,1 +1,0 @@
-Fix a long-standing bug which meant that rate limiting was not restrictive enough in some cases.

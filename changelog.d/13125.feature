@@ -1,0 +1,1 @@
+Add a rate limit for local users sending invites.
