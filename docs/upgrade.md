@@ -98,7 +98,7 @@ ownership, and password reset confirmation, to be delegated to an identity serve
 
 To continue to allow users to add email addresses to their homeserver accounts,
 and perform password resets, make sure that Synapse is configured with a
-working email server in the `email` configureation section (including, at a
+working email server in the `email` configuration section (including, at a
 minimum, a `notif_from` setting.)
 
 Specifying an `email` setting under `account_threepid_delegates` will now cause
