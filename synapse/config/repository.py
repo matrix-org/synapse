@@ -46,6 +46,8 @@ THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP = {
     "image/jpeg": "jpeg",
     "image/jpg": "jpeg",
     "image/webp": "jpeg",
+    # Thumbnails can only be jpeg or png. We choose png thumbnails for gif
+    # because it can have transparency.
     "image/gif": "png",
     "image/png": "png",
 }
