@@ -40,7 +40,6 @@ from typing import (
 )
 
 import yaml
-from matrix_common.versionstring import get_distribution_version_string
 from typing_extensions import TypedDict
 
 from twisted.internet import defer, reactor as reactor_
@@ -59,10 +58,10 @@ from synapse.storage.databases.main.client_ips import ClientIpBackgroundUpdateSt
 from synapse.storage.databases.main.deviceinbox import DeviceInboxBackgroundUpdateStore
 from synapse.storage.databases.main.devices import DeviceBackgroundUpdateStore
 from synapse.storage.databases.main.end_to_end_keys import EndToEndKeyBackgroundStore
+from synapse.storage.databases.main.event_push_actions import EventPushActionsStore
 from synapse.storage.databases.main.events_bg_updates import (
     EventsBackgroundUpdatesStore,
 )
-from synapse.storage.databases.main.group_server import GroupServerStore
 from synapse.storage.databases.main.media_repository import (
     MediaRepositoryBackgroundUpdateStore,
 )
@@ -84,7 +83,7 @@ from synapse.storage.databases.state.bg_updates import StateBackgroundUpdateStor
 from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 from synapse.types import ISynapseReactor
-from synapse.util import Clock
+from synapse.util import SYNAPSE_VERSION, Clock
 
 # Cast safety: Twisted does some naughty magic which replaces the
 # twisted.internet.reactor module with a Reactor instance at runtime.
@@ -182,6 +181,7 @@ IGNORED_TABLES = {
     "groups",
     "local_group_membership",
     "local_group_updates",
+    "remote_profile_cache",
 }
 
 
@@ -200,6 +200,7 @@ R = TypeVar("R")
 
 
 class Store(
+    EventPushActionsStore,
     ClientIpBackgroundUpdateStore,
     DeviceInboxBackgroundUpdateStore,
     DeviceBackgroundUpdateStore,
@@ -218,7 +219,6 @@ class Store(
     PushRuleStore,
     PusherWorkerStore,
     PresenceBackgroundUpdateStore,
-    GroupServerStore,
 ):
     def execute(self, f: Callable[..., R], *args: Any, **kwargs: Any) -> Awaitable[R]:
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)
@@ -257,9 +257,7 @@ class MockHomeserver:
         self.clock = Clock(reactor)
         self.config = config
         self.hostname = config.server.server_name
-        self.version_string = "Synapse/" + get_distribution_version_string(
-            "matrix-synapse"
-        )
+        self.version_string = SYNAPSE_VERSION
 
     def get_clock(self) -> Clock:
         return self.clock
@@ -269,6 +267,9 @@ class MockHomeserver:
 
     def get_instance_name(self) -> str:
         return "master"
+
+    def should_send_federation(self) -> bool:
+        return False
 
 
 class Porter:

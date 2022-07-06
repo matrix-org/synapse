@@ -53,6 +53,7 @@ class FederationBase:
         self.spam_checker = hs.get_spam_checker()
         self.store = hs.get_datastores().main
         self._clock = hs.get_clock()
+        self._storage_controllers = hs.get_storage_controllers()
 
     async def _check_sigs_and_hash(
         self, room_version: RoomVersion, pdu: EventBase

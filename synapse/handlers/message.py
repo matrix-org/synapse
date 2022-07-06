@@ -37,12 +37,13 @@ from synapse.api.errors import (
     AuthError,
     Codes,
     ConsentNotGivenError,
+    LimitExceededError,
     NotFoundError,
     ShadowBanError,
     SynapseError,
     UnsupportedRoomVersionError,
 )
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.api.urls import ConsentURIBuilder
 from synapse.event_auth import validate_event_for_room_version
 from synapse.events import EventBase, relation_from_event
@@ -53,6 +54,7 @@ from synapse.handlers.directory import DirectoryHandler
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
+from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import (
@@ -125,7 +127,9 @@ class MessageHandler:
         )
 
         if membership == Membership.JOIN:
-            data = await self.state.get_current_state(room_id, event_type, state_key)
+            data = await self._storage_controllers.state.get_current_state_event(
+                room_id, event_type, state_key
+            )
         elif membership == Membership.LEAVE:
             key = (event_type, state_key)
             # If the membership is not JOIN, then the event ID should exist.
@@ -442,7 +446,7 @@ _DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY = 7 * 24 * 60 * 60 * 1000
 class EventCreationHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.auth = hs.get_auth()
+        self.auth_blocking = hs.get_auth_blocking()
         self._event_auth_handler = hs.get_event_auth_handler()
         self.store = hs.get_datastores().main
         self._storage_controllers = hs.get_storage_controllers()
@@ -603,7 +607,7 @@ class EventCreationHandler:
         Returns:
             Tuple of created event, Context
         """
-        await self.auth.check_auth_blocking(requester=requester)
+        await self.auth_blocking.check_auth_blocking(requester=requester)
 
         if event_dict["type"] == EventTypes.Create and event_dict["state_key"] == "":
             room_version_id = event_dict["content"]["room_version"]
@@ -901,6 +905,9 @@ class EventCreationHandler:
             await self.clock.sleep(random.randint(1, 10))
             raise ShadowBanError()
 
+        if ratelimit:
+            await self.request_ratelimiter.ratelimit(requester, update=False)
+
         # We limit the number of concurrent event sends in a room so that we
         # don't fork the DAG too much. If we don't limit then we can end up in
         # a situation where event persistence can't keep up, causing
@@ -952,14 +959,12 @@ class EventCreationHandler:
                             "Spam-check module returned invalid error value. Expecting [code, dict], got %s",
                             spam_check_result,
                         )
-                        spam_check_result = Codes.FORBIDDEN
 
-                if isinstance(spam_check_result, Codes):
-                    raise SynapseError(
-                        403,
-                        "This message has been rejected as probable spam",
-                        spam_check_result,
-                    )
+                        raise SynapseError(
+                            403,
+                            "This message has been rejected as probable spam",
+                            Codes.FORBIDDEN,
+                        )
 
                 # Backwards compatibility: if the return value is not an error code, it
                 # means the module returned an error message to be included in the
@@ -1100,6 +1105,7 @@ class EventCreationHandler:
             #
             # TODO(faster_joins): figure out how this works, and make sure that the
             #   old state is complete.
+            #   https://github.com/matrix-org/synapse/issues/13003
             metadata = await self.store.get_metadata_for_events(state_event_ids)
 
             state_map_for_event: MutableStateMap[str] = {}
@@ -1246,6 +1252,8 @@ class EventCreationHandler:
 
         Raises:
             ShadowBanError if the requester has been shadow-banned.
+            SynapseError(503) if attempting to persist a partial state event in
+                a room that has been un-partial stated.
         """
         extra_users = extra_users or []
 
@@ -1271,23 +1279,6 @@ class EventCreationHandler:
                 )
                 return prev_event
 
-        if event.is_state() and (event.type, event.state_key) == (
-            EventTypes.Create,
-            "",
-        ):
-            room_version_id = event.content.get(
-                "room_version", RoomVersions.V1.identifier
-            )
-            maybe_room_version_obj = KNOWN_ROOM_VERSIONS.get(room_version_id)
-            if not maybe_room_version_obj:
-                raise UnsupportedRoomVersionError(
-                    "Attempt to create a room with unsupported room version %s"
-                    % (room_version_id,)
-                )
-            room_version_obj = maybe_room_version_obj
-        else:
-            room_version_obj = await self.store.get_room_version(event.room_id)
-
         if event.internal_metadata.is_out_of_band_membership():
             # the only sort of out-of-band-membership events we expect to see here are
             # invite rejections and rescinded knocks that we have generated ourselves.
@@ -1295,9 +1286,9 @@ class EventCreationHandler:
             assert event.content["membership"] == Membership.LEAVE
         else:
             try:
-                validate_event_for_room_version(room_version_obj, event)
+                validate_event_for_room_version(event)
                 await self._event_auth_handler.check_auth_rules_from_context(
-                    room_version_obj, event, context
+                    event, context
                 )
             except AuthError as err:
                 logger.warning("Denying new event %r because %s", event, err)
@@ -1313,24 +1304,35 @@ class EventCreationHandler:
 
         # We now persist the event (and update the cache in parallel, since we
         # don't want to block on it).
-        result, _ = await make_deferred_yieldable(
-            gather_results(
-                (
-                    run_in_background(
-                        self._persist_event,
-                        requester=requester,
-                        event=event,
-                        context=context,
-                        ratelimit=ratelimit,
-                        extra_users=extra_users,
+        try:
+            result, _ = await make_deferred_yieldable(
+                gather_results(
+                    (
+                        run_in_background(
+                            self._persist_event,
+                            requester=requester,
+                            event=event,
+                            context=context,
+                            ratelimit=ratelimit,
+                            extra_users=extra_users,
+                        ),
+                        run_in_background(
+                            self.cache_joined_hosts_for_event, event, context
+                        ).addErrback(
+                            log_failure, "cache_joined_hosts_for_event failed"
+                        ),
                     ),
-                    run_in_background(
-                        self.cache_joined_hosts_for_event, event, context
-                    ).addErrback(log_failure, "cache_joined_hosts_for_event failed"),
-                ),
-                consumeErrors=True,
+                    consumeErrors=True,
+                )
+            ).addErrback(unwrapFirstError)
+        except PartialStateConflictError as e:
+            # The event context needs to be recomputed.
+            # Turn the error into a 429, as a hint to the client to try again.
+            logger.info(
+                "Room %s was un-partial stated while persisting client event.",
+                event.room_id,
             )
-        ).addErrback(unwrapFirstError)
+            raise LimitExceededError(msg=e.msg, errcode=e.errcode, retry_after_ms=0)
 
         return result
 
@@ -1345,6 +1347,9 @@ class EventCreationHandler:
         """Actually persists the event. Should only be called by
         `handle_new_client_event`, and see its docstring for documentation of
         the arguments.
+
+        PartialStateConflictError: if attempting to persist a partial state event in
+            a room that has been un-partial stated.
         """
 
         # Skip push notification actions for historical messages
@@ -1361,16 +1366,21 @@ class EventCreationHandler:
             # If we're a worker we need to hit out to the master.
             writer_instance = self._events_shard_config.get_instance(event.room_id)
             if writer_instance != self._instance_name:
-                result = await self.send_event(
-                    instance_name=writer_instance,
-                    event_id=event.event_id,
-                    store=self.store,
-                    requester=requester,
-                    event=event,
-                    context=context,
-                    ratelimit=ratelimit,
-                    extra_users=extra_users,
-                )
+                try:
+                    result = await self.send_event(
+                        instance_name=writer_instance,
+                        event_id=event.event_id,
+                        store=self.store,
+                        requester=requester,
+                        event=event,
+                        context=context,
+                        ratelimit=ratelimit,
+                        extra_users=extra_users,
+                    )
+                except SynapseError as e:
+                    if e.code == HTTPStatus.CONFLICT:
+                        raise PartialStateConflictError()
+                    raise
                 stream_id = result["stream_id"]
                 event_id = result["event_id"]
                 if event_id != event.event_id:
@@ -1498,6 +1508,10 @@ class EventCreationHandler:
             The persisted event. This may be different than the given event if
             it was de-duplicated (e.g. because we had already persisted an
             event with the same transaction ID.)
+
+        Raises:
+            PartialStateConflictError: if attempting to persist a partial state event in
+                a room that has been un-partial stated.
         """
         extra_users = extra_users or []
 

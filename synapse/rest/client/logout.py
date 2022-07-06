@@ -45,8 +45,8 @@ class LogoutRestServlet(RestServlet):
             access_token = self.auth.get_access_token_from_request(request)
             await self._auth_handler.delete_access_token(access_token)
         else:
-            await self._device_handler.delete_device(
-                requester.user.to_string(), requester.device_id
+            await self._device_handler.delete_devices(
+                requester.user.to_string(), [requester.device_id]
             )
 
         return 200, {}

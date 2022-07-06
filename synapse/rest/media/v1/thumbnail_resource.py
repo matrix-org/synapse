@@ -18,7 +18,11 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from synapse.api.errors import SynapseError
-from synapse.http.server import DirectServeJsonResource, set_cors_headers
+from synapse.http.server import (
+    DirectServeJsonResource,
+    set_corp_headers,
+    set_cors_headers,
+)
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.media.v1.media_storage import MediaStorage
@@ -58,6 +62,7 @@ class ThumbnailResource(DirectServeJsonResource):
 
     async def _async_render_GET(self, request: SynapseRequest) -> None:
         set_cors_headers(request)
+        set_corp_headers(request)
         server_name, media_id, _ = parse_media_id(request)
         width = parse_integer(request, "width", required=True)
         height = parse_integer(request, "height", required=True)

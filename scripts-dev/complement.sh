@@ -14,15 +14,61 @@
 # By default Synapse is run in monolith mode. This can be overridden by
 # setting the WORKERS environment variable.
 #
-# A regular expression of test method names can be supplied as the first
-# argument to the script. Complement will then only run those tests. If
-# no regex is supplied, all tests are run. For example;
+# You can optionally give a "-f" argument (for "fast") before any to skip
+# rebuilding the docker images, if you just want to rerun the tests.
 #
-# ./complement.sh "TestOutboundFederation(Profile|Send)"
+# Remaining commandline arguments are passed through to `go test`. For example,
+# you can supply a regular expression of test method names via the "-run"
+# argument:
 #
+# ./complement.sh -run "TestOutboundFederation(Profile|Send)"
+#
+# Specifying TEST_ONLY_SKIP_DEP_HASH_VERIFICATION=1 will cause `poetry export`
+# to not emit any hashes when building the Docker image. This then means that
+# you can use 'unverifiable' sources such as git repositories as dependencies.
 
 # Exit if a line returns a non-zero exit code
 set -e
+
+
+# Helper to emit annotations that collapse portions of the log in GitHub Actions
+echo_if_github() {
+  if [[ -n "$GITHUB_WORKFLOW" ]]; then
+    echo $*
+  fi
+}
+
+# Helper to print out the usage instructions
+usage() {
+    cat >&2 <<EOF
+Usage: $0 [-f] <go test arguments>...
+Run the complement test suite on Synapse.
+
+  -f    Skip rebuilding the docker images, and just use the most recent
+        'complement-synapse:latest' image
+
+For help on arguments to 'go test', run 'go help testflag'.
+EOF
+}
+
+# parse our arguments
+skip_docker_build=""
+while [ $# -ge 1 ]; do
+    arg=$1
+    case "$arg" in
+        "-h")
+            usage
+            exit 1
+            ;;
+        "-f")
+            skip_docker_build=1
+            ;;
+        *)
+            # unknown arg: presumably an argument to gotest. break the loop.
+            break
+    esac
+    shift
+done
 
 # enable buildkit for the docker builds
 export DOCKER_BUILDKIT=1
@@ -40,20 +86,45 @@ if [[ -z "$COMPLEMENT_DIR" ]]; then
   echo "Checkout available at 'complement-${COMPLEMENT_REF}'"
 fi
 
-# Build the base Synapse image from the local checkout
-docker build -t matrixdotorg/synapse -f "docker/Dockerfile" .
+if [ -z "$skip_docker_build" ]; then
+    # Build the base Synapse image from the local checkout
+    echo_if_github "::group::Build Docker image: matrixdotorg/synapse"
+    docker build -t matrixdotorg/synapse \
+      --build-arg TEST_ONLY_SKIP_DEP_HASH_VERIFICATION \
+      -f "docker/Dockerfile" .
+    echo_if_github "::endgroup::"
+
+    # Build the workers docker image (from the base Synapse image we just built).
+    echo_if_github "::group::Build Docker image: matrixdotorg/synapse-workers"
+    docker build -t matrixdotorg/synapse-workers -f "docker/Dockerfile-workers" .
+    echo_if_github "::endgroup::"
+
+    # Build the unified Complement image (from the worker Synapse image we just built).
+    echo_if_github "::group::Build Docker image: complement/Dockerfile"
+    docker build -t complement-synapse \
+           -f "docker/complement/Dockerfile" "docker/complement"
+    echo_if_github "::endgroup::"
+fi
+
+export COMPLEMENT_BASE_IMAGE=complement-synapse
 
 extra_test_args=()
 
 test_tags="synapse_blacklist,msc2716,msc3030,msc3787"
 
-# If we're using workers, modify the docker files slightly.
-if [[ -n "$WORKERS" ]]; then
-  # Build the workers docker image (from the base Synapse image).
-  docker build -t matrixdotorg/synapse-workers -f "docker/Dockerfile-workers" .
+# All environment variables starting with PASS_ will be shared.
+# (The prefix is stripped off before reaching the container.)
+export COMPLEMENT_SHARE_ENV_PREFIX=PASS_
 
-  export COMPLEMENT_BASE_IMAGE=complement-synapse-workers
-  COMPLEMENT_DOCKERFILE=SynapseWorkers.Dockerfile
+# It takes longer than 10m to run the whole suite.
+extra_test_args+=("-timeout=60m")
+
+if [[ -n "$WORKERS" ]]; then
+  # Use workers.
+  export PASS_SYNAPSE_COMPLEMENT_USE_WORKERS=true
+
+  # Workers can only use Postgres as a database.
+  export PASS_SYNAPSE_COMPLEMENT_DATABASE=postgres
 
   # And provide some more configuration to complement.
 
@@ -61,20 +132,30 @@ if [[ -n "$WORKERS" ]]; then
   # time (the main problem is that we start 14 python processes for each test,
   # and complement likes to do two of them in parallel).
   export COMPLEMENT_SPAWN_HS_TIMEOUT_SECS=120
-
-  # ... and it takes longer than 10m to run the whole suite.
-  extra_test_args+=("-timeout=60m")
 else
-  export COMPLEMENT_BASE_IMAGE=complement-synapse
-  COMPLEMENT_DOCKERFILE=Dockerfile
+  export PASS_SYNAPSE_COMPLEMENT_USE_WORKERS=
+  if [[ -n "$POSTGRES" ]]; then
+    export PASS_SYNAPSE_COMPLEMENT_DATABASE=postgres
+  else
+    export PASS_SYNAPSE_COMPLEMENT_DATABASE=sqlite
+  fi
 
   # We only test faster room joins on monoliths, because they are purposefully
   # being developed without worker support to start with.
   test_tags="$test_tags,faster_joins"
 fi
 
-# Build the Complement image from the Synapse image we just built.
-docker build -t $COMPLEMENT_BASE_IMAGE -f "docker/complement/$COMPLEMENT_DOCKERFILE" "docker/complement"
+
+if [[ -n "$SYNAPSE_TEST_LOG_LEVEL" ]]; then
+  # Set the log level to what is desired
+  export PASS_SYNAPSE_LOG_LEVEL="$SYNAPSE_TEST_LOG_LEVEL"
+
+  # Allow logging sensitive things (currently SQL queries & parameters).
+  # (This won't have any effect if we're not logging at DEBUG level overall.)
+  # Since this is just a test suite, this is fine and won't reveal anyone's
+  # personal information
+  export PASS_SYNAPSE_LOG_SENSITIVE=1
+fi
 
 # Run the tests!
 echo "Images built; running complement"

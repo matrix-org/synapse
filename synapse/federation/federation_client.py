@@ -1642,10 +1642,6 @@ def _validate_hierarchy_event(d: JsonDict) -> None:
     if not isinstance(event_type, str):
         raise ValueError("Invalid event: 'event_type' must be a str")
 
-    room_id = d.get("room_id")
-    if not isinstance(room_id, str):
-        raise ValueError("Invalid event: 'room_id' must be a str")
-
     state_key = d.get("state_key")
     if not isinstance(state_key, str):
         raise ValueError("Invalid event: 'state_key' must be a str")

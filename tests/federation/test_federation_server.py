@@ -134,6 +134,8 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
         super().prepare(reactor, clock, hs)
 
+        self._storage_controllers = hs.get_storage_controllers()
+
         # create the room
         creator_user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test")
@@ -207,7 +209,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
 
         # the room should show that the new user is a member
         r = self.get_success(
-            self.hs.get_state_handler().get_current_state(self._room_id)
+            self._storage_controllers.state.get_current_state(self._room_id)
         )
         self.assertEqual(r[("m.room.member", joining_user)].membership, "join")
 
@@ -258,7 +260,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
 
         # the room should show that the new user is a member
         r = self.get_success(
-            self.hs.get_state_handler().get_current_state(self._room_id)
+            self._storage_controllers.state.get_current_state(self._room_id)
         )
         self.assertEqual(r[("m.room.member", joining_user)].membership, "join")
 

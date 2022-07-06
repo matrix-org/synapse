@@ -50,19 +50,21 @@ from synapse.api.errors import (
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion, RoomVersions
 from synapse.event_auth import (
     auth_types_for_event,
-    check_auth_rules_for_event,
+    check_state_dependent_auth_rules,
+    check_state_independent_auth_rules,
     validate_event_for_room_version,
 )
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.federation.federation_client import InvalidResponseError
-from synapse.logging.context import nested_logging_context, run_in_background
+from synapse.logging.context import nested_logging_context
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (
     ReplicationFederationSendEventsRestServlet,
 )
 from synapse.state import StateResolutionStore
+from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import (
@@ -274,7 +276,16 @@ class FederationEventHandler:
                     affected=pdu.event_id,
                 )
 
-        await self._process_received_pdu(origin, pdu, state_ids=None)
+        try:
+            await self._process_received_pdu(origin, pdu, state_ids=None)
+        except PartialStateConflictError:
+            # The room was un-partial stated while we were processing the PDU.
+            # Try once more, with full state this time.
+            logger.info(
+                "Room %s was un-partial stated while processing the PDU, trying again.",
+                room_id,
+            )
+            await self._process_received_pdu(origin, pdu, state_ids=None)
 
     async def on_send_membership_event(
         self, origin: str, event: EventBase
@@ -305,6 +316,9 @@ class FederationEventHandler:
 
         Raises:
             SynapseError if the event is not accepted into the room
+            PartialStateConflictError if the room was un-partial stated in between
+                computing the state at the event and persisting it. The caller should
+                retry exactly once in this case.
         """
         logger.debug(
             "on_send_membership_event: Got event: %s, signatures: %s",
@@ -422,6 +436,8 @@ class FederationEventHandler:
 
         Raises:
             SynapseError if the response is in some way invalid.
+            PartialStateConflictError if the homeserver is already in the room and it
+                has been un-partial stated.
         """
         create_event = None
         for e in state:
@@ -532,6 +548,7 @@ class FederationEventHandler:
                 #
                 # TODO(faster_joins): we probably need to be more intelligent, and
                 #    exclude partial-state prev_events from consideration
+                #    https://github.com/matrix-org/synapse/issues/13001
                 logger.warning(
                     "%s still has partial state: can't de-partial-state it yet",
                     event.event_id,
@@ -777,6 +794,7 @@ class FederationEventHandler:
             state_ids = await self._resolve_state_at_missing_prevs(origin, event)
             # TODO(faster_joins): make sure that _resolve_state_at_missing_prevs does
             #   not return partial state
+            #   https://github.com/matrix-org/synapse/issues/13002
 
             await self._process_received_pdu(
                 origin, event, state_ids=state_ids, backfilled=backfilled
@@ -1081,28 +1099,31 @@ class FederationEventHandler:
 
             state_ids: Normally None, but if we are handling a gap in the graph
                 (ie, we are missing one or more prev_events), the resolved state at the
-                event
+                event. Must not be partial state.
 
             backfilled: True if this is part of a historical batch of events (inhibits
                 notification to clients, and validation of device keys.)
+
+        PartialStateConflictError: if the room was un-partial stated in between
+            computing the state at the event and persisting it. The caller should retry
+            exactly once in this case. Will never be raised if `state_ids` is provided.
         """
         logger.debug("Processing event: %s", event)
         assert not event.internal_metadata.outlier
 
+        context = await self._state_handler.compute_event_context(
+            event,
+            state_ids_before_event=state_ids,
+        )
         try:
-            context = await self._state_handler.compute_event_context(
-                event,
-                state_ids_before_event=state_ids,
-            )
             context = await self._check_event_auth(
                 origin,
                 event,
                 context,
             )
         except AuthError as e:
-            # FIXME richvdh 2021/10/07 I don't think this is reachable. Let's log it
-            #   for now
-            logger.exception("Unexpected AuthError from _check_event_auth")
+            # This happens only if we couldn't find the auth events. We'll already have
+            # logged a warning, so now we just convert to a FederationError.
             raise FederationError("ERROR", e.code, e.msg, affected=event.event_id)
 
         if not backfilled and not context.rejected:
@@ -1428,10 +1449,9 @@ class FederationEventHandler:
             allow_rejected=True,
         )
 
-        room_version = await self._store.get_room_version_id(room_id)
-        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+        events_and_contexts_to_persist: List[Tuple[EventBase, EventContext]] = []
 
-        def prep(event: EventBase) -> Optional[Tuple[EventBase, EventContext]]:
+        async def prep(event: EventBase) -> None:
             with nested_logging_context(suffix=event.event_id):
                 auth = []
                 for auth_event_id in event.auth_event_ids():
@@ -1445,7 +1465,7 @@ class FederationEventHandler:
                             event,
                             auth_event_id,
                         )
-                        return None
+                        return
                     auth.append(ae)
 
                 # we're not bothering about room state, so flag the event as an outlier.
@@ -1453,18 +1473,21 @@ class FederationEventHandler:
 
                 context = EventContext.for_outlier(self._storage_controllers)
                 try:
-                    validate_event_for_room_version(room_version_obj, event)
-                    check_auth_rules_for_event(room_version_obj, event, auth)
+                    validate_event_for_room_version(event)
+                    await check_state_independent_auth_rules(self._store, event)
+                    check_state_dependent_auth_rules(event, auth)
                 except AuthError as e:
                     logger.warning("Rejecting %r because %s", event, e)
                     context.rejected = RejectedReason.AUTH_ERROR
 
-            return event, context
+            events_and_contexts_to_persist.append((event, context))
 
-        events_to_persist = (x for x in (prep(event) for event in fetched_events) if x)
+        for event in fetched_events:
+            await prep(event)
+
         await self.persist_events_and_notify(
             room_id,
-            tuple(events_to_persist),
+            events_and_contexts_to_persist,
             # Mark these events backfilled as they're historic events that will
             # eventually be backfilled. For example, missing events we fetch
             # during backfill should be marked as backfilled as well.
@@ -1497,11 +1520,8 @@ class FederationEventHandler:
         assert not event.internal_metadata.outlier
 
         # first of all, check that the event itself is valid.
-        room_version = await self._store.get_room_version_id(event.room_id)
-        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
-
         try:
-            validate_event_for_room_version(room_version_obj, event)
+            validate_event_for_room_version(event)
         except AuthError as e:
             logger.warning("While validating received event %r: %s", event, e)
             # TODO: use a different rejected reason here?
@@ -1519,7 +1539,8 @@ class FederationEventHandler:
 
         # ... and check that the event passes auth at those auth events.
         try:
-            check_auth_rules_for_event(room_version_obj, event, claimed_auth_events)
+            await check_state_independent_auth_rules(self._store, event)
+            check_state_dependent_auth_rules(event, claimed_auth_events)
         except AuthError as e:
             logger.warning(
                 "While checking auth of %r against auth_events: %s", event, e
@@ -1567,9 +1588,7 @@ class FederationEventHandler:
             auth_events_for_auth = calculated_auth_event_map
 
         try:
-            check_auth_rules_for_event(
-                room_version_obj, event, auth_events_for_auth.values()
-            )
+            check_state_dependent_auth_rules(event, auth_events_for_auth.values())
         except AuthError as e:
             logger.warning("Failed auth resolution for %r because %s", event, e)
             context.rejected = RejectedReason.AUTH_ERROR
@@ -1584,9 +1603,11 @@ class FederationEventHandler:
         if guest_access == GuestAccess.CAN_JOIN:
             return
 
-        current_state_map = await self._state_handler.get_current_state(event.room_id)
-        current_state = list(current_state_map.values())
-        await self._get_room_member_handler().kick_guest_users(current_state)
+        current_state = await self._storage_controllers.state.get_current_state(
+            event.room_id
+        )
+        current_state_list = list(current_state.values())
+        await self._get_room_member_handler().kick_guest_users(current_state_list)
 
     async def _check_for_soft_fail(
         self,
@@ -1613,6 +1634,9 @@ class FederationEventHandler:
 
         room_version = await self._store.get_room_version_id(event.room_id)
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+
+        # The event types we want to pull from the "current" state.
+        auth_types = auth_types_for_event(room_version_obj, event)
 
         # Calculate the "current state".
         if state_ids is not None:
@@ -1643,8 +1667,10 @@ class FederationEventHandler:
                 )
             )
         else:
-            current_state_ids = await self._state_handler.get_current_state_ids(
-                event.room_id, latest_event_ids=extrem_ids
+            current_state_ids = (
+                await self._state_storage_controller.get_current_state_ids(
+                    event.room_id, StateFilter.from_types(auth_types)
+                )
             )
 
         logger.debug(
@@ -1654,7 +1680,6 @@ class FederationEventHandler:
         )
 
         # Now check if event pass auth against said current state
-        auth_types = auth_types_for_event(room_version_obj, event)
         current_state_ids_list = [
             e for k, e in current_state_ids.items() if k in auth_types
         ]
@@ -1663,7 +1688,7 @@ class FederationEventHandler:
         )
 
         try:
-            check_auth_rules_for_event(room_version_obj, event, current_auth_events)
+            check_state_dependent_auth_rules(event, current_auth_events)
         except AuthError as e:
             logger.warning(
                 "Soft-failing %r (from %s) because %s",
@@ -1927,6 +1952,9 @@ class FederationEventHandler:
             event: The event itself.
             context: The event context.
             backfilled: True if the event was backfilled.
+
+        PartialStateConflictError: if attempting to persist a partial state event in
+            a room that has been un-partial stated.
         """
         # this method should not be called on outliers (those code paths call
         # persist_events_and_notify directly.)
@@ -1957,9 +1985,7 @@ class FederationEventHandler:
                 event.room_id, [(event, context)], backfilled=backfilled
             )
         except Exception:
-            run_in_background(
-                self._store.remove_push_actions_from_staging, event.event_id
-            )
+            await self._store.remove_push_actions_from_staging(event.event_id)
             raise
 
     async def persist_events_and_notify(
@@ -1981,6 +2007,10 @@ class FederationEventHandler:
 
         Returns:
             The stream ID after which all events have been persisted.
+
+        Raises:
+            PartialStateConflictError: if attempting to persist a partial state event in
+                a room that has been un-partial stated.
         """
         if not event_and_contexts:
             return self._store.get_room_max_stream_ordering()
@@ -1989,14 +2019,19 @@ class FederationEventHandler:
         if instance != self._instance_name:
             # Limit the number of events sent over replication. We choose 200
             # here as that is what we default to in `max_request_body_size(..)`
-            for batch in batch_iter(event_and_contexts, 200):
-                result = await self._send_events(
-                    instance_name=instance,
-                    store=self._store,
-                    room_id=room_id,
-                    event_and_contexts=batch,
-                    backfilled=backfilled,
-                )
+            try:
+                for batch in batch_iter(event_and_contexts, 200):
+                    result = await self._send_events(
+                        instance_name=instance,
+                        store=self._store,
+                        room_id=room_id,
+                        event_and_contexts=batch,
+                        backfilled=backfilled,
+                    )
+            except SynapseError as e:
+                if e.code == HTTPStatus.CONFLICT:
+                    raise PartialStateConflictError()
+                raise
             return result["max_stream_id"]
         else:
             assert self._storage_controllers.persistence

@@ -67,6 +67,7 @@ from synapse.replication.http.federation import (
     ReplicationFederationSendEduRestServlet,
     ReplicationGetQueryRestServlet,
 )
+from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.lock import Lock
 from synapse.types import JsonDict, StateMap, get_domain_from_id
 from synapse.util import json_decoder, unwrapFirstError
@@ -882,9 +883,20 @@ class FederationServer(FederationBase):
             logger.warning("%s", errmsg)
             raise SynapseError(403, errmsg, Codes.FORBIDDEN)
 
-        return await self._federation_event_handler.on_send_membership_event(
-            origin, event
-        )
+        try:
+            return await self._federation_event_handler.on_send_membership_event(
+                origin, event
+            )
+        except PartialStateConflictError:
+            # The room was un-partial stated while we were persisting the event.
+            # Try once more, with full state this time.
+            logger.info(
+                "Room %s was un-partial stated during `on_send_membership_event`, trying again.",
+                room_id,
+            )
+            return await self._federation_event_handler.on_send_membership_event(
+                origin, event
+            )
 
     async def on_event_auth(
         self, origin: str, room_id: str, event_id: str
@@ -1223,14 +1235,10 @@ class FederationServer(FederationBase):
         Raises:
             AuthError if the server does not match the ACL
         """
-        state_ids = await self._state_storage_controller.get_current_state_ids(room_id)
-        acl_event_id = state_ids.get((EventTypes.ServerACL, ""))
-
-        if not acl_event_id:
-            return
-
-        acl_event = await self.store.get_event(acl_event_id)
-        if server_matches_acl_event(server_name, acl_event):
+        acl_event = await self._storage_controllers.state.get_current_state_event(
+            room_id, EventTypes.ServerACL, ""
+        )
+        if not acl_event or server_matches_acl_event(server_name, acl_event):
             return
 
         raise AuthError(code=403, msg="Server is banned from room")

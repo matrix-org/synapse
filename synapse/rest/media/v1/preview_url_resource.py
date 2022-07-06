@@ -586,12 +586,16 @@ class PreviewUrlResource(DirectServeJsonResource):
             og: The Open Graph dictionary. This is modified with image information.
         """
         # If there's no image or it is blank, there's nothing to do.
-        if "og:image" not in og or not og["og:image"]:
+        if "og:image" not in og:
+            return
+
+        # Remove the raw image URL, this will be replaced with an MXC URL, if successful.
+        image_url = og.pop("og:image")
+        if not image_url:
             return
 
         # The image URL from the HTML might be relative to the previewed page,
         # convert it to an URL which can be requested directly.
-        image_url = og["og:image"]
         url_parts = urlparse(image_url)
         if url_parts.scheme != "data":
             image_url = urljoin(media_info.uri, image_url)
@@ -599,7 +603,16 @@ class PreviewUrlResource(DirectServeJsonResource):
         # FIXME: it might be cleaner to use the same flow as the main /preview_url
         # request itself and benefit from the same caching etc.  But for now we
         # just rely on the caching on the master request to speed things up.
-        image_info = await self._handle_url(image_url, user, allow_data_urls=True)
+        try:
+            image_info = await self._handle_url(image_url, user, allow_data_urls=True)
+        except Exception as e:
+            # Pre-caching the image failed, don't block the entire URL preview.
+            logger.warning(
+                "Pre-caching image failed during URL preview: %s errored with %s",
+                image_url,
+                e,
+            )
+            return
 
         if _is_media(image_info.media_type):
             # TODO: make sure we don't choke on white-on-transparent images
@@ -611,13 +624,11 @@ class PreviewUrlResource(DirectServeJsonResource):
                 og["og:image:width"] = dims["width"]
                 og["og:image:height"] = dims["height"]
             else:
-                logger.warning("Couldn't get dims for %s", og["og:image"])
+                logger.warning("Couldn't get dims for %s", image_url)
 
             og["og:image"] = f"mxc://{self.server_name}/{image_info.filesystem_id}"
             og["og:image:type"] = image_info.media_type
             og["matrix:image:size"] = image_info.media_length
-        else:
-            del og["og:image"]
 
     async def _handle_oembed_response(
         self, url: str, media_info: MediaInfo, expiration_ms: int

@@ -164,6 +164,7 @@ Gotchas
   with an active span?
 """
 import contextlib
+import enum
 import inspect
 import logging
 import re
@@ -268,7 +269,7 @@ try:
 
         _reporter: Reporter = attr.Factory(Reporter)
 
-        def set_process(self, *args, **kwargs):
+        def set_process(self, *args: Any, **kwargs: Any) -> None:
             return self._reporter.set_process(*args, **kwargs)
 
         def report_span(self, span: "opentracing.Span") -> None:
@@ -319,7 +320,11 @@ _homeserver_whitelist: Optional[Pattern[str]] = None
 
 # Util methods
 
-Sentinel = object()
+
+class _Sentinel(enum.Enum):
+    # defining a sentinel in this way allows mypy to correctly handle the
+    # type of a dictionary lookup.
+    sentinel = object()
 
 
 P = ParamSpec("P")
@@ -339,12 +344,12 @@ def only_if_tracing(func: Callable[P, R]) -> Callable[P, Optional[R]]:
     return _only_if_tracing_inner
 
 
-def ensure_active_span(message, ret=None):
+def ensure_active_span(message: str, ret=None):
     """Executes the operation only if opentracing is enabled and there is an active span.
     If there is no active span it logs message at the error level.
 
     Args:
-        message (str): Message which fills in "There was no active span when trying to %s"
+        message: Message which fills in "There was no active span when trying to %s"
             in the error log if there is no active span and opentracing is enabled.
         ret (object): return value if opentracing is None or there is no active span.
 
@@ -402,7 +407,7 @@ def init_tracer(hs: "HomeServer") -> None:
     config = JaegerConfig(
         config=hs.config.tracing.jaeger_config,
         service_name=f"{hs.config.server.server_name} {hs.get_instance_name()}",
-        scope_manager=LogContextScopeManager(hs.config),
+        scope_manager=LogContextScopeManager(),
         metrics_factory=PrometheusMetricsFactory(),
     )
 
@@ -451,15 +456,15 @@ def whitelisted_homeserver(destination: str) -> bool:
 
 # Could use kwargs but I want these to be explicit
 def start_active_span(
-    operation_name,
-    child_of=None,
-    references=None,
-    tags=None,
-    start_time=None,
-    ignore_active_span=False,
-    finish_on_close=True,
+    operation_name: str,
+    child_of: Optional[Union["opentracing.Span", "opentracing.SpanContext"]] = None,
+    references: Optional[List["opentracing.Reference"]] = None,
+    tags: Optional[Dict[str, str]] = None,
+    start_time: Optional[float] = None,
+    ignore_active_span: bool = False,
+    finish_on_close: bool = True,
     *,
-    tracer=None,
+    tracer: Optional["opentracing.Tracer"] = None,
 ):
     """Starts an active opentracing span.
 
@@ -493,11 +498,11 @@ def start_active_span(
 def start_active_span_follows_from(
     operation_name: str,
     contexts: Collection,
-    child_of=None,
+    child_of: Optional[Union["opentracing.Span", "opentracing.SpanContext"]] = None,
     start_time: Optional[float] = None,
     *,
-    inherit_force_tracing=False,
-    tracer=None,
+    inherit_force_tracing: bool = False,
+    tracer: Optional["opentracing.Tracer"] = None,
 ):
     """Starts an active opentracing span, with additional references to previous spans
 
@@ -540,7 +545,7 @@ def start_active_span_from_edu(
     edu_content: Dict[str, Any],
     operation_name: str,
     references: Optional[List["opentracing.Reference"]] = None,
-    tags: Optional[Dict] = None,
+    tags: Optional[Dict[str, str]] = None,
     start_time: Optional[float] = None,
     ignore_active_span: bool = False,
     finish_on_close: bool = True,
@@ -617,23 +622,27 @@ def set_operation_name(operation_name: str) -> None:
 
 
 @only_if_tracing
-def force_tracing(span=Sentinel) -> None:
+def force_tracing(
+    span: Union["opentracing.Span", _Sentinel] = _Sentinel.sentinel
+) -> None:
     """Force sampling for the active/given span and its children.
 
     Args:
         span: span to force tracing for. By default, the active span.
     """
-    if span is Sentinel:
-        span = opentracing.tracer.active_span
-    if span is None:
+    if isinstance(span, _Sentinel):
+        span_to_trace = opentracing.tracer.active_span
+    else:
+        span_to_trace = span
+    if span_to_trace is None:
         logger.error("No active span in force_tracing")
         return
 
-    span.set_tag(opentracing.tags.SAMPLING_PRIORITY, 1)
+    span_to_trace.set_tag(opentracing.tags.SAMPLING_PRIORITY, 1)
 
     # also set a bit of baggage, so that we have a way of figuring out if
     # it is enabled later
-    span.set_baggage_item(SynapseBaggage.FORCE_TRACING, "1")
+    span_to_trace.set_baggage_item(SynapseBaggage.FORCE_TRACING, "1")
 
 
 def is_context_forced_tracing(
@@ -789,7 +798,7 @@ def extract_text_map(carrier: Dict[str, str]) -> Optional["opentracing.SpanConte
 # Tracing decorators
 
 
-def trace(func=None, opname=None):
+def trace(func=None, opname: Optional[str] = None):
     """
     Decorator to trace a function.
     Sets the operation name to that of the function's or that given
@@ -822,11 +831,11 @@ def trace(func=None, opname=None):
                     result = func(*args, **kwargs)
                     if isinstance(result, defer.Deferred):
 
-                        def call_back(result):
+                        def call_back(result: R) -> R:
                             scope.__exit__(None, None, None)
                             return result
 
-                        def err_back(result):
+                        def err_back(result: R) -> R:
                             scope.__exit__(None, None, None)
                             return result
 

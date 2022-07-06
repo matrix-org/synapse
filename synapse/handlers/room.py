@@ -62,6 +62,7 @@ from synapse.events.utils import copy_and_fixup_power_levels_contents
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.handlers.federation import get_domains_from_state
 from synapse.handlers.relations import BundledAggregations
+from synapse.module_api import NOT_SPAM
 from synapse.rest.admin._base import assert_user_is_admin
 from synapse.storage.state import StateFilter
 from synapse.streams import EventSource
@@ -109,6 +110,7 @@ class RoomCreationHandler:
         self.store = hs.get_datastores().main
         self._storage_controllers = hs.get_storage_controllers()
         self.auth = hs.get_auth()
+        self.auth_blocking = hs.get_auth_blocking()
         self.clock = hs.get_clock()
         self.hs = hs
         self.spam_checker = hs.get_spam_checker()
@@ -226,10 +228,9 @@ class RoomCreationHandler:
                 },
             },
         )
-        old_room_version = await self.store.get_room_version(old_room_id)
-        validate_event_for_room_version(old_room_version, tombstone_event)
+        validate_event_for_room_version(tombstone_event)
         await self._event_auth_handler.check_auth_rules_from_context(
-            old_room_version, tombstone_event, tombstone_context
+            tombstone_event, tombstone_context
         )
 
         # Upgrade the room
@@ -437,10 +438,9 @@ class RoomCreationHandler:
         """
         user_id = requester.user.to_string()
 
-        if not await self.spam_checker.user_may_create_room(user_id):
-            raise SynapseError(
-                403, "You are not permitted to create rooms", Codes.FORBIDDEN
-            )
+        spam_check = await self.spam_checker.user_may_create_room(user_id)
+        if spam_check != NOT_SPAM:
+            raise SynapseError(403, "You are not permitted to create rooms", spam_check)
 
         creation_content: JsonDict = {
             "room_version": new_room_version.identifier,
@@ -707,7 +707,7 @@ class RoomCreationHandler:
         """
         user_id = requester.user.to_string()
 
-        await self.auth.check_auth_blocking(requester=requester)
+        await self.auth_blocking.check_auth_blocking(requester=requester)
 
         if (
             self._server_notices_mxid is not None
@@ -727,12 +727,12 @@ class RoomCreationHandler:
         invite_3pid_list = config.get("invite_3pid", [])
         invite_list = config.get("invite", [])
 
-        if not is_requester_admin and not (
-            await self.spam_checker.user_may_create_room(user_id)
-        ):
-            raise SynapseError(
-                403, "You are not permitted to create rooms", Codes.FORBIDDEN
-            )
+        if not is_requester_admin:
+            spam_check = await self.spam_checker.user_may_create_room(user_id)
+            if spam_check != NOT_SPAM:
+                raise SynapseError(
+                    403, "You are not permitted to create rooms", spam_check
+                )
 
         if ratelimit:
             await self.request_ratelimiter.ratelimit(requester)
@@ -1333,6 +1333,7 @@ class TimestampLookupHandler:
         self.store = hs.get_datastores().main
         self.state_handler = hs.get_state_handler()
         self.federation_client = hs.get_federation_client()
+        self._storage_controllers = hs.get_storage_controllers()
 
     async def get_event_for_timestamp(
         self,
@@ -1406,7 +1407,9 @@ class TimestampLookupHandler:
             )
 
             # Find other homeservers from the given state in the room
-            curr_state = await self.state_handler.get_current_state(room_id)
+            curr_state = await self._storage_controllers.state.get_current_state(
+                room_id
+            )
             curr_domains = get_domains_from_state(curr_state)
             likely_domains = [
                 domain for domain, depth in curr_domains if domain != self.server_name

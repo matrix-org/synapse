@@ -21,7 +21,7 @@ from typing import Any, Callable, Dict, Optional
 import attr
 
 from synapse.types import JsonDict
-from synapse.util.check_dependencies import DependencyException, check_requirements
+from synapse.util.check_dependencies import check_requirements
 
 from ._base import Config, ConfigError
 
@@ -113,97 +113,6 @@ class CacheConfig(Config):
         with _CACHES_LOCK:
             _CACHES.clear()
 
-    def generate_config_section(self, **kwargs: Any) -> str:
-        return """\
-        ## Caching ##
-
-        # Caching can be configured through the following options.
-        #
-        # A cache 'factor' is a multiplier that can be applied to each of
-        # Synapse's caches in order to increase or decrease the maximum
-        # number of entries that can be stored.
-        #
-        # The configuration for cache factors (caches.global_factor and
-        # caches.per_cache_factors) can be reloaded while the application is running,
-        # by sending a SIGHUP signal to the Synapse process. Changes to other parts of
-        # the caching config will NOT be applied after a SIGHUP is received; a restart
-        # is necessary.
-
-        # The number of events to cache in memory. Not affected by
-        # caches.global_factor.
-        #
-        #event_cache_size: 10K
-
-        caches:
-          # Controls the global cache factor, which is the default cache factor
-          # for all caches if a specific factor for that cache is not otherwise
-          # set.
-          #
-          # This can also be set by the "SYNAPSE_CACHE_FACTOR" environment
-          # variable. Setting by environment variable takes priority over
-          # setting through the config file.
-          #
-          # Defaults to 0.5, which will half the size of all caches.
-          #
-          #global_factor: 1.0
-
-          # A dictionary of cache name to cache factor for that individual
-          # cache. Overrides the global cache factor for a given cache.
-          #
-          # These can also be set through environment variables comprised
-          # of "SYNAPSE_CACHE_FACTOR_" + the name of the cache in capital
-          # letters and underscores. Setting by environment variable
-          # takes priority over setting through the config file.
-          # Ex. SYNAPSE_CACHE_FACTOR_GET_USERS_WHO_SHARE_ROOM_WITH_USER=2.0
-          #
-          # Some caches have '*' and other characters that are not
-          # alphanumeric or underscores. These caches can be named with or
-          # without the special characters stripped. For example, to specify
-          # the cache factor for `*stateGroupCache*` via an environment
-          # variable would be `SYNAPSE_CACHE_FACTOR_STATEGROUPCACHE=2.0`.
-          #
-          per_cache_factors:
-            #get_users_who_share_room_with_user: 2.0
-
-          # Controls whether cache entries are evicted after a specified time
-          # period. Defaults to true. Uncomment to disable this feature.
-          #
-          #expire_caches: false
-
-          # If expire_caches is enabled, this flag controls how long an entry can
-          # be in a cache without having been accessed before being evicted.
-          # Defaults to 30m. Uncomment to set a different time to live for cache entries.
-          #
-          #cache_entry_ttl: 30m
-
-          # This flag enables cache autotuning, and is further specified by the sub-options `max_cache_memory_usage`,
-          # `target_cache_memory_usage`, `min_cache_ttl`. These flags work in conjunction with each other to maintain
-          # a balance between cache memory usage and cache entry availability. You must be using jemalloc to utilize
-          # this option, and all three of the options must be specified for this feature to work.
-          #cache_autotuning:
-            # This flag sets a ceiling on much memory the cache can use before caches begin to be continuously evicted.
-            # They will continue to be evicted until the memory usage drops below the `target_memory_usage`, set in
-            # the flag below, or until the `min_cache_ttl` is hit.
-            #max_cache_memory_usage: 1024M
-
-            # This flag sets a rough target for the desired memory usage of the caches.
-            #target_cache_memory_usage: 758M
-
-            # 'min_cache_ttl` sets a limit under which newer cache entries are not evicted and is only applied when
-            # caches are actively being evicted/`max_cache_memory_usage` has been exceeded. This is to protect hot caches
-            # from being emptied while Synapse is evicting due to memory.
-            #min_cache_ttl: 5m
-
-          # Controls how long the results of a /sync request are cached for after
-          # a successful response is returned. A higher duration can help clients with
-          # intermittent connections, at the cost of higher memory usage.
-          #
-          # By default, this is zero, which means that sync responses are not cached
-          # at all.
-          #
-          #sync_response_cache_duration: 2m
-        """
-
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         """Populate this config object with values from `config`.
 
@@ -250,12 +159,7 @@ class CacheConfig(Config):
 
         self.track_memory_usage = cache_config.get("track_memory_usage", False)
         if self.track_memory_usage:
-            try:
-                check_requirements("cache_memory")
-            except DependencyException as e:
-                raise ConfigError(
-                    e.message  # noqa: B306, DependencyException.message is a property
-                )
+            check_requirements("cache_memory")
 
         expire_caches = cache_config.get("expire_caches", True)
         cache_entry_ttl = cache_config.get("cache_entry_ttl", "30m")
@@ -297,7 +201,7 @@ class CacheConfig(Config):
             self.cache_autotuning["min_cache_ttl"] = self.parse_duration(min_cache_ttl)
 
         self.sync_response_cache_duration = self.parse_duration(
-            cache_config.get("sync_response_cache_duration", 0)
+            cache_config.get("sync_response_cache_duration", "2m")
         )
 
     def resize_all_caches(self) -> None:

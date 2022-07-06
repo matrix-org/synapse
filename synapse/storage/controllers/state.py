@@ -23,6 +23,7 @@ from typing import (
     List,
     Mapping,
     Optional,
+    Set,
     Tuple,
 )
 
@@ -451,7 +452,44 @@ class StateStorageController:
                  up to date.
         """
         # FIXME(faster_joins): what do we do here?
+        #   https://github.com/matrix-org/synapse/issues/12814
+        #   https://github.com/matrix-org/synapse/issues/12815
+        #   https://github.com/matrix-org/synapse/issues/13008
 
         return await self.stores.main.get_partial_current_state_deltas(
             prev_stream_id, max_stream_id
         )
+
+    async def get_current_state(
+        self, room_id: str, state_filter: Optional[StateFilter] = None
+    ) -> StateMap[EventBase]:
+        """Same as `get_current_state_ids` but also fetches the events"""
+        state_map_ids = await self.get_current_state_ids(room_id, state_filter)
+
+        event_map = await self.stores.main.get_events(list(state_map_ids.values()))
+
+        state_map = {}
+        for key, event_id in state_map_ids.items():
+            event = event_map.get(event_id)
+            if event:
+                state_map[key] = event
+
+        return state_map
+
+    async def get_current_state_event(
+        self, room_id: str, event_type: str, state_key: str
+    ) -> Optional[EventBase]:
+        """Get the current state event for the given type/state_key."""
+
+        key = (event_type, state_key)
+        state_map = await self.get_current_state(
+            room_id, StateFilter.from_types((key,))
+        )
+        return state_map.get(key)
+
+    async def get_current_hosts_in_room(self, room_id: str) -> Set[str]:
+        """Get current hosts in room based on current state."""
+
+        await self._partial_state_room_tracker.await_full_state(room_id)
+
+        return await self.stores.main.get_current_hosts_in_room(room_id)

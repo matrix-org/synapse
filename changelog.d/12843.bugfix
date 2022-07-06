@@ -1,1 +1,0 @@
-Fix bug where servers using a Postgres database would fail to backfill from an insertion event when MSC2716 is enabled (`experimental_features.msc2716_enabled`).

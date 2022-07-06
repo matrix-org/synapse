@@ -16,8 +16,6 @@ import logging
 import sys
 from typing import Dict, List, Optional, Tuple
 
-from matrix_common.versionstring import get_distribution_version_string
-
 from twisted.internet import address
 from twisted.web.resource import Resource
 
@@ -121,6 +119,7 @@ from synapse.storage.databases.main.transactions import TransactionWorkerStore
 from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.databases.main.user_directory import UserDirectoryStore
 from synapse.types import JsonDict
+from synapse.util import SYNAPSE_VERSION
 from synapse.util.httpresourcetree import create_resource_tree
 
 logger = logging.getLogger("synapse.app.generic_worker")
@@ -447,7 +446,7 @@ def start(config_options: List[str]) -> None:
     hs = GenericWorkerServer(
         config.server.server_name,
         config=config,
-        version_string="Synapse/" + get_distribution_version_string("matrix-synapse"),
+        version_string=f"Synapse/{SYNAPSE_VERSION}",
     )
 
     setup_logging(hs, config, use_worker_options=True)

@@ -290,7 +290,13 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
                 "key": "type",
                 "pattern": "m.room.server_acl",
                 "_cache_key": "_room_server_acl",
-            }
+            },
+            {
+                "kind": "event_match",
+                "key": "state_key",
+                "pattern": "",
+                "_cache_key": "_room_server_acl_state_key",
+            },
         ],
         "actions": [],
     },

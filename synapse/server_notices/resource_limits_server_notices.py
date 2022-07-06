@@ -36,7 +36,8 @@ class ResourceLimitsServerNotices:
     def __init__(self, hs: "HomeServer"):
         self._server_notices_manager = hs.get_server_notices_manager()
         self._store = hs.get_datastores().main
-        self._auth = hs.get_auth()
+        self._storage_controllers = hs.get_storage_controllers()
+        self._auth_blocking = hs.get_auth_blocking()
         self._config = hs.config
         self._resouce_limited = False
         self._account_data_handler = hs.get_account_data_handler()
@@ -90,7 +91,7 @@ class ResourceLimitsServerNotices:
             # Normally should always pass in user_id to check_auth_blocking
             # if you have it, but in this case are checking what would happen
             # to other users if they were to arrive.
-            await self._auth.check_auth_blocking()
+            await self._auth_blocking.check_auth_blocking()
         except ResourceLimitError as e:
             limit_msg = e.msg
             limit_type = e.limit_type
@@ -178,8 +179,10 @@ class ResourceLimitsServerNotices:
         currently_blocked = False
         pinned_state_event = None
         try:
-            pinned_state_event = await self._state.get_current_state(
-                room_id, event_type=EventTypes.Pinned
+            pinned_state_event = (
+                await self._storage_controllers.state.get_current_state_event(
+                    room_id, event_type=EventTypes.Pinned, state_key=""
+                )
             )
         except AuthError:
             # The user has yet to join the server notices room
