@@ -42,6 +42,8 @@ THUMBNAIL_SIZE_YAML = """\
         #    method: %(method)s
 """
 
+# A map from the given media type to the type of thumbnail we should generate
+# for it.
 THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP = {
     "image/jpeg": "jpeg",
     "image/jpg": "jpeg",
