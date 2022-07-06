@@ -266,6 +266,8 @@ class SyncHandler:
 
         self.rooms_to_exclude = hs.config.server.rooms_to_exclude_from_sync
 
+        self._msc3773_enabled = hs.config.experimental.msc3773_enabled
+
     async def wait_for_sync_for_user(
         self,
         requester: Requester,
@@ -2127,20 +2129,32 @@ class SyncHandler:
                     )
 
                     # Notifications for the main timeline.
-                    unread_notifications["notification_count"] = notifs.notify_count
-                    unread_notifications["highlight_count"] = notifs.highlight_count
+                    notify_count = notifs.notify_count
+                    highlight_count = notifs.highlight_count
+                    unread_count = notifs.unread_count
 
-                    room_sync.unread_count = notifs.unread_count
-
-                    # And add info for each thread.
-                    room_sync.unread_thread_notifications = {
-                        thread_id: {
-                            "notification_count": thread_notifs.notify_count,
-                            "highlight_count": thread_notifs.highlight_count,
+                    # XXX Check the sync configuration.
+                    if self._msc3773_enabled:
+                        # And add info for each thread.
+                        room_sync.unread_thread_notifications = {
+                            thread_id: {
+                                "notification_count": tnotifs.notify_count,
+                                "highlight_count": tnotifs.highlight_count,
+                            }
+                            for thread_id, tnotifs in thread_notifs.items()
+                            if thread_id is not None
                         }
-                        for thread_id, thread_notifs in thread_notifs.items()
-                        if thread_id is not None
-                    }
+
+                    else:
+                        # Combine the unread counts for all threads and main timeline.
+                        for tnotifs in thread_notifs.values():
+                            notify_count += tnotifs.notify_count
+                            highlight_count += tnotifs.highlight_count
+                            unread_count += tnotifs.unread_count
+
+                    unread_notifications["notification_count"] = notify_count
+                    unread_notifications["highlight_count"] = highlight_count
+                    room_sync.unread_count = unread_count
 
                     sync_result_builder.joined.append(room_sync)
 
