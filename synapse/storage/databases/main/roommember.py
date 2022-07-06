@@ -444,15 +444,15 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         membership_list: List[str],
     ) -> List[RoomsForUser]:
         """Get all the rooms for this *local* user where the membership for this user
-            matches one in the membership list.
+        matches one in the membership list.
 
-            Args:
-                user_id: The user ID.
-                membership_list: A list of synapse.api.constants.Membership
-                        values which the user must be in.
+        Args:
+            user_id: The user ID.
+            membership_list: A list of synapse.api.constants.Membership
+                    values which the user must be in.
 
-            Returns:
-                The RoomsForUser that the user matches the membership types.
+        Returns:
+            The RoomsForUser that the user matches the membership types.
         """
         # Paranoia check.
         if not self.hs.is_mine_id(user_id):
