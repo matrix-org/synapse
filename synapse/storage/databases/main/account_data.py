@@ -568,10 +568,10 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 )
             )
             # If the data is invalid, no one is ignored.
-            ignored_users_content = content.get("ignored_rooms", [])
+            ignored_rooms_content = content.get("ignored_rooms", [])
             if isinstance(ignored_rooms_content, list):
                 room_ids = []
-                for room in ignored_users_content:
+                for room in ignored_rooms_content:
                     room_id = room.get("room_id")
                     if room_id:
                         room_ids.append(room_id)
