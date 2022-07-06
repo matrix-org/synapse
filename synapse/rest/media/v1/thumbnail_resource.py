@@ -412,7 +412,7 @@ class ThumbnailResource(DirectServeJsonResource):
                 request,
                 400,
                 cs_error(
-                    "Cannot find any thumbnails for the requested media (%r). This might mean the media is not a supported_media_format=(%s) or your media is corrupted and cannot be thumbnailed. We also cannot generate a new thumbnail because `dynamic_thumbnails` is disabled (see `homeserver.yaml`)."
+                    "Cannot find any thumbnails for the requested media (%r). This might mean the media is not a supported_media_format=(%s) or your media is corrupted and cannot be thumbnailed. Additionally, dynamic thumbnails are disabled on this server."
                     % (
                         request.postpath,
                         ", ".join(THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP.keys()),
