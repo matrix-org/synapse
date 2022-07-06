@@ -368,7 +368,10 @@ class FederationClient(FederationBase):
 
         ev = self._get_pdu_cache.get(event_id)
         logger.info(
-            "get_pdu from cache ev=%s outlier=%s", ev, ev.internal_metadata.outlier
+            "get_pdu from cache event_id=%s ev=%s outlier=%s",
+            event_id,
+            ev,
+            ev and ev.internal_metadata.outlier,
         )
         if ev:
             return ev
