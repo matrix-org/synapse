@@ -124,7 +124,9 @@ class _TestImage:
         expected_scaled: The expected bytes from scaled thumbnailing, or None if
             test should just check for a valid image returned.
         expected_found: True if the file should exist on the server, or False if
-            a 404 is expected.
+            a 404/400 is expected.
+        unable_to_thumbnail: True if we expect the thumbnailing to fail (400), or
+            False if the thumbnailing should succeed or a normal 404 is expected.
     """
 
     data: bytes
@@ -489,6 +491,18 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         expected_found: bool,
         unable_to_thumbnail: bool = False,
     ) -> None:
+        """Test the given thumbnailing method works as expected.
+
+        Args:
+            method: The thumbnailing method to use (crop, scale).
+            expected_body: The expected bytes from cropped thumbnailing, or None if
+                test should just check for a valid image.
+            expected_found: True if the file should exist on the server, or False if
+                a 404/400 is expected.
+            unable_to_thumbnail: True if we expect the thumbnailing to fail (400), or
+                False if the thumbnailing should succeed or a normal 404 is expected.
+        """
+
         params = "?width=32&height=32&method=" + method
         channel = make_request(
             self.reactor,
@@ -525,7 +539,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
                 channel.json_body,
                 {
                     "errcode": "M_UNKNOWN",
-                    "error": "Cannot find any thumbnails for the requested media ([b'example.com', b'12345']). This might mean the media is not a supported_media_format=(image/jpeg, image/jpg, image/webp, image/gif, image/png) or your media is corrupted and cannot be thumbnailed. We also cannot try to generate a new thumbnail because `dynamic_thumbnails` is disabled (see `homeserver.yaml`).",
+                    "error": "Cannot find any thumbnails for the requested media ([b'example.com', b'12345']). This might mean the media is not a supported_media_format=(image/jpeg, image/jpg, image/webp, image/gif, image/png) or your media is corrupted and cannot be thumbnailed. We also cannot generate a new thumbnail because `dynamic_thumbnails` is disabled (see `homeserver.yaml`).",
                 },
             )
         else:
