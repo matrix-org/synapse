@@ -117,6 +117,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         """Get the current max stream ID for receipts stream"""
         return self._receipts_id_gen.get_current_token()
 
+    # XXX MOVE TO TESTS
     async def get_last_receipt_event_id_for_user(
         self, user_id: str, room_id: str, receipt_types: Collection[str]
     ) -> Optional[str]:
