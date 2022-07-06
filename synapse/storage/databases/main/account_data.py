@@ -419,10 +419,10 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
         """
         Get rooms which the given user has explicitly ignored.
         See MSC3840
-        
+
         Params:
             user_id: The user ID which is making the request.
-            
+
         Return:
             The room IDs which are ignored by the given user."""
         return frozenset(
@@ -433,6 +433,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 desc="ignored_rooms",
             )
         )
+
     def process_replication_rows(
         self,
         stream_name: str,
@@ -577,7 +578,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 currently_ignored_rooms = set(room_ids)
             else:
                 currently_ignored_rooms = set()
-            
+
             # If the data has not changed, nothing to do.
             if previously_ignored_rooms == currently_ignored_rooms:
                 return
@@ -597,7 +598,8 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 table="ignored_rooms",
                 keys=("ignorer_user_id", "ignored_room_id"),
                 values=[
-                    (user_id, r) for r in currently_ignored_rooms - previously_ignored_rooms
+                    (user_id, r)
+                    for r in currently_ignored_rooms - previously_ignored_rooms
                 ],
             )
             # Invalidate cache for the user's ignored rooms.
