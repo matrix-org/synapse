@@ -81,6 +81,7 @@
 # Development
   - [Contributing Guide](development/contributing_guide.md)
   - [Code Style](code_style.md)
+  - [Reviewing Code](development/reviews.md)
   - [Release Cycle](development/releases.md)
   - [Git Usage](development/git.md)
   - [Testing]()
