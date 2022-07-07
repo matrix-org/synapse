@@ -757,6 +757,13 @@ of the SQLite database file. This makes it safe to repeat step 1 if
 there was a delay between taking the previous snapshot and being ready
 to do step 2.</p>
 <p>It is safe to at any time kill the port script and restart it.</p>
+<p>However, under no circumstances should the SQLite database be <code>VACUUM</code>ed between
+multiple runs of the script. Doing so can lead to an inconsistent copy of your database
+into Postgres.
+To avoid accidental error, the script will check that SQLite's <code>auto_vacuum</code> mechanism
+is disabled, but the script is not able to protect against a manual <code>VACUUM</code> operation
+performed either by the administrator or by any automated task that the administrator
+may have configured.</p>
 <p>Note that the database may take up significantly more (25% - 100% more)
 space on disk after porting to Postgres.</p>
 <h3 id="using-the-port-script"><a class="header" href="#using-the-port-script">Using the port script</a></h3>
