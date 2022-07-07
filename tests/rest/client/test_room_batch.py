@@ -300,3 +300,41 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
         assert (
             "m.room.create" in state_event_types
         ), "Missing room full state in sync response"
+
+    @unittest.override_config({"experimental_features": {"msc2716_enabled": True}})
+    def test_room_batch_id_persistence(self) -> None:
+        """Make sure that the next_batch_id sent back to the user is persisted
+        in the database.
+        """
+
+        time_before_room = int(self.clock.time_msec())
+        room_id, event_id_a, _, _ = self._create_test_room()
+
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/unstable/org.matrix.msc2716/rooms/%s/batch_send?prev_event_id=%s"
+            % (room_id, event_id_a),
+            content={
+                "events": _create_message_events_for_batch_send_request(
+                    self.virtual_user_id, time_before_room, 3
+                ),
+                "state_events_at_start": _create_join_state_events_for_batch_send_request(
+                    [self.virtual_user_id], time_before_room
+                ),
+            },
+            access_token=self.appservice.token,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+        corresponding_insertion_event_id = self.get_success(
+            self._storage_controllers.main.get_insertion_event_id_by_batch_id(
+                room_id, channel.json_body["next_batch_id"]
+            )
+        )
+
+        # The insertion event ID from the database should be the same as the
+        # insertion event ID from the batch response.
+        self.assertEqual(
+            corresponding_insertion_event_id,
+            channel.json_body["insertion_event_id"],
+        )
