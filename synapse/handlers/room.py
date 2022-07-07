@@ -1011,6 +1011,9 @@ class RoomCreationHandler:
 
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
 
+        sent_event_ids = []
+        state_event_ids = []
+
         def create(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
             e = {"type": etype, "content": content}
 
@@ -1025,14 +1028,21 @@ class RoomCreationHandler:
             # Allow these events to be sent even if the user is shadow-banned to
             # allow the room creation to complete.
             (
-                _,
+                event,
                 last_stream_id,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 creator,
                 event,
                 ratelimit=False,
                 ignore_shadow_ban=True,
+                prev_event_ids=[sent_event_ids[-1]] if sent_event_ids else None,
+                state_event_ids=state_event_ids.copy() if state_event_ids else None,
             )
+
+            sent_event_ids.append(event.event_id)
+            if event.is_state():
+                state_event_ids.append(event.event_id)
+
             return last_stream_id
 
         try:
@@ -1046,7 +1056,7 @@ class RoomCreationHandler:
         await send(etype=EventTypes.Create, content=creation_content)
 
         logger.debug("Sending %s in new room", EventTypes.Member)
-        await self.room_member_handler.update_membership(
+        member_event_id, _ = await self.room_member_handler.update_membership(
             creator,
             creator.user,
             room_id,
@@ -1054,7 +1064,11 @@ class RoomCreationHandler:
             ratelimit=ratelimit,
             content=creator_join_profile,
             new_room=True,
+            prev_event_ids=[sent_event_ids[-1]],
+            state_event_ids=state_event_ids.copy(),
         )
+        state_event_ids.append(member_event_id)
+        sent_event_ids.append(member_event_id)
 
         # We treat the power levels override specially as this needs to be one
         # of the first events that get sent into a room.
