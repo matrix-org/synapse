@@ -1011,8 +1011,8 @@ class RoomCreationHandler:
 
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
 
-        sent_event_ids: List[str] = []
         state_event_ids: List[str] = []
+        last_sent_event_id: Optional[str] = None
 
         def create(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
             e = {"type": etype, "content": content}
@@ -1023,6 +1023,8 @@ class RoomCreationHandler:
             return e
 
         async def send(etype: str, content: JsonDict, **kwargs: Any) -> int:
+            nonlocal last_sent_event_id
+
             event = create(etype, content, **kwargs)
             logger.debug("Sending %s in new room", etype)
             # Allow these events to be sent even if the user is shadow-banned to
@@ -1035,11 +1037,11 @@ class RoomCreationHandler:
                 event,
                 ratelimit=False,
                 ignore_shadow_ban=True,
-                prev_event_ids=[sent_event_ids[-1]] if sent_event_ids else [],
+                prev_event_ids=[last_sent_event_id] if last_sent_event_id else [],
                 state_event_ids=state_event_ids.copy(),
             )
 
-            sent_event_ids.append(sent_event.event_id)
+            last_sent_event_id = sent_event.event_id
             if sent_event.is_state():
                 state_event_ids.append(sent_event.event_id)
 
@@ -1064,11 +1066,11 @@ class RoomCreationHandler:
             ratelimit=ratelimit,
             content=creator_join_profile,
             new_room=True,
-            prev_event_ids=[sent_event_ids[-1]],
+            prev_event_ids=[last_sent_event_id],
             state_event_ids=state_event_ids.copy(),
         )
         state_event_ids.append(member_event_id)
-        sent_event_ids.append(member_event_id)
+        last_sent_event_id = member_event_id
 
         # We treat the power levels override specially as this needs to be one
         # of the first events that get sent into a room.
