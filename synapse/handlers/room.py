@@ -1462,9 +1462,9 @@ class TimestampLookupHandler:
                         ex.args,
                     )
 
-        # We only expect `local_event` to be `None` when `local_event_id` is
-        # `None` but mypy isn't as smart and assuming as us so we have to add
-        # both conditions to make it happy.
+        # To appease mypy, we have to add both of these conditions to check for
+        # `None`. We only expect `local_event` to be `None` when
+        # `local_event_id` is `None` but mypy isn't as smart and assuming as us.
         if not local_event_id or not local_event:
             raise SynapseError(
                 404,
