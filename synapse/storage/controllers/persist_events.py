@@ -367,6 +367,10 @@ class EventsPersistenceStorageController:
             if they were deduplicated due to an event already existing that
             matched the transaction ID; the existing event is returned in such
             a case.
+
+        Raises:
+            PartialStateConflictError: if attempting to persist a partial state event in
+                a room that has been un-partial stated.
         """
         partitioned: Dict[str, List[Tuple[EventBase, EventContext]]] = {}
         for event, ctx in events_and_contexts:
@@ -416,6 +420,10 @@ class EventsPersistenceStorageController:
             latest persisted event. The returned event may not match the given
             event if it was deduplicated due to an existing event matching the
             transaction ID.
+
+        Raises:
+            PartialStateConflictError: if attempting to persist a partial state event in
+                a room that has been un-partial stated.
         """
         # add_to_queue returns a map from event ID to existing event ID if the
         # event was deduplicated. (The dict may also include other entries if
@@ -509,6 +517,10 @@ class EventsPersistenceStorageController:
         Returns:
             A dictionary of event ID to event ID we didn't persist as we already
             had another event persisted with the same TXN ID.
+
+        Raises:
+            PartialStateConflictError: if attempting to persist a partial state event in
+                a room that has been un-partial stated.
         """
         events_and_contexts = task.events_and_contexts
         backfilled = task.backfilled

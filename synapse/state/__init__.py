@@ -256,8 +256,12 @@ class StateHandler:
                 partial_state = True
 
             logger.debug("calling resolve_state_groups from compute_event_context")
+            # we've already taken into account partial state, so no need to wait for
+            # complete state here.
             entry = await self.resolve_state_groups_for_events(
-                event.room_id, event.prev_event_ids()
+                event.room_id,
+                event.prev_event_ids(),
+                await_full_state=False,
             )
 
             state_ids_before_event = entry.state
@@ -342,7 +346,7 @@ class StateHandler:
 
     @measure_func()
     async def resolve_state_groups_for_events(
-        self, room_id: str, event_ids: Collection[str]
+        self, room_id: str, event_ids: Collection[str], await_full_state: bool = True
     ) -> _StateCacheEntry:
         """Given a list of event_ids this method fetches the state at each
         event, resolves conflicts between them and returns them.
@@ -350,6 +354,8 @@ class StateHandler:
         Args:
             room_id
             event_ids
+            await_full_state: if true, will block if we do not yet have complete
+               state at these events.
 
         Returns:
             The resolved state
@@ -357,7 +363,7 @@ class StateHandler:
         logger.debug("resolve_state_groups event_ids %s", event_ids)
 
         state_groups = await self._state_storage_controller.get_state_group_for_events(
-            event_ids
+            event_ids, await_full_state=await_full_state
         )
 
         state_group_ids = state_groups.values()

@@ -1,0 +1,1 @@
+Make use of the more robust `get_current_state` in `_get_state_map_for_room` to avoid breakages.

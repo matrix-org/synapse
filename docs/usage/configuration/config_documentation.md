@@ -591,7 +591,7 @@ Example configuration:
 dummy_events_threshold: 5
 ```
 ---
-Config option `delete_stale_devices_after`
+### `delete_stale_devices_after`
 
 An optional duration. If set, Synapse will run a daily background task to log out and
 delete any device that hasn't been accessed for more than the specified amount of time.
@@ -1843,7 +1843,7 @@ Example configuration:
 turn_shared_secret: "YOUR_SHARED_SECRET"
 ```
 ----
-Config options: `turn_username` and `turn_password`
+### `turn_username` and `turn_password`
 
 The Username and password if the TURN server needs them and does not use a token.
 
@@ -3373,7 +3373,7 @@ alias_creation_rules:
     action: deny
 ```
 ---
-Config options: `room_list_publication_rules`
+### `room_list_publication_rules`
 
 The `room_list_publication_rules` option controls who can publish and
 which rooms can be published in the public room list.

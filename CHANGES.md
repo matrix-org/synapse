@@ -1,3 +1,31 @@
+Synapse 1.62.0 (2022-07-05)
+===========================
+
+No significant changes since 1.62.0rc3.
+
+Authors of spam-checker plugins should consult the [upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.62/docs/upgrade.md#upgrading-to-v1620) to learn about the enriched signatures for spam checker callbacks, which are supported with this release of Synapse.
+
+
+Synapse 1.62.0rc3 (2022-07-04)
+==============================
+
+Bugfixes
+--------
+
+- Update the version of the [ldap3 plugin](https://github.com/matrix-org/matrix-synapse-ldap3/) included in the `matrixdotorg/synapse` DockerHub images and the Debian packages hosted on `packages.matrix.org` to 0.2.1. This fixes [a bug](https://github.com/matrix-org/matrix-synapse-ldap3/pull/163) with usernames containing uppercase characters. ([\#13156](https://github.com/matrix-org/synapse/issues/13156))
+- Fix a bug introduced in Synapse 1.62.0rc1 affecting unread counts for users on small servers. ([\#13168](https://github.com/matrix-org/synapse/issues/13168))
+
+
+Synapse 1.62.0rc2 (2022-07-01)
+==============================
+
+Bugfixes
+--------
+
+- Fix unread counts for users on large servers. Introduced in v1.62.0rc1. ([\#13140](https://github.com/matrix-org/synapse/issues/13140))
+- Fix DB performance when deleting old push notifications. Introduced in v1.62.0rc1. ([\#13141](https://github.com/matrix-org/synapse/issues/13141))
+
+
 Synapse 1.62.0rc1 (2022-06-28)
 ==============================
 

@@ -136,27 +136,24 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             last_read_stream_ordering[0] = stream
 
             self.get_success(
-                self.store.db_pool.runInteraction(
-                    "",
-                    self.store._insert_linearized_receipt_txn,
+                self.store.insert_receipt(
                     room_id,
                     "m.read",
-                    user_id,
-                    f"$test{stream}:example.com",
-                    {},
-                    stream,
+                    user_id=user_id,
+                    event_ids=[f"$test{stream}:example.com"],
+                    data={},
                 )
             )
 
         _assert_counts(0, 0)
         _inject_actions(1, PlAIN_NOTIF)
         _assert_counts(1, 0)
-        _rotate(2)
+        _rotate(1)
         _assert_counts(1, 0)
 
         _inject_actions(3, PlAIN_NOTIF)
         _assert_counts(2, 0)
-        _rotate(4)
+        _rotate(3)
         _assert_counts(2, 0)
 
         _inject_actions(5, PlAIN_NOTIF)
@@ -167,7 +164,8 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _assert_counts(0, 0)
 
         _inject_actions(6, PlAIN_NOTIF)
-        _rotate(7)
+        _rotate(6)
+        _assert_counts(1, 0)
 
         self.get_success(
             self.store.db_pool.simple_delete(
@@ -182,13 +180,13 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
 
         _inject_actions(8, HIGHLIGHT)
         _assert_counts(1, 1)
-        _rotate(9)
+        _rotate(8)
         _assert_counts(1, 1)
 
         # Check that adding another notification and rotating after highlight
         # works.
         _inject_actions(10, PlAIN_NOTIF)
-        _rotate(11)
+        _rotate(10)
         _assert_counts(2, 1)
 
         # Check that sending read receipts at different points results in the

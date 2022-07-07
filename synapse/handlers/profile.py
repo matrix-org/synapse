@@ -67,19 +67,14 @@ class ProfileHandler:
         target_user = UserID.from_string(user_id)
 
         if self.hs.is_mine(target_user):
-            try:
-                displayname = await self.store.get_profile_displayname(
-                    target_user.localpart
-                )
-                avatar_url = await self.store.get_profile_avatar_url(
-                    target_user.localpart
-                )
-            except StoreError as e:
-                if e.code == 404:
-                    raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
-                raise
+            profileinfo = await self.store.get_profileinfo(target_user.localpart)
+            if profileinfo.display_name is None:
+                raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
 
-            return {"displayname": displayname, "avatar_url": avatar_url}
+            return {
+                "displayname": profileinfo.display_name,
+                "avatar_url": profileinfo.avatar_url,
+            }
         else:
             try:
                 result = await self.federation.make_query(

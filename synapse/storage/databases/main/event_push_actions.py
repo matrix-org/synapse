@@ -864,18 +864,20 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
         limit = 100
 
-        min_stream_id = self.db_pool.simple_select_one_onecol_txn(
+        min_receipts_stream_id = self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="event_push_summary_last_receipt_stream_id",
             keyvalues={},
             retcol="stream_id",
         )
 
+        max_receipts_stream_id = self._receipts_id_gen.get_current_token()
+
         sql = """
             SELECT r.stream_id, r.room_id, r.user_id, e.stream_ordering
             FROM receipts_linearized AS r
             INNER JOIN events AS e USING (event_id)
-            WHERE r.stream_id > ? AND user_id LIKE ?
+            WHERE ? < r.stream_id AND r.stream_id <= ? AND user_id LIKE ?
             ORDER BY r.stream_id ASC
             LIMIT ?
         """
@@ -887,12 +889,20 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         txn.execute(
             sql,
             (
-                min_stream_id,
+                min_receipts_stream_id,
+                max_receipts_stream_id,
                 user_filter,
                 limit,
             ),
         )
         rows = txn.fetchall()
+
+        old_rotate_stream_ordering = self.db_pool.simple_select_one_onecol_txn(
+            txn,
+            table="event_push_summary_stream_ordering",
+            keyvalues={},
+            retcol="stream_ordering",
+        )
 
         # For each new read receipt we delete push actions from before it and
         # recalculate the summary.
@@ -910,13 +920,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                     AND highlight = 0
                 """,
                 (room_id, user_id, stream_ordering),
-            )
-
-            old_rotate_stream_ordering = self.db_pool.simple_select_one_onecol_txn(
-                txn,
-                table="event_push_summary_stream_ordering",
-                keyvalues={},
-                retcol="stream_ordering",
             )
 
             notif_count, unread_count = self._get_notif_unread_count_for_user_room(
@@ -937,18 +940,19 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
         # We always update `event_push_summary_last_receipt_stream_id` to
         # ensure that we don't rescan the same receipts for remote users.
-        #
-        # This requires repeatable read to be safe, as we need the
-        # `MAX(stream_id)` to not include any new rows that have been committed
-        # since the start of the transaction (since those rows won't have been
-        # returned by the query above). Alternatively we could query the max
-        # stream ID at the start of the transaction and bound everything by
-        # that.
-        txn.execute(
-            """
-            UPDATE event_push_summary_last_receipt_stream_id
-            SET stream_id = (SELECT COALESCE(MAX(stream_id), 0) FROM receipts_linearized)
-            """
+
+        upper_limit = max_receipts_stream_id
+        if len(rows) >= limit:
+            # If we pulled out a limited number of rows we only update the
+            # position to the last receipt we processed, so we continue
+            # processing the rest next iteration.
+            upper_limit = rows[-1][0]
+
+        self.db_pool.simple_update_txn(
+            txn,
+            table="event_push_summary_last_receipt_stream_id",
+            keyvalues={},
+            updatevalues={"stream_id": upper_limit},
         )
 
         return len(rows) < limit
@@ -978,7 +982,12 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         stream_row = txn.fetchone()
         if stream_row:
             (offset_stream_ordering,) = stream_row
-            rotate_to_stream_ordering = offset_stream_ordering
+
+            # We need to bound by the current token to ensure that we handle
+            # out-of-order writes correctly.
+            rotate_to_stream_ordering = min(
+                offset_stream_ordering, self._stream_id_gen.get_current_token()
+            )
             caught_up = False
         else:
             rotate_to_stream_ordering = self._stream_id_gen.get_current_token()
@@ -1004,13 +1013,12 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         sql = """
             SELECT user_id, room_id,
                 coalesce(old.%s, 0) + upd.cnt,
-                upd.stream_ordering,
-                old.user_id
+                upd.stream_ordering
             FROM (
                 SELECT user_id, room_id, count(*) as cnt,
                     max(stream_ordering) as stream_ordering
                 FROM event_push_actions
-                WHERE ? <= stream_ordering AND stream_ordering < ?
+                WHERE ? < stream_ordering AND stream_ordering <= ?
                     AND %s = 1
                 GROUP BY user_id, room_id
             ) AS upd
@@ -1033,7 +1041,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             summaries[(row[0], row[1])] = _EventPushSummary(
                 unread_count=row[2],
                 stream_ordering=row[3],
-                old_user_id=row[4],
                 notif_count=0,
             )
 
@@ -1054,55 +1061,25 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 summaries[(row[0], row[1])] = _EventPushSummary(
                     unread_count=0,
                     stream_ordering=row[3],
-                    old_user_id=row[4],
                     notif_count=row[2],
                 )
 
         logger.info("Rotating notifications, handling %d rows", len(summaries))
 
-        # If the `old.user_id` above is NULL then we know there isn't already an
-        # entry in the table, so we simply insert it. Otherwise we update the
-        # existing table.
-        self.db_pool.simple_insert_many_txn(
+        self.db_pool.simple_upsert_many_txn(
             txn,
             table="event_push_summary",
-            keys=(
-                "user_id",
-                "room_id",
-                "notif_count",
-                "unread_count",
-                "stream_ordering",
-            ),
-            values=[
+            key_names=("user_id", "room_id"),
+            key_values=[(user_id, room_id) for user_id, room_id in summaries],
+            value_names=("notif_count", "unread_count", "stream_ordering"),
+            value_values=[
                 (
-                    user_id,
-                    room_id,
                     summary.notif_count,
                     summary.unread_count,
                     summary.stream_ordering,
                 )
-                for ((user_id, room_id), summary) in summaries.items()
-                if summary.old_user_id is None
+                for summary in summaries.values()
             ],
-        )
-
-        txn.execute_batch(
-            """
-                UPDATE event_push_summary
-                SET notif_count = ?, unread_count = ?, stream_ordering = ?
-                WHERE user_id = ? AND room_id = ?
-            """,
-            (
-                (
-                    summary.notif_count,
-                    summary.unread_count,
-                    summary.stream_ordering,
-                    user_id,
-                    room_id,
-                )
-                for ((user_id, room_id), summary) in summaries.items()
-                if summary.old_user_id is not None
-            ),
         )
 
         txn.execute(
@@ -1137,7 +1114,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             txn.execute(
                 """
                 SELECT stream_ordering FROM event_push_actions
-                WHERE stream_ordering < ? AND highlight = 0
+                WHERE stream_ordering <= ? AND highlight = 0
                 ORDER BY stream_ordering ASC LIMIT 1 OFFSET ?
             """,
                 (
@@ -1152,10 +1129,12 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             else:
                 stream_ordering = max_stream_ordering_to_delete
 
+            # We need to use a inclusive bound here to handle the case where a
+            # single stream ordering has more than `batch_size` rows.
             txn.execute(
                 """
                 DELETE FROM event_push_actions
-                WHERE stream_ordering < ? AND highlight = 0
+                WHERE stream_ordering <= ? AND highlight = 0
                 """,
                 (stream_ordering,),
             )
@@ -1197,6 +1176,16 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             table="event_push_actions",
             columns=["user_id", "room_id", "topological_ordering", "stream_ordering"],
             where_clause="highlight=1",
+        )
+
+        # Add index to make deleting old push actions faster.
+        self.db_pool.updates.register_background_index_update(
+            "event_push_actions_stream_highlight_index",
+            index_name="event_push_actions_stream_highlight_index",
+            table="event_push_actions",
+            columns=["highlight", "stream_ordering"],
+            where_clause="highlight=0",
+            psql_only=True,
         )
 
     async def get_push_actions_for_user(
@@ -1274,5 +1263,4 @@ class _EventPushSummary:
 
     unread_count: int
     stream_ordering: int
-    old_user_id: str
     notif_count: int

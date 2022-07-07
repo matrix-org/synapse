@@ -1,0 +1,1 @@
+Check that `auto_vacuum` is disabled when porting a SQLite database to Postgres, as `VACUUM`s must not be performed between runs of the script.
