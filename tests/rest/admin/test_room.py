@@ -1131,6 +1131,8 @@ class RoomTestCase(unittest.HomeserverTestCase):
             self.assertIn("history_visibility", r)
             self.assertIn("state_events", r)
             self.assertIn("room_type", r)
+            self.assertIsNone(r["room_type"])
+
         # Check that the correct number of total rooms was returned
         self.assertEqual(channel.json_body["total_rooms"], total_rooms)
 
