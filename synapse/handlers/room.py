@@ -1066,7 +1066,7 @@ class RoomCreationHandler:
             ratelimit=ratelimit,
             content=creator_join_profile,
             new_room=True,
-            prev_event_ids=[last_sent_event_id],
+            prev_event_ids=[last_sent_event_id] if last_sent_event_id else [],
             state_event_ids=state_event_ids.copy(),
         )
         state_event_ids.append(member_event_id)
