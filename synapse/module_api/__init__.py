@@ -14,6 +14,7 @@
 # limitations under the License.
 import email.utils
 import logging
+import inspect
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -23,6 +24,7 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Sequence,
     Tuple,
     TypeVar,
     Union,
@@ -206,6 +208,7 @@ class ModuleApi:
         self._registration_handler = hs.get_registration_handler()
         self._send_email_handler = hs.get_send_email_handler()
         self._push_rules_handler = hs.get_push_rules_handler()
+        self._room_creation_handler = hs.get_room_creation_handler()
         self.custom_template_dir = hs.config.server.custom_template_directory
 
         try:
@@ -859,6 +862,30 @@ class ModuleApi:
             request,
             client_redirect_url,
         )
+
+    async def define_supported_custom_room_presets(
+        self,
+        room_preset_names: Sequence,
+    ) -> None:
+        """Define the list of custom room presets that your module supports.
+
+        Custom room presets names defined with this method will be available
+        for use by clients. If not defined, clients will receive an error indicating
+        the room preset name is not recognised.
+
+        Added in Synapse v1.XX.Y.
+        """
+        # We need a unique identifier for each calling module, so that when
+        # this method is called again, the previous list of room presets can
+        # be identified and replaced.
+
+        # Get the calling module's ...
+        caller_frame = inspect.stack()[1]
+        module_filepath = inspect.getmodule(caller_frame[0]).__file__
+        if module_filepath:
+            self._room_creation_handler.custom_room_presets.update(
+                {module_filepath: room_preset_names}
+            )
 
     async def complete_sso_login_async(
         self,

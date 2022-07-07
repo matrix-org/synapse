@@ -90,3 +90,6 @@ class ExperimentalConfig(Config):
 
         # MSC3827: Filtering of /publicRooms by room type
         self.msc3827_enabled: bool = experimental.get("msc3827_enabled", False)
+
+        # MSCXXXX: Custom room presets.
+        self.mscxxxx_enabled: bool = experimental.get("mscxxxx_enabled", False)

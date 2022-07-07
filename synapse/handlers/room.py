@@ -117,11 +117,14 @@ class RoomCreationHandler:
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
-        self.config = hs.config
         self.request_ratelimiter = hs.get_request_ratelimiter()
 
+        self.config = hs.config
+        self._allow_custom_room_presets = hs.config.experimental.mscxxxx_enabled
+        self.custom_room_presets: Dict[str, Tuple] = {}
+
         # Room state based off defined presets
-        self._presets_dict: Dict[str, Dict[str, Any]] = {
+        self._default_presets_dict: Dict[str, Dict[str, Any]] = {
             RoomCreationPreset.PRIVATE_CHAT: {
                 "join_rules": JoinRules.INVITE,
                 "history_visibility": HistoryVisibility.SHARED,
@@ -146,7 +149,7 @@ class RoomCreationHandler:
         }
 
         # Modify presets to selectively enable encryption by default per homeserver config
-        for preset_name, preset_config in self._presets_dict.items():
+        for preset_name, preset_config in self._default_presets_dict.items():
             encrypted = (
                 preset_name
                 in self.config.room.encryption_enabled_by_default_for_room_presets
@@ -1035,9 +1038,10 @@ class RoomCreationHandler:
             )
             return last_stream_id
 
-        try:
-            config = self._presets_dict[preset_config]
-        except KeyError:
+        config = self._default_presets_dict.get(preset_config)
+        if config is None and self._allow_custom_room_presets:
+            config = self._default_presets_dict[preset_config]
+
             raise SynapseError(
                 400, f"'{preset_config}' is not a valid preset", errcode=Codes.BAD_JSON
             )
