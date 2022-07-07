@@ -59,7 +59,7 @@ The following fields are possible in the JSON response body:
     - `guest_access` - Whether guests can join the room. One of: ["can_join", "forbidden"].
     - `history_visibility` - Who can see the room history. One of: ["invited", "joined", "shared", "world_readable"].
     - `state_events` - Total number of state_events of a room. Complexity of the room.
-    - `room_type` - the type of the room. 
+    - `room_type` - the type of the room. It is `null` for normal rooms and `m.space` for spaces.
 * `offset` - The current pagination offset in rooms. This parameter should be
              used instead of `next_token` for room offset as `next_token` is
              not intended to be parsed.
@@ -300,7 +300,7 @@ The following fields are possible in the JSON response body:
 * `guest_access` - Whether guests can join the room. One of: ["can_join", "forbidden"].
 * `history_visibility` - Who can see the room history. One of: ["invited", "joined", "shared", "world_readable"].
 * `state_events` - Total number of state_events of a room. Complexity of the room.
-* `room_type` - the type of the room. 
+* `room_type` - the type of the room. It is `null` for normal rooms and `m.space` for spaces.
 
 The API is:
 
