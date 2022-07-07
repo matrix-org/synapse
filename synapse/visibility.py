@@ -188,10 +188,13 @@ async def filter_events_for_client_with_state(
     if event.internal_metadata.is_soft_failed():
         return []
 
-    filter = StateFilter.from_types(
-        [(EventTypes.Member, None), (EventTypes.RoomHistoryVisibility, "")]
-    )
-    state_map = await context.get_prev_state_ids(filter)
+    filter_list = []
+    for user_id in user_ids:
+        filter_list.append((EventTypes.Member, user_id))
+    filter_list.append((EventTypes.RoomHistoryVisibility, ""))
+
+    state_filter = StateFilter.from_types(filter_list)
+    state_map = await context.get_prev_state_ids(state_filter)
 
     # Use events rather than event ids as content from the events are needed in _check_visibility
     updated_state_map = {}
