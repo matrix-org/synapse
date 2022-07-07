@@ -66,6 +66,7 @@ class _BackgroundUpdates:
 
     EVENT_EDGES_DROP_INVALID_ROWS = "event_edges_drop_invalid_rows"
     EVENT_EDGES_REPLACE_INDEX = "event_edges_replace_index"
+    EVENT_EDGES_DROP_OLD_COLS = "event_edges_drop_old_cols"
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -237,6 +238,8 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         )
 
         ################################################################################
+        #
+        # event_edges cleanups
 
         self.db_pool.updates.register_background_update_handler(
             _BackgroundUpdates.EVENT_EDGES_DROP_INVALID_ROWS,
@@ -251,6 +254,11 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             unique=True,
             # the old index which just covered event_id is now redundant.
             replaces_index="ev_edges_id",
+        )
+
+        self.db_pool.updates.register_background_update_handler(
+            _BackgroundUpdates.EVENT_EDGES_DROP_OLD_COLS,
+            self._background_event_edges_drop_old_cols,
         )
 
     async def _background_reindex_fields_sender(
@@ -1399,3 +1407,30 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             )
 
         return batch_size
+
+    async def _background_event_edges_drop_old_cols(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """Drop unused columns from event_edges
+
+        This only runs for postgres. For SQLite, it all happens synchronously.
+        """
+
+        def _drop_txn(txn: LoggingTransaction) -> None:
+            txn.execute(
+                """
+                ALTER TABLE event_edges
+                    DROP COLUMN room_id,
+                    DROP COLUMN is_state
+                """
+            )
+
+        await self.db_pool.runInteraction(
+            desc="drop_invalid_event_edges", func=_drop_txn
+        )
+
+        await self.db_pool.updates._end_background_update(
+            _BackgroundUpdates.EVENT_EDGES_DROP_OLD_COLS
+        )
+
+        return 1
