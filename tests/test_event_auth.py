@@ -689,6 +689,41 @@ class EventAuthTestCase(unittest.TestCase):
             auth_events.values(),
         )
 
+    def test_room_v10_rejects_string_power_levels(self) -> None:
+        pl_event_content = {"users_default": "42"}
+        pl_event = make_event_from_dict(
+            {
+                "room_id": TEST_ROOM_ID,
+                **_maybe_get_event_id_dict_for_room_version(RoomVersions.V10),
+                "type": "m.room.power_levels",
+                "sender": "@test:test.com",
+                "state_key": "",
+                "content": pl_event_content,
+                "signatures": {"test.com": {"ed25519:0": "some9signature"}},
+            },
+            room_version=RoomVersions.V10,
+        )
+
+        with self.assertRaises(AuthError):
+            event_auth.validate_event_for_room_version(pl_event)
+
+        pl_event2_content = {"events": {"m.room.name": "42", "m.room.power_levels": 42}}
+        pl_event2 = make_event_from_dict(
+            {
+                "room_id": TEST_ROOM_ID,
+                **_maybe_get_event_id_dict_for_room_version(RoomVersions.V10),
+                "type": "m.room.power_levels",
+                "sender": "@test:test.com",
+                "state_key": "",
+                "content": pl_event2_content,
+                "signatures": {"test.com": {"ed25519:0": "some9signature"}},
+            },
+            room_version=RoomVersions.V10,
+        )
+
+        with self.assertRaises(AuthError):
+            event_auth.validate_event_for_room_version(pl_event2)
+
 
 # helpers for making events
 TEST_DOMAIN = "example.com"
