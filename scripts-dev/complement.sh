@@ -46,10 +46,12 @@ Run the complement test suite on Synapse.
 
   -f, --fast
         Skip rebuilding the docker images, and just use the most recent
-        'complement-synapse:latest' image
+        'complement-synapse:latest' image.
+        Conflicts with --build-only.
 
   --build-only
         Only build the Docker images. Don't actually run Complement.
+        Conflicts with -f/--fast.
 
 For help on arguments to 'go test', run 'go help testflag'.
 EOF
