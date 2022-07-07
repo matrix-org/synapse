@@ -1035,8 +1035,8 @@ class RoomCreationHandler:
                 event,
                 ratelimit=False,
                 ignore_shadow_ban=True,
-                prev_event_ids=[sent_event_ids[-1]] if sent_event_ids else None,
-                state_event_ids=state_event_ids.copy() if state_event_ids else None,
+                prev_event_ids=[sent_event_ids[-1]] if sent_event_ids else [],
+                state_event_ids=state_event_ids.copy(),
             )
 
             sent_event_ids.append(sent_event.event_id)
