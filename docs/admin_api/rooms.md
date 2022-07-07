@@ -59,6 +59,7 @@ The following fields are possible in the JSON response body:
     - `guest_access` - Whether guests can join the room. One of: ["can_join", "forbidden"].
     - `history_visibility` - Who can see the room history. One of: ["invited", "joined", "shared", "world_readable"].
     - `state_events` - Total number of state_events of a room. Complexity of the room.
+    - `room_type` - the type of the room. 
 * `offset` - The current pagination offset in rooms. This parameter should be
              used instead of `next_token` for room offset as `next_token` is
              not intended to be parsed.
@@ -101,7 +102,8 @@ A response body like the following is returned:
       "join_rules": "invite",
       "guest_access": null,
       "history_visibility": "shared",
-      "state_events": 93534
+      "state_events": 93534,
+      "room_type": "m.space"
     },
     ... (8 hidden items) ...
     {
@@ -118,7 +120,8 @@ A response body like the following is returned:
       "join_rules": "invite",
       "guest_access": null,
       "history_visibility": "shared",
-      "state_events": 8345
+      "state_events": 8345,
+      "room_type": null
     }
   ],
   "offset": 0,
@@ -151,7 +154,8 @@ A response body like the following is returned:
       "join_rules": "invite",
       "guest_access": null,
       "history_visibility": "shared",
-      "state_events": 8
+      "state_events": 8,
+      "room_type": null
     }
   ],
   "offset": 0,
@@ -184,7 +188,8 @@ A response body like the following is returned:
       "join_rules": "invite",
       "guest_access": null,
       "history_visibility": "shared",
-      "state_events": 93534
+      "state_events": 93534,
+      "room_type": null
     },
     ... (98 hidden items) ...
     {
@@ -201,7 +206,8 @@ A response body like the following is returned:
       "join_rules": "invite",
       "guest_access": null,
       "history_visibility": "shared",
-      "state_events": 8345
+      "state_events": 8345,
+      "room_type": "m.space"
     }
   ],
   "offset": 0,
@@ -238,7 +244,9 @@ A response body like the following is returned:
       "join_rules": "invite",
       "guest_access": null,
       "history_visibility": "shared",
-      "state_events": 93534
+      "state_events": 93534,
+      "room_type": "m.space"
+
     },
     ... (48 hidden items) ...
     {
@@ -255,7 +263,9 @@ A response body like the following is returned:
       "join_rules": "invite",
       "guest_access": null,
       "history_visibility": "shared",
-      "state_events": 8345
+      "state_events": 8345,
+      "room_type": null
+
     }
   ],
   "offset": 100,
@@ -290,6 +300,7 @@ The following fields are possible in the JSON response body:
 * `guest_access` - Whether guests can join the room. One of: ["can_join", "forbidden"].
 * `history_visibility` - Who can see the room history. One of: ["invited", "joined", "shared", "world_readable"].
 * `state_events` - Total number of state_events of a room. Complexity of the room.
+* `room_type` - the type of the room. 
 
 The API is:
 
@@ -317,7 +328,8 @@ A response body like the following is returned:
   "join_rules": "invite",
   "guest_access": null,
   "history_visibility": "shared",
-  "state_events": 93534
+  "state_events": 93534,
+  "room_type": "m.space"
 }
 ```
 
