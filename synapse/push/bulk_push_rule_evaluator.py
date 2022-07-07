@@ -291,7 +291,7 @@ class BulkPushRuleEvaluator:
             ignorers = frozenset()
 
         users = list(rules_by_user.keys())
-        profiles = await self.store.get_users_in_room_with_profiles(
+        profiles = await self.store.get_subset_users_in_room_with_profiles(
             event.room_id, users
         )
 
