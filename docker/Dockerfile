@@ -68,7 +68,18 @@ COPY pyproject.toml poetry.lock /synapse/
 # reason, such as when a git repository is used directly as a dependency.
 ARG TEST_ONLY_SKIP_DEP_HASH_VERIFICATION
 
-RUN /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt ${TEST_ONLY_SKIP_DEP_HASH_VERIFICATION:+--without-hashes}
+# If specified, we won't use the Poetry lockfile.
+# Instead, we'll just install what a regular `pip install` would from PyPI.
+ARG TEST_ONLY_IGNORE_POETRY_LOCKFILE
+
+# Export the dependencies, but only if we're actually going to use the Poetry lockfile.
+# Otherwise, just create an empty requirements file so that the Dockerfile can
+# proceed.
+RUN if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
+    /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt ${TEST_ONLY_SKIP_DEP_HASH_VERIFICATION:+--without-hashes}; \
+  else \
+    touch /synapse/requirements.txt; \
+  fi
 
 ###
 ### Stage 1: builder
@@ -109,7 +120,7 @@ COPY synapse /synapse/synapse/
 COPY pyproject.toml README.rst /synapse/
 
 # Install the synapse package itself.
-RUN pip install --prefix="/install" --no-deps --no-warn-script-location /synapse
+RUN pip install --prefix="/install" --no-deps --no-warn-script-location /synapse[all]
 
 ###
 ### Stage 2: runtime
