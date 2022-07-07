@@ -1,0 +1,1 @@
+Preparation for database schema simplifications: populate `state_key` and `rejection_reason` for existing rows in the `events` table.
