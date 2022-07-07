@@ -27,7 +27,6 @@ from synapse.state import POWER_KEY
 from synapse.storage.databases.main.roommember import EventIdMembership
 from synapse.storage.state import StateFilter
 from synapse.util.caches import register_cache
-from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_events_for_client_with_state
 
@@ -110,26 +109,21 @@ class BulkPushRuleEvaluator:
         # Whether to support MSC3772 is supported.
         self._relations_match_enabled = self.hs.config.experimental.msc3772_enabled
 
-    @cached(cache_context=True, uncached_args=("event",))
     async def get_rules(
-        self, room_id: str, event: EventBase, cache_context: _CacheContext
+        self, room_id: str, event: EventBase
     ) -> Dict[str, List[Dict[str, dict]]]:
         """Given an event return the rules for all users who are
         currently in the room.
         """
 
-        local_users = await self.store.get_local_users_in_room(
-            room_id, on_invalidate=cache_context.invalidate
-        )
+        local_users = await self.store.get_local_users_in_room(room_id)
 
         if event.type == EventTypes.Member and event.membership == Membership.JOIN:
             if self.hs.is_mine_id(event.state_key):
                 local_users = list(local_users)
                 local_users.append(event.state_key)
 
-        ret_rules_by_user = await self.store.bulk_get_push_rules(
-            local_users, on_invalidate=cache_context.invalidate
-        )
+        ret_rules_by_user = await self.store.bulk_get_push_rules(local_users)
 
         logger.debug("Users in room: %s", local_users)
 
