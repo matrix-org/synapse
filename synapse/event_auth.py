@@ -80,6 +80,31 @@ def validate_event_for_room_version(event: "EventBase") -> None:
     Raises:
         SynapseError if there is a problem with the event
     """
+    # Reject events with stringy power levels if required by room version
+    if (
+        event.type == EventTypes.PowerLevels
+        and event.room_version.msc3667_int_only_power_levels
+    ):
+        for key, value in event.content.items():
+            if key in [
+                "users_default",
+                "events_default",
+                "state_default",
+                "ban",
+                "reject",
+                "kick",
+                "invite",
+            ]:
+                if not isinstance(value, int):
+                    raise AuthError(403, f"{value} must be an integer.")
+            if key in ["events", "notifications"]:
+                if not isinstance(value, dict) or not all(
+                    isinstance(v, int) for v in value.values()
+                ):
+                    raise AuthError(
+                        403, f"{value} must be a dict with integers as values."
+                    )
+
     _check_size_limits(event)
 
     if not hasattr(event, "room_id"):
