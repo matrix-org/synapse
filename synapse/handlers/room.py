@@ -1011,8 +1011,8 @@ class RoomCreationHandler:
 
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
 
-        sent_event_ids = []
-        state_event_ids = []
+        sent_event_ids: List[str] = []
+        state_event_ids: List[str] = []
 
         def create(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
             e = {"type": etype, "content": content}
@@ -1028,7 +1028,7 @@ class RoomCreationHandler:
             # Allow these events to be sent even if the user is shadow-banned to
             # allow the room creation to complete.
             (
-                event,
+                sent_event,
                 last_stream_id,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 creator,
@@ -1039,9 +1039,9 @@ class RoomCreationHandler:
                 state_event_ids=state_event_ids.copy() if state_event_ids else None,
             )
 
-            sent_event_ids.append(event.event_id)
-            if event.is_state():
-                state_event_ids.append(event.event_id)
+            sent_event_ids.append(sent_event.event_id)
+            if sent_event.is_state():
+                state_event_ids.append(sent_event.event_id)
 
             return last_stream_id
 
