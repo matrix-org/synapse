@@ -1058,6 +1058,8 @@ class RoomCreationHandler:
         await send(etype=EventTypes.Create, content=creation_content)
 
         logger.debug("Sending %s in new room", EventTypes.Member)
+        # Room create event must exist at this point
+        assert last_sent_event_id is not None
         member_event_id, _ = await self.room_member_handler.update_membership(
             creator,
             creator.user,
@@ -1066,7 +1068,7 @@ class RoomCreationHandler:
             ratelimit=ratelimit,
             content=creator_join_profile,
             new_room=True,
-            prev_event_ids=[last_sent_event_id] if last_sent_event_id else [],
+            prev_event_ids=[last_sent_event_id],
             state_event_ids=state_event_ids.copy(),
         )
         state_event_ids.append(member_event_id)
