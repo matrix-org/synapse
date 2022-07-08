@@ -422,3 +422,47 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
             '("insertion", "batch", and "marker")',
             channel.json_body,
         )
+
+    @unittest.override_config({"experimental_features": {"msc2716_enabled": True}})
+    def test_batch_send_with_permission_msc2716_room_version(self) -> None:
+        """Make sure that the batch send succeeds when the user does have the
+        ``historical`` power level in a room version with MSC2716 enabled, even
+        if they are not the creator of the room.
+        """
+
+        time_before_room = int(self.clock.time_msec())
+        room_id, event_id_a, _, _ = self._create_test_room(
+            room_version=RoomVersions.MSC2716v3
+        )
+
+        power_levels = self.helper.get_state(
+            room_id,
+            EventTypes.PowerLevels,
+            tok=self.appservice.token,
+            appservice_user_id=self.room_creator_user_id,
+        )
+        power_levels["historical"] = 0
+        self.helper.send_state(
+            room_id,
+            EventTypes.PowerLevels,
+            power_levels,
+            tok=self.appservice.token,
+            appservice_user_id=self.room_creator_user_id,
+        )
+
+        channel = self.make_request(
+            "POST",
+            self._create_batch_send_url(
+                room_id, event_id_a, user_id=self.virtual_user_id
+            ),
+            content={
+                "events": _create_message_events_for_batch_send_request(
+                    self.virtual_user_id, time_before_room, 3
+                ),
+                "state_events_at_start": _create_join_state_events_for_batch_send_request(
+                    [self.virtual_user_id], time_before_room
+                ),
+            },
+            access_token=self.appservice.token,
+        )
+        self.assertEqual(channel.code, 200, channel.result)

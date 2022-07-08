@@ -60,6 +60,24 @@ class RestHelper:
     site: Site
     auth_user_id: Optional[str]
 
+    def _path_with_token_and_appservice_user_id(
+        self,
+        path: str,
+        tok: Optional[str] = None,
+        appservice_user_id: Optional[str] = None,
+    ) -> str:
+        url_params: Dict[str, str] = {}
+
+        if tok:
+            url_params["access_token"] = tok
+
+        if appservice_user_id:
+            url_params["user_id"] = appservice_user_id
+
+        if url_params:
+            path += "?" + urlencode(url_params)
+        return path
+
     @overload
     def create_room_as(
         self,
@@ -127,19 +145,14 @@ class RestHelper:
         """
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator
-        path = "/_matrix/client/r0/createRoom"
+        path = self._path_with_token_and_appservice_user_id(
+            "/_matrix/client/r0/createRoom", tok, appservice_user_id
+        )
         content = extra_content or {}
         if is_public is not None:
             content["visibility"] = "public" if is_public else "private"
         if room_version:
             content["room_version"] = room_version
-        query_params = {}
-        if tok:
-            query_params["access_token"] = tok
-        if appservice_user_id:
-            query_params["user_id"] = appservice_user_id
-        if query_params:
-            path = f"{path}?{urlencode(query_params)}"
 
         channel = make_request(
             self.hs.get_reactor(),
@@ -209,9 +222,7 @@ class RestHelper:
     ) -> None:
         temp_id = self.auth_user_id
         self.auth_user_id = user
-        path = "/knock/%s" % room
-        if tok:
-            path = path + "?access_token=%s" % tok
+        path = self._path_with_token_and_appservice_user_id(f"/knock/{room}", tok)
 
         data = {}
         if reason:
@@ -301,17 +312,11 @@ class RestHelper:
         temp_id = self.auth_user_id
         self.auth_user_id = src
 
-        path = f"/_matrix/client/r0/rooms/{room}/state/m.room.member/{targ}"
-        url_params: Dict[str, str] = {}
-
-        if tok:
-            url_params["access_token"] = tok
-
-        if appservice_user_id:
-            url_params["user_id"] = appservice_user_id
-
-        if url_params:
-            path += "?" + urlencode(url_params)
+        path = self._path_with_token_and_appservice_user_id(
+            f"/_matrix/client/r0/rooms/{room}/state/m.room.member/{targ}",
+            tok,
+            appservice_user_id,
+        )
 
         data = {"membership": membership}
         data.update(extra_data or {})
@@ -396,14 +401,11 @@ class RestHelper:
         if txn_id is None:
             txn_id = "m%s" % (str(time.time()))
 
-        path = "/_matrix/client/r0/rooms/%s/send/%s/%s" % (room_id, type, txn_id)
-        query_params = {}
-        if tok:
-            query_params["access_token"] = tok
-        if appservice_user_id:
-            query_params["user_id"] = appservice_user_id
-        if query_params:
-            path = f"{path}?{urlencode(query_params)}"
+        path = self._path_with_token_and_appservice_user_id(
+            f"/_matrix/client/r0/rooms/{room_id}/send/{type}/{txn_id}",
+            tok,
+            appservice_user_id,
+        )
 
         channel = make_request(
             self.hs.get_reactor(),
@@ -430,6 +432,7 @@ class RestHelper:
         event_type: str,
         body: Optional[Dict[str, Any]],
         tok: Optional[str],
+        appservice_user_id: Optional[str] = None,
         expect_code: int = HTTPStatus.OK,
         state_key: str = "",
         method: str = "GET",
@@ -452,13 +455,11 @@ class RestHelper:
         Raises:
             AssertionError: if expect_code doesn't match the HTTP code we received
         """
-        path = "/_matrix/client/r0/rooms/%s/state/%s/%s" % (
-            room_id,
-            event_type,
-            state_key,
+        path = self._path_with_token_and_appservice_user_id(
+            f"/_matrix/client/r0/rooms/{room_id}/state/{event_type}/{state_key}",
+            tok,
+            appservice_user_id,
         )
-        if tok:
-            path = path + "?access_token=%s" % tok
 
         # Set request body if provided
         content = b""
@@ -482,6 +483,7 @@ class RestHelper:
         room_id: str,
         event_type: str,
         tok: str,
+        appservice_user_id: Optional[str] = None,
         expect_code: int = HTTPStatus.OK,
         state_key: str = "",
     ) -> JsonDict:
@@ -501,7 +503,14 @@ class RestHelper:
             AssertionError: if expect_code doesn't match the HTTP code we received
         """
         return self._read_write_state(
-            room_id, event_type, None, tok, expect_code, state_key, method="GET"
+            room_id,
+            event_type,
+            None,
+            tok,
+            appservice_user_id,
+            expect_code,
+            state_key,
+            method="GET",
         )
 
     def send_state(
@@ -510,6 +519,7 @@ class RestHelper:
         event_type: str,
         body: Dict[str, Any],
         tok: Optional[str],
+        appservice_user_id: Optional[str] = None,
         expect_code: int = HTTPStatus.OK,
         state_key: str = "",
     ) -> JsonDict:
@@ -530,7 +540,14 @@ class RestHelper:
             AssertionError: if expect_code doesn't match the HTTP code we received
         """
         return self._read_write_state(
-            room_id, event_type, body, tok, expect_code, state_key, method="PUT"
+            room_id,
+            event_type,
+            body,
+            tok,
+            appservice_user_id,
+            expect_code,
+            state_key,
+            method="PUT",
         )
 
     def upload_media(
