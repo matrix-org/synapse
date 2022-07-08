@@ -128,7 +128,7 @@ async def filter_events_for_client(
 
 async def filter_event_for_clients_with_state(
     store: DataStore,
-    user_ids: List[str],
+    user_ids: Collection[str],
     event: EventBase,
     context: EventContext,
     is_peeking: bool = False,
@@ -145,9 +145,14 @@ async def filter_event_for_clients_with_state(
         user_ids: user_ids to be checked
         event: the event to be checked
         context: EventContext for the event to be checked
+        is_peeking: Whether the users are peeking into the room, ie not
+            currently joined
+        filter_send_to_client: Whether we're checking an event that's going to be
+            sent to a client. This might not always be the case since this function can
+            also be called to check whether a user can see the state at a given point.
 
     Returns:
-        list of uids for whom the event is visible
+        Collection of user IDs for whom the event is visible
     """
     # None of the users should see the event if it is soft_failed
     if event.internal_metadata.is_soft_failed():
