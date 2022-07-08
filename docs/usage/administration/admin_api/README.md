@@ -18,11 +18,21 @@ already on your `$PATH` depending on how Synapse was installed.
 Finding your user's `access_token` is client-dependent, but will usually be shown in the client's settings.
 
 ## Making an Admin API request
+The Admin API (`/_synapse/admin/...`) is by default only accessible from within the host, so be sure to
+call the queries from a terminal on the PC `matrix-synapse` is running on.
+
 Once you have your `access_token`, you will need to authenticate each request to an Admin API endpoint by
 providing the token as either a query parameter or a request header. To add it as a request header in cURL:
 
 ```sh
 curl --header "Authorization: Bearer <access_token>" <the_rest_of_your_API_request>
+```
+
+For example, to query the information regarding the user '@foo:bar.com' call the following command in the terminal
+using the access token 'syt_AjfVef2_L33JNpafeif_0feKJfeaf0CQpoZk'.
+
+```sh
+curl --header "Authorization: Bearer syt_AjfVef2_L33JNpafeif_0feKJfeaf0CQpoZk" -X GET http://127.0.0.1:8008/_synapse/admin/v2/users/@foo:bar.com
 ```
 
 For more details on access tokens in Matrix, please refer to the complete
