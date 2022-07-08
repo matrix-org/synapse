@@ -136,7 +136,9 @@ async def filter_event_for_clients_with_state(
 ) -> Collection[str]:
     """
     Checks to see if an event is visible to the users in the list at the time of
-    the event
+    the event.
+
+    Note: This does *not* check if the sender of the event was erased.
 
     Args:
         store: databases
@@ -206,7 +208,7 @@ async def filter_event_for_clients_with_state(
     return {
         user_id
         for user_id in allowed_user_ids
-        if _check_membership(user_id, event, visibility, state_map, is_peeking)
+        if _check_membership(user_id, event, visibility, state_map, is_peeking)[0]
     }
 
 
@@ -298,22 +300,29 @@ def _check_client_allowed_to_see_event(
     if state is None:
         raise Exception("Missing state for non-outlier event")
 
-    # If the sender has been erased we must only return the redacted form.
-    if sender_erased:
-        event = prune_event(event)
-
     # get the room_visibility at the time of the event.
     visibility = get_effective_room_visibility_from_state(state)
 
     # Check if the room has lax history visibility, allowing us to skip
     # membership checks.
-    if _check_history_visibility(event, visibility, is_peeking):
+    #
+    # We can only do this check if the sender has *not* been erased, as if they
+    # have we need to check the user's membership.
+    if not sender_erased and _check_history_visibility(event, visibility, is_peeking):
         return event
 
-    if _check_membership(user_id, event, visibility, state, is_peeking):
-        return event
+    allowed, membership = _check_membership(
+        user_id, event, visibility, state, is_peeking
+    )
+    if not allowed:
+        return None
 
-    return None
+    # If the sender has been erased and the user was not joined at the time, we
+    # must only return the redacted form.
+    if sender_erased and membership != Membership.JOIN:
+        event = prune_event(event)
+
+    return event
 
 
 def _check_membership(
@@ -322,11 +331,12 @@ def _check_membership(
     visibility: str,
     state: StateMap[EventBase],
     is_peeking: bool,
-) -> bool:
+) -> Tuple[bool, Membership]:
     """Check whether the user can see the event due to their membership
 
     Returns:
-        True if they can, False if they can't
+        True if they can, False if they can't, plus the membership of the user
+        at the event.
     """
     # If the event is the user's own membership event, use the 'most joined'
     # membership
@@ -349,7 +359,7 @@ def _check_membership(
         if membership == "leave" and (
             prev_membership == "join" or prev_membership == "invite"
         ):
-            return True
+            return True, membership
 
         new_priority = MEMBERSHIP_PRIORITY.index(membership)
         old_priority = MEMBERSHIP_PRIORITY.index(prev_membership)
@@ -365,14 +375,14 @@ def _check_membership(
     # if the user was a member of the room at the time of the event,
     # they can see it.
     if membership == Membership.JOIN:
-        return True
+        return True, membership
 
     # otherwise, it depends on the room visibility.
 
     if visibility == HistoryVisibility.JOINED:
         # we weren't a member at the time of the event, so we can't
         # see this event.
-        return False
+        return False, membership
 
     elif visibility == HistoryVisibility.INVITED:
         # user can also see the event if they were *invited* at the time
@@ -388,11 +398,11 @@ def _check_membership(
         # ideally we would share history up to the point they left. But
         # we don't know when they left. We just treat it as though they
         # never joined, and restrict access.
-        return False
+        return False, membership
 
     # The visibility is either shared or world_readable, and the user was
     # not a member at the time. We allow it.
-    return True
+    return True, membership
 
 
 def _check_filter_send_to_client(
