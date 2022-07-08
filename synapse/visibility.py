@@ -176,13 +176,17 @@ async def filter_events_for_client_with_state(
     store: DataStore, user_ids: List[str], event: EventBase, context: EventContext
 ) -> List[str]:
     """
-    Checks to see if an event is visible to the users in the list at the time of the event
+    Checks to see if an event is visible to the users in the list at the time of
+    the event
+
     Args:
         store: databases
         user_ids: user_ids to be checked
         event: the event to be checked
         context: EventContext for the event to be checked
-    Returns: list of uids for whom the event is visible
+
+    Returns:
+        list of uids for whom the event is visible
     """
     # None of the users should see the event if it is soft_failed
     if event.internal_metadata.is_soft_failed():
@@ -196,14 +200,16 @@ async def filter_events_for_client_with_state(
     state_filter = StateFilter.from_types(filter_list)
     state_map = await context.get_prev_state_ids(state_filter)
 
-    # Use events rather than event ids as content from the events are needed in _check_visibility
+    # Use events rather than event ids as content from the events are needed in
+    # _check_visibility
     updated_state_map = {}
     for state_key, event_id in state_map.items():
         updated_state_map[state_key] = await store.get_event(event_id)
 
     if event.is_state():
         current_state_key = (event.type, event.state_key)
-        # Add current event to updated_state_map, we need to do this here as it may not have been persisted to the db yet
+        # Add current event to updated_state_map, we need to do this here as it
+        # may not have been persisted to the db yet
         updated_state_map[current_state_key] = event
 
     uids_with_visibility = []
@@ -223,14 +229,20 @@ def _check_visibility(
     erased_senders: Optional[dict] = None,
 ) -> Optional[EventBase]:
     """
-    Checks whether the room history should be visible to the user at the time of this event.
+    Checks whether the room history should be visible to the user at the time
+    of this event.
+
     Args:
         user_id: user_id for the user to be checked
         event: the event to be checked
         state_map: state at the event to be checked
         is_peeking: whether the user in question is peeking
-        erased_senders: optional dict matching a user id to a boolean representing whether the user has requested erasure
-    Returns: the event if the room history is visible to the user at the time of the event, None if not
+        erased_senders: optional dict matching a user id to a boolean
+            representing whether the user has requested erasure
+
+    Returns:
+        the event if the room history is visible to the user at the time
+        of the event, None if not
     """
     # Get the room_visibility at the time of the event.
     visibility = get_effective_room_visibility_from_state(state_map)
