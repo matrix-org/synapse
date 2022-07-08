@@ -322,6 +322,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "purge_room",
             self._purge_room_txn,
             room_id=room_id,
+            # This is safe because we don't care if room data is updated during the transaction
             isolation_level=IsolationLevel.READ_COMMITTED,
         )
 
