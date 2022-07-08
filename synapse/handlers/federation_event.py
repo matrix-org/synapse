@@ -538,16 +538,20 @@ class FederationEventHandler:
             #
             # This is the same operation as we do when we receive a regular event
             # over federation.
-            state_ids = await self._resolve_state_at_missing_prevs(destination, event)
-
-            # build a new state group for it if need be
-            context = await self._state_handler.compute_event_context(
-                event,
-                state_ids_before_event=state_ids,
-                # TODO(faster_joins): Calculate the partial_state flag correctly.
-                partial_state=None if state_ids is None else False,
+            state_ids, partial_state = await self._resolve_state_at_missing_prevs(
+                destination, event
             )
-            if context.partial_state:
+
+            context = None
+            if not partial_state:
+                # build a new state group for it if need be
+                context = await self._state_handler.compute_event_context(
+                    event,
+                    state_ids_before_event=state_ids,
+                    partial_state=partial_state,
+                )
+
+            if context is None or context.partial_state:
                 # this can happen if some or all of the event's prev_events still have
                 # partial state - ie, an event has an earlier stream_ordering than one
                 # or more of its prev_events, so we de-partial-state it before its
@@ -812,16 +816,12 @@ class FederationEventHandler:
             return
 
         try:
-            state_ids = await self._resolve_state_at_missing_prevs(origin, event)
-            # TODO(faster_joins): make sure that _resolve_state_at_missing_prevs does
-            #   not return partial state
-            #   https://github.com/matrix-org/synapse/issues/13002
-
+            state_ids, partial_state = await self._resolve_state_at_missing_prevs(origin, event)
             await self._process_received_pdu(
                 origin,
                 event,
                 state_ids=state_ids,
-                partial_state=False,
+                partial_state=partial_state,
                 backfilled=backfilled,
             )
         except FederationError as e:
@@ -832,7 +832,7 @@ class FederationEventHandler:
 
     async def _resolve_state_at_missing_prevs(
         self, dest: str, event: EventBase
-    ) -> Optional[StateMap[str]]:
+    ) -> Tuple[Optional[StateMap[str]], Optional[bool]]:
         """Calculate the state at an event with missing prev_events.
 
         This is used when we have pulled a batch of events from a remote server, and
@@ -859,8 +859,10 @@ class FederationEventHandler:
             event: an event to check for missing prevs.
 
         Returns:
-            if we already had all the prev events, `None`. Otherwise, returns
-            the event ids of the state at `event`.
+            if we already had all the prev events, `None, None`. Otherwise, returns a
+            tuple containing:
+             * the event ids of the state at `event`.
+             * a boolean indicating whether the state may be partial.
 
         Raises:
             FederationError if we fail to get the state from the remote server after any
@@ -874,7 +876,7 @@ class FederationEventHandler:
         missing_prevs = prevs - seen
 
         if not missing_prevs:
-            return None
+            return None, None
 
         logger.info(
             "Event %s is missing prev_events %s: calculating state for a "
@@ -886,9 +888,15 @@ class FederationEventHandler:
         # resolve them to find the correct state at the current event.
 
         try:
+            # Determine whether we may be about to retrieve partial state
+            # Events may be un-partial stated right after we compute the partial state
+            # flag, but that's okay, as long as the flag errs on the conservative side.
+            partial_state_flags = await self._store.get_partial_state_events(seen)
+            partial_state = any(partial_state_flags.values())
+
             # Get the state of the events we know about
             ours = await self._state_storage_controller.get_state_groups_ids(
-                room_id, seen
+                room_id, seen, await_full_state=False
             )
 
             # state_maps is a list of mappings from (type, state_key) to event_id
@@ -934,7 +942,7 @@ class FederationEventHandler:
                 "We can't get valid state history.",
                 affected=event_id,
             )
-        return state_map
+        return state_map, partial_state
 
     async def _get_state_ids_after_missing_prev_event(
         self,
