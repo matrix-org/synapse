@@ -224,7 +224,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     async def get_subset_users_in_room_with_profiles(
         self, room_id: str, user_ids: List[str]
     ) -> Dict[str, ProfileInfo]:
-        """Get a mapping from user ID to profile information for a list of users in a given room.
+        """Get a mapping from user ID to profile information for a list of users
+        in a given room.
 
         The profile information comes directly from this room's `m.room.member`
         events, and so may be specific to this room rather than part of a user's
@@ -232,8 +233,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         revealed to users who are already in this room.
 
         Args:
-            room_id: The ID of the room to retrieve the users of.
-            user_ids: a list of users in the room to run the query for
+            room_id: The ID of the room to retrieve the users of. user_ids: a
+            list of users in the room to run the query for
 
         Returns:
                 A mapping from user ID to ProfileInfo.

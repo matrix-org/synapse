@@ -219,6 +219,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self.get_invited_rooms_for_local_user.invalidate((state_key,))
             self.get_local_users_in_room.invalidate((room_id,))
             self.get_number_joined_users_in_room.invalidate((room_id,))
+            self.get_user_in_room_with_profile.invalidate((room_id, state_key))
 
         if relates_to:
             self.get_relations_for_event.invalidate((relates_to,))
