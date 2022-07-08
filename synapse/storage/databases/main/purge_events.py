@@ -327,6 +327,13 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         )
 
     def _purge_room_txn(self, txn: LoggingTransaction, room_id: str) -> List[int]:
+        # This collides with event persistence so we cannot write new events and metadata into
+        # a room while deleting it or this transaction will fail.
+        txn.execute(
+            "SELECT room_version FROM rooms WHERE room_id = ? FOR UPDATE",
+            (room_id,),
+        )
+
         # First, fetch all the state groups that should be deleted, before
         # we delete that information.
         txn.execute(
