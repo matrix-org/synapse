@@ -1382,7 +1382,7 @@ rc_joins:
 ---
 ### `rc_joins_per_room`
 
-This option allows for ratelimiting joins to a room based on the number of recent
+This option allows admins to ratelimit joins to a room based on the number of recent
 joins (local or remote) to that room. It is intended to mitigate mass-join spam
 waves which target multiple homeservers.
 
@@ -1395,6 +1395,9 @@ rc_joins_per_room:
   per_second: 1
   burst_count: 10
 ```
+
+_Added in Synapse 1.63.0._
+
 ---
 ### `rc_3pid_validation`
 
