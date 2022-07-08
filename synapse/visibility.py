@@ -202,9 +202,13 @@ async def filter_events_for_client_with_state(
 
     # Use events rather than event ids as content from the events are needed in
     # _check_visibility
+    event_map = await store.get_events(state_map.values(), get_prev_content=False)
+
     updated_state_map = {}
     for state_key, event_id in state_map.items():
-        updated_state_map[state_key] = await store.get_event(event_id)
+        state_event = event_map.get(event_id)
+        if state_event:
+            updated_state_map[state_key] = state_event
 
     if event.is_state():
         current_state_key = (event.type, event.state_key)
