@@ -23,6 +23,7 @@ from synapse.events.utils import prune_event
 from synapse.storage.controllers import StorageControllers
 from synapse.storage.state import StateFilter
 from synapse.types import RetentionPolicy, StateMap, get_domain_from_id
+from synapse.util import Clock
 
 logger = logging.getLogger(__name__)
 
@@ -102,153 +103,18 @@ async def filter_events_for_client(
             ] = await storage.main.get_retention_policy_for_room(room_id)
 
     def allowed(event: EventBase) -> Optional[EventBase]:
-        """
-        Args:
-            event: event to check
-
-        Returns:
-           None if the user cannot see this event at all
-
-           a redacted copy of the event if they can only see a redacted
-           version
-
-           the original event if they can see it as normal.
-        """
-        # Only run some checks if these events aren't about to be sent to clients. This is
-        # because, if this is not the case, we're probably only checking if the users can
-        # see events in the room at that point in the DAG, and that shouldn't be decided
-        # on those checks.
-        if filter_send_to_client:
-            if event.type == EventTypes.Dummy:
-                return None
-
-            if not event.is_state() and event.sender in ignore_list:
-                return None
-
-            # Until MSC2261 has landed we can't redact malicious alias events, so for
-            # now we temporarily filter out m.room.aliases entirely to mitigate
-            # abuse, while we spec a better solution to advertising aliases
-            # on rooms.
-            if event.type == EventTypes.Aliases:
-                return None
-
-            # Don't try to apply the room's retention policy if the event is a state
-            # event, as MSC1763 states that retention is only considered for non-state
-            # events.
-            if not event.is_state():
-                retention_policy = retention_policies[event.room_id]
-                max_lifetime = retention_policy.max_lifetime
-
-                if max_lifetime is not None:
-                    oldest_allowed_ts = storage.main.clock.time_msec() - max_lifetime
-
-                    if event.origin_server_ts < oldest_allowed_ts:
-                        return None
-
-        if event.event_id in always_include_ids:
-            return event
-
-        # we need to handle outliers separately, since we don't have the room state.
-        if event.internal_metadata.outlier:
-            # Normally these can't be seen by clients, but we make an exception for
-            # for out-of-band membership events (eg, incoming invites, or rejections of
-            # said invite) for the user themselves.
-            if event.type == EventTypes.Member and event.state_key == user_id:
-                logger.debug("Returning out-of-band-membership event %s", event)
-                return event
-
-            return None
-
-        state = event_id_to_state[event.event_id]
-
-        # get the room_visibility at the time of the event.
-        visibility = get_effective_room_visibility_from_state(state)
-
-        # Always allow history visibility events on boundaries. This is done
-        # by setting the effective visibility to the least restrictive
-        # of the old vs new.
-        if event.type == EventTypes.RoomHistoryVisibility:
-            prev_content = event.unsigned.get("prev_content", {})
-            prev_visibility = prev_content.get("history_visibility", None)
-
-            if prev_visibility not in VISIBILITY_PRIORITY:
-                prev_visibility = HistoryVisibility.SHARED
-
-            new_priority = VISIBILITY_PRIORITY.index(visibility)
-            old_priority = VISIBILITY_PRIORITY.index(prev_visibility)
-            if old_priority < new_priority:
-                visibility = prev_visibility
-
-        # likewise, if the event is the user's own membership event, use
-        # the 'most joined' membership
-        membership = None
-        if event.type == EventTypes.Member and event.state_key == user_id:
-            membership = event.content.get("membership", None)
-            if membership not in MEMBERSHIP_PRIORITY:
-                membership = "leave"
-
-            prev_content = event.unsigned.get("prev_content", {})
-            prev_membership = prev_content.get("membership", None)
-            if prev_membership not in MEMBERSHIP_PRIORITY:
-                prev_membership = "leave"
-
-            # Always allow the user to see their own leave events, otherwise
-            # they won't see the room disappear if they reject the invite
-            #
-            # (Note this doesn't work for out-of-band invite rejections, which don't
-            # have prev_state populated. They are handled above in the outlier code.)
-            if membership == "leave" and (
-                prev_membership == "join" or prev_membership == "invite"
-            ):
-                return event
-
-            new_priority = MEMBERSHIP_PRIORITY.index(membership)
-            old_priority = MEMBERSHIP_PRIORITY.index(prev_membership)
-            if old_priority < new_priority:
-                membership = prev_membership
-
-        # otherwise, get the user's membership at the time of the event.
-        if membership is None:
-            membership_event = state.get((EventTypes.Member, user_id), None)
-            if membership_event:
-                membership = membership_event.membership
-
-        # if the user was a member of the room at the time of the event,
-        # they can see it.
-        if membership == Membership.JOIN:
-            return event
-
-        # otherwise, it depends on the room visibility.
-
-        if visibility == HistoryVisibility.JOINED:
-            # we weren't a member at the time of the event, so we can't
-            # see this event.
-            return None
-
-        elif visibility == HistoryVisibility.INVITED:
-            # user can also see the event if they were *invited* at the time
-            # of the event.
-            return event if membership == Membership.INVITE else None
-
-        elif visibility == HistoryVisibility.SHARED and is_peeking:
-            # if the visibility is shared, users cannot see the event unless
-            # they have *subsequently* joined the room (or were members at the
-            # time, of course)
-            #
-            # XXX: if the user has subsequently joined and then left again,
-            # ideally we would share history up to the point they left. But
-            # we don't know when they left. We just treat it as though they
-            # never joined, and restrict access.
-            return None
-
-        # the visibility is either shared or world_readable, and the user was
-        # not a member at the time. We allow it, provided the original sender
-        # has not requested their data to be erased, in which case, we return
-        # a redacted version.
-        if erased_senders[event.sender]:
-            return prune_event(event)
-
-        return event
+        return _check_client_allowed_to_see_event(
+            user_id=user_id,
+            event=event,
+            clock=storage.main.clock,
+            filter_send_to_client=filter_send_to_client,
+            sender_ignored=event.sender in ignore_list,
+            always_include_ids=always_include_ids,
+            retention_policy=retention_policies[room_id],
+            state=event_id_to_state.get(event.event_id),
+            is_peeking=is_peeking,
+            sender_erased=event.sender in erased_senders,
+        )
 
     # Check each event: gives an iterable of None or (a potentially modified)
     # EventBase.
@@ -256,6 +122,179 @@ async def filter_events_for_client(
 
     # Turn it into a list and remove None entries before returning.
     return [ev for ev in filtered_events if ev]
+
+
+def _check_client_allowed_to_see_event(
+    user_id: str,
+    event: EventBase,
+    clock: Clock,
+    filter_send_to_client: bool,
+    is_peeking: bool,
+    always_include_ids: FrozenSet[str],
+    sender_ignored: bool,
+    retention_policy: RetentionPolicy,
+    state: Optional[StateMap[EventBase]],
+    sender_erased: bool,
+) -> Optional[EventBase]:
+    """Check with the given user is allowed to see the given event
+
+    See `filter_events_for_client` for details about args
+
+    Args:
+        user_id
+        event
+        clock
+        filter_send_to_client
+        is_peeking
+        always_include_ids
+        sender_ignored: Whether the user is ignoring the event sender
+        retention_policy: The retention policy of the room
+        state: The state at the event, unless its an outlier
+        sender_erased: Whether the event sender has been marked as "erased"
+
+    Returns:
+        None if the user cannot see this event at all
+
+        a redacted copy of the event if they can only see a redacted
+        version
+
+        the original event if they can see it as normal.
+    """
+    # Only run some checks if these events aren't about to be sent to clients. This is
+    # because, if this is not the case, we're probably only checking if the users can
+    # see events in the room at that point in the DAG, and that shouldn't be decided
+    # on those checks.
+    if filter_send_to_client:
+        if event.type == EventTypes.Dummy:
+            return None
+
+        if not event.is_state() and sender_ignored:
+            return None
+
+        # Until MSC2261 has landed we can't redact malicious alias events, so for
+        # now we temporarily filter out m.room.aliases entirely to mitigate
+        # abuse, while we spec a better solution to advertising aliases
+        # on rooms.
+        if event.type == EventTypes.Aliases:
+            return None
+
+        # Don't try to apply the room's retention policy if the event is a state
+        # event, as MSC1763 states that retention is only considered for non-state
+        # events.
+        if not event.is_state():
+            max_lifetime = retention_policy.max_lifetime
+
+            if max_lifetime is not None:
+                oldest_allowed_ts = clock.time_msec() - max_lifetime
+
+                if event.origin_server_ts < oldest_allowed_ts:
+                    return None
+
+    if event.event_id in always_include_ids:
+        return event
+
+    # we need to handle outliers separately, since we don't have the room state.
+    if event.internal_metadata.outlier:
+        # Normally these can't be seen by clients, but we make an exception for
+        # for out-of-band membership events (eg, incoming invites, or rejections of
+        # said invite) for the user themselves.
+        if event.type == EventTypes.Member and event.state_key == user_id:
+            logger.debug("Returning out-of-band-membership event %s", event)
+            return event
+
+        return None
+
+    if state is None:
+        raise Exception("Missing state for non-outlier event")
+
+    # get the room_visibility at the time of the event.
+    visibility = get_effective_room_visibility_from_state(state)
+
+    # Always allow history visibility events on boundaries. This is done
+    # by setting the effective visibility to the least restrictive
+    # of the old vs new.
+    if event.type == EventTypes.RoomHistoryVisibility:
+        prev_content = event.unsigned.get("prev_content", {})
+        prev_visibility = prev_content.get("history_visibility", None)
+
+        if prev_visibility not in VISIBILITY_PRIORITY:
+            prev_visibility = HistoryVisibility.SHARED
+
+        new_priority = VISIBILITY_PRIORITY.index(visibility)
+        old_priority = VISIBILITY_PRIORITY.index(prev_visibility)
+        if old_priority < new_priority:
+            visibility = prev_visibility
+
+    # likewise, if the event is the user's own membership event, use
+    # the 'most joined' membership
+    membership = None
+    if event.type == EventTypes.Member and event.state_key == user_id:
+        membership = event.content.get("membership", None)
+        if membership not in MEMBERSHIP_PRIORITY:
+            membership = "leave"
+
+        prev_content = event.unsigned.get("prev_content", {})
+        prev_membership = prev_content.get("membership", None)
+        if prev_membership not in MEMBERSHIP_PRIORITY:
+            prev_membership = "leave"
+
+        # Always allow the user to see their own leave events, otherwise
+        # they won't see the room disappear if they reject the invite
+        #
+        # (Note this doesn't work for out-of-band invite rejections, which don't
+        # have prev_state populated. They are handled above in the outlier code.)
+        if membership == "leave" and (
+            prev_membership == "join" or prev_membership == "invite"
+        ):
+            return event
+
+        new_priority = MEMBERSHIP_PRIORITY.index(membership)
+        old_priority = MEMBERSHIP_PRIORITY.index(prev_membership)
+        if old_priority < new_priority:
+            membership = prev_membership
+
+    # otherwise, get the user's membership at the time of the event.
+    if membership is None:
+        membership_event = state.get((EventTypes.Member, user_id), None)
+        if membership_event:
+            membership = membership_event.membership
+
+    # if the user was a member of the room at the time of the event,
+    # they can see it.
+    if membership == Membership.JOIN:
+        return event
+
+    # otherwise, it depends on the room visibility.
+
+    if visibility == HistoryVisibility.JOINED:
+        # we weren't a member at the time of the event, so we can't
+        # see this event.
+        return None
+
+    elif visibility == HistoryVisibility.INVITED:
+        # user can also see the event if they were *invited* at the time
+        # of the event.
+        return event if membership == Membership.INVITE else None
+
+    elif visibility == HistoryVisibility.SHARED and is_peeking:
+        # if the visibility is shared, users cannot see the event unless
+        # they have *subsequently* joined the room (or were members at the
+        # time, of course)
+        #
+        # XXX: if the user has subsequently joined and then left again,
+        # ideally we would share history up to the point they left. But
+        # we don't know when they left. We just treat it as though they
+        # never joined, and restrict access.
+        return None
+
+    # the visibility is either shared or world_readable, and the user was
+    # not a member at the time. We allow it, provided the original sender
+    # has not requested their data to be erased, in which case, we return
+    # a redacted version.
+    if sender_erased:
+        return prune_event(event)
+
+    return event
 
 
 def get_effective_room_visibility_from_state(state: StateMap[EventBase]) -> str:
