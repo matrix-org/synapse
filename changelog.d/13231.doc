@@ -1,0 +1,2 @@
+Pointed out, that the Admin API is not accessible by default from any remote computer, but only from the PC `matrix-synapse` is running on.
+Added a full, working example, making sure to include the cURL flag `-X`, which needs to be prepended to `GET`, `POST`, `PUT` etc. and listing the full query string including protocol, IP address and port.
