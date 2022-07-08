@@ -15,6 +15,7 @@ import threading
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
 from unittest.mock import Mock
 
+from twisted.internet import defer
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventTypes, LoginType, Membership
@@ -931,3 +932,62 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
 
         # Check that the mock was called with the right parameters
         self.assertEqual(args, (user_id, "email", "foo@example.com"))
+
+    def test_on_threepid_unbind(self) -> None:
+        """Tests that the on_threepid_unbind module callback is called correctly before
+        removing a 3PID mapping.
+        """
+
+        # Register an admin user.
+        self.register_user("admin", "password", admin=True)
+        admin_tok = self.login("admin", "password")
+
+        # Also register a normal user we can modify.
+        user_id = self.register_user("user", "password")
+
+        # Add a 3PID to the user.
+        channel = self.make_request(
+            "PUT",
+            "/_synapse/admin/v2/users/%s" % user_id,
+            {
+                "threepids": [
+                    {
+                        "medium": "email",
+                        "address": "foo@example.com",
+                    },
+                ],
+            },
+            access_token=admin_tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # Add the mapping to the remote 3pid assoc table
+        defer.ensureDeferred(
+            self.hs.get_module_api().store_remote_3pid_association(
+                user_id, "email", "foo@example.com", "identityserver.org"
+            )
+        )
+
+        # Register a mocked callback with stop = True since we don't want to actually
+        # call identityserver.org
+        threepid_unbind_mock = Mock(return_value=make_awaitable((True, True)))
+        third_party_rules = self.hs.get_third_party_event_rules()
+        third_party_rules._on_threepid_unbind_callbacks.append(threepid_unbind_mock)
+
+        # Deactivate the account, this should remove the 3pid mapping
+        # and call the module handler.
+        channel = self.make_request(
+            "POST",
+            "/_synapse/admin/v1/deactivate/%s" % user_id,
+            access_token=admin_tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # Check that the mock was called once.
+        threepid_unbind_mock.assert_called_once()
+        args = threepid_unbind_mock.call_args[0]
+
+        # Check that the mock was called with the right parameters
+        self.assertEqual(
+            args, (user_id, "email", "foo@example.com", "identityserver.org")
+        )

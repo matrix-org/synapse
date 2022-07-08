@@ -265,6 +265,24 @@ server_.
 
 If multiple modules implement this callback, Synapse runs them all in order.
 
+### `on_threepid_unbind`
+
+_First introduced in Synapse v1.63.0_
+
+```python
+async def on_threepid_unbind(
+    user_id: str, medium: str, address: str, identity_server: str
+) -> Tuple[bool, bool]:
+```
+
+Called before a threepid association is removed.
+
+It should return a tuple of 2 booleans reporting if a changed happened for the first, and if unbind
+needs to stop there for the second (True value). In this case no other module unbind will be
+called, and the default unbind made to the IS that was used on bind will also be skipped.
+In any case the mapping will be removed from the Synapse 3pid remote table, except if an Exception
+was raised at some point.
+
 ## Example
 
 The example below is a module that implements the third-party rules callback

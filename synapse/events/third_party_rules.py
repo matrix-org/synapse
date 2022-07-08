@@ -45,6 +45,9 @@ CHECK_CAN_DEACTIVATE_USER_CALLBACK = Callable[[str, bool], Awaitable[bool]]
 ON_PROFILE_UPDATE_CALLBACK = Callable[[str, ProfileInfo, bool, bool], Awaitable]
 ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK = Callable[[str, bool, bool], Awaitable]
 ON_THREEPID_BIND_CALLBACK = Callable[[str, str, str], Awaitable]
+ON_THREEPID_UNBIND_CALLBACK = Callable[
+    [str, str, str, str], Awaitable[Tuple[bool, bool]]
+]
 
 
 def load_legacy_third_party_event_rules(hs: "HomeServer") -> None:
@@ -174,6 +177,7 @@ class ThirdPartyEventRules:
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = []
         self._on_threepid_bind_callbacks: List[ON_THREEPID_BIND_CALLBACK] = []
+        self._on_threepid_unbind_callbacks: List[ON_THREEPID_UNBIND_CALLBACK] = []
 
     def register_third_party_rules_callbacks(
         self,
@@ -193,6 +197,7 @@ class ThirdPartyEventRules:
             ON_USER_DEACTIVATION_STATUS_CHANGED_CALLBACK
         ] = None,
         on_threepid_bind: Optional[ON_THREEPID_BIND_CALLBACK] = None,
+        on_threepid_unbind: Optional[ON_THREEPID_UNBIND_CALLBACK] = None,
     ) -> None:
         """Register callbacks from modules for each hook."""
         if check_event_allowed is not None:
@@ -229,6 +234,9 @@ class ThirdPartyEventRules:
 
         if on_threepid_bind is not None:
             self._on_threepid_bind_callbacks.append(on_threepid_bind)
+
+        if on_threepid_unbind is not None:
+            self._on_threepid_unbind_callbacks.append(on_threepid_unbind)
 
     async def check_event_allowed(
         self, event: EventBase, context: EventContext
@@ -523,3 +531,42 @@ class ThirdPartyEventRules:
                 logger.exception(
                     "Failed to run module API callback %s: %s", callback, e
                 )
+
+    async def on_threepid_unbind(
+        self, user_id: str, medium: str, address: str, identity_server: str
+    ) -> Tuple[bool, bool]:
+        """Called before a threepid association is removed.
+
+        Note that this callback is called before an association is deleted on the
+        local homeserver.
+
+        Args:
+            user_id: the user being associated with the threepid.
+            medium: the threepid's medium.
+            address: the threepid's address.
+            identity_server: the identity server where the threepid was successfully registered.
+
+        Returns:
+            A tuple of 2 booleans reporting if a changed happened for the first, and if unbind
+            needs to stop there for the second (True value). In this case no other module unbind will be
+            called, and the default unbind made to the IS that was used on bind will also be skipped.
+            In any case the mapping will be removed from the Synapse 3pid remote table, except if an Exception
+            was raised at some point.
+        """
+
+        global_changed = True
+        for callback in self._on_threepid_unbind_callbacks:
+            try:
+                (changed, stop) = await callback(
+                    user_id, medium, address, identity_server
+                )
+                global_changed &= changed
+                if stop:
+                    return (global_changed, True)
+            except Exception as e:
+                logger.exception(
+                    "Failed to run module API callback %s: %s", callback, e
+                )
+                raise e
+
+        return (global_changed, False)

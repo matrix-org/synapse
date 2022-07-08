@@ -276,49 +276,67 @@ class IdentityHandler:
             server doesn't support unbinding
         """
 
-        if not valid_id_server_location(id_server):
-            raise SynapseError(
-                400,
-                "id_server must be a valid hostname with optional port and path components",
-            )
+        medium = threepid["medium"]
+        address = threepid["address"]
 
-        url = "https://%s/_matrix/identity/v2/3pid/unbind" % (id_server,)
-        url_bytes = b"/_matrix/identity/v2/3pid/unbind"
-
-        content = {
-            "mxid": mxid,
-            "threepid": {"medium": threepid["medium"], "address": threepid["address"]},
-        }
-
-        # we abuse the federation http client to sign the request, but we have to send it
-        # using the normal http client since we don't want the SRV lookup and want normal
-        # 'browser-like' HTTPS.
-        auth_headers = self.federation_http_client.build_auth_headers(
-            destination=None,
-            method=b"POST",
-            url_bytes=url_bytes,
-            content=content,
-            destination_is=id_server.encode("ascii"),
+        (
+            changed,
+            stop,
+        ) = await self.hs.get_third_party_event_rules().on_threepid_unbind(
+            mxid, medium, address, id_server
         )
-        headers = {b"Authorization": auth_headers}
 
-        try:
-            # Use the blacklisting http client as this call is only to identity servers
-            # provided by a client
-            await self.blacklisting_http_client.post_json_get_json(
-                url, content, headers
+        # If a module wants to take over unbind it will return stop = True,
+        # in this case we should just purge the table from the 3pid record
+        if not stop:
+            if not valid_id_server_location(id_server):
+                raise SynapseError(
+                    400,
+                    "id_server must be a valid hostname with optional port and path components",
+                )
+
+            url = "https://%s/_matrix/identity/v2/3pid/unbind" % (id_server,)
+            url_bytes = b"/_matrix/identity/v2/3pid/unbind"
+
+            content = {
+                "mxid": mxid,
+                "threepid": {
+                    "medium": threepid["medium"],
+                    "address": threepid["address"],
+                },
+            }
+
+            # we abuse the federation http client to sign the request, but we have to send it
+            # using the normal http client since we don't want the SRV lookup and want normal
+            # 'browser-like' HTTPS.
+            auth_headers = self.federation_http_client.build_auth_headers(
+                destination=None,
+                method=b"POST",
+                url_bytes=url_bytes,
+                content=content,
+                destination_is=id_server.encode("ascii"),
             )
-            changed = True
-        except HttpResponseException as e:
-            changed = False
-            if e.code in (400, 404, 501):
-                # The remote server probably doesn't support unbinding (yet)
-                logger.warning("Received %d response while unbinding threepid", e.code)
-            else:
-                logger.error("Failed to unbind threepid on identity server: %s", e)
-                raise SynapseError(500, "Failed to contact identity server")
-        except RequestTimedOutError:
-            raise SynapseError(500, "Timed out contacting identity server")
+            headers = {b"Authorization": auth_headers}
+
+            try:
+                # Use the blacklisting http client as this call is only to identity servers
+                # provided by a client
+                await self.blacklisting_http_client.post_json_get_json(
+                    url, content, headers
+                )
+                changed &= True
+            except HttpResponseException as e:
+                changed &= False
+                if e.code in (400, 404, 501):
+                    # The remote server probably doesn't support unbinding (yet)
+                    logger.warning(
+                        "Received %d response while unbinding threepid", e.code
+                    )
+                else:
+                    logger.error("Failed to unbind threepid on identity server: %s", e)
+                    raise SynapseError(500, "Failed to contact identity server")
+            except RequestTimedOutError:
+                raise SynapseError(500, "Timed out contacting identity server")
 
         await self.store.remove_user_bound_threepid(
             user_id=mxid,
