@@ -1386,10 +1386,10 @@ This option allows admins to ratelimit joins to a room based on the number of re
 joins (local or remote) to that room. It is intended to mitigate mass-join spam
 waves which target multiple homeservers.
 
-Sensible values for this option are provided by default; most server admins
-won't need to adjust this setting.
+By default, one join is permitted to a room every second, with an accumulating
+buffer of up to ten instantaneous joins.
 
-Example configuration:
+Example configuration (default values):
 ```yaml
 rc_joins_per_room:
   per_second: 1
