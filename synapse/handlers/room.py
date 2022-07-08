@@ -889,7 +889,7 @@ class RoomCreationHandler:
         # override any attempt to set room versions via the creation_content
         creation_content["room_version"] = room_version.identifier
 
-        last_stream_id = await self._send_events_for_new_room(
+        last_stream_id, last_sent_event_id, depth = await self._send_events_for_new_room(
             requester,
             room_id,
             preset_config=preset_config,
@@ -905,7 +905,7 @@ class RoomCreationHandler:
         if "name" in config:
             name = config["name"]
             (
-                _,
+                name_event,
                 last_stream_id,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
@@ -917,12 +917,16 @@ class RoomCreationHandler:
                     "content": {"name": name},
                 },
                 ratelimit=False,
+                prev_event_ids=[last_sent_event_id],
+                depth=depth,
             )
+            last_sent_event_id = name_event.event_id
+            depth += 1
 
         if "topic" in config:
             topic = config["topic"]
             (
-                _,
+                topic_event,
                 last_stream_id,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
@@ -934,7 +938,11 @@ class RoomCreationHandler:
                     "content": {"topic": topic},
                 },
                 ratelimit=False,
+                prev_event_ids=[last_sent_event_id],
+                depth=depth,
             )
+            last_sent_event_id = topic_event.event_id
+            depth += 1
 
         # we avoid dropping the lock between invites, as otherwise joins can
         # start coming in and making the createRoom slow.
@@ -959,7 +967,10 @@ class RoomCreationHandler:
                     ratelimit=False,
                     content=content,
                     new_room=True,
+                    prev_event_ids=[last_sent_event_id],
+                    depth=depth,
                 )
+                depth += 1
 
         for invite_3pid in invite_3pid_list:
             id_server = invite_3pid["id_server"]
@@ -1019,6 +1030,7 @@ class RoomCreationHandler:
 
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
 
+        depth = 1
         last_sent_event_id: Optional[str] = None
 
         def create(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
@@ -1031,6 +1043,7 @@ class RoomCreationHandler:
 
         async def send(etype: str, content: JsonDict, **kwargs: Any) -> int:
             nonlocal last_sent_event_id
+            nonlocal depth
 
             event = create(etype, content, **kwargs)
             logger.debug("Sending %s in new room", etype)
@@ -1047,9 +1060,11 @@ class RoomCreationHandler:
                 # Note: we don't pass state_event_ids here because this triggers
                 # an additional query per event to look them up from the events table.
                 prev_event_ids=[last_sent_event_id] if last_sent_event_id else [],
+                depth=depth,
             )
 
             last_sent_event_id = sent_event.event_id
+            depth += 1
 
             return last_stream_id
 
@@ -1075,6 +1090,7 @@ class RoomCreationHandler:
             content=creator_join_profile,
             new_room=True,
             prev_event_ids=[last_sent_event_id],
+            depth=depth,
         )
         last_sent_event_id = member_event_id
 
@@ -1168,7 +1184,7 @@ class RoomCreationHandler:
                 content={"algorithm": RoomEncryptionAlgorithms.DEFAULT},
             )
 
-        return last_sent_stream_id
+        return last_sent_stream_id, last_sent_event_id, depth
 
     def _generate_room_id(self) -> str:
         """Generates a random room ID.
