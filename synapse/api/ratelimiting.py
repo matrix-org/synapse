@@ -27,6 +27,9 @@ class Ratelimiter:
     """
     Ratelimit actions marked by arbitrary keys.
 
+    (Note that the source code speaks of "actions" and "burst_count" rather than
+    "tokens" and a "bucket_size".)
+
     This is a "leaky bucket as a meter". For each key to be tracked there is a bucket
     containing some number 0 <= T <= `burst_count` of tokens corresponding to previously
     permitted requests for that key. Each bucket starts empty, and gradually leaks
@@ -50,9 +53,6 @@ class Ratelimiter:
     Then for each incoming request, we can calculate how many tokens have leaked
     since this time point, and use that to decide if we should accept or reject the
     request.
-
-    Note that the source code speaks of "actions" and "burst_count" rather than "tokens"
-    and a "bucket_size".
 
     Args:
         clock: A homeserver clock, for retrieving the current time
