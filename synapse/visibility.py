@@ -187,26 +187,38 @@ def _check_client_allowed_to_see_event(
     if state is None:
         raise Exception("Missing state for non-outlier event")
 
+    # If the sender has been erased we must only return the redacted form.
+    if sender_erased:
+        event = prune_event(event)
+
     # get the room_visibility at the time of the event.
     visibility = get_effective_room_visibility_from_state(state)
 
-    # Always allow history visibility events on boundaries. This is done
-    # by setting the effective visibility to the least restrictive
-    # of the old vs new.
-    if event.type == EventTypes.RoomHistoryVisibility:
-        prev_content = event.unsigned.get("prev_content", {})
-        prev_visibility = prev_content.get("history_visibility", None)
+    # Check if the room has lax history visibility, allowing us to skip
+    # membership checks.
+    if _check_history_visibility(event, visibility, is_peeking):
+        return event
 
-        if prev_visibility not in VISIBILITY_PRIORITY:
-            prev_visibility = HistoryVisibility.SHARED
+    if _check_membership(user_id, event, visibility, state, is_peeking):
+        return event
 
-        new_priority = VISIBILITY_PRIORITY.index(visibility)
-        old_priority = VISIBILITY_PRIORITY.index(prev_visibility)
-        if old_priority < new_priority:
-            visibility = prev_visibility
+    return None
 
-    # likewise, if the event is the user's own membership event, use
-    # the 'most joined' membership
+
+def _check_membership(
+    user_id: str,
+    event: EventBase,
+    visibility: str,
+    state: StateMap[EventBase],
+    is_peeking: bool,
+) -> bool:
+    """Check whether the user can see the event due to their membership
+
+    Returns:
+        True if they can, False if they can't
+    """
+    # If the event is the user's own membership event, use the 'most joined'
+    # membership
     membership = None
     if event.type == EventTypes.Member and event.state_key == user_id:
         membership = event.content.get("membership", None)
@@ -226,7 +238,7 @@ def _check_client_allowed_to_see_event(
         if membership == "leave" and (
             prev_membership == "join" or prev_membership == "invite"
         ):
-            return event
+            return True
 
         new_priority = MEMBERSHIP_PRIORITY.index(membership)
         old_priority = MEMBERSHIP_PRIORITY.index(prev_membership)
@@ -242,19 +254,19 @@ def _check_client_allowed_to_see_event(
     # if the user was a member of the room at the time of the event,
     # they can see it.
     if membership == Membership.JOIN:
-        return event
+        return True
 
     # otherwise, it depends on the room visibility.
 
     if visibility == HistoryVisibility.JOINED:
         # we weren't a member at the time of the event, so we can't
         # see this event.
-        return None
+        return False
 
     elif visibility == HistoryVisibility.INVITED:
         # user can also see the event if they were *invited* at the time
         # of the event.
-        return event if membership == Membership.INVITE else None
+        return membership == Membership.INVITE
 
     elif visibility == HistoryVisibility.SHARED and is_peeking:
         # if the visibility is shared, users cannot see the event unless
@@ -265,16 +277,11 @@ def _check_client_allowed_to_see_event(
         # ideally we would share history up to the point they left. But
         # we don't know when they left. We just treat it as though they
         # never joined, and restrict access.
-        return None
+        return False
 
-    # the visibility is either shared or world_readable, and the user was
-    # not a member at the time. We allow it, provided the original sender
-    # has not requested their data to be erased, in which case, we return
-    # a redacted version.
-    if sender_erased:
-        return prune_event(event)
-
-    return event
+    # The visibility is either shared or world_readable, and the user was
+    # not a member at the time. We allow it.
+    return True
 
 
 def _check_filter_send_to_client(
@@ -317,9 +324,39 @@ def _check_filter_send_to_client(
     return True
 
 
+def _check_history_visibility(
+    event: EventBase, visibility: str, is_peeking: bool
+) -> bool:
+    """Check if event is allowed to be seen due to lax history visibility.
+
+    Returns:
+        True if user can definitely see the event, False if maybe not.
+    """
+    # Always allow history visibility events on boundaries. This is done
+    # by setting the effective visibility to the least restrictive
+    # of the old vs new.
+    if event.type == EventTypes.RoomHistoryVisibility:
+        prev_content = event.unsigned.get("prev_content", {})
+        prev_visibility = prev_content.get("history_visibility", None)
+
+        if prev_visibility not in VISIBILITY_PRIORITY:
+            prev_visibility = HistoryVisibility.SHARED
+
+        new_priority = VISIBILITY_PRIORITY.index(visibility)
+        old_priority = VISIBILITY_PRIORITY.index(prev_visibility)
+        if old_priority < new_priority:
+            visibility = prev_visibility
+
+    if visibility == HistoryVisibility.SHARED and not is_peeking:
+        return True
+    elif visibility == HistoryVisibility.WORLD_READABLE:
+        return True
+
+    return False
+
+
 def get_effective_room_visibility_from_state(state: StateMap[EventBase]) -> str:
     """Get the actual history vis, from a state map including the history_visibility event
-
     Handles missing and invalid history visibility events.
     """
     visibility_event = state.get(_HISTORY_VIS_KEY, None)
