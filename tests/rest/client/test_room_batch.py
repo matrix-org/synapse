@@ -1,5 +1,5 @@
 import logging
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from unittest.mock import Mock, patch
 from urllib.parse import urlencode
 
@@ -133,10 +133,12 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
 
         return room_id, event_id_a, event_id_b, event_id_c
 
-    def _create_batch_send_url(self, room_id: str, prev_event_id: str) -> str:
+    def _create_batch_send_url(
+        self, room_id: str, prev_event_id: str, user_id: Optional[str] = None
+    ) -> str:
         params = {
             "prev_event_id": prev_event_id,
-            "user_id": self.room_creator_user_id,
+            "user_id": user_id or self.room_creator_user_id,
         }
         return (
             "/_matrix/client/unstable/org.matrix.msc2716/rooms/{}/batch_send?{}".format(
@@ -350,4 +352,35 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             corresponding_insertion_event_id,
             channel.json_body["insertion_event_id"],
+        )
+
+    @unittest.override_config({"experimental_features": {"msc2716_enabled": True}})
+    def test_batch_send_as_non_creator_v9(self) -> None:
+        """Make sure that the batch send fails with 403 FORBIDDEN when the user
+        making the /batch_send request is not the creator of the room.
+        """
+
+        time_before_room = int(self.clock.time_msec())
+        room_id, event_id_a, _, _ = self._create_test_room()
+
+        channel = self.make_request(
+            "POST",
+            self._create_batch_send_url(
+                room_id, event_id_a, user_id=self.virtual_user_id
+            ),
+            content={
+                "events": _create_message_events_for_batch_send_request(
+                    self.virtual_user_id, time_before_room, 3
+                ),
+                "state_events_at_start": _create_join_state_events_for_batch_send_request(
+                    [self.virtual_user_id], time_before_room
+                ),
+            },
+            access_token=self.appservice.token,
+        )
+        self.assertEqual(channel.code, 403, channel.result)
+        self.assertEqual(
+            channel.json_body["error"],
+            "In room version 9, only the room creator can use the /batch_send endpoint",
+            channel.json_body,
         )

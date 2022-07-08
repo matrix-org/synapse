@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Awaitable, Tuple
 from twisted.web.server import Request
 
 from synapse.api.constants import EventContentFields
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
@@ -89,7 +89,33 @@ class RoomBatchSendEventRestServlet(RestServlet):
         if not requester.app_service:
             raise AuthError(
                 HTTPStatus.FORBIDDEN,
-                "Only application services can use the /batchsend endpoint",
+                "Only application services can use the /batch_send endpoint",
+                errcode=Codes.FORBIDDEN,
+            )
+
+        # Verify that the user actually has permission to batch send in this
+        # room.
+        #
+        # We only have to check when the room version does not support
+        # msc2716_historical because if it does, the event auth code verifies
+        # whether the user has permission to send historical events.
+        #
+        # For room versions that don't support msc2716_historical, only the
+        # room creator is allowed to batch send.
+        room = await self.store.get_room(room_id)
+        if not room:
+            raise NotFoundError("Room not found")
+
+        room_version = await self.store.get_room_version(room_id)
+        if (
+            not room_version.msc2716_historical
+            and requester.user.to_string() != room["creator"]
+        ):
+            raise SynapseError(
+                HTTPStatus.FORBIDDEN,
+                f"In room version {room_version.identifier}, only the room "
+                "creator can use the /batch_send endpoint",
+                errcode=Codes.FORBIDDEN,
             )
 
         body = parse_json_object_from_request(request)
