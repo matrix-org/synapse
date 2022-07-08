@@ -5,9 +5,19 @@
 Many of the API calls in the admin api will require an `access_token` for a
 server admin. (Note that a server admin is distinct from a room admin.)
 
-A user can be marked as a server admin by updating the database directly, e.g.:
+An existing user can be marked as a server admin by updating the database directly.
 
+When using PostgreSQL, switch to the `postgres` user and start the command line tool.
+```sh
+su - postgres
+psql
+```
+
+List all databases, connect to the correct database called e.g. `synapse` and elevate the user 
+`@foo:bar.com` to administrator.
 ```sql
+\l
+\c synapse
 UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 ```
 
