@@ -461,6 +461,7 @@ class EventCreationHandler:
         )
         self._events_shard_config = self.config.worker.events_shard_config
         self._instance_name = hs.get_instance_name()
+        self._notifier = hs.get_notifier()
 
         self.room_prejoin_state_types = self.hs.config.api.room_prejoin_state
 
@@ -1510,6 +1511,18 @@ class EventCreationHandler:
                 is_admin_redaction = bool(
                     original_event and event.sender != original_event.sender
                 )
+
+            if event.type == EventTypes.Member and event.membership == Membership.JOIN:
+                (
+                    current_membership,
+                    _,
+                ) = await self.store.get_local_current_membership_for_user_in_room(
+                    event.state_key, event.room_id
+                )
+                if current_membership != Membership.JOIN:
+                    self._notifier.notify_user_joined_room(
+                        event.event_id, event.room_id
+                    )
 
             await self.request_ratelimiter.ratelimit(
                 requester, is_admin_redaction=is_admin_redaction

@@ -105,6 +105,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         )
         # TODO: find a better place to keep this Ratelimiter.
         #   It needs to be
+        #    - written to by event persistence code
         #    - written to by something which can snoop on replication streams
         #    - read by the RoomMemberHandler to rate limit joins from local users
         #    - read by the FederationServer to rate limit make_joins and send_joins from
@@ -404,9 +405,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             if newly_joined and ratelimit:
                 await self._join_rate_limiter_local.ratelimit(requester)
                 await self._join_rate_per_room_limiter.ratelimit(
-                    requester,
-                    key=room_id,
-                    update=self.hs.persists_events_for_room(room_id),
+                    requester, key=room_id, update=False
                 )
 
         result_event = await self.event_creation_handler.handle_new_client_event(
@@ -859,7 +858,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     await self._join_rate_per_room_limiter.ratelimit(
                         requester,
                         key=room_id,
-                        update=self.hs.persists_events_for_room(room_id),
+                        update=False,
                     )
 
                 inviter = await self._get_inviter(target.to_string(), room_id)

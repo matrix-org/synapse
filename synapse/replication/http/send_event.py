@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, List, Tuple
 
 from twisted.web.server import Request
 
-from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase, make_event_from_dict
 from synapse.events.snapshot import EventContext
@@ -73,7 +72,6 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
         self.store = hs.get_datastores().main
         self._storage_controllers = hs.get_storage_controllers()
         self.clock = hs.get_clock()
-        self._notifier = hs.get_notifier()
 
     @staticmethod
     async def _serialize_payload(  # type: ignore[override]
@@ -139,16 +137,6 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
         logger.info(
             "Got event to send with ID: %s into room: %s", event.event_id, event.room_id
         )
-
-        if event.type == EventTypes.Member and event.membership == Membership.JOIN:
-            (
-                current_membership,
-                _,
-            ) = await self.store.get_local_current_membership_for_user_in_room(
-                event.state_key, event.room_id
-            )
-            if current_membership != Membership.JOIN:
-                self._notifier.notify_user_joined_room(event.event_id, event.room_id)
 
         event = await self.event_creation_handler.persist_and_notify_client_event(
             requester, event, context, ratelimit=ratelimit, extra_users=extra_users

@@ -667,7 +667,7 @@ class FederationServer(FederationBase):
         await self._room_member_handler._join_rate_per_room_limiter.ratelimit(  # type: ignore[has-type]
             requester=None,
             key=room_id,
-            update=self.hs.persists_events_for_room(room_id),
+            update=False,
         )
 
         event, context = await self._on_send_membership_event(
