@@ -117,7 +117,7 @@ async def filter_events_for_client(
             retention_policy=retention_policies[room_id],
             state=event_id_to_state.get(event.event_id),
             is_peeking=is_peeking,
-            sender_erased=event.sender in erased_senders,
+            sender_erased=erased_senders.get(event.sender, False),
         )
 
     # Check each event: gives an iterable of None or (a potentially modified)
