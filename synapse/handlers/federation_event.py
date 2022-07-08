@@ -278,7 +278,9 @@ class FederationEventHandler:
                 )
 
         try:
-            await self._process_received_pdu(origin, pdu, state_ids=None)
+            await self._process_received_pdu(
+                origin, pdu, state_ids=None, partial_state=None
+            )
         except PartialStateConflictError:
             # The room was un-partial stated while we were processing the PDU.
             # Try once more, with full state this time.
@@ -286,7 +288,9 @@ class FederationEventHandler:
                 "Room %s was un-partial stated while processing the PDU, trying again.",
                 room_id,
             )
-            await self._process_received_pdu(origin, pdu, state_ids=None)
+            await self._process_received_pdu(
+                origin, pdu, state_ids=None, partial_state=None
+            )
 
     async def on_send_membership_event(
         self, origin: str, event: EventBase
@@ -814,7 +818,11 @@ class FederationEventHandler:
             #   https://github.com/matrix-org/synapse/issues/13002
 
             await self._process_received_pdu(
-                origin, event, state_ids=state_ids, backfilled=backfilled
+                origin,
+                event,
+                state_ids=state_ids,
+                partial_state=False,
+                backfilled=backfilled,
             )
         except FederationError as e:
             if e.code == 403:
@@ -1096,6 +1104,7 @@ class FederationEventHandler:
         origin: str,
         event: EventBase,
         state_ids: Optional[StateMap[str]],
+        partial_state: Optional[bool],
         backfilled: bool = False,
     ) -> None:
         """Called when we have a new non-outlier event.
@@ -1119,14 +1128,21 @@ class FederationEventHandler:
 
             state_ids: Normally None, but if we are handling a gap in the graph
                 (ie, we are missing one or more prev_events), the resolved state at the
-                event. Must not be partial state.
+                event
+
+            partial_state:
+                `True` if `state_ids` is partial and omits non-critical membership
+                events.
+                `False` if `state_ids` is the full state.
+                `None` if `state_ids` is not provided. In this case, the flag will be
+                calculated based on `event`'s prev events.
 
             backfilled: True if this is part of a historical batch of events (inhibits
                 notification to clients, and validation of device keys.)
 
         PartialStateConflictError: if the room was un-partial stated in between
             computing the state at the event and persisting it. The caller should retry
-            exactly once in this case. Will never be raised if `state_ids` is provided.
+            exactly once in this case.
         """
         logger.debug("Processing event: %s", event)
         assert not event.internal_metadata.outlier
@@ -1134,7 +1150,7 @@ class FederationEventHandler:
         context = await self._state_handler.compute_event_context(
             event,
             state_ids_before_event=state_ids,
-            partial_state=None if state_ids is None else False,
+            partial_state=partial_state,
         )
         try:
             await self._check_event_auth(origin, event, context)
