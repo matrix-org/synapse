@@ -462,6 +462,7 @@ class StateTestCase(unittest.TestCase):
                 state_ids_before_event={
                     (e.type, e.state_key): e.event_id for e in old_state
                 },
+                partial_state=False,
             )
         )
 
@@ -492,6 +493,7 @@ class StateTestCase(unittest.TestCase):
                 state_ids_before_event={
                     (e.type, e.state_key): e.event_id for e in old_state
                 },
+                partial_state=False,
             )
         )
 

@@ -540,6 +540,8 @@ class FederationEventHandler:
             context = await self._state_handler.compute_event_context(
                 event,
                 state_ids_before_event=state_ids,
+                # TODO(faster_joins): Calculate the partial_state flag correctly.
+                partial_state=None if state_ids is None else False,
             )
             if context.partial_state:
                 # this can happen if some or all of the event's prev_events still have
@@ -1132,6 +1134,7 @@ class FederationEventHandler:
         context = await self._state_handler.compute_event_context(
             event,
             state_ids_before_event=state_ids,
+            partial_state=None if state_ids is None else False,
         )
         try:
             await self._check_event_auth(origin, event, context)

@@ -70,7 +70,11 @@ class ExtremPruneTestCase(HomeserverTestCase):
     def persist_event(self, event, state=None):
         """Persist the event, with optional state"""
         context = self.get_success(
-            self.state.compute_event_context(event, state_ids_before_event=state)
+            self.state.compute_event_context(
+                event,
+                state_ids_before_event=state,
+                partial_state=None if state is None else False,
+            )
         )
         self.get_success(self._persistence.persist_event(event, context))
 
@@ -148,6 +152,7 @@ class ExtremPruneTestCase(HomeserverTestCase):
             self.state.compute_event_context(
                 remote_event_2,
                 state_ids_before_event=state_before_gap,
+                partial_state=False,
             )
         )
 
