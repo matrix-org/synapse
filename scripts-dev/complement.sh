@@ -161,4 +161,4 @@ fi
 echo "Images built; running complement"
 cd "$COMPLEMENT_DIR"
 
-go test -v -tags $test_tags -count=1 "${extra_test_args[@]}" "$@" ./tests/
+go test -v -tags $test_tags -count=1 "${extra_test_args[@]}" "$@" ./tests/...

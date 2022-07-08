@@ -764,6 +764,8 @@ class RoomEventContextServlet(RestServlet):
             requester, room_id, event_id, limit, event_filter
         )
 
+        logger.info("GET /context event_id=%s", event_id)
+
         if not event_context:
             raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 

@@ -322,6 +322,15 @@ class EventsPersistenceStorageController:
         """
         partitioned: Dict[str, List[Tuple[EventBase, EventContext]]] = {}
         for event, ctx in events_and_contexts:
+            import traceback
+
+            logger.info(
+                "persist_events _event_persist_queue event_id=%s backfilled=%s stack=%s",
+                event.event_id,
+                backfilled,
+                traceback.format_stack(),
+            )
+
             partitioned.setdefault(event.room_id, []).append((event, ctx))
 
         async def enqueue(
@@ -372,6 +381,12 @@ class EventsPersistenceStorageController:
             PartialStateConflictError: if attempting to persist a partial state event in
                 a room that has been un-partial stated.
         """
+        logger.info(
+            "persist_event _event_persist_queue event_id=%s backfilled=%s",
+            event.event_id,
+            backfilled,
+        )
+
         # add_to_queue returns a map from event ID to existing event ID if the
         # event was deduplicated. (The dict may also include other entries if
         # the event was persisted in a batch with other events.)

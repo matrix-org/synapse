@@ -780,6 +780,11 @@ class FederationEventHandler:
         existing = await self._store.get_event(
             event_id, allow_none=True, allow_rejected=True
         )
+        logger.info(
+            "_process_pulled_event event_id=%s existing_outlier=%s",
+            event_id,
+            existing and existing.internal_metadata.is_outlier(),
+        )
         if existing:
             if not existing.internal_metadata.is_outlier():
                 logger.info(
@@ -943,8 +948,9 @@ class FederationEventHandler:
             destination, room_id, event_id=event_id
         )
 
-        logger.debug(
-            "state_ids returned %i state events, %i auth events",
+        logger.info(
+            "_get_state_ids_after_missing_prev_event: state_ids for event_id=%s returned %i state events, %i auth events",
+            event_id,
             len(state_event_ids),
             len(auth_event_ids),
         )
@@ -952,12 +958,17 @@ class FederationEventHandler:
         # Start by checking events we already have in the DB
         desired_events = set(state_event_ids)
         desired_events.add(event_id)
-        logger.debug("Fetching %i events from cache/store", len(desired_events))
+        logger.info(
+            "_get_state_ids_after_missing_prev_event: event_id=%s Fetching %i events from cache/store",
+            event_id,
+            len(desired_events),
+        )
         have_events = await self._store.have_seen_events(room_id, desired_events)
 
         missing_desired_events = desired_events - have_events
-        logger.debug(
-            "We are missing %i events (got %i)",
+        logger.info(
+            "_get_state_ids_after_missing_prev_event: event_id=%s We are missing %i events (got %i)",
+            event_id,
             len(missing_desired_events),
             len(have_events),
         )
@@ -974,7 +985,11 @@ class FederationEventHandler:
         missing_auth_events.difference_update(
             await self._store.have_seen_events(room_id, missing_auth_events)
         )
-        logger.debug("We are also missing %i auth events", len(missing_auth_events))
+        logger.info(
+            "_get_state_ids_after_missing_prev_event: event_id=%s We are also missing %i auth events",
+            event_id,
+            len(missing_auth_events),
+        )
 
         missing_events = missing_desired_events | missing_auth_events
 
@@ -988,10 +1003,17 @@ class FederationEventHandler:
         # TODO: might it be better to have an API which lets us do an aggregate event
         #   request
         if (len(missing_events) * 10) >= len(auth_event_ids) + len(state_event_ids):
-            logger.debug("Requesting complete state from remote")
+            logger.info(
+                "_get_state_ids_after_missing_prev_event: event_id=%s requesting complete state from remote",
+                event_id,
+            )
             await self._get_state_and_persist(destination, room_id, event_id)
         else:
-            logger.debug("Fetching %i events from remote", len(missing_events))
+            logger.info(
+                "_get_state_ids_after_missing_prev_event: event_id=%sFetching %i events from remote",
+                event_id,
+                len(missing_events),
+            )
             await self._get_events_and_persist(
                 destination=destination, room_id=room_id, event_ids=missing_events
             )
@@ -1010,8 +1032,9 @@ class FederationEventHandler:
                 # This can happen if a remote server claims that the state or
                 # auth_events at an event in room A are actually events in room B
                 logger.warning(
-                    "Remote server %s claims event %s in room %s is an auth/state "
+                    "_get_state_ids_after_missing_prev_event: event_id=%s Remote server %s claims event %s in room %s is an auth/state "
                     "event in room %s",
+                    event_id,
                     destination,
                     state_event_id,
                     metadata.room_id,
@@ -1021,7 +1044,9 @@ class FederationEventHandler:
 
             if metadata.state_key is None:
                 logger.warning(
-                    "Remote server gave us non-state event in state: %s", state_event_id
+                    "_get_state_ids_after_missing_prev_event: event_id=%s Remote server gave us non-state event in state: %s",
+                    event_id,
+                    state_event_id,
                 )
                 continue
 
@@ -1043,7 +1068,7 @@ class FederationEventHandler:
         failed_to_fetch = desired_events - event_metadata.keys()
         if failed_to_fetch:
             logger.warning(
-                "Failed to fetch missing state events for %s %s",
+                "_get_state_ids_after_missing_prev_event: Failed to fetch missing state events for event_id=%s failed_to_fetch=%s",
                 event_id,
                 failed_to_fetch,
             )
@@ -1332,18 +1357,17 @@ class FederationEventHandler:
             event_id,
             room_version,
         )
-        event = await self._federation_client.get_pdu_from_destination_raw(
-            destination,
-            event_id,
-            room_version,
-        )
-        logger.info(
-            "backfill_event get_pdu=%s get_pdu_from_destination_raw=%s",
-            eventAsdf,
-            event,
-        )
-        # # FIXME: Too sketchy?
-        # event.internal_metadata.outlier = False
+        # FIXME: Too sketchy?
+        eventAsdf.internal_metadata.outlier = False
+        eventAsdf.internal_metadata.stream_ordering = None
+
+        event = eventAsdf
+
+        # event = await self._federation_client.get_pdu_from_destination_raw(
+        #     destination,
+        #     event_id,
+        #     room_version,
+        # )
 
         logger.info(
             "backfill_event event=%s outlier=%s", event, event.internal_metadata.outlier
