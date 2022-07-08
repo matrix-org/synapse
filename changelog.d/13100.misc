@@ -1,0 +1,1 @@
+Faster room joins: Handle race between persisting an event and un-partial stating a room.

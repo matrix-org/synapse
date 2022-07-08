@@ -28,7 +28,7 @@ from synapse.storage.databases.main.roommember import EventIdMembership
 from synapse.storage.state import StateFilter
 from synapse.util.caches import register_cache
 from synapse.util.metrics import measure_func
-from synapse.visibility import filter_events_for_client_with_state
+from synapse.visibility import filter_event_for_clients_with_state
 
 from .push_rule_evaluator import PushRuleEvaluatorForEvent
 
@@ -278,12 +278,6 @@ class BulkPushRuleEvaluator:
             self._relations_match_enabled,
         )
 
-        # If the event is not a state event check if any users ignore the sender.
-        if not event.is_state():
-            ignorers = await self.store.ignored_by(event.sender)
-        else:
-            ignorers = frozenset()
-
         users = list(rules_by_user.keys())
         profiles = await self.store.get_subset_users_in_room_with_profiles(
             event.room_id, users
@@ -291,15 +285,12 @@ class BulkPushRuleEvaluator:
 
         # This is a check for the case where user joins a room without being allowed to see history, and then the server
         # receives a delayed event from before the user joined, which they should not be pushed for
-        uids_with_visibility = await filter_events_for_client_with_state(
+        uids_with_visibility = await filter_event_for_clients_with_state(
             self.store, users, event, context
         )
 
         for uid, rules in rules_by_user.items():
             if event.sender == uid:
-                continue
-
-            if uid in ignorers:
                 continue
 
             if uid not in uids_with_visibility:

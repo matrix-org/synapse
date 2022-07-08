@@ -1,1 +1,0 @@
-Update [MSC3786](https://github.com/matrix-org/matrix-spec-proposals/pull/3786) implementation to check `state_key`.

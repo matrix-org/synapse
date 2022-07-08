@@ -317,7 +317,7 @@ Example configuration:
 allow_public_rooms_without_auth: true
 ```
 ---
-### `allow_public_rooms_without_auth`
+### `allow_public_rooms_over_federation`
 
 If set to true, allows any other homeserver to fetch the server's public
 rooms directory via federation. Defaults to false.
@@ -591,7 +591,7 @@ Example configuration:
 dummy_events_threshold: 5
 ```
 ---
-Config option `delete_stale_devices_after`
+### `delete_stale_devices_after`
 
 An optional duration. If set, Synapse will run a daily background task to log out and
 delete any device that hasn't been accessed for more than the specified amount of time.
@@ -1843,7 +1843,7 @@ Example configuration:
 turn_shared_secret: "YOUR_SHARED_SECRET"
 ```
 ----
-Config options: `turn_username` and `turn_password`
+### `turn_username` and `turn_password`
 
 The Username and password if the TURN server needs them and does not use a token.
 
@@ -2999,7 +2999,7 @@ This setting has the following sub-options:
 * `localdb_enabled`: Set to false to disable authentication against the local password
    database. This is ignored if `enabled` is false, and is only useful
    if you have other `password_providers`. Defaults to true. 
-* `pepper`: Set the value here to a secret random string for extra security. # Uncomment and change to a secret random string for extra security.
+* `pepper`: Set the value here to a secret random string for extra security.
    DO NOT CHANGE THIS AFTER INITIAL SETUP!
 * `policy`: Define and enforce a password policy, such as minimum lengths for passwords, etc. 
    Each parameter is optional. This is an implementation of MSC2000. Parameters are as follows:
@@ -3373,7 +3373,7 @@ alias_creation_rules:
     action: deny
 ```
 ---
-Config options: `room_list_publication_rules`
+### `room_list_publication_rules`
 
 The `room_list_publication_rules` option controls who can publish and
 which rooms can be published in the public room list.
