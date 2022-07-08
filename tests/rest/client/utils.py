@@ -70,6 +70,7 @@ class RestHelper:
         expect_code: Literal[200] = ...,
         extra_content: Optional[Dict] = ...,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = ...,
+        appservice_user_id: Optional[str] = None,
     ) -> str:
         ...
 
@@ -83,6 +84,7 @@ class RestHelper:
         expect_code: int = ...,
         extra_content: Optional[Dict] = ...,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = ...,
+        appservice_user_id: Optional[str] = None,
     ) -> Optional[str]:
         ...
 
@@ -95,6 +97,7 @@ class RestHelper:
         expect_code: int = HTTPStatus.OK,
         extra_content: Optional[Dict] = None,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
+        appservice_user_id: Optional[str] = None,
     ) -> Optional[str]:
         """
         Create a room.
@@ -116,6 +119,8 @@ class RestHelper:
                 Note that if is_public is set, the "visibility" key will be overridden.
                 If room_version is set, the "room_version" key will be overridden.
             custom_headers: HTTP headers to include in the request.
+            appservice_user_id: The virtual User ID to act through. Only works
+                when making appservice requests.
 
         Returns:
             The ID of the newly created room, or None if the request failed.
@@ -128,8 +133,13 @@ class RestHelper:
             content["visibility"] = "public" if is_public else "private"
         if room_version:
             content["room_version"] = room_version
+        query_params = {}
         if tok:
-            path = path + "?access_token=%s" % tok
+            query_params["access_token"] = tok
+        if appservice_user_id:
+            query_params["user_id"] = appservice_user_id
+        if query_params:
+            path = f"{path}?{urlencode(query_params)}"
 
         channel = make_request(
             self.hs.get_reactor(),
@@ -155,12 +165,14 @@ class RestHelper:
         targ: Optional[str] = None,
         expect_code: int = HTTPStatus.OK,
         tok: Optional[str] = None,
+        appservice_user_id: Optional[str] = None,
     ) -> None:
         self.change_membership(
             room=room,
             src=src,
             targ=targ,
             tok=tok,
+            appservice_user_id=appservice_user_id,
             membership=Membership.INVITE,
             expect_code=expect_code,
         )
@@ -379,13 +391,19 @@ class RestHelper:
         tok: Optional[str] = None,
         expect_code: int = HTTPStatus.OK,
         custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
+        appservice_user_id: Optional[str] = None,
     ) -> JsonDict:
         if txn_id is None:
             txn_id = "m%s" % (str(time.time()))
 
         path = "/_matrix/client/r0/rooms/%s/send/%s/%s" % (room_id, type, txn_id)
+        query_params = {}
         if tok:
-            path = path + "?access_token=%s" % tok
+            query_params["access_token"] = tok
+        if appservice_user_id:
+            query_params["user_id"] = appservice_user_id
+        if query_params:
+            path = f"{path}?{urlencode(query_params)}"
 
         channel = make_request(
             self.hs.get_reactor(),

@@ -1,6 +1,7 @@
 import logging
 from typing import List, Tuple
 from unittest.mock import Mock, patch
+from urllib.parse import urlencode
 
 from twisted.test.proto_helpers import MemoryReactor
 
@@ -89,49 +90,59 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
         self.clock = clock
         self._storage_controllers = hs.get_storage_controllers()
 
+        self.room_creator_user_id, _ = self.register_appservice_user(
+            "as_user_creator", self.appservice.token
+        )
         self.virtual_user_id, _ = self.register_appservice_user(
             "as_user_potato", self.appservice.token
         )
 
     def _create_test_room(self) -> Tuple[str, str, str, str]:
         room_id = self.helper.create_room_as(
-            self.appservice.sender, tok=self.appservice.token
+            self.appservice.sender,
+            tok=self.appservice.token,
+            appservice_user_id=self.room_creator_user_id,
         )
 
         res_a = self.helper.send_event(
             room_id=room_id,
             type=EventTypes.Message,
-            content={
-                "msgtype": "m.text",
-                "body": "A",
-            },
+            content={"msgtype": "m.text", "body": "A"},
             tok=self.appservice.token,
+            appservice_user_id=self.room_creator_user_id,
         )
         event_id_a = res_a["event_id"]
 
         res_b = self.helper.send_event(
             room_id=room_id,
             type=EventTypes.Message,
-            content={
-                "msgtype": "m.text",
-                "body": "B",
-            },
+            content={"msgtype": "m.text", "body": "B"},
             tok=self.appservice.token,
+            appservice_user_id=self.room_creator_user_id,
         )
         event_id_b = res_b["event_id"]
 
         res_c = self.helper.send_event(
             room_id=room_id,
             type=EventTypes.Message,
-            content={
-                "msgtype": "m.text",
-                "body": "C",
-            },
+            content={"msgtype": "m.text", "body": "C"},
             tok=self.appservice.token,
+            appservice_user_id=self.room_creator_user_id,
         )
         event_id_c = res_c["event_id"]
 
         return room_id, event_id_a, event_id_b, event_id_c
+
+    def _create_batch_send_url(self, room_id: str, prev_event_id: str) -> str:
+        params = {
+            "prev_event_id": prev_event_id,
+            "user_id": self.room_creator_user_id,
+        }
+        return (
+            "/_matrix/client/unstable/org.matrix.msc2716/rooms/{}/batch_send?{}".format(
+                room_id, urlencode(params)
+            )
+        )
 
     @unittest.override_config({"experimental_features": {"msc2716_enabled": True}})
     def test_same_state_groups_for_whole_historical_batch(self) -> None:
@@ -147,8 +158,7 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            "/_matrix/client/unstable/org.matrix.msc2716/rooms/%s/batch_send?prev_event_id=%s"
-            % (room_id, event_id_a),
+            self._create_batch_send_url(room_id, event_id_a),
             content={
                 "events": _create_message_events_for_batch_send_request(
                     self.virtual_user_id, time_before_room, 3
@@ -198,12 +208,18 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
         room_id, _, _, _ = self._create_test_room()
         # Invite the user
         self.helper.invite(
-            room_id, src=self.appservice.sender, tok=self.appservice.token, targ=user_id
+            room_id,
+            src=self.appservice.sender,
+            targ=user_id,
+            tok=self.appservice.token,
+            appservice_user_id=self.room_creator_user_id,
         )
 
         # Create another room, send a bunch of events to advance the stream token
         other_room_id = self.helper.create_room_as(
-            self.appservice.sender, tok=self.appservice.token
+            self.appservice.sender,
+            tok=self.appservice.token,
+            appservice_user_id=self.room_creator_user_id,
         )
         for _ in range(5):
             self.helper.send_event(
@@ -211,6 +227,7 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
                 type=EventTypes.Message,
                 content={"msgtype": "m.text", "body": "C"},
                 tok=self.appservice.token,
+                appservice_user_id=self.room_creator_user_id,
             )
 
         # Join the room as the normal user
@@ -231,18 +248,15 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
         response = self.helper.send_event(
             room_id=room_id,
             type=EventTypes.Message,
-            content={
-                "msgtype": "m.text",
-                "body": "C",
-            },
+            content={"msgtype": "m.text", "body": "C"},
             tok=self.appservice.token,
+            appservice_user_id=self.room_creator_user_id,
         )
         event_to_hang_id = response["event_id"]
 
         channel = self.make_request(
             "POST",
-            "/_matrix/client/unstable/org.matrix.msc2716/rooms/%s/batch_send?prev_event_id=%s"
-            % (room_id, event_to_hang_id),
+            self._create_batch_send_url(room_id, event_to_hang_id),
             content={
                 "events": _create_message_events_for_batch_send_request(
                     self.virtual_user_id, time_before_room, 3
@@ -312,8 +326,7 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            "/_matrix/client/unstable/org.matrix.msc2716/rooms/%s/batch_send?prev_event_id=%s"
-            % (room_id, event_id_a),
+            self._create_batch_send_url(room_id, event_id_a),
             content={
                 "events": _create_message_events_for_batch_send_request(
                     self.virtual_user_id, time_before_room, 3
