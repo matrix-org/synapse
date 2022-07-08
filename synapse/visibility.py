@@ -165,30 +165,10 @@ def _check_client_allowed_to_see_event(
     # see events in the room at that point in the DAG, and that shouldn't be decided
     # on those checks.
     if filter_send_to_client:
-        if event.type == EventTypes.Dummy:
+        if not _check_filter_send_to_client(
+            event, clock, retention_policy, sender_ignored
+        ):
             return None
-
-        if not event.is_state() and sender_ignored:
-            return None
-
-        # Until MSC2261 has landed we can't redact malicious alias events, so for
-        # now we temporarily filter out m.room.aliases entirely to mitigate
-        # abuse, while we spec a better solution to advertising aliases
-        # on rooms.
-        if event.type == EventTypes.Aliases:
-            return None
-
-        # Don't try to apply the room's retention policy if the event is a state
-        # event, as MSC1763 states that retention is only considered for non-state
-        # events.
-        if not event.is_state():
-            max_lifetime = retention_policy.max_lifetime
-
-            if max_lifetime is not None:
-                oldest_allowed_ts = clock.time_msec() - max_lifetime
-
-                if event.origin_server_ts < oldest_allowed_ts:
-                    return None
 
     if event.event_id in always_include_ids:
         return event
@@ -295,6 +275,46 @@ def _check_client_allowed_to_see_event(
         return prune_event(event)
 
     return event
+
+
+def _check_filter_send_to_client(
+    event: EventBase,
+    clock: Clock,
+    retention_policy: RetentionPolicy,
+    sender_ignored: bool,
+) -> bool:
+    """Apply checks for sending events to client
+
+    Returns:
+        True if might be allowed to be sent to clients, False if definitely not.
+    """
+
+    if event.type == EventTypes.Dummy:
+        return False
+
+    if not event.is_state() and sender_ignored:
+        return False
+
+    # Until MSC2261 has landed we can't redact malicious alias events, so for
+    # now we temporarily filter out m.room.aliases entirely to mitigate
+    # abuse, while we spec a better solution to advertising aliases
+    # on rooms.
+    if event.type == EventTypes.Aliases:
+        return False
+
+    # Don't try to apply the room's retention policy if the event is a state
+    # event, as MSC1763 states that retention is only considered for non-state
+    # events.
+    if not event.is_state():
+        max_lifetime = retention_policy.max_lifetime
+
+        if max_lifetime is not None:
+            oldest_allowed_ts = clock.time_msec() - max_lifetime
+
+            if event.origin_server_ts < oldest_allowed_ts:
+                return False
+
+    return True
 
 
 def get_effective_room_visibility_from_state(state: StateMap[EventBase]) -> str:
