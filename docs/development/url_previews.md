@@ -1,5 +1,6 @@
 URL Previews
 ============
+For information on how to enable URL previews in synapse, please see the [config manual](../usage/configuration/config_documentation.md#url_preview_enabled).
 
 The `GET /_matrix/media/r0/preview_url` endpoint provides a generic preview API
 for URLs which outputs [Open Graph](https://ogp.me/) responses (with some Matrix
