@@ -1,0 +1,1 @@
+Added better verification and tests for the `/batch_send` endpoint related to which users are allowed to send historical events. Specifically, when the room version does not support the `historical` power level, the `/batch_send` endpoint will now fail if the user performing the request is not the room creator. Contributed by @sumnerevans @ Beeper.
