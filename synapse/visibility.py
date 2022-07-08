@@ -19,8 +19,10 @@ from typing_extensions import Final
 
 from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
 from synapse.events.utils import prune_event
 from synapse.storage.controllers import StorageControllers
+from synapse.storage.databases.main import DataStore
 from synapse.storage.state import StateFilter
 from synapse.types import RetentionPolicy, StateMap, get_domain_from_id
 from synapse.util import Clock
@@ -122,6 +124,115 @@ async def filter_events_for_client(
 
     # Turn it into a list and remove None entries before returning.
     return [ev for ev in filtered_events if ev]
+
+
+async def filter_event_for_clients_with_state(
+    store: DataStore,
+    user_ids: List[str],
+    event: EventBase,
+    context: EventContext,
+    is_peeking: bool = False,
+    filter_send_to_client: bool = True,
+) -> Collection[str]:
+    """
+    Checks to see if an event is visible to the users in the list at the time of
+    the event
+
+    Args:
+        store: databases
+        user_ids: user_ids to be checked
+        event: the event to be checked
+        context: EventContext for the event to be checked
+
+    Returns:
+        list of uids for whom the event is visible
+    """
+    # None of the users should see the event if it is soft_failed
+    if event.internal_metadata.is_soft_failed():
+        return []
+
+    # Make a set for all user IDs that haven't been filtered out by a check.
+    allowed_user_ids = set(user_ids)
+
+    # Only run some checks if these events aren't about to be sent to clients. This is
+    # because, if this is not the case, we're probably only checking if the users can
+    # see events in the room at that point in the DAG, and that shouldn't be decided
+    # on those checks.
+    if filter_send_to_client:
+        ignored_by = await store.ignored_by(event.sender)
+        retention_policy = await store.get_retention_policy_for_room(event.room_id)
+
+        for user_id in user_ids:
+            if not _check_filter_send_to_client(
+                event,
+                store.clock,
+                retention_policy,
+                sender_ignored=user_id in ignored_by,
+            ):
+                allowed_user_ids.discard(user_id)
+
+    if event.internal_metadata.outlier:
+        # Normally these can't be seen by clients, but we make an exception for
+        # for out-of-band membership events (eg, incoming invites, or rejections of
+        # said invite) for the user themselves.
+        if event.type == EventTypes.Member and event.state_key in allowed_user_ids:
+            logger.debug("Returning out-of-band-membership event %s", event)
+            return {event.state_key}
+
+        return set()
+
+    # First we get just the history visibility in case its shared/world-readable
+    # room.
+    visibility_state_map = await _get_state_map(
+        store, event, context, StateFilter.from_types([_HISTORY_VIS_KEY])
+    )
+
+    visibility = get_effective_room_visibility_from_state(visibility_state_map)
+    if _check_history_visibility(event, visibility, is_peeking=is_peeking):
+        return allowed_user_ids
+
+    # The history visibility isn't lax, so we now need to fetch the membership
+    # events of all the users.
+
+    filter_list = []
+    for user_id in allowed_user_ids:
+        filter_list.append((EventTypes.Member, user_id))
+    filter_list.append((EventTypes.RoomHistoryVisibility, ""))
+
+    state_filter = StateFilter.from_types(filter_list)
+    state_map = await _get_state_map(store, event, context, state_filter)
+
+    # Now we check whether the membership allows each user to see the event.
+    return {
+        user_id
+        for user_id in allowed_user_ids
+        if _check_membership(user_id, event, visibility, state_map, is_peeking)
+    }
+
+
+async def _get_state_map(
+    store: DataStore, event: EventBase, context: EventContext, state_filter: StateFilter
+) -> StateMap[EventBase]:
+    """Helper function for getting a `StateMap[EventBase]` from an `EventContext`"""
+    state_map = await context.get_prev_state_ids(state_filter)
+
+    # Use events rather than event ids as content from the events are needed in
+    # _check_visibility
+    event_map = await store.get_events(state_map.values(), get_prev_content=False)
+
+    updated_state_map = {}
+    for state_key, event_id in state_map.items():
+        state_event = event_map.get(event_id)
+        if state_event:
+            updated_state_map[state_key] = state_event
+
+    if event.is_state():
+        current_state_key = (event.type, event.state_key)
+        # Add current event to updated_state_map, we need to do this here as it
+        # may not have been persisted to the db yet
+        updated_state_map[current_state_key] = event
+
+    return updated_state_map
 
 
 def _check_client_allowed_to_see_event(
