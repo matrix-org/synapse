@@ -816,14 +816,32 @@ class FederationEventHandler:
             return
 
         try:
-            state_ids, partial_state = await self._resolve_state_at_missing_prevs(origin, event)
-            await self._process_received_pdu(
-                origin,
-                event,
-                state_ids=state_ids,
-                partial_state=partial_state,
-                backfilled=backfilled,
-            )
+            try:
+                state_ids, partial_state = await self._resolve_state_at_missing_prevs(
+                    origin, event
+                )
+                await self._process_received_pdu(
+                    origin,
+                    event,
+                    state_ids=state_ids,
+                    partial_state=partial_state,
+                    backfilled=backfilled,
+                )
+            except PartialStateConflictError:
+                # The room was un-partial stated while we were processing the event.
+                # Try once more, with full state this time.
+                state_ids, partial_state = await self._resolve_state_at_missing_prevs(
+                    origin, event
+                )
+                # We ought to have full state now, barring some unlikely race where we left and
+                # rejoned the room in the background.
+                await self._process_received_pdu(
+                    origin,
+                    event,
+                    state_ids=state_ids,
+                    partial_state=partial_state,
+                    backfilled=backfilled,
+                )
         except FederationError as e:
             if e.code == 403:
                 logger.warning("Pulled event %s failed history check.", event_id)
