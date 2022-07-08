@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.constants import EventContentFields, EventTypes
+from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.appservice import ApplicationService
 from synapse.rest import admin
 from synapse.rest.client import login, register, room, room_batch, sync
@@ -97,9 +98,12 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
             "as_user_potato", self.appservice.token
         )
 
-    def _create_test_room(self) -> Tuple[str, str, str, str]:
+    def _create_test_room(
+        self, room_version: RoomVersion = RoomVersions.V9
+    ) -> Tuple[str, str, str, str]:
         room_id = self.helper.create_room_as(
             self.appservice.sender,
+            room_version=room_version.identifier,
             tok=self.appservice.token,
             appservice_user_id=self.room_creator_user_id,
         )
@@ -382,5 +386,39 @@ class RoomBatchTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             channel.json_body["error"],
             "In room version 9, only the room creator can use the /batch_send endpoint",
+            channel.json_body,
+        )
+
+    @unittest.override_config({"experimental_features": {"msc2716_enabled": True}})
+    def test_batch_send_without_permission_msc2716_room_version(self) -> None:
+        """Make sure that the batch send fails when the user does not have the
+        ``historical`` power level in a room version with MSC2716 enabled.
+        """
+
+        time_before_room = int(self.clock.time_msec())
+        room_id, event_id_a, _, _ = self._create_test_room(
+            room_version=RoomVersions.MSC2716v3
+        )
+
+        channel = self.make_request(
+            "POST",
+            self._create_batch_send_url(
+                room_id, event_id_a, user_id=self.virtual_user_id
+            ),
+            content={
+                "events": _create_message_events_for_batch_send_request(
+                    self.virtual_user_id, time_before_room, 3
+                ),
+                "state_events_at_start": _create_join_state_events_for_batch_send_request(
+                    [self.virtual_user_id], time_before_room
+                ),
+            },
+            access_token=self.appservice.token,
+        )
+        self.assertEqual(channel.code, 403, channel.result)
+        self.assertEqual(
+            channel.json_body["error"],
+            "You don't have permission to send send historical related events "
+            '("insertion", "batch", and "marker")',
             channel.json_body,
         )
