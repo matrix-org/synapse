@@ -319,7 +319,8 @@ class _ServiceQueuer:
         rooms_of_interesting_users.update(event.room_id for event in events)
         # EDUs
         rooms_of_interesting_users.update(
-            ephemeral["room_id"] for ephemeral in ephemerals if
+            ephemeral["room_id"]
+            for ephemeral in ephemerals if
             ephemeral.get("room_id") is not None
         )
 
