@@ -242,6 +242,27 @@ class PersistEventsStore:
                     (room_id,), list(latest_event_ids)
                 )
 
+
+    async def asdf_get_debug_events_in_room_ordered_by_depth(self, room_id: str) -> Any:
+        """Gets the topological token in a room after or at the given stream
+        ordering.
+        Args:
+            room_id
+        """
+        from tabulate import tabulate
+
+        sql = (
+            "SELECT depth, stream_ordering, type, state_key, event_id FROM events"
+            " WHERE events.room_id = ?"
+            " ORDER BY depth DESC, stream_ordering DESC;"
+        )
+        rows = await self.db_pool.execute(
+            "asdf_get_debug_events_in_room_ordered_by_depth", None, sql, room_id
+        )
+
+        headers = ["depth", "stream_ordering", "type", "state_key", "event_id"]
+        return tabulate(rows, headers=headers)
+
     async def _get_events_which_are_prevs(self, event_ids: Iterable[str]) -> List[str]:
         """Filter the supplied list of event_ids to get those which are prev_events of
         existing (non-outlier/rejected) events.
@@ -1410,6 +1431,8 @@ class PersistEventsStore:
         """Insert new events into the event, event_json, redaction and
         state_events tables.
         """
+
+        logger.info("_store_event_txn events=%s", [event.event_id for event, _ in events_and_contexts])
 
         if not events_and_contexts:
             # nothing to do here

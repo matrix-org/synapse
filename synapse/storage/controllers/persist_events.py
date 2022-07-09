@@ -322,13 +322,13 @@ class EventsPersistenceStorageController:
         """
         partitioned: Dict[str, List[Tuple[EventBase, EventContext]]] = {}
         for event, ctx in events_and_contexts:
-            import traceback
+            # import traceback
 
             logger.info(
                 "persist_events _event_persist_queue event_id=%s backfilled=%s stack=%s",
                 event.event_id,
                 backfilled,
-                traceback.format_stack(),
+                "commented out",  # traceback.format_stack(),
             )
 
             partitioned.setdefault(event.room_id, []).append((event, ctx))
@@ -664,6 +664,19 @@ class EventsPersistenceStorageController:
                 use_negative_stream_ordering=backfilled,
                 inhibit_local_membership_updates=backfilled,
             )
+
+            logger.info(
+                "_persist_event_batch done events=%s",
+                [ev.event_id for ev, _ in events_and_contexts],
+            )
+
+            if events_and_contexts:
+                logger.info(
+                    "asdf_get_debug_events_in_room_ordered_by_depth\n%s",
+                    await self.persist_events_store.asdf_get_debug_events_in_room_ordered_by_depth(
+                        events_and_contexts[0][0].room_id
+                    ),
+                )
 
             await self._handle_potentially_left_users(potentially_left_users)
 

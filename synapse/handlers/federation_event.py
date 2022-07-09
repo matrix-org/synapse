@@ -100,6 +100,7 @@ class FederationEventHandler:
 
     def __init__(self, hs: "HomeServer"):
         self._store = hs.get_datastores().main
+        self.persist_events_store = hs.get_datastores().persist_events
         self._storage_controllers = hs.get_storage_controllers()
         self._state_storage_controller = self._storage_controllers.state
 
@@ -1023,6 +1024,11 @@ class FederationEventHandler:
         state_map = {}
 
         event_metadata = await self._store.get_metadata_for_events(state_event_ids)
+        logger.info(
+            "_get_state_ids_after_missing_prev_event: get_metadata_for_events state_event_ids=%s event_metadata=%s",
+            state_event_ids,
+            event_metadata,
+        )
         for state_event_id, metadata in event_metadata.items():
             if metadata.room_id != room_id:
                 # This is a bogus situation, but since we may only discover it a long time
@@ -1066,6 +1072,25 @@ class FederationEventHandler:
         # XXX: this doesn't sound right? it means that we'll end up with incomplete
         #   state.
         failed_to_fetch = desired_events - event_metadata.keys()
+
+        logger.info(
+            "_get_state_ids_after_missing_prev_event: asdf_get_debug_events_in_room_ordered_by_depth\n%s",
+            await self.persist_events_store.asdf_get_debug_events_in_room_ordered_by_depth(
+                room_id
+            ),
+        )
+
+        # The event_id is part of the `desired_events` but isn't fetched as part
+        # of the `event_metadata` so we remove it here separately if we did find it.
+        have_event_id = await self._store.have_seen_event(room_id, event_id)
+        logger.info(
+            "_get_state_ids_after_missing_prev_event: event_id=%s have_event_id=%s",
+            event_id,
+            have_event_id,
+        )
+        if have_event_id:
+            failed_to_fetch = failed_to_fetch - {event_id}
+
         if failed_to_fetch:
             logger.warning(
                 "_get_state_ids_after_missing_prev_event: Failed to fetch missing state events for event_id=%s failed_to_fetch=%s",
@@ -1096,7 +1121,13 @@ class FederationEventHandler:
         )
 
         # we also need the event itself.
-        if not await self._store.have_seen_event(room_id, event_id):
+        have_seen_event = await self._store.have_seen_event(room_id, event_id)
+        logger.info(
+            "_get_state_and_persist event_id=%s have_seen_event=%s",
+            event_id,
+            have_seen_event,
+        )
+        if not have_seen_event:
             await self._get_events_and_persist(
                 destination=destination, room_id=room_id, event_ids=(event_id,)
             )
