@@ -24,9 +24,7 @@
 #     https://github.com/python-poetry/poetry/discussions/1879#discussioncomment-216865
 #     https://stackoverflow.com/questions/53835198/integrating-python-poetry-with-docker?answertab=scoredesc
 
-
-
-ARG PYTHON_VERSION=3.9
+ARG PYTHON_VERSION=3.10
 
 ###
 ### Stage 0: generate requirements.txt
@@ -38,10 +36,10 @@ FROM docker.io/python:${PYTHON_VERSION}-slim as requirements
 # Here we use it to set up a cache for apt (and below for pip), to improve
 # rebuild speeds on slow connections.
 RUN \
-   --mount=type=cache,target=/var/cache/apt,sharing=locked \
-   --mount=type=cache,target=/var/lib/apt,sharing=locked \
- apt-get update -qq && apt-get install -yqq git \
-    && rm -rf /var/lib/apt/lists/*
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  apt-get update -qq && apt-get install -yqq git &&
+  rm -rf /var/lib/apt/lists/*
 
 # We install poetry in its own build stage to avoid its dependencies conflicting with
 # synapse's dependencies.
@@ -62,7 +60,6 @@ WORKDIR /synapse
 # Copy just what we need to run `poetry export`...
 COPY pyproject.toml poetry.lock /synapse/
 
-
 # If specified, we won't verify the hashes of dependencies.
 # This is only needed if the hashes of dependencies cannot be checked for some
 # reason, such as when a git repository is used directly as a dependency.
@@ -77,22 +74,22 @@ FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 
 # install the OS build deps
 RUN \
-   --mount=type=cache,target=/var/cache/apt,sharing=locked \
-   --mount=type=cache,target=/var/lib/apt,sharing=locked \
- apt-get update -qq && apt-get install -yqq \
-    build-essential \
-    libffi-dev \
-    libjpeg-dev \
-    libpq-dev \
-    libssl-dev \
-    libwebp-dev \
-    libxml++2.6-dev \
-    libxslt1-dev \
-    openssl \
-    rustc \
-    zlib1g-dev \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  apt-get update -qq && apt-get install -yqq \
+  build-essential \
+  libffi-dev \
+  libjpeg-dev \
+  libpq-dev \
+  libssl-dev \
+  libwebp-dev \
+  libxml++2.6-dev \
+  libxslt1-dev \
+  openssl \
+  rustc \
+  zlib1g-dev \
+  git &&
+  rm -rf /var/lib/apt/lists/*
 
 # To speed up rebuilds, install all of the dependencies before we copy over
 # the whole synapse project, so that this layer in the Docker cache can be
@@ -123,19 +120,19 @@ LABEL org.opencontainers.image.source='https://github.com/matrix-org/synapse.git
 LABEL org.opencontainers.image.licenses='Apache-2.0'
 
 RUN \
-   --mount=type=cache,target=/var/cache/apt,sharing=locked \
-   --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
   apt-get update -qq && apt-get install -yqq \
-    curl \
-    gosu \
-    libjpeg62-turbo \
-    libpq5 \
-    libwebp6 \
-    xmlsec1 \
-    libjemalloc2 \
-    libssl-dev \
-    openssl \
-    && rm -rf /var/lib/apt/lists/*
+  curl \
+  gosu \
+  libjpeg62-turbo \
+  libpq5 \
+  libwebp6 \
+  xmlsec1 \
+  libjemalloc2 \
+  libssl-dev \
+  openssl &&
+  rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
 COPY ./docker/start.py /start.py
@@ -146,4 +143,4 @@ EXPOSE 8008/tcp 8009/tcp 8448/tcp
 ENTRYPOINT ["/start.py"]
 
 HEALTHCHECK --start-period=5s --interval=15s --timeout=5s \
-    CMD curl -fSs http://localhost:8008/health || exit 1
+  CMD curl -fSs http://localhost:8008/health || exit 1
