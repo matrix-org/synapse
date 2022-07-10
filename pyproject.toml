@@ -180,6 +180,7 @@ hiredis = { version = "*", optional = true }
 Pympler = { version = "*", optional = true }
 parameterized = { version = ">=0.7.4", optional = true }
 idna = { version = ">=2.5", optional = true }
+jump-consistent-hash = "^3.2.0"
 
 [tool.poetry.extras]
 # NB: Packages that should be part of `pip install matrix-synapse[all]` need to be specified
@@ -198,7 +199,7 @@ opentracing = ["jaeger-client", "opentracing"]
 jwt = ["authlib"]
 # hiredis is not a *strict* dependency, but it makes things much faster.
 # (if it is not installed, we fall back to slow code.)
-redis = ["txredisapi", "hiredis"]
+redis = ["txredisapi", "hiredis", "jump-consistent-hash"]
 # Required to use experimental `caches.track_memory_usage` config option.
 cache_memory = ["pympler"]
 test = ["parameterized", "idna"]
@@ -230,7 +231,7 @@ all = [
     # opentracing
     "jaeger-client", "opentracing",
     # redis
-    "txredisapi", "hiredis",
+    "txredisapi", "hiredis", "jump-consistent-hash",
     # cache_memory
     "pympler",
     # omitted:
