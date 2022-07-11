@@ -1,0 +1,1 @@
+Prevent `Failed to fetch missing state events...` warning being logged every time we tried to fetch `state_ids` for a missing `prev_event`.
