@@ -1322,7 +1322,7 @@ Example configuration:
 
 ```yaml
 databases:
-  main:
+  super_database:
     name: psycopg2
     txn_limit: 10000
     data_stores: ["main"]
@@ -1335,7 +1335,7 @@ databases:
       cp_min: 5
       cp_max: 10
 
-  state:
+  that_other_database:
     name: psycopg2
     txn_limit: 10000
     data_stores: ["state"]
