@@ -163,7 +163,7 @@ class IdentityHandler:
         sid: str,
         mxid: str,
         id_server: str,
-        id_access_token: Optional[str] = None,
+        id_access_token: str,
     ) -> JsonDict:
         """Bind a 3PID to an identity server
 
@@ -173,11 +173,10 @@ class IdentityHandler:
             mxid: The MXID to bind the 3PID to
             id_server: The domain of the identity server to query
             id_access_token: The access token to authenticate to the identity
-                server with, if necessary. Required if use_v2 is true
+                server with
 
         Raises:
             SynapseError: On any of the following conditions
-                - no id_access_token was supplied
                 - the supplied id_server is not a valid identity server name
                 - we failed to contact the supplied identity server
 
@@ -186,18 +185,12 @@ class IdentityHandler:
         """
         logger.debug("Proxying threepid bind request for %s to %s", mxid, id_server)
 
-        if id_access_token is None:
-            raise SynapseError(
-                400, "id_access_token is required", errcode=Codes.MISSING_PARAM
-            )
-
         if not valid_id_server_location(id_server):
             raise SynapseError(
                 400,
                 "id_server must be a valid hostname with optional port and path components",
             )
 
-        # Decide which API endpoint URLs to use
         bind_data = {"sid": sid, "client_secret": client_secret, "mxid": mxid}
         bind_url = "https://%s/_matrix/identity/v2/3pid/bind" % (id_server,)
         headers = {"Authorization": create_id_access_token_header(id_access_token)}
@@ -219,15 +212,13 @@ class IdentityHandler:
 
             return data
         except HttpResponseException as e:
-            if e.code != 404:
-                logger.error("3PID bind failed with Matrix error: %r", e)
-                raise e.to_synapse_error()
+            logger.error("3PID bind failed with Matrix error: %r", e)
+            raise e.to_synapse_error()
         except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except CodeMessageException as e:
             data = json_decoder.decode(e.msg)  # XXX WAT?
             return data
-        return {}
 
     async def try_unbind_threepid(self, mxid: str, threepid: dict) -> bool:
         """Attempt to remove a 3PID from an identity server, or if one is not provided, all

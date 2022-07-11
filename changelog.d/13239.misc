@@ -1,1 +1,1 @@
-Drop v1 3pid bind support.
+Drop support for calling `/_matrix/client/v3/account/3pid/bind` without an `id_access_token`.
