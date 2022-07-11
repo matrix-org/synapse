@@ -1320,7 +1320,9 @@ class FederationEventHandler:
     async def backfill_event(
         self, destination: str, room_id: str, event_id: str
     ) -> None:
-        logger.info("backfill_event event_id=%s from destination=%s", event_id, destination)
+        logger.info(
+            "backfill_event event_id=%s from destination=%s", event_id, destination
+        )
 
         room_version = await self._store.get_room_version(room_id)
 
@@ -1351,6 +1353,10 @@ class FederationEventHandler:
         )
         assert not event_non_outlier.internal_metadata.outlier
 
+        # Persist the event we just fetched, including pulling all of the state
+        # and auth events to de-outlier it. This function is weird and
+        # de-outliers but only works on non-outlier events. This also sets up
+        # the necessary `state_groups` for the event.
         await self._process_pulled_events(
             destination,
             [event_non_outlier],
