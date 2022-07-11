@@ -1354,7 +1354,7 @@ class PersistEventsStore:
 
         to_remove = set()
         for event, context in events_and_contexts:
-            outlier_persisted = have_persisted.get(event.event_id, False)
+            outlier_persisted = have_persisted.get(event.event_id)
             logger.debug(
                 "_update_outliers_txn: event=%s outlier=%s outlier_persisted=%s",
                 event.event_id,
@@ -1362,7 +1362,8 @@ class PersistEventsStore:
                 outlier_persisted,
             )
 
-            if not outlier_persisted:
+            # Ignore events which we haven't persisted at all
+            if outlier_persisted is None:
                 continue
 
             to_remove.add(event)
