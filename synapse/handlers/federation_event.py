@@ -939,7 +939,8 @@ class FederationEventHandler:
         )
 
         logger.debug(
-            "state_ids returned %i state events, %i auth events",
+            "_get_state_ids_after_missing_prev_event(event_id=%s): state_ids returned %i state events, %i auth events",
+            event_id,
             len(state_event_ids),
             len(auth_event_ids),
         )
@@ -947,12 +948,17 @@ class FederationEventHandler:
         # Start by checking events we already have in the DB
         desired_events = set(state_event_ids)
         desired_events.add(event_id)
-        logger.debug("Fetching %i events from cache/store", len(desired_events))
+        logger.debug(
+            "_get_state_ids_after_missing_prev_event(event_id=%s): Fetching %i events from cache/store",
+            event_id,
+            len(desired_events),
+        )
         have_events = await self._store.have_seen_events(room_id, desired_events)
 
         missing_desired_events = desired_events - have_events
         logger.debug(
-            "We are missing %i events (got %i)",
+            "_get_state_ids_after_missing_prev_event(event_id=%s): We are missing %i events (got %i)",
+            event_id,
             len(missing_desired_events),
             len(have_events),
         )
@@ -969,7 +975,11 @@ class FederationEventHandler:
         missing_auth_events.difference_update(
             await self._store.have_seen_events(room_id, missing_auth_events)
         )
-        logger.debug("We are also missing %i auth events", len(missing_auth_events))
+        logger.debug(
+            "_get_state_ids_after_missing_prev_event(event_id=%s): We are also missing %i auth events",
+            event_id,
+            len(missing_auth_events),
+        )
 
         missing_events = missing_desired_events | missing_auth_events
 
@@ -983,10 +993,17 @@ class FederationEventHandler:
         # TODO: might it be better to have an API which lets us do an aggregate event
         #   request
         if (len(missing_events) * 10) >= len(auth_event_ids) + len(state_event_ids):
-            logger.debug("Requesting complete state from remote")
+            logger.debug(
+                "_get_state_ids_after_missing_prev_event(event_id=%s): Requesting complete state from remote",
+                event_id,
+            )
             await self._get_state_and_persist(destination, room_id, event_id)
         else:
-            logger.debug("Fetching %i events from remote", len(missing_events))
+            logger.debug(
+                "_get_state_ids_after_missing_prev_event(event_id=%s): Fetching %i events from remote",
+                event_id,
+                len(missing_events),
+            )
             await self._get_events_and_persist(
                 destination=destination, room_id=room_id, event_ids=missing_events
             )
@@ -1005,8 +1022,9 @@ class FederationEventHandler:
                 # This can happen if a remote server claims that the state or
                 # auth_events at an event in room A are actually events in room B
                 logger.warning(
-                    "Remote server %s claims event %s in room %s is an auth/state "
+                    "_get_state_ids_after_missing_prev_event(event_id=%s):  Remote server %s claims event %s in room %s is an auth/state "
                     "event in room %s",
+                    event_id,
                     destination,
                     state_event_id,
                     metadata.room_id,
@@ -1016,7 +1034,9 @@ class FederationEventHandler:
 
             if metadata.state_key is None:
                 logger.warning(
-                    "Remote server gave us non-state event in state: %s", state_event_id
+                    "_get_state_ids_after_missing_prev_event(event_id=%s): Remote server gave us non-state event in state: %s",
+                    event_id,
+                    state_event_id,
                 )
                 continue
 
@@ -1036,9 +1056,16 @@ class FederationEventHandler:
         # XXX: this doesn't sound right? it means that we'll end up with incomplete
         #   state.
         failed_to_fetch = desired_events - event_metadata.keys()
+
+        # The event_id is part of the `desired_events` but isn't fetched as part
+        # of the `event_metadata` so we remove it here separately if we did find it.
+        have_event_id = await self._store.have_seen_event(room_id, event_id)
+        if have_event_id:
+            failed_to_fetch = failed_to_fetch - {event_id}
+
         if failed_to_fetch:
             logger.warning(
-                "Failed to fetch missing state events for %s %s",
+                "_get_state_ids_after_missing_prev_event(event_id=%s): Failed to fetch missing state events %s",
                 event_id,
                 failed_to_fetch,
             )

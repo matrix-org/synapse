@@ -1370,7 +1370,8 @@ class EventsWorkerStore(SQLBaseStore):
 
         return results
 
-    @cachedList(cached_method_name="have_seen_event", list_name="keys")
+    # TODO: The cache is giving us stale results for the `failed_to_fetch` stuff.
+    # @cachedList(cached_method_name="have_seen_event", list_name="keys")
     async def _have_seen_events_dict(
         self, keys: Collection[Tuple[str, str]]
     ) -> Dict[Tuple[str, str], bool]:
@@ -1410,7 +1411,8 @@ class EventsWorkerStore(SQLBaseStore):
         await self.db_pool.runInteraction("have_seen_events", have_seen_events_txn)
         return results
 
-    @cached(max_entries=100000, tree=True)
+    # TODO: The cache is giving us stale results for the `failed_to_fetch` stuff.
+    # @cached(max_entries=100000, tree=True)
     async def have_seen_event(self, room_id: str, event_id: str) -> bool:
         res = await self._have_seen_events_dict(((room_id, event_id),))
         return res[(room_id, event_id)]
