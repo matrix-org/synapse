@@ -124,9 +124,8 @@ Body parameters:
   - `address` - string. Value of third-party ID.
   belonging to a user.
 - `external_ids` - array, optional. Allow setting the identifier of the external identity
-  provider for SSO (Single sign-on). Details in
-  [Sample Configuration File](../usage/configuration/homeserver_sample_config.html)
-  section `sso` and `oidc_providers`.
+  provider for SSO (Single sign-on). Details in the configuration manual under the
+  sections [sso](../usage/configuration/config_documentation.md#sso) and [oidc_providers](../usage/configuration/config_documentation.md#oidc_providers).
   - `auth_provider` - string. ID of the external identity provider. Value of `idp_id`
     in the homeserver configuration. Note that no error is raised if the provided
     value is not in the homeserver configuration.

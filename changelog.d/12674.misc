@@ -1,1 +1,0 @@
-Add tests for cancellation of `GET /rooms/$room_id/members` and `GET /rooms/$room_id/state` requests.

@@ -43,6 +43,7 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, StateResolutionVersio
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.logging.context import ContextResourceUsage
+from synapse.replication.http.state import ReplicationUpdateCurrentStateRestServlet
 from synapse.state import v1, v2
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.roommember import ProfileInfo
@@ -129,6 +130,12 @@ class StateHandler:
         self.hs = hs
         self._state_resolution_handler = hs.get_state_resolution_handler()
         self._storage_controllers = hs.get_storage_controllers()
+        self._events_shard_config = hs.config.worker.events_shard_config
+        self._instance_name = hs.get_instance_name()
+
+        self._update_current_state_client = (
+            ReplicationUpdateCurrentStateRestServlet.make_client(hs)
+        )
 
     async def get_current_state_ids(
         self,
@@ -249,8 +256,12 @@ class StateHandler:
                 partial_state = True
 
             logger.debug("calling resolve_state_groups from compute_event_context")
+            # we've already taken into account partial state, so no need to wait for
+            # complete state here.
             entry = await self.resolve_state_groups_for_events(
-                event.room_id, event.prev_event_ids()
+                event.room_id,
+                event.prev_event_ids(),
+                await_full_state=False,
             )
 
             state_ids_before_event = entry.state
@@ -335,7 +346,7 @@ class StateHandler:
 
     @measure_func()
     async def resolve_state_groups_for_events(
-        self, room_id: str, event_ids: Collection[str]
+        self, room_id: str, event_ids: Collection[str], await_full_state: bool = True
     ) -> _StateCacheEntry:
         """Given a list of event_ids this method fetches the state at each
         event, resolves conflicts between them and returns them.
@@ -343,6 +354,8 @@ class StateHandler:
         Args:
             room_id
             event_ids
+            await_full_state: if true, will block if we do not yet have complete
+               state at these events.
 
         Returns:
             The resolved state
@@ -350,7 +363,7 @@ class StateHandler:
         logger.debug("resolve_state_groups event_ids %s", event_ids)
 
         state_groups = await self._state_storage_controller.get_state_group_for_events(
-            event_ids
+            event_ids, await_full_state=await_full_state
         )
 
         state_group_ids = state_groups.values()
@@ -416,6 +429,24 @@ class StateHandler:
         )
 
         return {key: state_map[ev_id] for key, ev_id in new_state.items()}
+
+    async def update_current_state(self, room_id: str) -> None:
+        """Recalculates the current state for a room, and persists it.
+
+        Raises:
+            SynapseError(502): if all attempts to connect to the event persister worker
+                fail
+        """
+        writer_instance = self._events_shard_config.get_instance(room_id)
+        if writer_instance != self._instance_name:
+            await self._update_current_state_client(
+                instance_name=writer_instance,
+                room_id=room_id,
+            )
+            return
+
+        assert self._storage_controllers.persistence is not None
+        await self._storage_controllers.persistence.update_current_state(room_id)
 
 
 @attr.s(slots=True, auto_attribs=True)

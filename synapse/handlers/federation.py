@@ -45,6 +45,7 @@ from synapse.api.errors import (
     FederationDeniedError,
     FederationError,
     HttpResponseException,
+    LimitExceededError,
     NotFoundError,
     RequestSendFailed,
     SynapseError,
@@ -64,6 +65,7 @@ from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationStoreRoomOnOutlierMembershipRestServlet,
 )
+from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import JsonDict, StateMap, get_domain_from_id
@@ -549,15 +551,29 @@ class FederationHandler:
                 #   https://github.com/matrix-org/synapse/issues/12998
                 await self.store.store_partial_state_room(room_id, ret.servers_in_room)
 
-            max_stream_id = await self._federation_event_handler.process_remote_join(
-                origin,
-                room_id,
-                auth_chain,
-                state,
-                event,
-                room_version_obj,
-                partial_state=ret.partial_state,
-            )
+            try:
+                max_stream_id = (
+                    await self._federation_event_handler.process_remote_join(
+                        origin,
+                        room_id,
+                        auth_chain,
+                        state,
+                        event,
+                        room_version_obj,
+                        partial_state=ret.partial_state,
+                    )
+                )
+            except PartialStateConflictError as e:
+                # The homeserver was already in the room and it is no longer partial
+                # stated. We ought to be doing a local join instead. Turn the error into
+                # a 429, as a hint to the client to try again.
+                # TODO(faster_joins): `_should_perform_remote_join` suggests that we may
+                #   do a remote join for restricted rooms even if we have full state.
+                logger.error(
+                    "Room %s was un-partial stated while processing remote join.",
+                    room_id,
+                )
+                raise LimitExceededError(msg=e.msg, errcode=e.errcode, retry_after_ms=0)
 
             if ret.partial_state:
                 # Kick off the process of asynchronously fetching the state for this
@@ -1544,14 +1560,9 @@ class FederationHandler:
                 # all the events are updated, so we can update current state and
                 # clear the lazy-loading flag.
                 logger.info("Updating current state for %s", room_id)
-                # TODO(faster_joins): support workers
+                # TODO(faster_joins): notify workers in notify_room_un_partial_stated
                 #   https://github.com/matrix-org/synapse/issues/12994
-                assert (
-                    self._storage_controllers.persistence is not None
-                ), "worker-mode deployments not currently supported here"
-                await self._storage_controllers.persistence.update_current_state(
-                    room_id
-                )
+                await self.state_handler.update_current_state(room_id)
 
                 logger.info("Clearing partial-state flag for %s", room_id)
                 success = await self.store.clear_partial_state_room(room_id)
@@ -1568,11 +1579,6 @@ class FederationHandler:
 
                 # we raced against more events arriving with partial state. Go round
                 # the loop again. We've already logged a warning, so no need for more.
-                # TODO(faster_joins): there is still a race here, whereby incoming events which raced
-                #   with us will fail to be persisted after the call to `clear_partial_state_room` due to
-                #   having partial state.
-                #   https://github.com/matrix-org/synapse/issues/12988
-                #
                 continue
 
             events = await self.store.get_events_as_list(
