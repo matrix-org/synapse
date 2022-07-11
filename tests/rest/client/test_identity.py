@@ -55,6 +55,7 @@ class IdentityTestCase(unittest.HomeserverTestCase):
             "id_server": "testis",
             "medium": "email",
             "address": "test@example.com",
+            "id_access_token": tok,
         }
         request_data = json.dumps(params)
         request_url = ("/rooms/%s/invite" % (room_id)).encode("ascii")
@@ -62,3 +63,15 @@ class IdentityTestCase(unittest.HomeserverTestCase):
             b"POST", request_url, request_data, access_token=tok
         )
         self.assertEqual(channel.code, HTTPStatus.FORBIDDEN, channel.result)
+
+
+# {'version': b'1.1', 'code': b'400', 'reason': b'Bad Request',
+# 'headers': [
+#     (b'Server', b'1'), (b'Date', b'Mon,
+#         11 Jul 2022 10: 58: 19 GMT'),
+#         (b'Content-Type', b'application/json'), (b'Cache-Control', b'no-cache, no-store, must-revalidate'), (b'Access-Control-Allow-Origin', b'*'), (b'Access-Control-Allow-Methods', b'GET, HEAD, POST, PUT, DELETE, OPTIONS'), (b'Access-Control-Allow-Headers', b'X-Requested-With, Content-Type, Authorization, Date')
+#     ], 'body': b'{
+#         "errcode": "M_MISSING_PARAM",
+#         "error":"Missing params: [\'user_id\']"
+#     }', 'done': True
+# }

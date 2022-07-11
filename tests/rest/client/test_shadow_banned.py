@@ -97,7 +97,12 @@ class RoomTestCase(_ShadowBannedBase):
         channel = self.make_request(
             "POST",
             "/rooms/%s/invite" % (room_id,),
-            {"id_server": "test", "medium": "email", "address": "test@test.test"},
+            {
+                "id_server": "test",
+                "medium": "email",
+                "address": "test@test.test",
+                "id_access_token": self.banned_access_token,
+            },
             access_token=self.banned_access_token,
         )
         self.assertEqual(200, channel.code, channel.result)
