@@ -1321,15 +1321,24 @@ class FederationEventHandler:
     async def backfill_event(
         self, destination: str, room_id: str, event_id: str
     ) -> None:
-        room_version = await self._store.get_room_version(room_id)
-
         logger.info("backfill_event event_id=%s", event_id)
+
+        room_version = await self._store.get_room_version(room_id)
 
         event_from_response = await self._federation_client.get_pdu(
             [destination],
             event_id,
             room_version,
         )
+
+        if not event_from_response:
+            raise FederationError(
+                "ERROR",
+                404,
+                "Unable to find event_id=%s from destination=%s to backfill."
+                % (event_id, destination),
+                affected=event_id,
+            )
 
         # We want to make a non-outlier event so it plays well with
         # `_process_pulled_events()` -> `_update_outliers_txn()` to create a
