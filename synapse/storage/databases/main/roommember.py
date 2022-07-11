@@ -233,8 +233,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         revealed to users who are already in this room.
 
         Args:
-            room_id: The ID of the room to retrieve the users of. user_ids: a
-            list of users in the room to run the query for
+            room_id: The ID of the room to retrieve the users of.
+            user_ids: a list of users in the room to run the query for
 
         Returns:
                 A mapping from user ID to ProfileInfo.
