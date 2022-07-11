@@ -610,11 +610,7 @@ class IdentityHandler:
             raise SynapseError(400, "Error contacting the identity server")
 
     async def lookup_3pid(
-        self,
-        id_server: str,
-        medium: str,
-        address: str,
-        id_access_token: Optional[str] = None,
+        self, id_server: str, medium: str, address: str, id_access_token: str
     ) -> Optional[str]:
         """Looks up a 3pid in the passed identity server.
 
@@ -629,13 +625,9 @@ class IdentityHandler:
         Returns:
             the matrix ID of the 3pid, or None if it is not recognized.
         """
-        if id_access_token is None:
-            raise SynapseError(
-                400, "id_access_token is required", errcode=Codes.MISSING_PARAM
-            )
 
         try:
-            results = await self._lookup_3pid(
+            results = await self._lookup_3pid_v2(
                 id_server, id_access_token, medium, address
             )
             return results
@@ -643,7 +635,7 @@ class IdentityHandler:
             logger.warning("Error when looking up hashing details: %s", e)
             return None
 
-    async def _lookup_3pid(
+    async def _lookup_3pid_v2(
         self, id_server: str, id_access_token: str, medium: str, address: str
     ) -> Optional[str]:
         """Looks up a 3pid in the passed identity server using v2 lookup.
@@ -770,7 +762,7 @@ class IdentityHandler:
         room_type: Optional[str],
         inviter_display_name: str,
         inviter_avatar_url: str,
-        id_access_token: Optional[str] = None,
+        id_access_token: str,
     ) -> Tuple[str, List[Dict[str, str]], Dict[str, str], str]:
         """
         Asks an identity server for a third party invite.
@@ -791,7 +783,7 @@ class IdentityHandler:
             inviter_display_name: The current display name of the
                 inviter.
             inviter_avatar_url: The URL of the inviter's avatar.
-            id_access_token (str|None): The access token to authenticate to the identity
+            id_access_token (str): The access token to authenticate to the identity
                 server with
 
         Returns:
@@ -823,30 +815,28 @@ class IdentityHandler:
             invite_config["org.matrix.web_client_location"] = self._web_client_location
 
         # Add the identity service access token to the JSON body and use the v2
-        # Identity Service endpoints if id_access_token is present
+        # Identity Service endpoints
         data = None
         base_url = "%s%s/_matrix/identity" % (id_server_scheme, id_server)
 
-        if id_access_token:
-            key_validity_url = "%s%s/_matrix/identity/v2/pubkey/isvalid" % (
-                id_server_scheme,
-                id_server,
-            )
+        key_validity_url = "%s%s/_matrix/identity/v2/pubkey/isvalid" % (
+            id_server_scheme,
+            id_server,
+        )
 
-            # Attempt a v2 lookup
-            url = base_url + "/v2/store-invite"
-            try:
-                data = await self.blacklisting_http_client.post_json_get_json(
-                    url,
-                    invite_config,
-                    {"Authorization": create_id_access_token_header(id_access_token)},
-                )
-            except RequestTimedOutError:
-                raise SynapseError(500, "Timed out contacting identity server")
-            except HttpResponseException as e:
-                if e.code != 404:
-                    logger.info("Failed to POST %s with JSON: %s", url, e)
-                    raise e
+        url = base_url + "/v2/store-invite"
+        try:
+            data = await self.blacklisting_http_client.post_json_get_json(
+                url,
+                invite_config,
+                {"Authorization": create_id_access_token_header(id_access_token)},
+            )
+        except RequestTimedOutError:
+            raise SynapseError(500, "Timed out contacting identity server")
+        except HttpResponseException as e:
+            if e.code != 404:
+                logger.info("Failed to POST %s with JSON: %s", url, e)
+                raise e
 
         if data is None:
             key_validity_url = "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (

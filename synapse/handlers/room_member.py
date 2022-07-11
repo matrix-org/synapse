@@ -1313,7 +1313,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         id_server: str,
         requester: Requester,
         txn_id: Optional[str],
-        id_access_token: Optional[str] = None,
+        id_access_token: str,
     ) -> int:
         """Invite a 3PID to a room.
 
@@ -1326,7 +1326,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             requester: The user making the request.
             txn_id: The transaction ID this is part of, or None if this is not
                 part of a transaction.
-            id_access_token: The optional identity server access token.
+            id_access_token: Identity server access token.
 
         Returns:
              The new stream ID.
@@ -1411,7 +1411,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         room_id: str,
         user: UserID,
         txn_id: Optional[str],
-        id_access_token: Optional[str] = None,
+        id_access_token: str,
     ) -> int:
         room_state = await self._storage_controllers.state.get_current_state(
             room_id,

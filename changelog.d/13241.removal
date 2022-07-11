@@ -1,0 +1,1 @@
+Drop support for calling `/_matrix/client/v3/rooms/{roomId}/invite` without an `id_access_token`.
