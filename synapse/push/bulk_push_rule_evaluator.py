@@ -113,12 +113,21 @@ class BulkPushRuleEvaluator:
         self,
         event: EventBase,
     ) -> Dict[str, List[Dict[str, Any]]]:
-        """Get the push rules for all users who should be notified about the
-        event.
+        """Get the push rules for all users who may need to be notified about
+        the event.
+
+        Note: this does not check if the user is allowed to see the event.
 
         Returns:
             Mapping of user ID to their push rules.
         """
+        # We get the users who may need to be notified by first fetching the
+        # local users currently in the room, finding those that have push rules,
+        # and *then* checking which users are actually allowed to see the event.
+        #
+        # The alternative is to first fetch all users that were joined at the
+        # event, but that requires fetching the full state at the event, which
+        # may be expensive for large rooms with few local users.
 
         local_users = await self.store.get_local_users_in_room(event.room_id)
 
