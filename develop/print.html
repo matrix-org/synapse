@@ -4184,6 +4184,101 @@ see <a href="usage/configuration/../../postgres.html">here</a>.</p>
     cp_max: 10
 </code></pre>
 <hr />
+<h3 id="databases"><a class="header" href="#databases"><code>databases</code></a></h3>
+<p>The <code>databases</code> option allows specifying a mapping between certain database tables and
+database host details, spreading the load of a single Synapse instance across multiple
+database backends. This is often referred to as &quot;database sharding&quot;. This option is only
+supported for PostgreSQL database backends.</p>
+<p><strong>Important note:</strong> This is a supported option, but is not currently used in production by the
+Matrix.org Foundation. Proceed with caution and always make backups.</p>
+<p><code>databases</code> is a dictionary of arbitrarily-named database entries. Each entry is equivalent
+to the value of the <code>database</code> homeserver config option (see above), with the addition of
+a <code>data_stores</code> key. <code>data_stores</code> is an array of strings that specifies the data store(s)
+(a defined label for a set of tables) that should be stored on the associated database
+backend entry.</p>
+<p>The currently defined values for <code>data_stores</code> are:</p>
+<ul>
+<li>
+<p><code>&quot;state&quot;</code>: Database that relates to state groups will be stored in this database.</p>
+<p>Specifically, that means the following tables:</p>
+<ul>
+<li><code>state_groups</code></li>
+<li><code>state_group_edges</code></li>
+<li><code>state_groups_state</code></li>
+</ul>
+<p>And the following sequences:</p>
+<ul>
+<li><code>state_groups_seq_id</code></li>
+</ul>
+</li>
+<li>
+<p><code>&quot;main&quot;</code>: All other database tables and sequences.</p>
+</li>
+</ul>
+<p>All databases will end up with additional tables used for tracking database schema migrations
+and any pending background updates. Synapse will create these automatically on startup when checking for
+and/or performing database schema migrations.</p>
+<p>To migrate an existing database configuration (e.g. all tables on a single database) to a different
+configuration (e.g. the &quot;main&quot; data store on one database, and &quot;state&quot; on another), do the following:</p>
+<ol>
+<li>
+<p>Take a backup of your existing database. Things can and do go wrong and database corruption is no joke!</p>
+</li>
+<li>
+<p>Ensure all pending database migrations have been applied and background updates have run. The simplest
+way to do this is to use the <code>update_synapse_database</code> script supplied with your Synapse installation.</p>
+<pre><code class="language-sh">update_synapse_database --database-config homeserver.yaml --run-background-updates
+</code></pre>
+</li>
+<li>
+<p>Copy over the necessary tables and sequences from one database to the other. Tables relating to database
+migrations, schemas, schema versions and background updates should <strong>not</strong> be copied.</p>
+<p>As an example, say that you'd like to split out the &quot;state&quot; data store from an existing database which
+currently contains all data stores.</p>
+<p>Simply copy the tables and sequences defined above for the &quot;state&quot; datastore from the existing database
+to the secondary database. As noted above, additional tables will be created in the secondary database
+when Synapse is started.</p>
+</li>
+<li>
+<p>Modify/create the <code>databases</code> option in your <code>homeserver.yaml</code> to match the desired database configuration.</p>
+</li>
+<li>
+<p>Start Synapse. Check that it starts up successfully and that things generally seem to be working.</p>
+</li>
+<li>
+<p>Drop the old tables that were copied in step 3.</p>
+</li>
+</ol>
+<p>Only one of the options <code>database</code> or <code>databases</code> may be specified in your config, but not both.</p>
+<p>Example configuration:</p>
+<pre><code class="language-yaml">databases:
+  basement_box:
+    name: psycopg2
+    txn_limit: 10000
+    data_stores: [&quot;main&quot;]
+    args:
+      user: synapse_user
+      password: secretpassword
+      database: synapse_main
+      host: localhost
+      port: 5432
+      cp_min: 5
+      cp_max: 10
+
+  my_other_database:
+    name: psycopg2
+    txn_limit: 10000
+    data_stores: [&quot;state&quot;]
+    args:
+      user: synapse_user
+      password: secretpassword
+      database: synapse_state
+      host: localhost
+      port: 5432
+      cp_min: 5
+      cp_max: 10
+</code></pre>
+<hr />
 <h2 id="logging"><a class="header" href="#logging">Logging</a></h2>
 <p>Config options related to logging. </p>
 <hr />
