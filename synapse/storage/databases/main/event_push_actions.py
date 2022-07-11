@@ -143,7 +143,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             self._find_stream_orderings_for_times, 10 * 60 * 1000
         )
 
-        self._rotate_delay = 3
         self._rotate_count = 10000
         self._doing_notif_rotation = False
         if hs.config.worker.run_background_tasks:
@@ -847,7 +846,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 )
                 if caught_up:
                     break
-                await self.hs.get_clock().sleep(self._rotate_delay)
 
             # Finally we clear out old event push actions.
             await self._remove_old_push_actions_that_have_rotated()
@@ -1016,9 +1014,14 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 upd.stream_ordering
             FROM (
                 SELECT user_id, room_id, count(*) as cnt,
-                    max(stream_ordering) as stream_ordering
-                FROM event_push_actions
-                WHERE ? < stream_ordering AND stream_ordering <= ?
+                    max(ea.stream_ordering) as stream_ordering
+                FROM event_push_actions AS ea
+                LEFT JOIN event_push_summary AS old USING (user_id, room_id)
+                WHERE ? < ea.stream_ordering AND ea.stream_ordering <= ?
+                    AND (
+                        old.last_receipt_stream_ordering IS NULL
+                        OR old.last_receipt_stream_ordering < ea.stream_ordering
+                    )
                     AND %s = 1
                 GROUP BY user_id, room_id
             ) AS upd
@@ -1109,7 +1112,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         ) -> bool:
             # We don't want to clear out too much at a time, so we bound our
             # deletes.
-            batch_size = 10000
+            batch_size = self._rotate_count
 
             txn.execute(
                 """

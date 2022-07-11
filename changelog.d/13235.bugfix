@@ -1,0 +1,1 @@
+Fix MSC3202-enabled appservices not receiving to-device messages, preventing messages from being decrypted.

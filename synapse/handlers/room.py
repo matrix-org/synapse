@@ -440,7 +440,12 @@ class RoomCreationHandler:
 
         spam_check = await self.spam_checker.user_may_create_room(user_id)
         if spam_check != NOT_SPAM:
-            raise SynapseError(403, "You are not permitted to create rooms", spam_check)
+            raise SynapseError(
+                403,
+                "You are not permitted to create rooms",
+                errcode=spam_check[0],
+                additional_fields=spam_check[1],
+            )
 
         creation_content: JsonDict = {
             "room_version": new_room_version.identifier,
@@ -731,7 +736,10 @@ class RoomCreationHandler:
             spam_check = await self.spam_checker.user_may_create_room(user_id)
             if spam_check != NOT_SPAM:
                 raise SynapseError(
-                    403, "You are not permitted to create rooms", spam_check
+                    403,
+                    "You are not permitted to create rooms",
+                    errcode=spam_check[0],
+                    additional_fields=spam_check[1],
                 )
 
         if ratelimit:
@@ -1011,6 +1019,8 @@ class RoomCreationHandler:
 
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
 
+        last_sent_event_id: Optional[str] = None
+
         def create(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
             e = {"type": etype, "content": content}
 
@@ -1020,19 +1030,27 @@ class RoomCreationHandler:
             return e
 
         async def send(etype: str, content: JsonDict, **kwargs: Any) -> int:
+            nonlocal last_sent_event_id
+
             event = create(etype, content, **kwargs)
             logger.debug("Sending %s in new room", etype)
             # Allow these events to be sent even if the user is shadow-banned to
             # allow the room creation to complete.
             (
-                _,
+                sent_event,
                 last_stream_id,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 creator,
                 event,
                 ratelimit=False,
                 ignore_shadow_ban=True,
+                # Note: we don't pass state_event_ids here because this triggers
+                # an additional query per event to look them up from the events table.
+                prev_event_ids=[last_sent_event_id] if last_sent_event_id else [],
             )
+
+            last_sent_event_id = sent_event.event_id
+
             return last_stream_id
 
         try:
@@ -1046,7 +1064,9 @@ class RoomCreationHandler:
         await send(etype=EventTypes.Create, content=creation_content)
 
         logger.debug("Sending %s in new room", EventTypes.Member)
-        await self.room_member_handler.update_membership(
+        # Room create event must exist at this point
+        assert last_sent_event_id is not None
+        member_event_id, _ = await self.room_member_handler.update_membership(
             creator,
             creator.user,
             room_id,
@@ -1054,7 +1074,9 @@ class RoomCreationHandler:
             ratelimit=ratelimit,
             content=creator_join_profile,
             new_room=True,
+            prev_event_ids=[last_sent_event_id],
         )
+        last_sent_event_id = member_event_id
 
         # We treat the power levels override specially as this needs to be one
         # of the first events that get sent into a room.
@@ -1481,6 +1503,9 @@ class TimestampLookupHandler:
                         exc_info=(type(ex), ex, ex.__traceback__),
                     )
 
+        # To appease mypy, we have to add both of these conditions to check for
+        # `None`. We only expect `local_event` to be `None` when
+        # `local_event_id` is `None` but mypy isn't as smart and assuming as us.
         if not local_event_id or not local_event:
             raise SynapseError(
                 404,
