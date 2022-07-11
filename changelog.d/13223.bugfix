@@ -1,0 +1,1 @@
+Fix bug where notification counts would get stuck after a highlighted message. Broke in v1.62.0.
