@@ -109,51 +109,37 @@ class BulkPushRuleEvaluator:
         # Whether to support MSC3772 is supported.
         self._relations_match_enabled = self.hs.config.experimental.msc3772_enabled
 
-    async def get_rules(
-        self, room_id: str, event: EventBase
-    ) -> Dict[str, List[Dict[str, dict]]]:
-        """Given an event return the rules for all users currently in the room
-        who should be notified of this event.
+    async def _get_rules_for_event(
+        self,
+        event: EventBase,
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """Get the push rules for all users who should be notified about the
+        event.
 
         Returns:
-            Mapping from user ID to their push rules.
+            Mapping of user ID to their push rules.
         """
 
-        local_users = await self.store.get_local_users_in_room(room_id)
+        local_users = await self.store.get_local_users_in_room(event.room_id)
 
-        ret_rules_by_user = await self.store.bulk_get_push_rules(local_users)
+        # if this event is an invite event, we may need to run rules for the user
+        # who's been invited, otherwise they won't get told they've been invited
+        if event.type == EventTypes.Member and event.membership == Membership.INVITE:
+            invited = event.state_key
+            if invited and self.hs.is_mine_id(invited) and invited not in local_users:
+                local_users = list(local_users)
+                local_users.append(invited)
+
+        rules_by_user = await self.store.bulk_get_push_rules(local_users)
 
         logger.debug("Users in room: %s", local_users)
 
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(
                 "Returning push rules for %r %r",
-                room_id,
-                ret_rules_by_user.keys(),
+                event.room_id,
+                rules_by_user.keys(),
             )
-        return ret_rules_by_user
-
-    async def _get_rules_for_event(
-        self,
-        event: EventBase,
-    ) -> Dict[str, List[Dict[str, Any]]]:
-        """This gets the rules for all users in the room at the time of the event,
-        as well as the push rules for the invitee if the event is an invite.
-
-        Returns:
-            dict of user_id -> push_rules
-        """
-        rules_by_user = await self.get_rules(event.room_id, event)
-
-        # if this event is an invite event, we may need to run rules for the user
-        # who's been invited, otherwise they won't get told they've been invited
-        if event.type == "m.room.member" and event.content["membership"] == "invite":
-            invited = event.state_key
-            if invited and self.hs.is_mine_id(invited):
-                rules_by_user = dict(rules_by_user)
-                rules_by_user[invited] = await self.store.get_push_rules_for_user(
-                    invited
-                )
 
         return rules_by_user
 
