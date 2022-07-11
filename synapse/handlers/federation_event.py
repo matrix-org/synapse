@@ -1052,17 +1052,17 @@ class FederationEventHandler:
         if not remote_event:
             raise Exception("Unable to get missing prev_event %s" % (event_id,))
 
-        # missing state at that event is a warning, not a blocker
-        # XXX: this doesn't sound right? it means that we'll end up with incomplete
-        #   state.
+        # Figure out which events we failed to fetch
         failed_to_fetch = desired_events - event_metadata.keys()
-
         # The event_id is part of the `desired_events` but isn't fetched as part
         # of the `event_metadata` so we remove it here separately if we did find it.
         have_event_id = await self._store.have_seen_event(room_id, event_id)
         if have_event_id:
             failed_to_fetch = failed_to_fetch - {event_id}
 
+        # missing state at that event is a warning, not a blocker
+        # XXX: this doesn't sound right? it means that we'll end up with incomplete
+        #   state.
         if failed_to_fetch:
             logger.warning(
                 "_get_state_ids_after_missing_prev_event(event_id=%s): Failed to fetch missing state events %s",
