@@ -75,6 +75,15 @@ class SQLBaseStore(metaclass=ABCMeta):
             self._attempt_to_invalidate_cache(
                 "get_users_in_room_with_profiles", (room_id,)
             )
+            self._attempt_to_invalidate_cache(
+                "get_number_joined_users_in_room", (room_id,)
+            )
+            self._attempt_to_invalidate_cache("get_local_users_in_room", (room_id,))
+
+        for user_id in members_changed:
+            self._attempt_to_invalidate_cache(
+                "get_user_in_room_with_profile", (room_id, user_id)
+            )
 
         # Purge other caches based on room state.
         self._attempt_to_invalidate_cache("get_room_summary", (room_id,))

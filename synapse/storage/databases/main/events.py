@@ -1797,6 +1797,18 @@ class PersistEventsStore:
                 self.store.get_invited_rooms_for_local_user.invalidate,
                 (event.state_key,),
             )
+            txn.call_after(
+                self.store.get_local_users_in_room.invalidate,
+                (event.room_id,),
+            )
+            txn.call_after(
+                self.store.get_number_joined_users_in_room.invalidate,
+                (event.room_id,),
+            )
+            txn.call_after(
+                self.store.get_user_in_room_with_profile.invalidate,
+                (event.room_id, event.state_key),
+            )
 
             # The `_get_membership_from_event_id` is immutable, except for the
             # case where we look up an event *before* persisting it.
