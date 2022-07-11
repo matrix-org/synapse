@@ -708,6 +708,8 @@ class RoomsCreateTestCase(RoomBase):
 
         self.assertEqual(200, channel.code, channel.result)
         self.assertTrue("room_id" in channel.json_body)
+        assert channel.resource_usage is not None
+        self.assertEqual(33, channel.resource_usage.db_txn_count)
 
     def test_post_room_visibility_key(self) -> None:
         # POST with visibility config key, expect new room id
