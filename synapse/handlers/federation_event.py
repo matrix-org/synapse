@@ -1320,7 +1320,7 @@ class FederationEventHandler:
     async def backfill_event(
         self, destination: str, room_id: str, event_id: str
     ) -> None:
-        logger.info("backfill_event event_id=%s", event_id)
+        logger.info("backfill_event event_id=%s from destination=%s", event_id, destination)
 
         room_version = await self._store.get_room_version(room_id)
 
