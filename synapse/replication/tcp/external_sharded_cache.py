@@ -145,9 +145,14 @@ class ExternalShardedCache:
         original_keys = list(key_mapping.keys())
         mapped_results: dict[str, Any] = {}
         for i, result in enumerate(results):
-            if result:
+            if not result:
+                continue
+            try:
                 result = marshal.loads(result)
-            mapped_results[original_keys[i]] = result
+            except Exception as e:
+                logger.warning("Failed to decode cache result: %r", e)
+            else:
+                mapped_results[original_keys[i]] = result
         return mapped_results
 
     async def mget(self, cache_name: str, keys: Iterable[str]) -> dict[str, Any]:
