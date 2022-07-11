@@ -19,6 +19,7 @@ from synapse.api.errors import SynapseError
 from synapse.storage.database import LoggingTransaction
 from synapse.storage.databases.main import CacheInvalidationWorkerStore
 from synapse.storage.databases.main.state import StateGroupWorkerStore
+from synapse.storage.engines import PostgresEngine
 from synapse.storage.engines._base import IsolationLevel
 from synapse.types import RoomStreamToken
 
@@ -329,10 +330,11 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
     def _purge_room_txn(self, txn: LoggingTransaction, room_id: str) -> List[int]:
         # This collides with event persistence so we cannot write new events and metadata into
         # a room while deleting it or this transaction will fail.
-        txn.execute(
-            "SELECT room_version FROM rooms WHERE room_id = ? FOR UPDATE",
-            (room_id,),
-        )
+        if isinstance(self.database_engine, PostgresEngine):
+            txn.execute(
+                "SELECT room_version FROM rooms WHERE room_id = ? FOR UPDATE",
+                (room_id,),
+            )
 
         # First, fetch all the state groups that should be deleted, before
         # we delete that information.
