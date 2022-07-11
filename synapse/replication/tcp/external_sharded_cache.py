@@ -198,4 +198,14 @@ class ExternalShardedCache:
     async def get(
         self, cache_name: str, key: str, default: Optional[Any] = None
     ) -> Any:
-        return await self.mget(cache_name, [key]).get(key, default)
+        return (await self.mget(cache_name, [key])).get(key, default)
+
+    async def contains(self, cache_name: str, key: str) -> bool:
+        redis_key = self._get_redis_key(cache_name, key)
+        shard_id = self._get_redis_shard_id(redis_key)
+        return await self._redis_shards[shard_id].exists(redis_key)
+
+    async def delete(self, cache_name: str, key: str) -> None:
+        redis_key = self._get_redis_key(cache_name, key)
+        shard_id = self._get_redis_shard_id(redis_key)
+        await self._redis_shards[shard_id].delete(redis_key)
