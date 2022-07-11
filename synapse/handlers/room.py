@@ -1036,6 +1036,8 @@ class RoomCreationHandler:
                 event,
                 ratelimit=False,
                 ignore_shadow_ban=True,
+                # Note: we don't pass state_event_ids here because this triggers
+                # an additional query per event to look them up from the events table.
                 prev_event_ids=[last_sent_event_id] if last_sent_event_id else [],
             )
 
