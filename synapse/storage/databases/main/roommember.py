@@ -222,7 +222,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         cached_method_name="get_user_in_room_with_profile", list_name="user_ids"
     )
     async def get_subset_users_in_room_with_profiles(
-        self, room_id: str, user_ids: List[str]
+        self, room_id: str, user_ids: Collection[str]
     ) -> Dict[str, ProfileInfo]:
         """Get a mapping from user ID to profile information for a list of users
         in a given room.
