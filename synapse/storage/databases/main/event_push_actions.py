@@ -1016,9 +1016,14 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 upd.stream_ordering
             FROM (
                 SELECT user_id, room_id, count(*) as cnt,
-                    max(stream_ordering) as stream_ordering
-                FROM event_push_actions
-                WHERE ? < stream_ordering AND stream_ordering <= ?
+                    max(ea.stream_ordering) as stream_ordering
+                FROM event_push_actions AS ea
+                LEFT JOIN event_push_summary AS old USING (user_id, room_id)
+                WHERE ? < ea.stream_ordering AND ea.stream_ordering <= ?
+                    AND (
+                        old.last_receipt_stream_ordering IS NULL
+                        OR old.last_receipt_stream_ordering < ea.stream_ordering
+                    )
                     AND %s = 1
                 GROUP BY user_id, room_id
             ) AS upd
