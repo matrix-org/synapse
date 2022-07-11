@@ -57,7 +57,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 from synapse.storage.types import Connection, Cursor
-from synapse.util.async_helpers import delay_cancellation
+from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
@@ -818,7 +818,7 @@ class DatabasePool:
                     )
 
                 for after_callback, after_args, after_kwargs in after_callbacks:
-                    after_callback(*after_args, **after_kwargs)
+                    await maybe_awaitable(after_callback(*after_args, **after_kwargs))
 
                 return cast(R, result)
             except Exception:
