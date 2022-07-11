@@ -13,8 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from enum import Enum, auto
 from typing import Collection, Dict, FrozenSet, List, Optional, Tuple
 
+import attr
 from typing_extensions import Final
 
 from synapse.api.constants import EventTypes, HistoryVisibility, Membership
@@ -115,7 +117,7 @@ async def filter_events_for_client(
             retention_policy=retention_policies[room_id],
             state=event_id_to_state.get(event.event_id),
             is_peeking=is_peeking,
-            sender_erased=event.sender in erased_senders,
+            sender_erased=erased_senders.get(event.sender, False),
         )
 
     # Check each event: gives an iterable of None or (a potentially modified)
@@ -128,7 +130,7 @@ async def filter_events_for_client(
 
 async def filter_event_for_clients_with_state(
     store: DataStore,
-    user_ids: List[str],
+    user_ids: Collection[str],
     event: EventBase,
     context: EventContext,
     is_peeking: bool = False,
@@ -136,16 +138,23 @@ async def filter_event_for_clients_with_state(
 ) -> Collection[str]:
     """
     Checks to see if an event is visible to the users in the list at the time of
-    the event
+    the event.
+
+    Note: This does *not* check if the sender of the event was erased.
 
     Args:
         store: databases
         user_ids: user_ids to be checked
         event: the event to be checked
         context: EventContext for the event to be checked
+        is_peeking: Whether the users are peeking into the room, ie not
+            currently joined
+        filter_send_to_client: Whether we're checking an event that's going to be
+            sent to a client. This might not always be the case since this function can
+            also be called to check whether a user can see the state at a given point.
 
     Returns:
-        list of uids for whom the event is visible
+        Collection of user IDs for whom the event is visible
     """
     # None of the users should see the event if it is soft_failed
     if event.internal_metadata.is_soft_failed():
@@ -163,11 +172,14 @@ async def filter_event_for_clients_with_state(
         retention_policy = await store.get_retention_policy_for_room(event.room_id)
 
         for user_id in user_ids:
-            if not _check_filter_send_to_client(
-                event,
-                store.clock,
-                retention_policy,
-                sender_ignored=user_id in ignored_by,
+            if (
+                _check_filter_send_to_client(
+                    event,
+                    store.clock,
+                    retention_policy,
+                    sender_ignored=user_id in ignored_by,
+                )
+                == _CheckFilter.DENIED
             ):
                 allowed_user_ids.discard(user_id)
 
@@ -188,7 +200,10 @@ async def filter_event_for_clients_with_state(
     )
 
     visibility = get_effective_room_visibility_from_state(visibility_state_map)
-    if _check_history_visibility(event, visibility, is_peeking=is_peeking):
+    if (
+        _check_history_visibility(event, visibility, is_peeking=is_peeking)
+        == _CheckVisibility.ALLOWED
+    ):
         return allowed_user_ids
 
     # The history visibility isn't lax, so we now need to fetch the membership
@@ -206,7 +221,7 @@ async def filter_event_for_clients_with_state(
     return {
         user_id
         for user_id in allowed_user_ids
-        if _check_membership(user_id, event, visibility, state_map, is_peeking)
+        if _check_membership(user_id, event, visibility, state_map, is_peeking).allowed
     }
 
 
@@ -276,8 +291,9 @@ def _check_client_allowed_to_see_event(
     # see events in the room at that point in the DAG, and that shouldn't be decided
     # on those checks.
     if filter_send_to_client:
-        if not _check_filter_send_to_client(
-            event, clock, retention_policy, sender_ignored
+        if (
+            _check_filter_send_to_client(event, clock, retention_policy, sender_ignored)
+            == _CheckFilter.DENIED
         ):
             return None
 
@@ -298,22 +314,38 @@ def _check_client_allowed_to_see_event(
     if state is None:
         raise Exception("Missing state for non-outlier event")
 
-    # If the sender has been erased we must only return the redacted form.
-    if sender_erased:
-        event = prune_event(event)
-
     # get the room_visibility at the time of the event.
     visibility = get_effective_room_visibility_from_state(state)
 
     # Check if the room has lax history visibility, allowing us to skip
     # membership checks.
-    if _check_history_visibility(event, visibility, is_peeking):
+    #
+    # We can only do this check if the sender has *not* been erased, as if they
+    # have we need to check the user's membership.
+    if (
+        not sender_erased
+        and _check_history_visibility(event, visibility, is_peeking)
+        == _CheckVisibility.ALLOWED
+    ):
         return event
 
-    if _check_membership(user_id, event, visibility, state, is_peeking):
-        return event
+    membership_result = _check_membership(user_id, event, visibility, state, is_peeking)
+    if not membership_result.allowed:
+        return None
 
-    return None
+    # If the sender has been erased and the user was not joined at the time, we
+    # must only return the redacted form.
+    if sender_erased and not membership_result.joined:
+        event = prune_event(event)
+
+    return event
+
+
+@attr.s(frozen=True, slots=True, auto_attribs=True)
+class _CheckMembershipReturn:
+    "Return value of _check_membership"
+    allowed: bool
+    joined: bool
 
 
 def _check_membership(
@@ -322,11 +354,12 @@ def _check_membership(
     visibility: str,
     state: StateMap[EventBase],
     is_peeking: bool,
-) -> bool:
+) -> _CheckMembershipReturn:
     """Check whether the user can see the event due to their membership
 
     Returns:
-        True if they can, False if they can't
+        True if they can, False if they can't, plus the membership of the user
+        at the event.
     """
     # If the event is the user's own membership event, use the 'most joined'
     # membership
@@ -349,7 +382,7 @@ def _check_membership(
         if membership == "leave" and (
             prev_membership == "join" or prev_membership == "invite"
         ):
-            return True
+            return _CheckMembershipReturn(True, membership == Membership.JOIN)
 
         new_priority = MEMBERSHIP_PRIORITY.index(membership)
         old_priority = MEMBERSHIP_PRIORITY.index(prev_membership)
@@ -365,19 +398,19 @@ def _check_membership(
     # if the user was a member of the room at the time of the event,
     # they can see it.
     if membership == Membership.JOIN:
-        return True
+        return _CheckMembershipReturn(True, True)
 
     # otherwise, it depends on the room visibility.
 
     if visibility == HistoryVisibility.JOINED:
         # we weren't a member at the time of the event, so we can't
         # see this event.
-        return False
+        return _CheckMembershipReturn(False, False)
 
     elif visibility == HistoryVisibility.INVITED:
         # user can also see the event if they were *invited* at the time
         # of the event.
-        return membership == Membership.INVITE
+        return _CheckMembershipReturn(membership == Membership.INVITE, False)
 
     elif visibility == HistoryVisibility.SHARED and is_peeking:
         # if the visibility is shared, users cannot see the event unless
@@ -388,11 +421,16 @@ def _check_membership(
         # ideally we would share history up to the point they left. But
         # we don't know when they left. We just treat it as though they
         # never joined, and restrict access.
-        return False
+        return _CheckMembershipReturn(False, False)
 
     # The visibility is either shared or world_readable, and the user was
     # not a member at the time. We allow it.
-    return True
+    return _CheckMembershipReturn(True, False)
+
+
+class _CheckFilter(Enum):
+    MAYBE_ALLOWED = auto()
+    DENIED = auto()
 
 
 def _check_filter_send_to_client(
@@ -400,7 +438,7 @@ def _check_filter_send_to_client(
     clock: Clock,
     retention_policy: RetentionPolicy,
     sender_ignored: bool,
-) -> bool:
+) -> _CheckFilter:
     """Apply checks for sending events to client
 
     Returns:
@@ -408,17 +446,17 @@ def _check_filter_send_to_client(
     """
 
     if event.type == EventTypes.Dummy:
-        return False
+        return _CheckFilter.DENIED
 
     if not event.is_state() and sender_ignored:
-        return False
+        return _CheckFilter.DENIED
 
     # Until MSC2261 has landed we can't redact malicious alias events, so for
     # now we temporarily filter out m.room.aliases entirely to mitigate
     # abuse, while we spec a better solution to advertising aliases
     # on rooms.
     if event.type == EventTypes.Aliases:
-        return False
+        return _CheckFilter.DENIED
 
     # Don't try to apply the room's retention policy if the event is a state
     # event, as MSC1763 states that retention is only considered for non-state
@@ -430,14 +468,19 @@ def _check_filter_send_to_client(
             oldest_allowed_ts = clock.time_msec() - max_lifetime
 
             if event.origin_server_ts < oldest_allowed_ts:
-                return False
+                return _CheckFilter.DENIED
 
-    return True
+    return _CheckFilter.MAYBE_ALLOWED
+
+
+class _CheckVisibility(Enum):
+    ALLOWED = auto()
+    MAYBE_DENIED = auto()
 
 
 def _check_history_visibility(
     event: EventBase, visibility: str, is_peeking: bool
-) -> bool:
+) -> _CheckVisibility:
     """Check if event is allowed to be seen due to lax history visibility.
 
     Returns:
@@ -459,11 +502,11 @@ def _check_history_visibility(
             visibility = prev_visibility
 
     if visibility == HistoryVisibility.SHARED and not is_peeking:
-        return True
+        return _CheckVisibility.ALLOWED
     elif visibility == HistoryVisibility.WORLD_READABLE:
-        return True
+        return _CheckVisibility.ALLOWED
 
-    return False
+    return _CheckVisibility.MAYBE_DENIED
 
 
 def get_effective_room_visibility_from_state(state: StateMap[EventBase]) -> str:
