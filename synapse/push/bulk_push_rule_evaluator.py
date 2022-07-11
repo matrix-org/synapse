@@ -112,8 +112,11 @@ class BulkPushRuleEvaluator:
     async def get_rules(
         self, room_id: str, event: EventBase
     ) -> Dict[str, List[Dict[str, dict]]]:
-        """Given an event return the rules for all users who are
-        currently in the room.
+        """Given an event return the rules for all users currently in the room
+        who should be notified of this event.
+
+        Returns:
+            Mapping from user ID to their push rules.
         """
 
         local_users = await self.store.get_local_users_in_room(room_id)
