@@ -1512,21 +1512,19 @@ class EventCreationHandler:
                     original_event and event.sender != original_event.sender
                 )
 
-            if event.type == EventTypes.Member and event.membership == Membership.JOIN:
-                (
-                    current_membership,
-                    _,
-                ) = await self.store.get_local_current_membership_for_user_in_room(
-                    event.state_key, event.room_id
-                )
-                if current_membership != Membership.JOIN:
-                    self._notifier.notify_user_joined_room(
-                        event.event_id, event.room_id
-                    )
-
             await self.request_ratelimiter.ratelimit(
                 requester, is_admin_redaction=is_admin_redaction
             )
+
+        if event.type == EventTypes.Member and event.membership == Membership.JOIN:
+            (
+                current_membership,
+                _,
+            ) = await self.store.get_local_current_membership_for_user_in_room(
+                event.state_key, event.room_id
+            )
+            if current_membership != Membership.JOIN:
+                self._notifier.notify_user_joined_room(event.event_id, event.room_id)
 
         await self._maybe_kick_guest_users(event, context)
 
