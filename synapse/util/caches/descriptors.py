@@ -44,6 +44,7 @@ from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import delay_cancellation
 from synapse.util.caches.deferred_cache import DeferredCache
 from synapse.util.caches.lrucache import LruCache
+from synapse.util.caches.redis_caches import redisCachedList
 
 logger = logging.getLogger(__name__)
 
@@ -371,6 +372,7 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
         wrapped.invalidate_all = cache.invalidate_all
         wrapped.cache = cache
         wrapped.num_args = self.num_args
+        wrapped.tree = self.tree
 
         obj.__dict__[self.orig.__name__] = wrapped
 
@@ -417,6 +419,8 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
                 "Couldn't see arguments %r for %r."
                 % (self.list_name, cached_method_name)
             )
+
+        self.orig_wrapped = self.orig
 
     def __get__(
         self, obj: Optional[Any], objtype: Optional[Type] = None
@@ -509,7 +513,7 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
 
                 # dispatch the call, and attach the two handlers
                 defer.maybeDeferred(
-                    preserve_fn(self.orig), **args_to_call
+                    preserve_fn(self.orig_wrapped), **args_to_call
                 ).addCallbacks(complete_all, errback_all)
 
             if cached_defers:
@@ -525,6 +529,29 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
             else:
                 return defer.succeed(results)
 
+        def enable_redis_cache(external_sharded_cache):
+            if getattr(cached_method, "redis_enabled", False):
+                return
+
+            self.orig_wrapped = redisCachedList(
+                external_sharded_cache,
+                self.cached_method_name,
+                self.list_name,
+            )(self.orig)
+
+            # Tree caches cannot be backed by Redis
+            assert not cached_method.tree
+            # Cache context is not supported yet
+            assert not self.add_cache_context
+
+            # Cache invalidations are not allowed with Redis backed caches (currently)
+            def block_invalidate():
+                raise Exception("Cannot invalidate Redis backed @cachedList")
+            cached_method.invalidate = block_invalidate
+            cached_method.invalidate_all = block_invalidate
+            cached_method.redis_enabled = True
+
+        wrapped.enable_redis_cache = enable_redis_cache
         obj.__dict__[self.orig.__name__] = wrapped
 
         return wrapped
