@@ -711,6 +711,19 @@ class RoomsCreateTestCase(RoomBase):
         assert channel.resource_usage is not None
         self.assertEqual(33, channel.resource_usage.db_txn_count)
 
+    def test_post_room_initial_state(self) -> None:
+        # POST with initial_state config key, expect new room id
+        channel = self.make_request(
+            "POST",
+            "/createRoom",
+            b'{"initial_state":[{"type": "m.bridge", "content": {}}]}',
+        )
+
+        self.assertEqual(200, channel.code, channel.result)
+        self.assertTrue("room_id" in channel.json_body)
+        assert channel.resource_usage is not None
+        self.assertEqual(37, channel.resource_usage.db_txn_count)
+
     def test_post_room_visibility_key(self) -> None:
         # POST with visibility config key, expect new room id
         channel = self.make_request("POST", "/createRoom", b'{"visibility":"private"}')
