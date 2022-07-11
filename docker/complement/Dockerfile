@@ -8,17 +8,17 @@ ARG SYNAPSE_VERSION=latest
 FROM matrixdotorg/synapse-workers:$SYNAPSE_VERSION
 
 # Install postgresql
-RUN apt-get update && \
-  DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -yqq postgresql-13
+# RUN apt-get update && \
+#   DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -yqq postgresql-13
 
 # Configure a user and create a database for Synapse
-RUN pg_ctlcluster 13 main start &&  su postgres -c "echo \
- \"ALTER USER postgres PASSWORD 'somesecret'; \
- CREATE DATABASE synapse \
-  ENCODING 'UTF8' \
-  LC_COLLATE='C' \
-  LC_CTYPE='C' \
-  template=template0;\" | psql" && pg_ctlcluster 13 main stop
+# RUN pg_ctlcluster 13 main start &&  su postgres -c "echo \
+#  \"ALTER USER postgres PASSWORD 'somesecret'; \
+#  CREATE DATABASE synapse \
+#   ENCODING 'UTF8' \
+#   LC_COLLATE='C' \
+#   LC_CTYPE='C' \
+#   template=template0;\" | psql" && pg_ctlcluster 13 main stop
 
 # Extend the shared homeserver config to disable rate-limiting,
 # set Complement's static shared secret, enable registration, amongst other
@@ -42,4 +42,4 @@ ENTRYPOINT ["/start_for_complement.sh"]
 
 # Update the healthcheck to have a shorter check interval
 HEALTHCHECK --start-period=5s --interval=1s --timeout=1s \
-    CMD /bin/sh /healthcheck.sh
+  CMD /bin/sh /healthcheck.sh

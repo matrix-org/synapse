@@ -54,7 +54,7 @@ from synapse.event_auth import (
     check_state_independent_auth_rules,
     validate_event_for_room_version,
 )
-from synapse.events import EventBase
+from synapse.events import EventBase, make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.logging.context import nested_logging_context
@@ -778,18 +778,30 @@ class FederationEventHandler:
 
         event_id = event.event_id
 
+        logger.info(
+            "_process_pulled_event: event_id=%s asdf_get_debug_events_in_room_ordered_by_depth\n%s",
+            event.event_id,
+            await self.persist_events_store.asdf_get_debug_events_in_room_ordered_by_depth(
+                event.room_id
+            ),
+        )
+
+        # TODO: Why is `get_event` returning the event as non-outlier when it's
+        # clearly an outlier still?
         existing = await self._store.get_event(
             event_id, allow_none=True, allow_rejected=True
         )
         logger.info(
-            "_process_pulled_event event_id=%s existing_outlier=%s",
+            "_process_pulled_event: event_id=%s existing_outlier=%s",
             event_id,
             existing and existing.internal_metadata.is_outlier(),
         )
         if existing:
+            # TODO: We could comment this out so it properly creates the
+            # `state_group`` in `_update_outliers_txn`
             if not existing.internal_metadata.is_outlier():
                 logger.info(
-                    "Ignoring received event %s which we have already seen",
+                    "_process_pulled_event: Ignoring received event %s which we have already seen",
                     event_id,
                 )
                 return
@@ -1388,11 +1400,12 @@ class FederationEventHandler:
             event_id,
             room_version,
         )
-        # FIXME: Too sketchy?
-        eventAsdf.internal_metadata.outlier = False
-        eventAsdf.internal_metadata.stream_ordering = None
+        # # FIXME: Too sketchy? Yes, because it updates references in place (messes with the cache)
+        # eventAsdf.internal_metadata.outlier = False
+        # eventAsdf.internal_metadata.stream_ordering = None
+        # event = eventAsdf
 
-        event = eventAsdf
+        event = make_event_from_dict(eventAsdf.get_pdu_json(), eventAsdf.room_version)
 
         # event = await self._federation_client.get_pdu_from_destination_raw(
         #     destination,

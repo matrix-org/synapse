@@ -242,7 +242,6 @@ class PersistEventsStore:
                     (room_id,), list(latest_event_ids)
                 )
 
-
     async def asdf_get_debug_events_in_room_ordered_by_depth(self, room_id: str) -> Any:
         """Gets the topological token in a room after or at the given stream
         ordering.
@@ -252,7 +251,7 @@ class PersistEventsStore:
         from tabulate import tabulate
 
         sql = (
-            "SELECT depth, stream_ordering, type, state_key, event_id FROM events"
+            "SELECT depth, stream_ordering, outlier, type, state_key, event_id FROM events"
             " WHERE events.room_id = ?"
             " ORDER BY depth DESC, stream_ordering DESC;"
         )
@@ -260,7 +259,14 @@ class PersistEventsStore:
             "asdf_get_debug_events_in_room_ordered_by_depth", None, sql, room_id
         )
 
-        headers = ["depth", "stream_ordering", "type", "state_key", "event_id"]
+        headers = [
+            "depth",
+            "stream_ordering",
+            "outlier",
+            "type",
+            "state_key",
+            "event_id",
+        ]
         return tabulate(rows, headers=headers)
 
     async def _get_events_which_are_prevs(self, event_ids: Iterable[str]) -> List[str]:
@@ -1367,9 +1373,23 @@ class PersistEventsStore:
             event_id: outlier for event_id, outlier in txn
         }
 
+        logger.info(
+            "_update_outliers_txn: events=%s have_persisted=%s",
+            [ev.event_id for ev, _ in events_and_contexts],
+            have_persisted,
+        )
+
         to_remove = set()
         for event, context in events_and_contexts:
-            if event.event_id not in have_persisted:
+            outlier_persisted = have_persisted.get(event.event_id, False)
+            logger.info(
+                "_update_outliers_txn: event=%s outlier=%s outlier_persisted=%s",
+                event.event_id,
+                event.internal_metadata.is_outlier(),
+                outlier_persisted,
+            )
+
+            if not outlier_persisted:
                 continue
 
             to_remove.add(event)
@@ -1379,8 +1399,7 @@ class PersistEventsStore:
                 # was an outlier or not - what we have is at least as good.
                 continue
 
-            outlier_persisted = have_persisted[event.event_id]
-            if not event.internal_metadata.is_outlier() and outlier_persisted:
+            if not event.internal_metadata.is_outlier():  # and outlier_persisted:
                 # We received a copy of an event that we had already stored as
                 # an outlier in the database. We now have some state at that event
                 # so we need to update the state_groups table with that state.
@@ -1390,7 +1409,10 @@ class PersistEventsStore:
                 # events down /sync. In general they will be historical events, so that
                 # doesn't matter too much, but that is not always the case.
 
-                logger.info("Updating state for ex-outlier event %s", event.event_id)
+                logger.info(
+                    "_update_outliers_txn: Updating state for ex-outlier event %s",
+                    event.event_id,
+                )
 
                 # insert into event_to_state_groups.
                 try:
@@ -1432,7 +1454,17 @@ class PersistEventsStore:
         state_events tables.
         """
 
-        logger.info("_store_event_txn events=%s", [event.event_id for event, _ in events_and_contexts])
+        logger.info(
+            "_store_event_txn events=%s",
+            [
+                "(event_id="
+                + event.event_id
+                + " outlier="
+                + str(event.internal_metadata.outlier)
+                + ")"
+                for event, _ in events_and_contexts
+            ],
+        )
 
         if not events_and_contexts:
             # nothing to do here
@@ -1694,8 +1726,23 @@ class PersistEventsStore:
 
         def prefill() -> None:
             for cache_entry in to_prefill:
+                logger.info(
+                    "_add_to_cache: _get_event_cache set event_id=%s outlier=%s",
+                    cache_entry.event.event_id,
+                    cache_entry.event.internal_metadata.outlier,
+                )
                 self.store._get_event_cache.set(
                     (cache_entry.event.event_id,), cache_entry
+                )
+
+                # TODO: it does read as expected so we can remove this
+                ret = self.store._get_event_cache.get(
+                    (cache_entry.event.event_id,), None
+                )
+                logger.info(
+                    "_add_to_cache: _get_event_cache get event_id=%s outlier=%s",
+                    ret and ret.event.event_id,
+                    ret and ret.event.internal_metadata.outlier,
                 )
 
         txn.call_after(prefill)

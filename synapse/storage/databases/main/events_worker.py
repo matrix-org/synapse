@@ -617,9 +617,12 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             map from event id to result
         """
+        # TODO: Wtf, outdated cache entry? outlier vs non-outlier
         event_entry_map = self._get_events_from_cache(
             event_ids,
         )
+        # event_entry_map = {}
+        # logger.info("_get_events_from_cache_or_db: event_entry_map=%s", event_entry_map)
 
         missing_events_ids = {e for e in event_ids if e not in event_entry_map}
 
@@ -752,6 +755,11 @@ class EventsWorkerStore(SQLBaseStore):
             ret = self._get_event_cache.get(
                 (event_id,), None, update_metrics=update_metrics
             )
+            logger.info(
+                "_get_events_from_cache: _get_event_cache get event_id=%s outlier=%s",
+                ret and ret.event.event_id,
+                ret and ret.event.internal_metadata.outlier,
+            )
             if ret:
                 event_map[event_id] = ret
                 continue
@@ -771,6 +779,11 @@ class EventsWorkerStore(SQLBaseStore):
 
                 # We add the entry back into the cache as we want to keep
                 # recently queried events in the cache.
+                logger.info(
+                    "_get_events_from_cache: _get_event_cache set event_id=%s outlier=%s",
+                    event_id,
+                    cache_entry.event.internal_metadata.outlier,
+                )
                 self._get_event_cache.set((event_id,), cache_entry)
 
         return event_map
@@ -1148,6 +1161,11 @@ class EventsWorkerStore(SQLBaseStore):
                 event=original_ev, redacted_event=redacted_event
             )
 
+            logger.info(
+                "_get_events_from_db: _get_event_cache set event_id=%s outlier=%s",
+                event_id,
+                cache_entry.event.internal_metadata.outlier,
+            )
             self._get_event_cache.set((event_id,), cache_entry)
             result_map[event_id] = cache_entry
 
