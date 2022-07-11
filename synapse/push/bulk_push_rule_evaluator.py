@@ -138,7 +138,7 @@ class BulkPushRuleEvaluator:
             logger.debug(
                 "Returning push rules for %r %r",
                 event.room_id,
-                rules_by_user.keys(),
+                list(rules_by_user.keys()),
             )
 
         return rules_by_user
