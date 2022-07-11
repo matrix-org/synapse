@@ -778,8 +778,6 @@ class FederationEventHandler:
 
         event_id = event.event_id
 
-        # TODO: Why is `get_event` returning the event as non-outlier when it's
-        # clearly an outlier still?
         existing = await self._store.get_event(
             event_id, allow_none=True, allow_rejected=True
         )
@@ -1071,13 +1069,7 @@ class FederationEventHandler:
         )
 
         # we also need the event itself.
-        have_seen_event = await self._store.have_seen_event(room_id, event_id)
-        logger.info(
-            "_get_state_and_persist event_id=%s have_seen_event=%s",
-            event_id,
-            have_seen_event,
-        )
-        if not have_seen_event:
+        if not await self._store.have_seen_event(room_id, event_id):
             await self._get_events_and_persist(
                 destination=destination, room_id=room_id, event_ids=(event_id,)
             )
