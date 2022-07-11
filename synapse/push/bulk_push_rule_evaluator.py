@@ -121,11 +121,6 @@ class BulkPushRuleEvaluator:
 
         local_users = await self.store.get_local_users_in_room(room_id)
 
-        if event.type == EventTypes.Member and event.membership == Membership.JOIN:
-            if self.hs.is_mine_id(event.state_key):
-                local_users = list(local_users)
-                local_users.append(event.state_key)
-
         ret_rules_by_user = await self.store.bulk_get_push_rules(local_users)
 
         logger.debug("Users in room: %s", local_users)
