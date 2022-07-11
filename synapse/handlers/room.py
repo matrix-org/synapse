@@ -1388,7 +1388,7 @@ class TimestampLookupHandler:
         local_event_id = await self.store.get_event_id_for_timestamp(
             room_id, timestamp, direction
         )
-        logger.info(
+        logger.debug(
             "get_event_for_timestamp: locally, we found event_id=%s closest to timestamp=%s",
             local_event_id,
             timestamp,
@@ -1424,7 +1424,7 @@ class TimestampLookupHandler:
             or is_event_next_to_backward_gap
             or is_event_next_to_forward_gap
         ):
-            logger.info(
+            logger.debug(
                 "get_event_for_timestamp: locally, we found event_id=%s closest to timestamp=%s which is next to a gap in event history so we're asking other homeservers first",
                 local_event_id,
                 timestamp,
@@ -1445,7 +1445,7 @@ class TimestampLookupHandler:
                     remote_response = await self.federation_client.timestamp_to_event(
                         domain, room_id, timestamp, direction
                     )
-                    logger.info(
+                    logger.debug(
                         "get_event_for_timestamp: response from domain(%s)=%s",
                         domain,
                         remote_response,
@@ -1454,22 +1454,17 @@ class TimestampLookupHandler:
                     remote_event_id = remote_response.event_id
                     origin_server_ts = remote_response.origin_server_ts
 
-                    # TODO: Do we want to persist this as an extremity?
-                    # TODO: I think ideally, we would try to backfill from
-                    # this event and run this whole
-                    # `get_event_for_timestamp` function again to make sure
-                    # they didn't give us an event from their gappy history.
-                    # await self.federation_event_handler._get_events_and_persist(
-                    #     domain,
-                    #     room_id,
-                    #     [remote_event_id],
-                    # )
+                    # Backfill this event so we can get a pagination token for
+                    # it with `/context` and paginate `/messages` from this
+                    # point.
+                    #
+                    # FIXME: After this backfill, we might want to run this
+                    # whole `get_event_for_timestamp` function again to make
+                    # sure they didn't give us an event from their gappy
+                    # history. Also need a heuristic for when to stop recursing
+                    # if they keep giving us gappy results.
                     await self.federation_event_handler.backfill_event(
                         domain, room_id, remote_event_id
-                    )
-                    logger.info(
-                        "get_event_for_timestamp: asdf %s",
-                        remote_event_id,
                     )
 
                     # Only return the remote event if it's closer than the local event
@@ -1485,7 +1480,7 @@ class TimestampLookupHandler:
                 except (HttpResponseException, InvalidResponseError) as ex:
                     # Let's not put a high priority on some other homeserver
                     # failing to respond or giving a random response
-                    logger.info(
+                    logger.debug(
                         "get_event_for_timestamp: Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",
                         domain,
                         type(ex).__name__,

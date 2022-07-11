@@ -308,8 +308,8 @@ class FederationClient(FederationBase):
             destination, event_id, timeout=timeout
         )
 
-        logger.info(
-            "get_pdu_raw retrieved event id %s from %s: %r",
+        logger.debug(
+            "get_pdu_raw: retrieved event id %s from %s: %r",
             event_id,
             destination,
             transaction_data,
@@ -318,12 +318,6 @@ class FederationClient(FederationBase):
         pdu_list: List[EventBase] = [
             event_from_pdu_json(p, room_version) for p in transaction_data["pdus"]
         ]
-
-        logger.info(
-            "get_pdu_raw pdu_list[0]=%s outlier=%s",
-            pdu_list[0],
-            pdu_list[0].internal_metadata.outlier,
-        )
 
         if pdu_list and pdu_list[0]:
             pdu = pdu_list[0]
@@ -367,12 +361,6 @@ class FederationClient(FederationBase):
         # TODO: Rate limit the number of times we try and get the same event.
 
         ev = self._get_pdu_cache.get(event_id)
-        logger.info(
-            "get_pdu from cache event_id=%s ev=%s outlier=%s",
-            event_id,
-            ev,
-            ev and ev.internal_metadata.outlier,
-        )
         if ev:
             return ev
 

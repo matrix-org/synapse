@@ -617,12 +617,9 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             map from event id to result
         """
-        # TODO: Wtf, outdated cache entry? outlier vs non-outlier
         event_entry_map = self._get_events_from_cache(
             event_ids,
         )
-        # event_entry_map = {}
-        # logger.info("_get_events_from_cache_or_db: event_entry_map=%s", event_entry_map)
 
         missing_events_ids = {e for e in event_ids if e not in event_entry_map}
 
@@ -755,11 +752,6 @@ class EventsWorkerStore(SQLBaseStore):
             ret = self._get_event_cache.get(
                 (event_id,), None, update_metrics=update_metrics
             )
-            logger.info(
-                "_get_events_from_cache: _get_event_cache get event_id=%s outlier=%s",
-                ret and ret.event.event_id,
-                ret and ret.event.internal_metadata.outlier,
-            )
             if ret:
                 event_map[event_id] = ret
                 continue
@@ -779,11 +771,6 @@ class EventsWorkerStore(SQLBaseStore):
 
                 # We add the entry back into the cache as we want to keep
                 # recently queried events in the cache.
-                logger.info(
-                    "_get_events_from_cache: _get_event_cache set event_id=%s outlier=%s",
-                    event_id,
-                    cache_entry.event.internal_metadata.outlier,
-                )
                 self._get_event_cache.set((event_id,), cache_entry)
 
         return event_map
@@ -1161,11 +1148,6 @@ class EventsWorkerStore(SQLBaseStore):
                 event=original_ev, redacted_event=redacted_event
             )
 
-            logger.info(
-                "_get_events_from_db: _get_event_cache set event_id=%s outlier=%s",
-                event_id,
-                cache_entry.event.internal_metadata.outlier,
-            )
             self._get_event_cache.set((event_id,), cache_entry)
             result_map[event_id] = cache_entry
 
@@ -1388,8 +1370,7 @@ class EventsWorkerStore(SQLBaseStore):
 
         return results
 
-    # TODO: The cache is giving us stale results for the `failed_to_fetch` stuff.
-    # @cachedList(cached_method_name="have_seen_event", list_name="keys")
+    @cachedList(cached_method_name="have_seen_event", list_name="keys")
     async def _have_seen_events_dict(
         self, keys: Collection[Tuple[str, str]]
     ) -> Dict[Tuple[str, str], bool]:
@@ -1421,13 +1402,6 @@ class EventsWorkerStore(SQLBaseStore):
             txn.execute(sql + clause, args)
             found_events = {eid for eid, in txn}
 
-            logger.info(
-                "have_seen_events sql=%s args=%s found_events=%s",
-                sql + clause,
-                args,
-                found_events,
-            )
-
             # ... and then we can update the results for each key
             results.update(
                 {(rid, eid): (eid in found_events) for (rid, eid) in remaining}
@@ -1436,8 +1410,7 @@ class EventsWorkerStore(SQLBaseStore):
         await self.db_pool.runInteraction("have_seen_events", have_seen_events_txn)
         return results
 
-    # TODO: The cache is giving us stale results for the `failed_to_fetch` stuff.
-    # @cached(max_entries=100000, tree=True)
+    @cached(max_entries=100000, tree=True)
     async def have_seen_event(self, room_id: str, event_id: str) -> bool:
         res = await self._have_seen_events_dict(((room_id, event_id),))
         return res[(room_id, event_id)]
