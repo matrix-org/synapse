@@ -16,7 +16,7 @@ import binascii
 import logging
 import marshal
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Iterable, Union
+from typing import TYPE_CHECKING, Any, Iterable, Optional, Union
 
 import jump
 from prometheus_client import Counter, Histogram
@@ -190,5 +190,7 @@ class ExternalShardedCache:
 
         return combined_results
 
-    async def get(self, cache_name: str, key: str) -> Any:
-        await self.mget(cache_name, [key])
+    async def get(
+        self, cache_name: str, key: str, default: Optional[Any] = None
+    ) -> Any:
+        return await self.mget(cache_name, [key]).get(key, default)
