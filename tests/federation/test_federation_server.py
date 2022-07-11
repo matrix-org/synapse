@@ -21,7 +21,6 @@ from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.config.server import DEFAULT_ROOM_VERSION
-from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events import make_event_from_dict
 from synapse.federation.federation_server import server_matches_acl_event
 from synapse.rest import admin
@@ -164,11 +163,9 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
         join_result = self._make_join(joining_user)
 
         join_event_dict = join_result["event"]
-        add_hashes_and_signatures(
-            KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
+        self.add_hashes_and_signatures_from_other_server(
             join_event_dict,
-            signature_name=self.OTHER_SERVER_NAME,
-            signing_key=self.OTHER_SERVER_SIGNATURE_KEY,
+            KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
         )
         channel = self.make_signed_federation_request(
             "PUT",
@@ -221,11 +218,9 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
         join_result = self._make_join(joining_user)
 
         join_event_dict = join_result["event"]
-        add_hashes_and_signatures(
-            KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
+        self.add_hashes_and_signatures_from_other_server(
             join_event_dict,
-            signature_name=self.OTHER_SERVER_NAME,
-            signing_key=self.OTHER_SERVER_SIGNATURE_KEY,
+            KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
         )
         channel = self.make_signed_federation_request(
             "PUT",
@@ -296,11 +291,9 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
             joining_user = f"@misspiggy{i}:{self.OTHER_SERVER_NAME}"
             join_result = self._make_join(joining_user)
             join_event_dict = join_result["event"]
-            add_hashes_and_signatures(
-                KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
+            self.add_hashes_and_signatures_from_other_server(
                 join_event_dict,
-                signature_name=self.OTHER_SERVER_NAME,
-                signing_key=self.OTHER_SERVER_SIGNATURE_KEY,
+                KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
             )
             join_event_dicts.append(join_event_dict)
 

@@ -104,7 +104,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         # mock up a load of state events which we are missing
         state_events = [
             make_event_from_dict(
-                self.add_hashes_and_signatures(
+                self.add_hashes_and_signatures_from_other_server(
                     {
                         "type": "test_state_type",
                         "state_key": f"state_{i}",
@@ -131,7 +131,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         # Depending on the test, we either persist this upfront (as an outlier),
         # or let the server request it.
         prev_event = make_event_from_dict(
-            self.add_hashes_and_signatures(
+            self.add_hashes_and_signatures_from_other_server(
                 {
                     "type": "test_regular_type",
                     "room_id": room_id,
@@ -165,7 +165,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
 
         # mock up a regular event to pass into _process_pulled_event
         pulled_event = make_event_from_dict(
-            self.add_hashes_and_signatures(
+            self.add_hashes_and_signatures_from_other_server(
                 {
                     "type": "test_regular_type",
                     "room_id": room_id,
