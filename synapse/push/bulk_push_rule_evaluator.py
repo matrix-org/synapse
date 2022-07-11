@@ -262,7 +262,7 @@ class BulkPushRuleEvaluator:
             self._relations_match_enabled,
         )
 
-        users = list(rules_by_user.keys())
+        users = rules_by_user.keys()
         profiles = await self.store.get_subset_users_in_room_with_profiles(
             event.room_id, users
         )
