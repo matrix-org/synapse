@@ -10,11 +10,6 @@
         showcontent = true
 
     [[tool.towncrier.type]]
-        directory = "config"
-        name = "Config options"
-        showcontent = true
-
-    [[tool.towncrier.type]]
         directory = "bugfix"
         name = "Bugfixes"
         showcontent = true
