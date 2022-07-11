@@ -518,7 +518,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return results
 
-    @cached()
+    @cached(iterable=True)
     async def get_local_users_in_room(self, room_id: str) -> List[str]:
         """
         Retrieves a list of the current roommembers who are local to the server.
