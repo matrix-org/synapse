@@ -28,6 +28,7 @@ from typing import (
     Optional,
     Set,
     Tuple,
+    Union,
     cast,
     overload,
 )
@@ -80,6 +81,7 @@ from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import ObservableDeferred, delay_cancellation
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.lrucache import AsyncLruCache
+from synapse.util.caches.redis_caches import RedisLruCache
 from synapse.util.iterutils import batch_iter
 from synapse.util.metrics import Measure
 
@@ -238,12 +240,23 @@ class EventsWorkerStore(SQLBaseStore):
                 5 * 60 * 1000,
             )
 
-        self._get_event_cache: AsyncLruCache[
-            Tuple[str], EventCacheEntry
-        ] = AsyncLruCache(
-            cache_name="*getEvent*",
-            max_size=hs.config.caches.event_cache_size,
-        )
+        self._get_event_cache: Union[
+            AsyncLruCache[Tuple[str], EventCacheEntry],
+            RedisLruCache[Tuple[str], EventCacheEntry],
+        ]
+
+        external_sharded_cache = hs.get_external_sharded_cache()
+        if external_sharded_cache.is_enabled():
+            self._get_event_cache = RedisLruCache(
+                cache_name="*getEvent*",
+                max_size=hs.config.caches.event_cache_size,
+                redis_shard_cache=external_sharded_cache,
+            )
+        else:
+            self._get_event_cache = AsyncLruCache(
+                cache_name="*getEvent*",
+                max_size=hs.config.caches.event_cache_size,
+            )
 
         # Map from event ID to a deferred that will result in a map from event
         # ID to cache entry. Note that the returned dict may not have the
