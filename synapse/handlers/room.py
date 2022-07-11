@@ -1011,7 +1011,6 @@ class RoomCreationHandler:
 
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
 
-        state_event_ids: List[str] = []
         last_sent_event_id: Optional[str] = None
 
         def create(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
@@ -1038,12 +1037,9 @@ class RoomCreationHandler:
                 ratelimit=False,
                 ignore_shadow_ban=True,
                 prev_event_ids=[last_sent_event_id] if last_sent_event_id else [],
-                state_event_ids=state_event_ids.copy(),
             )
 
             last_sent_event_id = sent_event.event_id
-            if sent_event.is_state():
-                state_event_ids.append(sent_event.event_id)
 
             return last_stream_id
 
@@ -1069,9 +1065,7 @@ class RoomCreationHandler:
             content=creator_join_profile,
             new_room=True,
             prev_event_ids=[last_sent_event_id],
-            state_event_ids=state_event_ids.copy(),
         )
-        state_event_ids.append(member_event_id)
         last_sent_event_id = member_event_id
 
         # We treat the power levels override specially as this needs to be one
