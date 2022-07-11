@@ -14,7 +14,7 @@
 
 import binascii
 import logging
-import marshal
+import pickle
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Iterable, Optional, Union
 
@@ -120,7 +120,7 @@ class ExternalShardedCache:
         for key, value in values.items():
             redis_key = self._get_redis_key(cache_name, key)
             shard_id = self._get_redis_shard_id(redis_key)
-            shard_id_to_encoded_values[shard_id][redis_key] = marshal.dumps(value)
+            shard_id_to_encoded_values[shard_id][redis_key] = pickle.dumps(value)
 
         with opentracing.start_active_span(
             "ExternalShardedCache.set",
@@ -148,7 +148,7 @@ class ExternalShardedCache:
             if not result:
                 continue
             try:
-                result = marshal.loads(result)
+                result = pickle.loads(result)
             except Exception as e:
                 logger.warning("Failed to decode cache result: %r", e)
             else:
