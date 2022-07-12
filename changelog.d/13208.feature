@@ -1,0 +1,1 @@
+Add a `room_type` field in the responses for the list room and room details admin API. Contributed by @andrewdoh.
