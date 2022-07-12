@@ -1007,16 +1007,16 @@ class PersistEventsStore:
         self,
         room_id: str,
         state_delta: DeltaState,
-        stream_id: int,
     ) -> None:
         """Update the current state stored in the datatabase for the given room"""
 
-        await self.db_pool.runInteraction(
-            "update_current_state",
-            self._update_current_state_txn,
-            state_delta_by_room={room_id: state_delta},
-            stream_id=stream_id,
-        )
+        async with self._stream_id_gen.get_next() as stream_ordering:
+            await self.db_pool.runInteraction(
+                "update_current_state",
+                self._update_current_state_txn,
+                state_delta_by_room={room_id: state_delta},
+                stream_id=stream_ordering,
+            )
 
     def _update_current_state_txn(
         self,
@@ -1796,6 +1796,18 @@ class PersistEventsStore:
             txn.call_after(
                 self.store.get_invited_rooms_for_local_user.invalidate,
                 (event.state_key,),
+            )
+            txn.call_after(
+                self.store.get_local_users_in_room.invalidate,
+                (event.room_id,),
+            )
+            txn.call_after(
+                self.store.get_number_joined_users_in_room.invalidate,
+                (event.room_id,),
+            )
+            txn.call_after(
+                self.store.get_user_in_room_with_profile.invalidate,
+                (event.room_id, event.state_key),
             )
 
             # The `_get_membership_from_event_id` is immutable, except for the
