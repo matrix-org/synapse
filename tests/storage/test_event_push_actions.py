@@ -132,7 +132,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 )
             )
 
-        def _mark_read(stream: int, depth: int) -> None:
+        def _mark_read(stream: int) -> None:
             last_read_stream_ordering[0] = stream
 
             self.get_success(
@@ -157,10 +157,10 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _assert_counts(2, 0)
 
         _inject_actions(5, PlAIN_NOTIF)
-        _mark_read(3, 3)
+        _mark_read(3)
         _assert_counts(1, 0)
 
-        _mark_read(5, 5)
+        _mark_read(5)
         _assert_counts(0, 0)
 
         _inject_actions(6, PlAIN_NOTIF)
@@ -171,7 +171,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         self.get_success(self.store._remove_old_push_actions_that_have_rotated())
         _assert_counts(1, 0)
 
-        _mark_read(6, 6)
+        _mark_read(6)
         _assert_counts(0, 0)
 
         _inject_actions(8, HIGHLIGHT)
@@ -187,14 +187,14 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
 
         # Check that sending read receipts at different points results in the
         # right counts.
-        _mark_read(8, 8)
+        _mark_read(8)
         _assert_counts(1, 0)
-        _mark_read(10, 10)
+        _mark_read(10)
         _assert_counts(0, 0)
 
         _inject_actions(11, HIGHLIGHT)
         _assert_counts(1, 1)
-        _mark_read(11, 11)
+        _mark_read(11)
         _assert_counts(0, 0)
         _rotate(11)
         _assert_counts(0, 0)
