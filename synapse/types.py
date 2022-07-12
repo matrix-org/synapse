@@ -24,6 +24,7 @@ from typing import (
     Mapping,
     Match,
     MutableMapping,
+    MutableSequence,
     NoReturn,
     Optional,
     Set,
