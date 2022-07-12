@@ -2091,7 +2091,7 @@ their account.
 by the Matrix Identity Service API
 [specification](https://matrix.org/docs/spec/identity_service/latest).)
 
-*Updated in Synapse 1.63.0*: No longer accepts an `email` option.
+*Updated in Synapse 1.64.0*: No longer accepts an `email` option.
 
 Example configuration:
 ```yaml
