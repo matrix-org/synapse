@@ -5,7 +5,7 @@ Features
 --------
 
 - Add a rate limit for local users sending invites. ([\#13125](https://github.com/matrix-org/synapse/issues/13125))
-- Implement [MSC3827](https://github.com/matrix-org/matrix-spec-proposals/pull/3827): Filtering of /publicRooms by room type. ([\#13031](https://github.com/matrix-org/synapse/issues/13031))
+- Implement [MSC3827](https://github.com/matrix-org/matrix-spec-proposals/pull/3827): Filtering of `/publicRooms` by room type. ([\#13031](https://github.com/matrix-org/synapse/issues/13031))
 - Improve validation logic in Synapse's REST endpoints. ([\#13148](https://github.com/matrix-org/synapse/issues/13148))
 
 
@@ -15,7 +15,7 @@ Bugfixes
 - Fix a long-standing bug where application services were not able to join remote federated rooms without a profile. ([\#13131](https://github.com/matrix-org/synapse/issues/13131))
 - Fix a long-standing bug where `_get_state_map_for_room` might raise errors when third party event rules callbacks are present. ([\#13174](https://github.com/matrix-org/synapse/issues/13174))
 - Fix a long-standing bug where the `synapse_port_db` script could fail to copy rows with negative row ids. ([\#13226](https://github.com/matrix-org/synapse/issues/13226))
-- Fix a bug introduced in 1.54.0 where appservices would not receive room-less EDUs, like presence, if enabled. ([\#13236](https://github.com/matrix-org/synapse/issues/13236))
+- Fix a bug introduced in 1.54.0 where appservices would not receive room-less EDUs, like presence, when both [MSC2409](https://github.com/matrix-org/matrix-spec-proposals/pull/2409) and [MSC3202](https://github.com/matrix-org/matrix-spec-proposals/pull/3202) are enabled. ([\#13236](https://github.com/matrix-org/synapse/issues/13236))
 - Fix a bug introduced in 1.62.0 where rows were not deleted from `event_push_actions` table on large servers. ([\#13194](https://github.com/matrix-org/synapse/issues/13194))
 - Fix a bug introduced in 1.62.0 where notification counts would get stuck after a highlighted message. ([\#13223](https://github.com/matrix-org/synapse/issues/13223))
 - Fix exception when using experimental [MSC3030](https://github.com/matrix-org/matrix-spec-proposals/pull/3030) `/timestamp_to_event` endpoint to look for remote federated imported events before room creation. ([\#13197](https://github.com/matrix-org/synapse/issues/13197))
