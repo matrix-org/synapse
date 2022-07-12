@@ -116,7 +116,15 @@ class UsersRestServletV2(RestServlet):
         direction = parse_string(request, "dir", default="f", allowed_values=("f", "b"))
 
         users, total = await self.store.get_users_paginate(
-            start, limit, user_id, name, guests, deactivated, order_by, direction, appservice
+            start,
+            limit,
+            user_id,
+            name,
+            guests,
+            deactivated,
+            order_by,
+            direction,
+            appservice,
         )
         ret = {"users": users, "total": total}
         if (start + limit) < total:

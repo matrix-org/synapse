@@ -32,7 +32,9 @@ class ExperimentalConfig(Config):
         # MSC2716 (importing historical messages)
         self.msc2716_enabled: bool = experimental.get("msc2716_enabled", False)
 
-        self.msc2716_also_allow_user: bool = experimental.get("com.beeper.msc2716_also_allow_user", False)
+        self.msc2716_also_allow_user: bool = experimental.get(
+            "com.beeper.msc2716_also_allow_user", False
+        )
 
         # MSC2285 (private read receipts)
         self.msc2285_enabled: bool = experimental.get("msc2285_enabled", False)

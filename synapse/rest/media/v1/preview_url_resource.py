@@ -66,6 +66,7 @@ ONE_HOUR = 60 * 60 * 1000
 ONE_DAY = 24 * ONE_HOUR
 IMAGE_CACHE_EXPIRY_MS = 2 * ONE_DAY
 
+
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class DownloadResult:
     length: int

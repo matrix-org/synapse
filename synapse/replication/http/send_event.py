@@ -143,7 +143,12 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
         )
 
         event = await self.event_creation_handler.persist_and_notify_client_event(
-            requester, event, context, ratelimit=ratelimit, extra_users=extra_users, dont_notify=dont_notify,
+            requester,
+            event,
+            context,
+            ratelimit=ratelimit,
+            extra_users=extra_users,
+            dont_notify=dont_notify,
         )
 
         return (

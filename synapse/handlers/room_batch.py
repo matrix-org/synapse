@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING, List, Tuple, Optional
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from synapse.api.constants import EventContentFields, EventTypes
 from synapse.appservice import ApplicationService
@@ -104,7 +104,10 @@ class RoomBatchHandler:
         return insertion_event
 
     async def create_requester_for_user_id_from_app_service(
-        self, user_id: str, app_service: ApplicationService, also_allow_user: Optional[str] = None,
+        self,
+        user_id: str,
+        app_service: ApplicationService,
+        also_allow_user: Optional[str] = None,
     ) -> Requester:
         """Creates a new requester for the given user_id
         and validates that the app service is allowed to control
@@ -119,7 +122,9 @@ class RoomBatchHandler:
             Requester object
         """
 
-        await self.auth.validate_appservice_can_control_user_id(app_service, user_id, also_allow_user)
+        await self.auth.validate_appservice_can_control_user_id(
+            app_service, user_id, also_allow_user
+        )
 
         return create_requester(user_id, app_service=app_service)
 
@@ -212,7 +217,8 @@ class RoomBatchHandler:
                 membership = event_dict["content"].get("membership", None)
                 event_id, _ = await self.room_member_handler.update_membership(
                     await self.create_requester_for_user_id_from_app_service(
-                        state_event["sender"], app_service_requester.app_service,
+                        state_event["sender"],
+                        app_service_requester.app_service,
                         also_allow_user,
                     ),
                     target=UserID.from_string(event_dict["state_key"]),
@@ -241,7 +247,8 @@ class RoomBatchHandler:
                     _,
                 ) = await self.event_creation_handler.create_and_send_nonmember_event(
                     await self.create_requester_for_user_id_from_app_service(
-                        state_event["sender"], app_service_requester.app_service,
+                        state_event["sender"],
+                        app_service_requester.app_service,
                         also_allow_user,
                     ),
                     event_dict,
@@ -341,7 +348,9 @@ class RoomBatchHandler:
 
             event, context = await self.event_creation_handler.create_event(
                 await self.create_requester_for_user_id_from_app_service(
-                    ev["sender"], app_service_requester.app_service, also_allow_user,
+                    ev["sender"],
+                    app_service_requester.app_service,
+                    also_allow_user,
                 ),
                 event_dict,
                 # Only the first event (which is the insertion event) in the
@@ -386,11 +395,13 @@ class RoomBatchHandler:
             for index, (event, context) in enumerate(events_to_persist):
                 await self.event_creation_handler.handle_new_client_event(
                     await self.create_requester_for_user_id_from_app_service(
-                        event.sender, app_service_requester.app_service, also_allow_user,
+                        event.sender,
+                        app_service_requester.app_service,
+                        also_allow_user,
                     ),
                     event=event,
                     context=context,
-                    dont_notify=index < len(events_to_persist) - 1
+                    dont_notify=index < len(events_to_persist) - 1,
                 )
             return event_ids
 
@@ -401,7 +412,9 @@ class RoomBatchHandler:
         for (event, context) in reversed(events_to_persist):
             await self.event_creation_handler.handle_new_client_event(
                 await self.create_requester_for_user_id_from_app_service(
-                    event.sender, app_service_requester.app_service, also_allow_user,
+                    event.sender,
+                    app_service_requester.app_service,
+                    also_allow_user,
                 ),
                 event=event,
                 context=context,

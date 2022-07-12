@@ -276,7 +276,7 @@ class DataStore(
             if not deactivated:
                 filters.append("deactivated = 0")
 
-            if appservice == 'null':
+            if appservice == "null":
                 filters.append("appservice_id is null")
             elif appservice:
                 filters.append("appservice_id = ?")

@@ -17,8 +17,8 @@ import time
 from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Set
 
 import attr
-
 from prometheus_client import Histogram
+
 from twisted.python.failure import Failure
 
 from synapse.api.constants import EventTypes, Membership

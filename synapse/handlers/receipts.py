@@ -146,7 +146,11 @@ class ReceiptsHandler:
         return True
 
     async def received_client_receipt(
-        self, room_id: str, receipt_type: str, user_id: str, event_id: str,
+        self,
+        room_id: str,
+        receipt_type: str,
+        user_id: str,
+        event_id: str,
         extra_content: Optional[JsonDict] = None,
     ) -> None:
         """Called when a client tells us a local user has read up to the given

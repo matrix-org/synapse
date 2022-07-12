@@ -15,10 +15,10 @@
 
 import itertools
 import logging
+import re
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import attr
-import re
 from prometheus_client import Counter
 
 from synapse.api.constants import EventTypes, Membership, RelationTypes
@@ -26,8 +26,8 @@ from synapse.event_auth import auth_types_for_event, get_user_power_level
 from synapse.events import EventBase, relation_from_event
 from synapse.events.snapshot import EventContext
 from synapse.state import POWER_KEY
-from synapse.storage.roommember import ProfileInfo
 from synapse.storage.databases.main.roommember import EventIdMembership
+from synapse.storage.roommember import ProfileInfo
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import CacheMetric, register_cache
 from synapse.util.caches.descriptors import lru_cache
@@ -67,7 +67,7 @@ def _should_count_as_unread(
     context: EventContext,
     room_members: Dict[str, ProfileInfo],
     current_user: str,
-    related_event: Optional[EventBase]
+    related_event: Optional[EventBase],
 ) -> bool:
     # Exclude rejected and soft-failed events.
     if context.rejected or event.internal_metadata.is_soft_failed():
@@ -266,7 +266,9 @@ class BulkPushRuleEvaluator:
 
         related_event_id = event.content.get("m.relates_to", {}).get("event_id")
         related_event = (
-            (await self.store.get_event(related_event_id, allow_none=True)) if related_event_id else None
+            (await self.store.get_event(related_event_id, allow_none=True))
+            if related_event_id
+            else None
         )
 
         non_bot_room_members = [x for x in room_members if not BOT_PATTERN.match(x)]
@@ -318,7 +320,9 @@ class BulkPushRuleEvaluator:
 
             # Beeper: Need to calculate this per user as whether it should count as unread or not depends on who the
             # current user is
-            count_as_unread_by_user[uid] = _should_count_as_unread(event, context, non_bot_room_members, uid, related_event)
+            count_as_unread_by_user[uid] = _should_count_as_unread(
+                event, context, non_bot_room_members, uid, related_event
+            )
 
             if count_as_unread_by_user[uid]:
                 # Add an element for the current user if the event needs to be marked as

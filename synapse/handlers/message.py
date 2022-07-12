@@ -1359,7 +1359,9 @@ class EventCreationHandler:
         # The historical messages also do not have the proper `context.current_state_ids`
         # and `state_groups` because they have `prev_events` that aren't persisted yet
         # (historical messages persisted in reverse-chronological order).
-        if not event.internal_metadata.is_historical() and not event.content.get(EventContentFields.MSC2716_HISTORICAL):
+        if not event.internal_metadata.is_historical() and not event.content.get(
+            EventContentFields.MSC2716_HISTORICAL
+        ):
             await self._bulk_push_rule_evaluator.action_for_event_by_user(
                 event, context
             )
@@ -1394,7 +1396,12 @@ class EventCreationHandler:
                 return event
 
             event = await self.persist_and_notify_client_event(
-                requester, event, context, ratelimit=ratelimit, extra_users=extra_users, dont_notify=dont_notify,
+                requester,
+                event,
+                context,
+                ratelimit=ratelimit,
+                extra_users=extra_users,
+                dont_notify=dont_notify,
             )
 
             return event

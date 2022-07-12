@@ -32,8 +32,8 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
-from synapse.storage.engines._base import IsolationLevel
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
+from synapse.storage.engines._base import IsolationLevel
 from synapse.storage.types import Cursor
 from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import DeviceListUpdates, JsonDict

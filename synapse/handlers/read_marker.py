@@ -15,8 +15,8 @@
 import logging
 from typing import TYPE_CHECKING, Optional
 
-from synapse.util.async_helpers import Linearizer
 from synapse.types import JsonDict
+from synapse.util.async_helpers import Linearizer
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -32,7 +32,11 @@ class ReadMarkerHandler:
         self.read_marker_linearizer = Linearizer(name="read_marker")
 
     async def received_client_read_marker(
-        self, room_id: str, user_id: str, event_id: str, extra_content: Optional[JsonDict] = None
+        self,
+        room_id: str,
+        user_id: str,
+        event_id: str,
+        extra_content: Optional[JsonDict] = None,
     ) -> None:
         """Updates the read marker for a given user in a given room if the event ID given
         is ahead in the stream relative to the current read marker.

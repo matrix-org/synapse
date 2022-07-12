@@ -25,10 +25,10 @@ from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
+    parse_boolean_from_args,
     parse_json_object_from_request,
     parse_string,
     parse_strings_from_args,
-    parse_boolean_from_args,
 )
 from synapse.http.site import SynapseRequest
 from synapse.rest.client.transactions import HttpTransactionCache
@@ -102,9 +102,14 @@ class RoomBatchSendEventRestServlet(RestServlet):
             request.args, "prev_event_id"
         )
         batch_id_from_query = parse_string(request, "batch_id")
-        also_allow_from_query = (parse_string(request, "com.beeper.also_allow_user")
-                                 if self.enable_also_allow_user else None)
-        beeper_new_messages = parse_boolean_from_args(request.args, "com.beeper.new_messages")
+        also_allow_from_query = (
+            parse_string(request, "com.beeper.also_allow_user")
+            if self.enable_also_allow_user
+            else None
+        )
+        beeper_new_messages = parse_boolean_from_args(
+            request.args, "com.beeper.new_messages"
+        )
 
         if prev_event_ids_from_query is None:
             raise SynapseError(
@@ -234,7 +239,9 @@ class RoomBatchSendEventRestServlet(RestServlet):
             app_service_requester=requester,
             also_allow_user=also_allow_from_query,
             beeper_new_messages=beeper_new_messages,
-            beeper_initial_prev_event_ids=prev_event_ids_from_query if beeper_new_messages else None,
+            beeper_initial_prev_event_ids=prev_event_ids_from_query
+            if beeper_new_messages
+            else None,
         )
 
         if beeper_new_messages:
