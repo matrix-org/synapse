@@ -89,7 +89,7 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
-# Upgrading to v1.63.0
+# Upgrading to v1.64.0
 
 ## Delegation of email validation no longer supported
 
