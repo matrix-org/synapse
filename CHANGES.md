@@ -1,3 +1,83 @@
+Synapse 1.63.0rc1 (2022-07-12)
+==============================
+
+Features
+--------
+
+- Implement [MSC3827](https://github.com/matrix-org/matrix-spec-proposals/pull/3827): Filtering of /publicRooms by room type. ([\#13031](https://github.com/matrix-org/synapse/issues/13031))
+- Add a rate limit for local users sending invites. ([\#13125](https://github.com/matrix-org/synapse/issues/13125))
+- Improve validation logic in Synapse's REST endpoints. ([\#13148](https://github.com/matrix-org/synapse/issues/13148))
+
+
+Bugfixes
+--------
+
+- Fix application service not being able to join remote federated room without a profile set. ([\#13131](https://github.com/matrix-org/synapse/issues/13131))
+- Make use of the more robust `get_current_state` in `_get_state_map_for_room` to avoid breakages. ([\#13174](https://github.com/matrix-org/synapse/issues/13174))
+- Fix bug where rows were not deleted from `event_push_actions` table on large servers. Introduced in v1.62.0. ([\#13194](https://github.com/matrix-org/synapse/issues/13194))
+- Fix exception when using experimental [MSC3030](https://github.com/matrix-org/matrix-spec-proposals/pull/3030) `/timestamp_to_event` endpoint to look for remote federated imported events before room creation. ([\#13197](https://github.com/matrix-org/synapse/issues/13197))
+- Fix bug where notification counts would get stuck after a highlighted message. Broke in v1.62.0. ([\#13223](https://github.com/matrix-org/synapse/issues/13223))
+- Fix a long-standing bug where the `synapse_port_db` script could fail to copy rows with negative row ids. ([\#13226](https://github.com/matrix-org/synapse/issues/13226))
+- Fix MSC3202-enabled appservices not receiving to-device messages, preventing messages from being decrypted. ([\#13235](https://github.com/matrix-org/synapse/issues/13235))
+- Fix appservices not receiving room-less EDUs, like presence, if enabled. ([\#13236](https://github.com/matrix-org/synapse/issues/13236))
+
+
+Updates to the Docker image
+---------------------------
+
+- Bump the version of `lxml` in matrix.org Docker images Debian packages from 4.8.0 to 4.9.1. ([\#13207](https://github.com/matrix-org/synapse/issues/13207))
+
+
+Improved Documentation
+----------------------
+
+- Add an explanation of the `--report-stats` argument to the docs. ([\#13029](https://github.com/matrix-org/synapse/issues/13029))
+- Add a helpful example bash script to the contrib directory for creating multiple worker configuration files of the same type. Contributed by @villepeh. ([\#13032](https://github.com/matrix-org/synapse/issues/13032))
+- Clean up references to sample configuration and redirect users to the configuration manual instead. ([\#13077](https://github.com/matrix-org/synapse/issues/13077))
+- Add documentation for anonymised homeserver statistics collection. ([\#13086](https://github.com/matrix-org/synapse/issues/13086))
+- Fix wrong section header for `allow_public_rooms_over_federation` in the homeserver config documentation. ([\#13116](https://github.com/matrix-org/synapse/issues/13116))
+- Document how the Synapse team does reviews. ([\#13132](https://github.com/matrix-org/synapse/issues/13132))
+- Add a link to the configuration manual from the homeserver sample config documentation. ([\#13139](https://github.com/matrix-org/synapse/issues/13139))
+- Add missing links to config options. ([\#13166](https://github.com/matrix-org/synapse/issues/13166))
+- Add documentation for the existing `databases` option in the homeserver configuration manual. ([\#13212](https://github.com/matrix-org/synapse/issues/13212))
+
+
+Deprecations and Removals
+-------------------------
+
+- Remove obsolete and for 8 years unused `RoomEventsStoreTestCase`. Contributed by @arkamar. ([\#13200](https://github.com/matrix-org/synapse/issues/13200))
+
+
+Internal Changes
+----------------
+
+- Add type annotations to `tests.utils`. ([\#13028](https://github.com/matrix-org/synapse/issues/13028))
+- Support temporary experimental return values for spam checker module callbacks. ([\#13044](https://github.com/matrix-org/synapse/issues/13044))
+- Reduce memory consumption when processing incoming events in large rooms. ([\#13078](https://github.com/matrix-org/synapse/issues/13078), [\#13222](https://github.com/matrix-org/synapse/issues/13222))
+- Enable Complement testing in the 'Twisted Trunk' CI runs. ([\#13079](https://github.com/matrix-org/synapse/issues/13079), [\#13157](https://github.com/matrix-org/synapse/issues/13157))
+- Faster room joins: Handle race between persisting an event and un-partial stating a room. ([\#13100](https://github.com/matrix-org/synapse/issues/13100))
+- Add missing type hints to `synapse.logging`. ([\#13103](https://github.com/matrix-org/synapse/issues/13103))
+- Raise a `DependencyError` on missing dependencies instead of a `ConfigError`. ([\#13113](https://github.com/matrix-org/synapse/issues/13113))
+- Reduce DB usage of `/sync` when a large number of unread messages have recently been sent in a room. ([\#13119](https://github.com/matrix-org/synapse/issues/13119), [\#13153](https://github.com/matrix-org/synapse/issues/13153))
+- Improve startup times in Complement test runs against workers, particularly in CPU-constrained environments. ([\#13127](https://github.com/matrix-org/synapse/issues/13127))
+- Only one-line SQL statements for logging and tracing. ([\#13129](https://github.com/matrix-org/synapse/issues/13129))
+- Apply ratelimiting earlier in processing of /send request. ([\#13134](https://github.com/matrix-org/synapse/issues/13134))
+- Enforce type annotations for `tests.test_server`. ([\#13135](https://github.com/matrix-org/synapse/issues/13135))
+- Add type annotations to `tests.server`. ([\#13136](https://github.com/matrix-org/synapse/issues/13136))
+- Add support to `complement.sh` for skipping the docker build. ([\#13143](https://github.com/matrix-org/synapse/issues/13143), [\#13158](https://github.com/matrix-org/synapse/issues/13158))
+- Faster joins: skip waiting for full state when processing incoming events over federation. ([\#13144](https://github.com/matrix-org/synapse/issues/13144))
+- Improve exception handling when processing events received over federation. ([\#13145](https://github.com/matrix-org/synapse/issues/13145))
+- Faster room joins: fix race in recalculation of current room state. ([\#13151](https://github.com/matrix-org/synapse/issues/13151))
+- Add the ability to set the log level using the `SYNAPSE_TEST_LOG_LEVEL` environment when using `complement.sh`. ([\#13152](https://github.com/matrix-org/synapse/issues/13152))
+- Improve and fix type hints. ([\#13159](https://github.com/matrix-org/synapse/issues/13159))
+- Update config used by Complement to allow device name lookup over federation. ([\#13167](https://github.com/matrix-org/synapse/issues/13167))
+- Check that `auto_vacuum` is disabled when porting a SQLite database to Postgres, as `VACUUM`s must not be performed between runs of the script. ([\#13195](https://github.com/matrix-org/synapse/issues/13195))
+- Reduce number of queries used to get profile information. Contributed by Nick @ Beeper (@fizzadar). ([\#13209](https://github.com/matrix-org/synapse/issues/13209))
+- Reduce number of events queried during room creation. Contributed by Nick @ Beeper (@fizzadar). ([\#13210](https://github.com/matrix-org/synapse/issues/13210))
+- More aggressively rotate push actions. ([\#13211](https://github.com/matrix-org/synapse/issues/13211))
+- Add `max_line_length` setting for Python files to the `.editorconfig`. Contributed by @sumnerevans @ Beeper. ([\#13228](https://github.com/matrix-org/synapse/issues/13228))
+
+
 Synapse 1.62.0 (2022-07-05)
 ===========================
 
