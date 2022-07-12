@@ -51,6 +51,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         hs = Mock()
         hs.get_datastores.return_value = Mock(main=self.mock_store)
         self.mock_store.get_received_ts.return_value = make_awaitable(0)
+        self.mock_store.get_appservice_last_pos.return_value = make_awaitable(None)
         self.mock_store.set_appservice_last_pos.return_value = make_awaitable(None)
         self.mock_store.set_appservice_stream_type_pos.return_value = make_awaitable(
             None
@@ -76,7 +77,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         event = Mock(
             sender="@someone:anywhere", type="m.room.message", room_id="!foo:bar"
         )
-        self.mock_store.get_new_events_for_appservice.side_effect = [
+        self.mock_store.get_all_new_events_stream.side_effect = [
             make_awaitable((0, [])),
             make_awaitable((1, [event])),
         ]
@@ -95,7 +96,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         event = Mock(sender=user_id, type="m.room.message", room_id="!foo:bar")
         self.mock_as_api.query_user.return_value = make_awaitable(True)
-        self.mock_store.get_new_events_for_appservice.side_effect = [
+        self.mock_store.get_all_new_events_stream.side_effect = [
             make_awaitable((0, [event])),
         ]
 
@@ -112,7 +113,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         event = Mock(sender=user_id, type="m.room.message", room_id="!foo:bar")
         self.mock_as_api.query_user.return_value = make_awaitable(True)
-        self.mock_store.get_new_events_for_appservice.side_effect = [
+        self.mock_store.get_all_new_events_stream.side_effect = [
             make_awaitable((0, [event])),
         ]
 

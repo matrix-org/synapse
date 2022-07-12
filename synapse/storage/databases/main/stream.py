@@ -1022,7 +1022,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         }
 
     async def get_all_new_events_stream(
-        self, from_id: int, current_id: int, limit: int
+        self, from_id: int, current_id: int, limit: int, get_prev_content: bool = False
     ) -> Tuple[int, List[EventBase]]:
         """Get all new events
 
@@ -1065,7 +1065,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             "get_all_new_events_stream", get_all_new_events_stream_txn
         )
 
-        events = await self.get_events_as_list(event_ids)
+        events = await self.get_events_as_list(event_ids, get_prev_content=get_prev_content)
 
         return upper_bound, events
 
