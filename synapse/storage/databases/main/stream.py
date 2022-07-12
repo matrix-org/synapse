@@ -1059,7 +1059,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             if len(rows) == limit:
                 upper_bound = rows[-1][0]
 
-            event_to_received_ts: Dict[str, Optional[int]] = {row[1]: row[2] for row in rows}
+            event_to_received_ts: Dict[str, Optional[int]] = {
+                row[1]: row[2] for row in rows
+            }
             return upper_bound, event_to_received_ts
 
         upper_bound, event_to_received_ts = await self.db_pool.runInteraction(
