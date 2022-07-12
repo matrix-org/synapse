@@ -232,6 +232,16 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1640"><a class="header" href="#upgrading-to-v1640">Upgrading to v1.64.0</a></h1>
+<h2 id="delegation-of-email-validation-no-longer-supported"><a class="header" href="#delegation-of-email-validation-no-longer-supported">Delegation of email validation no longer supported</a></h2>
+<p>As of this version, Synapse no longer allows the tasks of verifying email address
+ownership, and password reset confirmation, to be delegated to an identity server.</p>
+<p>To continue to allow users to add email addresses to their homeserver accounts,
+and perform password resets, make sure that Synapse is configured with a
+working email server in the <code>email</code> configuration section (including, at a
+minimum, a <code>notif_from</code> setting.)</p>
+<p>Specifying an <code>email</code> setting under <code>account_threepid_delegates</code> will now cause
+an error at startup.</p>
 <h1 id="upgrading-to-v1620"><a class="header" href="#upgrading-to-v1620">Upgrading to v1.62.0</a></h1>
 <h2 id="new-signatures-for-spam-checker-callbacks"><a class="header" href="#new-signatures-for-spam-checker-callbacks">New signatures for spam checker callbacks</a></h2>
 <p>As a followup to changes in v1.60.0, the following spam-checker callbacks have changed signature:</p>

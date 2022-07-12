@@ -1642,6 +1642,16 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1640"><a class="header" href="#upgrading-to-v1640">Upgrading to v1.64.0</a></h1>
+<h2 id="delegation-of-email-validation-no-longer-supported"><a class="header" href="#delegation-of-email-validation-no-longer-supported">Delegation of email validation no longer supported</a></h2>
+<p>As of this version, Synapse no longer allows the tasks of verifying email address
+ownership, and password reset confirmation, to be delegated to an identity server.</p>
+<p>To continue to allow users to add email addresses to their homeserver accounts,
+and perform password resets, make sure that Synapse is configured with a
+working email server in the <code>email</code> configuration section (including, at a
+minimum, a <code>notif_from</code> setting.)</p>
+<p>Specifying an <code>email</code> setting under <code>account_threepid_delegates</code> will now cause
+an error at startup.</p>
 <h1 id="upgrading-to-v1620"><a class="header" href="#upgrading-to-v1620">Upgrading to v1.62.0</a></h1>
 <h2 id="new-signatures-for-spam-checker-callbacks"><a class="header" href="#new-signatures-for-spam-checker-callbacks">New signatures for spam checker callbacks</a></h2>
 <p>As a followup to changes in v1.60.0, the following spam-checker callbacks have changed signature:</p>
@@ -4925,24 +4935,20 @@ This setting is ignored unless <code>public_baseurl</code> is also explicitly se
 </code></pre>
 <hr />
 <h3 id="account_threepid_delegates"><a class="header" href="#account_threepid_delegates"><code>account_threepid_delegates</code></a></h3>
-<p>Handle threepid (email/phone etc) registration and password resets through a set of
-<em>trusted</em> identity servers. Note that this allows the configured identity server to
-reset passwords for accounts!</p>
-<p>Be aware that if <code>email</code> is not set, and SMTP options have not been
-configured in the email config block, registration and user password resets via
-email will be globally disabled.</p>
-<p>Additionally, if <code>msisdn</code> is not set, registration and password resets via msisdn
-will be disabled regardless, and users will not be able to associate an msisdn
-identifier to their account. This is due to Synapse currently not supporting
-any method of sending SMS messages on its own.</p>
-<p>To enable using an identity server for operations regarding a particular third-party
-identifier type, set the value to the URL of that identity server as shown in the
-examples below.</p>
-<p>Servers handling the these requests must answer the <code>/requestToken</code> endpoints defined
-by the Matrix Identity Service API <a href="https://matrix.org/docs/spec/identity_service/latest">specification</a>.</p>
+<p>Delegate verification of phone numbers to an identity server.</p>
+<p>When a user wishes to add a phone number to their account, we need to verify that they
+actually own that phone number, which requires sending them a text message (SMS).
+Currently Synapse does not support sending those texts itself and instead delegates the
+task to an identity server. The base URI for the identity server to be used is
+specified by the <code>account_threepid_delegates.msisdn</code> option.</p>
+<p>If this is left unspecified, Synapse will not allow users to add phone numbers to
+their account.</p>
+<p>(Servers handling the these requests must answer the <code>/requestToken</code> endpoints defined
+by the Matrix Identity Service API
+<a href="https://matrix.org/docs/spec/identity_service/latest">specification</a>.)</p>
+<p><em>Updated in Synapse 1.64.0</em>: No longer accepts an <code>email</code> option.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">account_threepid_delegates:
-    email: https://example.com     # Delegate email sending to example.com
     msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 </code></pre>
 <hr />
