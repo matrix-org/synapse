@@ -1036,7 +1036,7 @@ class FederationEventHandler:
         # XXX: this doesn't sound right? it means that we'll end up with incomplete
         #   state.
         failed_to_fetch = desired_events - event_metadata.keys()
-        # `event_id`'s missing from `event_metadata` because it's not necessarily a
+        # `event_id` could be missing from `event_metadata` because it's not necessarily a
         # state event. We've already checked that we've fetched it above.
         failed_to_fetch.discard(event_id)
         if failed_to_fetch:
