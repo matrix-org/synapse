@@ -406,8 +406,9 @@ class ThumbnailResource(DirectServeJsonResource):
             #    when the media was first uploaded (these bugs should be
             #    reported and fixed).
             # 3. `dynamic_thumbnails` is disabled (see `homeserver.yaml`) and we
-            #    can't generate one. If this was enabled, Synapse would
-            #    go down a different code path.
+            #    failed to generate thumbnails on initial upload. If
+            #    `dynamic_thumbnails` was enabled, Synapse would go down a
+            #    different code path.
             logger.info("Failed to find any generated thumbnails")
 
             respond_with_json(
