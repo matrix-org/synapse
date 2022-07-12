@@ -3283,7 +3283,7 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         # Mock a few functions to prevent the test from failing due to failing to talk to
         # a remote IS. We keep the mock for make_and_store_3pid_invite around so we
         # can check its call_count later on during the test.
-        make_invite_mock = Mock(return_value=make_awaitable(0))
+        make_invite_mock = Mock(return_value=make_awaitable((0, {})))
         self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock
         self.hs.get_identity_handler().lookup_3pid = Mock(
             return_value=make_awaitable(None),
@@ -3344,7 +3344,7 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         # Mock a few functions to prevent the test from failing due to failing to talk to
         # a remote IS. We keep the mock for make_and_store_3pid_invite around so we
         # can check its call_count later on during the test.
-        make_invite_mock = Mock(return_value=make_awaitable(0))
+        make_invite_mock = Mock(return_value=make_awaitable((0, {})))
         self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock
         self.hs.get_identity_handler().lookup_3pid = Mock(
             return_value=make_awaitable(None),
