@@ -704,9 +704,6 @@ class EventAuthTestCase(unittest.TestCase):
             room_version=RoomVersions.V10,
         )
 
-        with self.assertRaises(AuthError):
-            event_auth.validate_event_for_room_version(pl_event)
-
         pl_event2_content = {"events": {"m.room.name": "42", "m.room.power_levels": 42}}
         pl_event2 = make_event_from_dict(
             {
@@ -722,7 +719,14 @@ class EventAuthTestCase(unittest.TestCase):
         )
 
         with self.assertRaises(AuthError):
-            event_auth.validate_event_for_room_version(pl_event2)
+            event_auth._check_power_levels(
+                pl_event.room_version, pl_event, {("fake_type", "fake_key"): pl_event2}
+            )
+
+        with self.assertRaises(AuthError):
+            event_auth._check_power_levels(
+                pl_event.room_version, pl_event2, {("fake_type", "fake_key"): pl_event}
+            )
 
 
 # helpers for making events
