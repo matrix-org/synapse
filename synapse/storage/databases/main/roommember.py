@@ -212,6 +212,60 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         txn.execute(sql, (room_id, Membership.JOIN))
         return [r[0] for r in txn]
 
+    @cached()
+    def get_user_in_room_with_profile(
+        self, room_id: str, user_id: str
+    ) -> Dict[str, ProfileInfo]:
+        raise NotImplementedError()
+
+    @cachedList(
+        cached_method_name="get_user_in_room_with_profile", list_name="user_ids"
+    )
+    async def get_subset_users_in_room_with_profiles(
+        self, room_id: str, user_ids: Collection[str]
+    ) -> Dict[str, ProfileInfo]:
+        """Get a mapping from user ID to profile information for a list of users
+        in a given room.
+
+        The profile information comes directly from this room's `m.room.member`
+        events, and so may be specific to this room rather than part of a user's
+        global profile. To avoid privacy leaks, the profile data should only be
+        revealed to users who are already in this room.
+
+        Args:
+            room_id: The ID of the room to retrieve the users of.
+            user_ids: a list of users in the room to run the query for
+
+        Returns:
+                A mapping from user ID to ProfileInfo.
+        """
+
+        def _get_subset_users_in_room_with_profiles(
+            txn: LoggingTransaction,
+        ) -> Dict[str, ProfileInfo]:
+            clause, ids = make_in_list_sql_clause(
+                self.database_engine, "m.user_id", user_ids
+            )
+
+            sql = """
+                SELECT state_key, display_name, avatar_url FROM room_memberships as m
+                INNER JOIN current_state_events as c
+                ON m.event_id = c.event_id
+                AND m.room_id = c.room_id
+                AND m.user_id = c.state_key
+                WHERE c.type = 'm.room.member' AND c.room_id = ? AND m.membership = ? AND %s
+            """ % (
+                clause,
+            )
+            txn.execute(sql, (room_id, Membership.JOIN, *ids))
+
+            return {r[0]: ProfileInfo(display_name=r[1], avatar_url=r[2]) for r in txn}
+
+        return await self.db_pool.runInteraction(
+            "get_subset_users_in_room_with_profiles",
+            _get_subset_users_in_room_with_profiles,
+        )
+
     @cached(max_entries=100000, iterable=True)
     async def get_users_in_room_with_profiles(
         self, room_id: str
@@ -338,6 +392,15 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
     @cached()
+    async def get_number_joined_users_in_room(self, room_id: str) -> int:
+        return await self.db_pool.simple_select_one_onecol(
+            table="current_state_events",
+            keyvalues={"room_id": room_id, "membership": Membership.JOIN},
+            retcol="COUNT(*)",
+            desc="get_number_joined_users_in_room",
+        )
+
+    @cached()
     async def get_invited_rooms_for_local_user(
         self, user_id: str
     ) -> List[RoomsForUser]:
@@ -416,6 +479,17 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         user_id: str,
         membership_list: List[str],
     ) -> List[RoomsForUser]:
+        """Get all the rooms for this *local* user where the membership for this user
+        matches one in the membership list.
+
+        Args:
+            user_id: The user ID.
+            membership_list: A list of synapse.api.constants.Membership
+                    values which the user must be in.
+
+        Returns:
+            The RoomsForUser that the user matches the membership types.
+        """
         # Paranoia check.
         if not self.hs.is_mine_id(user_id):
             raise Exception(
@@ -443,6 +517,18 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         results = [RoomsForUser(*r) for r in txn]
 
         return results
+
+    @cached(iterable=True)
+    async def get_local_users_in_room(self, room_id: str) -> List[str]:
+        """
+        Retrieves a list of the current roommembers who are local to the server.
+        """
+        return await self.db_pool.simple_select_onecol(
+            table="local_current_membership",
+            keyvalues={"room_id": room_id, "membership": Membership.JOIN},
+            retcol="user_id",
+            desc="get_local_users_in_room",
+        )
 
     async def get_local_current_membership_for_user_in_room(
         self, user_id: str, room_id: str

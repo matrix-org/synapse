@@ -43,6 +43,7 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, StateResolutionVersio
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.logging.context import ContextResourceUsage
+from synapse.replication.http.state import ReplicationUpdateCurrentStateRestServlet
 from synapse.state import v1, v2
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.roommember import ProfileInfo
@@ -129,6 +130,12 @@ class StateHandler:
         self.hs = hs
         self._state_resolution_handler = hs.get_state_resolution_handler()
         self._storage_controllers = hs.get_storage_controllers()
+        self._events_shard_config = hs.config.worker.events_shard_config
+        self._instance_name = hs.get_instance_name()
+
+        self._update_current_state_client = (
+            ReplicationUpdateCurrentStateRestServlet.make_client(hs)
+        )
 
     async def get_current_state_ids(
         self,
@@ -422,6 +429,24 @@ class StateHandler:
         )
 
         return {key: state_map[ev_id] for key, ev_id in new_state.items()}
+
+    async def update_current_state(self, room_id: str) -> None:
+        """Recalculates the current state for a room, and persists it.
+
+        Raises:
+            SynapseError(502): if all attempts to connect to the event persister worker
+                fail
+        """
+        writer_instance = self._events_shard_config.get_instance(room_id)
+        if writer_instance != self._instance_name:
+            await self._update_current_state_client(
+                instance_name=writer_instance,
+                room_id=room_id,
+            )
+            return
+
+        assert self._storage_controllers.persistence is not None
+        await self._storage_controllers.persistence.update_current_state(room_id)
 
 
 @attr.s(slots=True, auto_attribs=True)

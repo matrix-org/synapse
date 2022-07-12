@@ -195,6 +195,8 @@ class StateTestCase(unittest.TestCase):
                 "get_state_resolution_handler",
                 "get_account_validity_handler",
                 "get_macaroon_generator",
+                "get_instance_name",
+                "get_simple_http_client",
                 "hostname",
             ]
         )

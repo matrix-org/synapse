@@ -464,14 +464,7 @@ class ThirdPartyEventRules:
         Returns:
             A dict mapping (event type, state key) to state event.
         """
-        state_ids = await self._storage_controllers.state.get_current_state_ids(room_id)
-        room_state_events = await self.store.get_events(state_ids.values())
-
-        state_events = {}
-        for key, event_id in state_ids.items():
-            state_events[key] = room_state_events[event_id]
-
-        return state_events
+        return await self._storage_controllers.state.get_current_state(room_id)
 
     async def on_profile_update(
         self, user_id: str, new_profile: ProfileInfo, by_admin: bool, deactivation: bool
