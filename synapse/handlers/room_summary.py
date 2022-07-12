@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Set,
 import attr
 
 from synapse.api.constants import (
+    EventContentFields,
     EventTypes,
     HistoryVisibility,
     JoinRules,
@@ -705,6 +706,9 @@ class RoomSummaryHandler:
         current_state_ids = await self._storage_controllers.state.get_current_state_ids(
             room_id
         )
+        create_event = await self._store.get_event(
+            current_state_ids[(EventTypes.Create, "")]
+        )
 
         entry = {
             "room_id": stats["room_id"],
@@ -718,7 +722,7 @@ class RoomSummaryHandler:
                 stats["history_visibility"] == HistoryVisibility.WORLD_READABLE
             ),
             "guest_can_join": stats["guest_access"] == "can_join",
-            "room_type": stats["room_type"],
+            "room_type": create_event.content.get(EventContentFields.ROOM_TYPE),
         }
 
         if self._msc3266_enabled:
