@@ -35,7 +35,6 @@
     - [Application Services](application_services.md)
     - [Server Notices](server_notices.md)
     - [Consent Tracking](consent_tracking.md)
-    - [URL Previews](development/url_previews.md)
     - [User Directory](user_directory.md)
     - [Message Retention Policies](message_retention_policies.md)
     - [Pluggable Modules](modules/index.md)
