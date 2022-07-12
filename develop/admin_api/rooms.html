@@ -217,6 +217,7 @@ Specifically, rooms are selected if the search term is contained in</p>
 <li><code>guest_access</code> - Whether guests can join the room. One of: [&quot;can_join&quot;, &quot;forbidden&quot;].</li>
 <li><code>history_visibility</code> - Who can see the room history. One of: [&quot;invited&quot;, &quot;joined&quot;, &quot;shared&quot;, &quot;world_readable&quot;].</li>
 <li><code>state_events</code> - Total number of state_events of a room. Complexity of the room.</li>
+<li><code>room_type</code> - The type of the room taken from the room's creation event; for example &quot;m.space&quot; if the room is a space. If the room does not define a type, the value will be <code>null</code>.</li>
 </ul>
 </li>
 </ul>
@@ -257,7 +258,8 @@ get the &quot;previous page&quot; of results.</li>
       &quot;join_rules&quot;: &quot;invite&quot;,
       &quot;guest_access&quot;: null,
       &quot;history_visibility&quot;: &quot;shared&quot;,
-      &quot;state_events&quot;: 93534
+      &quot;state_events&quot;: 93534,
+      &quot;room_type&quot;: &quot;m.space&quot;
     },
     ... (8 hidden items) ...
     {
@@ -274,7 +276,8 @@ get the &quot;previous page&quot; of results.</li>
       &quot;join_rules&quot;: &quot;invite&quot;,
       &quot;guest_access&quot;: null,
       &quot;history_visibility&quot;: &quot;shared&quot;,
-      &quot;state_events&quot;: 8345
+      &quot;state_events&quot;: 8345,
+      &quot;room_type&quot;: null
     }
   ],
   &quot;offset&quot;: 0,
@@ -301,7 +304,8 @@ get the &quot;previous page&quot; of results.</li>
       &quot;join_rules&quot;: &quot;invite&quot;,
       &quot;guest_access&quot;: null,
       &quot;history_visibility&quot;: &quot;shared&quot;,
-      &quot;state_events&quot;: 8
+      &quot;state_events&quot;: 8,
+      &quot;room_type&quot;: null
     }
   ],
   &quot;offset&quot;: 0,
@@ -328,7 +332,8 @@ get the &quot;previous page&quot; of results.</li>
       &quot;join_rules&quot;: &quot;invite&quot;,
       &quot;guest_access&quot;: null,
       &quot;history_visibility&quot;: &quot;shared&quot;,
-      &quot;state_events&quot;: 93534
+      &quot;state_events&quot;: 93534,
+      &quot;room_type&quot;: null
     },
     ... (98 hidden items) ...
     {
@@ -345,7 +350,8 @@ get the &quot;previous page&quot; of results.</li>
       &quot;join_rules&quot;: &quot;invite&quot;,
       &quot;guest_access&quot;: null,
       &quot;history_visibility&quot;: &quot;shared&quot;,
-      &quot;state_events&quot;: 8345
+      &quot;state_events&quot;: 8345,
+      &quot;room_type&quot;: &quot;m.space&quot;
     }
   ],
   &quot;offset&quot;: 0,
@@ -376,7 +382,9 @@ parameter to the value of <code>next_token</code>.</p>
       &quot;join_rules&quot;: &quot;invite&quot;,
       &quot;guest_access&quot;: null,
       &quot;history_visibility&quot;: &quot;shared&quot;,
-      &quot;state_events&quot;: 93534
+      &quot;state_events&quot;: 93534,
+      &quot;room_type&quot;: &quot;m.space&quot;
+
     },
     ... (48 hidden items) ...
     {
@@ -393,7 +401,9 @@ parameter to the value of <code>next_token</code>.</p>
       &quot;join_rules&quot;: &quot;invite&quot;,
       &quot;guest_access&quot;: null,
       &quot;history_visibility&quot;: &quot;shared&quot;,
-      &quot;state_events&quot;: 8345
+      &quot;state_events&quot;: 8345,
+      &quot;room_type&quot;: null
+
     }
   ],
   &quot;offset&quot;: 100,
@@ -424,6 +434,8 @@ end of the list.</p>
 <li><code>guest_access</code> - Whether guests can join the room. One of: [&quot;can_join&quot;, &quot;forbidden&quot;].</li>
 <li><code>history_visibility</code> - Who can see the room history. One of: [&quot;invited&quot;, &quot;joined&quot;, &quot;shared&quot;, &quot;world_readable&quot;].</li>
 <li><code>state_events</code> - Total number of state_events of a room. Complexity of the room.</li>
+<li><code>room_type</code> - The type of the room taken from the room's creation event; for example &quot;m.space&quot; if the room is a space.
+If the room does not define a type, the value will be <code>null</code>.</li>
 </ul>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/rooms/&lt;room_id&gt;
@@ -446,7 +458,8 @@ end of the list.</p>
   &quot;join_rules&quot;: &quot;invite&quot;,
   &quot;guest_access&quot;: null,
   &quot;history_visibility&quot;: &quot;shared&quot;,
-  &quot;state_events&quot;: 93534
+  &quot;state_events&quot;: 93534,
+  &quot;room_type&quot;: &quot;m.space&quot;
 }
 </code></pre>
 <h1 id="room-members-api"><a class="header" href="#room-members-api">Room Members API</a></h1>
