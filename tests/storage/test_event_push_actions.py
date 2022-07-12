@@ -62,7 +62,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         def _assert_counts(noitf_count: int, highlight_count: int) -> None:
             counts = self.get_success(
                 self.store.db_pool.runInteraction(
-                    "",
+                    "get-unread-counts",
                     self.store._get_unread_counts_by_pos_txn,
                     room_id,
                     user_id,
@@ -167,12 +167,8 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _rotate(6)
         _assert_counts(1, 0)
 
-        self.get_success(
-            self.store.db_pool.simple_delete(
-                table="event_push_actions", keyvalues={"1": 1}, desc=""
-            )
-        )
-
+        # Delete old event push actions, this should not affect the (summarised) count.
+        self.get_success(self.store._remove_old_push_actions_that_have_rotated())
         _assert_counts(1, 0)
 
         _mark_read(6, 6)
