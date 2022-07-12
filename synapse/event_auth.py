@@ -80,30 +80,6 @@ def validate_event_for_room_version(event: "EventBase") -> None:
     Raises:
         SynapseError if there is a problem with the event
     """
-    # Reject events with stringy power levels if required by room version
-    if (
-        event.type == EventTypes.PowerLevels
-        and event.room_version.msc3667_int_only_power_levels
-    ):
-        for key, value in event.content.items():
-            if key in [
-                "users_default",
-                "events_default",
-                "state_default",
-                "ban",
-                "reject",
-                "kick",
-                "invite",
-            ]:
-                if not isinstance(value, int):
-                    raise AuthError(403, f"{value} must be an integer.")
-            if key in ["events", "notifications"]:
-                if not isinstance(value, dict) or not all(
-                    isinstance(v, int) for v in value.values()
-                ):
-                    raise AuthError(
-                        403, f"{value} must be a dict with integers as values."
-                    )
 
     _check_size_limits(event)
 
@@ -754,16 +730,36 @@ def _check_power_levels(
 ) -> None:
     user_list = event.content.get("users", {})
     # Validate users
-    for k, v in user_list.items():
+    for k in user_list.keys():
         try:
             UserID.from_string(k)
         except Exception:
             raise SynapseError(400, "Not a valid user_id: %s" % (k,))
 
-        try:
-            int(v)
-        except Exception:
-            raise SynapseError(400, "Not a valid power level: %s" % (v,))
+    # Reject events with stringy power levels if required by room version
+    if (
+        event.type == EventTypes.PowerLevels
+        and room_version_obj.msc3667_int_only_power_levels
+    ):
+        for k, v in event.content.items():
+            if k in {
+                "users_default",
+                "events_default",
+                "state_default",
+                "ban",
+                "redact",
+                "kick",
+                "invite",
+            }:
+                if not isinstance(v, int):
+                    raise AuthError(403, f"{v} must be an integer.")
+            if k in {"events", "notifications", "users"}:
+                if not isinstance(v, dict) or not all(
+                    isinstance(v, int) for v in v.values()
+                ):
+                    raise AuthError(
+                        403, f"{v} must be a dict wherein all the values are integers."
+                    )
 
     key = (event.type, event.state_key)
     current_state = auth_events.get(key)
