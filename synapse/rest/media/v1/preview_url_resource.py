@@ -110,7 +110,7 @@ class MediaInfo:
 class PreviewUrlResource(DirectServeJsonResource):
     """
     The `GET /_matrix/media/r0/preview_url` endpoint provides a generic preview API
-    for URLs which outputs [Open Graph](https://ogp.me/) responses (with some Matrix
+    for URLs which outputs Open Graph (https://ogp.me/) responses (with some Matrix
     specific additions).
 
     This does have trade-offs compared to other designs:
@@ -118,7 +118,7 @@ class PreviewUrlResource(DirectServeJsonResource):
     * Pros:
       * Simple and flexible; can be used by any clients at any point
     * Cons:
-      * If each homeserver provides one of these independently, all the HSes in a
+      * If each homeserver provides one of these independently, all the homeservers in a
         room may needlessly DoS the target URI
       * The URL metadata must be stored somewhere, rather than just using Matrix
         itself to store the media.
@@ -128,12 +128,12 @@ class PreviewUrlResource(DirectServeJsonResource):
 
     1. Checks against a URL blacklist (defined as `url_preview_url_blacklist` in the
        config).
-    2. Checks the in-memory cache by URLs and returns the result if it exists. (This
+    2. Checks the URL against an in-memory cache and returns the result if it exists. (This
        is also used to de-duplicate processing of multiple in-flight requests at once.)
     3. Kicks off a background process to generate a preview:
-       1. Checks the database cache by URL and timestamp and returns the result if it
+       1. Checks URL and timestamp against the database cache and returns the result if it
           has not expired and was successful (a 2xx return code).
-       2. Checks if the URL matches an [oEmbed](https://oembed.com/) pattern. If it
+       2. Checks if the URL matches an oEmbed (https://oembed.com/) pattern. If it
           does, update the URL to download.
        3. Downloads the URL and stores it into a file via the media storage provider
           and saves the local media metadata.
