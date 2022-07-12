@@ -300,7 +300,8 @@ The following fields are possible in the JSON response body:
 * `guest_access` - Whether guests can join the room. One of: ["can_join", "forbidden"].
 * `history_visibility` - Who can see the room history. One of: ["invited", "joined", "shared", "world_readable"].
 * `state_events` - Total number of state_events of a room. Complexity of the room.
-* `room_type` - The type of the room. It is specified as `m.space` for spaces and `null` otherwise. However, unspecificed room types are also permitted.
+* `room_type` - The type of the room taken from the room's creation event; for example "m.space" if the room is a space.
+  If the room does not define a type, the value will be `null`.
 
 The API is:
 
