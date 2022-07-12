@@ -961,7 +961,7 @@ class RoomCreationHandler:
 
             for invitee in invite_list:
                 (
-                    _,
+                    member_event_id,
                     last_stream_id,
                 ) = await self.room_member_handler.update_membership_locked(
                     requester,
@@ -974,6 +974,7 @@ class RoomCreationHandler:
                     prev_event_ids=[last_sent_event_id],
                     depth=depth,
                 )
+                last_sent_event_id = member_event_id
                 depth += 1
 
         for invite_3pid in invite_3pid_list:
