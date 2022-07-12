@@ -1042,7 +1042,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         def get_all_new_events_stream_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[int, List[str]]:
+        ) -> Tuple[int, Dict[str, Optional[int]]]:
             sql = (
                 "SELECT e.stream_ordering, e.event_id, e.received_ts"
                 " FROM events AS e"
@@ -1059,10 +1059,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             if len(rows) == limit:
                 upper_bound = rows[-1][0]
 
-            event_to_received_ts = {
-                row[1]: row[2]
-                for row in rows
-            }
+            event_to_received_ts: Dict[str, Optional[int]] = {row[1]: row[2] for row in rows}
             return upper_bound, event_to_received_ts
 
         upper_bound, event_to_received_ts = await self.db_pool.runInteraction(
