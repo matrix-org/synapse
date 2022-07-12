@@ -91,15 +91,17 @@ def parse_thumbnail_requirements(
         width = size["width"]
         height = size["height"]
         method = size["method"]
-        jpeg_thumbnail = ThumbnailRequirement(width, height, method, "image/jpeg")
-        png_thumbnail = ThumbnailRequirement(width, height, method, "image/png")
 
         for format, thumbnail_format in THUMBNAIL_SUPPORTED_MEDIA_FORMAT_MAP.items():
             requirement = requirements.setdefault(format, [])
             if thumbnail_format == "jpeg":
-                requirement.append(jpeg_thumbnail)
+                requirement.append(
+                    ThumbnailRequirement(width, height, method, "image/jpeg")
+                )
             elif thumbnail_format == "png":
-                requirement.append(png_thumbnail)
+                requirement.append(
+                    ThumbnailRequirement(width, height, method, "image/png")
+                )
             else:
                 raise Exception(
                     "Unknown thumbnail mapping from %s to %s. This is a Synapse problem, please report!"
