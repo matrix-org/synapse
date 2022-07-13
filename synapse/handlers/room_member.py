@@ -1340,7 +1340,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         id_access_token: Optional[str] = None,
         prev_event_ids: Optional[List[str]] = None,
         depth: Optional[int] = None,
-    ) -> Tuple[EventBase, int]:
+    ) -> Tuple[str, int]:
         """Invite a 3PID to a room.
 
         Args:
@@ -1405,7 +1405,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             # We don't check the invite against the spamchecker(s) here (through
             # user_may_invite) because we'll do it further down the line anyway (in
             # update_membership_locked).
-            _, stream_id = await self.update_membership(
+            event_id, stream_id = await self.update_membership(
                 requester, UserID.from_string(invitee), room_id, "invite", txn_id=txn_id
             )
         else:
@@ -1436,8 +1436,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 prev_event_ids=prev_event_ids,
                 depth=depth,
             )
+            event_id = event.event_id
 
-        return event, stream_id
+        return event_id, stream_id
 
     async def _make_and_store_3pid_invite(
         self,
