@@ -709,7 +709,7 @@ class RoomsCreateTestCase(RoomBase):
         self.assertEqual(200, channel.code, channel.result)
         self.assertTrue("room_id" in channel.json_body)
         assert channel.resource_usage is not None
-        self.assertEqual(37, channel.resource_usage.db_txn_count)
+        self.assertEqual(32, channel.resource_usage.db_txn_count)
 
     def test_post_room_initial_state(self) -> None:
         # POST with initial_state config key, expect new room id
@@ -722,7 +722,7 @@ class RoomsCreateTestCase(RoomBase):
         self.assertEqual(200, channel.code, channel.result)
         self.assertTrue("room_id" in channel.json_body)
         assert channel.resource_usage is not None
-        self.assertEqual(41, channel.resource_usage.db_txn_count)
+        self.assertEqual(35, channel.resource_usage.db_txn_count)
 
     def test_post_room_visibility_key(self) -> None:
         # POST with visibility config key, expect new room id
@@ -3283,7 +3283,7 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         # Mock a few functions to prevent the test from failing due to failing to talk to
         # a remote IS. We keep the mock for make_and_store_3pid_invite around so we
         # can check its call_count later on during the test.
-        make_invite_mock = Mock(return_value=make_awaitable(0))
+        make_invite_mock = Mock(return_value=make_awaitable((Mock(event_id="abc"), 0)))
         self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock
         self.hs.get_identity_handler().lookup_3pid = Mock(
             return_value=make_awaitable(None),
@@ -3344,7 +3344,7 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         # Mock a few functions to prevent the test from failing due to failing to talk to
         # a remote IS. We keep the mock for make_and_store_3pid_invite around so we
         # can check its call_count later on during the test.
-        make_invite_mock = Mock(return_value=make_awaitable(0))
+        make_invite_mock = Mock(return_value=make_awaitable((Mock(event_id="abc"), 0)))
         self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock
         self.hs.get_identity_handler().lookup_3pid = Mock(
             return_value=make_awaitable(None),
