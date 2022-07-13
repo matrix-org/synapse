@@ -328,9 +328,6 @@ jobs:
           - arrangement: monolith
             database: Postgres
 
-          - arrangement: workers
-            database: Postgres
-
     steps:
       - name: Run actions/checkout@v2 for synapse
         uses: actions/checkout@v2
