@@ -797,13 +797,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 room_id, state_group, state_entry.state, context=state_entry
             )
 
-    @cached(num_args=2, cache_context=True, iterable=True, max_entries=100000)
+    @cached(num_args=2, iterable=True, max_entries=100000)
     async def _get_joined_users_from_context(
         self,
         room_id: str,
         state_group: Union[object, int],
         current_state_ids: StateMap[str],
-        cache_context: _CacheContext,
         event: Optional[EventBase] = None,
         context: Optional["_StateCacheEntry"] = None,
     ) -> Dict[str, ProfileInfo]:
