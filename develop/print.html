@@ -10277,9 +10277,22 @@ command. This is a script that is distributed as part of synapse. It is possibly
 already on your <code>$PATH</code> depending on how Synapse was installed.</p>
 <p>Finding your user's <code>access_token</code> is client-dependent, but will usually be shown in the client's settings.</p>
 <h2 id="making-an-admin-api-request"><a class="header" href="#making-an-admin-api-request">Making an Admin API request</a></h2>
+<p>For security reasons, we <a href="usage/administration/admin_api/reverse_proxy.html#synapse-administration-endpoints">recommend</a>
+that the Admin API (<code>/_synapse/admin/...</code>) should be hidden from public view using a
+reverse proxy. This means you should typically query the Admin API from a terminal on
+the machine which runs Synapse.</p>
 <p>Once you have your <code>access_token</code>, you will need to authenticate each request to an Admin API endpoint by
 providing the token as either a query parameter or a request header. To add it as a request header in cURL:</p>
 <pre><code class="language-sh">curl --header &quot;Authorization: Bearer &lt;access_token&gt;&quot; &lt;the_rest_of_your_API_request&gt;
+</code></pre>
+<p>For example, suppose we want to
+<a href="usage/administration/admin_api/user_admin_api.html#query-user-account">query the account</a> of the user
+<code>@foo:bar.com</code>. We need an admin access token (e.g.
+<code>syt_AjfVef2_L33JNpafeif_0feKJfeaf0CQpoZk</code>), and we need to know which port
+Synapse's <a href="usage/administration/admin_api/config_documentation.html#listeners"><code>client</code> listener</a> is listening
+on (e.g. <code>8008</code>). Then we can use the following command to request the account
+information from the Admin API.</p>
+<pre><code class="language-sh">curl --header &quot;Authorization: Bearer syt_AjfVef2_L33JNpafeif_0feKJfeaf0CQpoZk&quot; -X GET http://127.0.0.1:8008/_synapse/admin/v2/users/@foo:bar.com
 </code></pre>
 <p>For more details on access tokens in Matrix, please refer to the complete
 <a href="https://matrix.org/docs/spec/client_server/r0.6.1#using-access-tokens">matrix spec documentation</a>.</p>
