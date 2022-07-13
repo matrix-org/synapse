@@ -730,11 +730,15 @@ def _check_power_levels(
 ) -> None:
     user_list = event.content.get("users", {})
     # Validate users
-    for k in user_list.keys():
+    for k, v in user_list.items():
         try:
             UserID.from_string(k)
         except Exception:
             raise SynapseError(400, "Not a valid user_id: %s" % (k,))
+        try:
+            int(v)
+        except Exception:
+            raise SynapseError(400, "Not a valid power level: %s" % (v,))
 
     # Reject events with stringy power levels if required by room version
     if (
@@ -752,13 +756,13 @@ def _check_power_levels(
                 "invite",
             }:
                 if not isinstance(v, int):
-                    raise AuthError(403, f"{v} must be an integer.")
+                    raise SynapseError(400, f"{v} must be an integer.")
             if k in {"events", "notifications", "users"}:
                 if not isinstance(v, dict) or not all(
                     isinstance(v, int) for v in v.values()
                 ):
-                    raise AuthError(
-                        403, f"{v} must be a dict wherein all the values are integers."
+                    raise SynapseError(
+                        400, f"{v} must be a dict wherein all the values are integers."
                     )
 
     key = (event.type, event.state_key)

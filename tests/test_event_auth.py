@@ -19,7 +19,7 @@ from parameterized import parameterized
 
 from synapse import event_auth
 from synapse.api.constants import EventContentFields
-from synapse.api.errors import AuthError
+from synapse.api.errors import AuthError, SynapseError
 from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
 from synapse.events import EventBase, make_event_from_dict
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
@@ -718,12 +718,12 @@ class EventAuthTestCase(unittest.TestCase):
             room_version=RoomVersions.V10,
         )
 
-        with self.assertRaises(AuthError):
+        with self.assertRaises(SynapseError):
             event_auth._check_power_levels(
                 pl_event.room_version, pl_event, {("fake_type", "fake_key"): pl_event2}
             )
 
-        with self.assertRaises(AuthError):
+        with self.assertRaises(SynapseError):
             event_auth._check_power_levels(
                 pl_event.room_version, pl_event2, {("fake_type", "fake_key"): pl_event}
             )
