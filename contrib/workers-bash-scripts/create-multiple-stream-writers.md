@@ -24,11 +24,11 @@ HTTP_START_PORT=8044
 
 STREAM_WRITERS+=( "presence" "typing" "receipts" "to_device" "account_data" )
 
-NUM_WRITERS=$(expr ${#STREAM_WRITERS[@]} - 1)
+NUM_WRITERS=$(expr ${#STREAM_WRITERS[@]})
 
 i=0
 
-while [ $i -le "$NUM_WRITERS" ]
+while [ $i -lt "$NUM_WRITERS" ]
 do
 cat << EOF > ${STREAM_WRITERS[$i]}_stream_writer.yaml
 worker_app: synapse.app.generic_worker
