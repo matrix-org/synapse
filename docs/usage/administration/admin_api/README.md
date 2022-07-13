@@ -13,10 +13,9 @@ su - postgres
 psql
 ```
 
-List all databases, connect to the correct database called e.g. `synapse` and elevate the user 
-`@foo:bar.com` to administrator.
+Check your  [database settings](config_documentation.md#database) in the `homeserver.yaml`, connect to the
+specified database called e.g. `synapse` and elevate the user `@foo:bar.com` to administrator.
 ```sql
-\l
 \c synapse
 UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 ```
