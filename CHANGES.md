@@ -1,3 +1,8 @@
+Synapse vNext
+=============
+
+As of this release, Synapse no longer allows the tasks of verifying email address ownership, and password reset confirmation, to be delegated to an identity server. For more information, see the [upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.63/docs/upgrade.md#upgrading-to-v1630).
+
 Synapse 1.63.0rc1 (2022-07-12)
 ==============================
 
@@ -73,14 +78,12 @@ Internal Changes
 - More aggressively rotate push actions. ([\#13211](https://github.com/matrix-org/synapse/issues/13211))
 - Add `max_line_length` setting for Python files to the `.editorconfig`. Contributed by @sumnerevans @ Beeper. ([\#13228](https://github.com/matrix-org/synapse/issues/13228))
 
-
 Synapse 1.62.0 (2022-07-05)
 ===========================
 
 No significant changes since 1.62.0rc3.
 
 Authors of spam-checker plugins should consult the [upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.62/docs/upgrade.md#upgrading-to-v1620) to learn about the enriched signatures for spam checker callbacks, which are supported with this release of Synapse.
-
 
 Synapse 1.62.0rc3 (2022-07-04)
 ==============================
