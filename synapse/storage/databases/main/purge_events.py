@@ -319,13 +319,30 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         Returns:
             The list of state groups to delete.
         """
-        return await self.db_pool.runInteraction(
+        state_groups_to_delete = await self.db_pool.runInteraction(
             "purge_room",
             self._purge_room_txn,
             room_id=room_id,
-            # This is safe because we don't care if room data is updated during the transaction
+            # This is safe because we don't care if room data is updated during the transaction, note
+            # we run a second transaction to cleanup tables we may write to during this transaction.
             isolation_level=IsolationLevel.READ_COMMITTED,
         )
+
+        def _purge_room_second_pass_txn(txn: LoggingTransaction, room_id: str) -> None:
+            for table in (
+                "event_push_actions",
+                "stream_ordering_to_exterm",
+            ):
+                logger.info("[purge] removing %s from %s", room_id, table)
+                txn.execute("DELETE FROM %s WHERE room_id=?" % (table,), (room_id,))
+
+        await self.db_pool.runInteraction(
+            "purge_room_second_pass",
+            _purge_room_second_pass_txn,
+            room_id=room_id,
+        )
+
+        return state_groups_to_delete
 
     def _purge_room_txn(self, txn: LoggingTransaction, room_id: str) -> List[int]:
         # This collides with event persistence so we cannot write new events and metadata into
@@ -402,7 +419,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "destination_rooms",
             "event_backward_extremities",
             "event_forward_extremities",
-            "event_push_actions",
             "event_search",
             "partial_state_events",
             "events",
@@ -419,7 +435,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "room_stats_state",
             "room_stats_current",
             "room_stats_earliest_token",
-            "stream_ordering_to_exterm",
             "users_in_public_rooms",
             "users_who_share_private_rooms",
             # no useful index, but let's clear them anyway
