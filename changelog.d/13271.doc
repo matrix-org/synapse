@@ -1,0 +1,1 @@
+Added a script to contrib directory for creating multiple different stream writers. Renamed the script related to generic workers. Contributed by @villepeh.
