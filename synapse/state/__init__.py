@@ -15,8 +15,6 @@
 import heapq
 import logging
 from collections import defaultdict
-from enum import auto
-from optparse import Option
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -33,7 +31,6 @@ from typing import (
     Sequence,
     Set,
     Tuple,
-    Union,
 )
 
 import attr

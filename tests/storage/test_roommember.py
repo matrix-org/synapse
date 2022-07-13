@@ -23,7 +23,6 @@ from synapse.util import Clock
 
 from tests import unittest
 from tests.server import TestHomeServer
-from tests.test_utils import event_injection
 
 
 class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
