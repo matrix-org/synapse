@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest.mock import Mock
-
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.rest import admin
@@ -74,7 +72,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         room_id = self.helper.create_room_as(user_id, tok=token)
         self.helper.join(room_id, other_id, tok=other_token)
 
-        last_event_id = None
+        last_event_id: str
 
         def _assert_counts(
             noitf_count: int, unread_count: int, highlight_count: int
@@ -96,7 +94,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 ),
             )
 
-        def _inject_actions(highlight: bool = False) -> None:
+        def _inject_actions(highlight: bool = False) -> str:
             result = self.helper.send_event(
                 room_id,
                 type="m.room.message",
@@ -110,7 +108,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         def _rotate() -> None:
             self.get_success(self.store._rotate_notifs())
 
-        def _mark_read(event_id) -> None:
+        def _mark_read(event_id: str) -> None:
             self.get_success(
                 self.store.insert_receipt(
                     room_id,
