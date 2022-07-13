@@ -256,7 +256,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         ]
         for _ in range(0, 8):
             event = make_event_from_dict(
-                self.add_hashes_and_signatures(
+                self.add_hashes_and_signatures_from_other_server(
                     {
                         "origin_server_ts": 1,
                         "type": "m.room.message",
