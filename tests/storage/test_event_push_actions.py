@@ -87,7 +87,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
                 ),
             )
 
-        def _inject_actions(highlight: bool = False) -> str:
+        def _create_event(highlight: bool = False) -> str:
             result = self.helper.send_event(
                 room_id,
                 type="m.room.message",
@@ -113,24 +113,24 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             )
 
         _assert_counts(0, 0, 0)
-        _inject_actions()
+        _create_event()
         _assert_counts(1, 0, 0)
         _rotate()
         _assert_counts(1, 0, 0)
 
-        event_id = _inject_actions()
+        event_id = _create_event()
         _assert_counts(2, 0, 0)
         _rotate()
         _assert_counts(2, 0, 0)
 
-        _inject_actions()
+        _create_event()
         _mark_read(event_id)
         _assert_counts(1, 0, 0)
 
         _mark_read(last_event_id)
         _assert_counts(0, 0, 0)
 
-        _inject_actions()
+        _create_event()
         _rotate()
         _assert_counts(1, 0, 0)
 
@@ -141,14 +141,14 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _mark_read(last_event_id)
         _assert_counts(0, 0, 0)
 
-        event_id = _inject_actions(True)
+        event_id = _create_event(True)
         _assert_counts(1, 1, 1)
         _rotate()
         _assert_counts(1, 1, 1)
 
         # Check that adding another notification and rotating after highlight
         # works.
-        _inject_actions()
+        _create_event()
         _rotate()
         _assert_counts(2, 0, 1)
 
@@ -159,7 +159,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _mark_read(last_event_id)
         _assert_counts(0, 0, 0)
 
-        _inject_actions(True)
+        _create_event(True)
         _assert_counts(1, 1, 1)
         _mark_read(last_event_id)
         _assert_counts(0, 0, 0)
