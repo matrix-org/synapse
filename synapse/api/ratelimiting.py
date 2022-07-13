@@ -79,8 +79,6 @@ class Ratelimiter:
         self, requester: Optional[Requester], key: Optional[Hashable]
     ) -> Hashable:
         """Use the requester's MXID as a fallback key if no key is provided.
-
-        Pulled out so that `can_do_action` and `record_action` are consistent.
         """
         if key is None:
             if not requester:
@@ -93,8 +91,6 @@ class Ratelimiter:
         self, key: Hashable, time_now_s: float
     ) -> Tuple[float, float, float]:
         """Retrieve the action counts, with a fallback representing an empty bucket.
-
-        Pulled out so that `can_do_action` and `record_action` are consistent.
         """
         return self.actions.get(key, (0.0, time_now_s, 0.0))
 
