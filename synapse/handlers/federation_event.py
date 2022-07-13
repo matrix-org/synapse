@@ -1530,8 +1530,10 @@ class FederationEventHandler:
         #
         # ... however, if we only have partial state for the room, then there is a good
         # chance that we'll be missing some of the state needed to auth the new event.
-        # So, we state-resolve the auth event that we are given against the state that
-        # we know about, which ensures things like bans are applied.
+        # So, we state-resolve the auth events that we are given against the state that
+        # we know about, which ensures things like bans are applied. (Note that we'll
+        # already have checked we have all the auth events, in
+        # _load_or_fetch_auth_events_for_event above)
         if context.partial_state:
             room_version = await self._store.get_room_version_id(event.room_id)
 
