@@ -1,0 +1,1 @@
+Fix error when adding a User through the Synapse Admin API with a "msisdn" threepid, when "enable_email_notifs" and "email_notifs_for_new_users" are both enabled. Contributed by @thomasweston12.
