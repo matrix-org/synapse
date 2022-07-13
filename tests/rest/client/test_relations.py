@@ -800,7 +800,7 @@ class RelationPaginationTestCase(BaseRelationsTestCase):
             )
             expected_event_ids.append(channel.json_body["event_id"])
 
-        prev_token = ""
+        prev_token: Optional[str] = ""
         found_event_ids: List[str] = []
         for _ in range(20):
             from_token = ""

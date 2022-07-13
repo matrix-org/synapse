@@ -143,7 +143,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             self._find_stream_orderings_for_times, 10 * 60 * 1000
         )
 
-        self._rotate_delay = 3
         self._rotate_count = 10000
         self._doing_notif_rotation = False
         if hs.config.worker.run_background_tasks:
@@ -847,7 +846,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 )
                 if caught_up:
                     break
-                await self.hs.get_clock().sleep(self._rotate_delay)
 
             # Finally we clear out old event push actions.
             await self._remove_old_push_actions_that_have_rotated()
@@ -982,7 +980,12 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         stream_row = txn.fetchone()
         if stream_row:
             (offset_stream_ordering,) = stream_row
-            rotate_to_stream_ordering = offset_stream_ordering
+
+            # We need to bound by the current token to ensure that we handle
+            # out-of-order writes correctly.
+            rotate_to_stream_ordering = min(
+                offset_stream_ordering, self._stream_id_gen.get_current_token()
+            )
             caught_up = False
         else:
             rotate_to_stream_ordering = self._stream_id_gen.get_current_token()
@@ -1008,13 +1011,17 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         sql = """
             SELECT user_id, room_id,
                 coalesce(old.%s, 0) + upd.cnt,
-                upd.stream_ordering,
-                old.user_id
+                upd.stream_ordering
             FROM (
                 SELECT user_id, room_id, count(*) as cnt,
-                    max(stream_ordering) as stream_ordering
-                FROM event_push_actions
-                WHERE ? <= stream_ordering AND stream_ordering < ?
+                    max(ea.stream_ordering) as stream_ordering
+                FROM event_push_actions AS ea
+                LEFT JOIN event_push_summary AS old USING (user_id, room_id)
+                WHERE ? < ea.stream_ordering AND ea.stream_ordering <= ?
+                    AND (
+                        old.last_receipt_stream_ordering IS NULL
+                        OR old.last_receipt_stream_ordering < ea.stream_ordering
+                    )
                     AND %s = 1
                 GROUP BY user_id, room_id
             ) AS upd
@@ -1037,7 +1044,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             summaries[(row[0], row[1])] = _EventPushSummary(
                 unread_count=row[2],
                 stream_ordering=row[3],
-                old_user_id=row[4],
                 notif_count=0,
             )
 
@@ -1058,55 +1064,25 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 summaries[(row[0], row[1])] = _EventPushSummary(
                     unread_count=0,
                     stream_ordering=row[3],
-                    old_user_id=row[4],
                     notif_count=row[2],
                 )
 
         logger.info("Rotating notifications, handling %d rows", len(summaries))
 
-        # If the `old.user_id` above is NULL then we know there isn't already an
-        # entry in the table, so we simply insert it. Otherwise we update the
-        # existing table.
-        self.db_pool.simple_insert_many_txn(
+        self.db_pool.simple_upsert_many_txn(
             txn,
             table="event_push_summary",
-            keys=(
-                "user_id",
-                "room_id",
-                "notif_count",
-                "unread_count",
-                "stream_ordering",
-            ),
-            values=[
+            key_names=("user_id", "room_id"),
+            key_values=[(user_id, room_id) for user_id, room_id in summaries],
+            value_names=("notif_count", "unread_count", "stream_ordering"),
+            value_values=[
                 (
-                    user_id,
-                    room_id,
                     summary.notif_count,
                     summary.unread_count,
                     summary.stream_ordering,
                 )
-                for ((user_id, room_id), summary) in summaries.items()
-                if summary.old_user_id is None
+                for summary in summaries.values()
             ],
-        )
-
-        txn.execute_batch(
-            """
-                UPDATE event_push_summary
-                SET notif_count = ?, unread_count = ?, stream_ordering = ?
-                WHERE user_id = ? AND room_id = ?
-            """,
-            (
-                (
-                    summary.notif_count,
-                    summary.unread_count,
-                    summary.stream_ordering,
-                    user_id,
-                    room_id,
-                )
-                for ((user_id, room_id), summary) in summaries.items()
-                if summary.old_user_id is not None
-            ),
         )
 
         txn.execute(
@@ -1136,12 +1112,12 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         ) -> bool:
             # We don't want to clear out too much at a time, so we bound our
             # deletes.
-            batch_size = 10000
+            batch_size = self._rotate_count
 
             txn.execute(
                 """
                 SELECT stream_ordering FROM event_push_actions
-                WHERE stream_ordering < ? AND highlight = 0
+                WHERE stream_ordering <= ? AND highlight = 0
                 ORDER BY stream_ordering ASC LIMIT 1 OFFSET ?
             """,
                 (
@@ -1156,10 +1132,12 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             else:
                 stream_ordering = max_stream_ordering_to_delete
 
+            # We need to use a inclusive bound here to handle the case where a
+            # single stream ordering has more than `batch_size` rows.
             txn.execute(
                 """
                 DELETE FROM event_push_actions
-                WHERE stream_ordering < ? AND highlight = 0
+                WHERE stream_ordering <= ? AND highlight = 0
                 """,
                 (stream_ordering,),
             )
@@ -1288,5 +1266,4 @@ class _EventPushSummary:
 
     unread_count: int
     stream_ordering: int
-    old_user_id: str
     notif_count: int

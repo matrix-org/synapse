@@ -35,7 +35,6 @@
     - [Application Services](application_services.md)
     - [Server Notices](server_notices.md)
     - [Consent Tracking](consent_tracking.md)
-    - [URL Previews](development/url_previews.md)
     - [User Directory](user_directory.md)
     - [Message Retention Policies](message_retention_policies.md)
     - [Pluggable Modules](modules/index.md)
@@ -81,6 +80,7 @@
 # Development
   - [Contributing Guide](development/contributing_guide.md)
   - [Code Style](code_style.md)
+  - [Reviewing Code](development/reviews.md)
   - [Release Cycle](development/releases.md)
   - [Git Usage](development/git.md)
   - [Testing]()

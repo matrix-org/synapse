@@ -1,0 +1,1 @@
+Make the AS login method call `Auth.get_user_by_req` for checking the AS token.

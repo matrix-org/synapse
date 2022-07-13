@@ -65,6 +65,7 @@ from synapse.replication.http.federation import (
     ReplicationFederationSendEventsRestServlet,
 )
 from synapse.state import StateResolutionStore
+from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import (
@@ -276,7 +277,16 @@ class FederationEventHandler:
                     affected=pdu.event_id,
                 )
 
-        await self._process_received_pdu(origin, pdu, state_ids=None)
+        try:
+            await self._process_received_pdu(origin, pdu, state_ids=None)
+        except PartialStateConflictError:
+            # The room was un-partial stated while we were processing the PDU.
+            # Try once more, with full state this time.
+            logger.info(
+                "Room %s was un-partial stated while processing the PDU, trying again.",
+                room_id,
+            )
+            await self._process_received_pdu(origin, pdu, state_ids=None)
 
     async def on_send_membership_event(
         self, origin: str, event: EventBase
@@ -307,6 +317,9 @@ class FederationEventHandler:
 
         Raises:
             SynapseError if the event is not accepted into the room
+            PartialStateConflictError if the room was un-partial stated in between
+                computing the state at the event and persisting it. The caller should
+                retry exactly once in this case.
         """
         logger.debug(
             "on_send_membership_event: Got event: %s, signatures: %s",
@@ -424,6 +437,8 @@ class FederationEventHandler:
 
         Raises:
             SynapseError if the response is in some way invalid.
+            PartialStateConflictError if the homeserver is already in the room and it
+                has been un-partial stated.
         """
         create_event = None
         for e in state:
@@ -1085,10 +1100,14 @@ class FederationEventHandler:
 
             state_ids: Normally None, but if we are handling a gap in the graph
                 (ie, we are missing one or more prev_events), the resolved state at the
-                event
+                event. Must not be partial state.
 
             backfilled: True if this is part of a historical batch of events (inhibits
                 notification to clients, and validation of device keys.)
+
+        PartialStateConflictError: if the room was un-partial stated in between
+            computing the state at the event and persisting it. The caller should retry
+            exactly once in this case. Will never be raised if `state_ids` is provided.
         """
         logger.debug("Processing event: %s", event)
         assert not event.internal_metadata.outlier
@@ -1820,6 +1839,9 @@ class FederationEventHandler:
             event: The event itself.
             context: The event context.
             backfilled: True if the event was backfilled.
+
+        PartialStateConflictError: if attempting to persist a partial state event in
+            a room that has been un-partial stated.
         """
         # this method should not be called on outliers (those code paths call
         # persist_events_and_notify directly.)
@@ -1872,6 +1894,10 @@ class FederationEventHandler:
 
         Returns:
             The stream ID after which all events have been persisted.
+
+        Raises:
+            PartialStateConflictError: if attempting to persist a partial state event in
+                a room that has been un-partial stated.
         """
         if not event_and_contexts:
             return self._store.get_room_max_stream_ordering()
@@ -1880,14 +1906,19 @@ class FederationEventHandler:
         if instance != self._instance_name:
             # Limit the number of events sent over replication. We choose 200
             # here as that is what we default to in `max_request_body_size(..)`
-            for batch in batch_iter(event_and_contexts, 200):
-                result = await self._send_events(
-                    instance_name=instance,
-                    store=self._store,
-                    room_id=room_id,
-                    event_and_contexts=batch,
-                    backfilled=backfilled,
-                )
+            try:
+                for batch in batch_iter(event_and_contexts, 200):
+                    result = await self._send_events(
+                        instance_name=instance,
+                        store=self._store,
+                        room_id=room_id,
+                        event_and_contexts=batch,
+                        backfilled=backfilled,
+                    )
+            except SynapseError as e:
+                if e.code == HTTPStatus.CONFLICT:
+                    raise PartialStateConflictError()
+                raise
             return result["max_stream_id"]
         else:
             assert self._storage_controllers.persistence

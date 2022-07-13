@@ -45,7 +45,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         # mock up some events to use in the response.
         # In real life, these would have things in `prev_events` and `auth_events`, but that's
         # a bit annoying to mock up, and the code under test doesn't care, so we don't bother.
-        create_event_dict = self.add_hashes_and_signatures(
+        create_event_dict = self.add_hashes_and_signatures_from_other_server(
             {
                 "room_id": test_room_id,
                 "type": "m.room.create",
@@ -57,7 +57,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
                 "origin_server_ts": 500,
             }
         )
-        member_event_dict = self.add_hashes_and_signatures(
+        member_event_dict = self.add_hashes_and_signatures_from_other_server(
             {
                 "room_id": test_room_id,
                 "type": "m.room.member",
@@ -69,7 +69,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
                 "origin_server_ts": 600,
             }
         )
-        pl_event_dict = self.add_hashes_and_signatures(
+        pl_event_dict = self.add_hashes_and_signatures_from_other_server(
             {
                 "room_id": test_room_id,
                 "type": "m.room.power_levels",

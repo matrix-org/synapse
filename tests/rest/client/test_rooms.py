@@ -22,7 +22,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 from unittest.mock import Mock, call
 from urllib import parse as urlparse
 
-# `Literal` appears with Python 3.8.
+from parameterized import param, parameterized
 from typing_extensions import Literal
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -708,6 +708,21 @@ class RoomsCreateTestCase(RoomBase):
 
         self.assertEqual(200, channel.code, channel.result)
         self.assertTrue("room_id" in channel.json_body)
+        assert channel.resource_usage is not None
+        self.assertEqual(37, channel.resource_usage.db_txn_count)
+
+    def test_post_room_initial_state(self) -> None:
+        # POST with initial_state config key, expect new room id
+        channel = self.make_request(
+            "POST",
+            "/createRoom",
+            b'{"initial_state":[{"type": "m.bridge", "content": {}}]}',
+        )
+
+        self.assertEqual(200, channel.code, channel.result)
+        self.assertTrue("room_id" in channel.json_body)
+        assert channel.resource_usage is not None
+        self.assertEqual(41, channel.resource_usage.db_txn_count)
 
     def test_post_room_visibility_key(self) -> None:
         # POST with visibility config key, expect new room id
@@ -815,14 +830,14 @@ class RoomsCreateTestCase(RoomBase):
         In this test, we use the more recent API in which callbacks return a `Union[Codes, Literal["NOT_SPAM"]]`.
         """
 
-        async def user_may_join_room(
+        async def user_may_join_room_codes(
             mxid: str,
             room_id: str,
             is_invite: bool,
         ) -> Codes:
             return Codes.CONSENT_NOT_GIVEN
 
-        join_mock = Mock(side_effect=user_may_join_room)
+        join_mock = Mock(side_effect=user_may_join_room_codes)
         self.hs.get_spam_checker()._user_may_join_room_callbacks.append(join_mock)
 
         channel = self.make_request(
@@ -832,6 +847,25 @@ class RoomsCreateTestCase(RoomBase):
         )
         self.assertEqual(channel.code, 200, channel.json_body)
 
+        self.assertEqual(join_mock.call_count, 0)
+
+        # Now change the return value of the callback to deny any join. Since we're
+        # creating the room, despite the return value, we should be able to join.
+        async def user_may_join_room_tuple(
+            mxid: str,
+            room_id: str,
+            is_invite: bool,
+        ) -> Tuple[Codes, dict]:
+            return Codes.INCOMPATIBLE_ROOM_VERSION, {}
+
+        join_mock.side_effect = user_may_join_room_tuple
+
+        channel = self.make_request(
+            "POST",
+            "/createRoom",
+            {},
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
         self.assertEqual(join_mock.call_count, 0)
 
 
@@ -1113,13 +1147,15 @@ class RoomJoinTestCase(RoomBase):
         """
 
         # Register a dummy callback. Make it allow all room joins for now.
-        return_value: Union[Literal["NOT_SPAM"], Codes] = synapse.module_api.NOT_SPAM
+        return_value: Union[
+            Literal["NOT_SPAM"], Tuple[Codes, dict], Codes
+        ] = synapse.module_api.NOT_SPAM
 
         async def user_may_join_room(
             userid: str,
             room_id: str,
             is_invited: bool,
-        ) -> Union[Literal["NOT_SPAM"], Codes]:
+        ) -> Union[Literal["NOT_SPAM"], Tuple[Codes, dict], Codes]:
             return return_value
 
         # `spec` argument is needed for this function mock to have `__qualname__`, which
@@ -1163,8 +1199,28 @@ class RoomJoinTestCase(RoomBase):
         )
 
         # Now make the callback deny all room joins, and check that a join actually fails.
+        # We pick an arbitrary Codes rather than the default `Codes.FORBIDDEN`.
         return_value = Codes.CONSENT_NOT_GIVEN
-        self.helper.join(self.room3, self.user2, expect_code=403, tok=self.tok2)
+        self.helper.invite(self.room3, self.user1, self.user2, tok=self.tok1)
+        self.helper.join(
+            self.room3,
+            self.user2,
+            expect_code=403,
+            expect_errcode=return_value,
+            tok=self.tok2,
+        )
+
+        # Now make the callback deny all room joins, and check that a join actually fails.
+        # As above, with the experimental extension that lets us return dictionaries.
+        return_value = (Codes.BAD_ALIAS, {"another_field": "12345"})
+        self.helper.join(
+            self.room3,
+            self.user2,
+            expect_code=403,
+            expect_errcode=return_value[0],
+            tok=self.tok2,
+            expect_additional_fields=return_value[1],
+        )
 
 
 class RoomJoinRatelimitTestCase(RoomBase):
@@ -1313,6 +1369,97 @@ class RoomMessagesTestCase(RoomBase):
         content = b'{"body":"test2","msgtype":"m.text"}'
         channel = self.make_request("PUT", path, content)
         self.assertEqual(200, channel.code, msg=channel.result["body"])
+
+    @parameterized.expand(
+        [
+            # Allow
+            param(
+                name="NOT_SPAM", value="NOT_SPAM", expected_code=200, expected_fields={}
+            ),
+            param(name="False", value=False, expected_code=200, expected_fields={}),
+            # Block
+            param(
+                name="scalene string",
+                value="ANY OTHER STRING",
+                expected_code=403,
+                expected_fields={"errcode": "M_FORBIDDEN"},
+            ),
+            param(
+                name="True",
+                value=True,
+                expected_code=403,
+                expected_fields={"errcode": "M_FORBIDDEN"},
+            ),
+            param(
+                name="Code",
+                value=Codes.LIMIT_EXCEEDED,
+                expected_code=403,
+                expected_fields={"errcode": "M_LIMIT_EXCEEDED"},
+            ),
+            param(
+                name="Tuple",
+                value=(Codes.SERVER_NOT_TRUSTED, {"additional_field": "12345"}),
+                expected_code=403,
+                expected_fields={
+                    "errcode": "M_SERVER_NOT_TRUSTED",
+                    "additional_field": "12345",
+                },
+            ),
+        ]
+    )
+    def test_spam_checker_check_event_for_spam(
+        self,
+        name: str,
+        value: Union[str, bool, Codes, Tuple[Codes, JsonDict]],
+        expected_code: int,
+        expected_fields: dict,
+    ) -> None:
+        class SpamCheck:
+            mock_return_value: Union[
+                str, bool, Codes, Tuple[Codes, JsonDict], bool
+            ] = "NOT_SPAM"
+            mock_content: Optional[JsonDict] = None
+
+            async def check_event_for_spam(
+                self,
+                event: synapse.events.EventBase,
+            ) -> Union[str, Codes, Tuple[Codes, JsonDict], bool]:
+                self.mock_content = event.content
+                return self.mock_return_value
+
+        spam_checker = SpamCheck()
+
+        self.hs.get_spam_checker()._check_event_for_spam_callbacks.append(
+            spam_checker.check_event_for_spam
+        )
+
+        # Inject `value` as mock_return_value
+        spam_checker.mock_return_value = value
+        path = "/rooms/%s/send/m.room.message/check_event_for_spam_%s" % (
+            urlparse.quote(self.room_id),
+            urlparse.quote(name),
+        )
+        body = "test-%s" % name
+        content = '{"body":"%s","msgtype":"m.text"}' % body
+        channel = self.make_request("PUT", path, content)
+
+        # Check that the callback has witnessed the correct event.
+        self.assertIsNotNone(spam_checker.mock_content)
+        if (
+            spam_checker.mock_content is not None
+        ):  # Checked just above, but mypy doesn't know about that.
+            self.assertEqual(
+                spam_checker.mock_content["body"], body, spam_checker.mock_content
+            )
+
+        # Check that we have the correct result.
+        self.assertEqual(expected_code, channel.code, msg=channel.result["body"])
+        for expected_key, expected_value in expected_fields.items():
+            self.assertEqual(
+                channel.json_body.get(expected_key, None),
+                expected_value,
+                "Field %s absent or invalid " % expected_key,
+            )
 
 
 class RoomPowerLevelOverridesTestCase(RoomBase):
@@ -3235,7 +3382,8 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         make_invite_mock.assert_called_once()
 
         # Now change the return value of the callback to deny any invite and test that
-        # we can't send the invite.
+        # we can't send the invite. We pick an arbitrary error code to be able to check
+        # that the same code has been returned
         mock.return_value = make_awaitable(Codes.CONSENT_NOT_GIVEN)
         channel = self.make_request(
             method="POST",
@@ -3249,6 +3397,27 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.json_body["errcode"], Codes.CONSENT_NOT_GIVEN)
+
+        # Also check that it stopped before calling _make_and_store_3pid_invite.
+        make_invite_mock.assert_called_once()
+
+        # Run variant with `Tuple[Codes, dict]`.
+        mock.return_value = make_awaitable((Codes.EXPIRED_ACCOUNT, {"field": "value"}))
+        channel = self.make_request(
+            method="POST",
+            path="/rooms/" + self.room_id + "/invite",
+            content={
+                "id_server": "example.com",
+                "id_access_token": "sometoken",
+                "medium": "email",
+                "address": email_to_invite,
+            },
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT)
+        self.assertEqual(channel.json_body["field"], "value")
 
         # Also check that it stopped before calling _make_and_store_3pid_invite.
         make_invite_mock.assert_called_once()
