@@ -24,13 +24,6 @@ from tests.unittest import HomeserverTestCase
 
 USER_ID = "@user:example.com"
 
-PlAIN_NOTIF = ["notify", {"set_tweak": "highlight", "value": False}]
-HIGHLIGHT = [
-    "notify",
-    {"set_tweak": "sound", "value": "default"},
-    {"set_tweak": "highlight"},
-]
-
 
 class EventPushActionsStoreTestCase(HomeserverTestCase):
     servlets = [
