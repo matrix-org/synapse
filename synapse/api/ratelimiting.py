@@ -78,8 +78,7 @@ class Ratelimiter:
     def _get_key(
         self, requester: Optional[Requester], key: Optional[Hashable]
     ) -> Hashable:
-        """Use the requester's MXID as a fallback key if no key is provided.
-        """
+        """Use the requester's MXID as a fallback key if no key is provided."""
         if key is None:
             if not requester:
                 raise ValueError("Must supply at least one of `requester` or `key`")
@@ -90,8 +89,7 @@ class Ratelimiter:
     def _get_action_counts(
         self, key: Hashable, time_now_s: float
     ) -> Tuple[float, float, float]:
-        """Retrieve the action counts, with a fallback representing an empty bucket.
-        """
+        """Retrieve the action counts, with a fallback representing an empty bucket."""
         return self.actions.get(key, (0.0, time_now_s, 0.0))
 
     async def can_do_action(
