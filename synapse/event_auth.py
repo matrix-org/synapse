@@ -762,7 +762,8 @@ def _check_power_levels(
                     isinstance(v, int) for v in v.values()
                 ):
                     raise SynapseError(
-                        400, f"{v!r} must be a dict wherein all the values are integers."
+                        400,
+                        f"{v!r} must be a dict wherein all the values are integers.",
                     )
 
     key = (event.type, event.state_key)
