@@ -80,7 +80,6 @@ def validate_event_for_room_version(event: "EventBase") -> None:
     Raises:
         SynapseError if there is a problem with the event
     """
-
     _check_size_limits(event)
 
     if not hasattr(event, "room_id"):
@@ -735,6 +734,7 @@ def _check_power_levels(
             UserID.from_string(k)
         except Exception:
             raise SynapseError(400, "Not a valid user_id: %s" % (k,))
+
         try:
             int(v)
         except Exception:
@@ -756,13 +756,13 @@ def _check_power_levels(
                 "invite",
             }:
                 if not isinstance(v, int):
-                    raise SynapseError(400, f"{v} must be an integer.")
+                    raise SynapseError(400, f"{v!r} must be an integer.")
             if k in {"events", "notifications", "users"}:
                 if not isinstance(v, dict) or not all(
                     isinstance(v, int) for v in v.values()
                 ):
                     raise SynapseError(
-                        400, f"{v} must be a dict wherein all the values are integers."
+                        400, f"{v!r} must be a dict wherein all the values are integers."
                     )
 
     key = (event.type, event.state_key)
