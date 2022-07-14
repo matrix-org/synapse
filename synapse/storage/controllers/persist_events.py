@@ -934,6 +934,8 @@ class EventsPersistenceStorageController:
             state_res_store=StateResolutionStore(self.main_store),
         )
 
+        full_state = await res.get_state(self._state_controller)
+
         state_resolutions_during_persistence.inc()
 
         # If the returned state matches the state group of one of the new
@@ -948,7 +950,7 @@ class EventsPersistenceStorageController:
                 events_context,
             )
 
-        return res.state, None, new_latest_event_ids
+        return full_state, None, new_latest_event_ids
 
     async def _prune_extremities(
         self,
