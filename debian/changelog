@@ -1,3 +1,76 @@
+matrix-synapse-py3 (1.63.0~rc1) stable; urgency=medium
+
+  * New Synapse release 1.63.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 12 Jul 2022 11:26:02 +0100
+
+matrix-synapse-py3 (1.62.0) stable; urgency=medium
+
+  * New Synapse release 1.62.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 05 Jul 2022 11:14:15 +0100
+
+matrix-synapse-py3 (1.62.0~rc3) stable; urgency=medium
+
+  * New Synapse release 1.62.0rc3.
+
+ -- Synapse Packaging team <packages@matrix.org>  Mon, 04 Jul 2022 16:07:01 +0100
+
+matrix-synapse-py3 (1.62.0~rc2) stable; urgency=medium
+
+  * New Synapse release 1.62.0rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 01 Jul 2022 11:42:41 +0100
+
+matrix-synapse-py3 (1.62.0~rc1) stable; urgency=medium
+
+  * New Synapse release 1.62.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 28 Jun 2022 16:34:57 +0100
+
+matrix-synapse-py3 (1.61.1) stable; urgency=medium
+
+  * New Synapse release 1.61.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 28 Jun 2022 14:33:46 +0100
+
+matrix-synapse-py3 (1.61.0) stable; urgency=medium
+
+  * New Synapse release 1.61.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 14 Jun 2022 11:44:19 +0100
+
+matrix-synapse-py3 (1.61.0~rc1) stable; urgency=medium
+
+  * Remove unused `jitsimeetbridge` experiment from `contrib` directory.
+  * New Synapse release 1.61.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 07 Jun 2022 12:42:31 +0100
+
+matrix-synapse-py3 (1.60.0) stable; urgency=medium
+
+  * New Synapse release 1.60.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 31 May 2022 13:41:22 +0100
+
+matrix-synapse-py3 (1.60.0~rc2) stable; urgency=medium
+
+  * New Synapse release 1.60.0rc2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 27 May 2022 11:04:55 +0100
+
+matrix-synapse-py3 (1.60.0~rc1) stable; urgency=medium
+
+  * New Synapse release 1.60.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 24 May 2022 12:05:01 +0100
+
+matrix-synapse-py3 (1.59.1) stable; urgency=medium
+
+  * New Synapse release 1.59.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 18 May 2022 11:41:46 +0100
+
 matrix-synapse-py3 (1.59.0) stable; urgency=medium
 
   * New Synapse release 1.59.0.

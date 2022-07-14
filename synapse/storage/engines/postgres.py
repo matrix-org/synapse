@@ -13,39 +13,45 @@
 # limitations under the License.
 
 import logging
-from typing import Mapping, Optional
+from typing import TYPE_CHECKING, Any, Mapping, NoReturn, Optional, Tuple, cast
+
+import psycopg2.extensions
 
 from synapse.storage.engines._base import (
     BaseDatabaseEngine,
     IncorrectDatabaseSetup,
     IsolationLevel,
 )
-from synapse.storage.types import Connection
+from synapse.storage.types import Cursor
+
+if TYPE_CHECKING:
+    from synapse.storage.database import LoggingDatabaseConnection
+
 
 logger = logging.getLogger(__name__)
 
 
-class PostgresEngine(BaseDatabaseEngine):
-    def __init__(self, database_module, database_config):
-        super().__init__(database_module, database_config)
-        self.module.extensions.register_type(self.module.extensions.UNICODE)
+class PostgresEngine(BaseDatabaseEngine[psycopg2.extensions.connection]):
+    def __init__(self, database_config: Mapping[str, Any]):
+        super().__init__(psycopg2, database_config)
+        psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
 
         # Disables passing `bytes` to txn.execute, c.f. #6186. If you do
         # actually want to use bytes than wrap it in `bytearray`.
-        def _disable_bytes_adapter(_):
+        def _disable_bytes_adapter(_: bytes) -> NoReturn:
             raise Exception("Passing bytes to DB is disabled.")
 
-        self.module.extensions.register_adapter(bytes, _disable_bytes_adapter)
-        self.synchronous_commit = database_config.get("synchronous_commit", True)
-        self._version = None  # unknown as yet
+        psycopg2.extensions.register_adapter(bytes, _disable_bytes_adapter)
+        self.synchronous_commit: bool = database_config.get("synchronous_commit", True)
+        self._version: Optional[int] = None  # unknown as yet
 
         self.isolation_level_map: Mapping[int, int] = {
-            IsolationLevel.READ_COMMITTED: self.module.extensions.ISOLATION_LEVEL_READ_COMMITTED,
-            IsolationLevel.REPEATABLE_READ: self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ,
-            IsolationLevel.SERIALIZABLE: self.module.extensions.ISOLATION_LEVEL_SERIALIZABLE,
+            IsolationLevel.READ_COMMITTED: psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED,
+            IsolationLevel.REPEATABLE_READ: psycopg2.extensions.ISOLATION_LEVEL_REPEATABLE_READ,
+            IsolationLevel.SERIALIZABLE: psycopg2.extensions.ISOLATION_LEVEL_SERIALIZABLE,
         }
         self.default_isolation_level = (
-            self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
+            psycopg2.extensions.ISOLATION_LEVEL_REPEATABLE_READ
         )
         self.config = database_config
 
@@ -53,19 +59,23 @@ class PostgresEngine(BaseDatabaseEngine):
     def single_threaded(self) -> bool:
         return False
 
-    def get_db_locale(self, txn):
+    def get_db_locale(self, txn: Cursor) -> Tuple[str, str]:
         txn.execute(
             "SELECT datcollate, datctype FROM pg_database WHERE datname = current_database()"
         )
-        collation, ctype = txn.fetchone()
+        collation, ctype = cast(Tuple[str, str], txn.fetchone())
         return collation, ctype
 
-    def check_database(self, db_conn, allow_outdated_version: bool = False):
+    def check_database(
+        self,
+        db_conn: psycopg2.extensions.connection,
+        allow_outdated_version: bool = False,
+    ) -> None:
         # Get the version of PostgreSQL that we're using. As per the psycopg2
         # docs: The number is formed by converting the major, minor, and
         # revision numbers into two-decimal-digit numbers and appending them
         # together. For example, version 8.1.5 will be returned as 80105
-        self._version = db_conn.server_version
+        self._version = cast(int, db_conn.server_version)
         allow_unsafe_locale = self.config.get("allow_unsafe_locale", False)
 
         # Are we on a supported PostgreSQL version?
@@ -108,7 +118,7 @@ class PostgresEngine(BaseDatabaseEngine):
                         ctype,
                     )
 
-    def check_new_database(self, txn):
+    def check_new_database(self, txn: Cursor) -> None:
         """Gets called when setting up a brand new database. This allows us to
         apply stricter checks on new databases versus existing database.
         """
@@ -129,10 +139,10 @@ class PostgresEngine(BaseDatabaseEngine):
                 "See docs/postgres.md for more information." % ("\n".join(errors))
             )
 
-    def convert_param_style(self, sql):
+    def convert_param_style(self, sql: str) -> str:
         return sql.replace("?", "%s")
 
-    def on_new_connection(self, db_conn):
+    def on_new_connection(self, db_conn: "LoggingDatabaseConnection") -> None:
         db_conn.set_isolation_level(self.default_isolation_level)
 
         # Set the bytea output to escape, vs the default of hex
@@ -149,14 +159,14 @@ class PostgresEngine(BaseDatabaseEngine):
         db_conn.commit()
 
     @property
-    def can_native_upsert(self):
+    def can_native_upsert(self) -> bool:
         """
         Can we use native UPSERTs?
         """
         return True
 
     @property
-    def supports_using_any_list(self):
+    def supports_using_any_list(self) -> bool:
         """Do we support using `a = ANY(?)` and passing a list"""
         return True
 
@@ -165,27 +175,23 @@ class PostgresEngine(BaseDatabaseEngine):
         """Do we support the `RETURNING` clause in insert/update/delete?"""
         return True
 
-    def is_deadlock(self, error):
-        if isinstance(error, self.module.DatabaseError):
+    def is_deadlock(self, error: Exception) -> bool:
+        if isinstance(error, psycopg2.DatabaseError):
             # https://www.postgresql.org/docs/current/static/errcodes-appendix.html
             # "40001" serialization_failure
             # "40P01" deadlock_detected
             return error.pgcode in ["40001", "40P01"]
         return False
 
-    def is_connection_closed(self, conn):
+    def is_connection_closed(self, conn: psycopg2.extensions.connection) -> bool:
         return bool(conn.closed)
 
-    def lock_table(self, txn, table):
+    def lock_table(self, txn: Cursor, table: str) -> None:
         txn.execute("LOCK TABLE %s in EXCLUSIVE MODE" % (table,))
 
     @property
-    def server_version(self):
-        """Returns a string giving the server version. For example: '8.1.5'
-
-        Returns:
-            string
-        """
+    def server_version(self) -> str:
+        """Returns a string giving the server version. For example: '8.1.5'."""
         # note that this is a bit of a hack because it relies on check_database
         # having been called. Still, that should be a safe bet here.
         numver = self._version
@@ -197,17 +203,19 @@ class PostgresEngine(BaseDatabaseEngine):
         else:
             return "%i.%i.%i" % (numver / 10000, (numver % 10000) / 100, numver % 100)
 
-    def in_transaction(self, conn: Connection) -> bool:
-        return conn.status != self.module.extensions.STATUS_READY  # type: ignore
+    def in_transaction(self, conn: psycopg2.extensions.connection) -> bool:
+        return conn.status != psycopg2.extensions.STATUS_READY
 
-    def attempt_to_set_autocommit(self, conn: Connection, autocommit: bool):
-        return conn.set_session(autocommit=autocommit)  # type: ignore
+    def attempt_to_set_autocommit(
+        self, conn: psycopg2.extensions.connection, autocommit: bool
+    ) -> None:
+        return conn.set_session(autocommit=autocommit)
 
     def attempt_to_set_isolation_level(
-        self, conn: Connection, isolation_level: Optional[int]
-    ):
+        self, conn: psycopg2.extensions.connection, isolation_level: Optional[int]
+    ) -> None:
         if isolation_level is None:
             isolation_level = self.default_isolation_level
         else:
             isolation_level = self.isolation_level_map[isolation_level]
-        return conn.set_isolation_level(isolation_level)  # type: ignore
+        return conn.set_isolation_level(isolation_level)

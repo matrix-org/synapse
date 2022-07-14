@@ -90,6 +90,7 @@ class RoomSummaryHandler:
     def __init__(self, hs: "HomeServer"):
         self._event_auth_handler = hs.get_event_auth_handler()
         self._store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self._event_serializer = hs.get_event_client_serializer()
         self._server_name = hs.hostname
         self._federation_client = hs.get_federation_client()
@@ -537,7 +538,7 @@ class RoomSummaryHandler:
         Returns:
              True if the room is accessible to the requesting user or server.
         """
-        state_ids = await self._store.get_current_state_ids(room_id)
+        state_ids = await self._storage_controllers.state.get_current_state_ids(room_id)
 
         # If there's no state for the room, it isn't known.
         if not state_ids:
@@ -562,8 +563,13 @@ class RoomSummaryHandler:
         if join_rules_event_id:
             join_rules_event = await self._store.get_event(join_rules_event_id)
             join_rule = join_rules_event.content.get("join_rule")
-            if join_rule == JoinRules.PUBLIC or (
-                room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
+            if (
+                join_rule == JoinRules.PUBLIC
+                or (room_version.msc2403_knocking and join_rule == JoinRules.KNOCK)
+                or (
+                    room_version.msc3787_knock_restricted_join_rule
+                    and join_rule == JoinRules.KNOCK_RESTRICTED
+                )
             ):
                 return True
 
@@ -657,7 +663,8 @@ class RoomSummaryHandler:
         # The API doesn't return the room version so assume that a
         # join rule of knock is valid.
         if (
-            room.get("join_rules") in (JoinRules.PUBLIC, JoinRules.KNOCK)
+            room.get("join_rule")
+            in (JoinRules.PUBLIC, JoinRules.KNOCK, JoinRules.KNOCK_RESTRICTED)
             or room.get("world_readable") is True
         ):
             return True
@@ -696,7 +703,9 @@ class RoomSummaryHandler:
         # there should always be an entry
         assert stats is not None, "unable to retrieve stats for %s" % (room_id,)
 
-        current_state_ids = await self._store.get_current_state_ids(room_id)
+        current_state_ids = await self._storage_controllers.state.get_current_state_ids(
+            room_id
+        )
         create_event = await self._store.get_event(
             current_state_ids[(EventTypes.Create, "")]
         )
@@ -708,9 +717,6 @@ class RoomSummaryHandler:
             "canonical_alias": stats["canonical_alias"],
             "num_joined_members": stats["joined_members"],
             "avatar_url": stats["avatar"],
-            # plural join_rules is a documentation error but kept for historical
-            # purposes. Should match /publicRooms.
-            "join_rules": stats["join_rules"],
             "join_rule": stats["join_rules"],
             "world_readable": (
                 stats["history_visibility"] == HistoryVisibility.WORLD_READABLE
@@ -757,7 +763,9 @@ class RoomSummaryHandler:
         """
 
         # look for child rooms/spaces.
-        current_state_ids = await self._store.get_current_state_ids(room_id)
+        current_state_ids = await self._storage_controllers.state.get_current_state_ids(
+            room_id
+        )
 
         events = await self._store.get_events_as_list(
             [

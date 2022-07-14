@@ -18,8 +18,6 @@ import os
 import sys
 from typing import Dict, Iterable, List
 
-from matrix_common.versionstring import get_distribution_version_string
-
 from twisted.internet.tcp import Port
 from twisted.web.resource import EncodingResourceWrapper, Resource
 from twisted.web.server import GzipEncoderFactory
@@ -46,7 +44,6 @@ from synapse.app._base import (
     register_start,
 )
 from synapse.config._base import ConfigError, format_config_error
-from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import ListenerConfig
 from synapse.federation.transport.server import TransportLayerServer
@@ -69,7 +66,7 @@ from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.rest.well_known import well_known_resource
 from synapse.server import HomeServer
 from synapse.storage import DataStore
-from synapse.util.check_dependencies import check_requirements
+from synapse.util.check_dependencies import VERSION, check_requirements
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.module_loader import load_module
 
@@ -204,7 +201,7 @@ class SynapseHomeServer(HomeServer):
                 }
             )
 
-            if self.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            if self.config.email.can_verify_email:
                 from synapse.rest.synapse.client.password_reset import (
                     PasswordResetSubmitTokenResource,
                 )
@@ -371,7 +368,7 @@ def setup(config_options: List[str]) -> SynapseHomeServer:
     hs = SynapseHomeServer(
         config.server.server_name,
         config=config,
-        version_string="Synapse/" + get_distribution_version_string("matrix-synapse"),
+        version_string=f"Synapse/{VERSION}",
     )
 
     synapse.config.logger.setup_logging(hs, config, use_worker_options=False)

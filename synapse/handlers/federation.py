@@ -20,7 +20,16 @@ import itertools
 import logging
 from enum import Enum
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import attr
 from signedjson.key import decode_verify_key_bytes
@@ -34,7 +43,9 @@ from synapse.api.errors import (
     CodeMessageException,
     Codes,
     FederationDeniedError,
+    FederationError,
     HttpResponseException,
+    LimitExceededError,
     NotFoundError,
     RequestSendFailed,
     SynapseError,
@@ -49,11 +60,14 @@ from synapse.federation.federation_client import InvalidResponseError
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import nested_logging_context
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.module_api import NOT_SPAM
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationStoreRoomOnOutlierMembershipRestServlet,
 )
+from synapse.storage.databases.main.events import PartialStateConflictError
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
+from synapse.storage.state import StateFilter
 from synapse.types import JsonDict, StateMap, get_domain_from_id
 from synapse.util.async_helpers import Linearizer
 from synapse.util.retryutils import NotRetryingDestination
@@ -124,8 +138,8 @@ class FederationHandler:
         self.hs = hs
 
         self.store = hs.get_datastores().main
-        self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self._storage_controllers = hs.get_storage_controllers()
+        self._state_storage_controller = self._storage_controllers.state
         self.federation_client = hs.get_federation_client()
         self.state_handler = hs.get_state_handler()
         self.server_name = hs.hostname
@@ -157,6 +171,14 @@ class FederationHandler:
         self._room_backfill = Linearizer("room_backfill")
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
+
+        # if this is the main process, fire off a background process to resume
+        # any partial-state-resync operations which were in flight when we
+        # were shut down.
+        if not hs.config.worker.worker_app:
+            run_as_background_process(
+                "resume_sync_partial_state_room", self._resume_sync_partial_state_room
+            )
 
     async def maybe_backfill(
         self, room_id: str, current_depth: int, limit: int
@@ -323,7 +345,7 @@ class FederationHandler:
             # We set `check_history_visibility_only` as we might otherwise get false
             # positives from users having been erased.
             filtered_extremities = await filter_events_for_server(
-                self.storage,
+                self._storage_controllers,
                 self.server_name,
                 events_to_check,
                 redact=False,
@@ -352,7 +374,7 @@ class FederationHandler:
         # First we try hosts that are already in the room
         # TODO: HEURISTIC ALERT.
 
-        curr_state = await self.state_handler.get_current_state(room_id)
+        curr_state = await self._storage_controllers.state.get_current_state(room_id)
 
         curr_domains = get_domains_from_state(curr_state)
 
@@ -459,6 +481,8 @@ class FederationHandler:
         """
         # TODO: We should be able to call this on workers, but the upgrading of
         # room stuff after join currently doesn't work on workers.
+        # TODO: Before we relax this condition, we need to allow re-syncing of
+        # partial room state to happen on workers.
         assert self.config.worker.worker_app is None
 
         logger.debug("Joining %s to %s", joinee, room_id)
@@ -524,27 +548,41 @@ class FederationHandler:
             if ret.partial_state:
                 # TODO(faster_joins): roll this back if we don't manage to start the
                 #   background resync (eg process_remote_join fails)
+                #   https://github.com/matrix-org/synapse/issues/12998
                 await self.store.store_partial_state_room(room_id, ret.servers_in_room)
 
-            max_stream_id = await self._federation_event_handler.process_remote_join(
-                origin,
-                room_id,
-                auth_chain,
-                state,
-                event,
-                room_version_obj,
-                partial_state=ret.partial_state,
-            )
+            try:
+                max_stream_id = (
+                    await self._federation_event_handler.process_remote_join(
+                        origin,
+                        room_id,
+                        auth_chain,
+                        state,
+                        event,
+                        room_version_obj,
+                        partial_state=ret.partial_state,
+                    )
+                )
+            except PartialStateConflictError as e:
+                # The homeserver was already in the room and it is no longer partial
+                # stated. We ought to be doing a local join instead. Turn the error into
+                # a 429, as a hint to the client to try again.
+                # TODO(faster_joins): `_should_perform_remote_join` suggests that we may
+                #   do a remote join for restricted rooms even if we have full state.
+                logger.error(
+                    "Room %s was un-partial stated while processing remote join.",
+                    room_id,
+                )
+                raise LimitExceededError(msg=e.msg, errcode=e.errcode, retry_after_ms=0)
 
             if ret.partial_state:
                 # Kick off the process of asynchronously fetching the state for this
                 # room.
-                #
-                # TODO(faster_joins): pick this up again on restart
                 run_as_background_process(
                     desc="sync_partial_state_room",
                     func=self._sync_partial_state_room,
-                    destination=origin,
+                    initial_destination=origin,
+                    other_destinations=ret.servers_in_room,
                     room_id=room_id,
                 )
 
@@ -659,7 +697,7 @@ class FederationHandler:
         # in the invitee's sync stream. It is stripped out for all other local users.
         event.unsigned["knock_room_state"] = stripped_room_state["knock_state_events"]
 
-        context = EventContext.for_outlier(self.storage)
+        context = EventContext.for_outlier(self._storage_controllers)
         stream_id = await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -730,7 +768,9 @@ class FederationHandler:
         # Note that this requires the /send_join request to come back to the
         # same server.
         if room_version.msc3083_join_rules:
-            state_ids = await self.store.get_current_state_ids(room_id)
+            state_ids = await self._state_storage_controller.get_current_state_ids(
+                room_id
+            )
             if await self._event_auth_handler.has_restricted_join_rules(
                 state_ids, room_version
             ):
@@ -777,9 +817,7 @@ class FederationHandler:
 
         # The remote hasn't signed it yet, obviously. We'll do the full checks
         # when we get the event back in `on_send_join_request`
-        await self._event_auth_handler.check_auth_rules_from_context(
-            room_version, event, context
-        )
+        await self._event_auth_handler.check_auth_rules_from_context(event, context)
         return event
 
     async def on_invite_request(
@@ -799,11 +837,15 @@ class FederationHandler:
         if self.hs.config.server.block_non_admin_invites:
             raise SynapseError(403, "This server does not accept room invites")
 
-        if not await self.spam_checker.user_may_invite(
+        spam_check = await self.spam_checker.user_may_invite(
             event.sender, event.state_key, event.room_id
-        ):
+        )
+        if spam_check != NOT_SPAM:
             raise SynapseError(
-                403, "This user is not permitted to send invites to this server/user"
+                403,
+                "This user is not permitted to send invites to this server/user",
+                errcode=spam_check[0],
+                additional_fields=spam_check[1],
             )
 
         membership = event.content.get("membership")
@@ -848,7 +890,7 @@ class FederationHandler:
             )
         )
 
-        context = EventContext.for_outlier(self.storage)
+        context = EventContext.for_outlier(self._storage_controllers)
         await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -877,7 +919,7 @@ class FederationHandler:
 
         await self.federation_client.send_leave(host_list, event)
 
-        context = EventContext.for_outlier(self.storage)
+        context = EventContext.for_outlier(self._storage_controllers)
         stream_id = await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -950,9 +992,7 @@ class FederationHandler:
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_leave_request`
-            await self._event_auth_handler.check_auth_rules_from_context(
-                room_version_obj, event, context
-            )
+            await self._event_auth_handler.check_auth_rules_from_context(event, context)
         except AuthError as e:
             logger.warning("Failed to create new leave %r because %s", event, e)
             raise e
@@ -1011,9 +1051,7 @@ class FederationHandler:
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_knock_request`
-            await self._event_auth_handler.check_auth_rules_from_context(
-                room_version_obj, event, context
-            )
+            await self._event_auth_handler.check_auth_rules_from_context(event, context)
         except AuthError as e:
             logger.warning("Failed to create new knock %r because %s", event, e)
             raise e
@@ -1026,7 +1064,9 @@ class FederationHandler:
         if event.internal_metadata.outlier:
             raise NotFoundError("State not known at event %s" % (event_id,))
 
-        state_groups = await self.state_store.get_state_groups_ids(room_id, [event_id])
+        state_groups = await self._state_storage_controller.get_state_groups_ids(
+            room_id, [event_id]
+        )
 
         # get_state_groups_ids should return exactly one result
         assert len(state_groups) == 1
@@ -1075,7 +1115,9 @@ class FederationHandler:
             ],
         )
 
-        events = await filter_events_for_server(self.storage, origin, events)
+        events = await filter_events_for_server(
+            self._storage_controllers, origin, events
+        )
 
         return events
 
@@ -1106,7 +1148,9 @@ class FederationHandler:
             if not in_room:
                 raise AuthError(403, "Host not in room.")
 
-            events = await filter_events_for_server(self.storage, origin, [event])
+            events = await filter_events_for_server(
+                self._storage_controllers, origin, [event]
+            )
             event = events[0]
             return event
         else:
@@ -1135,7 +1179,7 @@ class FederationHandler:
         )
 
         missing_events = await filter_events_for_server(
-            self.storage, origin, missing_events
+            self._storage_controllers, origin, missing_events
         )
 
         return missing_events
@@ -1178,9 +1222,9 @@ class FederationHandler:
             event.internal_metadata.send_on_behalf_of = self.hs.hostname
 
             try:
-                validate_event_for_room_version(room_version_obj, event)
+                validate_event_for_room_version(event)
                 await self._event_auth_handler.check_auth_rules_from_context(
-                    room_version_obj, event, context
+                    event, context
                 )
             except AuthError as e:
                 logger.warning("Denying new third party invite %r because %s", event, e)
@@ -1230,10 +1274,8 @@ class FederationHandler:
         )
 
         try:
-            validate_event_for_room_version(room_version_obj, event)
-            await self._event_auth_handler.check_auth_rules_from_context(
-                room_version_obj, event, context
-            )
+            validate_event_for_room_version(event)
+            await self._event_auth_handler.check_auth_rules_from_context(event, context)
         except AuthError as e:
             logger.warning("Denying third party invite %r because %s", event, e)
             raise e
@@ -1259,7 +1301,9 @@ class FederationHandler:
             event.content["third_party_invite"]["signed"]["token"],
         )
         original_invite = None
-        prev_state_ids = await context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids(
+            StateFilter.from_types([(EventTypes.ThirdPartyInvite, None)])
+        )
         original_invite_id = prev_state_ids.get(key)
         if original_invite_id:
             original_invite = await self.store.get_event(
@@ -1308,7 +1352,9 @@ class FederationHandler:
         signed = event.content["third_party_invite"]["signed"]
         token = signed["token"]
 
-        prev_state_ids = await context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids(
+            StateFilter.from_types([(EventTypes.ThirdPartyInvite, None)])
+        )
         invite_event_id = prev_state_ids.get((EventTypes.ThirdPartyInvite, token))
 
         invite_event = None
@@ -1441,28 +1487,70 @@ class FederationHandler:
         # well.
         return None
 
+    async def _resume_sync_partial_state_room(self) -> None:
+        """Resumes resyncing of all partial-state rooms after a restart."""
+        assert not self.config.worker.worker_app
+
+        partial_state_rooms = await self.store.get_partial_state_rooms_and_servers()
+        for room_id, servers_in_room in partial_state_rooms.items():
+            run_as_background_process(
+                desc="sync_partial_state_room",
+                func=self._sync_partial_state_room,
+                initial_destination=None,
+                other_destinations=servers_in_room,
+                room_id=room_id,
+            )
+
     async def _sync_partial_state_room(
         self,
-        destination: str,
+        initial_destination: Optional[str],
+        other_destinations: Collection[str],
         room_id: str,
     ) -> None:
         """Background process to resync the state of a partial-state room
 
         Args:
-            destination: homeserver to pull the state from
+            initial_destination: the initial homeserver to pull the state from
+            other_destinations: other homeservers to try to pull the state from, if
+                `initial_destination` is unavailable
             room_id: room to be resynced
         """
+        assert not self.config.worker.worker_app
 
         # TODO(faster_joins): do we need to lock to avoid races? What happens if other
         #   worker processes kick off a resync in parallel? Perhaps we should just elect
         #   a single worker to do the resync.
+        #   https://github.com/matrix-org/synapse/issues/12994
         #
         # TODO(faster_joins): what happens if we leave the room during a resync? if we
         #   really leave, that might mean we have difficulty getting the room state over
         #   federation.
+        #   https://github.com/matrix-org/synapse/issues/12802
         #
-        # TODO(faster_joins): try other destinations if the one we have fails
+        # TODO(faster_joins): we need some way of prioritising which homeservers in
+        #   `other_destinations` to try first, otherwise we'll spend ages trying dead
+        #   homeservers for large rooms.
+        #   https://github.com/matrix-org/synapse/issues/12999
 
+        if initial_destination is None and len(other_destinations) == 0:
+            raise ValueError(
+                f"Cannot resync state of {room_id}: no destinations provided"
+            )
+
+        # Make an infinite iterator of destinations to try. Once we find a working
+        # destination, we'll stick with it until it flakes.
+        if initial_destination is not None:
+            # Move `initial_destination` to the front of the list.
+            destinations = list(other_destinations)
+            if initial_destination in destinations:
+                destinations.remove(initial_destination)
+            destinations = [initial_destination] + destinations
+            destination_iter = itertools.cycle(destinations)
+        else:
+            destination_iter = itertools.cycle(other_destinations)
+
+        # `destination` is the current remote homeserver we're pulling from.
+        destination = next(destination_iter)
         logger.info("Syncing state for room %s via %s", room_id, destination)
 
         # we work through the queue in order of increasing stream ordering.
@@ -1472,24 +1560,25 @@ class FederationHandler:
                 # all the events are updated, so we can update current state and
                 # clear the lazy-loading flag.
                 logger.info("Updating current state for %s", room_id)
-                assert (
-                    self.storage.persistence is not None
-                ), "TODO(faster_joins): support for workers"
-                await self.storage.persistence.update_current_state(room_id)
+                # TODO(faster_joins): notify workers in notify_room_un_partial_stated
+                #   https://github.com/matrix-org/synapse/issues/12994
+                await self.state_handler.update_current_state(room_id)
 
                 logger.info("Clearing partial-state flag for %s", room_id)
                 success = await self.store.clear_partial_state_room(room_id)
                 if success:
                     logger.info("State resync complete for %s", room_id)
+                    self._storage_controllers.state.notify_room_un_partial_stated(
+                        room_id
+                    )
 
                     # TODO(faster_joins) update room stats and user directory?
+                    #   https://github.com/matrix-org/synapse/issues/12814
+                    #   https://github.com/matrix-org/synapse/issues/12815
                     return
 
                 # we raced against more events arriving with partial state. Go round
                 # the loop again. We've already logged a warning, so no need for more.
-                # TODO(faster_joins): there is still a race here, whereby incoming events which raced
-                #   with us will fail to be persisted after the call to `clear_partial_state_room` due to
-                #   having partial state.
                 continue
 
             events = await self.store.get_events_as_list(
@@ -1498,6 +1587,42 @@ class FederationHandler:
                 allow_rejected=True,
             )
             for event in events:
-                await self._federation_event_handler.update_state_for_partial_state_event(
-                    destination, event
-                )
+                for attempt in itertools.count():
+                    try:
+                        await self._federation_event_handler.update_state_for_partial_state_event(
+                            destination, event
+                        )
+                        break
+                    except FederationError as e:
+                        if attempt == len(destinations) - 1:
+                            # We have tried every remote server for this event. Give up.
+                            # TODO(faster_joins) giving up isn't the right thing to do
+                            #   if there's a temporary network outage. retrying
+                            #   indefinitely is also not the right thing to do if we can
+                            #   reach all homeservers and they all claim they don't have
+                            #   the state we want.
+                            #   https://github.com/matrix-org/synapse/issues/13000
+                            logger.error(
+                                "Failed to get state for %s at %s from %s because %s, "
+                                "giving up!",
+                                room_id,
+                                event,
+                                destination,
+                                e,
+                            )
+                            raise
+
+                        # Try the next remote server.
+                        logger.info(
+                            "Failed to get state for %s at %s from %s because %s",
+                            room_id,
+                            event,
+                            destination,
+                            e,
+                        )
+                        destination = next(destination_iter)
+                        logger.info(
+                            "Syncing state for room %s via %s instead",
+                            room_id,
+                            destination,
+                        )

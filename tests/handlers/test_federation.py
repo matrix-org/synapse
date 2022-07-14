@@ -50,7 +50,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         hs = self.setup_test_homeserver(federation_http_client=None)
         self.handler = hs.get_federation_handler()
         self.store = hs.get_datastores().main
-        self.state_store = hs.get_storage().state
+        self.state_storage_controller = hs.get_storage_controllers().state
         self._event_auth_handler = hs.get_event_auth_handler()
         return hs
 
@@ -119,7 +119,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         join_event = self._build_and_send_join_event(OTHER_SERVER, OTHER_USER, room_id)
 
         # check the state group
-        sg = self.successResultOf(
+        sg = self.get_success(
             self.store._get_state_group_for_event(join_event.event_id)
         )
 
@@ -149,7 +149,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         self.assertIsNotNone(e.rejected_reason)
 
         # ... and the state group should be the same as before
-        sg2 = self.successResultOf(self.store._get_state_group_for_event(ev.event_id))
+        sg2 = self.get_success(self.store._get_state_group_for_event(ev.event_id))
 
         self.assertEqual(sg, sg2)
 
@@ -172,7 +172,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         join_event = self._build_and_send_join_event(OTHER_SERVER, OTHER_USER, room_id)
 
         # check the state group
-        sg = self.successResultOf(
+        sg = self.get_success(
             self.store._get_state_group_for_event(join_event.event_id)
         )
 
@@ -203,7 +203,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         self.assertIsNotNone(e.rejected_reason)
 
         # ... and the state group should be the same as before
-        sg2 = self.successResultOf(self.store._get_state_group_for_event(ev.event_id))
+        sg2 = self.get_success(self.store._get_state_group_for_event(ev.event_id))
 
         self.assertEqual(sg, sg2)
 
@@ -225,9 +225,10 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
 
         # we need a user on the remote server to be a member, so that we can send
         # extremity-causing events.
+        remote_server_user_id = f"@user:{self.OTHER_SERVER_NAME}"
         self.get_success(
             event_injection.inject_member_event(
-                self.hs, room_id, f"@user:{self.OTHER_SERVER_NAME}", "join"
+                self.hs, room_id, remote_server_user_id, "join"
             )
         )
 
@@ -237,7 +238,9 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         )
         current_state = self.get_success(
             self.store.get_events_as_list(
-                (self.get_success(self.store.get_current_state_ids(room_id))).values()
+                (
+                    self.get_success(self.store.get_partial_current_state_ids(room_id))
+                ).values()
             )
         )
 
@@ -245,9 +248,15 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         # create more than is 5 which corresponds to the number of backward
         # extremities we slice off in `_maybe_backfill_inner`
         federation_event_handler = self.hs.get_federation_event_handler()
+        auth_events = [
+            ev
+            for ev in current_state
+            if (ev.type, ev.state_key)
+            in {("m.room.create", ""), ("m.room.member", remote_server_user_id)}
+        ]
         for _ in range(0, 8):
             event = make_event_from_dict(
-                self.add_hashes_and_signatures(
+                self.add_hashes_and_signatures_from_other_server(
                     {
                         "origin_server_ts": 1,
                         "type": "m.room.message",
@@ -256,15 +265,14 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
                             "body": "message connected to fake event",
                         },
                         "room_id": room_id,
-                        "sender": f"@user:{self.OTHER_SERVER_NAME}",
+                        "sender": remote_server_user_id,
                         "prev_events": [
                             ev1.event_id,
                             # We're creating an backward extremity each time thanks
                             # to this fake event
                             generate_fake_event_id(),
                         ],
-                        # lazy: *everything* is an auth event
-                        "auth_events": [ev.event_id for ev in current_state],
+                        "auth_events": [ev.event_id for ev in auth_events],
                         "depth": ev1.depth + 1,
                     },
                     room_version,
@@ -276,7 +284,11 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
             # federation handler wanting to backfill the fake event.
             self.get_success(
                 federation_event_handler._process_received_pdu(
-                    self.OTHER_SERVER_NAME, event, state=current_state
+                    self.OTHER_SERVER_NAME,
+                    event,
+                    state_ids={
+                        (e.type, e.state_key): e.event_id for e in current_state
+                    },
                 )
             )
 
@@ -332,8 +344,11 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
             most_recent_prev_event_depth,
         ) = self.get_success(self.store.get_max_depth_of(prev_event_ids))
         # mapping from (type, state_key) -> state_event_id
+        assert most_recent_prev_event_id is not None
         prev_state_map = self.get_success(
-            self.state_store.get_state_ids_for_event(most_recent_prev_event_id)
+            self.state_storage_controller.get_state_ids_for_event(
+                most_recent_prev_event_id
+            )
         )
         # List of state event ID's
         prev_state_ids = list(prev_state_map.values())
@@ -505,7 +520,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
         self.get_success(d)
 
         # sanity-check: the room should show that the new user is a member
-        r = self.get_success(self.store.get_current_state_ids(room_id))
+        r = self.get_success(self.store.get_partial_current_state_ids(room_id))
         self.assertEqual(r[(EventTypes.Member, other_user)], join_event.event_id)
 
         return join_event

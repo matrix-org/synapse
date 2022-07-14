@@ -1488,7 +1488,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         if channel.code != HTTPStatus.OK:
             raise HttpResponseException(
-                channel.code, channel.result["reason"], channel.json_body
+                channel.code, channel.result["reason"], channel.result["body"]
             )
 
         # Set monthly active users to the limit
@@ -1635,6 +1635,41 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             self.get_success(self.store.get_pushers_by({"user_name": "@bob:test"}))
         )
         self.assertEqual(len(pushers), 0)
+
+    @override_config(
+        {
+            "email": {
+                "enable_notifs": True,
+                "notif_for_new_users": True,
+                "notif_from": "test@example.com",
+            },
+            "public_baseurl": "https://example.com",
+        }
+    )
+    def test_create_user_email_notif_for_new_users_with_msisdn_threepid(self) -> None:
+        """
+        Check that a new regular user is created successfully when they have a msisdn
+        threepid and email notif_for_new_users is set to True.
+        """
+        url = self.url_prefix % "@bob:test"
+
+        # Create user
+        body = {
+            "password": "abc123",
+            "threepids": [{"medium": "msisdn", "address": "1234567890"}],
+        }
+
+        channel = self.make_request(
+            "PUT",
+            url,
+            access_token=self.admin_user_tok,
+            content=body,
+        )
+
+        self.assertEqual(201, channel.code, msg=channel.json_body)
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual("msisdn", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual("1234567890", channel.json_body["threepids"][0]["address"])
 
     def test_set_password(self) -> None:
         """
@@ -2579,7 +2614,7 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
         other_user_tok = self.login("user", "pass")
         event_builder_factory = self.hs.get_event_builder_factory()
         event_creation_handler = self.hs.get_event_creation_handler()
-        storage = self.hs.get_storage()
+        storage_controllers = self.hs.get_storage_controllers()
 
         # Create two rooms, one with a local user only and one with both a local
         # and remote user.
@@ -2604,7 +2639,7 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
             event_creation_handler.create_new_client_event(builder)
         )
 
-        self.get_success(storage.persistence.persist_event(event, context))
+        self.get_success(storage_controllers.persistence.persist_event(event, context))
 
         # Now get rooms
         url = "/_synapse/admin/v1/users/@joiner:remote_hs/joined_rooms"

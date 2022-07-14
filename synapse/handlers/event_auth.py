@@ -23,7 +23,10 @@ from synapse.api.constants import (
 )
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.api.room_versions import RoomVersion
-from synapse.event_auth import check_auth_rules_for_event
+from synapse.event_auth import (
+    check_state_dependent_auth_rules,
+    check_state_independent_auth_rules,
+)
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
@@ -48,14 +51,14 @@ class EventAuthHandler:
 
     async def check_auth_rules_from_context(
         self,
-        room_version_obj: RoomVersion,
         event: EventBase,
         context: EventContext,
     ) -> None:
         """Check an event passes the auth rules at its own auth events"""
+        await check_state_independent_auth_rules(self._store, event)
         auth_event_ids = event.auth_event_ids()
         auth_events_by_id = await self._store.get_events(auth_event_ids)
-        check_auth_rules_for_event(room_version_obj, event, auth_events_by_id.values())
+        check_state_dependent_auth_rules(event, auth_events_by_id.values())
 
     def compute_auth_events(
         self,
@@ -241,7 +244,15 @@ class EventAuthHandler:
 
         # If the join rule is not restricted, this doesn't apply.
         join_rules_event = await self._store.get_event(join_rules_event_id)
-        return join_rules_event.content.get("join_rule") == JoinRules.RESTRICTED
+        content_join_rule = join_rules_event.content.get("join_rule")
+        if content_join_rule == JoinRules.RESTRICTED:
+            return True
+
+        # also check for MSC3787 behaviour
+        if room_version.msc3787_knock_restricted_join_rule:
+            return content_join_rule == JoinRules.KNOCK_RESTRICTED
+
+        return False
 
     async def get_rooms_that_allow_join(
         self, state_ids: StateMap[str]

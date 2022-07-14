@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from prometheus_client import Counter
 from typing_extensions import TypeGuard
@@ -51,6 +51,18 @@ failed_transactions_counter = Counter(
 
 sent_events_counter = Counter(
     "synapse_appservice_api_sent_events", "Number of events sent to the AS", ["service"]
+)
+
+sent_ephemeral_counter = Counter(
+    "synapse_appservice_api_sent_ephemeral",
+    "Number of ephemeral events sent to the AS",
+    ["service"],
+)
+
+sent_todevice_counter = Counter(
+    "synapse_appservice_api_sent_todevice",
+    "Number of todevice messages sent to the AS",
+    ["service"],
 )
 
 HOUR_IN_MS = 60 * 60 * 1000
@@ -155,6 +167,9 @@ class ApplicationServiceApi(SimpleHttpClient):
         if service.url is None:
             return []
 
+        # This is required by the configuration.
+        assert service.hs_token is not None
+
         uri = "%s%s/thirdparty/%s/%s" % (
             service.url,
             APP_SERVICE_PREFIX,
@@ -162,7 +177,11 @@ class ApplicationServiceApi(SimpleHttpClient):
             urllib.parse.quote(protocol),
         )
         try:
-            response = await self.get_json(uri, fields)
+            args: Mapping[Any, Any] = {
+                **fields,
+                b"access_token": service.hs_token,
+            }
+            response = await self.get_json(uri, args=args)
             if not isinstance(response, list):
                 logger.warning(
                     "query_3pe to %s returned an invalid response %r", uri, response
@@ -190,13 +209,15 @@ class ApplicationServiceApi(SimpleHttpClient):
             return {}
 
         async def _get() -> Optional[JsonDict]:
+            # This is required by the configuration.
+            assert service.hs_token is not None
             uri = "%s%s/thirdparty/protocol/%s" % (
                 service.url,
                 APP_SERVICE_PREFIX,
                 urllib.parse.quote(protocol),
             )
             try:
-                info = await self.get_json(uri)
+                info = await self.get_json(uri, {"access_token": service.hs_token})
 
                 if not _is_valid_3pe_metadata(info):
                     logger.warning(
@@ -301,6 +322,8 @@ class ApplicationServiceApi(SimpleHttpClient):
                 )
             sent_transactions_counter.labels(service.id).inc()
             sent_events_counter.labels(service.id).inc(len(serialized_events))
+            sent_ephemeral_counter.labels(service.id).inc(len(ephemeral))
+            sent_todevice_counter.labels(service.id).inc(len(to_device_messages))
             return True
         except CodeMessageException as e:
             logger.warning(

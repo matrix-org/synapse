@@ -109,10 +109,10 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
 
     def register(self, http_server: HttpServer) -> None:
-        # /room/$roomid/state/$eventtype
+        # /rooms/$roomid/state/$eventtype
         no_state_key = "/rooms/(?P<room_id>[^/]*)/state/(?P<event_type>[^/]*)$"
 
-        # /room/$roomid/state/$eventtype/$statekey
+        # /rooms/$roomid/state/$eventtype/$statekey
         state_key = (
             "/rooms/(?P<room_id>[^/]*)/state/"
             "(?P<event_type>[^/]*)/(?P<state_key>[^/]*)$"
@@ -650,6 +650,7 @@ class RoomEventServlet(RestServlet):
         self.clock = hs.get_clock()
         self._store = hs.get_datastores().main
         self._state = hs.get_state_handler()
+        self._storage_controllers = hs.get_storage_controllers()
         self.event_handler = hs.get_event_handler()
         self._event_serializer = hs.get_event_client_serializer()
         self._relations_handler = hs.get_relations_handler()
@@ -673,8 +674,10 @@ class RoomEventServlet(RestServlet):
         if include_unredacted_content and not await self.auth.is_server_admin(
             requester.user
         ):
-            power_level_event = await self._state.get_current_state(
-                room_id, EventTypes.PowerLevels, ""
+            power_level_event = (
+                await self._storage_controllers.state.get_current_state_event(
+                    room_id, EventTypes.PowerLevels, ""
+                )
             )
 
             auth_events = {}
@@ -1174,7 +1177,9 @@ class TimestampLookupRestServlet(RestServlet):
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self._auth.get_user_by_req(request)
-        await self._auth.check_user_in_room(room_id, requester.user.to_string())
+        await self._auth.check_user_in_room_or_world_readable(
+            room_id, requester.user.to_string()
+        )
 
         timestamp = parse_integer(request, "ts", required=True)
         direction = parse_string(request, "dir", default="f", allowed_values=["f", "b"])
@@ -1193,12 +1198,7 @@ class TimestampLookupRestServlet(RestServlet):
 
 
 class RoomHierarchyRestServlet(RestServlet):
-    PATTERNS = (
-        re.compile(
-            "^/_matrix/client/(v1|unstable/org.matrix.msc2946)"
-            "/rooms/(?P<room_id>[^/]*)/hierarchy$"
-        ),
-    )
+    PATTERNS = (re.compile("^/_matrix/client/v1/rooms/(?P<room_id>[^/]*)/hierarchy$"),)
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

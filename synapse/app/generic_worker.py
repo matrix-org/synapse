@@ -16,8 +16,6 @@ import logging
 import sys
 from typing import Dict, List, Optional, Tuple
 
-from matrix_common.versionstring import get_distribution_version_string
-
 from twisted.internet import address
 from twisted.web.resource import Resource
 
@@ -58,7 +56,6 @@ from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.directory import DirectoryStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.filtering import SlavedFilteringStore
-from synapse.replication.slave.storage.groups import SlavedGroupServerStore
 from synapse.replication.slave.storage.keys import SlavedKeyStore
 from synapse.replication.slave.storage.profile import SlavedProfileStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
@@ -69,7 +66,6 @@ from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.client import (
     account_data,
     events,
-    groups,
     initial_sync,
     login,
     presence,
@@ -78,6 +74,7 @@ from synapse.rest.client import (
     read_marker,
     receipts,
     room,
+    room_batch,
     room_keys,
     sendtodevice,
     sync,
@@ -87,7 +84,7 @@ from synapse.rest.client import (
     voip,
 )
 from synapse.rest.client._base import client_patterns
-from synapse.rest.client.account import ThreepidRestServlet
+from synapse.rest.client.account import ThreepidRestServlet, WhoamiRestServlet
 from synapse.rest.client.devices import DevicesRestServlet
 from synapse.rest.client.keys import (
     KeyChangesServlet,
@@ -122,6 +119,7 @@ from synapse.storage.databases.main.transactions import TransactionWorkerStore
 from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.databases.main.user_directory import UserDirectoryStore
 from synapse.types import JsonDict
+from synapse.util import SYNAPSE_VERSION
 from synapse.util.httpresourcetree import create_resource_tree
 
 logger = logging.getLogger("synapse.app.generic_worker")
@@ -233,7 +231,6 @@ class GenericWorkerSlavedStore(
     SlavedDeviceStore,
     SlavedReceiptsStore,
     SlavedPushRuleStore,
-    SlavedGroupServerStore,
     SlavedAccountDataStore,
     SlavedPusherStore,
     CensorEventsStore,
@@ -289,6 +286,7 @@ class GenericWorkerServer(HomeServer):
                     RegistrationTokenValidityRestServlet(self).register(resource)
                     login.register_servlets(self, resource)
                     ThreepidRestServlet(self).register(resource)
+                    WhoamiRestServlet(self).register(resource)
                     DevicesRestServlet(self).register(resource)
 
                     # Read-only
@@ -308,6 +306,7 @@ class GenericWorkerServer(HomeServer):
                     room.register_servlets(self, resource, is_worker=True)
                     room.register_deprecated_servlets(self, resource)
                     initial_sync.register_servlets(self, resource)
+                    room_batch.register_servlets(self, resource)
                     room_keys.register_servlets(self, resource)
                     tags.register_servlets(self, resource)
                     account_data.register_servlets(self, resource)
@@ -319,9 +318,6 @@ class GenericWorkerServer(HomeServer):
                     user_directory.register_servlets(self, resource)
 
                     presence.register_servlets(self, resource)
-
-                    if self.config.experimental.groups_enabled:
-                        groups.register_servlets(self, resource)
 
                     resources.update({CLIENT_API_PREFIX: resource})
 
@@ -450,7 +446,7 @@ def start(config_options: List[str]) -> None:
     hs = GenericWorkerServer(
         config.server.server_name,
         config=config,
-        version_string="Synapse/" + get_distribution_version_string("matrix-synapse"),
+        version_string=f"Synapse/{SYNAPSE_VERSION}",
     )
 
     setup_logging(hs, config, use_worker_options=True)

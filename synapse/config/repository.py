@@ -19,9 +19,9 @@ from urllib.request import getproxies_environment  # type: ignore
 
 import attr
 
-from synapse.config.server import DEFAULT_IP_RANGE_BLACKLIST, generate_ip_set
+from synapse.config.server import generate_ip_set
 from synapse.types import JsonDict
-from synapse.util.check_dependencies import DependencyException, check_requirements
+from synapse.util.check_dependencies import check_requirements
 from synapse.util.module_loader import load_module
 
 from ._base import Config, ConfigError
@@ -184,13 +184,7 @@ class ContentRepositoryConfig(Config):
         )
         self.url_preview_enabled = config.get("url_preview_enabled", False)
         if self.url_preview_enabled:
-            try:
-                check_requirements("url_preview")
-
-            except DependencyException as e:
-                raise ConfigError(
-                    e.message  # noqa: B306, DependencyException.message is a property
-                )
+            check_requirements("url_preview")
 
             proxy_env = getproxies_environment()
             if "url_preview_ip_range_blacklist" not in config:
@@ -223,169 +217,23 @@ class ContentRepositoryConfig(Config):
                 "url_preview_accept_language"
             ) or ["en"]
 
+        media_retention = config.get("media_retention") or {}
+
+        self.media_retention_local_media_lifetime_ms = None
+        local_media_lifetime = media_retention.get("local_media_lifetime")
+        if local_media_lifetime is not None:
+            self.media_retention_local_media_lifetime_ms = self.parse_duration(
+                local_media_lifetime
+            )
+
+        self.media_retention_remote_media_lifetime_ms = None
+        remote_media_lifetime = media_retention.get("remote_media_lifetime")
+        if remote_media_lifetime is not None:
+            self.media_retention_remote_media_lifetime_ms = self.parse_duration(
+                remote_media_lifetime
+            )
+
     def generate_config_section(self, data_dir_path: str, **kwargs: Any) -> str:
         assert data_dir_path is not None
         media_store = os.path.join(data_dir_path, "media_store")
-
-        formatted_thumbnail_sizes = "".join(
-            THUMBNAIL_SIZE_YAML % s for s in DEFAULT_THUMBNAIL_SIZES
-        )
-        # strip final NL
-        formatted_thumbnail_sizes = formatted_thumbnail_sizes[:-1]
-
-        ip_range_blacklist = "\n".join(
-            "        #  - '%s'" % ip for ip in DEFAULT_IP_RANGE_BLACKLIST
-        )
-
-        return (
-            r"""
-        ## Media Store ##
-
-        # Enable the media store service in the Synapse master. Uncomment the
-        # following if you are using a separate media store worker.
-        #
-        #enable_media_repo: false
-
-        # Directory where uploaded images and attachments are stored.
-        #
-        media_store_path: "%(media_store)s"
-
-        # Media storage providers allow media to be stored in different
-        # locations.
-        #
-        #media_storage_providers:
-        #  - module: file_system
-        #    # Whether to store newly uploaded local files
-        #    store_local: false
-        #    # Whether to store newly downloaded remote files
-        #    store_remote: false
-        #    # Whether to wait for successful storage for local uploads
-        #    store_synchronous: false
-        #    config:
-        #       directory: /mnt/some/other/directory
-
-        # The largest allowed upload size in bytes
-        #
-        # If you are using a reverse proxy you may also need to set this value in
-        # your reverse proxy's config. Notably Nginx has a small max body size by default.
-        # See https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
-        #
-        #max_upload_size: 50M
-
-        # Maximum number of pixels that will be thumbnailed
-        #
-        #max_image_pixels: 32M
-
-        # Whether to generate new thumbnails on the fly to precisely match
-        # the resolution requested by the client. If true then whenever
-        # a new resolution is requested by the client the server will
-        # generate a new thumbnail. If false the server will pick a thumbnail
-        # from a precalculated list.
-        #
-        #dynamic_thumbnails: false
-
-        # List of thumbnails to precalculate when an image is uploaded.
-        #
-        #thumbnail_sizes:
-%(formatted_thumbnail_sizes)s
-
-        # Is the preview URL API enabled?
-        #
-        # 'false' by default: uncomment the following to enable it (and specify a
-        # url_preview_ip_range_blacklist blacklist).
-        #
-        #url_preview_enabled: true
-
-        # List of IP address CIDR ranges that the URL preview spider is denied
-        # from accessing.  There are no defaults: you must explicitly
-        # specify a list for URL previewing to work.  You should specify any
-        # internal services in your network that you do not want synapse to try
-        # to connect to, otherwise anyone in any Matrix room could cause your
-        # synapse to issue arbitrary GET requests to your internal services,
-        # causing serious security issues.
-        #
-        # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
-        # listed here, since they correspond to unroutable addresses.)
-        #
-        # This must be specified if url_preview_enabled is set. It is recommended that
-        # you uncomment the following list as a starting point.
-        #
-        # Note: The value is ignored when an HTTP proxy is in use
-        #
-        #url_preview_ip_range_blacklist:
-%(ip_range_blacklist)s
-
-        # List of IP address CIDR ranges that the URL preview spider is allowed
-        # to access even if they are specified in url_preview_ip_range_blacklist.
-        # This is useful for specifying exceptions to wide-ranging blacklisted
-        # target IP ranges - e.g. for enabling URL previews for a specific private
-        # website only visible in your network.
-        #
-        #url_preview_ip_range_whitelist:
-        #   - '192.168.1.1'
-
-        # Optional list of URL matches that the URL preview spider is
-        # denied from accessing.  You should use url_preview_ip_range_blacklist
-        # in preference to this, otherwise someone could define a public DNS
-        # entry that points to a private IP address and circumvent the blacklist.
-        # This is more useful if you know there is an entire shape of URL that
-        # you know that will never want synapse to try to spider.
-        #
-        # Each list entry is a dictionary of url component attributes as returned
-        # by urlparse.urlsplit as applied to the absolute form of the URL.  See
-        # https://docs.python.org/2/library/urlparse.html#urlparse.urlsplit
-        # The values of the dictionary are treated as an filename match pattern
-        # applied to that component of URLs, unless they start with a ^ in which
-        # case they are treated as a regular expression match.  If all the
-        # specified component matches for a given list item succeed, the URL is
-        # blacklisted.
-        #
-        #url_preview_url_blacklist:
-        #  # blacklist any URL with a username in its URI
-        #  - username: '*'
-        #
-        #  # blacklist all *.google.com URLs
-        #  - netloc: 'google.com'
-        #  - netloc: '*.google.com'
-        #
-        #  # blacklist all plain HTTP URLs
-        #  - scheme: 'http'
-        #
-        #  # blacklist http(s)://www.acme.com/foo
-        #  - netloc: 'www.acme.com'
-        #    path: '/foo'
-        #
-        #  # blacklist any URL with a literal IPv4 address
-        #  - netloc: '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
-
-        # The largest allowed URL preview spidering size in bytes
-        #
-        #max_spider_size: 10M
-
-        # A list of values for the Accept-Language HTTP header used when
-        # downloading webpages during URL preview generation. This allows
-        # Synapse to specify the preferred languages that URL previews should
-        # be in when communicating with remote servers.
-        #
-        # Each value is a IETF language tag; a 2-3 letter identifier for a
-        # language, optionally followed by subtags separated by '-', specifying
-        # a country or region variant.
-        #
-        # Multiple values can be provided, and a weight can be added to each by
-        # using quality value syntax (;q=). '*' translates to any language.
-        #
-        # Defaults to "en".
-        #
-        # Example:
-        #
-        # url_preview_accept_language:
-        #   - en-UK
-        #   - en-US;q=0.9
-        #   - fr;q=0.8
-        #   - *;q=0.7
-        #
-        url_preview_accept_language:
-        #   - en
-        """
-            % locals()
-        )
+        return f"media_store_path: {media_store}"

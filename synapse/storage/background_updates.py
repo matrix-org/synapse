@@ -282,12 +282,20 @@ class BackgroundUpdater:
 
         self._running = True
 
+        back_to_back_failures = 0
+
         try:
             logger.info("Starting background schema updates")
             while self.enabled:
                 try:
                     result = await self.do_next_background_update(sleep)
+                    back_to_back_failures = 0
                 except Exception:
+                    back_to_back_failures += 1
+                    if back_to_back_failures >= 5:
+                        raise RuntimeError(
+                            "5 back-to-back background update failures; aborting."
+                        )
                     logger.exception("Error doing update")
                 else:
                     if result:
@@ -499,25 +507,6 @@ class BackgroundUpdater:
             update_handler
         )
 
-    def register_noop_background_update(self, update_name: str) -> None:
-        """Register a noop handler for a background update.
-
-        This is useful when we previously did a background update, but no
-        longer wish to do the update. In this case the background update should
-        be removed from the schema delta files, but there may still be some
-        users who have the background update queued, so this method should
-        also be called to clear the update.
-
-        Args:
-            update_name: Name of update
-        """
-
-        async def noop_update(progress: JsonDict, batch_size: int) -> int:
-            await self._end_background_update(update_name)
-            return 1
-
-        self.register_background_update_handler(update_name, noop_update)
-
     def register_background_index_update(
         self,
         update_name: str,
@@ -527,6 +516,7 @@ class BackgroundUpdater:
         where_clause: Optional[str] = None,
         unique: bool = False,
         psql_only: bool = False,
+        replaces_index: Optional[str] = None,
     ) -> None:
         """Helper for store classes to do a background index addition
 
@@ -546,6 +536,8 @@ class BackgroundUpdater:
             unique: true to make a UNIQUE index
             psql_only: true to only create this index on psql databases (useful
                 for virtual sqlite tables)
+            replaces_index: The name of an index that this index replaces.
+                The named index will be dropped upon completion of the new index.
         """
 
         def create_index_psql(conn: Connection) -> None:
@@ -577,6 +569,12 @@ class BackgroundUpdater:
                 }
                 logger.debug("[SQL] %s", sql)
                 c.execute(sql)
+
+                if replaces_index is not None:
+                    # We drop the old index as the new index has now been created.
+                    sql = f"DROP INDEX IF EXISTS {replaces_index}"
+                    logger.debug("[SQL] %s", sql)
+                    c.execute(sql)
             finally:
                 conn.set_session(autocommit=False)  # type: ignore
 
@@ -604,6 +602,12 @@ class BackgroundUpdater:
             c = conn.cursor()
             logger.debug("[SQL] %s", sql)
             c.execute(sql)
+
+            if replaces_index is not None:
+                # We drop the old index as the new index has now been created.
+                sql = f"DROP INDEX IF EXISTS {replaces_index}"
+                logger.debug("[SQL] %s", sql)
+                c.execute(sql)
 
         if isinstance(self.db_pool.engine, engines.PostgresEngine):
             runner: Optional[Callable[[Connection], None]] = create_index_psql

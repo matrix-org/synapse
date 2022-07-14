@@ -21,6 +21,18 @@
 #   * SYNAPSE_REPORT_STATS: Whether to report stats.
 #   * SYNAPSE_WORKER_TYPES: A comma separated list of worker names as specified in WORKER_CONFIG
 #         below. Leave empty for no workers, or set to '*' for all possible workers.
+#   * SYNAPSE_AS_REGISTRATION_DIR: If specified, a directory in which .yaml and .yml files
+#         will be treated as Application Service registration files.
+#   * SYNAPSE_TLS_CERT: Path to a TLS certificate in PEM format.
+#   * SYNAPSE_TLS_KEY: Path to a TLS key. If this and SYNAPSE_TLS_CERT are specified,
+#         Nginx will be configured to serve TLS on port 8448.
+#   * SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER: Whether to use the forking launcher,
+#         only intended for usage in Complement at the moment.
+#         No stability guarantees are provided.
+#   * SYNAPSE_LOG_LEVEL: Set this to DEBUG, INFO, WARNING or ERROR to change the
+#         log level. INFO is the default.
+#   * SYNAPSE_LOG_SENSITIVE: If unset, SQL and SQL values won't be logged,
+#         regardless of the SYNAPSE_LOG_LEVEL setting.
 #
 # NOTE: According to Complement's ENTRYPOINT expectations for a homeserver image (as defined
 # in the project's README), this script may be run multiple times, and functionality should
@@ -29,10 +41,11 @@
 import os
 import subprocess
 import sys
-from typing import Any, Dict, List, Mapping, MutableMapping, NoReturn, Set
+from pathlib import Path
+from typing import Any, Dict, List, Mapping, MutableMapping, NoReturn, Optional, Set
 
-import jinja2
 import yaml
+from jinja2 import Environment, FileSystemLoader
 
 MAIN_PROCESS_HTTP_LISTENER_PORT = 8080
 
@@ -46,12 +59,12 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "worker_extra_conf": "",
     },
     "user_dir": {
-        "app": "synapse.app.user_dir",
+        "app": "synapse.app.generic_worker",
         "listener_resources": ["client"],
         "endpoint_patterns": [
             "^/_matrix/client/(api/v1|r0|v3|unstable)/user_directory/search$"
         ],
-        "shared_extra_conf": {"update_user_directory": False},
+        "shared_extra_conf": {"update_user_directory_from_worker": "user_dir1"},
         "worker_extra_conf": "",
     },
     "media_repository": {
@@ -72,7 +85,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
         "app": "synapse.app.generic_worker",
         "listener_resources": [],
         "endpoint_patterns": [],
-        "shared_extra_conf": {"notify_appservices_from_worker": "appservice"},
+        "shared_extra_conf": {"notify_appservices_from_worker": "appservice1"},
         "worker_extra_conf": "",
     },
     "federation_sender": {
@@ -152,6 +165,7 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
             "^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/join/",
             "^/_matrix/client/(api/v1|r0|v3|unstable)/profile/",
+            "^/_matrix/client/(v1|unstable/org.matrix.msc2716)/rooms/.*/batch_send",
         ],
         "shared_extra_conf": {},
         "worker_extra_conf": "",
@@ -169,21 +183,6 @@ WORKERS_CONFIG: Dict[str, Dict[str, Any]] = {
 }
 
 # Templates for sections that may be inserted multiple times in config files
-SUPERVISORD_PROCESS_CONFIG_BLOCK = """
-[program:synapse_{name}]
-command=/usr/local/bin/prefix-log /usr/local/bin/python -m {app} \
-    --config-path="{config_path}" \
-    --config-path=/conf/workers/shared.yaml \
-    --config-path=/conf/workers/{name}.yaml
-autorestart=unexpected
-priority=500
-exitcodes=0
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-"""
-
 NGINX_LOCATION_CONFIG_BLOCK = """
     location ~* {endpoint} {{
         proxy_pass {upstream};
@@ -229,12 +228,13 @@ def convert(src: str, dst: str, **template_vars: object) -> None:
         template_vars: The arguments to replace placeholder variables in the template with.
     """
     # Read the template file
-    with open(src) as infile:
-        template = infile.read()
+    # We disable autoescape to prevent template variables from being escaped,
+    # as we're not using HTML.
+    env = Environment(loader=FileSystemLoader(os.path.dirname(src)), autoescape=False)
+    template = env.get_template(os.path.basename(src))
 
-    # Generate a string from the template. We disable autoescape to prevent template
-    # variables from being escaped.
-    rendered = jinja2.Template(template, autoescape=False).render(**template_vars)
+    # Generate a string from the template.
+    rendered = template.render(**template_vars)
 
     # Write the generated contents to a file
     #
@@ -345,13 +345,10 @@ def generate_worker_files(
     # This config file will be passed to all workers, included Synapse's main process.
     shared_config: Dict[str, Any] = {"listeners": listeners}
 
-    # The supervisord config. The contents of which will be inserted into the
-    # base supervisord jinja2 template.
-    #
-    # Supervisord will be in charge of running everything, from redis to nginx to Synapse
-    # and all of its worker processes. Load the config template, which defines a few
-    # services that are necessary to run.
-    supervisord_config = ""
+    # List of dicts that describe workers.
+    # We pass this to the Supervisor template later to generate the appropriate
+    # program blocks.
+    worker_descriptors: List[Dict[str, Any]] = []
 
     # Upstreams for load-balancing purposes. This dict takes the form of a worker type to the
     # ports of each worker. For example:
@@ -371,8 +368,8 @@ def generate_worker_files(
     nginx_locations = {}
 
     # Read the desired worker configuration from the environment
-    worker_types_env = environ.get("SYNAPSE_WORKER_TYPES")
-    if worker_types_env is None:
+    worker_types_env = environ.get("SYNAPSE_WORKER_TYPES", "").strip()
+    if not worker_types_env:
         # No workers, just the main process
         worker_types = []
     else:
@@ -429,7 +426,7 @@ def generate_worker_files(
             )
 
         # Enable the worker in supervisord
-        supervisord_config += SUPERVISORD_PROCESS_CONFIG_BLOCK.format_map(worker_config)
+        worker_descriptors.append(worker_config)
 
         # Add nginx location blocks for this worker's endpoints (if any are defined)
         for pattern in worker_config["endpoint_patterns"]:
@@ -488,11 +485,27 @@ def generate_worker_files(
     master_log_config = generate_worker_log_config(environ, "master", data_dir)
     shared_config["log_config"] = master_log_config
 
+    # Find application service registrations
+    appservice_registrations = None
+    appservice_registration_dir = os.environ.get("SYNAPSE_AS_REGISTRATION_DIR")
+    if appservice_registration_dir:
+        # Scan for all YAML files that should be application service registrations.
+        appservice_registrations = [
+            str(reg_path.resolve())
+            for reg_path in Path(appservice_registration_dir).iterdir()
+            if reg_path.suffix.lower() in (".yaml", ".yml")
+        ]
+
+    workers_in_use = len(worker_types) > 0
+
     # Shared homeserver config
     convert(
         "/conf/shared.yaml.j2",
         "/conf/workers/shared.yaml",
         shared_worker_config=yaml.dump(shared_config),
+        appservice_registrations=appservice_registrations,
+        enable_redis=workers_in_use,
+        workers_in_use=workers_in_use,
     )
 
     # Nginx config
@@ -501,6 +514,8 @@ def generate_worker_files(
         "/etc/nginx/conf.d/matrix-synapse.conf",
         worker_locations=nginx_location_config,
         upstream_directives=nginx_upstream_config,
+        tls_cert_path=os.environ.get("SYNAPSE_TLS_CERT"),
+        tls_key_path=os.environ.get("SYNAPSE_TLS_KEY"),
     )
 
     # Supervisord config
@@ -509,7 +524,15 @@ def generate_worker_files(
         "/conf/supervisord.conf.j2",
         "/etc/supervisor/supervisord.conf",
         main_config_path=config_path,
-        worker_config=supervisord_config,
+        enable_redis=workers_in_use,
+    )
+
+    convert(
+        "/conf/synapse.supervisord.conf.j2",
+        "/etc/supervisor/conf.d/synapse.conf",
+        workers=worker_descriptors,
+        main_config_path=config_path,
+        use_forking_launcher=environ.get("SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER"),
     )
 
     # healthcheck config
@@ -533,18 +556,25 @@ def generate_worker_log_config(
     Returns: the path to the generated file
     """
     # Check whether we should write worker logs to disk, in addition to the console
-    extra_log_template_args = {}
+    extra_log_template_args: Dict[str, Optional[str]] = {}
     if environ.get("SYNAPSE_WORKERS_WRITE_LOGS_TO_DISK"):
-        extra_log_template_args["LOG_FILE_PATH"] = "{dir}/logs/{name}.log".format(
-            dir=data_dir, name=worker_name
-        )
+        extra_log_template_args["LOG_FILE_PATH"] = f"{data_dir}/logs/{worker_name}.log"
+
+    extra_log_template_args["SYNAPSE_LOG_LEVEL"] = environ.get("SYNAPSE_LOG_LEVEL")
+    extra_log_template_args["SYNAPSE_LOG_SENSITIVE"] = environ.get(
+        "SYNAPSE_LOG_SENSITIVE"
+    )
+
     # Render and write the file
-    log_config_filepath = "/conf/workers/{name}.log.config".format(name=worker_name)
+    log_config_filepath = f"/conf/workers/{worker_name}.log.config"
     convert(
         "/conf/log.config",
         log_config_filepath,
         worker_name=worker_name,
         **extra_log_template_args,
+        include_worker_name_in_log_line=environ.get(
+            "SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER"
+        ),
     )
     return log_config_filepath
 

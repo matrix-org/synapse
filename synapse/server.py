@@ -21,17 +21,7 @@
 import abc
 import functools
 import logging
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, TypeVar, cast
 
 from twisted.internet.interfaces import IOpenSSLContextFactory
 from twisted.internet.tcp import Port
@@ -39,6 +29,7 @@ from twisted.web.iweb import IPolicyForHTTPS
 from twisted.web.resource import Resource
 
 from synapse.api.auth import Auth
+from synapse.api.auth_blocking import AuthBlocking
 from synapse.api.filtering import Filtering
 from synapse.api.ratelimiting import Ratelimiter, RequestRatelimiter
 from synapse.appservice.api import ApplicationServiceApi
@@ -60,14 +51,12 @@ from synapse.federation.federation_server import (
 from synapse.federation.send_queue import FederationRemoteSendQueue
 from synapse.federation.sender import AbstractFederationSender, FederationSender
 from synapse.federation.transport.client import TransportLayerClient
-from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
-from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
 from synapse.handlers.account import AccountHandler
 from synapse.handlers.account_data import AccountDataHandler
 from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.admin import AdminHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
-from synapse.handlers.auth import AuthHandler, MacaroonGenerator, PasswordAuthProvider
+from synapse.handlers.auth import AuthHandler, PasswordAuthProvider
 from synapse.handlers.cas import CasHandler
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
 from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
@@ -79,7 +68,6 @@ from synapse.handlers.event_auth import EventAuthHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.federation import FederationHandler
 from synapse.handlers.federation_event import FederationEventHandler
-from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerHandler
 from synapse.handlers.identity import IdentityHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
@@ -136,11 +124,13 @@ from synapse.server_notices.worker_server_notices_sender import (
     WorkerServerNoticesSender,
 )
 from synapse.state import StateHandler, StateResolutionHandler
-from synapse.storage import Databases, Storage
+from synapse.storage import Databases
+from synapse.storage.controllers import StorageControllers
 from synapse.streams.events import EventSources
 from synapse.types import DomainSpecificString, ISynapseReactor
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
+from synapse.util.macaroons import MacaroonGenerator
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import random_string
 
@@ -392,6 +382,10 @@ class HomeServer(metaclass=abc.ABCMeta):
         return Auth(self)
 
     @cache_in_self
+    def get_auth_blocking(self) -> AuthBlocking:
+        return AuthBlocking(self)
+
+    @cache_in_self
     def get_http_client_context_factory(self) -> IPolicyForHTTPS:
         if self.config.tls.use_insecure_ssl_client_just_for_testing_do_not_use:
             return InsecureInterceptableContextFactory()
@@ -499,7 +493,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_macaroon_generator(self) -> MacaroonGenerator:
-        return MacaroonGenerator(self)
+        return MacaroonGenerator(
+            self.get_clock(), self.hostname, self.config.key.macaroon_secret_key
+        )
 
     @cache_in_self
     def get_device_handler(self):
@@ -652,30 +648,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         return UserDirectoryHandler(self)
 
     @cache_in_self
-    def get_groups_local_handler(
-        self,
-    ) -> Union[GroupsLocalWorkerHandler, GroupsLocalHandler]:
-        if self.config.worker.worker_app:
-            return GroupsLocalWorkerHandler(self)
-        else:
-            return GroupsLocalHandler(self)
-
-    @cache_in_self
-    def get_groups_server_handler(self):
-        if self.config.worker.worker_app:
-            return GroupsServerWorkerHandler(self)
-        else:
-            return GroupsServerHandler(self)
-
-    @cache_in_self
-    def get_groups_attestation_signing(self) -> GroupAttestationSigning:
-        return GroupAttestationSigning(self)
-
-    @cache_in_self
-    def get_groups_attestation_renewer(self) -> GroupAttestionRenewer:
-        return GroupAttestionRenewer(self)
-
-    @cache_in_self
     def get_stats_handler(self) -> StatsHandler:
         return StatsHandler(self)
 
@@ -766,8 +738,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         return PasswordPolicyHandler(self)
 
     @cache_in_self
-    def get_storage(self) -> Storage:
-        return Storage(self, self.get_datastores())
+    def get_storage_controllers(self) -> StorageControllers:
+        return StorageControllers(self, self.get_datastores())
 
     @cache_in_self
     def get_replication_streamer(self) -> ReplicationStreamer:

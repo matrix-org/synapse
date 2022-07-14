@@ -41,7 +41,6 @@ from typing import (
 
 import attr
 import bcrypt
-import pymacaroons
 import unpaddedbase64
 import ecdsa
 from pymacaroons.exceptions import MacaroonVerificationFailedException
@@ -74,7 +73,7 @@ from synapse.storage.roommember import ProfileInfo
 from synapse.types import JsonDict, Requester, UserID
 from synapse.util import stringutils as stringutils
 from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
-from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
+from synapse.util.macaroons import LoginTokenAttributes
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import base62_encode
 from synapse.util.threepids import canonicalise_email
@@ -85,6 +84,8 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+INVALID_USERNAME_OR_PASSWORD = "Invalid username or password"
 
 
 def convert_client_dict_legacy_fields_to_identifier(
@@ -183,25 +184,13 @@ class SsoLoginExtraAttributes:
     extra_attributes: JsonDict
 
 
-@attr.s(slots=True, frozen=True, auto_attribs=True)
-class LoginTokenAttributes:
-    """Data we store in a short-term login token"""
-
-    user_id: str
-
-    auth_provider_id: str
-    """The SSO Identity Provider that the user authenticated with, to get this token."""
-
-    auth_provider_session_id: Optional[str]
-    """The session ID advertised by the SSO Identity Provider."""
-
-
 class AuthHandler:
     SESSION_EXPIRE_MS = 48 * 60 * 60 * 1000
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
+        self.auth_blocking = hs.get_auth_blocking()
         self.clock = hs.get_clock()
         self.checkers: Dict[str, UserInteractiveAuthChecker] = {}
         for auth_checker_class in INTERACTIVE_AUTH_CHECKERS:
@@ -215,7 +204,8 @@ class AuthHandler:
 
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.macaroon_gen = hs.get_macaroon_generator()
-        self._password_enabled = hs.config.auth.password_enabled
+        self._password_enabled_for_login = hs.config.auth.password_enabled_for_login
+        self._password_enabled_for_reauth = hs.config.auth.password_enabled_for_reauth
         self._password_localdb_enabled = hs.config.auth.password_localdb_enabled
         self._third_party_rules = hs.get_third_party_event_rules()
 
@@ -392,13 +382,13 @@ class AuthHandler:
         return params, session_id
 
     async def _get_available_ui_auth_types(self, user: UserID) -> Iterable[str]:
-        """Get a list of the authentication types this user can use"""
+        """Get a list of the user-interactive authentication types this user can use."""
 
         ui_auth_types = set()
 
         # if the HS supports password auth, and the user has a non-null password, we
         # support password auth
-        if self._password_localdb_enabled and self._password_enabled:
+        if self._password_localdb_enabled and self._password_enabled_for_reauth:
             lookupres = await self._find_user_id_and_pwd_hash(user.to_string())
             if lookupres:
                 _, password_hash = lookupres
@@ -407,7 +397,7 @@ class AuthHandler:
 
         # also allow auth from password providers
         for t in self.password_auth_provider.get_supported_login_types().keys():
-            if t == LoginType.PASSWORD and not self._password_enabled:
+            if t == LoginType.PASSWORD and not self._password_enabled_for_reauth:
                 continue
             ui_auth_types.add(t)
 
@@ -715,7 +705,7 @@ class AuthHandler:
             return res
 
         # fall back to the v1 login flow
-        canonical_id, _ = await self.validate_login(authdict)
+        canonical_id, _ = await self.validate_login(authdict, is_reauth=True)
         return canonical_id
 
     def _get_params_recaptcha(self) -> dict:
@@ -820,6 +810,7 @@ class AuthHandler:
         now_ms = self._clock.time_msec()
 
         if existing_token.expiry_ts is not None and existing_token.expiry_ts < now_ms:
+
             raise SynapseError(
                 HTTPStatus.FORBIDDEN,
                 "The supplied refresh token has expired",
@@ -986,7 +977,7 @@ class AuthHandler:
             not is_appservice_ghost
             or self.hs.config.appservice.track_appservice_user_ips
         ):
-            await self.auth.check_auth_blocking(user_id)
+            await self.auth_blocking.check_auth_blocking(user_id)
 
         access_token = self.generate_access_token(target_user_id_obj)
         await self.store.add_access_token_to_user(
@@ -1068,7 +1059,7 @@ class AuthHandler:
         Returns:
             Whether users on this server are allowed to change or set a password
         """
-        return self._password_enabled and self._password_localdb_enabled
+        return self._password_enabled_for_login and self._password_localdb_enabled
 
     def get_supported_login_types(self) -> Iterable[str]:
         """Get a the login types supported for the /login API
@@ -1093,9 +1084,9 @@ class AuthHandler:
         # that comes first, where it's present.
         if LoginType.PASSWORD in types:
             types.remove(LoginType.PASSWORD)
-            if self._password_enabled:
+            if self._password_enabled_for_login:
                 types.insert(0, LoginType.PASSWORD)
-        elif self._password_localdb_enabled and self._password_enabled:
+        elif self._password_localdb_enabled and self._password_enabled_for_login:
             types.insert(0, LoginType.PASSWORD)
 
         return types
@@ -1104,6 +1095,7 @@ class AuthHandler:
         self,
         login_submission: Dict[str, Any],
         ratelimit: bool = False,
+        is_reauth: bool = False,
     ) -> Tuple[str, Optional[Callable[["LoginResponse"], Awaitable[None]]]]:
         """Authenticates the user for the /login API
 
@@ -1114,6 +1106,9 @@ class AuthHandler:
             login_submission: the whole of the login submission
                 (including 'type' and other relevant fields)
             ratelimit: whether to apply the failed_login_attempt ratelimiter
+            is_reauth: whether this is part of a User-Interactive Authorisation
+                flow to reauthenticate for a privileged action (rather than a
+                new login)
         Returns:
             A tuple of the canonical user id, and optional callback
                 to be called once the access token and device id are issued
@@ -1136,8 +1131,14 @@ class AuthHandler:
         # special case to check for "password" for the check_password interface
         # for the auth providers
         password = login_submission.get("password")
+
         if login_type == LoginType.PASSWORD:
-            if not self._password_enabled:
+            if is_reauth:
+                passwords_allowed_here = self._password_enabled_for_reauth
+            else:
+                passwords_allowed_here = self._password_enabled_for_login
+
+            if not passwords_allowed_here:
                 raise SynapseError(400, "Password login has been disabled.")
             if not isinstance(password, str):
                 raise SynapseError(400, "Bad parameter: password", Codes.INVALID_PARAM)
@@ -1208,7 +1209,9 @@ class AuthHandler:
                     await self._failed_login_attempts_ratelimiter.can_do_action(
                         None, (medium, address)
                     )
-                raise LoginError(403, "", errcode=Codes.FORBIDDEN)
+                raise LoginError(
+                    403, msg=INVALID_USERNAME_OR_PASSWORD, errcode=Codes.FORBIDDEN
+                )
 
             identifier_dict = {"type": "m.id.user", "user": user_id}
 
@@ -1599,7 +1602,7 @@ class AuthHandler:
 
         # We raise a 403 here, but note that if we're doing user-interactive
         # login, it turns all LoginErrors into a 401 anyway.
-        raise LoginError(403, "Invalid password", errcode=Codes.FORBIDDEN)
+        raise LoginError(403, msg=INVALID_USERNAME_OR_PASSWORD, errcode=Codes.FORBIDDEN)
 
     async def check_password_provider_3pid(
         self, medium: str, address: str, password: str
@@ -1693,7 +1696,7 @@ class AuthHandler:
         except Exception:
             raise AuthError(403, "Invalid login token", errcode=Codes.FORBIDDEN)
 
-        await self.auth.check_auth_blocking(res.user_id)
+        await self.auth_blocking.check_auth_blocking(res.user_id)
         return res
 
     async def delete_access_token(self, access_token: str) -> None:
@@ -2082,98 +2085,6 @@ class AuthHandler:
         query.append((param_name, param))
         url_parts[4] = urllib.parse.urlencode(query)
         return urllib.parse.urlunparse(url_parts)
-
-
-@attr.s(slots=True, auto_attribs=True)
-class MacaroonGenerator:
-    hs: "HomeServer"
-
-    def generate_guest_access_token(self, user_id: str) -> str:
-        macaroon = self._generate_base_macaroon(user_id)
-        macaroon.add_first_party_caveat("type = access")
-        # Include a nonce, to make sure that each login gets a different
-        # access token.
-        macaroon.add_first_party_caveat(
-            "nonce = %s" % (stringutils.random_string_with_symbols(16),)
-        )
-        macaroon.add_first_party_caveat("guest = true")
-        return macaroon.serialize()
-
-    def generate_short_term_login_token(
-        self,
-        user_id: str,
-        auth_provider_id: str,
-        auth_provider_session_id: Optional[str] = None,
-        duration_in_ms: int = (2 * 60 * 1000),
-    ) -> str:
-        macaroon = self._generate_base_macaroon(user_id)
-        macaroon.add_first_party_caveat("type = login")
-        now = self.hs.get_clock().time_msec()
-        expiry = now + duration_in_ms
-        macaroon.add_first_party_caveat("time < %d" % (expiry,))
-        macaroon.add_first_party_caveat("auth_provider_id = %s" % (auth_provider_id,))
-        if auth_provider_session_id is not None:
-            macaroon.add_first_party_caveat(
-                "auth_provider_session_id = %s" % (auth_provider_session_id,)
-            )
-        return macaroon.serialize()
-
-    def verify_short_term_login_token(self, token: str) -> LoginTokenAttributes:
-        """Verify a short-term-login macaroon
-
-        Checks that the given token is a valid, unexpired short-term-login token
-        minted by this server.
-
-        Args:
-            token: the login token to verify
-
-        Returns:
-            the user_id that this token is valid for
-
-        Raises:
-            MacaroonVerificationFailedException if the verification failed
-        """
-        macaroon = pymacaroons.Macaroon.deserialize(token)
-        user_id = get_value_from_macaroon(macaroon, "user_id")
-        auth_provider_id = get_value_from_macaroon(macaroon, "auth_provider_id")
-
-        auth_provider_session_id: Optional[str] = None
-        try:
-            auth_provider_session_id = get_value_from_macaroon(
-                macaroon, "auth_provider_session_id"
-            )
-        except MacaroonVerificationFailedException:
-            pass
-
-        v = pymacaroons.Verifier()
-        v.satisfy_exact("gen = 1")
-        v.satisfy_exact("type = login")
-        v.satisfy_general(lambda c: c.startswith("user_id = "))
-        v.satisfy_general(lambda c: c.startswith("auth_provider_id = "))
-        v.satisfy_general(lambda c: c.startswith("auth_provider_session_id = "))
-        satisfy_expiry(v, self.hs.get_clock().time_msec)
-        v.verify(macaroon, self.hs.config.key.macaroon_secret_key)
-
-        return LoginTokenAttributes(
-            user_id=user_id,
-            auth_provider_id=auth_provider_id,
-            auth_provider_session_id=auth_provider_session_id,
-        )
-
-    def generate_delete_pusher_token(self, user_id: str) -> str:
-        macaroon = self._generate_base_macaroon(user_id)
-        macaroon.add_first_party_caveat("type = delete_pusher")
-        return macaroon.serialize()
-
-    def _generate_base_macaroon(self, user_id: str) -> pymacaroons.Macaroon:
-        macaroon = pymacaroons.Macaroon(
-            location=self.hs.config.server.server_name,
-            identifier="key",
-            key=self.hs.config.key.macaroon_secret_key,
-        )
-        macaroon.add_first_party_caveat("gen = 1")
-        macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
-        return macaroon
 
 
 def load_legacy_password_auth_providers(hs: "HomeServer") -> None:

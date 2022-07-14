@@ -19,6 +19,8 @@ from typing import Any, Callable, Dict, Generator, Optional
 
 import attr
 from frozendict import frozendict
+from matrix_common.versionstring import get_distribution_version_string
+from typing_extensions import ParamSpec
 
 from twisted.internet import defer, task
 from twisted.internet.defer import Deferred
@@ -81,6 +83,9 @@ def unwrapFirstError(failure: Failure) -> Failure:
     return failure.value.subFailure  # type: ignore[union-attr]  # Issue in Twisted's annotations
 
 
+P = ParamSpec("P")
+
+
 @attr.s(slots=True)
 class Clock:
     """
@@ -109,7 +114,7 @@ class Clock:
         return int(self.time() * 1000)
 
     def looping_call(
-        self, f: Callable, msec: float, *args: Any, **kwargs: Any
+        self, f: Callable[P, object], msec: float, *args: P.args, **kwargs: P.kwargs
     ) -> LoopingCall:
         """Call a function repeatedly.
 
@@ -183,3 +188,8 @@ def log_failure(
     if not consumeErrors:
         return failure
     return None
+
+
+# Version string with git info. Computed here once so that we don't invoke git multiple
+# times.
+SYNAPSE_VERSION = get_distribution_version_string("matrix-synapse", __file__)

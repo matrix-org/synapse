@@ -70,82 +70,61 @@ on save as they take a while and can be very resource intensive.
     -   Avoid wildcard imports (`from synapse.types import *`) and
         relative imports (`from .types import UserID`).
 
-## Configuration file format
+## Configuration code and documentation format
 
-The [sample configuration file](./sample_config.yaml) acts as a
+When adding a configuration option to the code, if several settings are grouped into a single dict, ensure that your code
+correctly handles the top-level option being set to `None` (as it will be if no sub-options are enabled).
+
+The [configuration manual](usage/configuration/config_documentation.md) acts as a
 reference to Synapse's configuration options for server administrators.
 Remember that many readers will be unfamiliar with YAML and server
-administration in general, so that it is important that the file be as
-easy to understand as possible, which includes following a consistent
-format.
+administration in general, so it is important that when you add
+a configuration option the documentation be as easy to understand as possible, which 
+includes following a consistent format.
 
 Some guidelines follow:
 
--   Sections should be separated with a heading consisting of a single
-    line prefixed and suffixed with `##`. There should be **two** blank
-    lines before the section header, and **one** after.
--   Each option should be listed in the file with the following format:
-    -   A comment describing the setting. Each line of this comment
-        should be prefixed with a hash (`#`) and a space.
+- Each option should be listed in the config manual with the following format:
+      
+    - The name of the option, prefixed by `###`. 
 
-        The comment should describe the default behaviour (ie, what
+    - A comment which describes the default behaviour (i.e. what
         happens if the setting is omitted), as well as what the effect
         will be if the setting is changed.
-
-        Often, the comment end with something like "uncomment the
-        following to <do action>".
-
-    -   A line consisting of only `#`.
-    -   A commented-out example setting, prefixed with only `#`.
+    - An example setting, using backticks to define the code block
 
         For boolean (on/off) options, convention is that this example
-        should be the *opposite* to the default (so the comment will end
-        with "Uncomment the following to enable [or disable]
-        <feature>." For other options, the example should give some
-        non-default value which is likely to be useful to the reader.
+        should be the *opposite* to the default. For other options, the example should give
+        some non-default value which is likely to be useful to the reader.
 
--   There should be a blank line between each option.
--   Where several settings are grouped into a single dict, *avoid* the
-    convention where the whole block is commented out, resulting in
-    comment lines starting `# #`, as this is hard to read and confusing
-    to edit. Instead, leave the top-level config option uncommented, and
-    follow the conventions above for sub-options. Ensure that your code
-    correctly handles the top-level option being set to `None` (as it
-    will be if no sub-options are enabled).
--   Lines should be wrapped at 80 characters.
--   Use two-space indents.
--   `true` and `false` are spelt thus (as opposed to `True`, etc.)
--   Use single quotes (`'`) rather than double-quotes (`"`) or backticks
-    (`` ` ``) to refer to configuration options.
+- There should be a horizontal rule between each option, which can be achieved by adding `---` before and
+  after the option.
+- `true` and `false` are spelt thus (as opposed to `True`, etc.)
 
 Example:
 
+---
+### `modules`
+
+Use the `module` sub-option to add a module under `modules` to extend functionality. 
+The `module` setting then has a sub-option, `config`, which can be used to define some configuration
+for the `module`.
+
+Defaults to none.
+
+Example configuration:
 ```yaml
-## Frobnication ##
-
-# The frobnicator will ensure that all requests are fully frobnicated.
-# To enable it, uncomment the following.
-#
-#frobnicator_enabled: true
-
-# By default, the frobnicator will frobnicate with the default frobber.
-# The following will make it use an alternative frobber.
-#
-#frobincator_frobber: special_frobber
-
-# Settings for the frobber
-#
-frobber:
-  # frobbing speed. Defaults to 1.
-  #
-  #speed: 10
-
-  # frobbing distance. Defaults to 1000.
-  #
-  #distance: 100
+modules:
+  - module: my_super_module.MySuperClass
+    config:
+      do_thing: true
+  - module: my_other_super_module.SomeClass
+    config: {}
 ```
+---
 
 Note that the sample configuration is generated from the synapse code
 and is maintained by a script, `scripts-dev/generate_sample_config.sh`.
 Making sure that the output from this script matches the desired format
 is left as an exercise for the reader!
+

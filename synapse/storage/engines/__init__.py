@@ -11,27 +11,53 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any, Mapping, NoReturn
 
 from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
-from .postgres import PostgresEngine
-from .sqlite import Sqlite3Engine
+
+# The classes `PostgresEngine` and `Sqlite3Engine` must always be importable, because
+# we use `isinstance(engine, PostgresEngine)` to write different queries for postgres
+# and sqlite. But the database driver modules are both optional: they may not be
+# installed. To account for this, create dummy classes on import failure so we can
+# still run `isinstance()` checks.
+try:
+    from .postgres import PostgresEngine
+except ImportError:
+
+    class PostgresEngine(BaseDatabaseEngine):  # type: ignore[no-redef]
+        def __new__(cls, *args: object, **kwargs: object) -> NoReturn:  # type: ignore[misc]
+            raise RuntimeError(
+                f"Cannot create {cls.__name__} -- psycopg2 module is not installed"
+            )
 
 
-def create_engine(database_config) -> BaseDatabaseEngine:
+try:
+    from .sqlite import Sqlite3Engine
+except ImportError:
+
+    class Sqlite3Engine(BaseDatabaseEngine):  # type: ignore[no-redef]
+        def __new__(cls, *args: object, **kwargs: object) -> NoReturn:  # type: ignore[misc]
+            raise RuntimeError(
+                f"Cannot create {cls.__name__} -- sqlite3 module is not installed"
+            )
+
+
+def create_engine(database_config: Mapping[str, Any]) -> BaseDatabaseEngine:
     name = database_config["name"]
 
     if name == "sqlite3":
-        import sqlite3
-
-        return Sqlite3Engine(sqlite3, database_config)
+        return Sqlite3Engine(database_config)
 
     if name == "psycopg2":
-        # Note that psycopg2cffi-compat provides the psycopg2 module on pypy.
-        import psycopg2
-
-        return PostgresEngine(psycopg2, database_config)
+        return PostgresEngine(database_config)
 
     raise RuntimeError("Unsupported database engine '%s'" % (name,))
 
 
-__all__ = ["create_engine", "BaseDatabaseEngine", "IncorrectDatabaseSetup"]
+__all__ = [
+    "create_engine",
+    "BaseDatabaseEngine",
+    "PostgresEngine",
+    "Sqlite3Engine",
+    "IncorrectDatabaseSetup",
+]

@@ -54,7 +54,11 @@ from synapse.api.room_versions import (
     RoomVersions,
 )
 from synapse.events import EventBase, builder
-from synapse.federation.federation_base import FederationBase, event_from_pdu_json
+from synapse.federation.federation_base import (
+    FederationBase,
+    InvalidEventSignatureError,
+    event_from_pdu_json,
+)
 from synapse.federation.transport.client import SendJoinResponse
 from synapse.http.types import QueryParams
 from synapse.types import JsonDict, UserID, get_domain_from_id
@@ -319,7 +323,13 @@ class FederationClient(FederationBase):
             pdu = pdu_list[0]
 
             # Check signatures are correct.
-            signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
+            try:
+                signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
+            except InvalidEventSignatureError as e:
+                errmsg = f"event id {pdu.event_id}: {e}"
+                logger.warning("%s", errmsg)
+                raise SynapseError(403, errmsg, Codes.FORBIDDEN)
+
             return signed_pdu
 
         return None
@@ -405,6 +415,9 @@ class FederationClient(FederationBase):
 
         Returns:
             a tuple of (state event_ids, auth event_ids)
+
+        Raises:
+            InvalidResponseError: if fields in the response have the wrong type.
         """
         result = await self.transport_layer.get_room_state_ids(
             destination, room_id, event_id=event_id
@@ -416,7 +429,7 @@ class FederationClient(FederationBase):
         if not isinstance(state_event_ids, list) or not isinstance(
             auth_event_ids, list
         ):
-            raise Exception("invalid response from /state_ids")
+            raise InvalidResponseError("invalid response from /state_ids")
 
         return state_event_ids, auth_event_ids
 
@@ -552,19 +565,23 @@ class FederationClient(FederationBase):
 
         Returns:
             The PDU (possibly redacted) if it has valid signatures and hashes.
+            None if no valid copy could be found.
         """
 
-        res = None
         try:
-            res = await self._check_sigs_and_hash(room_version, pdu)
-        except SynapseError:
-            pass
-
-        if not res:
-            # Check local db.
-            res = await self.store.get_event(
-                pdu.event_id, allow_rejected=True, allow_none=True
+            return await self._check_sigs_and_hash(room_version, pdu)
+        except InvalidEventSignatureError as e:
+            logger.warning(
+                "Signature on retrieved event %s was invalid (%s). "
+                "Checking local store/orgin server",
+                pdu.event_id,
+                e,
             )
+
+        # Check local db.
+        res = await self.store.get_event(
+            pdu.event_id, allow_rejected=True, allow_none=True
+        )
 
         pdu_origin = get_domain_from_id(pdu.sender)
         if not res and pdu_origin != origin:
@@ -1040,9 +1057,14 @@ class FederationClient(FederationBase):
         pdu = event_from_pdu_json(pdu_dict, room_version)
 
         # Check signatures are correct.
-        pdu = await self._check_sigs_and_hash(room_version, pdu)
+        try:
+            pdu = await self._check_sigs_and_hash(room_version, pdu)
+        except InvalidEventSignatureError as e:
+            errmsg = f"event id {pdu.event_id}: {e}"
+            logger.warning("%s", errmsg)
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
 
-        # FIXME: We should handle signature failures more gracefully.
+            # FIXME: We should handle signature failures more gracefully.
 
         return pdu
 
@@ -1619,10 +1641,6 @@ def _validate_hierarchy_event(d: JsonDict) -> None:
     event_type = d.get("type")
     if not isinstance(event_type, str):
         raise ValueError("Invalid event: 'event_type' must be a str")
-
-    room_id = d.get("room_id")
-    if not isinstance(room_id, str):
-        raise ValueError("Invalid event: 'room_id' must be a str")
 
     state_key = d.get("state_key")
     if not isinstance(state_key, str):

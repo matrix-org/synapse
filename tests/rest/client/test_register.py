@@ -56,7 +56,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         appservice = ApplicationService(
             as_token,
-            self.hs.config.server.server_name,
             id="1234",
             namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
             sender="@as:test",
@@ -80,7 +79,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         appservice = ApplicationService(
             as_token,
-            self.hs.config.server.server_name,
             id="1234",
             namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
             sender="@as:test",
@@ -594,9 +592,9 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
                 "require_at_registration": True,
             },
             "account_threepid_delegates": {
-                "email": "https://id_server",
                 "msisdn": "https://id_server",
             },
+            "email": {"notif_from": "Synapse <synapse@example.com>"},
         }
     )
     def test_advertised_flows_captcha_and_terms_and_3pids(self) -> None:

@@ -154,6 +154,31 @@ class EventCacheTestCase(unittest.HomeserverTestCase):
             # We should have fetched the event from the DB
             self.assertEqual(ctx.get_resource_usage().evt_db_fetch_count, 1)
 
+    def test_event_ref(self):
+        """Test that we reuse events that are still in memory but have fallen
+        out of the cache, rather than requesting them from the DB.
+        """
+
+        # Reset the event cache
+        self.store._get_event_cache.clear()
+
+        with LoggingContext("test") as ctx:
+            # We keep hold of the event event though we never use it.
+            event = self.get_success(self.store.get_event(self.event_id))  # noqa: F841
+
+            # We should have fetched the event from the DB
+            self.assertEqual(ctx.get_resource_usage().evt_db_fetch_count, 1)
+
+        # Reset the event cache
+        self.store._get_event_cache.clear()
+
+        with LoggingContext("test") as ctx:
+            self.get_success(self.store.get_event(self.event_id))
+
+            # Since the event is still in memory we shouldn't have fetched it
+            # from the DB
+            self.assertEqual(ctx.get_resource_usage().evt_db_fetch_count, 0)
+
     def test_dedupe(self):
         """Test that if we request the same event multiple times we only pull it
         out once.

@@ -45,7 +45,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
 
         # AuthBlocking reads from the hs' config on initialization. We need to
         # modify its config instead of the hs'
-        self.auth_blocking = self.hs.get_auth()._auth_blocking
+        self.auth_blocking = self.hs.get_auth_blocking()
 
     def test_wait_for_sync_for_user_auth_blocking(self):
         user_id1 = "@user1:test"
@@ -160,6 +160,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         # Blow away caches (supported room versions can only change due to a restart).
         self.store.get_rooms_for_user_with_stream_ordering.invalidate_all()
         self.store._get_event_cache.clear()
+        self.store._event_ref.clear()
 
         # The rooms should be excluded from the sync response.
         # Get a new request key.

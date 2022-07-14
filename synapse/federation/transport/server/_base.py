@@ -169,14 +169,16 @@ def _parse_auth_header(header_bytes: bytes) -> Tuple[str, str, str, Optional[str
     """
     try:
         header_str = header_bytes.decode("utf-8")
-        params = header_str.split(" ")[1].split(",")
+        params = re.split(" +", header_str)[1].split(",")
         param_dict: Dict[str, str] = {
-            k: v for k, v in [param.split("=", maxsplit=1) for param in params]
+            k.lower(): v for k, v in [param.split("=", maxsplit=1) for param in params]
         }
 
         def strip_quotes(value: str) -> str:
             if value.startswith('"'):
-                return value[1:-1]
+                return re.sub(
+                    "\\\\(.)", lambda matchobj: matchobj.group(1), value[1:-1]
+                )
             else:
                 return value
 

@@ -315,7 +315,7 @@ class HomeserverTestCase(TestCase):
                         "is_guest": False,
                     }
 
-                async def get_user_by_req(request, allow_guest=False, rights="access"):
+                async def get_user_by_req(request, allow_guest=False):
                     assert self.helper.auth_user_id is not None
                     return create_requester(
                         UserID.from_string(self.helper.auth_user_id),
@@ -838,7 +838,7 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
             client_ip=client_ip,
         )
 
-    def add_hashes_and_signatures(
+    def add_hashes_and_signatures_from_other_server(
         self,
         event_dict: JsonDict,
         room_version: RoomVersion = KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],

@@ -23,11 +23,13 @@ from urllib import parse
 import attr
 from parameterized import parameterized, parameterized_class
 from PIL import Image as Image
+from typing_extensions import Literal
 
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
 from twisted.test.proto_helpers import MemoryReactor
 
+from synapse.api.errors import Codes
 from synapse.events import EventBase
 from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.logging.context import make_deferred_yieldable
@@ -481,6 +483,12 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
         if expected_found:
             self.assertEqual(channel.code, 200)
+
+            self.assertEqual(
+                channel.headers.getRawHeaders(b"Cross-Origin-Resource-Policy"),
+                [b"cross-origin"],
+            )
+
             if expected_body is not None:
                 self.assertEqual(
                     channel.result["body"], expected_body, channel.result["body"]
@@ -549,10 +557,26 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             [b"noindex, nofollow, noarchive, noimageindex"],
         )
 
+    def test_cross_origin_resource_policy_header(self) -> None:
+        """
+        Test that the Cross-Origin-Resource-Policy header is set to "cross-origin"
+        allowing web clients to embed media from the downloads API.
+        """
+        channel = self._req(b"inline; filename=out" + self.test_image.extension)
 
-class TestSpamChecker:
+        headers = channel.headers
+
+        self.assertEqual(
+            headers.getRawHeaders(b"Cross-Origin-Resource-Policy"),
+            [b"cross-origin"],
+        )
+
+
+class TestSpamCheckerLegacy:
     """A spam checker module that rejects all media that includes the bytes
     `evil`.
+
+    Uses the legacy Spam-Checker API.
     """
 
     def __init__(self, config: Dict[str, Any], api: ModuleApi) -> None:
@@ -593,7 +617,7 @@ class TestSpamChecker:
         return b"evil" in buf.getvalue()
 
 
-class SpamCheckerTestCase(unittest.HomeserverTestCase):
+class SpamCheckerTestCaseLegacy(unittest.HomeserverTestCase):
     servlets = [
         login.register_servlets,
         admin.register_servlets,
@@ -617,7 +641,8 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
             {
                 "spam_checker": [
                     {
-                        "module": TestSpamChecker.__module__ + ".TestSpamChecker",
+                        "module": TestSpamCheckerLegacy.__module__
+                        + ".TestSpamCheckerLegacy",
                         "config": {},
                     }
                 ]
@@ -641,4 +666,63 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
 
         self.helper.upload_media(
             self.upload_resource, data, tok=self.tok, expect_code=400
+        )
+
+
+EVIL_DATA = b"Some evil data"
+EVIL_DATA_EXPERIMENT = b"Some evil data to trigger the experimental tuple API"
+
+
+class SpamCheckerTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        login.register_servlets,
+        admin.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.user = self.register_user("user", "pass")
+        self.tok = self.login("user", "pass")
+
+        # Allow for uploading and downloading to/from the media repo
+        self.media_repo = hs.get_media_repository_resource()
+        self.download_resource = self.media_repo.children[b"download"]
+        self.upload_resource = self.media_repo.children[b"upload"]
+
+        hs.get_module_api().register_spam_checker_callbacks(
+            check_media_file_for_spam=self.check_media_file_for_spam
+        )
+
+    async def check_media_file_for_spam(
+        self, file_wrapper: ReadableFileWrapper, file_info: FileInfo
+    ) -> Union[Codes, Literal["NOT_SPAM"]]:
+        buf = BytesIO()
+        await file_wrapper.write_chunks_to(buf.write)
+
+        if buf.getvalue() == EVIL_DATA:
+            return Codes.FORBIDDEN
+        elif buf.getvalue() == EVIL_DATA_EXPERIMENT:
+            return (Codes.FORBIDDEN, {})
+        else:
+            return "NOT_SPAM"
+
+    def test_upload_innocent(self) -> None:
+        """Attempt to upload some innocent data that should be allowed."""
+        self.helper.upload_media(
+            self.upload_resource, SMALL_PNG, tok=self.tok, expect_code=200
+        )
+
+    def test_upload_ban(self) -> None:
+        """Attempt to upload some data that includes bytes "evil", which should
+        get rejected by the spam checker.
+        """
+
+        self.helper.upload_media(
+            self.upload_resource, EVIL_DATA, tok=self.tok, expect_code=400
+        )
+
+        self.helper.upload_media(
+            self.upload_resource,
+            EVIL_DATA_EXPERIMENT,
+            tok=self.tok,
+            expect_code=400,
         )

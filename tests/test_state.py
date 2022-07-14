@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Collection, Dict, List, Optional
+from typing import Collection, Dict, List, Optional, cast
 from unittest.mock import Mock
 
 from twisted.internet import defer
@@ -22,6 +22,8 @@ from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.state import StateHandler, StateResolutionHandler
+from synapse.util import Clock
+from synapse.util.macaroons import MacaroonGenerator
 
 from tests import unittest
 
@@ -88,7 +90,7 @@ class _DummyStore:
 
         return groups
 
-    async def get_state_ids_for_group(self, state_group):
+    async def get_state_ids_for_group(self, state_group, state_filter=None):
         return self._group_to_state[state_group]
 
     async def store_state_group(
@@ -129,6 +131,21 @@ class _DummyStore:
     async def get_room_version_id(self, room_id):
         return RoomVersions.V1.identifier
 
+    async def get_state_group_for_events(
+        self, event_ids, await_full_state: bool = True
+    ):
+        res = {}
+        for event in event_ids:
+            res[event] = self._event_to_state_group[event]
+        return res
+
+    async def get_state_for_groups(self, groups):
+        res = {}
+        for group in groups:
+            state = self._group_to_state[group]
+            res[group] = state
+        return res
+
 
 class DictObj(dict):
     def __init__(self, **kwargs):
@@ -166,27 +183,34 @@ class Graph:
 class StateTestCase(unittest.TestCase):
     def setUp(self):
         self.dummy_store = _DummyStore()
-        storage = Mock(main=self.dummy_store, state=self.dummy_store)
+        storage_controllers = Mock(main=self.dummy_store, state=self.dummy_store)
         hs = Mock(
             spec_set=[
                 "config",
                 "get_datastores",
-                "get_storage",
+                "get_storage_controllers",
                 "get_auth",
                 "get_state_handler",
                 "get_clock",
                 "get_state_resolution_handler",
                 "get_account_validity_handler",
+                "get_macaroon_generator",
+                "get_instance_name",
+                "get_simple_http_client",
                 "hostname",
             ]
         )
+        clock = cast(Clock, MockClock())
         hs.config = default_config("tesths", True)
         hs.get_datastores.return_value = Mock(main=self.dummy_store)
         hs.get_state_handler.return_value = None
-        hs.get_clock.return_value = MockClock()
+        hs.get_clock.return_value = clock
+        hs.get_macaroon_generator.return_value = MacaroonGenerator(
+            clock, "tesths", b"verysecret"
+        )
         hs.get_auth.return_value = Auth(hs)
         hs.get_state_resolution_handler = lambda: StateResolutionHandler(hs)
-        hs.get_storage.return_value = storage
+        hs.get_storage_controllers.return_value = storage_controllers
 
         self.state = StateHandler(hs)
         self.event_id = 0
@@ -429,7 +453,12 @@ class StateTestCase(unittest.TestCase):
         ]
 
         context = yield defer.ensureDeferred(
-            self.state.compute_event_context(event, old_state=old_state)
+            self.state.compute_event_context(
+                event,
+                state_ids_before_event={
+                    (e.type, e.state_key): e.event_id for e in old_state
+                },
+            )
         )
 
         prev_state_ids = yield defer.ensureDeferred(context.get_prev_state_ids())
@@ -454,7 +483,12 @@ class StateTestCase(unittest.TestCase):
         ]
 
         context = yield defer.ensureDeferred(
-            self.state.compute_event_context(event, old_state=old_state)
+            self.state.compute_event_context(
+                event,
+                state_ids_before_event={
+                    (e.type, e.state_key): e.event_id for e in old_state
+                },
+            )
         )
 
         prev_state_ids = yield defer.ensureDeferred(context.get_prev_state_ids())

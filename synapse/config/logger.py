@@ -22,7 +22,6 @@ from string import Template
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
 import yaml
-from matrix_common.versionstring import get_distribution_version_string
 from zope.interface import implementer
 
 from twisted.logger import (
@@ -37,6 +36,7 @@ from synapse.logging.context import LoggingContextFilter
 from synapse.logging.filter import MetadataFilter
 from synapse.types import JsonDict
 
+from ..util import SYNAPSE_VERSION
 from ._base import Config, ConfigError
 
 if TYPE_CHECKING:
@@ -153,11 +153,6 @@ class LoggingConfig(Config):
         log_config = os.path.join(config_dir_path, server_name + ".log.config")
         return (
             """\
-        ## Logging ##
-
-        # A yaml python logging config file as described by
-        # https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
-        #
         log_config: "%(log_config)s"
         """
             % locals()
@@ -349,7 +344,7 @@ def setup_logging(
     logging.warning(
         "Server %s version %s",
         sys.argv[0],
-        get_distribution_version_string("matrix-synapse"),
+        SYNAPSE_VERSION,
     )
     logging.info("Server hostname: %s", config.server.server_name)
     logging.info("Instance name: %s", hs.get_instance_name())

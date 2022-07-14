@@ -40,7 +40,6 @@ from typing import (
 )
 
 import yaml
-from matrix_common.versionstring import get_distribution_version_string
 from typing_extensions import TypedDict
 
 from twisted.internet import defer, reactor as reactor_
@@ -59,10 +58,10 @@ from synapse.storage.databases.main.client_ips import ClientIpBackgroundUpdateSt
 from synapse.storage.databases.main.deviceinbox import DeviceInboxBackgroundUpdateStore
 from synapse.storage.databases.main.devices import DeviceBackgroundUpdateStore
 from synapse.storage.databases.main.end_to_end_keys import EndToEndKeyBackgroundStore
+from synapse.storage.databases.main.event_push_actions import EventPushActionsStore
 from synapse.storage.databases.main.events_bg_updates import (
     EventsBackgroundUpdatesStore,
 )
-from synapse.storage.databases.main.group_server import GroupServerWorkerStore
 from synapse.storage.databases.main.media_repository import (
     MediaRepositoryBackgroundUpdateStore,
 )
@@ -84,7 +83,7 @@ from synapse.storage.databases.state.bg_updates import StateBackgroundUpdateStor
 from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 from synapse.types import ISynapseReactor
-from synapse.util import Clock
+from synapse.util import SYNAPSE_VERSION, Clock
 
 # Cast safety: Twisted does some naughty magic which replaces the
 # twisted.internet.reactor module with a Reactor instance at runtime.
@@ -102,14 +101,6 @@ BOOLEAN_COLUMNS = {
     "devices": ["hidden"],
     "device_lists_outbound_pokes": ["sent"],
     "users_who_share_rooms": ["share_private"],
-    "groups": ["is_public"],
-    "group_rooms": ["is_public"],
-    "group_users": ["is_public", "is_admin"],
-    "group_summary_rooms": ["is_public"],
-    "group_room_categories": ["is_public"],
-    "group_summary_users": ["is_public"],
-    "group_roles": ["is_public"],
-    "local_group_membership": ["is_publicised", "is_admin"],
     "e2e_room_keys": ["is_verified"],
     "account_validity": ["email_sent"],
     "redactions": ["have_censored"],
@@ -193,6 +184,7 @@ R = TypeVar("R")
 
 
 class Store(
+    EventPushActionsStore,
     ClientIpBackgroundUpdateStore,
     DeviceInboxBackgroundUpdateStore,
     DeviceBackgroundUpdateStore,
@@ -211,7 +203,6 @@ class Store(
     PushRuleStore,
     PusherWorkerStore,
     PresenceBackgroundUpdateStore,
-    GroupServerWorkerStore,
 ):
     def execute(self, f: Callable[..., R], *args: Any, **kwargs: Any) -> Awaitable[R]:
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)
@@ -250,9 +241,7 @@ class MockHomeserver:
         self.clock = Clock(reactor)
         self.config = config
         self.hostname = config.server.server_name
-        self.version_string = "Synapse/" + get_distribution_version_string(
-            "matrix-synapse"
-        )
+        self.version_string = SYNAPSE_VERSION
 
     def get_clock(self) -> Clock:
         return self.clock
@@ -262,6 +251,9 @@ class MockHomeserver:
 
     def get_instance_name(self) -> str:
         return "master"
+
+    def should_send_federation(self) -> bool:
+        return False
 
 
 class Porter:
@@ -410,12 +402,15 @@ class Porter:
             self.progress.update(table, table_size)  # Mark table as done
             return
 
+        # We sweep over rowids in two directions: one forwards (rowids 1, 2, 3, ...)
+        # and another backwards (rowids 0, -1, -2, ...).
         forward_select = (
             "SELECT rowid, * FROM %s WHERE rowid >= ? ORDER BY rowid LIMIT ?" % (table,)
         )
 
         backward_select = (
-            "SELECT rowid, * FROM %s WHERE rowid <= ? ORDER BY rowid LIMIT ?" % (table,)
+            "SELECT rowid, * FROM %s WHERE rowid <= ? ORDER BY rowid DESC LIMIT ?"
+            % (table,)
         )
 
         do_forward = [True]
@@ -613,6 +608,25 @@ class Porter:
                 self.postgres_store.db_pool.updates.has_completed_background_updates()
             )
 
+    @staticmethod
+    def _is_sqlite_autovacuum_enabled(txn: LoggingTransaction) -> bool:
+        """
+        Returns true if auto_vacuum is enabled in SQLite.
+        https://www.sqlite.org/pragma.html#pragma_auto_vacuum
+
+        Vacuuming changes the rowids on rows in the database.
+        Auto-vacuuming is therefore dangerous when used in conjunction with this script.
+
+        Note that the auto_vacuum setting can't be changed without performing
+        a VACUUM after trying to change the pragma.
+        """
+        txn.execute("PRAGMA auto_vacuum")
+        row = txn.fetchone()
+        assert row is not None, "`PRAGMA auto_vacuum` did not give a row."
+        (autovacuum_setting,) = row
+        # 0 means off. 1 means full. 2 means incremental.
+        return autovacuum_setting != 0
+
     async def run(self) -> None:
         """Ports the SQLite database to a PostgreSQL database.
 
@@ -628,6 +642,21 @@ class Porter:
                 DatabaseConnectionConfig("master-sqlite", self.sqlite_config),
                 allow_outdated_version=True,
             )
+
+            # For safety, ensure auto_vacuums are disabled.
+            if await self.sqlite_store.db_pool.runInteraction(
+                "is_sqlite_autovacuum_enabled", self._is_sqlite_autovacuum_enabled
+            ):
+                end_error = (
+                    "auto_vacuum is enabled in the SQLite database."
+                    " (This is not the default configuration.)\n"
+                    " This script relies on rowids being consistent and must not"
+                    " be used if the database could be vacuumed between re-runs.\n"
+                    " To disable auto_vacuum, you need to stop Synapse and run the following SQL:\n"
+                    " PRAGMA auto_vacuum=off;\n"
+                    " VACUUM;"
+                )
+                return
 
             # Check if all background updates are done, abort if not.
             updates_complete = (

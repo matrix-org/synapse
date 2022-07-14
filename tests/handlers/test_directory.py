@@ -298,6 +298,7 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         self.store = hs.get_datastores().main
         self.handler = hs.get_directory_handler()
         self.state_handler = hs.get_state_handler()
+        self._storage_controllers = hs.get_storage_controllers()
 
         # Create user
         self.admin_user = self.register_user("admin", "pass", admin=True)
@@ -335,7 +336,7 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
     def _get_canonical_alias(self):
         """Get the canonical alias state of the room."""
         return self.get_success(
-            self.state_handler.get_current_state(
+            self._storage_controllers.state.get_current_state_event(
                 self.room_id, EventTypes.CanonicalAlias, ""
             )
         )

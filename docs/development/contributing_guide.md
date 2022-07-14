@@ -206,7 +206,32 @@ This means that we need to run our unit tests against PostgreSQL too. Our CI doe
 this automatically for pull requests and release candidates, but it's sometimes
 useful to reproduce this locally.
 
-To do so, [configure Postgres](../postgres.md) and run `trial` with the
+#### Using Docker
+
+The easiest way to do so is to run Postgres via a docker container. In one
+terminal:
+
+```shell
+docker run --rm -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgress -p 5432:5432 postgres:14
+```
+
+If you see an error like
+
+```
+docker: Error response from daemon: driver failed programming external connectivity on endpoint nice_ride (b57bbe2e251b70015518d00c9981e8cb8346b5c785250341a6c53e3c899875f1): Error starting userland proxy: listen tcp4 0.0.0.0:5432: bind: address already in use.
+```
+
+then something is already bound to port 5432. You're probably already running postgres locally.
+
+Once you have a postgres server running, invoke `trial` in a second terminal:
+
+```shell
+SYNAPSE_POSTGRES=1 SYNAPSE_POSTGRES_HOST=127.0.0.1 SYNAPSE_POSTGRES_USER=postgres SYNAPSE_POSTGRES_PASSWORD=mysecretpassword poetry run trial tests
+````
+
+#### Using an existing Postgres installation
+
+If you have postgres already installed on your system, you can run `trial` with the
 following environment variables matching your configuration:
 
 - `SYNAPSE_POSTGRES` to anything nonempty
@@ -229,8 +254,8 @@ You don't need to specify the host, user, port or password if your Postgres
 server is set to authenticate you over the UNIX socket (i.e. if the `psql` command
 works without further arguments).
 
-Your Postgres account needs to be able to create databases.
-
+Your Postgres account needs to be able to create databases; see the postgres
+docs for [`ALTER ROLE`](https://www.postgresql.org/docs/current/sql-alterrole.html).
 
 ## Run the integration tests ([Sytest](https://github.com/matrix-org/sytest)).
 
@@ -279,6 +304,29 @@ To run a specific test, you can specify the whole name structure:
 COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages/parallel/Historical_events_resolve_in_the_correct_order
 ```
 
+The above will run a monolithic (single-process) Synapse with SQLite as the database. For other configurations, try:
+
+- Passing `POSTGRES=1` as an environment variable to use the Postgres database instead.
+- Passing `WORKERS=1` as an environment variable to use a workerised setup instead. This option implies the use of Postgres.
+
+To increase the log level for the tests, set `SYNAPSE_TEST_LOG_LEVEL`, e.g:
+```sh
+SYNAPSE_TEST_LOG_LEVEL=DEBUG COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -run TestImportHistoricalMessages
+```
+
+### Prettier formatting with `gotestfmt`
+
+If you want to format the output of the tests the same way as it looks in CI,
+install [gotestfmt](https://github.com/haveyoudebuggedit/gotestfmt).
+
+You can then use this incantation to format the tests appropriately:
+
+```sh
+COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh -json | gotestfmt -hide successful-tests
+```
+
+(Remove `-hide successful-tests` if you don't want to hide successful tests.)
+
 
 ### Access database for homeserver after Complement test runs.
 
@@ -303,7 +351,7 @@ To prepare a Pull Request, please:
 3. `git push` your commit to your fork of Synapse;
 4. on GitHub, [create the Pull Request](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request);
 5. add a [changelog entry](#changelog) and push it to your Pull Request;
-6. for most contributors, that's all - however, if you are a member of the organization `matrix-org`, on GitHub, please request a review from `matrix.org / Synapse Core`.
+6. that's it for now, a non-draft pull request will automatically request review from the team;
 7. if you need to update your PR, please avoid rebasing and just add new commits to your branch.
 
 
@@ -397,8 +445,8 @@ same lightweight approach that the Linux Kernel
 [submitting patches process](
 https://www.kernel.org/doc/html/latest/process/submitting-patches.html#sign-your-work-the-developer-s-certificate-of-origin>),
 [Docker](https://github.com/docker/docker/blob/master/CONTRIBUTING.md), and many other
-projects use: the DCO (Developer Certificate of Origin:
-http://developercertificate.org/). This is a simple declaration that you wrote
+projects use: the DCO ([Developer Certificate of Origin](http://developercertificate.org/)).
+This is a simple declaration that you wrote
 the contribution or otherwise have the right to contribute it to Matrix:
 
 ```
@@ -479,10 +527,13 @@ From this point, you should:
 1. Look at the results of the CI pipeline.
     - If there is any error, fix the error.
 2. If a developer has requested changes, make these changes and let us know if it is ready for a developer to review again.
+   - A pull request is a conversation, if you disagree with the suggestions, please respond and discuss it.
 3. Create a new commit with the changes.
     - Please do NOT overwrite the history. New commits make the reviewer's life easier.
     - Push this commits to your Pull Request.
 4. Back to 1.
+5. Once the pull request is ready for review again please re-request review from whichever developer did your initial
+  review (or leave a comment in the pull request that you believe all required changes have been done).
 
 Once both the CI and the developers are happy, the patch will be merged into Synapse and released shortly!
 

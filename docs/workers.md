@@ -1,6 +1,6 @@
 # Scaling synapse via workers
 
-For small instances it recommended to run Synapse in the default monolith mode.
+For small instances it is recommended to run Synapse in the default monolith mode.
 For larger instances where performance is a concern it can be helpful to split
 out functionality into multiple separate python processes. These processes are
 called 'workers', and are (eventually) intended to scale horizontally
@@ -191,9 +191,8 @@ information.
     ^/_matrix/federation/v1/event_auth/
     ^/_matrix/federation/v1/exchange_third_party_invite/
     ^/_matrix/federation/v1/user/devices/
-    ^/_matrix/federation/v1/get_groups_publicised$
     ^/_matrix/key/v2/query
-    ^/_matrix/federation/(v1|unstable/org.matrix.msc2946)/hierarchy/
+    ^/_matrix/federation/v1/hierarchy/
 
     # Inbound federation transaction request
     ^/_matrix/federation/v1/send/
@@ -205,15 +204,14 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/context/.*$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/members$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/state$
-    ^/_matrix/client/(v1|unstable/org.matrix.msc2946)/rooms/.*/hierarchy$
+    ^/_matrix/client/v1/rooms/.*/hierarchy$
+    ^/_matrix/client/unstable/org.matrix.msc2716/rooms/.*/batch_send$
     ^/_matrix/client/unstable/im.nheko.summary/rooms/.*/summary$
     ^/_matrix/client/(r0|v3|unstable)/account/3pid$
+    ^/_matrix/client/(r0|v3|unstable)/account/whoami$
     ^/_matrix/client/(r0|v3|unstable)/devices$
     ^/_matrix/client/versions$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/voip/turnServer$
-    ^/_matrix/client/(r0|v3|unstable)/joined_groups$
-    ^/_matrix/client/(r0|v3|unstable)/publicised_groups$
-    ^/_matrix/client/(r0|v3|unstable)/publicised_groups/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/rooms/.*/event/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/joined_rooms$
     ^/_matrix/client/(api/v1|r0|v3|unstable)/search$
@@ -237,9 +235,6 @@ information.
     ^/_matrix/client/(api/v1|r0|v3|unstable)/join/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/profile/
 
-    # Device requests
-    ^/_matrix/client/(r0|v3|unstable)/sendToDevice/
-
     # Account data requests
     ^/_matrix/client/(r0|v3|unstable)/.*/tags
     ^/_matrix/client/(r0|v3|unstable)/.*/account_data
@@ -251,12 +246,12 @@ information.
     # Presence requests
     ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/
 
+    # User directory search requests
+    ^/_matrix/client/(r0|v3|unstable)/user_directory/search$
 
 Additionally, the following REST endpoints can be handled for GET requests:
 
-    ^/_matrix/federation/v1/groups/
     ^/_matrix/client/(api/v1|r0|v3|unstable)/pushrules/
-    ^/_matrix/client/(r0|v3|unstable)/groups/
 
 Pagination requests can also be handled, but all requests for a given
 room must be routed to the same instance. Additionally, care must be taken to
@@ -447,6 +442,14 @@ update_user_directory_from_worker: worker_name
 
 This work cannot be load-balanced; please ensure the main process is restarted
 after setting this option in the shared configuration!
+
+User directory updates allow REST endpoints matching the following regular
+expressions to work:
+
+    ^/_matrix/client/(r0|v3|unstable)/user_directory/search$
+
+The above endpoints can be routed to any worker, though you may choose to route
+it to the chosen user directory worker.
 
 This style of configuration supersedes the legacy `synapse.app.user_dir`
 worker application type.

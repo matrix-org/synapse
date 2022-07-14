@@ -40,7 +40,7 @@ FROM docker.io/python:${PYTHON_VERSION}-slim as requirements
 RUN \
    --mount=type=cache,target=/var/cache/apt,sharing=locked \
    --mount=type=cache,target=/var/lib/apt,sharing=locked \
- apt-get update && apt-get install -y git \
+ apt-get update -qq && apt-get install -yqq git \
     && rm -rf /var/lib/apt/lists/*
 
 # We install poetry in its own build stage to avoid its dependencies conflicting with
@@ -55,14 +55,20 @@ RUN \
 # NB: In poetry 1.2 `poetry export` will be moved into a plugin; we'll need to also
 # pip install poetry-plugin-export (https://github.com/python-poetry/poetry-plugin-export).
 RUN --mount=type=cache,target=/root/.cache/pip \
-  pip install --user git+https://github.com/python-poetry/poetry.git@fb13b3a676f476177f7937ffa480ee5cff9a90a5
+  pip install --user "poetry-core==1.1.0a7" "git+https://github.com/python-poetry/poetry.git@fb13b3a676f476177f7937ffa480ee5cff9a90a5"
 
 WORKDIR /synapse
 
 # Copy just what we need to run `poetry export`...
 COPY pyproject.toml poetry.lock /synapse/
 
-RUN /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt
+
+# If specified, we won't verify the hashes of dependencies.
+# This is only needed if the hashes of dependencies cannot be checked for some
+# reason, such as when a git repository is used directly as a dependency.
+ARG TEST_ONLY_SKIP_DEP_HASH_VERIFICATION
+
+RUN /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt ${TEST_ONLY_SKIP_DEP_HASH_VERIFICATION:+--without-hashes}
 
 ###
 ### Stage 1: builder
@@ -73,7 +79,7 @@ FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 RUN \
    --mount=type=cache,target=/var/cache/apt,sharing=locked \
    --mount=type=cache,target=/var/lib/apt,sharing=locked \
- apt-get update && apt-get install -y \
+ apt-get update -qq && apt-get install -yqq \
     build-essential \
     libffi-dev \
     libjpeg-dev \
@@ -85,6 +91,7 @@ RUN \
     openssl \
     rustc \
     zlib1g-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # To speed up rebuilds, install all of the dependencies before we copy over
@@ -118,7 +125,7 @@ LABEL org.opencontainers.image.licenses='Apache-2.0'
 RUN \
    --mount=type=cache,target=/var/cache/apt,sharing=locked \
    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  apt-get update && apt-get install -y \
+  apt-get update -qq && apt-get install -yqq \
     curl \
     gosu \
     libjpeg62-turbo \

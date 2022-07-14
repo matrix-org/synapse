@@ -26,18 +26,14 @@ from synapse.api.constants import (
     GuestAccess,
     Membership,
 )
-from synapse.api.errors import (
-    AuthError,
-    Codes,
-    LimitExceededError,
-    ShadowBanError,
-    SynapseError,
-)
+from synapse.api.errors import AuthError, Codes, ShadowBanError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.event_auth import get_named_level, get_power_level_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
+from synapse.module_api import NOT_SPAM
+from synapse.storage.state import StateFilter
 from synapse.types import (
     JsonDict,
     Requester,
@@ -67,6 +63,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.auth = hs.get_auth()
         self.state_handler = hs.get_state_handler()
         self.config = hs.config
@@ -104,17 +101,31 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             burst_count=hs.config.ratelimiting.rc_joins_remote.burst_count,
         )
 
+        # Ratelimiter for invites, keyed by room (across all issuers, all
+        # recipients).
         self._invites_per_room_limiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
             rate_hz=hs.config.ratelimiting.rc_invites_per_room.per_second,
             burst_count=hs.config.ratelimiting.rc_invites_per_room.burst_count,
         )
-        self._invites_per_user_limiter = Ratelimiter(
+
+        # Ratelimiter for invites, keyed by recipient (across all rooms, all
+        # issuers).
+        self._invites_per_recipient_limiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
             rate_hz=hs.config.ratelimiting.rc_invites_per_user.per_second,
             burst_count=hs.config.ratelimiting.rc_invites_per_user.burst_count,
+        )
+
+        # Ratelimiter for invites, keyed by issuer (across all rooms, all
+        # recipients).
+        self._invites_per_issuer_limiter = Ratelimiter(
+            store=self.store,
+            clock=self.clock,
+            rate_hz=hs.config.ratelimiting.rc_invites_per_issuer.per_second,
+            burst_count=hs.config.ratelimiting.rc_invites_per_issuer.burst_count,
         )
 
         self._third_party_invite_limiter = Ratelimiter(
@@ -261,7 +272,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if room_id:
             await self._invites_per_room_limiter.ratelimit(requester, room_id)
 
-        await self._invites_per_user_limiter.ratelimit(requester, invitee_user_id)
+        await self._invites_per_recipient_limiter.ratelimit(requester, invitee_user_id)
+        if requester is not None:
+            await self._invites_per_issuer_limiter.ratelimit(requester)
 
     async def _local_membership_update(
         self,
@@ -272,6 +285,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         state_event_ids: Optional[List[str]] = None,
+        depth: Optional[int] = None,
         txn_id: Optional[str] = None,
         ratelimit: bool = True,
         content: Optional[dict] = None,
@@ -302,6 +316,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 prev_events are set so we need to set them ourself via this argument.
                 This should normally be left as None, which will cause the auth_event_ids
                 to be calculated based on the room state at the prev_events.
+            depth: Override the depth used to order the event in the DAG.
+                Should normally be set to None, which will cause the depth to be calculated
+                based on the prev_events.
 
             txn_id:
             ratelimit:
@@ -357,12 +374,15 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             allow_no_prev_events=allow_no_prev_events,
             prev_event_ids=prev_event_ids,
             state_event_ids=state_event_ids,
+            depth=depth,
             require_consent=require_consent,
             outlier=outlier,
             historical=historical,
         )
 
-        prev_state_ids = await context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids(
+            StateFilter.from_types([(EventTypes.Member, None)])
+        )
 
         prev_member_event_id = prev_state_ids.get((EventTypes.Member, user_id), None)
 
@@ -375,16 +395,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             # Only rate-limit if the user actually joined the room, otherwise we'll end
             # up blocking profile updates.
             if newly_joined and ratelimit:
-                time_now_s = self.clock.time()
-                (
-                    allowed,
-                    time_allowed,
-                ) = await self._join_rate_limiter_local.can_do_action(requester)
-
-                if not allowed:
-                    raise LimitExceededError(
-                        retry_after_ms=int(1000 * (time_allowed - time_now_s))
-                    )
+                await self._join_rate_limiter_local.ratelimit(requester)
 
         result_event = await self.event_creation_handler.handle_new_client_event(
             requester,
@@ -460,6 +471,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         state_event_ids: Optional[List[str]] = None,
+        depth: Optional[int] = None,
     ) -> Tuple[str, int]:
         """Update a user's membership in a room.
 
@@ -495,6 +507,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 prev_events are set so we need to set them ourself via this argument.
                 This should normally be left as None, which will cause the auth_event_ids
                 to be calculated based on the room state at the prev_events.
+            depth: Override the depth used to order the event in the DAG.
+                Should normally be set to None, which will cause the depth to be calculated
+                based on the prev_events.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -534,6 +549,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     allow_no_prev_events=allow_no_prev_events,
                     prev_event_ids=prev_event_ids,
                     state_event_ids=state_event_ids,
+                    depth=depth,
                 )
 
         return result
@@ -556,6 +572,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         allow_no_prev_events: bool = False,
         prev_event_ids: Optional[List[str]] = None,
         state_event_ids: Optional[List[str]] = None,
+        depth: Optional[int] = None,
     ) -> Tuple[str, int]:
         """Helper for update_membership.
 
@@ -593,6 +610,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 prev_events are set so we need to set them ourself via this argument.
                 This should normally be left as None, which will cause the auth_event_ids
                 to be calculated based on the room state at the prev_events.
+            depth: Override the depth used to order the event in the DAG.
+                Should normally be set to None, which will cause the depth to be calculated
+                based on the prev_events.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -679,7 +699,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             if target_id == self._server_notices_mxid:
                 raise SynapseError(HTTPStatus.FORBIDDEN, "Cannot invite this user")
 
-            block_invite = False
+            block_invite_result = None
 
             if (
                 self._server_notices_mxid is not None
@@ -697,16 +717,22 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                         "Blocking invite: user is not admin and non-admin "
                         "invites disabled"
                     )
-                    block_invite = True
+                    block_invite_result = (Codes.FORBIDDEN, {})
 
-                if not await self.spam_checker.user_may_invite(
+                spam_check = await self.spam_checker.user_may_invite(
                     requester.user.to_string(), target_id, room_id
-                ):
+                )
+                if spam_check != NOT_SPAM:
                     logger.info("Blocking invite due to spam checker")
-                    block_invite = True
+                    block_invite_result = spam_check
 
-            if block_invite:
-                raise SynapseError(403, "Invites have been disabled on this server")
+            if block_invite_result is not None:
+                raise SynapseError(
+                    403,
+                    "Invites have been disabled on this server",
+                    errcode=block_invite_result[0],
+                    additional_fields=block_invite_result[1],
+                )
 
         # An empty prev_events list is allowed as long as the auth_event_ids are present
         if prev_event_ids is not None:
@@ -720,6 +746,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 allow_no_prev_events=allow_no_prev_events,
                 prev_event_ids=prev_event_ids,
                 state_event_ids=state_event_ids,
+                depth=depth,
                 content=content,
                 require_consent=require_consent,
                 outlier=outlier,
@@ -814,11 +841,17 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 # We assume that if the spam checker allowed the user to create
                 # a room then they're allowed to join it.
                 and not new_room
-                and not await self.spam_checker.user_may_join_room(
+            ):
+                spam_check = await self.spam_checker.user_may_join_room(
                     target.to_string(), room_id, is_invited=inviter is not None
                 )
-            ):
-                raise SynapseError(403, "Not allowed to join this room")
+                if spam_check != NOT_SPAM:
+                    raise SynapseError(
+                        403,
+                        "Not allowed to join this room",
+                        errcode=spam_check[0],
+                        additional_fields=spam_check[1],
+                    )
 
             # Check if a remote join should be performed.
             remote_join, remote_room_hosts = await self._should_perform_remote_join(
@@ -826,18 +859,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             )
             if remote_join:
                 if ratelimit:
-                    time_now_s = self.clock.time()
-                    (
-                        allowed,
-                        time_allowed,
-                    ) = await self._join_rate_limiter_remote.can_do_action(
+                    await self._join_rate_limiter_remote.ratelimit(
                         requester,
                     )
-
-                    if not allowed:
-                        raise LimitExceededError(
-                            retry_after_ms=int(1000 * (time_allowed - time_now_s))
-                        )
 
                 inviter = await self._get_inviter(target.to_string(), room_id)
                 if inviter and not self.hs.is_mine(inviter):
@@ -845,10 +869,17 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
                 content["membership"] = Membership.JOIN
 
-                profile = self.profile_handler
-                if not content_specified:
-                    content["displayname"] = await profile.get_displayname(target)
-                    content["avatar_url"] = await profile.get_avatar_url(target)
+                try:
+                    profile = self.profile_handler
+                    if not content_specified:
+                        content["displayname"] = await profile.get_displayname(target)
+                        content["avatar_url"] = await profile.get_avatar_url(target)
+                except Exception as e:
+                    logger.info(
+                        "Failed to get profile information while processing remote join for %r: %s",
+                        target,
+                        e,
+                    )
 
                 if requester.is_guest:
                     content["kind"] = "guest"
@@ -925,11 +956,18 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
                 content["membership"] = Membership.KNOCK
 
-                profile = self.profile_handler
-                if "displayname" not in content:
-                    content["displayname"] = await profile.get_displayname(target)
-                if "avatar_url" not in content:
-                    content["avatar_url"] = await profile.get_avatar_url(target)
+                try:
+                    profile = self.profile_handler
+                    if "displayname" not in content:
+                        content["displayname"] = await profile.get_displayname(target)
+                    if "avatar_url" not in content:
+                        content["avatar_url"] = await profile.get_avatar_url(target)
+                except Exception as e:
+                    logger.info(
+                        "Failed to get profile information while processing remote knock for %r: %s",
+                        target,
+                        e,
+                    )
 
                 return await self.remote_knock(
                     remote_room_hosts, room_id, target, content
@@ -944,6 +982,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             ratelimit=ratelimit,
             prev_event_ids=latest_event_ids,
             state_event_ids=state_event_ids,
+            depth=depth,
             content=content,
             require_consent=require_consent,
             outlier=outlier,
@@ -991,7 +1030,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # If the host is in the room, but not one of the authorised hosts
         # for restricted join rules, a remote join must be used.
         room_version = await self.store.get_room_version(room_id)
-        current_state_ids = await self.store.get_current_state_ids(room_id)
+        current_state_ids = await self._storage_controllers.state.get_current_state_ids(
+            room_id
+        )
 
         # If restricted join rules are not being used, a local join can always
         # be used.
@@ -1078,17 +1119,6 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # Transfer alias mappings in the room directory
         await self.store.update_aliases_for_room(old_room_id, room_id)
 
-        # Check if any groups we own contain the predecessor room
-        local_group_ids = await self.store.get_local_groups_for_room(old_room_id)
-        for group_id in local_group_ids:
-            # Add new the new room to those groups
-            await self.store.add_room_to_group(
-                group_id, room_id, old_room is not None and old_room["is_public"]
-            )
-
-            # Remove the old room from those groups
-            await self.store.remove_room_from_group(group_id, old_room_id)
-
     async def copy_user_state_on_room_upgrade(
         self, old_room_id: str, new_room_id: str, user_ids: Iterable[str]
     ) -> None:
@@ -1160,7 +1190,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         else:
             requester = types.create_requester(target_user)
 
-        prev_state_ids = await context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids(
+            StateFilter.from_types([(EventTypes.GuestAccess, None)])
+        )
         if event.membership == Membership.JOIN:
             if requester.is_guest:
                 guest_can_join = await self._can_guest_join(prev_state_ids)
@@ -1306,7 +1338,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         requester: Requester,
         txn_id: Optional[str],
         id_access_token: Optional[str] = None,
-    ) -> int:
+        prev_event_ids: Optional[List[str]] = None,
+        depth: Optional[int] = None,
+    ) -> Tuple[str, int]:
         """Invite a 3PID to a room.
 
         Args:
@@ -1319,9 +1353,13 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             txn_id: The transaction ID this is part of, or None if this is not
                 part of a transaction.
             id_access_token: The optional identity server access token.
+            depth: Override the depth used to order the event in the DAG.
+            prev_event_ids: The event IDs to use as the prev events
+                Should normally be set to None, which will cause the depth to be calculated
+                based on the prev_events.
 
         Returns:
-             The new stream ID.
+            Tuple of event ID and stream ordering position
 
         Raises:
             ShadowBanError if the requester has been shadow-banned.
@@ -1367,20 +1405,26 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             # We don't check the invite against the spamchecker(s) here (through
             # user_may_invite) because we'll do it further down the line anyway (in
             # update_membership_locked).
-            _, stream_id = await self.update_membership(
+            event_id, stream_id = await self.update_membership(
                 requester, UserID.from_string(invitee), room_id, "invite", txn_id=txn_id
             )
         else:
             # Check if the spamchecker(s) allow this invite to go through.
-            if not await self.spam_checker.user_may_send_3pid_invite(
+            spam_check = await self.spam_checker.user_may_send_3pid_invite(
                 inviter_userid=requester.user.to_string(),
                 medium=medium,
                 address=address,
                 room_id=room_id,
-            ):
-                raise SynapseError(403, "Cannot send threepid invite")
+            )
+            if spam_check != NOT_SPAM:
+                raise SynapseError(
+                    403,
+                    "Cannot send threepid invite",
+                    errcode=spam_check[0],
+                    additional_fields=spam_check[1],
+                )
 
-            stream_id = await self._make_and_store_3pid_invite(
+            event, stream_id = await self._make_and_store_3pid_invite(
                 requester,
                 id_server,
                 medium,
@@ -1389,9 +1433,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 inviter,
                 txn_id=txn_id,
                 id_access_token=id_access_token,
+                prev_event_ids=prev_event_ids,
+                depth=depth,
             )
+            event_id = event.event_id
 
-        return stream_id
+        return event_id, stream_id
 
     async def _make_and_store_3pid_invite(
         self,
@@ -1403,8 +1450,22 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         user: UserID,
         txn_id: Optional[str],
         id_access_token: Optional[str] = None,
-    ) -> int:
-        room_state = await self.state_handler.get_current_state(room_id)
+        prev_event_ids: Optional[List[str]] = None,
+        depth: Optional[int] = None,
+    ) -> Tuple[EventBase, int]:
+        room_state = await self._storage_controllers.state.get_current_state(
+            room_id,
+            StateFilter.from_types(
+                [
+                    (EventTypes.Member, user.to_string()),
+                    (EventTypes.CanonicalAlias, ""),
+                    (EventTypes.Name, ""),
+                    (EventTypes.Create, ""),
+                    (EventTypes.JoinRules, ""),
+                    (EventTypes.RoomAvatar, ""),
+                ]
+            ),
+        )
 
         inviter_display_name = ""
         inviter_avatar_url = ""
@@ -1484,8 +1545,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             },
             ratelimit=False,
             txn_id=txn_id,
+            prev_event_ids=prev_event_ids,
+            depth=depth,
         )
-        return stream_id
+        return event, stream_id
 
     async def _is_host_in_room(self, current_state_ids: StateMap[str]) -> bool:
         # Have we just created the room, and is this about to be the very
@@ -1800,7 +1863,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
     async def forget(self, user: UserID, room_id: str) -> None:
         user_id = user.to_string()
 
-        member = await self.state_handler.get_current_state(
+        member = await self._storage_controllers.state.get_current_state_event(
             room_id=room_id, event_type=EventTypes.Member, state_key=user_id
         )
         membership = member.membership if member else None

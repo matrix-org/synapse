@@ -37,7 +37,7 @@ import attr
 from frozendict import frozendict
 from signedjson.key import decode_verify_key_bytes
 from signedjson.types import VerifyKey
-from typing_extensions import TypedDict
+from typing_extensions import Final, TypedDict
 from unpaddedbase64 import decode_base64
 from zope.interface import Interface
 
@@ -267,7 +267,6 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
             )
 
         domain = parts[1]
-
         # This code will need changing if we want to support multiple domain
         # names on one HS
         return cls(localpart=parts[0], domain=domain)
@@ -279,6 +278,8 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
     @classmethod
     def is_valid(cls: Type[DS], s: str) -> bool:
         """Parses the input string and attempts to ensure it is valid."""
+        # TODO: this does not reject an empty localpart or an overly-long string.
+        # See https://spec.matrix.org/v1.2/appendices/#identifier-grammar
         try:
             obj = cls.from_string(s)
             # Apply additional validation to the domain. This is only done
@@ -318,29 +319,6 @@ class EventID(DomainSpecificString):
     """Structure representing an event id."""
 
     SIGIL = "$"
-
-
-@attr.s(slots=True, frozen=True, repr=False)
-class GroupID(DomainSpecificString):
-    """Structure representing a group ID."""
-
-    SIGIL = "+"
-
-    @classmethod
-    def from_string(cls: Type[DS], s: str) -> DS:
-        group_id: DS = super().from_string(s)  # type: ignore
-
-        if not group_id.localpart:
-            raise SynapseError(400, "Group ID cannot be empty", Codes.INVALID_PARAM)
-
-        if contains_invalid_mxid_characters(group_id.localpart):
-            raise SynapseError(
-                400,
-                "Group ID can only contain characters a-z, 0-9, or '=_-./'",
-                Codes.INVALID_PARAM,
-            )
-
-        return group_id
 
 
 mxid_localpart_allowed_characters = set(
@@ -630,6 +608,22 @@ class RoomStreamToken:
             return "s%d" % (self.stream,)
 
 
+class StreamKeyType:
+    """Known stream types.
+
+    A stream is a list of entities ordered by an incrementing "stream token".
+    """
+
+    ROOM: Final = "room_key"
+    PRESENCE: Final = "presence_key"
+    TYPING: Final = "typing_key"
+    RECEIPT: Final = "receipt_key"
+    ACCOUNT_DATA: Final = "account_data_key"
+    PUSH_RULES: Final = "push_rules_key"
+    TO_DEVICE: Final = "to_device_key"
+    DEVICE_LIST: Final = "device_list_key"
+
+
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class StreamToken:
     """A collection of keys joined together by underscores in the following
@@ -646,7 +640,7 @@ class StreamToken:
         6. `push_rules_key`: `541479`
         7. `to_device_key`: `274711`
         8. `device_list_key`: `265584`
-        9. `groups_key`: `1`
+        9. `groups_key`: `1` (note that this key is now unused)
 
     You can see how many of these keys correspond to the various
     fields in a "/sync" response:
@@ -698,6 +692,7 @@ class StreamToken:
     push_rules_key: int
     to_device_key: int
     device_list_key: int
+    # Note that the groups key is no longer used and may have bogus values.
     groups_key: int
 
     _SEPARATOR = "_"
@@ -729,6 +724,9 @@ class StreamToken:
                 str(self.push_rules_key),
                 str(self.to_device_key),
                 str(self.device_list_key),
+                # Note that the groups key is no longer used, but it is still
+                # serialized so that there will not be confusion in the future
+                # if additional tokens are added.
                 str(self.groups_key),
             ]
         )
@@ -743,9 +741,9 @@ class StreamToken:
 
         :raises TypeError: if `key` is not the one of the keys tracked by a StreamToken.
         """
-        if key == "room_key":
+        if key == StreamKeyType.ROOM:
             new_token = self.copy_and_replace(
-                "room_key", self.room_key.copy_and_advance(new_value)
+                StreamKeyType.ROOM, self.room_key.copy_and_advance(new_value)
             )
             return new_token
 
@@ -916,3 +914,9 @@ class UserProfile(TypedDict):
     user_id: str
     display_name: Optional[str]
     avatar_url: Optional[str]
+
+
+@attr.s(auto_attribs=True, frozen=True, slots=True)
+class RetentionPolicy:
+    min_lifetime: Optional[int] = None
+    max_lifetime: Optional[int] = None

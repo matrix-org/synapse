@@ -114,10 +114,10 @@ class Mailer:
 
         self.send_email_handler = hs.get_send_email_handler()
         self.store = self.hs.get_datastores().main
-        self.state_store = self.hs.get_storage().state
+        self._state_storage_controller = self.hs.get_storage_controllers().state
         self.macaroon_gen = self.hs.get_macaroon_generator()
         self.state_handler = self.hs.get_state_handler()
-        self.storage = hs.get_storage()
+        self._storage_controllers = hs.get_storage_controllers()
         self.app_name = app_name
         self.email_subjects: EmailSubjectConfig = hs.config.email.email_subjects
 
@@ -255,7 +255,9 @@ class Mailer:
             user_display_name = user_id
 
         async def _fetch_room_state(room_id: str) -> None:
-            room_state = await self.store.get_current_state_ids(room_id)
+            room_state = await self._state_storage_controller.get_current_state_ids(
+                room_id
+            )
             state_by_room[room_id] = room_state
 
         # Run at most 3 of these at once: sync does 10 at a time but email
@@ -456,7 +458,7 @@ class Mailer:
         }
 
         the_events = await filter_events_for_client(
-            self.storage, user_id, results.events_before
+            self._storage_controllers, user_id, results.events_before
         )
         the_events.append(notif_event)
 
@@ -494,7 +496,7 @@ class Mailer:
             )
         else:
             # Attempt to check the historical state for the room.
-            historical_state = await self.state_store.get_state_for_event(
+            historical_state = await self._state_storage_controller.get_state_for_event(
                 event.event_id, StateFilter.from_types((type_state_key,))
             )
             sender_state_event = historical_state.get(type_state_key)
@@ -767,8 +769,10 @@ class Mailer:
                 member_event_ids.append(sender_state_event_id)
             else:
                 # Attempt to check the historical state for the room.
-                historical_state = await self.state_store.get_state_for_event(
-                    event_id, StateFilter.from_types((type_state_key,))
+                historical_state = (
+                    await self._state_storage_controller.get_state_for_event(
+                        event_id, StateFilter.from_types((type_state_key,))
+                    )
                 )
                 sender_state_event = historical_state.get(type_state_key)
                 if sender_state_event:
@@ -856,13 +860,14 @@ class Mailer:
              A link to unsubscribe from email notifications.
         """
         params = {
-            "access_token": self.macaroon_gen.generate_delete_pusher_token(user_id),
+            "access_token": self.macaroon_gen.generate_delete_pusher_token(
+                user_id, app_id, email_address
+            ),
             "app_id": app_id,
             "pushkey": email_address,
         }
 
-        # XXX: make r0 once API is stable
-        return "%s_matrix/client/unstable/pushers/remove?%s" % (
+        return "%s_synapse/client/unsubscribe?%s" % (
             self.hs.config.server.public_baseurl,
             urllib.parse.urlencode(params),
         )
