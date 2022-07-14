@@ -212,8 +212,8 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
                     event_content = {
                         receipt_type: receipt_value
                         for receipt_type, receipt_value in event_content.items()
-                        if not receipt_type
-                        in [
+                        if receipt_type
+                        not in [
                             ReceiptTypes.READ_PRIVATE,
                             "org.matrix.msc2285.read.private",
                         ]
