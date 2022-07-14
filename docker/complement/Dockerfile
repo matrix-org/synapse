@@ -4,21 +4,36 @@
 #
 # Instructions for building this image from those it depends on is detailed in this guide:
 # https://github.com/matrix-org/synapse/blob/develop/docker/README-testing.md#testing-with-postgresql-and-single-or-multi-process-synapse
+
 ARG SYNAPSE_VERSION=latest
+
+# first of all, we create a base image with a postgres server and database,
+# which we can copy into the target image. For repeated rebuilds, this is
+# much faster than apt installing postgres each time.
+#
+# This trick only works because (a) the Synapse image happens to have all the
+# shared libraries that postgres wants, (b) we use a postgres image based on
+# the same debian version as Synapse's docker image (so the versions of the
+# shared libraries match).
+
+FROM postgres:13-bullseye AS postgres_base
+    # initialise the database cluster in /var/lib/postgresql
+    RUN gosu postgres initdb --locale=C --encoding=UTF-8 --auth-host password
+
+    # Configure a password and create a database for Synapse
+    RUN echo "ALTER USER postgres PASSWORD 'somesecret'" | gosu postgres postgres --single
+    RUN echo "CREATE DATABASE synapse" | gosu postgres postgres --single
+
 FROM matrixdotorg/synapse-workers:$SYNAPSE_VERSION
 
-# Install postgresql
-RUN apt-get update && \
-  DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -yqq postgresql-13
-
-# Configure a user and create a database for Synapse
-RUN pg_ctlcluster 13 main start &&  su postgres -c "echo \
- \"ALTER USER postgres PASSWORD 'somesecret'; \
- CREATE DATABASE synapse \
-  ENCODING 'UTF8' \
-  LC_COLLATE='C' \
-  LC_CTYPE='C' \
-  template=template0;\" | psql" && pg_ctlcluster 13 main stop
+# copy the postgres installation over from the image we built above
+RUN adduser --system --uid 999 postgres --home /var/lib/postgresql
+COPY --from=postgres_base /var/lib/postgresql /var/lib/postgresql
+COPY --from=postgres_base /usr/lib/postgresql /usr/lib/postgresql
+COPY --from=postgres_base /usr/share/postgresql /usr/share/postgresql
+RUN mkdir /var/run/postgresql && chown postgres /var/run/postgresql
+ENV PATH="${PATH}:/usr/lib/postgresql/13/bin"
+ENV PGDATA=/var/lib/postgresql/data
 
 # Extend the shared homeserver config to disable rate-limiting,
 # set Complement's static shared secret, enable registration, amongst other
