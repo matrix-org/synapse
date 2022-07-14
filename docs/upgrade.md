@@ -108,10 +108,10 @@ an error at startup.
 
 Synapse now includes a flag indicating if an event is an outlier when
 replicating it to other workers. This is a forwards- and backwards-incompatible
-change: v1.62 and workers cannot process events replicated by v1.63 workers, and
+change: v1.63 and workers cannot process events replicated by v1.64 workers, and
 vice versa.
 
-Once all workers are upgraded to v1.63 (or downgraded to v1.62), event
+Once all workers are upgraded to v1.64 (or downgraded to v1.63), event
 replication will resume as normal.
 
 # Upgrading to v1.62.0
