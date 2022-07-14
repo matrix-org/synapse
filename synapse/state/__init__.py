@@ -125,7 +125,11 @@ class _StateCacheEntry:
         )
 
     def __len__(self) -> int:
-        return len(self.state) if self.state else 0
+        # The len should is used to estimate how large this cache entry is, for
+        # cache eviction purposes. This is why if `self.state` is None it's fine
+        # to return 1.
+
+        return len(self.state) if self.state else 1
 
 
 class StateHandler:
