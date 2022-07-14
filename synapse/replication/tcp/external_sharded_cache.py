@@ -16,7 +16,7 @@ import binascii
 import logging
 import pickle
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Union
 
 import jump
 from prometheus_client import Counter, Histogram
@@ -104,7 +104,7 @@ class ExternalShardedCache:
     async def mset(
         self,
         cache_name: str,
-        values: dict[str, Any],
+        values: Dict[str, Any],
     ) -> None:
         """Add the key/value combinations to the named cache, with the expiry time given."""
 
@@ -115,7 +115,7 @@ class ExternalShardedCache:
 
         logger.debug("Caching %s: %r", cache_name, values)
 
-        shard_id_to_encoded_values: dict[int, dict[str, Any]] = defaultdict(dict)
+        shard_id_to_encoded_values: Dict[int, Dict[str, Any]] = defaultdict(dict)
 
         for key, value in values.items():
             redis_key = self._get_redis_key(cache_name, key)
@@ -139,11 +139,11 @@ class ExternalShardedCache:
         await self.mset(cache_name, {key: value})
 
     async def _mget_shard(
-        self, shard_id: int, key_mapping: dict[str, str]
-    ) -> dict[str, Any]:
+        self, shard_id: int, key_mapping: Dict[str, str]
+    ) -> Dict[str, Any]:
         results = await self._redis_shards[shard_id].mget(list(key_mapping.values()))
         original_keys = list(key_mapping.keys())
-        mapped_results: dict[str, Any] = {}
+        mapped_results: Dict[str, Any] = {}
         for i, result in enumerate(results):
             if not result:
                 continue
@@ -155,13 +155,13 @@ class ExternalShardedCache:
                 mapped_results[original_keys[i]] = result
         return mapped_results
 
-    async def mget(self, cache_name: str, keys: Iterable[str]) -> dict[str, Any]:
+    async def mget(self, cache_name: str, keys: Iterable[str]) -> Dict[str, Any]:
         """Look up a key/value combinations in the named cache."""
 
         if not self.is_enabled():
             return {}
 
-        shard_id_to_key_mapping: dict[int, dict[str, str]] = defaultdict(dict)
+        shard_id_to_key_mapping: Dict[int, Dict[str, str]] = defaultdict(dict)
 
         for key in keys:
             redis_key = self._get_redis_key(cache_name, key)
@@ -178,14 +178,14 @@ class ExternalShardedCache:
                     for shard_id, keys in shard_id_to_key_mapping.items()
                 ]
                 results: Union[
-                    list, list[dict[str, Any]]
+                    list, list[Dict[str, Any]]
                 ] = await make_deferred_yieldable(
                     defer.gatherResults(deferreds, consumeErrors=True)
                 ).addErrback(
                     unwrapFirstError
                 )
 
-        combined_results: dict[str, Any] = {}
+        combined_results: Dict[str, Any] = {}
         for result in results:
             combined_results.update(result)
 
