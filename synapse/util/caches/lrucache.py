@@ -740,24 +740,24 @@ class AsyncLruCache(Generic[KT, VT]):
     """
 
     def __init__(self, *args, **kwargs):  # type: ignore
-        self.lru_cache: LruCache[KT, VT] = LruCache(*args, **kwargs)
+        self._lru_cache: LruCache[KT, VT] = LruCache(*args, **kwargs)
 
     async def get(
         self, key: KT, default: Optional[T] = None, update_metrics: bool = True
     ) -> Optional[VT]:
-        return self.lru_cache.get(key, update_metrics=update_metrics)
+        return self._lru_cache.get(key, update_metrics=update_metrics)
 
     async def set(self, key: KT, value: VT) -> None:
-        self.lru_cache.set(key, value)
+        self._lru_cache.set(key, value)
 
     async def invalidate(self, key: KT) -> None:
-        return self.lru_cache.invalidate(key)
+        return self._lru_cache.invalidate(key)
 
     def invalidate_local(self, key: KT) -> None:
-        return self.lru_cache.invalidate(key)
+        return self._lru_cache.invalidate(key)
 
     async def contains(self, key: KT) -> bool:
-        return self.lru_cache.contains(key)
+        return self._lru_cache.contains(key)
 
     def clear(self) -> None:
-        self.lru_cache.clear()
+        self._lru_cache.clear()
