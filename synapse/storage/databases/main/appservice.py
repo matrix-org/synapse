@@ -372,19 +372,27 @@ class ApplicationServiceTransactionWorkerStore(
         )
 
     async def get_appservice_last_pos(self) -> int:
+        """
+        Get the last stream ordering position for the appservice process.
+        """
+
         return await self.db_pool.simple_select_one_onecol(
             table="appservice_stream_position",
             retcol="stream_ordering",
             keyvalues={},
-            desc="get_appservice_last_pos_txn",
+            desc="get_appservice_last_pos",
         )
 
     async def set_appservice_last_pos(self, pos: int) -> None:
+        """
+        Set the last stream ordering position for the appservice process.
+        """
+
         await self.db_pool.simple_update_one(
             table="appservice_stream_position",
             keyvalues={},
             updatevalues={"stream_ordering": pos},
-            desc="set_appservice_last_pos_txn",
+            desc="set_appservice_last_pos",
         )
 
     async def get_type_stream_id_for_appservice(
