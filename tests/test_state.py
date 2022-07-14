@@ -99,6 +99,10 @@ class _DummyStore:
         state_group = self._next_group
         self._next_group += 1
 
+        if current_state_ids is None:
+            current_state_ids = dict(self._group_to_state[prev_group])
+            current_state_ids.update(delta_ids)
+
         self._group_to_state[state_group] = dict(current_state_ids)
 
         return state_group
