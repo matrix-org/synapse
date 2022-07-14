@@ -753,6 +753,9 @@ class AsyncLruCache(Generic[KT, VT]):
     async def invalidate(self, key: KT) -> None:
         return self.lru_cache.invalidate(key)
 
+    def invalidate_local(self, key: KT) -> None:
+        return self.lru_cache.invalidate(key)
+
     async def contains(self, key: KT) -> bool:
         return self.lru_cache.contains(key)
 
