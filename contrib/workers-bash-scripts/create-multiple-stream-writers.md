@@ -62,19 +62,80 @@ HOMESERVER_YAML_STREAM_WRITERS+=$"  ${STREAM_WRITERS[$i]}: ${STREAM_WRITERS[$i]}
 ((i++))
 done
 
-echo "# Add these lines to your homeserver.yaml."
-echo "# Don't forget to configure your reverse proxy and"
-echo "# necessary endpoints to their respective worker."
-echo ""
-echo "# See https://github.com/matrix-org/synapse/blob/develop/docs/workers.md"
-echo "# for more information"
-echo ""
-echo "# Remember: Under NO circumstances should the replication"
-echo "# listener be exposed to the public internet;"
-echo "# it has no authentication and is unencrypted."
-echo ""
-echo "instance_map:"
-echo "$HOMESERVER_YAML_INSTANCE_MAP"
-echo "stream_writers:"
-echo "$HOMESERVER_YAML_STREAM_WRITERS"
+cat << EXAMPLECONFIG
+# Add these lines to your homeserver.yaml.
+# Don't forget to configure your reverse proxy and
+# necessary endpoints to their respective worker.
+
+# See https://github.com/matrix-org/synapse/blob/develop/docs/workers.md
+# for more information.
+
+# Remember: Under NO circumstances should the replication
+# listener be exposed to the public internet;
+# it has no authentication and is unencrypted.
+
+instance_map:
+$HOMESERVER_YAML_INSTANCE_MAP
+stream_writers:
+$HOMESERVER_YAML_STREAM_WRITERS
+EXAMPLECONFIG
+```
+
+Copy the code above save it to a file ```create_stream_writers.sh``` (for example).
+
+Simply run the script to create YAML files in the current folder and print out the required configuration for ```homeserver.yaml```.
+
+```console
+$ ./create_stream_writers.sh
+
+# Add these lines to your homeserver.yaml.
+# Don't forget to configure your reverse proxy and
+# necessary endpoints to their respective worker.
+
+# See https://github.com/matrix-org/synapse/blob/develop/docs/workers.md
+# for more information
+
+# Remember: Under NO circumstances should the replication
+# listener be exposed to the public internet;
+# it has no authentication and is unencrypted.
+
+instance_map:
+  presence_stream_writer:
+    host: 127.0.0.1
+    port: 8034
+  typing_stream_writer:
+    host: 127.0.0.1
+    port: 8035
+  receipts_stream_writer:
+    host: 127.0.0.1
+    port: 8036
+  to_device_stream_writer:
+    host: 127.0.0.1
+    port: 8037
+  account_data_stream_writer:
+    host: 127.0.0.1
+    port: 8038
+
+stream_writers:
+  presence: presence_stream_writer
+  typing: typing_stream_writer
+  receipts: receipts_stream_writer
+  to_device: to_device_stream_writer
+  account_data: account_data_stream_writer
+```
+
+Simply copy-and-paste this the output to an appropriate place in your Synapse main configuration file.
+
+## Write directly to Synapse configuration file
+
+You could also write the output directly to homeserver main configuration file. **This, however, is not recommended** as even a small typo (such as replacing >> with >) can erase the entire ```homeserver.yaml```. 
+
+If you do this, back up your original configuration file first:
+
+```console
+# Back up homeserver.yaml first
+cp /etc/matrix-synapse/homeserver.yaml /etc/matrix-synapse/homeserver.yaml.bak 
+
+# Create workers and write output to your homeserver.yaml
+./create_stream_writers.sh >> /etc/matrix-synapse/homeserver.yaml 
 ```
