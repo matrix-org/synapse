@@ -49,9 +49,12 @@ from twisted.logger import LoggingFile, LogLevel
 from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.python.threadpool import ThreadPool
 
+import synapse.util.caches
 from synapse.api.constants import MAX_PDU_SIZE
 from synapse.app import check_bind_error
 from synapse.app.phone_stats_home import start_phone_stats_home
+from synapse.config import ConfigError
+from synapse.config._base import format_config_error
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import ManholeConfig
 from synapse.crypto import context_factory
@@ -432,6 +435,10 @@ async def start(hs: "HomeServer") -> None:
         signal.signal(signal.SIGHUP, run_sighup)
 
         register_sighup(refresh_certificate, hs)
+        register_sighup(reload_cache_config, hs.config)
+
+    # Apply the cache config.
+    hs.config.caches.resize_all_caches()
 
     # Load the certificate from disk.
     refresh_certificate(hs)
@@ -484,6 +491,43 @@ async def start(hs: "HomeServer") -> None:
         # Speed up shutdowns by freezing all allocated objects. This moves everything
         # into the permanent generation and excludes them from the final GC.
         atexit.register(gc.freeze)
+
+
+def reload_cache_config(config: HomeServerConfig) -> None:
+    """Reload cache config from disk and immediately apply it.resize caches accordingly.
+
+    If the config is invalid, a `ConfigError` is logged and no changes are made.
+
+    Otherwise, this:
+        - replaces the `caches` section on the given `config` object,
+        - resizes all caches according to the new cache factors, and
+
+    Note that the following cache config keys are read, but not applied:
+        - event_cache_size: used to set a max_size and _original_max_size on
+              EventsWorkerStore._get_event_cache when it is created. We'd have to update
+              the _original_max_size (and maybe
+        - sync_response_cache_duration: would have to update the timeout_sec attribute on
+              HomeServer ->  SyncHandler -> ResponseCache.
+        - track_memory_usage. This affects synapse.util.caches.TRACK_MEMORY_USAGE which
+              influences Synapse's self-reported metrics.
+
+    Also, the HTTPConnectionPool in SimpleHTTPClient sets its maxPersistentPerHost
+    parameter based on the global_factor. This won't be applied on a config reload.
+    """
+    try:
+        previous_cache_config = config.reload_config_section("caches")
+    except ConfigError as e:
+        logger.warning("Failed to reload cache config")
+        for f in format_config_error(e):
+            logger.warning(f)
+    else:
+        logger.debug(
+            "New cache config. Was:\n %s\nNow:\n",
+            previous_cache_config.__dict__,
+            config.caches.__dict__,
+        )
+        synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage
+        config.caches.resize_all_caches()
 
 
 def setup_sentry(hs: "HomeServer") -> None:

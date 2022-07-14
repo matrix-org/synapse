@@ -130,6 +130,7 @@ class StateHandler:
         self.state_store = hs.get_storage().state
         self.hs = hs
         self._state_resolution_handler = hs.get_state_resolution_handler()
+        self._storage = hs.get_storage()
 
     @overload
     async def get_current_state(
@@ -361,10 +362,10 @@ class StateHandler:
 
         if not event.is_state():
             return EventContext.with_state(
+                storage=self._storage,
                 state_group_before_event=state_group_before_event,
                 state_group=state_group_before_event,
-                current_state_ids=state_ids_before_event,
-                prev_state_ids=state_ids_before_event,
+                state_delta_due_to_event={},
                 prev_group=state_group_before_event_prev_group,
                 delta_ids=deltas_to_state_group_before_event,
                 partial_state=partial_state,
@@ -393,10 +394,10 @@ class StateHandler:
         )
 
         return EventContext.with_state(
+            storage=self._storage,
             state_group=state_group_after_event,
             state_group_before_event=state_group_before_event,
-            current_state_ids=state_ids_after_event,
-            prev_state_ids=state_ids_before_event,
+            state_delta_due_to_event=delta_ids,
             prev_group=state_group_before_event,
             delta_ids=delta_ids,
             partial_state=partial_state,
