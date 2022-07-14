@@ -23,6 +23,8 @@ test-sytest:
 test-complement:
   stage: test
   image: golang:1.18-buster
+  only:
+    - test-complement
   services:
     - docker:dind
   variables:
