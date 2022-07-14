@@ -701,7 +701,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         """
         if localpart is None:
             raise SynapseError(400, "Request must include user id")
-        await self.hs.get_auth().check_auth_blocking()
+        await self.hs.get_auth_blocking().check_auth_blocking()
         need_register = True
 
         try:

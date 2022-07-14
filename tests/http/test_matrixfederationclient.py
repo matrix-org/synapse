@@ -617,3 +617,17 @@ class FederationClientTests(HomeserverTestCase):
         self.assertIsInstance(f.value, RequestSendFailed)
 
         self.assertTrue(transport.disconnecting)
+
+    def test_build_auth_headers_rejects_falsey_destinations(self) -> None:
+        with self.assertRaises(ValueError):
+            self.cl.build_auth_headers(None, b"GET", b"https://example.com")
+        with self.assertRaises(ValueError):
+            self.cl.build_auth_headers(b"", b"GET", b"https://example.com")
+        with self.assertRaises(ValueError):
+            self.cl.build_auth_headers(
+                None, b"GET", b"https://example.com", destination_is=b""
+            )
+        with self.assertRaises(ValueError):
+            self.cl.build_auth_headers(
+                b"", b"GET", b"https://example.com", destination_is=b""
+            )

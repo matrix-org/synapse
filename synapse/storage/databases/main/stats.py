@@ -120,11 +120,6 @@ class StatsStore(StateDeltasStore):
         self.db_pool.updates.register_background_update_handler(
             "populate_stats_process_users", self._populate_stats_process_users
         )
-        # we no longer need to perform clean-up, but we will give ourselves
-        # the potential to reintroduce it in the future – so documentation
-        # will still encourage the use of this no-op handler.
-        self.db_pool.updates.register_noop_background_update("populate_stats_cleanup")
-        self.db_pool.updates.register_noop_background_update("populate_stats_prepare")
 
     async def _populate_stats_process_users(
         self, progress: JsonDict, batch_size: int
@@ -300,6 +295,7 @@ class StatsStore(StateDeltasStore):
             keyvalues={id_col: id},
             retcol="completed_delta_stream_id",
             allow_none=True,
+            desc="get_earliest_token_for_stats",
         )
 
     async def bulk_update_stats_delta(

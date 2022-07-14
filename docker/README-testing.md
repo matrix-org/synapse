@@ -8,13 +8,19 @@ docker images that can be run inside Complement for testing purposes.
 
 Note that running Synapse's unit tests from within the docker image is not supported.
 
-## Testing with SQLite and single-process Synapse
+## Using the Complement launch script
 
-> Note that `scripts-dev/complement.sh` is a script that will automatically build
-> and run an SQLite-based, single-process of Synapse against Complement.
+`scripts-dev/complement.sh` is a script that will automatically build
+and run Synapse against Complement.
+Consult the [contributing guide][guideComplementSh] for instructions on how to use it.
 
-The instructions below will set up Complement testing for a single-process,
-SQLite-based Synapse deployment.
+
+[guideComplementSh]: https://matrix-org.github.io/synapse/latest/development/contributing_guide.html#run-the-integration-tests-complement
+
+## Building and running the images manually
+
+Under some circumstances, you may wish to build the images manually.
+The instructions below will lead you to doing that.
 
 Start by building the base Synapse docker image. If you wish to run tests with the latest
 release of Synapse, instead of your current checkout, you can skip this step. From the
@@ -24,12 +30,17 @@ root of the repository:
 docker build -t matrixdotorg/synapse -f docker/Dockerfile .
 ```
 
-This will build an image with the tag `matrixdotorg/synapse`.
-
-Next, build the Synapse image for Complement.
+Next, build the workerised Synapse docker image, which is a layer over the base
+image.
 
 ```sh
-docker build -t complement-synapse -f "docker/complement/Dockerfile" docker/complement
+docker build -t matrixdotorg/synapse-workers -f docker/Dockerfile-workers .
+```
+
+Finally, build the multi-purpose image for Complement, which is a layer over the workers image.
+
+```sh
+docker build -t complement-synapse -f docker/complement/Dockerfile docker/complement
 ```
 
 This will build an image with the tag `complement-synapse`, which can be handed to
@@ -37,49 +48,9 @@ Complement for testing via the `COMPLEMENT_BASE_IMAGE` environment variable. Ref
 [Complement's documentation](https://github.com/matrix-org/complement/#running) for
 how to run the tests, as well as the various available command line flags.
 
-## Testing with PostgreSQL and single or multi-process Synapse
+See [the Complement image README](./complement/README.md) for information about the
+expected environment variables.
 
-The above docker image only supports running Synapse with SQLite and in a
-single-process topology. The following instructions are used to build a Synapse image for
-Complement that supports either single or multi-process topology with a PostgreSQL
-database backend.
-
-As with the single-process image, build the base Synapse docker image. If you wish to run
-tests with the latest release of Synapse, instead of your current checkout, you can skip
-this step. From the root of the repository:
-
-```sh
-docker build -t matrixdotorg/synapse -f docker/Dockerfile .
-```
-
-This will build an image with the tag `matrixdotorg/synapse`.
-
-Next, we build a new image with worker support based on `matrixdotorg/synapse:latest`.
-Again, from the root of the repository:
-
-```sh
-docker build -t matrixdotorg/synapse-workers -f docker/Dockerfile-workers .
-```
-
-This will build an image with the tag` matrixdotorg/synapse-workers`.
-
-It's worth noting at this point that this image is fully functional, and
-can be used for testing against locally. See instructions for using the container
-under
-[Running the Dockerfile-worker image standalone](#running-the-dockerfile-worker-image-standalone)
-below.
-
-Finally, build the Synapse image for Complement, which is based on
-`matrixdotorg/synapse-workers`.
-
-```sh
-docker build -t matrixdotorg/complement-synapse-workers -f docker/complement/SynapseWorkers.Dockerfile docker/complement
-```
-
-This will build an image with the tag `complement-synapse-workers`, which can be handed to
-Complement for testing via the `COMPLEMENT_BASE_IMAGE` environment variable. Refer to
-[Complement's documentation](https://github.com/matrix-org/complement/#running) for
-how to run the tests, as well as the various available command line flags.
 
 ## Running the Dockerfile-worker image standalone
 
@@ -113,6 +84,9 @@ docker run -d --name synapse \
 ...substituting `POSTGRES*` variables for those that match a postgres host you have
 available (usually a running postgres docker container).
 
+
+### Workers
+
 The `SYNAPSE_WORKER_TYPES` environment variable is a comma-separated list of workers to
 use when running the container. All possible worker names are defined by the keys of the
 `WORKERS_CONFIG` variable in [this script](configure_workers_and_start.py), which the
@@ -125,8 +99,11 @@ type, simply specify the type multiple times in `SYNAPSE_WORKER_TYPES`
 (e.g `SYNAPSE_WORKER_TYPES=event_creator,event_creator...`).
 
 Otherwise, `SYNAPSE_WORKER_TYPES` can either be left empty or unset to spawn no workers
-(leaving only the main process). The container is configured to use redis-based worker
-mode.
+(leaving only the main process).
+The container will only be configured to use Redis-based worker mode if there are
+workers enabled.
+
+### Logging
 
 Logs for workers and the main process are logged to stdout and can be viewed with
 standard `docker logs` tooling. Worker logs contain their worker name
@@ -136,3 +113,21 @@ Setting `SYNAPSE_WORKERS_WRITE_LOGS_TO_DISK=1` will cause worker logs to be writ
 `<data_dir>/logs/<worker_name>.log`. Logs are kept for 1 week and rotate every day at 00:
 00, according to the container's clock. Logging for the main process must still be
 configured by modifying the homeserver's log config in your Synapse data volume.
+
+
+### Application Services
+
+Setting the `SYNAPSE_AS_REGISTRATION_DIR` environment variable to the path of
+a directory (within the container) will cause the configuration script to scan
+that directory for `.yaml`/`.yml` registration files.
+Synapse will be configured to load these configuration files.
+
+
+### TLS Termination
+
+Nginx is present in the image to route requests to the appropriate workers,
+but it does not serve TLS by default.
+
+You can configure `SYNAPSE_TLS_CERT` and `SYNAPSE_TLS_KEY` to point to a
+TLS certificate and key (respectively), both in PEM (textual) format.
+In this case, Nginx will additionally serve using HTTPS on port 8448.

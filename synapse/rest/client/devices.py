@@ -147,7 +147,9 @@ class DeviceRestServlet(RestServlet):
             can_skip_ui_auth=True,
         )
 
-        await self.device_handler.delete_device(requester.user.to_string(), device_id)
+        await self.device_handler.delete_devices(
+            requester.user.to_string(), [device_id]
+        )
         return 200, {}
 
     async def on_PUT(

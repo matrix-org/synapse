@@ -1,13 +1,3 @@
-import argparse
-import cgi
-import datetime
-
-import pydot
-import simplejson as json
-
-from synapse.events import FrozenEvent
-from synapse.util.frozenutils import unfreeze
-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,15 +12,35 @@ from synapse.util.frozenutils import unfreeze
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import datetime
+import html
+import json
 
-def make_graph(file_name, room_id, file_prefix, limit):
+import pydot
+
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.events import make_event_from_dict
+from synapse.util.frozenutils import unfreeze
+
+
+def make_graph(file_name: str, file_prefix: str, limit: int) -> None:
+    """
+    Generate a dot and SVG file for a graph of events in the room based on the
+    topological ordering by reading line-delimited JSON from a file.
+    """
     print("Reading lines")
     with open(file_name) as f:
         lines = f.readlines()
 
     print("Read lines")
 
-    events = [FrozenEvent(json.loads(line)) for line in lines]
+    # Figure out the room version, assume the first line is the create event.
+    room_version = KNOWN_ROOM_VERSIONS[
+        json.loads(lines[0]).get("content", {}).get("room_version")
+    ]
+
+    events = [make_event_from_dict(json.loads(line), room_version) for line in lines]
 
     print("Loaded events.")
 
@@ -66,8 +76,8 @@ def make_graph(file_name, room_id, file_prefix, limit):
             content.append(
                 "<b>%s</b>: %s,"
                 % (
-                    cgi.escape(key, quote=True).encode("ascii", "xmlcharrefreplace"),
-                    cgi.escape(value, quote=True).encode("ascii", "xmlcharrefreplace"),
+                    html.escape(key, quote=True).encode("ascii", "xmlcharrefreplace"),
+                    html.escape(value, quote=True).encode("ascii", "xmlcharrefreplace"),
                 )
             )
 
@@ -101,11 +111,11 @@ def make_graph(file_name, room_id, file_prefix, limit):
     print("Created Nodes")
 
     for event in events:
-        for prev_id, _ in event.prev_events:
+        for prev_id in event.prev_event_ids():
             try:
                 end_node = node_map[prev_id]
             except Exception:
-                end_node = pydot.Node(name=prev_id, label="<<b>%s</b>>" % (prev_id,))
+                end_node = pydot.Node(name=prev_id, label=f"<<b>{prev_id}</b>>")
 
                 node_map[prev_id] = end_node
                 graph.add_node(end_node)
@@ -139,8 +149,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("-l", "--limit", help="Only retrieve the last N events.")
     parser.add_argument("event_file")
-    parser.add_argument("room")
 
     args = parser.parse_args()
 
-    make_graph(args.event_file, args.room, args.prefix, args.limit)
+    make_graph(args.event_file, args.prefix, args.limit)

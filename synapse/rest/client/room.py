@@ -1177,7 +1177,9 @@ class TimestampLookupRestServlet(RestServlet):
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self._auth.get_user_by_req(request)
-        await self._auth.check_user_in_room(room_id, requester.user.to_string())
+        await self._auth.check_user_in_room_or_world_readable(
+            room_id, requester.user.to_string()
+        )
 
         timestamp = parse_integer(request, "ts", required=True)
         direction = parse_string(request, "dir", default="f", allowed_values=["f", "b"])
