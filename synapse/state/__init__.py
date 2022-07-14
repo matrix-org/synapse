@@ -84,7 +84,7 @@ def _gen_state_id() -> str:
 
 
 class _StateCacheEntry:
-    __slots__ = ["state", "state_group", "prev_group", "delta_ids"]
+    __slots__ = ["_state", "state_group", "prev_group", "delta_ids"]
 
     def __init__(
         self,
@@ -97,7 +97,7 @@ class _StateCacheEntry:
             raise Exception("Either state or state group must be not None")
 
         # A map from (type, state_key) to event_id.
-        self.state = frozendict(state) if state is not None else None
+        self._state = frozendict(state) if state is not None else None
 
         # the ID of a state group if one and only one is involved.
         # otherwise, None otherwise?
@@ -115,8 +115,8 @@ class _StateCacheEntry:
         looking up the state group in the DB.
         """
 
-        if self.state is not None:
-            return self.state
+        if self._state is not None:
+            return self._state
 
         assert self.state_group is not None
 
@@ -129,7 +129,7 @@ class _StateCacheEntry:
         # cache eviction purposes. This is why if `self.state` is None it's fine
         # to return 1.
 
-        return len(self.state) if self.state else 1
+        return len(self._state) if self._state else 1
 
 
 class StateHandler:
