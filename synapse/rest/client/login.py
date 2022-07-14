@@ -730,7 +730,7 @@ class RandomStrServlet(RestServlet):
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         rand_str = ''.join(random.sample(string.ascii_letters + string.digits, 32))
 
-        # message = "Welcome to AMAX-IM! sign nonce:{s}".format(s=rand_str)
+        # message = "Welcome to amax-synapse! sign nonce:{s}".format(s=rand_str)
         message = "{sign_ms} sign nonce:{s}".format(sign_ms=self.wallet_sign_message, s=rand_str)
 
         # message to redis, expiry_ms: 60000

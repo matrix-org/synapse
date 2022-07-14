@@ -799,7 +799,7 @@ class ServerConfig(Config):
         
         amax_rpc_url: https://testnode.amaxscan.io/
         
-        wallet_sigin_message: "Welcome to AMAX-IM!"
+        wallet_sigin_message: "Welcome to amax-synapse!"
 
         # When running as a daemon, the file to store the pid in
         #
