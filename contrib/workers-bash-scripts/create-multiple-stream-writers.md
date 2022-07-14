@@ -83,6 +83,8 @@ EXAMPLECONFIG
 
 Copy the code above save it to a file ```create_stream_writers.sh``` (for example).
 
+## Run the script to create workers and print out a sample configuration
+
 Simply run the script to create YAML files in the current folder and print out the required configuration for ```homeserver.yaml```.
 
 ```console
@@ -124,7 +126,7 @@ stream_writers:
   account_data: account_data_stream_writer
 ```
 
-Simply copy-and-paste this the output to an appropriate place in your Synapse main configuration file.
+Simply copy-and-paste the output to an appropriate place in your Synapse main configuration file.
 
 ## Write directly to Synapse configuration file
 
