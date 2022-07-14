@@ -1,7 +1,7 @@
 Synapse vNext
 =============
 
-As of this release, Synapse no longer allows the tasks of verifying email address ownership, and password reset confirmation, to be delegated to an identity server. For more information, see the [upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.63/docs/upgrade.md#upgrading-to-v1630).
+As of this release, Synapse no longer allows the tasks of verifying email address ownership, and password reset confirmation, to be delegated to an identity server. For more information, see the [upgrade notes](https://matrix-org.github.io/synapse/v1.64/upgrade.html#upgrading-to-v1640).
 
 Synapse 1.63.0rc1 (2022-07-12)
 ==============================
