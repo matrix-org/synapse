@@ -472,6 +472,14 @@ format = ["fqdn", "idna", "isoduration", "jsonpointer (>1.13)", "rfc3339-validat
 format_nongpl = ["fqdn", "idna", "isoduration", "jsonpointer (>1.13)", "rfc3339-validator", "rfc3986-validator (>0.1.0)", "uri-template", "webcolors (>=1.11)"]
 
 [[package]]
+name = "jump-consistent-hash"
+version = "3.2.0"
+description = "Implementation of the Jump Consistent Hash algorithm"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[[package]]
 name = "keyring"
 version = "23.5.0"
 description = "Store and access your passwords safely."
@@ -1546,14 +1554,14 @@ docs = ["sphinx", "repoze.sphinx.autointerface"]
 test = ["zope.i18nmessageid", "zope.testing", "zope.testrunner"]
 
 [extras]
-all = ["matrix-synapse-ldap3", "psycopg2", "psycopg2cffi", "psycopg2cffi-compat", "pysaml2", "authlib", "lxml", "sentry-sdk", "jaeger-client", "opentracing", "txredisapi", "hiredis", "Pympler"]
+all = ["matrix-synapse-ldap3", "psycopg2", "psycopg2cffi", "psycopg2cffi-compat", "pysaml2", "authlib", "lxml", "sentry-sdk", "jaeger-client", "opentracing", "txredisapi", "hiredis", "Pympler", "jump-consistent-hash"]
 cache_memory = ["Pympler"]
 jwt = ["authlib"]
 matrix-synapse-ldap3 = ["matrix-synapse-ldap3"]
 oidc = ["authlib"]
 opentracing = ["jaeger-client", "opentracing"]
 postgres = ["psycopg2", "psycopg2cffi", "psycopg2cffi-compat"]
-redis = ["txredisapi", "hiredis"]
+redis = ["txredisapi", "hiredis", "jump-consistent-hash"]
 saml2 = ["pysaml2"]
 sentry = ["sentry-sdk"]
 systemd = ["systemd-python"]
@@ -2799,4 +2807,9 @@ zipp = [
 "zope.schema" = [
     {file = "zope.schema-6.2.0-py2.py3-none-any.whl", hash = "sha256:03150d8670549590b45109e06b7b964f4e751fa9cb5297ec4985c3bc38641b07"},
     {file = "zope.schema-6.2.0.tar.gz", hash = "sha256:2201aef8ad75ee5a881284d7a6acd384661d6dca7bde5e80a22839a77124595b"},
+]
+"jump-consistent-hash" = [
+    {file = "jump_consistent_hash-3.2.0-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:42753979b8ee53545282d18906b93c6db99ab77133a2ea9b750f8cc8f951db1c"},
+    {file = "jump_consistent_hash-3.2.0-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:b974d4ff7504c5efc10469dac8b279128aede01c539049e0e1fd86e649e7f37d"},
+    {file = "jump-consistent-hash-3.2.0.tar.gz", hash = "sha256:211c67366dc5e4afe00fae4ae5c0550362d8c77c9d73bc6ef428caf471b71603"},
 ]
