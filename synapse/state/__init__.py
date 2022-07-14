@@ -153,8 +153,8 @@ class StateHandler:
             event_ids: the events whose state should be fetched and resolved.
 
         Returns:
-            the resolution of the states after the given event IDs. This is a mapping
-            (event_type, state_key) -> event_id.
+            the state dict (a mapping from (event_type, state_key) -> event_id) which
+            holds the resolution of the state dicts after the given event IDs.
         """
         logger.debug("calling resolve_state_groups from get_current_state_ids")
         ret = await self.resolve_state_groups_for_events(room_id, event_ids)
