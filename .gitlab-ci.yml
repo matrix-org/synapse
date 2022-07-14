@@ -2,7 +2,7 @@ stages:
   - test
   - build
 
-test:
+test-trial:
   stage: test
   image:
     name: $CI_REGISTRY_IMAGE:latest
@@ -10,6 +10,31 @@ test:
   script:
     - pip install -e ".[all]"
     - trial -j 4 tests
+
+test-sytest:
+  stage: test
+  image:
+    name: matrixdotorg/sytest-synapse:buster
+    entrypoint: [""]
+  script:
+    - cp -r . /src
+    - /bootstrap.sh synapse
+
+test-complement:
+  stage: test
+  image: golang:1.18-buster
+  services:
+    - docker:dind
+  variables:
+    DOCKER_BUILDKIT: 1
+  before_script:
+    - echo "deb http://deb.debian.org/debian buster-backports main" > /etc/apt/sources.list.d/complement.list
+    - apt-get update
+    - apt-get install -yqq wget libolm3 libolm-dev/buster-backports
+    - wget -O docker-cli.deb https://download.docker.com/linux/debian/dists/buster/pool/stable/amd64/docker-ce-cli_20.10.9~3-0~debian-buster_amd64.deb
+    - dpkg -i docker-cli.deb
+  script:
+    - scripts-dev/complement.sh
 
 build:
   stage: build
