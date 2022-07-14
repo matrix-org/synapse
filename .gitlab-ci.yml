@@ -42,32 +42,32 @@ build:
   stage: build
   image: docker:latest
   services:
-  - docker:dind
+    - docker:dind
   variables:
     DOCKER_BUILDKIT: 1
   before_script:
-  - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-  - if [ $CI_COMMIT_BRANCH == "master" ]; then tag=$(cat pyproject.toml | grep -E "^version =" | sed -E 's/^version = "(.+)"$/\1/'); fi
-  - if [ $CI_COMMIT_BRANCH != "master" ]; then tag=$CI_COMMIT_BRANCH; fi
-  - docker build --tag $CI_REGISTRY_IMAGE:$tag-$CI_COMMIT_SHA -f docker/Dockerfile .
-  - docker push $CI_REGISTRY_IMAGE:$tag-$CI_COMMIT_SHA
-  - if [ $CI_COMMIT_BRANCH == "master" ]; then
-      docker tag $CI_REGISTRY_IMAGE:$tag-$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest;
-      docker push $CI_REGISTRY_IMAGE:latest;
-    fi
+    - if [ $CI_COMMIT_BRANCH == "master" ]; then tag=$(cat pyproject.toml | grep -E "^version =" | sed -E 's/^version = "(.+)"$/\1/'); fi
+    - if [ $CI_COMMIT_BRANCH != "master" ]; then tag=$CI_COMMIT_BRANCH; fi
+    - docker build --tag $CI_REGISTRY_IMAGE:$tag-$CI_COMMIT_SHA -f docker/Dockerfile .
+    - docker push $CI_REGISTRY_IMAGE:$tag-$CI_COMMIT_SHA
+    - if [ $CI_COMMIT_BRANCH == "master" ]; then
+        docker tag $CI_REGISTRY_IMAGE:$tag-$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest;
+        docker push $CI_REGISTRY_IMAGE:latest;
+      fi
 
 build-pyston:
   stage: build
   image: docker:latest
   services:
-  - docker:dind
+    - docker:dind
   variables:
     DOCKER_BUILDKIT: 1
   before_script:
-  - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-  - if [ $CI_COMMIT_BRANCH == "master" ]; then tag=$(cat pyproject.toml | grep -E "^version =" | sed -E 's/^version = "(.+)"$/\1/'); fi
-  - if [ $CI_COMMIT_BRANCH != "master" ]; then tag=$CI_COMMIT_BRANCH; fi
-  - docker build --tag $CI_REGISTRY_IMAGE:$tag-$CI_COMMIT_SHA-pyston --build-arg BASE_IMAGE=pyston/slim:2.3.3 -f docker/Dockerfile-custom-base .
-  - docker push $CI_REGISTRY_IMAGE:$tag-$CI_COMMIT_SHA-pyston
+    - if [ $CI_COMMIT_BRANCH == "master" ]; then tag=$(cat pyproject.toml | grep -E "^version =" | sed -E 's/^version = "(.+)"$/\1/'); fi
+    - if [ $CI_COMMIT_BRANCH != "master" ]; then tag=$CI_COMMIT_BRANCH; fi
+    - docker build --tag $CI_REGISTRY_IMAGE:$tag-$CI_COMMIT_SHA-pyston --build-arg BASE_IMAGE=pyston/slim:2.3.3 -f docker/Dockerfile-custom-base .
+    - docker push $CI_REGISTRY_IMAGE:$tag-$CI_COMMIT_SHA-pyston
