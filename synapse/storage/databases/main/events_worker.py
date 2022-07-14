@@ -733,7 +733,8 @@ class EventsWorkerStore(SQLBaseStore):
 
     async def _invalidate_get_event_cache(self, event_id: str) -> None:
         await self._get_event_cache.invalidate((event_id,))
-        self._invalidate_local_get_event_cache(event_id)
+        self._event_ref.pop(event_id, None)
+        self._current_event_fetches.pop(event_id, None)
 
     def _invalidate_local_get_event_cache(self, event_id: str) -> None:
         self._get_event_cache.invalidate_local((event_id,))
