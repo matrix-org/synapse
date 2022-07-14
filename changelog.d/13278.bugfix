@@ -1,0 +1,1 @@
+Fix long-standing bug where in rare instance Synapse could store the incorrect state.
