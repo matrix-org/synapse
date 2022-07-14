@@ -734,9 +734,10 @@ class LruCache(Generic[KT, VT]):
 
 class AsyncLruCache(Generic[KT, VT]):
     """
-    An asynchronous wrapper around a subset of the LruCache API. On it's own
-    this doesn't change the behaviour but allows subclasses that utilize
-    external cache systems that require await behaviour to be created.
+    An asynchronous wrapper around a subset of the LruCache API.
+
+    On it's own this doesn't change the behaviour but allows subclasses that
+    utilize external cache systems that require await behaviour to be created.
     """
 
     def __init__(self, *args, **kwargs):  # type: ignore
