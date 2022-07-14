@@ -40,9 +40,11 @@ class ReadMarkerRestServlet(RestServlet):
         self.read_marker_handler = hs.get_read_marker_handler()
         self.presence_handler = hs.get_presence_handler()
 
-        self._known_receipt_types = {ReceiptTypes.READ, ReceiptTypes.FULLY_READ}
-        if hs.config.experimental.msc2285_enabled:
-            self._known_receipt_types.add(ReceiptTypes.READ_PRIVATE)
+        self._known_receipt_types = {
+            ReceiptTypes.READ,
+            ReceiptTypes.FULLY_READ,
+            ReceiptTypes.READ_PRIVATE,
+        }
 
     async def on_POST(
         self, request: SynapseRequest, room_id: str
