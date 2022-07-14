@@ -863,13 +863,6 @@ class RoomCreationHandler:
                 check_membership=False,
             )
 
-        preset_identifier = config.get(
-            "preset",
-            RoomCreationPreset.PRIVATE_CHAT
-            if visibility == "private"
-            else RoomCreationPreset.PUBLIC_CHAT,
-        )
-
         raw_initial_state = config.get("initial_state", [])
 
         initial_state = OrderedDict()
@@ -881,10 +874,17 @@ class RoomCreationHandler:
         # override any attempt to set room versions via the creation_content
         creation_content["room_version"] = room_version.identifier
 
+        room_preset_identifier = config.get(
+            "preset",
+            RoomCreationPreset.PRIVATE_CHAT
+            if visibility == "private"
+            else RoomCreationPreset.PUBLIC_CHAT,
+        )
+
         last_stream_id = await self._send_events_for_new_room(
             requester,
             room_id,
-            preset_identifier=preset_identifier,
+            room_preset_identifier=room_preset_identifier,
             invite_list=invite_list,
             initial_state=initial_state,
             creation_content=creation_content,
@@ -894,6 +894,7 @@ class RoomCreationHandler:
             ratelimit=ratelimit,
         )
 
+        # TODO: These could also be moved into `_send_events_for_new_room`
         if "name" in config:
             name = config["name"]
             (
@@ -1057,32 +1058,35 @@ class RoomCreationHandler:
 
         # Determine the options that this preset defines. This will influence which state events will
         # be sent below.
-        room_preset_config_options = self._default_presets_dict.get(room_preset_identifier)
-        if not room_preset_config_options:
+        if room_preset_identifier not in self._default_presets_dict.keys():
             if not self._allow_custom_room_presets:
                 raise SynapseError(
-                    400, f"'{room_preset_identifier}' is not a valid preset", errcode=Codes.BAD_JSON
+                    400,
+                    f"'{room_preset_identifier}' is not a valid preset",
+                    errcode=Codes.BAD_JSON,
                 )
 
             # TODO: Ask modules about initial_state and base room preset
+            # Should modules be able to say "empty base room preset"? Aka return None here?
+            # This would just result in an empty dictionary I think...
             initial_state += {}
-            base_room_preset_identifier = RoomCreationPreset.PUBLIC_CHAT
+            room_preset_identifier = RoomCreationPreset.PUBLIC_CHAT
+
             # TODO: Should modules also be able to append to room_creation_content? I would think so, just
             # that they can't override room version I guess?
 
-            room_preset_config_options = self._default_presets_dict[base_room_preset_identifier]
-
+            # TODO: If no module recognised this preset ID, then raise an exception.
             if False:
                 raise SynapseError(
-                    400, f"'{room_preset_identifier}' is not a valid preset", errcode=Codes.BAD_JSON
+                    400,
+                    f"'{room_preset_identifier}' is not a valid preset",
+                    errcode=Codes.BAD_JSON,
                 )
 
-        # The code below will take `initial_state` and `preset_config` as input and
-        # figure out which events to send in the appropriate order.
-
-        # Send the create and creator membership join events first.
+        # Send the create event and creator membership join first. These are required regardless
+        # of room preset.
         creation_content.update({"creator": creator_id})
-        last_sent_stream_id = await send(etype=EventTypes.Create, content=creation_content)
+        await send(etype=EventTypes.Create, content=creation_content)
 
         logger.debug("Sending %s in new room", EventTypes.Member)
         last_sent_stream_id = await self.room_member_handler.update_membership(
@@ -1096,21 +1100,31 @@ class RoomCreationHandler:
         )
 
         state_to_send = self._get_state_events_for_new_room(
+            creator.user,
             room_preset_identifier,
             initial_state,
+            invite_list,
+            power_level_content_override,
+            room_alias,
         )
 
         # Send all state events in succession
         for (event_type, state_key), event_content in state_to_send:
-            last_sent_stream_id = await send(etype=event_type, state_key=state_key, content=event_content)
+            last_sent_stream_id = await send(
+                etype=event_type, state_key=state_key, content=event_content
+            )
 
         return last_sent_stream_id
 
     def _get_state_events_for_new_room(
         self,
+        room_creator_user: UserID,
         room_preset_identifier: str,
         initial_state: MutableStateMap,
-    ) -> List:
+        user_invite_list: List[str],
+        power_level_content_override: Optional[JsonDict] = None,
+        room_alias: Optional[RoomAlias] = None,
+    ) -> Dict[StateKey, JsonDict]:
         """
         For a given room preset, return a map of state events that should initially be sent into the room.
 
@@ -1118,20 +1132,21 @@ class RoomCreationHandler:
             room_preset_identifier: The identifier of the room preset.
 
         Returns:
-            A list of state events to send into the new room.
+            An ordered dict of state events to send into the new room.
         """
-        state_to_send = []
+        # We rely on Python 3.7 mandating that `dict`s are ordered by insertion order.
+        state_to_send = {}
+
+        room_preset_config_options = self._default_presets_dict[room_preset_identifier]
 
         # We treat the power levels override specially as this needs to be one
         # of the first events that get sent into a room.
         pl_content = initial_state.pop((EventTypes.PowerLevels, ""), None)
         if pl_content is not None:
-            state_to_send.append(
-                ((EventTypes.PowerLevels, ""), pl_content)
-            )
+            state_to_send[(EventTypes.PowerLevels, "")] = pl_content
         else:
             power_level_content: JsonDict = {
-                "users": {creator_id: 100},
+                "users": {room_creator_user.to_string(): 100},
                 "users_default": 0,
                 "events": {
                     EventTypes.Name: 50,
@@ -1153,17 +1168,21 @@ class RoomCreationHandler:
             }
 
             if room_preset_config_options["original_invitees_have_ops"]:
-                for invitee in invite_list:
+                for invitee in user_invite_list:
                     power_level_content["users"][invitee] = 100
 
             # If the user supplied a preset name e.g. "private_chat",
             # we apply that preset
-            power_level_content.update(room_preset_config_options["power_level_content_override"])
+            power_level_content.update(
+                room_preset_config_options["power_level_content_override"]
+            )
 
             # If the server config contains default_power_level_content_override,
             # and that contains information for this room preset, apply it.
             if self._default_power_level_content_override:
-                override = self._default_power_level_content_override.get(room_preset_identifier)
+                override = self._default_power_level_content_override.get(
+                    room_preset_identifier
+                )
                 if override is not None:
                     power_level_content.update(override)
 
@@ -1172,59 +1191,39 @@ class RoomCreationHandler:
             if power_level_content_override:
                 power_level_content.update(power_level_content_override)
 
-            state_to_send.append(
-                ((EventTypes.PowerLevels, ""), power_level_content)
-            )
+            state_to_send[(EventTypes.PowerLevels, "")] = power_level_content
 
-        if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
-            state_to_send.append(
-                (
-                    (EventTypes.CanonicalAlias, ""),
-                    {"alias": room_alias.to_string()},
-                )
-            )
+        state_to_send[(EventTypes.CanonicalAlias, "")] = {
+            "alias": room_alias.to_string()
+        }
 
-        if (EventTypes.JoinRules, "") not in initial_state:
-            state_to_send.append(
-                (
-                    (EventTypes.JoinRules, ""),
-                    {"join_rule": room_preset_config_options["join_rules"]},
-                )
-            )
+        state_to_send[(EventTypes.JoinRules, "")] = {
+            "join_rule": room_preset_config_options["join_rules"]
+        }
 
-        if (EventTypes.RoomHistoryVisibility, "") not in initial_state:
-            state_to_send.append(
-                (
-                    (EventTypes.RoomHistoryVisibility, ""),
-                    {"history_visibility": room_preset_config_options["history_visibility"]},
-                )
-            )
+        state_to_send[(EventTypes.RoomHistoryVisibility, "")] = {
+            "history_visibility": room_preset_config_options["history_visibility"]
+        }
 
         if room_preset_config_options["guest_can_join"]:
-            if (EventTypes.GuestAccess, "") not in initial_state:
-                state_to_send.append(
-                    (
-                        (EventTypes.GuestAccess, ""),
-                        {EventContentFields.GUEST_ACCESS: GuestAccess.CAN_JOIN},
-                    )
-                )
+            state_to_send[(EventTypes.GuestAccess, "")] = {
+                EventContentFields.GUEST_ACCESS: GuestAccess.CAN_JOIN
+            }
 
-        for (event_type, state_key), content in initial_state.items():
-            state_to_send.append(
-                (
-                    (event_type, state_key),
-                    content,
-                )
-            )
+        #
+        for (event_type, state_key), content_dict in initial_state.items():
+            # TODO: Support None meaning delete the state from the dict?
 
+            # If this (state event type, state_key) tuple is already in the list, replace it in-place.
+            state_to_send[(event_type, state_key)] = content_dict
+
+        # TODO: Why do we want to send this last? It means that custom room presets can't override it
         if room_preset_config_options["encrypted"]:
-            state_to_send.append(
-                (
-                    (EventTypes.RoomEncryption, ""),
-                    {"algorithm": RoomEncryptionAlgorithms.DEFAULT},
-                )
-            )
+            state_to_send[(EventTypes.RoomEncryption, "")] = {
+                "algorithm": RoomEncryptionAlgorithms.DEFAULT
+            }
 
+        return state_to_send
 
     def _generate_room_id(self) -> str:
         """Generates a random room ID.

@@ -875,17 +875,20 @@ class ModuleApi:
 
         Added in Synapse v1.XX.Y.
         """
-        # We need a unique identifier for each calling module, so that when
-        # this method is called again, the previous list of room presets can
-        # be identified and replaced.
+        # We need a unique identifier for each calling module, so that if this
+        # method is called multiple times, the previous list of room presets can
+        # be replaced.
 
         # Get the calling module's ...
+        # OK, instead of this nonsense, just have the module register a single
+        # custom_room_preset -> initial_state, base_room_preset mapping. The
+        # module could do this multiple times and override its previous ones.
+        # If other modules use the same then there's not much Synapse can do.
+        # We could log if we're overriding to give sysadmins a heads up.
         caller_frame = inspect.stack()[1]
         module_filepath = inspect.getmodule(caller_frame[0]).__file__
         if module_filepath:
-            self._room_creation_handler.custom_room_presets.update(
-                {module_filepath: room_preset_names}
-            )
+            self._room_creation_handler.custom_room_presets[module_filepath] = room_preset_names
 
     async def complete_sso_login_async(
         self,
