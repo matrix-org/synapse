@@ -221,9 +221,9 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
                     # Copy the current user's private read receipt from the
                     # original content, if it exists.
-                    user_private_read_receipt = orig_event_content[
-                        ReceiptTypes.READ_PRIVATE
-                    ].get(user_id, None)
+                    user_private_read_receipt = orig_event_content.get(
+                        ReceiptTypes.READ_PRIVATE, {}
+                    ).get(user_id, None)
                     if user_private_read_receipt:
                         event_content[ReceiptTypes.READ_PRIVATE] = {
                             user_id: user_private_read_receipt
