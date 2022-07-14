@@ -401,14 +401,12 @@ class ThumbnailResource(DirectServeJsonResource):
         else:
             # This might be because:
             # 1. We can't create thumbnails for the given media (corrupted or
-            #    unsupported file type)
+            #    unsupported file type), or
             # 2. The thumbnailing process never ran or errored out initially
             #    when the media was first uploaded (these bugs should be
             #    reported and fixed).
-            # 3. `dynamic_thumbnails` is disabled (see `homeserver.yaml`) and we
-            #    failed to generate thumbnails on initial upload. If
-            #    `dynamic_thumbnails` was enabled, Synapse would go down a
-            #    different code path.
+            # Note that we don't attempt to generate a thumbnail now because
+            # `dynamic_thumbnails` is disabled.
             logger.info("Failed to find any generated thumbnails")
 
             respond_with_json(
