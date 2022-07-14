@@ -411,6 +411,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             "_get_linearized_receipts_for_rooms", f
         )
 
+        # Map of room ID to a dictionary in the form that sync wants it.
         results: JsonDict = {}
         for row in txn_results:
             # We want a single event per room, since we want to batch the
@@ -426,6 +427,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
             receipt_type = event_entry.setdefault(row["receipt_type"], {})
 
             receipt_type[row["user_id"]] = db_to_json(row["data"])
+            if row["thread_id"]:
+                receipt_type[row["user_id"]]["thread_id"] = row["thread_id"]
 
         results = {
             room_id: [results[room_id]] if room_id in results else []
