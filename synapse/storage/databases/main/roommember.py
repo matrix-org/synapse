@@ -243,7 +243,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             txn: LoggingTransaction,
         ) -> Dict[str, ProfileInfo]:
             clause, ids = make_in_list_sql_clause(
-                self.database_engine, "m.user_id", user_ids
+                self.database_engine, "c.state_key", user_ids
             )
 
             sql = """
