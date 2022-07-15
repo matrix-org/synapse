@@ -1,1 +1,1 @@
-Use HTTPStatus constants in place of literals in tests.
+Use `HTTPStatus` constants in place of literals in tests.
