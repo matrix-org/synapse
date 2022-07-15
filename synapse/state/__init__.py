@@ -291,9 +291,9 @@ class StateHandler:
 
             state_group_before_event_prev_group = entry.prev_group
             deltas_to_state_group_before_event = entry.delta_ids
+            state_ids_before_event = None
 
             # We make sure that we have a state group assigned to the state.
-            state_ids_before_event = None
             if entry.state_group is None:
                 # store_state_group requires us to have either a previous state group
                 # (with deltas) or the complete state map. So, if we don't have a
