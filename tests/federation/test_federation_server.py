@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from http import HTTPStatus
 
 from parameterized import parameterized
 
@@ -20,7 +21,6 @@ from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.config.server import DEFAULT_ROOM_VERSION
-from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events import make_event_from_dict
 from synapse.federation.federation_server import server_matches_acl_event
 from synapse.rest import admin
@@ -59,7 +59,7 @@ class FederationServerTests(unittest.FederatingHomeserverTestCase):
             "/_matrix/federation/v1/get_missing_events/%s" % (room_1,),
             query_content,
         )
-        self.assertEqual(400, channel.code, channel.result)
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_NOT_JSON")
 
 
@@ -120,7 +120,7 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
         channel = self.make_signed_federation_request(
             "GET", "/_matrix/federation/v1/state/%s?event_id=xyz" % (room_1,)
         )
-        self.assertEqual(403, channel.code, channel.result)
+        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
 
 
@@ -154,7 +154,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
             f"/_matrix/federation/v1/make_join/{self._room_id}/{user_id}"
             f"?ver={DEFAULT_ROOM_VERSION}",
         )
-        self.assertEqual(channel.code, 200, channel.json_body)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
         return channel.json_body
 
     def test_send_join(self):
@@ -163,18 +163,16 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
         join_result = self._make_join(joining_user)
 
         join_event_dict = join_result["event"]
-        add_hashes_and_signatures(
-            KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
+        self.add_hashes_and_signatures_from_other_server(
             join_event_dict,
-            signature_name=self.OTHER_SERVER_NAME,
-            signing_key=self.OTHER_SERVER_SIGNATURE_KEY,
+            KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
         )
         channel = self.make_signed_federation_request(
             "PUT",
             f"/_matrix/federation/v2/send_join/{self._room_id}/x",
             content=join_event_dict,
         )
-        self.assertEqual(channel.code, 200, channel.json_body)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
 
         # we should get complete room state back
         returned_state = [
@@ -220,18 +218,16 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
         join_result = self._make_join(joining_user)
 
         join_event_dict = join_result["event"]
-        add_hashes_and_signatures(
-            KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
+        self.add_hashes_and_signatures_from_other_server(
             join_event_dict,
-            signature_name=self.OTHER_SERVER_NAME,
-            signing_key=self.OTHER_SERVER_SIGNATURE_KEY,
+            KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
         )
         channel = self.make_signed_federation_request(
             "PUT",
             f"/_matrix/federation/v2/send_join/{self._room_id}/x?org.matrix.msc3706.partial_state=true",
             content=join_event_dict,
         )
-        self.assertEqual(channel.code, 200, channel.json_body)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
 
         # expect a reduced room state
         returned_state = [
