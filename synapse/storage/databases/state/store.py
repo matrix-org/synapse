@@ -404,8 +404,8 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
     ) -> int:
         """Store a new set of state, returning a newly assigned state group.
 
-        If `current_state_ids` is None then `prev_group` and `delta_ids` must
-        not be None.
+        At least one of `current_state_ids` and `prev_group` must be provided. Whenever
+        `prev_group` is not None, `delta_ids` must also not be None.
 
         Args:
             event_id: The event ID for which the state was calculated
