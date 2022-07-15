@@ -157,6 +157,7 @@ class StateHandler:
         self,
         room_id: str,
         event_ids: Collection[str],
+        state_filter: Optional[StateFilter] = None,
     ) -> StateMap[str]:
         """Fetch the state after each of the given event IDs. Resolve them and return.
 
@@ -174,7 +175,7 @@ class StateHandler:
         """
         logger.debug("calling resolve_state_groups from compute_state_after_events")
         ret = await self.resolve_state_groups_for_events(room_id, event_ids)
-        return await ret.get_state(self._state_storage_controller, StateFilter.all())
+        return await ret.get_state(self._state_storage_controller, state_filter)
 
     async def get_current_users_in_room(
         self, room_id: str, latest_event_ids: List[str]
