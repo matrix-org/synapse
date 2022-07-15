@@ -773,7 +773,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             "register",
             {"auth": {"session": session, "type": LoginType.DUMMY}},
         )
-        self.assertEqual(channel.code, HTTPStatus.UNAUTHORIZED, channel.json_body)
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.USER_IN_USE)
 
 
