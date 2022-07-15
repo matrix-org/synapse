@@ -158,7 +158,7 @@ class DictionaryCache(Generic[KT, DKT, DV]):
             assert isinstance(entry, _PerKeyValue)
 
             if entry.value is _Sentinel.sentinel:
-                known_absent.add(entry.value)
+                known_absent.add(dict_key)
             else:
                 values[dict_key] = entry.value
 
