@@ -796,7 +796,7 @@ class StateTestCase(unittest.TestCase):
 
         self.assertEqual(entry.prev_group, 2)
 
-        # There are two changes from `old_state_2` to `new_state`
+        # There are three changes from `old_state_2` to `new_state`
         self.assertEqual(
             entry.delta_ids, {("a", ""): "E", ("c", ""): "E", ("d", ""): "E"}
         )
