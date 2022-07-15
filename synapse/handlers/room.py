@@ -1031,8 +1031,24 @@ class RoomCreationHandler:
     ) -> Tuple[int, str, int]:
         """Sends the initial events into a new room.
 
-        `power_level_content_override` doesn't apply when initial state has
-        power level state event content.
+        Args:
+            creator: The creator of the room.
+            room_id: The ID of the room to send events in.
+            invite_list: A list of Matrix user IDs to invite to the room. This is only
+                used by the method to set the power levels of the invitees to 100 if
+                the preset for the room specifies that initial invitees should have ops.
+            initial_state: A map of state key to an event definition or event ID.
+            creation_content: A json dict to use as the value of the "content" field
+                for the room's create event.
+            preset_config: The identifier of the room preset to use. This
+                determines the events that are sent into the room.
+            room_alias: A room alias to link to the room, if provided.
+            power_level_content_override: A json dictionary that specifies the initial
+                power levels of the room. If `initial_state` contains a 'm.room.power_levels'
+                event then this argument will be ignored.
+            creator_join_profile: The JSON dictionary value of the "content" field for the
+                'm.room.membership' join event that will be sent for the creator of the room.
+            ratelimit: Whether to ratelimit the join event of the room creator.
 
         Returns:
             A tuple containing the stream ID, event ID and depth of the last
