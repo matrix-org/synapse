@@ -421,20 +421,20 @@ class FederationClient(FederationBase):
         if signed_pdu:
             self._get_pdu_cache[event_id] = signed_pdu
 
-        # Make sure to return a copy because downstream callers will use this
-        # event reference directly and change our original, pristine, untouched
-        # PDU. For example when people mark the event as an `outlier`
-        # (`event.internal_metadata.outlier = true`), we don't want that to
-        # propagate back into the cache.
-        #
-        # We could get away with only making a new copy of the event when
-        # pulling from cache but it's probably better to have good hygiene and
-        # not dirty the cache in the first place as well.
-        event_copy = make_event_from_dict(
-            signed_pdu.get_pdu_json(),
-            signed_pdu.room_version,
-            internal_metadata_dict=None,
-        )
+            # Make sure to return a copy because downstream callers will use this
+            # event reference directly and change our original, pristine, untouched
+            # PDU. For example when people mark the event as an `outlier`
+            # (`event.internal_metadata.outlier = true`), we don't want that to
+            # propagate back into the cache.
+            #
+            # We could get away with only making a new copy of the event when
+            # pulling from cache but it's probably better to have good hygiene and
+            # not dirty the cache in the first place as well.
+            event_copy = make_event_from_dict(
+                signed_pdu.get_pdu_json(),
+                signed_pdu.room_version,
+                internal_metadata_dict=None,
+            )
 
         return event_copy
 
