@@ -1495,7 +1495,7 @@ class TimestampLookupHandler:
                         type(ex).__name__,
                         ex,
                         ex.args,
-                        exc_info=(type(ex), ex, ex.__traceback__),
+                        exc_info=True,
                     )
 
         # To appease mypy, we have to add both of these conditions to check for
