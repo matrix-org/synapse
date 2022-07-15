@@ -923,12 +923,15 @@ class FederationEventHandler:
         event_id: str,
     ) -> StateMap[str]:
         """Requests all of the room state at a given event from a remote homeserver.
+
         Args:
             destination: The remote homeserver to query for the state.
             room_id: The id of the room we're interested in.
             event_id: The id of the event we want the state at.
+
         Returns:
             The event ids of the state *after* the given event.
+
         Raises:
             InvalidResponseError: if the remote homeserver's response contains fields
                 of the wrong type.
