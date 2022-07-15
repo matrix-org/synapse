@@ -328,7 +328,7 @@ class PusherPool:
             return None
 
         try:
-            p = self.pusher_factory.create_pusher(pusher_config)
+            pusher = self.pusher_factory.create_pusher(pusher_config)
         except PusherConfigException as e:
             logger.warning(
                 "Pusher incorrectly configured id=%i, user=%s, appid=%s, pushkey=%s: %s",
@@ -346,7 +346,7 @@ class PusherPool:
             )
             return None
 
-        if not p:
+        if not pusher:
             return None
 
         appid_pushkey = "%s:%s" % (pusher_config.app_id, pusher_config.pushkey)
@@ -354,9 +354,9 @@ class PusherPool:
         byuser = self.pushers.setdefault(pusher_config.user_name, {})
         if appid_pushkey in byuser:
             byuser[appid_pushkey].on_stop()
-        byuser[appid_pushkey] = p
+        byuser[appid_pushkey] = pusher
 
-        synapse_pushers.labels(type(p).__name__, p.app_id).inc()
+        synapse_pushers.labels(type(pusher).__name__, pusher.app_id).inc()
 
         # Check if there *may* be push to process. We do this as this check is a
         # lot cheaper to do than actually fetching the exact rows we need to
@@ -372,9 +372,9 @@ class PusherPool:
             # risk missing push.
             have_notifs = True
 
-        p.on_started(have_notifs)
+        pusher.on_started(have_notifs)
 
-        return p
+        return pusher
 
     async def remove_pusher(self, app_id: str, pushkey: str, user_id: str) -> None:
         appid_pushkey = "%s:%s" % (app_id, pushkey)
