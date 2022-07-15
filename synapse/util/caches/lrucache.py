@@ -736,7 +736,7 @@ class AsyncLruCache(Generic[KT, VT]):
     """
     An asynchronous wrapper around a subset of the LruCache API.
 
-    On it's own this doesn't change the behaviour but allows subclasses that
+    On its own this doesn't change the behaviour but allows subclasses that
     utilize external cache systems that require await behaviour to be created.
     """
 
@@ -756,6 +756,11 @@ class AsyncLruCache(Generic[KT, VT]):
         return self._lru_cache.invalidate(key)
 
     def invalidate_local(self, key: KT) -> None:
+        """Remove an entry from the local cache
+        
+        This variant of `invalidate` is useful if we know that the external
+        cache has already been invalidated.
+        """
         return self._lru_cache.invalidate(key)
 
     async def contains(self, key: KT) -> bool:
