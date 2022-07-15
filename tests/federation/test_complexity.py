@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from http import HTTPStatus
 from unittest.mock import Mock
 
 from synapse.api.errors import Codes, SynapseError
@@ -50,7 +51,7 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         channel = self.make_signed_federation_request(
             "GET", "/_matrix/federation/unstable/rooms/%s/complexity" % (room_1,)
         )
-        self.assertEqual(200, channel.code)
+        self.assertEqual(HTTPStatus.OK, channel.code)
         complexity = channel.json_body["v1"]
         self.assertTrue(complexity > 0, complexity)
 
@@ -62,7 +63,7 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         channel = self.make_signed_federation_request(
             "GET", "/_matrix/federation/unstable/rooms/%s/complexity" % (room_1,)
         )
-        self.assertEqual(200, channel.code)
+        self.assertEqual(HTTPStatus.OK, channel.code)
         complexity = channel.json_body["v1"]
         self.assertEqual(complexity, 1.23)
 
