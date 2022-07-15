@@ -97,6 +97,9 @@ class _StateCacheEntry:
             raise Exception("Either state or state group must be not None")
 
         # A map from (type, state_key) to event_id.
+        #
+        # This can be None if we have a `state_group` (as then we can fetch the
+        # state from the DB.)
         self._state = frozendict(state) if state is not None else None
 
         # the ID of a state group if one and only one is involved.
