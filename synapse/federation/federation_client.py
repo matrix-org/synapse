@@ -53,7 +53,7 @@ from synapse.api.room_versions import (
     RoomVersion,
     RoomVersions,
 )
-from synapse.events import EventBase, builder
+from synapse.events import EventBase, builder, make_event_from_dict
 from synapse.federation.federation_base import (
     FederationBase,
     InvalidEventSignatureError,
@@ -360,9 +360,25 @@ class FederationClient(FederationBase):
 
         # TODO: Rate limit the number of times we try and get the same event.
 
-        ev = self._get_pdu_cache.get(event_id)
-        if ev:
-            return ev
+        event_from_cache = self._get_pdu_cache.get(event_id)
+        if event_from_cache:
+            assert not event_from_cache.internal_metadata.outlier, (
+                "Event from cache unexpectedly an `outlier` when it should be pristine and untouched without metadata set. "
+                "We are probably not be returning a copy of the event because downstream callers are modifying the event reference we have in the cache."
+            )
+
+            # Make sure to return a copy because downstream callers will use
+            # this event reference directly and change our original, pristine,
+            # untouched PDU. For example when people mark the event as an
+            # `outlier` (`event.internal_metadata.outlier = true`), we don't
+            # want that to propagate back into the cache.
+            event_copy = make_event_from_dict(
+                event_from_cache.get_pdu_json(),
+                event_from_cache.room_version,
+                internal_metadata_dict=None,
+            )
+
+            return event_copy
 
         pdu_attempts = self.pdu_destination_tried.setdefault(event_id, {})
 
@@ -405,7 +421,22 @@ class FederationClient(FederationBase):
         if signed_pdu:
             self._get_pdu_cache[event_id] = signed_pdu
 
-        return signed_pdu
+        # Make sure to return a copy because downstream callers will use this
+        # event reference directly and change our original, pristine, untouched
+        # PDU. For example when people mark the event as an `outlier`
+        # (`event.internal_metadata.outlier = true`), we don't want that to
+        # propagate back into the cache.
+        #
+        # We could get away with only making a new copy of the event when
+        # pulling from cache but it's probably better to have good hygiene and
+        # not dirty the cache in the first place as well.
+        event_copy = make_event_from_dict(
+            signed_pdu.get_pdu_json(),
+            signed_pdu.room_version,
+            internal_metadata_dict=None,
+        )
+
+        return event_copy
 
     async def get_room_state_ids(
         self, destination: str, room_id: str, event_id: str

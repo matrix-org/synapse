@@ -55,7 +55,7 @@ from synapse.event_auth import (
     check_state_independent_auth_rules,
     validate_event_for_room_version,
 )
-from synapse.events import EventBase, make_event_from_dict
+from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.logging.context import nested_logging_context
@@ -1356,25 +1356,12 @@ class FederationEventHandler:
                 affected=event_id,
             )
 
-        # We want to make a non-outlier event so it plays well with
-        # `_process_pulled_events()` -> `_update_outliers_txn()` to create a
-        # `state_group` and mimics what would happen in a regular backfill.
-        # `get_pdu()` can potentially return an `outlier` depending on the cache
-        # which we don't want.
-        event_non_outlier = make_event_from_dict(
-            event_from_response.get_pdu_json(),
-            event_from_response.room_version,
-            internal_metadata_dict=None,
-        )
-        assert not event_non_outlier.internal_metadata.outlier
-
         # Persist the event we just fetched, including pulling all of the state
-        # and auth events to de-outlier it. This function is weird and
-        # de-outliers but only works on non-outlier events. This also sets up
-        # the necessary `state_groups` for the event.
+        # and auth events to de-outlier it. This also sets up the necessary
+        # `state_groups` for the event.
         await self._process_pulled_events(
             destination,
-            [event_non_outlier],
+            [event_from_response],
             # Prevent notifications going to clients
             backfilled=True,
         )
