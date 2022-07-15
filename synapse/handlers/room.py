@@ -1520,7 +1520,7 @@ class TimestampLookupHandler:
                         ex,
                         ex.args,
                     )
-                except Exception as ex:
+                except Exception:
                     # But we do want to see some exceptions in our code
                     logger.warning(
                         "get_event_for_timestamp: Failed to fetch /timestamp_to_event from %s because of exception",
