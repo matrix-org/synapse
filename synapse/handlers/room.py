@@ -1022,7 +1022,7 @@ class RoomCreationHandler:
         room_id: str,
         room_preset_identifier: str,
         invite_list: List[str],
-        initial_state: MutableStateMap,
+        initial_state: MutableStateMap[JsonDict],
         creation_content: JsonDict,
         room_alias: Optional[RoomAlias] = None,
         power_level_content_override: Optional[JsonDict] = None,
@@ -1106,13 +1106,17 @@ class RoomCreationHandler:
                 errcode=Codes.BAD_JSON,
             )
 
+        # Create and send the 'm.room.create' event
         creation_content.update({"creator": creator_id})
         await send(etype=EventTypes.Create, content=creation_content)
-
-        logger.debug("Sending %s in new room", EventTypes.Member)
-        # Room create event must exist at this point
         assert last_sent_event_id is not None
-        member_event_id, _ = await self.room_member_handler.update_membership(
+
+        # Create and send the join event for the room creator
+        logger.debug("Sending %s in new room", EventTypes.Member)
+        (
+            last_sent_event_id,
+            last_sent_stream_id,
+        ) = await self.room_member_handler.update_membership(
             creator,
             creator.user,
             room_id,
@@ -1123,15 +1127,16 @@ class RoomCreationHandler:
             prev_event_ids=[last_sent_event_id],
             depth=depth,
         )
-        last_sent_event_id = member_event_id
+
+        # Create a map of (event_type, state_key) -> event json dict.
+        # A dict allows us to easily load up and override state event definitions
+        state_to_send: MutableStateMap[JsonDict] = {}
 
         # We treat the power levels override specially as this needs to be one
         # of the first events that get sent into a room.
         pl_content = initial_state.pop((EventTypes.PowerLevels, ""), None)
         if pl_content is not None:
-            last_sent_stream_id = await send(
-                etype=EventTypes.PowerLevels, content=pl_content
-            )
+            state_to_send[(EventTypes.PowerLevels, "")] = pl_content
         else:
             power_level_content: JsonDict = {
                 "users": {creator_id: 100},
@@ -1179,47 +1184,40 @@ class RoomCreationHandler:
             if power_level_content_override:
                 power_level_content.update(power_level_content_override)
 
-            last_sent_stream_id = await send(
-                etype=EventTypes.PowerLevels, content=power_level_content
-            )
+            state_to_send[(EventTypes.PowerLevels, "")] = power_level_content
 
-        if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
-            last_sent_stream_id = await send(
-                etype=EventTypes.CanonicalAlias,
-                content={"alias": room_alias.to_string()},
-            )
+        if room_alias:
+            state_to_send[(EventTypes.CanonicalAlias, "")] = {
+                "alias": room_alias.to_string()
+            }
 
-        if (EventTypes.JoinRules, "") not in initial_state:
-            last_sent_stream_id = await send(
-                etype=EventTypes.JoinRules,
-                content={"join_rule": room_preset_config["join_rules"]},
-            )
-
-        if (EventTypes.RoomHistoryVisibility, "") not in initial_state:
-            last_sent_stream_id = await send(
-                etype=EventTypes.RoomHistoryVisibility,
-                content={
-                    "history_visibility": room_preset_config["history_visibility"]
-                },
-            )
+        state_to_send[(EventTypes.JoinRules, "")] = {
+            "join_rule": room_preset_config["join_rules"]
+        }
+        state_to_send[(EventTypes.RoomHistoryVisibility, "")] = {
+            "history_visibility": room_preset_config["history_visibility"]
+        }
 
         if room_preset_config["guest_can_join"]:
-            if (EventTypes.GuestAccess, "") not in initial_state:
-                last_sent_stream_id = await send(
-                    etype=EventTypes.GuestAccess,
-                    content={EventContentFields.GUEST_ACCESS: GuestAccess.CAN_JOIN},
-                )
+            state_to_send[(EventTypes.GuestAccess, "")] = {
+                EventContentFields.GUEST_ACCESS: GuestAccess.CAN_JOIN
+            }
 
-        for (etype, state_key), content in initial_state.items():
-            last_sent_stream_id = await send(
-                etype=etype, state_key=state_key, content=content
-            )
+        # Override any default state with the user-provided contents of `initial_state`
+        state_to_send.update(initial_state)
 
+        # Set the encryption state of the room based on the room preset config
+        # FIXME: We should do this before layering initial_state on top, c.f.
+        # https://github.com/matrix-org/synapse/issues/9794.
         if room_preset_config["encrypted"]:
+            state_to_send[(EventTypes.RoomEncryption, "")] = {
+                "algorithm": RoomEncryptionAlgorithms.DEFAULT
+            }
+
+        # Send each event in order of its insertion into the dictionary
+        for (event_type, state_key), content in state_to_send.items():
             last_sent_stream_id = await send(
-                etype=EventTypes.RoomEncryption,
-                state_key="",
-                content={"algorithm": RoomEncryptionAlgorithms.DEFAULT},
+                etype=event_type, state_key=state_key, content=content
             )
 
         return last_sent_stream_id, last_sent_event_id, depth
