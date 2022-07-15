@@ -1481,7 +1481,7 @@ class TimestampLookupHandler:
                     )
 
                     remote_event_id = remote_response.event_id
-                    origin_server_ts = remote_response.origin_server_ts
+                    remote_origin_server_ts = remote_response.origin_server_ts
 
                     # Backfill this event so we can get a pagination token for
                     # it with `/context` and paginate `/messages` from this
@@ -1498,14 +1498,18 @@ class TimestampLookupHandler:
 
                     # Only return the remote event if it's closer than the local event
                     if not local_event or (
-                        abs(origin_server_ts - timestamp)
+                        abs(remote_origin_server_ts - timestamp)
                         < abs(local_event.origin_server_ts - timestamp)
                     ):
                         logger.info(
-                            "get_event_for_timestamp: returning remote_event_id=%s since it's closer",
+                            "get_event_for_timestamp: returning remote_event_id=%s (%s) since it's closer to timestamp=%s than local_event=%s (%s)",
                             remote_event_id,
+                            remote_origin_server_ts,
+                            timestamp,
+                            local_event.event_id,
+                            local_event.origin_server_ts,
                         )
-                        return remote_event_id, origin_server_ts
+                        return remote_event_id, remote_origin_server_ts
                 except (HttpResponseException, InvalidResponseError) as ex:
                     # Let's not put a high priority on some other homeserver
                     # failing to respond or giving a random response
