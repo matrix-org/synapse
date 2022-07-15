@@ -126,7 +126,8 @@ class DictionaryCache(Generic[KT, DKT, DV]):
                 return DictionaryEntry(True, set(), entry)
 
             all_entries = self.cache.get_multi(
-                (key,), _Sentinel.sentinel, update_metrics=False
+                (key,),
+                _Sentinel.sentinel,
             )
             if all_entries is _Sentinel.sentinel:
                 return DictionaryEntry(False, set(), {})
@@ -167,7 +168,6 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         entry = self.cache.get(
             (key, _FullCacheKey.KEY),
             _Sentinel.sentinel,
-            update_metrics=False,
             update_last_access=False,
         )
         if entry is _Sentinel.sentinel:
