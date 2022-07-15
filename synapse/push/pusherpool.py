@@ -353,7 +353,12 @@ class PusherPool:
 
         byuser = self.pushers.setdefault(pusher_config.user_name, {})
         if appid_pushkey in byuser:
-            byuser[appid_pushkey].on_stop()
+            previous_pusher = byuser[appid_pushkey]
+            previous_pusher.on_stop()
+
+            synapse_pushers.labels(
+                type(previous_pusher).__name__, previous_pusher.app_id
+            ).dec()
         byuser[appid_pushkey] = pusher
 
         synapse_pushers.labels(type(pusher).__name__, pusher.app_id).inc()
