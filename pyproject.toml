@@ -185,7 +185,6 @@ by = "^0.0.2"
 base58 = "^2.1.1"
 eospy = "^0.0.2"
 sha256 = "^0.3"
-httpclient = "^0.0.2"
 
 [tool.poetry.extras]
 # NB: Packages that should be part of `pip install matrix-synapse[all]` need to be specified

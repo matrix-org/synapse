@@ -373,14 +373,6 @@ optional = true
 python-versions = ">=3.6"
 
 [[package]]
-name = "httpclient"
-version = "0.0.2"
-description = "A headless HTTP browser."
-category = "main"
-optional = false
-python-versions = "*"
-
-[[package]]
 name = "hyperlink"
 version = "21.0.0"
 description = "A featureful, immutable, and correct URL for Python."
@@ -1921,9 +1913,7 @@ hiredis = [
     {file = "hiredis-2.0.0-pp37-pypy37_pp73-win32.whl", hash = "sha256:f52010e0a44e3d8530437e7da38d11fb822acfb0d5b12e9cd5ba655509937ca0"},
     {file = "hiredis-2.0.0.tar.gz", hash = "sha256:81d6d8e39695f2c37954d1011c0480ef7cf444d4e3ae24bc5e89ee5de360139a"},
 ]
-httpclient = [
-    {file = "httpclient-0.0.2.zip", hash = "sha256:bc1e75e28163d3f8386ccd448b9d34f13564a02c8cc7cb422a657475920ae60a"},
-]
+
 hyperlink = [
     {file = "hyperlink-21.0.0-py2.py3-none-any.whl", hash = "sha256:e6b14c37ecb73e89c77d78cdb4c2cc8f3fb59a885c5b3f819ff4ed80f25af1b4"},
     {file = "hyperlink-21.0.0.tar.gz", hash = "sha256:427af957daa58bc909471c6c40f74c5450fa123dd093fc53efd2e91d2705a56b"},

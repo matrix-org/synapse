@@ -114,7 +114,7 @@ class Clock:
         return int(self.time() * 1000)
 
     def looping_call(
-        self, f: Callable[P, object], msec: float, *args: P.args, **kwargs: P.kwargs
+        self, f: Callable[[P], object], msec: float, *args: P.args, **kwargs: P.kwargs
     ) -> LoopingCall:
         """Call a function repeatedly.
 
@@ -192,4 +192,5 @@ def log_failure(
 
 # Version string with git info. Computed here once so that we don't invoke git multiple
 # times.
-SYNAPSE_VERSION = get_distribution_version_string("matrix-synapse", __file__)
+# SYNAPSE_VERSION = get_distribution_version_string("matrix-synapse", __file__)
+SYNAPSE_VERSION = get_distribution_version_string("matrix-synapse")
