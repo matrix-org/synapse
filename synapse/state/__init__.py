@@ -295,6 +295,9 @@ class StateHandler:
             # We make sure that we have a state group assigned to the state.
             if entry.state_group is None:
                 state_ids_before_event = None
+                # store_state_group requires us to have either a previous state group
+                # (with deltas) or the complete state map. So, if we don't have a
+                # previous state group, load the complete state map now.
                 if state_group_before_event_prev_group is None:
                     state_ids_before_event = await entry.get_state(
                         self._state_storage_controller, StateFilter.all()

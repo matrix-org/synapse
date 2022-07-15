@@ -427,7 +427,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         def insert_delta_group_txn(
             txn: LoggingTransaction, prev_group: int, delta_ids: StateMap[str]
         ) -> Optional[int]:
-            """If we have a delta we try and persist the new group as a delta.
+            """Try and persist the new group as a delta.
+            
+            Requires that we have the state as a delta from a previous state group.
 
             Returns:
                 The state group if successfully created, or None if the state
@@ -446,8 +448,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                     % (prev_group,)
                 )
 
+            # if the chain of state group deltas is going too long, we fall back to
+            # persisting a complete state group.
             potential_hops = self._count_state_group_hops_txn(txn, prev_group)
-
             if potential_hops >= MAX_STATE_DELTA_HOPS:
                 return None
 
@@ -540,6 +543,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             if state_group is not None:
                 return state_group
 
+       # We're going to persist the state as a complete group rather than
+       # a delta, so first we need to ensure we have loaded the state map
+       # from the database.
         if current_state_ids is None:
             assert prev_group is not None
             assert delta_ids is not None
