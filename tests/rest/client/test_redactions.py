@@ -125,7 +125,7 @@ class RedactionsTestCase(HomeserverTestCase):
             self.other_access_token,
             self.room_id,
             admin_msg_id,
-            expect_code=HTTPStatus.FORBIDDEN
+            expect_code=HTTPStatus.FORBIDDEN,
         )
 
         # now try to redact our own event

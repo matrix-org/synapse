@@ -234,9 +234,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 )
                 retry_after_ms = int(channel.json_body["retry_after_ms"])
             else:
-                self.assertEqual(
-                    channel.code, HTTPStatus.FORBIDDEN, msg=channel.result
-                )
+                self.assertEqual(channel.code, HTTPStatus.FORBIDDEN, msg=channel.result)
 
         # Since we're ratelimiting at 1 request/min, retry_after_ms should be lower
         # than 1min.
