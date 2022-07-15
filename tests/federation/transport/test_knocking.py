@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from collections import OrderedDict
+from http import HTTPStatus
 from typing import Dict, List
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
@@ -255,7 +256,7 @@ class FederationKnockingTestCase(
                 RoomVersions.V7.identifier,
             ),
         )
-        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(HTTPStatus.OK, channel.code, channel.result)
 
         # Note: We don't expect the knock membership event to be sent over federation as
         # part of the stripped room state, as the knocking homeserver already has that
@@ -293,7 +294,7 @@ class FederationKnockingTestCase(
             % (room_id, signed_knock_event.event_id),
             signed_knock_event_json,
         )
-        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(HTTPStatus.OK, channel.code, channel.result)
 
         # Check that we got the stripped room state in return
         room_state_events = channel.json_body["knock_state_events"]
