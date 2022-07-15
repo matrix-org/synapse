@@ -369,7 +369,7 @@ class StateStoreTestCase(HomeserverTestCase):
         state_dict_ids = cache_entry.value
 
         self.assertEqual(cache_entry.full, False)
-        self.assertEqual(cache_entry.known_absent, {(e1.type, e1.state_key)})
+        self.assertEqual(cache_entry.known_absent, set())
         self.assertDictEqual(state_dict_ids, {(e1.type, e1.state_key): e1.event_id})
 
         ############################################
