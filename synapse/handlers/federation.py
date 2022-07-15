@@ -768,13 +768,20 @@ class FederationHandler:
         # Note that this requires the /send_join request to come back to the
         # same server.
         if room_version.msc3083_join_rules:
-            state_ids = await self._state_storage_controller.get_current_state_ids(
-                room_id
+            partial_state_ids = (
+                await self._state_storage_controller.get_current_state_ids(
+                    room_id,
+                    state_filter=StateFilter.from_types(
+                        [(EventTypes.JoinRules, ""), (EventTypes.Member, user_id)]
+                    ),
+                )
             )
             if await self._event_auth_handler.has_restricted_join_rules(
-                state_ids, room_version
+                partial_state_ids, room_version
             ):
-                prev_member_event_id = state_ids.get((EventTypes.Member, user_id), None)
+                prev_member_event_id = partial_state_ids.get(
+                    (EventTypes.Member, user_id), None
+                )
                 # If the user is invited or joined to the room already, then
                 # no additional info is needed.
                 include_auth_user_id = True
@@ -786,6 +793,12 @@ class FederationHandler:
                     )
 
                 if include_auth_user_id:
+                    state_ids = (
+                        await self._state_storage_controller.get_current_state_ids(
+                            room_id,
+                        )
+                    )
+
                     event_content[
                         EventContentFields.AUTHORISING_USER
                     ] = await self._event_auth_handler.get_user_which_could_invite(
