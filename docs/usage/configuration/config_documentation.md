@@ -1257,6 +1257,98 @@ database:
     cp_max: 10
 ```
 ---
+### `databases`
+
+The `databases` option allows specifying a mapping between certain database tables and
+database host details, spreading the load of a single Synapse instance across multiple
+database backends. This is often referred to as "database sharding". This option is only
+supported for PostgreSQL database backends.
+
+**Important note:** This is a supported option, but is not currently used in production by the
+Matrix.org Foundation. Proceed with caution and always make backups.
+
+`databases` is a dictionary of arbitrarily-named database entries. Each entry is equivalent
+to the value of the `database` homeserver config option (see above), with the addition of
+a `data_stores` key. `data_stores` is an array of strings that specifies the data store(s)
+(a defined label for a set of tables) that should be stored on the associated database
+backend entry.
+
+The currently defined values for `data_stores` are:
+
+* `"state"`: Database that relates to state groups will be stored in this database.
+
+  Specifically, that means the following tables:
+  * `state_groups`
+  * `state_group_edges`
+  * `state_groups_state`
+
+  And the following sequences:
+  * `state_groups_seq_id`
+
+* `"main"`: All other database tables and sequences.
+
+All databases will end up with additional tables used for tracking database schema migrations
+and any pending background updates. Synapse will create these automatically on startup when checking for
+and/or performing database schema migrations.
+
+To migrate an existing database configuration (e.g. all tables on a single database) to a different
+configuration (e.g. the "main" data store on one database, and "state" on another), do the following:
+
+1. Take a backup of your existing database. Things can and do go wrong and database corruption is no joke!
+2. Ensure all pending database migrations have been applied and background updates have run. The simplest
+   way to do this is to use the `update_synapse_database` script supplied with your Synapse installation.
+
+   ```sh
+   update_synapse_database --database-config homeserver.yaml --run-background-updates
+   ```
+
+3. Copy over the necessary tables and sequences from one database to the other. Tables relating to database
+   migrations, schemas, schema versions and background updates should **not** be copied.
+
+   As an example, say that you'd like to split out the "state" data store from an existing database which
+   currently contains all data stores.
+
+   Simply copy the tables and sequences defined above for the "state" datastore from the existing database
+   to the secondary database. As noted above, additional tables will be created in the secondary database
+   when Synapse is started.
+
+4. Modify/create the `databases` option in your `homeserver.yaml` to match the desired database configuration.
+5. Start Synapse. Check that it starts up successfully and that things generally seem to be working.
+6. Drop the old tables that were copied in step 3.
+
+Only one of the options `database` or `databases` may be specified in your config, but not both.
+
+Example configuration:
+
+```yaml
+databases:
+  basement_box:
+    name: psycopg2
+    txn_limit: 10000
+    data_stores: ["main"]
+    args:
+      user: synapse_user
+      password: secretpassword
+      database: synapse_main
+      host: localhost
+      port: 5432
+      cp_min: 5
+      cp_max: 10
+
+  my_other_database:
+    name: psycopg2
+    txn_limit: 10000
+    data_stores: ["state"]
+    args:
+      user: synapse_user
+      password: secretpassword
+      database: synapse_state
+      host: localhost
+      port: 5432
+      cp_min: 5
+      cp_max: 10
+```
+---
 ## Logging ##
 Config options related to logging. 
 
@@ -2076,30 +2168,26 @@ default_identity_server: https://matrix.org
 ---
 ### `account_threepid_delegates`
 
-Handle threepid (email/phone etc) registration and password resets through a set of
-*trusted* identity servers. Note that this allows the configured identity server to
-reset passwords for accounts!
+Delegate verification of phone numbers to an identity server.
 
-Be aware that if `email` is not set, and SMTP options have not been
-configured in the email config block, registration and user password resets via
-email will be globally disabled.
+When a user wishes to add a phone number to their account, we need to verify that they
+actually own that phone number, which requires sending them a text message (SMS).
+Currently Synapse does not support sending those texts itself and instead delegates the
+task to an identity server. The base URI for the identity server to be used is
+specified by the `account_threepid_delegates.msisdn` option.
 
-Additionally, if `msisdn` is not set, registration and password resets via msisdn
-will be disabled regardless, and users will not be able to associate an msisdn
-identifier to their account. This is due to Synapse currently not supporting
-any method of sending SMS messages on its own.
+If this is left unspecified, Synapse will not allow users to add phone numbers to
+their account.
 
-To enable using an identity server for operations regarding a particular third-party
-identifier type, set the value to the URL of that identity server as shown in the
-examples below.
+(Servers handling the these requests must answer the `/requestToken` endpoints defined
+by the Matrix Identity Service API
+[specification](https://matrix.org/docs/spec/identity_service/latest).)
 
-Servers handling the these requests must answer the `/requestToken` endpoints defined
-by the Matrix Identity Service API [specification](https://matrix.org/docs/spec/identity_service/latest).
+*Updated in Synapse 1.64.0*: No longer accepts an `email` option.
 
 Example configuration:
 ```yaml
 account_threepid_delegates:
-    email: https://example.com     # Delegate email sending to example.com
     msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 ```
 ---

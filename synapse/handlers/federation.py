@@ -844,7 +844,8 @@ class FederationHandler:
             raise SynapseError(
                 403,
                 "This user is not permitted to send invites to this server/user",
-                spam_check,
+                errcode=spam_check[0],
+                additional_fields=spam_check[1],
             )
 
         membership = event.content.get("membership")
@@ -1559,14 +1560,9 @@ class FederationHandler:
                 # all the events are updated, so we can update current state and
                 # clear the lazy-loading flag.
                 logger.info("Updating current state for %s", room_id)
-                # TODO(faster_joins): support workers
+                # TODO(faster_joins): notify workers in notify_room_un_partial_stated
                 #   https://github.com/matrix-org/synapse/issues/12994
-                assert (
-                    self._storage_controllers.persistence is not None
-                ), "worker-mode deployments not currently supported here"
-                await self._storage_controllers.persistence.update_current_state(
-                    room_id
-                )
+                await self.state_handler.update_current_state(room_id)
 
                 logger.info("Clearing partial-state flag for %s", room_id)
                 success = await self.store.clear_partial_state_room(room_id)

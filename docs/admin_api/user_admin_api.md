@@ -544,7 +544,7 @@ Gets a list of all local media that a specific `user_id` has created.
 These are media that the user has uploaded themselves
 ([local media](../media_repository.md#local-media)), as well as
 [URL preview images](../media_repository.md#url-previews) requested by the user if the
-[feature is enabled](../development/url_previews.md).
+[feature is enabled](../usage/configuration/config_documentation.md#url_preview_enabled).
 
 By default, the response is ordered by descending creation date and ascending media ID.
 The newest media is on top. You can change the order with parameters
