@@ -170,7 +170,7 @@ class StateHandler:
             the state dict (a mapping from (event_type, state_key) -> event_id) which
             holds the resolution of the states after the given event IDs.
         """
-        logger.debug("calling resolve_state_groups from get_current_state_ids")
+        logger.debug("calling resolve_state_groups from compute_state_after_events")
         ret = await self.resolve_state_groups_for_events(room_id, event_ids)
         return await ret.get_state(self._state_storage_controller, StateFilter.all())
 
