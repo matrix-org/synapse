@@ -91,7 +91,7 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             result = self.helper.send_event(
                 room_id,
                 type="m.room.message",
-                content={"msgtype": "m.text", "body": user_id if highlight else ""},
+                content={"msgtype": "m.text", "body": user_id if highlight else "msg"},
                 tok=other_token,
             )
             nonlocal last_event_id
@@ -114,29 +114,29 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
 
         _assert_counts(0, 0, 0)
         _create_event()
-        _assert_counts(1, 0, 0)
+        _assert_counts(1, 1, 0)
         _rotate()
-        _assert_counts(1, 0, 0)
+        _assert_counts(1, 1, 0)
 
         event_id = _create_event()
-        _assert_counts(2, 0, 0)
+        _assert_counts(2, 2, 0)
         _rotate()
-        _assert_counts(2, 0, 0)
+        _assert_counts(2, 2, 0)
 
         _create_event()
         _mark_read(event_id)
-        _assert_counts(1, 0, 0)
+        _assert_counts(1, 1, 0)
 
         _mark_read(last_event_id)
         _assert_counts(0, 0, 0)
 
         _create_event()
         _rotate()
-        _assert_counts(1, 0, 0)
+        _assert_counts(1, 1, 0)
 
         # Delete old event push actions, this should not affect the (summarised) count.
         self.get_success(self.store._remove_old_push_actions_that_have_rotated())
-        _assert_counts(1, 0, 0)
+        _assert_counts(1, 1, 0)
 
         _mark_read(last_event_id)
         _assert_counts(0, 0, 0)
@@ -150,12 +150,12 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         # works.
         _create_event()
         _rotate()
-        _assert_counts(2, 0, 1)
+        _assert_counts(2, 2, 1)
 
         # Check that sending read receipts at different points results in the
         # right counts.
         _mark_read(event_id)
-        _assert_counts(1, 0, 0)
+        _assert_counts(1, 1, 0)
         _mark_read(last_event_id)
         _assert_counts(0, 0, 0)
 
