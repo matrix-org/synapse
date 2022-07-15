@@ -14,11 +14,23 @@
 import enum
 import logging
 import threading
-from typing import Any, Dict, Generic, Iterable, Optional, Set, TypeVar
+from typing import (
+    Any,
+    Dict,
+    Generic,
+    Iterable,
+    Literal,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 import attr
 
 from synapse.util.caches.lrucache import LruCache
+from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_items
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +65,24 @@ class DictionaryEntry:  # should be: Generic[DKT, DV].
         return len(self.value)
 
 
+class _FullCacheKey(enum.Enum):
+    KEY = object()
+
+
 class _Sentinel(enum.Enum):
     # defining a sentinel in this way allows mypy to correctly handle the
     # type of a dictionary lookup.
     sentinel = object()
+
+
+class _PerKeyValue(Generic[DV]):
+    __slots__ = ["value"]
+
+    def __init__(self, value: Union[DV, Literal[_Sentinel.sentinel]]) -> None:
+        self.value = value
+
+    def __len__(self) -> int:
+        return 1
 
 
 class DictionaryCache(Generic[KT, DKT, DV]):
@@ -65,8 +91,14 @@ class DictionaryCache(Generic[KT, DKT, DV]):
     """
 
     def __init__(self, name: str, max_entries: int = 1000):
-        self.cache: LruCache[KT, DictionaryEntry] = LruCache(
-            max_size=max_entries, cache_name=name, size_callback=len
+        self.cache: LruCache[
+            Tuple[KT, Union[DKT, Literal[_FullCacheKey.KEY]]],
+            Union[_PerKeyValue, Dict[DKT, DV]],
+        ] = LruCache(
+            max_size=max_entries,
+            cache_name=name,
+            cache_type=TreeCache,
+            size_callback=len,
         )
 
         self.name = name
@@ -96,20 +128,69 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         Returns:
             DictionaryEntry
         """
-        entry = self.cache.get(key, _Sentinel.sentinel)
-        if entry is not _Sentinel.sentinel:
-            if dict_keys is None:
-                return DictionaryEntry(
-                    entry.full, entry.known_absent, dict(entry.value)
-                )
-            else:
-                return DictionaryEntry(
-                    entry.full,
-                    entry.known_absent,
-                    {k: entry.value[k] for k in dict_keys if k in entry.value},
-                )
 
-        return DictionaryEntry(False, set(), {})
+        if dict_keys is None:
+            entry = self.cache.get((key, _FullCacheKey.KEY), _Sentinel.sentinel)
+            if entry is not _Sentinel.sentinel:
+                assert isinstance(entry, dict)
+                return DictionaryEntry(True, set(), entry)
+
+            all_entries = self.cache.get_multi(
+                (key,), _Sentinel.sentinel, update_metrics=False
+            )
+            if all_entries is _Sentinel.sentinel:
+                return DictionaryEntry(False, set(), {})
+
+            values = {}
+            known_absent = set()
+            for dict_key, dict_value in iterate_tree_cache_items((), all_entries):
+                dict_key = dict_key[0]
+                dict_value = dict_value.value
+
+                assert isinstance(dict_value, _PerKeyValue)
+                if dict_value.value is _Sentinel.sentinel:
+                    known_absent.add(dict_key)
+                else:
+                    values[dict_key] = dict_value.value
+
+            return DictionaryEntry(False, known_absent, values)
+
+        values = {}
+        known_absent = set()
+        missing = set()
+        for dict_key in dict_keys:
+            entry = self.cache.get((key, dict_key), _Sentinel.sentinel)
+            if entry is _Sentinel.sentinel:
+                missing.add(dict_key)
+                continue
+
+            assert isinstance(entry, _PerKeyValue)
+
+            if entry.value is _Sentinel.sentinel:
+                known_absent.add(entry.value)
+            else:
+                values[dict_key] = entry.value
+
+        if not missing:
+            return DictionaryEntry(False, known_absent, values)
+
+        entry = self.cache.get(
+            (key, _FullCacheKey.KEY), _Sentinel.sentinel, update_metrics=False
+        )
+        if entry is _Sentinel.sentinel:
+            return DictionaryEntry(False, known_absent, values)
+
+        assert isinstance(entry, dict)
+
+        values = {}
+        for dict_key in dict_keys:
+            value = entry.get(dict_key, _Sentinel.sentinel)  # type: ignore[arg-type]
+            self.cache[(key, dict_key)] = _PerKeyValue(value)
+
+            if value is not _Sentinel.sentinel:
+                values[dict_key] = value
+
+        return DictionaryEntry(True, set(), values)
 
     def invalidate(self, key: KT) -> None:
         self.check_thread()
@@ -117,7 +198,9 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         # Increment the sequence number so that any SELECT statements that
         # raced with the INSERT don't update the cache (SYN-369)
         self.sequence += 1
-        self.cache.pop(key, None)
+
+        # Del-multi accepts truncated tuples.
+        self.cache.del_multi((key,))  # type: ignore[arg-type]
 
     def invalidate_all(self) -> None:
         self.check_thread()
@@ -149,20 +232,22 @@ class DictionaryCache(Generic[KT, DKT, DV]):
             # Only update the cache if the caches sequence number matches the
             # number that the cache had before the SELECT was started (SYN-369)
             if fetched_keys is None:
-                self._insert(key, value, set())
+                self._insert(key, value)
             else:
                 self._update_or_insert(key, value, fetched_keys)
 
     def _update_or_insert(
-        self, key: KT, value: Dict[DKT, DV], known_absent: Iterable[DKT]
+        self, key: KT, value: Dict[DKT, DV], fetched_keys: Iterable[DKT]
     ) -> None:
-        # We pop and reinsert as we need to tell the cache the size may have
-        # changed
 
-        entry: DictionaryEntry = self.cache.pop(key, DictionaryEntry(False, set(), {}))
-        entry.value.update(value)
-        entry.known_absent.update(known_absent)
-        self.cache[key] = entry
+        for dict_key, dict_value in value.items():
+            self.cache[(key, dict_key)] = _PerKeyValue(dict_value)
 
-    def _insert(self, key: KT, value: Dict[DKT, DV], known_absent: Set[DKT]) -> None:
-        self.cache[key] = DictionaryEntry(True, known_absent, value)
+        for dict_key in fetched_keys:
+            if (key, dict_key) in self.cache:
+                continue
+
+            self.cache[(key, dict_key)] = _PerKeyValue(_Sentinel.sentinel)
+
+    def _insert(self, key: KT, value: Dict[DKT, DV]) -> None:
+        self.cache[(key, _FullCacheKey.KEY)] = value

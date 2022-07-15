@@ -44,7 +44,11 @@ from synapse.metrics.background_process_metrics import wrap_as_background_proces
 from synapse.metrics.jemalloc import get_jemalloc_stats
 from synapse.util import Clock, caches
 from synapse.util.caches import CacheMetric, EvictionReason, register_cache
-from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
+from synapse.util.caches.treecache import (
+    TreeCache,
+    TreeCacheNode,
+    iterate_tree_cache_entry,
+)
 from synapse.util.linked_list import ListNode
 
 if TYPE_CHECKING:
@@ -569,6 +573,22 @@ class LruCache(Generic[KT, VT]):
                 return default
 
         @synchronized
+        def cache_get_multi(
+            key: tuple,
+            default: Optional[T] = None,
+            update_metrics: bool = True,
+        ) -> Union[None, T, TreeCacheNode]:
+            node = cache.get(key, None)  # type: ignore[arg-type]
+            if node is not None:
+                if update_metrics and metrics:
+                    metrics.inc_hits()
+                return node  # type: ignore[return-value]
+            else:
+                if update_metrics and metrics:
+                    metrics.inc_misses()
+                return default
+
+        @synchronized
         def cache_set(
             key: KT, value: VT, callbacks: Collection[Callable[[], None]] = ()
         ) -> None:
@@ -674,6 +694,8 @@ class LruCache(Generic[KT, VT]):
         self.setdefault = cache_set_default
         self.pop = cache_pop
         self.del_multi = cache_del_multi
+        if cache_type is TreeCache:
+            self.get_multi = cache_get_multi
         # `invalidate` is exposed for consistency with DeferredCache, so that it can be
         # invalidated by the cache invalidation replication stream.
         self.invalidate = cache_del_multi
