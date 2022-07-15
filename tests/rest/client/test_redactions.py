@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from http import HTTPStatus
 from typing import List
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -67,7 +68,11 @@ class RedactionsTestCase(HomeserverTestCase):
         )
 
     def _redact_event(
-        self, access_token: str, room_id: str, event_id: str, expect_code: int = 200
+        self,
+        access_token: str,
+        room_id: str,
+        event_id: str,
+        expect_code: int = HTTPStatus.OK,
     ) -> JsonDict:
         """Helper function to send a redaction event.
 
@@ -76,12 +81,12 @@ class RedactionsTestCase(HomeserverTestCase):
         path = "/_matrix/client/r0/rooms/%s/redact/%s" % (room_id, event_id)
 
         channel = self.make_request("POST", path, content={}, access_token=access_token)
-        self.assertEqual(int(channel.result["code"]), expect_code)
+        self.assertEqual(channel.code, expect_code)
         return channel.json_body
 
     def _sync_room_timeline(self, access_token: str, room_id: str) -> List[JsonDict]:
         channel = self.make_request("GET", "sync", access_token=self.mod_access_token)
-        self.assertEqual(channel.result["code"], b"200")
+        self.assertEqual(channel.code, HTTPStatus.OK)
         room_sync = channel.json_body["rooms"]["join"][room_id]
         return room_sync["timeline"]["events"]
 
@@ -117,7 +122,10 @@ class RedactionsTestCase(HomeserverTestCase):
 
         # as a normal, try to redact the admin's event
         self._redact_event(
-            self.other_access_token, self.room_id, admin_msg_id, expect_code=403
+            self.other_access_token,
+            self.room_id,
+            admin_msg_id,
+            expect_code=HTTPStatus.FORBIDDEN
         )
 
         # now try to redact our own event
@@ -153,7 +161,10 @@ class RedactionsTestCase(HomeserverTestCase):
 
         # ... but normals cannot
         self._redact_event(
-            self.other_access_token, self.room_id, "$zzz", expect_code=404
+            self.other_access_token,
+            self.room_id,
+            "$zzz",
+            expect_code=HTTPStatus.NOT_FOUND,
         )
 
         # when we sync, we should see only the valid redaction
@@ -178,12 +189,18 @@ class RedactionsTestCase(HomeserverTestCase):
 
         # room moderators cannot send redactions for create events
         self._redact_event(
-            self.mod_access_token, self.room_id, create_event_id, expect_code=403
+            self.mod_access_token,
+            self.room_id,
+            create_event_id,
+            expect_code=HTTPStatus.FORBIDDEN,
         )
 
         # and nor can normals
         self._redact_event(
-            self.other_access_token, self.room_id, create_event_id, expect_code=403
+            self.other_access_token,
+            self.room_id,
+            create_event_id,
+            expect_code=HTTPStatus.FORBIDDEN,
         )
 
     def test_redact_event_as_moderator_ratelimit(self) -> None:
