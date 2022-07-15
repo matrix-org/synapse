@@ -757,7 +757,7 @@ class AsyncLruCache(Generic[KT, VT]):
 
     def invalidate_local(self, key: KT) -> None:
         """Remove an entry from the local cache
-        
+
         This variant of `invalidate` is useful if we know that the external
         cache has already been invalidated.
         """
