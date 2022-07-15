@@ -1506,8 +1506,8 @@ class TimestampLookupHandler:
                             remote_event_id,
                             remote_origin_server_ts,
                             timestamp,
-                            local_event.event_id,
-                            local_event.origin_server_ts,
+                            local_event.event_id if local_event else None,
+                            local_event.origin_server_ts if local_event else None,
                         )
                         return remote_event_id, remote_origin_server_ts
                 except (HttpResponseException, InvalidResponseError) as ex:
