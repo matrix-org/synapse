@@ -404,6 +404,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
     ) -> int:
         """Store a new set of state, returning a newly assigned state group.
 
+        If `current_state_ids` is None then `prev_group` and `delta_ids` must
+        not be None.
+
         Args:
             event_id: The event ID for which the state was calculated
             room_id
@@ -428,7 +431,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             txn: LoggingTransaction, prev_group: int, delta_ids: StateMap[str]
         ) -> Optional[int]:
             """Try and persist the new group as a delta.
-            
+
             Requires that we have the state as a delta from a previous state group.
 
             Returns:
@@ -543,9 +546,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             if state_group is not None:
                 return state_group
 
-       # We're going to persist the state as a complete group rather than
-       # a delta, so first we need to ensure we have loaded the state map
-       # from the database.
+        # We're going to persist the state as a complete group rather than
+        # a delta, so first we need to ensure we have loaded the state map
+        # from the database.
         if current_state_ids is None:
             assert prev_group is not None
             assert delta_ids is not None
