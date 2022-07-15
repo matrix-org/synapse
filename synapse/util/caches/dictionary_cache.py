@@ -165,7 +165,10 @@ class DictionaryCache(Generic[KT, DKT, DV]):
             return DictionaryEntry(False, known_absent, values)
 
         entry = self.cache.get(
-            (key, _FullCacheKey.KEY), _Sentinel.sentinel, update_metrics=False
+            (key, _FullCacheKey.KEY),
+            _Sentinel.sentinel,
+            update_metrics=False,
+            update_last_access=False,
         )
         if entry is _Sentinel.sentinel:
             return DictionaryEntry(False, known_absent, values)
