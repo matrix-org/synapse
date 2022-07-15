@@ -770,8 +770,8 @@ class StateTestCase(unittest.TestCase):
             ("c", ""): "E",
         }
 
-        # Old state has fewer changes from new state, but the delta involves
-        # deleting a key, which isn't allowed in the deltas.
+        # old_state_1 has fewer differences to new_state than old_state_2, but the delta involves
+        # deleting a key, which isn't allowed in the deltas, so we should pick old_state_2 as the prev_group.
         old_state_1 = {
             ("a", ""): "F",
             ("b", ""): "E",

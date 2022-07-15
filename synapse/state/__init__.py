@@ -771,7 +771,8 @@ def _make_state_cache_entry(
     for old_group, old_state in state_groups_ids.items():
         if old_state.keys() - new_state.keys():
             # Currently we don't support deltas that remove keys from the state
-            # map.
+            # map, so we have to ignore this group as a candidate to base the
+            # new group on.
             continue
 
         n_delta_ids = {k: v for k, v in new_state.items() if old_state.get(k) != v}
