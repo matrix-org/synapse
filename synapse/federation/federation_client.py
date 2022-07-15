@@ -309,7 +309,7 @@ class FederationClient(FederationBase):
         )
 
         logger.debug(
-            "get_pdu_raw: retrieved event id %s from %s: %r",
+            "get_pdu_from_destination_raw: retrieved event id %s from %s: %r",
             event_id,
             destination,
             transaction_data,
