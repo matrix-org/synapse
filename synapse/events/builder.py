@@ -120,7 +120,7 @@ class EventBuilder:
             The signed and hashed event.
         """
         if auth_event_ids is None:
-            state_ids = await self._state.get_current_state_ids(
+            state_ids = await self._state.compute_state_after_events(
                 self.room_id, prev_event_ids
             )
             auth_event_ids = self._event_auth_handler.compute_auth_events(
