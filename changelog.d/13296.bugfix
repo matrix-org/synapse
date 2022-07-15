@@ -1,0 +1,1 @@
+Fix a bug introduced in 1.18 where the `synapse_pushers` metric would overcount pushers when they are replaced.
