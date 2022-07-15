@@ -822,8 +822,10 @@ class DatabasePool:
 
                 return cast(R, result)
             except Exception:
-                for after_callback, after_args, after_kwargs in exception_callbacks:
-                    after_callback(*after_args, **after_kwargs)
+                for exception_callback, after_args, after_kwargs in exception_callbacks:
+                    await maybe_awaitable(
+                        exception_callback(*after_args, **after_kwargs)
+                    )
                 raise
 
         # To handle cancellation, we ensure that `after_callback`s and

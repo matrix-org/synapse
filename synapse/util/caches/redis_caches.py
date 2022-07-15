@@ -1,5 +1,5 @@
-from typing import Any, Generic, Optional, Union, TYPE_CHECKING
 from functools import wraps
+from typing import TYPE_CHECKING, Any, Generic, Optional, Union
 
 from synapse.util.caches.lrucache import KT, VT, AsyncLruCache, T
 
@@ -21,7 +21,9 @@ def redisCachedList(redis_shard_cache, cache_name, list_name):
 
             values.update(missing_values)
             return values
+
         return _wrapped
+
     return decorator
 
 

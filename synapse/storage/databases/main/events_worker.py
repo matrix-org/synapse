@@ -745,11 +745,17 @@ class EventsWorkerStore(SQLBaseStore):
         return event_entry_map
 
     async def _invalidate_get_event_cache(self, event_id: str) -> None:
+        # First we invalidate the asynchronous cache instance. This may include
+        # out-of-process caches such as Redis/memcache. Once complete we can
+        # invalidate any in memory cache. The ordering is important here to
+        # ensure we don't pull in any remote invalid value after we invalidate
+        # the in-memory cache.
         await self._get_event_cache.invalidate((event_id,))
-        self._invalidate_local_get_event_cache(event_id)
+        self._event_ref.pop(event_id, None)
+        self._current_event_fetches.pop(event_id, None)
 
     def _invalidate_local_get_event_cache(self, event_id: str) -> None:
-        self._get_event_cache.lru_cache.invalidate((event_id,))
+        self._get_event_cache.invalidate_local((event_id,))
         self._event_ref.pop(event_id, None)
         self._current_event_fetches.pop(event_id, None)
 
