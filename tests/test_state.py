@@ -772,24 +772,35 @@ class StateTestCase(unittest.TestCase):
             ("a", ""): "E",
             ("b", ""): "E",
             ("c", ""): "E",
+            ("d", ""): "E",
         }
 
-        # Old state has fewer changes from new state, but the delta involves
-        # deleting a key, which isn't allowed in the deltas.
+        # old_state_1 has fewer differences to new_state than old_state_2, but
+        # the delta involves deleting a key, which isn't allowed in the deltas,
+        # so we should pick old_state_2 as the prev_group.
+
+        # `old_state_1` has two differences: `a` and `e`
         old_state_1 = {
             ("a", ""): "F",
             ("b", ""): "E",
             ("c", ""): "E",
             ("d", ""): "E",
+            ("e", ""): "E",
         }
 
+        # `old_state_2` has three differences: `a`, `c` and `d`
         old_state_2 = {
             ("a", ""): "F",
-            ("b", ""): "F",
+            ("b", ""): "E",
             ("c", ""): "F",
+            ("d", ""): "F",
         }
 
         entry = _make_state_cache_entry(new_state, {1: old_state_1, 2: old_state_2})
 
         self.assertEqual(entry.prev_group, 2)
-        self.assertEqual(entry.delta_ids, new_state)
+
+        # There are three changes from `old_state_2` to `new_state`
+        self.assertEqual(
+            entry.delta_ids, {("a", ""): "E", ("c", ""): "E", ("d", ""): "E"}
+        )

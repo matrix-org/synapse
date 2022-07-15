@@ -24,7 +24,6 @@ from typing import (
     DefaultDict,
     Dict,
     FrozenSet,
-    Iterable,
     List,
     Mapping,
     Optional,
@@ -84,7 +83,7 @@ def _gen_state_id() -> str:
 
 
 class _StateCacheEntry:
-    __slots__ = ["state", "state_group", "prev_group", "delta_ids"]
+    __slots__ = ["_state", "state_group", "prev_group", "delta_ids"]
 
     def __init__(
         self,
@@ -97,7 +96,10 @@ class _StateCacheEntry:
             raise Exception("Either state or state group must be not None")
 
         # A map from (type, state_key) to event_id.
-        self.state = frozendict(state) if state is not None else None
+        #
+        # This can be None if we have a `state_group` (as then we can fetch the
+        # state from the DB.)
+        self._state = frozendict(state) if state is not None else None
 
         # the ID of a state group if one and only one is involved.
         # otherwise, None otherwise?
@@ -115,8 +117,8 @@ class _StateCacheEntry:
         looking up the state group in the DB.
         """
 
-        if self.state is not None:
-            return self.state
+        if self._state is not None:
+            return self._state
 
         assert self.state_group is not None
 
@@ -129,7 +131,7 @@ class _StateCacheEntry:
         # cache eviction purposes. This is why if `self.state` is None it's fine
         # to return 1.
 
-        return len(self.state) if self.state else 1
+        return len(self._state) if self._state else 1
 
 
 class StateHandler:
@@ -151,22 +153,27 @@ class StateHandler:
             ReplicationUpdateCurrentStateRestServlet.make_client(hs)
         )
 
-    async def get_current_state_ids(
+    async def compute_state_after_events(
         self,
         room_id: str,
-        latest_event_ids: Collection[str],
+        event_ids: Collection[str],
     ) -> StateMap[str]:
-        """Get the current state, or the state at a set of events, for a room
+        """Fetch the state after each of the given event IDs. Resolve them and return.
+
+        This is typically used where `event_ids` is a collection of forward extremities
+        in a room, intended to become the `prev_events` of a new event E. If so, the
+        return value of this function represents the state before E.
 
         Args:
-            room_id:
-            latest_event_ids: The forward extremities to resolve.
+            room_id: the room_id containing the given events.
+            event_ids: the events whose state should be fetched and resolved.
 
         Returns:
-            the state dict, mapping from (event_type, state_key) -> event_id
+            the state dict (a mapping from (event_type, state_key) -> event_id) which
+            holds the resolution of the states after the given event IDs.
         """
-        logger.debug("calling resolve_state_groups from get_current_state_ids")
-        ret = await self.resolve_state_groups_for_events(room_id, latest_event_ids)
+        logger.debug("calling resolve_state_groups from compute_state_after_events")
+        ret = await self.resolve_state_groups_for_events(room_id, event_ids)
         return await ret.get_state(self._state_storage_controller, StateFilter.all())
 
     async def get_current_users_in_room(
@@ -427,31 +434,6 @@ class StateHandler:
             state_res_store=StateResolutionStore(self.store),
         )
         return result
-
-    async def resolve_events(
-        self,
-        room_version: str,
-        state_sets: Collection[Iterable[EventBase]],
-        event: EventBase,
-    ) -> StateMap[EventBase]:
-        logger.info(
-            "Resolving state for %s with %d groups", event.room_id, len(state_sets)
-        )
-        state_set_ids = [
-            {(ev.type, ev.state_key): ev.event_id for ev in st} for st in state_sets
-        ]
-
-        state_map = {ev.event_id: ev for st in state_sets for ev in st}
-
-        new_state = await self._state_resolution_handler.resolve_events_with_store(
-            event.room_id,
-            room_version,
-            state_set_ids,
-            event_map=state_map,
-            state_res_store=StateResolutionStore(self.store),
-        )
-
-        return {key: state_map[ev_id] for key, ev_id in new_state.items()}
 
     async def update_current_state(self, room_id: str) -> None:
         """Recalculates the current state for a room, and persists it.
@@ -777,7 +759,8 @@ def _make_state_cache_entry(
     for old_group, old_state in state_groups_ids.items():
         if old_state.keys() - new_state.keys():
             # Currently we don't support deltas that remove keys from the state
-            # map.
+            # map, so we have to ignore this group as a candidate to base the
+            # new group on.
             continue
 
         n_delta_ids = {k: v for k, v in new_state.items() if old_state.get(k) != v}
