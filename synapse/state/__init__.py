@@ -83,7 +83,7 @@ def _gen_state_id() -> str:
 
 
 class _StateCacheEntry:
-    __slots__ = ["state", "state_group", "prev_group", "delta_ids"]
+    __slots__ = ["_state", "state_group", "prev_group", "delta_ids"]
 
     def __init__(
         self,
@@ -96,7 +96,10 @@ class _StateCacheEntry:
             raise Exception("Either state or state group must be not None")
 
         # A map from (type, state_key) to event_id.
-        self.state = frozendict(state) if state is not None else None
+        #
+        # This can be None if we have a `state_group` (as then we can fetch the
+        # state from the DB.)
+        self._state = frozendict(state) if state is not None else None
 
         # the ID of a state group if one and only one is involved.
         # otherwise, None otherwise?
@@ -114,8 +117,8 @@ class _StateCacheEntry:
         looking up the state group in the DB.
         """
 
-        if self.state is not None:
-            return self.state
+        if self._state is not None:
+            return self._state
 
         assert self.state_group is not None
 
@@ -128,7 +131,7 @@ class _StateCacheEntry:
         # cache eviction purposes. This is why if `self.state` is None it's fine
         # to return 1.
 
-        return len(self.state) if self.state else 1
+        return len(self._state) if self._state else 1
 
 
 class StateHandler:
@@ -743,6 +746,12 @@ def _make_state_cache_entry(
     delta_ids: Optional[StateMap[str]] = None
 
     for old_group, old_state in state_groups_ids.items():
+        if old_state.keys() - new_state.keys():
+            # Currently we don't support deltas that remove keys from the state
+            # map, so we have to ignore this group as a candidate to base the
+            # new group on.
+            continue
+
         n_delta_ids = {k: v for k, v in new_state.items() if old_state.get(k) != v}
         if not delta_ids or len(n_delta_ids) < len(delta_ids):
             prev_group = old_group
