@@ -293,8 +293,8 @@ class StateHandler:
             deltas_to_state_group_before_event = entry.delta_ids
 
             # We make sure that we have a state group assigned to the state.
+            state_ids_before_event = None
             if entry.state_group is None:
-                state_ids_before_event = None
                 # store_state_group requires us to have either a previous state group
                 # (with deltas) or the complete state map. So, if we don't have a
                 # previous state group, load the complete state map now.
@@ -315,7 +315,6 @@ class StateHandler:
                 entry.state_group = state_group_before_event
             else:
                 state_group_before_event = entry.state_group
-                state_ids_before_event = None
 
         #
         # now if it's not a state event, we're done
