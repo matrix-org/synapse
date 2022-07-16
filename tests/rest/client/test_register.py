@@ -62,7 +62,8 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.hs.get_datastores().main.services_cache.append(appservice)
         request_data = {
-            "username": "as_user_kermit", "type": APP_SERVICE_REGISTRATION_TYPE
+            "username": "as_user_kermit",
+            "type": APP_SERVICE_REGISTRATION_TYPE,
         }
 
         channel = self.make_request(
