@@ -95,9 +95,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         """
         body = {"type": "m.login.password", "user": username, "password": password}
 
-        channel = self.make_request(
-            "POST", "/_matrix/client/r0/login", body.encode("utf8")
-        )
+        channel = self.make_request("POST", "/_matrix/client/r0/login", body)
         self.assertEqual(channel.code, HTTPStatus.FORBIDDEN, channel.result)
 
     def test_basic_password_reset(self) -> None:

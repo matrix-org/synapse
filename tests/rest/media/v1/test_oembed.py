@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import json
+
 from twisted.test.proto_helpers import MemoryReactor
 
 from synapse.rest.media.v1.oembed import OEmbedProvider, OEmbedResult
@@ -28,7 +30,7 @@ class OEmbedTests(HomeserverTestCase):
 
     def parse_response(self, response: JsonDict) -> OEmbedResult:
         return self.oembed.parse_oembed_response(
-            "https://test", response.encode("utf-8")
+            "https://test", json.dumps(response).encode("utf-8")
         )
 
     def test_version(self) -> None:

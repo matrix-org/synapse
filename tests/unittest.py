@@ -627,9 +627,7 @@ class HomeserverTestCase(TestCase):
             "mac": want_mac_digest,
             "inhibit_login": True,
         }
-        channel = self.make_request(
-            "POST", "/_synapse/admin/v1/register", body.encode("utf8")
-        )
+        channel = self.make_request("POST", "/_synapse/admin/v1/register", body)
         self.assertEqual(channel.code, 200, channel.json_body)
 
         user_id = channel.json_body["user_id"]
@@ -673,9 +671,7 @@ class HomeserverTestCase(TestCase):
         custom_headers: Optional[Iterable[CustomHeaderType]] = None,
     ) -> str:
         """
-        Log in a user, and get an access token. Requires the Login API be
-        registered.
-
+        Log in a user, and get an access token. Requires the Login API be registered.
         """
         body = {"type": "m.login.password", "user": username, "password": password}
         if device_id:
@@ -684,7 +680,7 @@ class HomeserverTestCase(TestCase):
         channel = self.make_request(
             "POST",
             "/_matrix/client/r0/login",
-            body.encode("utf8"),
+            body,
             custom_headers=custom_headers,
         )
         self.assertEqual(channel.code, 200, channel.result)

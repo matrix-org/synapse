@@ -399,7 +399,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST",
             "/_matrix/client/v3/login",
-            body.encode("utf8"),
+            body,
             custom_headers=None,
         )
 

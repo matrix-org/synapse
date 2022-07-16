@@ -68,14 +68,16 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
 
     def test_sync_filter_labels(self) -> None:
         """Test that we can filter by a label."""
-        sync_filter = {
-            "room": {
-                "timeline": {
-                    "types": [EventTypes.Message],
-                    "org.matrix.labels": ["#fun"],
+        sync_filter = json.dumps(
+            {
+                "room": {
+                    "timeline": {
+                        "types": [EventTypes.Message],
+                        "org.matrix.labels": ["#fun"],
+                    }
                 }
             }
-        }
+        )
 
         events = self._test_sync_filter_labels(sync_filter)
 
@@ -85,14 +87,16 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
 
     def test_sync_filter_not_labels(self) -> None:
         """Test that we can filter by the absence of a label."""
-        sync_filter = {
-            "room": {
-                "timeline": {
-                    "types": [EventTypes.Message],
-                    "org.matrix.not_labels": ["#fun"],
+        sync_filter = json.dumps(
+            {
+                "room": {
+                    "timeline": {
+                        "types": [EventTypes.Message],
+                        "org.matrix.not_labels": ["#fun"],
+                    }
                 }
             }
-        }
+        )
 
         events = self._test_sync_filter_labels(sync_filter)
 
@@ -105,15 +109,17 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
 
     def test_sync_filter_labels_not_labels(self) -> None:
         """Test that we can filter by both a label and the absence of another label."""
-        sync_filter = {
-            "room": {
-                "timeline": {
-                    "types": [EventTypes.Message],
-                    "org.matrix.labels": ["#work"],
-                    "org.matrix.not_labels": ["#notfun"],
+        sync_filter = json.dumps(
+            {
+                "room": {
+                    "timeline": {
+                        "types": [EventTypes.Message],
+                        "org.matrix.labels": ["#work"],
+                        "org.matrix.not_labels": ["#notfun"],
+                    }
                 }
             }
-        }
+        )
 
         events = self._test_sync_filter_labels(sync_filter)
 
@@ -600,11 +606,10 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(1)
 
         # Send a read receipt to tell the server we've read the latest event.
-        body = {ReceiptTypes.READ: res["event_id"]}
         channel = self.make_request(
             "POST",
             f"/rooms/{self.room_id}/read_markers",
-            body,
+            {ReceiptTypes.READ: res["event_id"]},
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)

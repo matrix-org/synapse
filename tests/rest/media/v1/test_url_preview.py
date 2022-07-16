@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import base64
+import json
 import os
 import re
 from typing import Any, Dict, Optional, Sequence, Tuple, Type
@@ -760,7 +761,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             "type": "photo",
             "url": "http://cdn.twitter.com/matrixdotorg",
         }
-        oembed_content = result.encode("utf-8")
+        oembed_content = json.dumps(result).encode("utf-8")
 
         channel = self.make_request(
             "GET",
@@ -820,7 +821,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             "author_name": "Alice",
             "html": "<div>Content Preview</div>",
         }
-        end_content = result.encode("utf-8")
+        end_content = json.dumps(result).encode("utf-8")
 
         channel = self.make_request(
             "GET",
@@ -864,7 +865,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             "type": "rich",
             "html": "<div>Content Preview</div>",
         }
-        end_content = result.encode("utf-8")
+        end_content = json.dumps(result).encode("utf-8")
 
         channel = self.make_request(
             "GET",
@@ -953,7 +954,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             "type": "photo",
             "url": "http://cdn.twitter.com/matrixdotorg",
         }
-        oembed_content = result2.encode("utf-8")
+        oembed_content = json.dumps(result2).encode("utf-8")
 
         # Ensure a second request is made to the oEmbed URL.
         client = self.reactor.tcpClients[1][2].buildProtocol(None)

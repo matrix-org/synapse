@@ -780,7 +780,7 @@ class RoomsCreateTestCase(RoomBase):
         }
 
         # Test that the invites are correctly ratelimited.
-        channel = self.make_request("POST", "/createRoom", content.encode("utf8"))
+        channel = self.make_request("POST", "/createRoom", content)
         self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code)
         self.assertEqual(
             "Cannot invite so many users at once",
