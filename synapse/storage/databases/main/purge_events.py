@@ -319,26 +319,22 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
         Returns:
             The list of state groups to delete.
         """
+
+        # This first runs the purge transaction with READ_COMMITTED isolation level,
+        # meaning any new rows in the tables will not trigger a serialization error.
+        # We then run the same purge a second time without this isolation level to
+        # purge any of those rows which were added during the first.
+
         state_groups_to_delete = await self.db_pool.runInteraction(
             "purge_room",
             self._purge_room_txn,
             room_id=room_id,
-            # This is safe because we don't care if room data is updated during the transaction, note
-            # we run a second transaction to cleanup tables we may write to during this transaction.
             isolation_level=IsolationLevel.READ_COMMITTED,
         )
 
-        def _purge_room_second_pass_txn(txn: LoggingTransaction, room_id: str) -> None:
-            for table in (
-                "event_push_actions",
-                "stream_ordering_to_exterm",
-            ):
-                logger.info("[purge] removing %s from %s", room_id, table)
-                txn.execute("DELETE FROM %s WHERE room_id=?" % (table,), (room_id,))
-
         await self.db_pool.runInteraction(
-            "purge_room_second_pass",
-            _purge_room_second_pass_txn,
+            "purge_room",
+            self._purge_room_txn,
             room_id=room_id,
         )
 
