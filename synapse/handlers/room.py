@@ -1492,19 +1492,32 @@ class TimestampLookupHandler:
                     # sure they didn't give us an event from their gappy
                     # history. Also need a heuristic for when to stop recursing
                     # if they keep giving us gappy results.
-                    await self.federation_event_handler.backfill_event(
-                        domain, room_id, remote_event_id
+                    remote_event = (
+                        await self.federation_event_handler.backfill_event_id(
+                            domain, room_id, remote_event_id
+                        )
                     )
+
+                    # XXX: When we see that the remote server is not trustworthy,
+                    # maybe we should not ask them first in the future.
+                    if remote_origin_server_ts != remote_event.origin_server_ts:
+                        logger.info(
+                            "get_event_for_timestamp: Remote server (%s) claimed that remote_event_id=%s occured at remote_origin_server_ts=%s but that isn't true (actually occured at %s). Their claims are dubious and we should consider not trusting them.",
+                            domain,
+                            remote_event_id,
+                            remote_origin_server_ts,
+                            remote_event.origin_server_ts,
+                        )
 
                     # Only return the remote event if it's closer than the local event
                     if not local_event or (
-                        abs(remote_origin_server_ts - timestamp)
+                        abs(remote_event.origin_server_ts - timestamp)
                         < abs(local_event.origin_server_ts - timestamp)
                     ):
                         logger.info(
                             "get_event_for_timestamp: returning remote_event_id=%s (%s) since it's closer to timestamp=%s than local_event=%s (%s)",
                             remote_event_id,
-                            remote_origin_server_ts,
+                            remote_event.origin_server_ts,
                             timestamp,
                             local_event.event_id if local_event else None,
                             local_event.origin_server_ts if local_event else None,

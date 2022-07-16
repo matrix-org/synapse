@@ -1324,9 +1324,9 @@ class FederationEventHandler:
             marker_event,
         )
 
-    async def backfill_event(
+    async def backfill_event_id(
         self, destination: str, room_id: str, event_id: str
-    ) -> None:
+    ) -> EventBase:
         """Backfill a single event and persist it as a non-outlier which means
         we also pull in all of the state and auth events necessary for it.
 
@@ -1334,9 +1334,12 @@ class FederationEventHandler:
             destination: The homeserver to pull the given event_id from.
             room_id: The room where the event is from.
             event_id: The event ID to backfill.
+
+        Raises:
+            FederationError if we are unable to find the event from the destination
         """
         logger.info(
-            "backfill_event event_id=%s from destination=%s", event_id, destination
+            "backfill_event_id: event_id=%s from destination=%s", event_id, destination
         )
 
         room_version = await self._store.get_room_version(room_id)
@@ -1365,6 +1368,8 @@ class FederationEventHandler:
             # Prevent notifications going to clients
             backfilled=True,
         )
+
+        return event_from_response
 
     async def _get_events_and_persist(
         self, destination: str, room_id: str, event_ids: Collection[str]
