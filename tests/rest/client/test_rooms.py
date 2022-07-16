@@ -769,19 +769,17 @@ class RoomsCreateTestCase(RoomBase):
 
         # Build the request's content. We use local MXIDs because invites over federation
         # are more difficult to mock.
-        content = json.dumps(
-            {
-                "invite": [
-                    "@alice1:red",
-                    "@alice2:red",
-                    "@alice3:red",
-                    "@alice4:red",
-                ]
-            }
-        ).encode("utf8")
+        content = {
+            "invite": [
+                "@alice1:red",
+                "@alice2:red",
+                "@alice3:red",
+                "@alice4:red",
+            ]
+        }
 
         # Test that the invites are correctly ratelimited.
-        channel = self.make_request("POST", "/createRoom", content)
+        channel = self.make_request("POST", "/createRoom", content.encode("utf8"))
         self.assertEqual(400, channel.code)
         self.assertEqual(
             "Cannot invite so many users at once",
@@ -1821,7 +1819,7 @@ class RoomMessageListTestCase(RoomBase):
             % (
                 self.room_id,
                 second_token_str,
-                json.dumps({"types": [EventTypes.Message]}),
+                {"types": [EventTypes.Message]},
             ),
         )
         self.assertEqual(channel.code, 200, channel.json_body)
@@ -1849,7 +1847,7 @@ class RoomMessageListTestCase(RoomBase):
             % (
                 self.room_id,
                 second_token_str,
-                json.dumps({"types": [EventTypes.Message]}),
+                {"types": [EventTypes.Message]},
             ),
         )
         self.assertEqual(channel.code, 200, channel.json_body)
@@ -1866,7 +1864,7 @@ class RoomMessageListTestCase(RoomBase):
             % (
                 self.room_id,
                 first_token_str,
-                json.dumps({"types": [EventTypes.Message]}),
+                {"types": [EventTypes.Message]},
             ),
         )
         self.assertEqual(channel.code, 200, channel.json_body)
@@ -2198,8 +2196,7 @@ class PerRoomProfilesForbiddenTestCase(unittest.HomeserverTestCase):
 
         # Set a profile for the test user
         self.displayname = "test user"
-        data = {"displayname": self.displayname}
-        request_data = json.dumps(data)
+        request_data = {"displayname": self.displayname}
         channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/profile/%s/displayname" % (self.user_id,),
@@ -2211,8 +2208,7 @@ class PerRoomProfilesForbiddenTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
 
     def test_per_room_profile_forbidden(self) -> None:
-        data = {"membership": "join", "displayname": "other test user"}
-        request_data = json.dumps(data)
+        request_data = {"membership": "join", "displayname": "other test user"}
         channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/rooms/%s/state/m.room.member/%s"
@@ -2404,7 +2400,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET",
             "/rooms/%s/context/%s?filter=%s"
-            % (self.room_id, event_id, json.dumps(self.FILTER_LABELS)),
+            % (self.room_id, event_id, self.FILTER_LABELS),
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 200, channel.result)
@@ -2434,7 +2430,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET",
             "/rooms/%s/context/%s?filter=%s"
-            % (self.room_id, event_id, json.dumps(self.FILTER_NOT_LABELS)),
+            % (self.room_id, event_id, self.FILTER_NOT_LABELS),
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 200, channel.result)
@@ -2469,7 +2465,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET",
             "/rooms/%s/context/%s?filter=%s"
-            % (self.room_id, event_id, json.dumps(self.FILTER_LABELS_NOT_LABELS)),
+            % (self.room_id, event_id, self.FILTER_LABELS_NOT_LABELS),
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 200, channel.result)
@@ -2497,7 +2493,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
-            % (self.room_id, self.tok, token, json.dumps(self.FILTER_LABELS)),
+            % (self.room_id, self.tok, token, self.FILTER_LABELS),
         )
 
         events = channel.json_body["chunk"]
@@ -2514,7 +2510,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
-            % (self.room_id, self.tok, token, json.dumps(self.FILTER_NOT_LABELS)),
+            % (self.room_id, self.tok, token, self.FILTER_NOT_LABELS),
         )
 
         events = channel.json_body["chunk"]
@@ -2541,7 +2537,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
                 self.room_id,
                 self.tok,
                 token,
-                json.dumps(self.FILTER_LABELS_NOT_LABELS),
+                self.FILTER_LABELS_NOT_LABELS,
             ),
         )
 
@@ -2552,16 +2548,14 @@ class LabelsTestCase(unittest.HomeserverTestCase):
 
     def test_search_filter_labels(self) -> None:
         """Test that we can filter by a label on a /search request."""
-        request_data = json.dumps(
-            {
-                "search_categories": {
-                    "room_events": {
-                        "search_term": "label",
-                        "filter": self.FILTER_LABELS,
-                    }
+        request_data = {
+            "search_categories": {
+                "room_events": {
+                    "search_term": "label",
+                    "filter": self.FILTER_LABELS,
                 }
             }
-        )
+        }
 
         self._send_labelled_messages_in_room()
 
@@ -2589,16 +2583,14 @@ class LabelsTestCase(unittest.HomeserverTestCase):
 
     def test_search_filter_not_labels(self) -> None:
         """Test that we can filter by the absence of a label on a /search request."""
-        request_data = json.dumps(
-            {
-                "search_categories": {
-                    "room_events": {
-                        "search_term": "label",
-                        "filter": self.FILTER_NOT_LABELS,
-                    }
+        request_data = {
+            "search_categories": {
+                "room_events": {
+                    "search_term": "label",
+                    "filter": self.FILTER_NOT_LABELS,
                 }
             }
-        )
+        }
 
         self._send_labelled_messages_in_room()
 
@@ -2638,16 +2630,14 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         """Test that we can filter by both a label and the absence of another label on a
         /search request.
         """
-        request_data = json.dumps(
-            {
-                "search_categories": {
-                    "room_events": {
-                        "search_term": "label",
-                        "filter": self.FILTER_LABELS_NOT_LABELS,
-                    }
+        request_data = {
+            "search_categories": {
+                "room_events": {
+                    "search_term": "label",
+                    "filter": self.FILTER_LABELS_NOT_LABELS,
                 }
             }
-        )
+        }
 
         self._send_labelled_messages_in_room()
 
@@ -2817,7 +2807,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         """Make a request to /messages with a filter, returns the chunk of events."""
         channel = self.make_request(
             "GET",
-            "/rooms/%s/messages?filter=%s&dir=b" % (self.room_id, json.dumps(filter)),
+            "/rooms/%s/messages?filter=%s&dir=b" % (self.room_id, filter),
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 200, channel.result)
@@ -3092,8 +3082,7 @@ class RoomAliasListTestCase(unittest.HomeserverTestCase):
 
     def _set_alias_via_directory(self, alias: str, expected_code: int = 200) -> None:
         url = "/_matrix/client/r0/directory/room/" + alias
-        data = {"room_id": self.room_id}
-        request_data = json.dumps(data)
+        request_data = {"room_id": self.room_id}
 
         channel = self.make_request(
             "PUT", url, request_data, access_token=self.room_owner_tok
@@ -3122,8 +3111,7 @@ class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):
 
     def _set_alias_via_directory(self, alias: str, expected_code: int = 200) -> None:
         url = "/_matrix/client/r0/directory/room/" + alias
-        data = {"room_id": self.room_id}
-        request_data = json.dumps(data)
+        request_data = {"room_id": self.room_id}
 
         channel = self.make_request(
             "PUT", url, request_data, access_token=self.room_owner_tok
@@ -3149,7 +3137,7 @@ class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "PUT",
             "rooms/%s/state/m.room.canonical_alias" % (self.room_id,),
-            json.dumps(content),
+            content,
             access_token=self.room_owner_tok,
         )
         self.assertEqual(channel.code, expected_code, channel.result)

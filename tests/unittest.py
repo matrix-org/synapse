@@ -16,7 +16,6 @@
 import gc
 import hashlib
 import hmac
-import json
 import logging
 import secrets
 import time
@@ -619,17 +618,15 @@ class HomeserverTestCase(TestCase):
         want_mac.update(nonce.encode("ascii") + b"\x00" + nonce_str)
         want_mac_digest = want_mac.hexdigest()
 
-        body = json.dumps(
-            {
-                "nonce": nonce,
-                "username": username,
-                "displayname": displayname,
-                "password": password,
-                "admin": admin,
-                "mac": want_mac_digest,
-                "inhibit_login": True,
-            }
-        )
+        body = {
+            "nonce": nonce,
+            "username": username,
+            "displayname": displayname,
+            "password": password,
+            "admin": admin,
+            "mac": want_mac_digest,
+            "inhibit_login": True,
+        }
         channel = self.make_request(
             "POST", "/_synapse/admin/v1/register", body.encode("utf8")
         )
@@ -687,7 +684,7 @@ class HomeserverTestCase(TestCase):
         channel = self.make_request(
             "POST",
             "/_matrix/client/r0/login",
-            json.dumps(body).encode("utf8"),
+            body.encode("utf8"),
             custom_headers=custom_headers,
         )
         self.assertEqual(channel.code, 200, channel.result)
