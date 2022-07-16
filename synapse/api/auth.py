@@ -220,7 +220,8 @@ class Auth:
 
             device_id = user_info.device_id
 
-            if access_token and ip_addr:
+            # Beeper change: don't store IPs for bridges making direct sync requests (for to-device)
+            if access_token and ip_addr and not user_info.user_id.startswith("@_"):
                 await self.store.insert_client_ip(
                     user_id=user_info.token_owner,
                     access_token=access_token,
