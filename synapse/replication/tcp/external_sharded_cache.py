@@ -191,7 +191,8 @@ class ExternalShardedCache:
 
         logger.debug("Got cache result %s %s: %r", cache_name, keys, combined_results)
 
-        get_counter.labels(cache_name).inc(len(combined_results))
+        get_counter.labels(cache_name, True).inc(len(combined_results))
+        get_counter.labels(cache_name, False).inc(len(keys) - len(combined_results))
 
         return combined_results
 
