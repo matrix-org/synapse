@@ -14,6 +14,7 @@
 import os
 import re
 from email.parser import Parser
+from http import HTTPStatus
 from typing import Any, Dict, List, Optional, Union
 from unittest.mock import Mock
 
@@ -97,7 +98,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST", "/_matrix/client/r0/login", body.encode("utf8")
         )
-        self.assertEqual(channel.code, 403, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.FORBIDDEN, channel.result)
 
     def test_basic_password_reset(self) -> None:
         """Test basic password reset flow"""
@@ -346,7 +347,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
             shorthand=False,
         )
 
-        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(HTTPStatus.OK, channel.code, channel.result)
 
         # Now POST to the same endpoint, mimicking the same behaviour as clicking the
         # password reset confirm button
@@ -361,7 +362,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
             shorthand=False,
             content_is_form=True,
         )
-        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(HTTPStatus.OK, channel.code, channel.result)
 
     def _get_link_from_email(self) -> str:
         assert self.email_attempts, "No emails have been sent"
@@ -389,7 +390,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         new_password: str,
         session_id: str,
         client_secret: str,
-        expected_code: int = 200,
+        expected_code: int = HTTPStatus.OK,
     ) -> None:
         channel = self.make_request(
             "POST",
@@ -712,7 +713,9 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             },
             access_token=self.user_id_tok,
         )
-        self.assertEqual(400, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            HTTPStatus.BAD_REQUEST, channel.code, msg=channel.result["body"]
+        )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
         # Get user
@@ -722,7 +725,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             access_token=self.user_id_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
         self.assertFalse(channel.json_body["threepids"])
 
     def test_delete_email(self) -> None:
@@ -744,7 +747,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             {"medium": "email", "address": self.email},
             access_token=self.user_id_tok,
         )
-        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
 
         # Get user
         channel = self.make_request(
@@ -753,7 +756,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             access_token=self.user_id_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
         self.assertFalse(channel.json_body["threepids"])
 
     def test_delete_email_if_disabled(self) -> None:
@@ -778,7 +781,9 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             access_token=self.user_id_tok,
         )
 
-        self.assertEqual(400, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            HTTPStatus.BAD_REQUEST, channel.code, msg=channel.result["body"]
+        )
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
         # Get user
@@ -788,7 +793,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             access_token=self.user_id_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual(self.email, channel.json_body["threepids"][0]["address"])
 
@@ -814,7 +819,9 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             },
             access_token=self.user_id_tok,
         )
-        self.assertEqual(400, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            HTTPStatus.BAD_REQUEST, channel.code, msg=channel.result["body"]
+        )
         self.assertEqual(Codes.THREEPID_AUTH_FAILED, channel.json_body["errcode"])
 
         # Get user
@@ -824,7 +831,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             access_token=self.user_id_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
         self.assertFalse(channel.json_body["threepids"])
 
     def test_no_valid_token(self) -> None:
@@ -849,7 +856,9 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             },
             access_token=self.user_id_tok,
         )
-        self.assertEqual(400, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            HTTPStatus.BAD_REQUEST, channel.code, msg=channel.result["body"]
+        )
         self.assertEqual(Codes.THREEPID_AUTH_FAILED, channel.json_body["errcode"])
 
         # Get user
@@ -859,7 +868,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             access_token=self.user_id_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
         self.assertFalse(channel.json_body["threepids"])
 
     @override_config({"next_link_domain_whitelist": None})
@@ -869,7 +878,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             "something@example.com",
             "some_secret",
             next_link="https://example.com/a/good/site",
-            expect_code=200,
+            expect_code=HTTPStatus.OK,
         )
 
     @override_config({"next_link_domain_whitelist": None})
@@ -881,7 +890,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             "something@example.com",
             "some_secret",
             next_link="some-protocol://abcdefghijklmopqrstuvwxyz",
-            expect_code=200,
+            expect_code=HTTPStatus.OK,
         )
 
     @override_config({"next_link_domain_whitelist": None})
@@ -892,7 +901,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             "something@example.com",
             "some_secret",
             next_link="file:///host/path",
-            expect_code=400,
+            expect_code=HTTPStatus.BAD_REQUEST,
         )
 
     @override_config({"next_link_domain_whitelist": ["example.com", "example.org"]})
@@ -904,28 +913,28 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             "something@example.com",
             "some_secret",
             next_link=None,
-            expect_code=200,
+            expect_code=HTTPStatus.OK,
         )
 
         self._request_token(
             "something@example.com",
             "some_secret",
             next_link="https://example.com/some/good/page",
-            expect_code=200,
+            expect_code=HTTPStatus.OK,
         )
 
         self._request_token(
             "something@example.com",
             "some_secret",
             next_link="https://example.org/some/also/good/page",
-            expect_code=200,
+            expect_code=HTTPStatus.OK,
         )
 
         self._request_token(
             "something@example.com",
             "some_secret",
             next_link="https://bad.example.org/some/bad/page",
-            expect_code=400,
+            expect_code=HTTPStatus.BAD_REQUEST,
         )
 
     @override_config({"next_link_domain_whitelist": []})
@@ -937,7 +946,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             "something@example.com",
             "some_secret",
             next_link="https://example.com/a/page",
-            expect_code=400,
+            expect_code=HTTPStatus.BAD_REQUEST,
         )
 
     def _request_token(
@@ -945,7 +954,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         email: str,
         client_secret: str,
         next_link: Optional[str] = None,
-        expect_code: int = 200,
+        expect_code: int = HTTPStatus.OK,
     ) -> Optional[str]:
         """Request a validation token to add an email address to a user's account
 
@@ -990,7 +999,9 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             b"account/3pid/email/requestToken",
             {"client_secret": client_secret, "email": email, "send_attempt": 1},
         )
-        self.assertEqual(400, channel.code, msg=channel.result["body"])
+        self.assertEqual(
+            HTTPStatus.BAD_REQUEST, channel.code, msg=channel.result["body"]
+        )
         self.assertEqual(expected_errcode, channel.json_body["errcode"])
         self.assertEqual(expected_error, channel.json_body["error"])
 
@@ -999,7 +1010,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         path = link.replace("https://example.com", "")
 
         channel = self.make_request("GET", path, shorthand=False)
-        self.assertEqual(200, channel.code, channel.result)
+        self.assertEqual(HTTPStatus.OK, channel.code, channel.result)
 
     def _get_link_from_email(self) -> str:
         assert self.email_attempts, "No emails have been sent"
@@ -1049,7 +1060,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             access_token=self.user_id_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
 
         # Get user
         channel = self.make_request(
@@ -1058,7 +1069,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             access_token=self.user_id_tok,
         )
 
-        self.assertEqual(200, channel.code, msg=channel.result["body"])
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
 
         threepids = {threepid["address"] for threepid in channel.json_body["threepids"]}
@@ -1089,7 +1100,7 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
         """Tests that not providing any MXID raises an error."""
         self._test_status(
             users=None,
-            expected_status_code=400,
+            expected_status_code=HTTPStatus.BAD_REQUEST,
             expected_errcode=Codes.MISSING_PARAM,
         )
 
@@ -1097,7 +1108,7 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
         """Tests that providing an invalid MXID raises an error."""
         self._test_status(
             users=["bad:test"],
-            expected_status_code=400,
+            expected_status_code=HTTPStatus.BAD_REQUEST,
             expected_errcode=Codes.INVALID_PARAM,
         )
 
@@ -1283,7 +1294,7 @@ class AccountStatusTestCase(unittest.HomeserverTestCase):
     def _test_status(
         self,
         users: Optional[List[str]],
-        expected_status_code: int = 200,
+        expected_status_code: int = HTTPStatus.OK,
         expected_statuses: Optional[Dict[str, Dict[str, bool]]] = None,
         expected_failures: Optional[List[str]] = None,
         expected_errcode: Optional[str] = None,
