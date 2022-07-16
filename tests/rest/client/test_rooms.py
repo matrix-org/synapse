@@ -1872,7 +1872,7 @@ class RoomMessageListTestCase(RoomBase):
             % (
                 self.room_id,
                 second_token_str,
-                {"types": [EventTypes.Message]},
+                json.dumps({"types": [EventTypes.Message]}),
             ),
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
@@ -1900,7 +1900,7 @@ class RoomMessageListTestCase(RoomBase):
             % (
                 self.room_id,
                 second_token_str,
-                {"types": [EventTypes.Message]},
+                json.dumps({"types": [EventTypes.Message]}),
             ),
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
@@ -1917,7 +1917,7 @@ class RoomMessageListTestCase(RoomBase):
             % (
                 self.room_id,
                 first_token_str,
-                {"types": [EventTypes.Message]},
+                json.dumps({"types": [EventTypes.Message]}),
             ),
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
@@ -2453,7 +2453,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET",
             "/rooms/%s/context/%s?filter=%s"
-            % (self.room_id, event_id, self.FILTER_LABELS),
+            % (self.room_id, event_id, json.dumps(self.FILTER_LABELS)),
             access_token=self.tok,
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
@@ -2483,7 +2483,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET",
             "/rooms/%s/context/%s?filter=%s"
-            % (self.room_id, event_id, self.FILTER_NOT_LABELS),
+            % (self.room_id, event_id, json.dumps(self.FILTER_NOT_LABELS)),
             access_token=self.tok,
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
@@ -2518,7 +2518,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET",
             "/rooms/%s/context/%s?filter=%s"
-            % (self.room_id, event_id, self.FILTER_LABELS_NOT_LABELS),
+            % (self.room_id, event_id, json.dumps(self.FILTER_LABELS_NOT_LABELS)),
             access_token=self.tok,
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
@@ -2563,7 +2563,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
-            % (self.room_id, self.tok, token, self.FILTER_NOT_LABELS),
+            % (self.room_id, self.tok, token, json.dumps(self.FILTER_NOT_LABELS)),
         )
 
         events = channel.json_body["chunk"]
@@ -2590,7 +2590,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
                 self.room_id,
                 self.tok,
                 token,
-                self.FILTER_LABELS_NOT_LABELS,
+                json.dumps(self.FILTER_LABELS_NOT_LABELS),
             ),
         )
 
