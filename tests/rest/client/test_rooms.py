@@ -2860,7 +2860,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         """Make a request to /messages with a filter, returns the chunk of events."""
         channel = self.make_request(
             "GET",
-            "/rooms/%s/messages?filter=%s&dir=b" % (self.room_id, filter),
+            "/rooms/%s/messages?filter=%s&dir=b" % (self.room_id, json.dumps(filter)),
             access_token=self.tok,
         )
         self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
