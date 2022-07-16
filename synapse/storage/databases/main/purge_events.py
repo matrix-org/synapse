@@ -415,6 +415,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "destination_rooms",
             "event_backward_extremities",
             "event_forward_extremities",
+            "event_push_actions",
             "event_search",
             "partial_state_events",
             "events",
@@ -431,6 +432,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "room_stats_state",
             "room_stats_current",
             "room_stats_earliest_token",
+            "stream_ordering_to_exterm",
             "users_in_public_rooms",
             "users_who_share_private_rooms",
             # no useful index, but let's clear them anyway
