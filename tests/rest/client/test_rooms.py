@@ -2546,7 +2546,7 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET",
             "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
-            % (self.room_id, self.tok, token, self.FILTER_LABELS),
+            % (self.room_id, self.tok, token, json.dumps(self.FILTER_LABELS)),
         )
 
         events = channel.json_body["chunk"]
