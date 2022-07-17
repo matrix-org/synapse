@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 from http import HTTPStatus
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -51,12 +50,11 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         room_id = channel.json_body["room_id"]
 
-        params = {
+        request_data = {
             "id_server": "testis",
             "medium": "email",
             "address": "test@example.com",
         }
-        request_data = json.dumps(params)
         request_url = ("/rooms/%s/invite" % (room_id)).encode("ascii")
         channel = self.make_request(
             b"POST", request_url, request_data, access_token=tok
