@@ -34,6 +34,7 @@ from typing import (
     overload,
 )
 
+from cuckoo.filter import ScalableCuckooFilter
 from typing_extensions import Literal
 
 from twisted.internet import reactor
@@ -427,6 +428,17 @@ class LruCache(Generic[KT, VT]):
         else:
             self.max_size = int(max_size)
 
+        self._doorkeeper = ScalableCuckooFilter(
+            initial_capacity=self.max_size, error_rate=0.001
+        )
+        self._doorkeeper_2 = ScalableCuckooFilter(self.max_size, 0.001)
+
+        def _rotate_doorkeeper() -> None:
+            self._doorkeeper_2 = self._doorkeeper
+            self._doorkeeper = ScalableCuckooFilter(self.max_size, 0.001)
+
+        real_clock.looping_call(_rotate_doorkeeper, 5 * 60 * 100)
+
         # register_cache might call our "set_cache_factor" callback; there's nothing to
         # do yet when we get resized.
         self._on_resize: Optional[Callable[[], None]] = None
@@ -496,6 +508,14 @@ class LruCache(Generic[KT, VT]):
         def add_node(
             key: KT, value: VT, callbacks: Collection[Callable[[], None]] = ()
         ) -> None:
+            hash_key = hash(()).to_bytes(8, byteorder="big")
+            found = self._doorkeeper.contains(hash_key) | self._doorkeeper_2.contains(
+                hash_key
+            )
+            if not found:
+                self._doorkeeper.insert(hash_key)
+                return
+
             node: _Node[KT, VT] = _Node(
                 list_root,
                 key,
