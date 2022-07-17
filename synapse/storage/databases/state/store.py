@@ -202,6 +202,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 requests state from the cache, if False we need to query the DB for the
                 missing state.
         """
+        # If we are asked explicitly for a subset of keys, we only ask for those
+        # from the cache. This ensures that the `DictionaryCache` can make
+        # better decisions about what to cache and what to expire.
         dict_keys = None
         if not state_filter.has_wildcards():
             dict_keys = state_filter.concrete_types()

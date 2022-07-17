@@ -56,6 +56,8 @@ class DictionaryEntry:  # should be: Generic[DKT, DV].
 
 
 class _FullCacheKey(enum.Enum):
+    """The key we use to cache the full dict."""
+
     KEY = object()
 
 
@@ -66,12 +68,18 @@ class _Sentinel(enum.Enum):
 
 
 class _PerKeyValue(Generic[DV]):
+    """The cached value of a dictionary key. If `value` is the sentinel,
+    indicates that the requested key is known to *not* be in the full dict.
+    """
+
     __slots__ = ["value"]
 
     def __init__(self, value: Union[DV, Literal[_Sentinel.sentinel]]) -> None:
         self.value = value
 
     def __len__(self) -> int:
+        # We add a `__len__` implementation as we use this class in a cache
+        # where the values are variable length.
         return 1
 
 
@@ -81,6 +89,25 @@ class DictionaryCache(Generic[KT, DKT, DV]):
     """
 
     def __init__(self, name: str, max_entries: int = 1000):
+        # We use a single cache to cache two different types of entries:
+        #   1. Map from (key, dict_key) -> dict value (or sentinel, indicating
+        #      the key doesn't exist in the dict); and
+        #   2. Map from (key, _FullCacheKey.KEY) -> full dict.
+        #
+        # The former is used when explicit keys of the dictionary are looked up,
+        # and the latter when the full dictionary is requested.
+        #
+        # If when explicit keys are requested and not in the cache, we then look
+        # to see if we have the full dict and use that if we do. If found in the
+        # full dict each key is added into the cache.
+        #
+        # This set up allows the `LruCache` to prune the full dict entries if
+        # they haven't been used in a while, even when there have been recent
+        # queries for subsets of the dict.
+        #
+        # Typing:
+        #     * A key of `(KT, DKT)` has a value of `_PerKeyValue`
+        #     * A key of `(KT, _FullCacheKey.KEY)` has a value of `Dict[DKT, DV]`
         self.cache: LruCache[
             Tuple[KT, Union[DKT, Literal[_FullCacheKey.KEY]]],
             Union[_PerKeyValue, Dict[DKT, DV]],
@@ -120,11 +147,13 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         """
 
         if dict_keys is None:
+            # First we check if we have cached the full dict.
             entry = self.cache.get((key, _FullCacheKey.KEY), _Sentinel.sentinel)
             if entry is not _Sentinel.sentinel:
                 assert isinstance(entry, dict)
                 return DictionaryEntry(True, set(), entry)
 
+            # If not, check if we have cached any of dict keys.
             all_entries = self.cache.get_multi(
                 (key,),
                 _Sentinel.sentinel,
@@ -132,13 +161,21 @@ class DictionaryCache(Generic[KT, DKT, DV]):
             if all_entries is _Sentinel.sentinel:
                 return DictionaryEntry(False, set(), {})
 
+            # If there are entries we need to unwrap the returned cache nodes
+            # and `_PerKeyValue` into the `DictionaryEntry`.
             values = {}
             known_absent = set()
             for dict_key, dict_value in iterate_tree_cache_items((), all_entries):
                 dict_key = dict_key[0]
                 dict_value = dict_value.value
 
+                # We have explicitly looked for a full cache key, so we
+                # shouldn't see one.
+                assert dict_key != _FullCacheKey.KEY
+
+                # ... therefore the values must be `_PerKeyValue`
                 assert isinstance(dict_value, _PerKeyValue)
+
                 if dict_value.value is _Sentinel.sentinel:
                     known_absent.add(dict_key)
                 else:
@@ -146,6 +183,10 @@ class DictionaryCache(Generic[KT, DKT, DV]):
 
             return DictionaryEntry(False, known_absent, values)
 
+        # We are being asked for a subset of keys.
+
+        # First got and check for each requested dict key in the cache, tracking
+        # which we couldn't find.
         values = {}
         known_absent = set()
         missing = set()
@@ -162,21 +203,32 @@ class DictionaryCache(Generic[KT, DKT, DV]):
             else:
                 values[dict_key] = entry.value
 
+        # If we found everything we can return immediately.
         if not missing:
             return DictionaryEntry(False, known_absent, values)
 
+        # If we are missing any keys check if we happen to have the full dict in
+        # the cache.
+        #
+        # We don't update the last access time for this cache fetch, as we
+        # aren't explicitly interested in the full dict and so we don't want
+        # requests for explicit dict keys to keep the full dict in the cache.
         entry = self.cache.get(
             (key, _FullCacheKey.KEY),
             _Sentinel.sentinel,
             update_last_access=False,
         )
         if entry is _Sentinel.sentinel:
+            # Not in the cache, return the subset of keys we found.
             return DictionaryEntry(False, known_absent, values)
 
+        # We have the full dict!
         assert isinstance(entry, dict)
 
         values = {}
         for dict_key in dict_keys:
+            # We explicitly add each dict key to the cache, so that cache hit
+            # rates for each key can be tracked separately.
             value = entry.get(dict_key, _Sentinel.sentinel)  # type: ignore[arg-type]
             self.cache[(key, dict_key)] = _PerKeyValue(value)
 
@@ -225,13 +277,21 @@ class DictionaryCache(Generic[KT, DKT, DV]):
             # Only update the cache if the caches sequence number matches the
             # number that the cache had before the SELECT was started (SYN-369)
             if fetched_keys is None:
-                self._insert(key, value)
+                self.cache[(key, _FullCacheKey.KEY)] = value
             else:
-                self._update_or_insert(key, value, fetched_keys)
+                self._update_subset(key, value, fetched_keys)
 
-    def _update_or_insert(
+    def _update_subset(
         self, key: KT, value: Dict[DKT, DV], fetched_keys: Iterable[DKT]
     ) -> None:
+        """Add the given dictionary values as explicit keys in the cache.
+
+        Args:
+            key
+            value: The dictionary with all the values that we should cache
+            fetched_keys: The full set of keys that were looked up, any keys
+                here not in `value` should be marked as "known absent".
+        """
 
         for dict_key, dict_value in value.items():
             self.cache[(key, dict_key)] = _PerKeyValue(dict_value)
@@ -241,6 +301,3 @@ class DictionaryCache(Generic[KT, DKT, DV]):
                 continue
 
             self.cache[(key, dict_key)] = _PerKeyValue(_Sentinel.sentinel)
-
-    def _insert(self, key: KT, value: Dict[DKT, DV]) -> None:
-        self.cache[(key, _FullCacheKey.KEY)] = value
