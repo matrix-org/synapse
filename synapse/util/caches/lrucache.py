@@ -35,6 +35,7 @@ from typing import (
 )
 
 from cuckoo.filter import ScalableCuckooFilter
+from prometheus_client import Counter
 from typing_extensions import Literal
 
 from twisted.internet import reactor
@@ -52,6 +53,9 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+doorkeeper_counter = Counter("synapse_lru_cache_doorkeeper_total", "")
+doorkeeper_hit_counter = Counter("synapse_lru_cache_doorkeeper_hits", "")
 
 try:
     from pympler.asizeof import Asizer
@@ -509,12 +513,15 @@ class LruCache(Generic[KT, VT]):
             key: KT, value: VT, callbacks: Collection[Callable[[], None]] = ()
         ) -> None:
             hash_key = hash(()).to_bytes(8, byteorder="big")
+            doorkeeper_counter.inc()
             found = self._doorkeeper.contains(hash_key) | self._doorkeeper_2.contains(
                 hash_key
             )
             if not found:
                 self._doorkeeper.insert(hash_key)
                 return
+
+            doorkeeper_hit_counter.inc()
 
             node: _Node[KT, VT] = _Node(
                 list_root,
