@@ -119,7 +119,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             "get_all_updated_caches", get_all_updated_caches_txn
         )
 
-    def process_replication_rows(
+    async def process_replication_rows(
         self, stream_name: str, instance_name: str, token: int, rows: Iterable[Any]
     ) -> None:
         if stream_name == EventsStream.NAME:
@@ -154,7 +154,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                 else:
                     self._attempt_to_invalidate_cache(row.cache_func, row.keys)
 
-        super().process_replication_rows(stream_name, instance_name, token, rows)
+        await super().process_replication_rows(stream_name, instance_name, token, rows)
 
     def _process_event_stream_row(self, token: int, row: EventsStreamRow) -> None:
         data = row.data
