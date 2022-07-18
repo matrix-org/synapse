@@ -83,6 +83,8 @@ EXAMPLECONFIG
 
 Copy the code above save it to a file ```create_stream_writers.sh``` (for example).
 
+Make the script executable by running ```chmod +x create_stream_writers.sh```.
+
 ## Run the script to create workers and print out a sample configuration
 
 Simply run the script to create YAML files in the current folder and print out the required configuration for ```homeserver.yaml```.
