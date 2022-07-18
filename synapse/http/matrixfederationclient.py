@@ -484,7 +484,7 @@ class MatrixFederationHttpClient:
         try:
             parse_and_validate_server_name(request.destination)
         except ValueError:
-            logger.info(f"Invalid destination: {request.destination}")
+            logger.info(f"Invalid destination: {request.destination}.")
             raise FederationDeniedError(request.destination)
 
         if timeout:
