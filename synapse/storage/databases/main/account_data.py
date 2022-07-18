@@ -414,7 +414,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
             )
         )
 
-    async def process_replication_rows(
+    def process_replication_rows(
         self,
         stream_name: str,
         instance_name: str,
@@ -437,7 +437,7 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
                 )
                 self._account_data_stream_cache.entity_has_changed(row.user_id, token)
 
-        await super().process_replication_rows(stream_name, instance_name, token, rows)
+        super().process_replication_rows(stream_name, instance_name, token, rows)
 
     async def add_account_data_to_room(
         self, user_id: str, room_id: str, account_data_type: str, content: JsonDict

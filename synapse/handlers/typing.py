@@ -158,7 +158,7 @@ class FollowerTypingHandler:
         except Exception:
             logger.exception("Error pushing typing notif to remotes")
 
-    async def process_replication_rows(
+    def process_replication_rows(
         self, token: int, rows: List[TypingStream.TypingStreamRow]
     ) -> None:
         """Should be called whenever we receive updates for typing stream."""
@@ -444,7 +444,7 @@ class TypingWriterHandler(FollowerTypingHandler):
 
         return rows, current_id, limited
 
-    async def process_replication_rows(
+    def process_replication_rows(
         self, token: int, rows: List[TypingStream.TypingStreamRow]
     ) -> None:
         # The writing process should never get updates from replication.

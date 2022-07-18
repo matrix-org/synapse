@@ -280,7 +280,7 @@ class EventsWorkerStore(SQLBaseStore):
             id_column="chain_id",
         )
 
-    async def process_replication_rows(
+    def process_replication_rows(
         self,
         stream_name: str,
         instance_name: str,
@@ -292,7 +292,7 @@ class EventsWorkerStore(SQLBaseStore):
         elif stream_name == BackfillStream.NAME:
             self._backfill_id_gen.advance(instance_name, -token)
 
-        await super().process_replication_rows(stream_name, instance_name, token, rows)
+        super().process_replication_rows(stream_name, instance_name, token, rows)
 
     async def have_censored_event(self, event_id: str) -> bool:
         """Check if an event has been censored, i.e. if the content of the event has been erased
