@@ -144,6 +144,15 @@ Improved Documentation
 - Remove documentation for the Delete Group Admin API which no longer exists. ([\#13112](https://github.com/matrix-org/synapse/issues/13112))
 
 
+Configuration Changes
+---------------------
+
+For full documentation please look at the [config documentation](usage/configuration/config_documentation.md).
+
+- The option `extra_well_known_client_content` has been added.
+- The default of `sync_response_cache_duration` has been changed from `0` to `2m`.
+
+
 Deprecations and Removals
 -------------------------
 
