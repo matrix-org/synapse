@@ -712,21 +712,41 @@ class EventsWorkerStore(SQLBaseStore):
 
         return event_entry_map
 
-    # The next two methods implement get event cache invalidation the first invalidates
-    # the asynchronous cache instance. This may include out-of-process caches such as
-    # Redis/memcache. Once complete we can invalidate any in memory cache in the second
-    # method. The ordering is important here to ensure we don't pull in any remote
-    # invalid value after we invalidate the in-memory cache.
     def invalidate_get_event_cache_after_txn(
         self, txn: LoggingTransaction, event_id: str
     ) -> None:
+        """
+        Prepares a database transaction to invalidate the get event cache for a given
+        event ID when executed successfully. This is achieved by attaching two callbacks
+        to the transaction, one to invalidate the async cache and one for the in memory
+        sync cache (importantly called in that order).
+
+        Arguments:
+            txn: the database transaction to attach the callbacks to
+            event_id: the event ID to be invalidated from caches
+        """
+
         txn.call_after(self._invalidate_async_get_event_cache, event_id)
         txn.call_after(self._invalidate_local_get_event_cache, event_id)
 
     async def _invalidate_async_get_event_cache(self, event_id: str) -> None:
+        """
+        Invalidates an event in the asyncronous get event cache, which may be remote.
+
+        Arguments:
+            event_id: the event ID to invalidate
+        """
+
         await self._get_event_cache.invalidate((event_id,))
 
     def _invalidate_local_get_event_cache(self, event_id: str) -> None:
+        """
+        Invalidates an event in local in-memory get event caches.
+
+        Arguments:
+            event_id: the event ID to invalidate
+        """
+
         self._get_event_cache.invalidate_local((event_id,))
         self._event_ref.pop(event_id, None)
         self._current_event_fetches.pop(event_id, None)
