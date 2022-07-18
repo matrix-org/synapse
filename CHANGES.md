@@ -34,7 +34,7 @@ Improved Documentation
 - Add an explanation of the `--report-stats` argument to the docs. ([\#13029](https://github.com/matrix-org/synapse/issues/13029))
 - Add a helpful example bash script to the contrib directory for creating multiple worker configuration files of the same type. Contributed by @villepeh. ([\#13032](https://github.com/matrix-org/synapse/issues/13032))
 - Add missing links to config options. ([\#13166](https://github.com/matrix-org/synapse/issues/13166))
-- Add documentation for anonymised homeserver statistics collection. ([\#13086](https://github.com/matrix-org/synapse/issues/13086))
+- Add documentation for homeserver usage statistics collection. ([\#13086](https://github.com/matrix-org/synapse/issues/13086))
 - Add documentation for the existing `databases` option in the homeserver configuration manual. ([\#13212](https://github.com/matrix-org/synapse/issues/13212))
 - Clean up references to sample configuration and redirect users to the configuration manual instead. ([\#13077](https://github.com/matrix-org/synapse/issues/13077), [\#13139](https://github.com/matrix-org/synapse/issues/13139))
 - Document how the Synapse team does reviews. ([\#13132](https://github.com/matrix-org/synapse/issues/13132))
