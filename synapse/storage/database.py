@@ -57,7 +57,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 from synapse.storage.types import Connection, Cursor
-from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
+from synapse.util.async_helpers import delay_cancellation
 from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
@@ -796,6 +796,18 @@ class DatabasePool:
             The result of func
         """
 
+        async def _run_callbacks(callbacks):
+            sync_callbacks = []
+
+            for cb, args, kwargs in callbacks:
+                if inspect.iscoroutinefunction(cb):
+                    await cb(*args, **kwargs)
+                else:
+                    sync_callbacks.append((cb, args, kwargs))
+
+            for cb, args, kwargs in sync_callbacks:
+                cb(*args, **kwargs)
+
         async def _runInteraction() -> R:
             after_callbacks: List[_CallbackListEntry] = []
             exception_callbacks: List[_CallbackListEntry] = []
@@ -817,15 +829,10 @@ class DatabasePool:
                         **kwargs,
                     )
 
-                for after_callback, after_args, after_kwargs in after_callbacks:
-                    await maybe_awaitable(after_callback(*after_args, **after_kwargs))
-
+                await _run_callbacks(after_callbacks)
                 return cast(R, result)
             except Exception:
-                for exception_callback, after_args, after_kwargs in exception_callbacks:
-                    await maybe_awaitable(
-                        exception_callback(*after_args, **after_kwargs)
-                    )
+                await _run_callbacks(exception_callbacks)
                 raise
 
         # To handle cancellation, we ensure that `after_callback`s and
