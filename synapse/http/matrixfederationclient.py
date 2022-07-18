@@ -98,6 +98,7 @@ MAX_LONG_RETRIES = 10
 MAX_SHORT_RETRIES = 3
 MAXINT = sys.maxsize
 
+
 _next_id = 1
 
 T = TypeVar("T")
@@ -565,6 +566,7 @@ class MatrixFederationHttpClient:
                         )
 
                     headers_dict[b"Authorization"] = auth_headers
+
                     logger.debug(
                         "{%s} [%s] Sending request: %s %s; timeout %fs",
                         request.txn_id,
