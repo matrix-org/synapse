@@ -3,6 +3,8 @@
 # To use this file locally, use:
 #   git blame --ignore-revs-file="path/to/.git-blame-ignore-revs" <files>
 #
+# or configure the `blame.ignoreRevsFile` option in your git config.
+#
 # If ignoring a pull request that was not squash merged, only the merge
 # commit needs to be put here. Child commits will be resolved from it.
 
