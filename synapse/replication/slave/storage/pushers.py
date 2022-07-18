@@ -40,11 +40,9 @@ class SlavedPusherStore(PusherWorkerStore, BaseSlavedStore):
     def get_pushers_stream_token(self) -> int:
         return self._pushers_id_gen.get_current_token()
 
-    async def process_replication_rows(
+    def process_replication_rows(
         self, stream_name: str, instance_name: str, token: int, rows: Iterable[Any]
     ) -> None:
         if stream_name == PushersStream.NAME:
             self._pushers_id_gen.advance(instance_name, token)
-        return await super().process_replication_rows(
-            stream_name, instance_name, token, rows
-        )
+        return super().process_replication_rows(stream_name, instance_name, token, rows)

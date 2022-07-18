@@ -1,1 +1,0 @@
-Make all replication row processing methods asynchronous. Contributed by Nick @ Beeper (@fizzadar).
