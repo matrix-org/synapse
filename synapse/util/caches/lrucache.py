@@ -576,17 +576,37 @@ class LruCache(Generic[KT, VT]):
                     metrics.inc_misses()
                 return default
 
+        @overload
+        def cache_get_multi(
+            key: tuple,
+            default: Literal[None] = None,
+            update_metrics: bool = True,
+        ) -> Union[None, TreeCacheNode]:
+            ...
+
+        @overload
+        def cache_get_multi(
+            key: tuple,
+            default: T,
+            update_metrics: bool = True,
+        ) -> Union[T, TreeCacheNode]:
+            ...
+
         @synchronized
         def cache_get_multi(
             key: tuple,
             default: Optional[T] = None,
             update_metrics: bool = True,
         ) -> Union[None, T, TreeCacheNode]:
-            node = cache.get(key, None)  # type: ignore[arg-type]
+            """Used only for `TreeCache` to fetch a subtree."""
+
+            assert isinstance(cache, TreeCache)
+
+            node = cache.get(key, None)
             if node is not None:
                 if update_metrics and metrics:
                     metrics.inc_hits()
-                return node  # type: ignore[return-value]
+                return node
             else:
                 if update_metrics and metrics:
                     metrics.inc_misses()
