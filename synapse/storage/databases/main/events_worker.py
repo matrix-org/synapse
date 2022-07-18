@@ -726,7 +726,7 @@ class EventsWorkerStore(SQLBaseStore):
             event_id: the event ID to be invalidated from caches
         """
 
-        txn.call_after(self._invalidate_async_get_event_cache, event_id)
+        txn.async_call_after(self._invalidate_async_get_event_cache, event_id)
         txn.call_after(self._invalidate_local_get_event_cache, event_id)
 
     async def _invalidate_async_get_event_cache(self, event_id: str) -> None:
@@ -982,7 +982,13 @@ class EventsWorkerStore(SQLBaseStore):
                 }
 
                 row_dict = self.db_pool.new_transaction(
-                    conn, "do_fetch", [], [], self._fetch_event_rows, events_to_fetch
+                    conn,
+                    "do_fetch",
+                    [],
+                    [],
+                    [],
+                    self._fetch_event_rows,
+                    events_to_fetch,
                 )
 
                 # We only want to resolve deferreds from the main thread
