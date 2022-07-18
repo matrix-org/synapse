@@ -332,10 +332,12 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             isolation_level=IsolationLevel.READ_COMMITTED,
         )
 
-        await self.db_pool.runInteraction(
-            "purge_room",
-            self._purge_room_txn,
-            room_id=room_id,
+        state_groups_to_delete.extend(
+            await self.db_pool.runInteraction(
+                "purge_room",
+                self._purge_room_txn,
+                room_id=room_id,
+            ),
         )
 
         return state_groups_to_delete
