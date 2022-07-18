@@ -144,6 +144,9 @@ def iterate_tree_cache_entry(d):
 def iterate_tree_cache_items(key, value):
     """Helper function to iterate over the leaves of a tree, i.e. a dict of that
     can contain dicts.
+
+    Returns:
+        A generator yielding key/value pairs.
     """
     if isinstance(value, TreeCacheNode):
         for sub_key, sub_value in value.items():
