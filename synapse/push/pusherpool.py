@@ -349,9 +349,9 @@ class PusherPool:
         if not pusher:
             return None
 
-        appid_pushkey = "%s:%s" % (pusher_config.app_id, pusher_config.pushkey)
+        appid_pushkey = "%s:%s" % (pusher.app_id, pusher.pushkey)
 
-        byuser = self.pushers.setdefault(pusher_config.user_name, {})
+        byuser = self.pushers.setdefault(pusher.user_id, {})
         if appid_pushkey in byuser:
             previous_pusher = byuser[appid_pushkey]
             previous_pusher.on_stop()
@@ -366,8 +366,8 @@ class PusherPool:
         # Check if there *may* be push to process. We do this as this check is a
         # lot cheaper to do than actually fetching the exact rows we need to
         # push.
-        user_id = pusher_config.user_name
-        last_stream_ordering = pusher_config.last_stream_ordering
+        user_id = pusher.user_id
+        last_stream_ordering = pusher.last_stream_ordering
         if last_stream_ordering:
             have_notifs = await self.store.get_if_maybe_push_in_range_for_user(
                 user_id, last_stream_ordering
