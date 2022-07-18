@@ -717,6 +717,12 @@ class EventsWorkerStore(SQLBaseStore):
     # Redis/memcache. Once complete we can invalidate any in memory cache in the second
     # method. The ordering is important here to ensure we don't pull in any remote
     # invalid value after we invalidate the in-memory cache.
+    def invalidate_get_event_cache_after_txn(
+        self, txn: LoggingTransaction, event_id: str
+    ) -> None:
+        txn.call_after(self._invalidate_async_get_event_cache, event_id)
+        txn.call_after(self._invalidate_local_get_event_cache, event_id)
+
     async def _invalidate_async_get_event_cache(self, event_id: str) -> None:
         await self._get_event_cache.invalidate((event_id,))
 
