@@ -2412,8 +2412,11 @@ metrics_flags:
 Whether or not to report homeserver usage statistics. This is originally
 set when generating the config. Set this option to true or false to change the current
 behavior. See
-[Reporting Phone Home Statistics](../administration/monitoring/reporting_phone_home_statistics.md)
+[Reporting Homeserver Usage Statistics](../administration/monitoring/reporting_homeserver_usage_statistics.md)
 for information on what data is reported.
+
+Statistics will be reported 5 minutes after Synapse starts, and then every 3 hours
+after that.
 
 Example configuration:
 ```yaml
