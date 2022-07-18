@@ -1,1 +1,1 @@
-Add 3pid unbind callback to module API.
+Add a module callback for unbinding a 3PID.

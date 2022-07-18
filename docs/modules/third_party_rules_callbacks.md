@@ -267,7 +267,7 @@ If multiple modules implement this callback, Synapse runs them all in order.
 
 ### `on_threepid_unbind`
 
-_First introduced in Synapse v1.63.0_
+_First introduced in Synapse v1.64.0_
 
 ```python
 async def on_threepid_unbind(
