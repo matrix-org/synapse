@@ -766,10 +766,21 @@ class FederationEventHandler:
         """
         logger.info("Processing pulled event %s", event)
 
-        # these should not be outliers.
-        assert (
-            not event.internal_metadata.is_outlier()
-        ), "pulled event unexpectedly flagged as outlier"
+        # This function should not be used to persist outliers. If you happen to
+        # run into a situation where the event you're trying to process/backfill
+        # is marked as an `outlier`, then you should update that spot to return
+        # an `EventBase` copy that doesn't have `outlier` flag set.
+        #
+        # `EventBase` is used to represent both an event we have not yet
+        # persisted, and one that we have persisted and now keep in the cache.
+        # In an ideal world this method would only be called with the first type
+        # of event, but it turns out that's not actually the case and for
+        # example, you could get an event from cache that is marked as an
+        # `outlier` (fix up that spot though).
+        assert not event.internal_metadata.is_outlier(), (
+            "This is a safe-guard to make sure we're not trying to persist an outlier using this function (use something else). "
+            "If you're trying to process/backfill an event, this is the right method but you need pass in an event copy that doesn't have `event.internal_metada.outlier = true`."
+        )
 
         event_id = event.event_id
 
