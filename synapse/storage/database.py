@@ -801,6 +801,15 @@ class DatabasePool:
         """
 
         async def _run_callbacks(callbacks: List[_CallbackListEntry]):
+            """
+            This function takes a list of mixed sync/async callbacks and executes
+            the async ones first and then the sync callbacks.
+
+            We do this with the assumption that async functions call out to external
+            systems (e.g. to invalidate a cache) and the sync functions make these
+            changes on any local in-memory caches/similar, and thus must be second.
+            """
+
             sync_callbacks: List[_CallbackListEntry] = []
 
             for cb, args, kwargs in callbacks:
