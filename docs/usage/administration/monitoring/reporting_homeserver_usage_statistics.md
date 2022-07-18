@@ -1,11 +1,11 @@
-# Reporting Anonymised Statistics
+# Reporting Homeserver Usage Statistics
 
 When generating your Synapse configuration file, you are asked whether you
-would like to report anonymised statistics to Matrix.org. These statistics
+would like to report usage statistics to Matrix.org. These statistics
 provide the foundation a glimpse into the number of Synapse homeservers
 participating in the network, as well as statistics such as the number of
 rooms being created and messages being sent. This feature is sometimes
-affectionately called "phone-home" stats. Reporting
+affectionately called "phone home" stats. Reporting
 [is optional](../../configuration/config_documentation.md#report_stats)
 and the reporting endpoint
 [can be configured](../../configuration/config_documentation.md#report_stats_endpoint),
@@ -21,9 +21,9 @@ The following statistics are sent to the configured reporting endpoint:
 
 | Statistic Name             | Type   | Description                                                                                                                                                                                                                                                                                     |
 |----------------------------|--------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `homeserver`               | string | The homeserver's server name.                                                                                                                                                                                                                                                                   |
 | `memory_rss`               | int    | The memory usage of the process (in kilobytes on Unix-based systems, bytes on MacOS).                                                                                                                                                                                                           |
 | `cpu_average`              | int    | CPU time in % of a single core (not % of all cores).                                                                                                                                                                                                                                            |              
-| `homeserver`               | string | The homeserver's server name.                                                                                                                                                                                                                                                                   |
 | `server_context`           | string | An arbitrary string used to group statistics from a set of homeservers.                                                                                                                                                                                                                         |
 | `timestamp`                | int    | The current time, represented as the number of seconds since the epoch.                                                                                                                                                                                                                         |                 
 | `uptime_seconds`           | int    | The number of seconds since the homeserver was last started.                                                                                                                                                                                                                                    |
