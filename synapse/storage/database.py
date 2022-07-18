@@ -23,6 +23,7 @@ from time import monotonic as monotonic_time
 from typing import (
     TYPE_CHECKING,
     Any,
+    Awaitable,
     Callable,
     Collection,
     Dict,
@@ -33,6 +34,7 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
+    Union,
     cast,
     overload,
 )
@@ -208,7 +210,9 @@ class LoggingDatabaseConnection:
 
 
 # The type of entry which goes on our after_callbacks and exception_callbacks lists.
-_CallbackListEntry = Tuple[Callable[..., object], Tuple[object, ...], Dict[str, object]]
+_CallbackListEntry = Tuple[
+    Callable[..., Union[object, Awaitable]], Tuple[object, ...], Dict[str, object]
+]
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -796,12 +800,14 @@ class DatabasePool:
             The result of func
         """
 
-        async def _run_callbacks(callbacks):
-            sync_callbacks = []
+        async def _run_callbacks(callbacks: List[_CallbackListEntry]):
+            sync_callbacks: List[_CallbackListEntry] = []
 
             for cb, args, kwargs in callbacks:
                 if inspect.iscoroutinefunction(cb):
-                    await cb(*args, **kwargs)
+                    awaitable = cb(*args, **kwargs)
+                    assert isinstance(awaitable, Awaitable)
+                    await awaitable
                 else:
                     sync_callbacks.append((cb, args, kwargs))
 
