@@ -91,19 +91,20 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
             event_injection.inject_member_event(self.hs, room_id, OTHER_USER, "join")
         )
 
-        initial_state_map = self.get_success(main_store.get_current_state_ids(room_id))
+        initial_state_map = self.get_success(
+            main_store.get_partial_current_state_ids(room_id)
+        )
 
         auth_event_ids = [
             initial_state_map[("m.room.create", "")],
             initial_state_map[("m.room.power_levels", "")],
-            initial_state_map[("m.room.join_rules", "")],
             member_event.event_id,
         ]
 
         # mock up a load of state events which we are missing
         state_events = [
             make_event_from_dict(
-                self.add_hashes_and_signatures(
+                self.add_hashes_and_signatures_from_other_server(
                     {
                         "type": "test_state_type",
                         "state_key": f"state_{i}",
@@ -130,7 +131,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
         # Depending on the test, we either persist this upfront (as an outlier),
         # or let the server request it.
         prev_event = make_event_from_dict(
-            self.add_hashes_and_signatures(
+            self.add_hashes_and_signatures_from_other_server(
                 {
                     "type": "test_regular_type",
                     "room_id": room_id,
@@ -164,7 +165,7 @@ class FederationEventHandlerTests(unittest.FederatingHomeserverTestCase):
 
         # mock up a regular event to pass into _process_pulled_event
         pulled_event = make_event_from_dict(
-            self.add_hashes_and_signatures(
+            self.add_hashes_and_signatures_from_other_server(
                 {
                     "type": "test_regular_type",
                     "room_id": room_id,

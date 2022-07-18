@@ -95,7 +95,6 @@ class EventTypes:
     Aliases: Final = "m.room.aliases"
     Redaction: Final = "m.room.redaction"
     ThirdPartyInvite: Final = "m.room.third_party_invite"
-    RelatedGroups: Final = "m.room.related_groups"
 
     RoomHistoryVisibility: Final = "m.room.history_visibility"
     CanonicalAlias: Final = "m.room.canonical_alias"
@@ -260,3 +259,13 @@ class ReceiptTypes:
     READ: Final = "m.read"
     READ_PRIVATE: Final = "org.matrix.msc2285.read.private"
     FULLY_READ: Final = "m.fully_read"
+
+
+class PublicRoomsFilterFields:
+    """Fields in the search filter for `/publicRooms` that we understand.
+
+    As defined in https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3publicrooms
+    """
+
+    GENERIC_SEARCH_TERM: Final = "generic_search_term"
+    ROOM_TYPES: Final = "org.matrix.msc3827.room_types"

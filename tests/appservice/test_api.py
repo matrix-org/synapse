@@ -37,7 +37,6 @@ class ApplicationServiceApiTestCase(unittest.HomeserverTestCase):
             url=URL,
             token="unused",
             hs_token=TOKEN,
-            hostname="myserver",
         )
 
     def test_query_3pe_authenticates_token(self):

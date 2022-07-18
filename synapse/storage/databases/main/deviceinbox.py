@@ -128,7 +128,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             prefilled_cache=device_outbox_prefill,
         )
 
-    def process_replication_rows(
+    async def process_replication_rows(
         self,
         stream_name: str,
         instance_name: str,
@@ -148,7 +148,9 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                     self._device_federation_outbox_stream_cache.entity_has_changed(
                         row.entity, token
                     )
-        return super().process_replication_rows(stream_name, instance_name, token, rows)
+        return await super().process_replication_rows(
+            stream_name, instance_name, token, rows
+        )
 
     def get_to_device_stream_token(self) -> int:
         return self._device_inbox_id_gen.get_current_token()
@@ -834,8 +836,6 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
 class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
     DEVICE_INBOX_STREAM_ID = "device_inbox_stream_drop"
-    REMOVE_DELETED_DEVICES = "remove_deleted_devices_from_device_inbox"
-    REMOVE_HIDDEN_DEVICES = "remove_hidden_devices_from_device_inbox"
     REMOVE_DEAD_DEVICES_FROM_INBOX = "remove_dead_devices_from_device_inbox"
 
     def __init__(
@@ -856,15 +856,6 @@ class DeviceInboxBackgroundUpdateStore(SQLBaseStore):
         self.db_pool.updates.register_background_update_handler(
             self.DEVICE_INBOX_STREAM_ID, self._background_drop_index_device_inbox
         )
-
-        # Used to be a background update that deletes all device_inboxes for deleted
-        # devices.
-        self.db_pool.updates.register_noop_background_update(
-            self.REMOVE_DELETED_DEVICES
-        )
-        # Used to be a background update that deletes all device_inboxes for hidden
-        # devices.
-        self.db_pool.updates.register_noop_background_update(self.REMOVE_HIDDEN_DEVICES)
 
         self.db_pool.updates.register_background_update_handler(
             self.REMOVE_DEAD_DEVICES_FROM_INBOX,

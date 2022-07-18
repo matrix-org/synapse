@@ -50,7 +50,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_scheduler = Mock()
         hs = Mock()
         hs.get_datastores.return_value = Mock(main=self.mock_store)
-        self.mock_store.get_received_ts.return_value = make_awaitable(0)
+        self.mock_store.get_appservice_last_pos.return_value = make_awaitable(None)
         self.mock_store.set_appservice_last_pos.return_value = make_awaitable(None)
         self.mock_store.set_appservice_stream_type_pos.return_value = make_awaitable(
             None
@@ -76,9 +76,9 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         event = Mock(
             sender="@someone:anywhere", type="m.room.message", room_id="!foo:bar"
         )
-        self.mock_store.get_new_events_for_appservice.side_effect = [
-            make_awaitable((0, [])),
-            make_awaitable((1, [event])),
+        self.mock_store.get_all_new_events_stream.side_effect = [
+            make_awaitable((0, [], {})),
+            make_awaitable((1, [event], {event.event_id: 0})),
         ]
         self.handler.notify_interested_services(RoomStreamToken(None, 1))
 
@@ -95,8 +95,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         event = Mock(sender=user_id, type="m.room.message", room_id="!foo:bar")
         self.mock_as_api.query_user.return_value = make_awaitable(True)
-        self.mock_store.get_new_events_for_appservice.side_effect = [
-            make_awaitable((0, [event])),
+        self.mock_store.get_all_new_events_stream.side_effect = [
+            make_awaitable((0, [event], {event.event_id: 0})),
         ]
 
         self.handler.notify_interested_services(RoomStreamToken(None, 0))
@@ -112,8 +112,8 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         event = Mock(sender=user_id, type="m.room.message", room_id="!foo:bar")
         self.mock_as_api.query_user.return_value = make_awaitable(True)
-        self.mock_store.get_new_events_for_appservice.side_effect = [
-            make_awaitable((0, [event])),
+        self.mock_store.get_all_new_events_stream.side_effect = [
+            make_awaitable((0, [event], {event.event_id: 0})),
         ]
 
         self.handler.notify_interested_services(RoomStreamToken(None, 0))
@@ -697,7 +697,6 @@ class ApplicationServicesHandlerSendEventsTestCase(unittest.HomeserverTestCase):
         # Create an application service
         appservice = ApplicationService(
             token=random_string(10),
-            hostname="example.com",
             id=random_string(10),
             sender="@as:example.com",
             rate_limited=False,
@@ -776,7 +775,6 @@ class ApplicationServicesHandlerDeviceListsTestCase(unittest.HomeserverTestCase)
         # Create an appservice that is interested in "local_user"
         appservice = ApplicationService(
             token=random_string(10),
-            hostname="example.com",
             id=random_string(10),
             sender="@as:example.com",
             rate_limited=False,
@@ -843,7 +841,6 @@ class ApplicationServicesHandlerOtkCountsTestCase(unittest.HomeserverTestCase):
         self._service_token = "VERYSECRET"
         self._service = ApplicationService(
             self._service_token,
-            "as1.invalid",
             "as1",
             "@as.sender:test",
             namespaces={

@@ -16,7 +16,6 @@
 import gc
 import hashlib
 import hmac
-import json
 import logging
 import secrets
 import time
@@ -315,7 +314,7 @@ class HomeserverTestCase(TestCase):
                         "is_guest": False,
                     }
 
-                async def get_user_by_req(request, allow_guest=False, rights="access"):
+                async def get_user_by_req(request, allow_guest=False):
                     assert self.helper.auth_user_id is not None
                     return create_requester(
                         UserID.from_string(self.helper.auth_user_id),
@@ -619,20 +618,16 @@ class HomeserverTestCase(TestCase):
         want_mac.update(nonce.encode("ascii") + b"\x00" + nonce_str)
         want_mac_digest = want_mac.hexdigest()
 
-        body = json.dumps(
-            {
-                "nonce": nonce,
-                "username": username,
-                "displayname": displayname,
-                "password": password,
-                "admin": admin,
-                "mac": want_mac_digest,
-                "inhibit_login": True,
-            }
-        )
-        channel = self.make_request(
-            "POST", "/_synapse/admin/v1/register", body.encode("utf8")
-        )
+        body = {
+            "nonce": nonce,
+            "username": username,
+            "displayname": displayname,
+            "password": password,
+            "admin": admin,
+            "mac": want_mac_digest,
+            "inhibit_login": True,
+        }
+        channel = self.make_request("POST", "/_synapse/admin/v1/register", body)
         self.assertEqual(channel.code, 200, channel.json_body)
 
         user_id = channel.json_body["user_id"]
@@ -676,9 +671,7 @@ class HomeserverTestCase(TestCase):
         custom_headers: Optional[Iterable[CustomHeaderType]] = None,
     ) -> str:
         """
-        Log in a user, and get an access token. Requires the Login API be
-        registered.
-
+        Log in a user, and get an access token. Requires the Login API be registered.
         """
         body = {"type": "m.login.password", "user": username, "password": password}
         if device_id:
@@ -687,7 +680,7 @@ class HomeserverTestCase(TestCase):
         channel = self.make_request(
             "POST",
             "/_matrix/client/r0/login",
-            json.dumps(body).encode("utf8"),
+            body,
             custom_headers=custom_headers,
         )
         self.assertEqual(channel.code, 200, channel.result)
@@ -838,7 +831,7 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
             client_ip=client_ip,
         )
 
-    def add_hashes_and_signatures(
+    def add_hashes_and_signatures_from_other_server(
         self,
         event_dict: JsonDict,
         room_version: RoomVersion = KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],

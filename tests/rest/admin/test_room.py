@@ -21,7 +21,7 @@ from parameterized import parameterized
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, Membership, RoomTypes
 from synapse.api.errors import Codes
 from synapse.handlers.pagination import PaginationHandler
 from synapse.rest.client import directory, events, login, room
@@ -1130,6 +1130,8 @@ class RoomTestCase(unittest.HomeserverTestCase):
             self.assertIn("guest_access", r)
             self.assertIn("history_visibility", r)
             self.assertIn("state_events", r)
+            self.assertIn("room_type", r)
+            self.assertIsNone(r["room_type"])
 
         # Check that the correct number of total rooms was returned
         self.assertEqual(channel.json_body["total_rooms"], total_rooms)
@@ -1229,7 +1231,11 @@ class RoomTestCase(unittest.HomeserverTestCase):
     def test_correct_room_attributes(self) -> None:
         """Test the correct attributes for a room are returned"""
         # Create a test room
-        room_id = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+        room_id = self.helper.create_room_as(
+            self.admin_user,
+            tok=self.admin_user_tok,
+            extra_content={"creation_content": {"type": RoomTypes.SPACE}},
+        )
 
         test_alias = "#test:test"
         test_room_name = "something"
@@ -1306,6 +1312,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(room_id, r["room_id"])
         self.assertEqual(test_room_name, r["name"])
         self.assertEqual(test_alias, r["canonical_alias"])
+        self.assertEqual(RoomTypes.SPACE, r["room_type"])
 
     def test_room_list_sort_order(self) -> None:
         """Test room list sort ordering. alphabetical name versus number of members,
@@ -1579,8 +1586,8 @@ class RoomTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
-        self.assertEqual(room_id, channel.json_body.get("rooms")[0].get("room_id"))
-        self.assertEqual("ж", channel.json_body.get("rooms")[0].get("name"))
+        self.assertEqual(room_id, channel.json_body["rooms"][0].get("room_id"))
+        self.assertEqual("ж", channel.json_body["rooms"][0].get("name"))
 
     def test_single_room(self) -> None:
         """Test that a single room can be requested correctly"""
@@ -1630,7 +1637,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertIn("guest_access", channel.json_body)
         self.assertIn("history_visibility", channel.json_body)
         self.assertIn("state_events", channel.json_body)
-
+        self.assertIn("room_type", channel.json_body)
         self.assertEqual(room_id_1, channel.json_body["room_id"])
 
     def test_single_room_devices(self) -> None:
@@ -2467,7 +2474,6 @@ PURGE_TABLES = [
     "event_push_actions",
     "event_search",
     "events",
-    "group_rooms",
     "receipts_graph",
     "receipts_linearized",
     "room_aliases",
@@ -2484,7 +2490,6 @@ PURGE_TABLES = [
     "e2e_room_keys",
     "event_push_summary",
     "pusher_throttle",
-    "group_summary_rooms",
     "room_account_data",
     "room_tags",
     # "state_groups",  # Current impl leaves orphaned state groups around.

@@ -255,7 +255,9 @@ class Mailer:
             user_display_name = user_id
 
         async def _fetch_room_state(room_id: str) -> None:
-            room_state = await self.store.get_current_state_ids(room_id)
+            room_state = await self._state_storage_controller.get_current_state_ids(
+                room_id
+            )
             state_by_room[room_id] = room_state
 
         # Run at most 3 of these at once: sync does 10 at a time but email
@@ -858,13 +860,14 @@ class Mailer:
              A link to unsubscribe from email notifications.
         """
         params = {
-            "access_token": self.macaroon_gen.generate_delete_pusher_token(user_id),
+            "access_token": self.macaroon_gen.generate_delete_pusher_token(
+                user_id, app_id, email_address
+            ),
             "app_id": app_id,
             "pushkey": email_address,
         }
 
-        # XXX: make r0 once API is stable
-        return "%s_matrix/client/unstable/pushers/remove?%s" % (
+        return "%s_synapse/client/unsubscribe?%s" % (
             self.hs.config.server.public_baseurl,
             urllib.parse.urlencode(params),
         )

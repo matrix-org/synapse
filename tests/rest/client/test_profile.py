@@ -13,6 +13,8 @@
 # limitations under the License.
 
 """Tests REST events for /profile paths."""
+import urllib.parse
+from http import HTTPStatus
 from typing import Any, Dict, Optional
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -48,6 +50,12 @@ class ProfileTestCase(unittest.HomeserverTestCase):
     def test_get_displayname(self) -> None:
         res = self._get_displayname()
         self.assertEqual(res, "owner")
+
+    def test_get_displayname_rejects_bad_username(self) -> None:
+        channel = self.make_request(
+            "GET", f"/profile/{urllib.parse.quote('@alice:')}/displayname"
+        )
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
 
     def test_set_displayname(self) -> None:
         channel = self.make_request(
@@ -145,18 +153,22 @@ class ProfileTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 400, channel.result)
 
-    def _get_displayname(self, name: Optional[str] = None) -> str:
+    def _get_displayname(self, name: Optional[str] = None) -> Optional[str]:
         channel = self.make_request(
             "GET", "/profile/%s/displayname" % (name or self.owner,)
         )
         self.assertEqual(channel.code, 200, channel.result)
-        return channel.json_body["displayname"]
+        # FIXME: If a user has no displayname set, Synapse returns 200 and omits a
+        # displayname from the response. This contradicts the spec, see #13137.
+        return channel.json_body.get("displayname")
 
-    def _get_avatar_url(self, name: Optional[str] = None) -> str:
+    def _get_avatar_url(self, name: Optional[str] = None) -> Optional[str]:
         channel = self.make_request(
             "GET", "/profile/%s/avatar_url" % (name or self.owner,)
         )
         self.assertEqual(channel.code, 200, channel.result)
+        # FIXME: If a user has no avatar set, Synapse returns 200 and omits an
+        # avatar_url from the response. This contradicts the spec, see #13137.
         return channel.json_body.get("avatar_url")
 
     @unittest.override_config({"max_avatar_size": 50})

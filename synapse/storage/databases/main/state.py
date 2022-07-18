@@ -127,13 +127,8 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             NotFoundError: if the room is unknown
         """
 
-        # First we try looking up room version from the database, but for old
-        # rooms we might not have added the room version to it yet so we fall
-        # back to previous behaviour and look in current state events.
-        #
         # We really should have an entry in the rooms table for every room we
-        # care about, but let's be a bit paranoid (at least while the background
-        # update is happening) to avoid breaking existing rooms.
+        # care about, but let's be a bit paranoid.
         room_version = self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="rooms",
@@ -242,7 +237,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         Raises:
             NotFoundError if the room is unknown
         """
-        state_ids = await self.get_current_state_ids(room_id)
+        state_ids = await self.get_partial_current_state_ids(room_id)
 
         if not state_ids:
             raise NotFoundError(f"Current state for room {room_id} is empty")
@@ -258,9 +253,11 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         return create_event
 
     @cached(max_entries=100000, iterable=True)
-    async def get_current_state_ids(self, room_id: str) -> StateMap[str]:
+    async def get_partial_current_state_ids(self, room_id: str) -> StateMap[str]:
         """Get the current state event ids for a room based on the
         current_state_events table.
+
+        This may be the partial state if we're lazy joining the room.
 
         Args:
             room_id: The room to get the state IDs of.
@@ -280,16 +277,18 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             return {(intern_string(r[0]), intern_string(r[1])): r[2] for r in txn}
 
         return await self.db_pool.runInteraction(
-            "get_current_state_ids", _get_current_state_ids_txn
+            "get_partial_current_state_ids", _get_current_state_ids_txn
         )
 
     # FIXME: how should this be cached?
-    async def get_filtered_current_state_ids(
+    async def get_partial_filtered_current_state_ids(
         self, room_id: str, state_filter: Optional[StateFilter] = None
     ) -> StateMap[str]:
         """Get the current state event of a given type for a room based on the
         current_state_events table.  This may not be as up-to-date as the result
         of doing a fresh state resolution as per state_handler.get_current_state
+
+        This may be the partial state if we're lazy joining the room.
 
         Args:
             room_id
@@ -306,7 +305,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         if not where_clause:
             # We delegate to the cached version
-            return await self.get_current_state_ids(room_id)
+            return await self.get_partial_current_state_ids(room_id)
 
         def _get_filtered_current_state_ids_txn(
             txn: LoggingTransaction,
@@ -333,30 +332,6 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         return await self.db_pool.runInteraction(
             "get_filtered_current_state_ids", _get_filtered_current_state_ids_txn
         )
-
-    async def get_canonical_alias_for_room(self, room_id: str) -> Optional[str]:
-        """Get canonical alias for room, if any
-
-        Args:
-            room_id: The room ID
-
-        Returns:
-            The canonical alias, if any
-        """
-
-        state = await self.get_filtered_current_state_ids(
-            room_id, StateFilter.from_types([(EventTypes.CanonicalAlias, "")])
-        )
-
-        event_id = state.get((EventTypes.CanonicalAlias, ""))
-        if not event_id:
-            return None
-
-        event = await self.get_event(event_id, allow_none=True)
-        if not event:
-            return None
-
-        return event.content.get("canonical_alias")
 
     @cached(max_entries=50000)
     async def _get_state_group_for_event(self, event_id: str) -> Optional[int]:
@@ -460,6 +435,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         # TODO(faster_joins): need to do something about workers here
+        #   https://github.com/matrix-org/synapse/issues/12994
         txn.call_after(self.is_partial_state_event.invalidate, (event.event_id,))
         txn.call_after(
             self._get_state_group_for_event.prefill,

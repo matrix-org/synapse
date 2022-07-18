@@ -84,3 +84,9 @@ class ExperimentalConfig(Config):
 
         # MSC3772: A push rule for mutual relations.
         self.msc3772_enabled: bool = experimental.get("msc3772_enabled", False)
+
+        # MSC3715: dir param on /relations.
+        self.msc3715_enabled: bool = experimental.get("msc3715_enabled", False)
+
+        # MSC3827: Filtering of /publicRooms by room type
+        self.msc3827_enabled: bool = experimental.get("msc3827_enabled", False)

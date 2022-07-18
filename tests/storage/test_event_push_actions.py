@@ -12,143 +12,162 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from unittest.mock import Mock
+from twisted.test.proto_helpers import MemoryReactor
 
+from synapse.rest import admin
+from synapse.rest.client import login, room
+from synapse.server import HomeServer
 from synapse.storage.databases.main.event_push_actions import NotifCounts
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase
 
 USER_ID = "@user:example.com"
 
-PlAIN_NOTIF = ["notify", {"set_tweak": "highlight", "value": False}]
-HIGHLIGHT = [
-    "notify",
-    {"set_tweak": "sound", "value": "default"},
-    {"set_tweak": "highlight"},
-]
-
 
 class EventPushActionsStoreTestCase(HomeserverTestCase):
-    def prepare(self, reactor, clock, hs):
-        self.store = hs.get_datastores().main
-        self.persist_events_store = hs.get_datastores().persist_events
+    servlets = [
+        admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
 
-    def test_get_unread_push_actions_for_user_in_range_for_http(self):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.store = hs.get_datastores().main
+        persist_events_store = hs.get_datastores().persist_events
+        assert persist_events_store is not None
+        self.persist_events_store = persist_events_store
+
+    def test_get_unread_push_actions_for_user_in_range_for_http(self) -> None:
         self.get_success(
             self.store.get_unread_push_actions_for_user_in_range_for_http(
                 USER_ID, 0, 1000, 20
             )
         )
 
-    def test_get_unread_push_actions_for_user_in_range_for_email(self):
+    def test_get_unread_push_actions_for_user_in_range_for_email(self) -> None:
         self.get_success(
             self.store.get_unread_push_actions_for_user_in_range_for_email(
                 USER_ID, 0, 1000, 20
             )
         )
 
-    def test_count_aggregation(self):
-        room_id = "!foo:example.com"
-        user_id = "@user1235:example.com"
+    def test_count_aggregation(self) -> None:
+        # Create a user to receive notifications and send receipts.
+        user_id = self.register_user("user1235", "pass")
+        token = self.login("user1235", "pass")
 
-        def _assert_counts(noitf_count, highlight_count):
+        # And another users to send events.
+        other_id = self.register_user("other", "pass")
+        other_token = self.login("other", "pass")
+
+        # Create a room and put both users in it.
+        room_id = self.helper.create_room_as(user_id, tok=token)
+        self.helper.join(room_id, other_id, tok=other_token)
+
+        last_event_id: str
+
+        def _assert_counts(
+            noitf_count: int, unread_count: int, highlight_count: int
+        ) -> None:
             counts = self.get_success(
                 self.store.db_pool.runInteraction(
-                    "", self.store._get_unread_counts_by_pos_txn, room_id, user_id, 0
+                    "get-unread-counts",
+                    self.store._get_unread_counts_by_receipt_txn,
+                    room_id,
+                    user_id,
                 )
             )
             self.assertEqual(
                 counts,
                 NotifCounts(
                     notify_count=noitf_count,
-                    unread_count=0,  # Unread counts are tested in the sync tests.
+                    unread_count=unread_count,
                     highlight_count=highlight_count,
                 ),
             )
 
-        def _inject_actions(stream, action):
-            event = Mock()
-            event.room_id = room_id
-            event.event_id = "$test:example.com"
-            event.internal_metadata.stream_ordering = stream
-            event.internal_metadata.is_outlier.return_value = False
-            event.depth = stream
-
-            self.get_success(
-                self.store.add_push_actions_to_staging(
-                    event.event_id,
-                    {user_id: action},
-                    False,
-                )
+        def _create_event(highlight: bool = False) -> str:
+            result = self.helper.send_event(
+                room_id,
+                type="m.room.message",
+                content={"msgtype": "m.text", "body": user_id if highlight else "msg"},
+                tok=other_token,
             )
-            self.get_success(
-                self.store.db_pool.runInteraction(
-                    "",
-                    self.persist_events_store._set_push_actions_for_event_and_users_txn,
-                    [(event, None)],
-                    [(event, None)],
-                )
-            )
+            nonlocal last_event_id
+            last_event_id = result["event_id"]
+            return last_event_id
 
-        def _rotate(stream):
-            self.get_success(
-                self.store.db_pool.runInteraction(
-                    "", self.store._rotate_notifs_before_txn, stream
-                )
-            )
+        def _rotate() -> None:
+            self.get_success(self.store._rotate_notifs())
 
-        def _mark_read(stream, depth):
+        def _mark_read(event_id: str) -> None:
             self.get_success(
-                self.store.db_pool.runInteraction(
-                    "",
-                    self.store._remove_old_push_actions_before_txn,
+                self.store.insert_receipt(
                     room_id,
-                    user_id,
-                    stream,
+                    "m.read",
+                    user_id=user_id,
+                    event_ids=[event_id],
+                    data={},
                 )
             )
 
-        _assert_counts(0, 0)
-        _inject_actions(1, PlAIN_NOTIF)
-        _assert_counts(1, 0)
-        _rotate(2)
-        _assert_counts(1, 0)
+        _assert_counts(0, 0, 0)
+        _create_event()
+        _assert_counts(1, 1, 0)
+        _rotate()
+        _assert_counts(1, 1, 0)
 
-        _inject_actions(3, PlAIN_NOTIF)
-        _assert_counts(2, 0)
-        _rotate(4)
-        _assert_counts(2, 0)
+        event_id = _create_event()
+        _assert_counts(2, 2, 0)
+        _rotate()
+        _assert_counts(2, 2, 0)
 
-        _inject_actions(5, PlAIN_NOTIF)
-        _mark_read(3, 3)
-        _assert_counts(1, 0)
+        _create_event()
+        _mark_read(event_id)
+        _assert_counts(1, 1, 0)
 
-        _mark_read(5, 5)
-        _assert_counts(0, 0)
+        _mark_read(last_event_id)
+        _assert_counts(0, 0, 0)
 
-        _inject_actions(6, PlAIN_NOTIF)
-        _rotate(7)
+        _create_event()
+        _rotate()
+        _assert_counts(1, 1, 0)
 
-        self.get_success(
-            self.store.db_pool.simple_delete(
-                table="event_push_actions", keyvalues={"1": 1}, desc=""
-            )
-        )
+        # Delete old event push actions, this should not affect the (summarised) count.
+        self.get_success(self.store._remove_old_push_actions_that_have_rotated())
+        _assert_counts(1, 1, 0)
 
-        _assert_counts(1, 0)
+        _mark_read(last_event_id)
+        _assert_counts(0, 0, 0)
 
-        _mark_read(7, 7)
-        _assert_counts(0, 0)
+        event_id = _create_event(True)
+        _assert_counts(1, 1, 1)
+        _rotate()
+        _assert_counts(1, 1, 1)
 
-        _inject_actions(8, HIGHLIGHT)
-        _assert_counts(1, 1)
-        _rotate(9)
-        _assert_counts(1, 1)
-        _rotate(10)
-        _assert_counts(1, 1)
+        # Check that adding another notification and rotating after highlight
+        # works.
+        _create_event()
+        _rotate()
+        _assert_counts(2, 2, 1)
 
-    def test_find_first_stream_ordering_after_ts(self):
-        def add_event(so, ts):
+        # Check that sending read receipts at different points results in the
+        # right counts.
+        _mark_read(event_id)
+        _assert_counts(1, 1, 0)
+        _mark_read(last_event_id)
+        _assert_counts(0, 0, 0)
+
+        _create_event(True)
+        _assert_counts(1, 1, 1)
+        _mark_read(last_event_id)
+        _assert_counts(0, 0, 0)
+        _rotate()
+        _assert_counts(0, 0, 0)
+
+    def test_find_first_stream_ordering_after_ts(self) -> None:
+        def add_event(so: int, ts: int) -> None:
             self.get_success(
                 self.store.db_pool.simple_insert(
                     "events",

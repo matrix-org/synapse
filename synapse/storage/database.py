@@ -57,7 +57,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 from synapse.storage.types import Connection, Cursor
-from synapse.util.async_helpers import delay_cancellation
+from synapse.util.async_helpers import delay_cancellation, maybe_awaitable
 from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
@@ -92,6 +92,7 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
     "event_search": "event_search_event_id_idx",
     "local_media_repository_thumbnails": "local_media_repository_thumbnails_method_idx",
     "remote_media_cache_thumbnails": "remote_media_repository_thumbnails_method_idx",
+    "event_push_summary": "event_push_summary_unique_index",
 }
 
 
@@ -365,10 +366,11 @@ class LoggingTransaction:
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> R:
-        sql = self._make_sql_one_line(sql)
+        # Generate a one-line version of the SQL to better log it.
+        one_line_sql = self._make_sql_one_line(sql)
 
         # TODO(paul): Maybe use 'info' and 'debug' for values?
-        sql_logger.debug("[SQL] {%s} %s", self.name, sql)
+        sql_logger.debug("[SQL] {%s} %s", self.name, one_line_sql)
 
         sql = self.database_engine.convert_param_style(sql)
         if args:
@@ -388,7 +390,7 @@ class LoggingTransaction:
                 "db.query",
                 tags={
                     opentracing.tags.DATABASE_TYPE: "sql",
-                    opentracing.tags.DATABASE_STATEMENT: sql,
+                    opentracing.tags.DATABASE_STATEMENT: one_line_sql,
                 },
             ):
                 return func(sql, *args, **kwargs)
@@ -816,12 +818,14 @@ class DatabasePool:
                     )
 
                 for after_callback, after_args, after_kwargs in after_callbacks:
-                    after_callback(*after_args, **after_kwargs)
+                    await maybe_awaitable(after_callback(*after_args, **after_kwargs))
 
                 return cast(R, result)
             except Exception:
-                for after_callback, after_args, after_kwargs in exception_callbacks:
-                    after_callback(*after_args, **after_kwargs)
+                for exception_callback, after_args, after_kwargs in exception_callbacks:
+                    await maybe_awaitable(
+                        exception_callback(*after_args, **after_kwargs)
+                    )
                 raise
 
         # To handle cancellation, we ensure that `after_callback`s and

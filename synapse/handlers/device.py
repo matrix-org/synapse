@@ -123,6 +123,43 @@ class DeviceWorkerHandler:
 
         return device
 
+    async def get_device_changes_in_shared_rooms(
+        self, user_id: str, room_ids: Collection[str], from_token: StreamToken
+    ) -> Collection[str]:
+        """Get the set of users whose devices have changed who share a room with
+        the given user.
+        """
+        changed_users = await self.store.get_device_list_changes_in_rooms(
+            room_ids, from_token.device_list_key
+        )
+
+        if changed_users is not None:
+            # We also check if the given user has changed their device. If
+            # they're in no rooms then the above query won't include them.
+            changed = await self.store.get_users_whose_devices_changed(
+                from_token.device_list_key, [user_id]
+            )
+            changed_users.update(changed)
+            return changed_users
+
+        # If the DB returned None then the `from_token` is too old, so we fall
+        # back on looking for device updates for all users.
+
+        users_who_share_room = await self.store.get_users_who_share_room_with_user(
+            user_id
+        )
+
+        tracked_users = set(users_who_share_room)
+
+        # Always tell the user about their own devices
+        tracked_users.add(user_id)
+
+        changed = await self.store.get_users_whose_devices_changed(
+            from_token.device_list_key, tracked_users
+        )
+
+        return changed
+
     @trace
     @measure_func("device.get_user_ids_changed")
     async def get_user_ids_changed(
@@ -138,19 +175,8 @@ class DeviceWorkerHandler:
 
         room_ids = await self.store.get_rooms_for_user(user_id)
 
-        # First we check if any devices have changed for users that we share
-        # rooms with.
-        users_who_share_room = await self.store.get_users_who_share_room_with_user(
-            user_id
-        )
-
-        tracked_users = set(users_who_share_room)
-
-        # Always tell the user about their own devices
-        tracked_users.add(user_id)
-
-        changed = await self.store.get_users_whose_devices_changed(
-            from_token.device_list_key, tracked_users
+        changed = await self.get_device_changes_in_shared_rooms(
+            user_id, room_ids, from_token
         )
 
         # Then work out if any users have since joined
@@ -166,7 +192,7 @@ class DeviceWorkerHandler:
         possibly_changed = set(changed)
         possibly_left = set()
         for room_id in rooms_changed:
-            current_state_ids = await self.store.get_current_state_ids(room_id)
+            current_state_ids = await self._state_storage.get_current_state_ids(room_id)
 
             # The user may have left the room
             # TODO: Check if they actually did or if we were just invited.
@@ -237,10 +263,19 @@ class DeviceWorkerHandler:
                         break
 
         if possibly_changed or possibly_left:
-            # Take the intersection of the users whose devices may have changed
-            # and those that actually still share a room with the user
-            possibly_joined = possibly_changed & users_who_share_room
-            possibly_left = (possibly_changed | possibly_left) - users_who_share_room
+            possibly_joined = possibly_changed
+            possibly_left = possibly_changed | possibly_left
+
+            # Double check if we still share rooms with the given user.
+            users_rooms = await self.store.get_rooms_for_users_with_stream_ordering(
+                possibly_left
+            )
+            for changed_user_id, entries in users_rooms.items():
+                if any(e.room_id in room_ids for e in entries):
+                    possibly_left.discard(changed_user_id)
+                else:
+                    possibly_joined.discard(changed_user_id)
+
         else:
             possibly_joined = set()
             possibly_left = set()
@@ -396,35 +431,6 @@ class DeviceHandler(DeviceWorkerHandler):
 
         for user_id, user_devices in devices.items():
             await self.delete_devices(user_id, user_devices)
-
-    @trace
-    async def delete_device(self, user_id: str, device_id: str) -> None:
-        """Delete the given device
-
-        Args:
-            user_id: The user to delete the device from.
-            device_id: The device to delete.
-        """
-
-        try:
-            await self.store.delete_device(user_id, device_id)
-        except errors.StoreError as e:
-            if e.code == 404:
-                # no match
-                set_tag("error", True)
-                log_kv(
-                    {"reason": "User doesn't have device id.", "device_id": device_id}
-                )
-            else:
-                raise
-
-        await self._auth_handler.delete_access_tokens_for_user(
-            user_id, device_id=device_id
-        )
-
-        await self.store.delete_e2e_keys_by_device(user_id=user_id, device_id=device_id)
-
-        await self.notify_device_update(user_id, [device_id])
 
     @trace
     async def delete_all_devices_for_user(
@@ -591,7 +597,7 @@ class DeviceHandler(DeviceWorkerHandler):
             user_id, device_id, device_data
         )
         if old_device_id is not None:
-            await self.delete_device(user_id, old_device_id)
+            await self.delete_devices(user_id, [old_device_id])
         return device_id
 
     async def get_dehydrated_device(
@@ -638,7 +644,7 @@ class DeviceHandler(DeviceWorkerHandler):
         await self.store.update_device(user_id, device_id, old_device["display_name"])
         # can't call self.delete_device because that will clobber the
         # access token so call the storage layer directly
-        await self.store.delete_device(user_id, old_device_id)
+        await self.store.delete_devices(user_id, [old_device_id])
         await self.store.delete_e2e_keys_by_device(
             user_id=user_id, device_id=old_device_id
         )

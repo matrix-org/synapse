@@ -216,10 +216,10 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
 
         # Delete all remote non-state events
         for table in (
+            "event_edges",
             "events",
             "event_json",
             "event_auth",
-            "event_edges",
             "event_forward_extremities",
             "event_relations",
             "event_search",
@@ -304,7 +304,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
                 self._invalidate_cache_and_stream(
                     txn, self.have_seen_event, (room_id, event_id)
                 )
-                self._invalidate_get_event_cache(event_id)
+                txn.call_after(self._invalidate_get_event_cache, event_id)
 
         logger.info("[purge] done")
 
@@ -422,7 +422,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "partial_state_events",
             "events",
             "federation_inbound_events_staging",
-            "group_rooms",
             "local_current_membership",
             "partial_state_rooms_servers",
             "partial_state_rooms",
@@ -442,7 +441,6 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "e2e_room_keys",
             "event_push_summary",
             "pusher_throttle",
-            "group_summary_rooms",
             "room_account_data",
             "room_tags",
             # "rooms" happens last, to keep the foreign keys in the other tables

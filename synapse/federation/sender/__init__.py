@@ -245,6 +245,8 @@ class FederationSender(AbstractFederationSender):
         self.store = hs.get_datastores().main
         self.state = hs.get_state_handler()
 
+        self._storage_controllers = hs.get_storage_controllers()
+
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
 
@@ -349,7 +351,11 @@ class FederationSender(AbstractFederationSender):
             self._is_processing = True
             while True:
                 last_token = await self.store.get_federation_out_pos("events")
-                next_token, events = await self.store.get_all_new_events_stream(
+                (
+                    next_token,
+                    events,
+                    event_to_received_ts,
+                ) = await self.store.get_all_new_events_stream(
                     last_token, self._last_poked_id, limit=100
                 )
 
@@ -474,7 +480,7 @@ class FederationSender(AbstractFederationSender):
                         await self._send_pdu(event, sharded_destinations)
 
                         now = self.clock.time_msec()
-                        ts = await self.store.get_received_ts(event.event_id)
+                        ts = event_to_received_ts[event.event_id]
                         assert ts is not None
                         synapse.metrics.event_processing_lag_by_event.labels(
                             "federation_sender"
@@ -507,7 +513,7 @@ class FederationSender(AbstractFederationSender):
 
                 if events:
                     now = self.clock.time_msec()
-                    ts = await self.store.get_received_ts(events[-1].event_id)
+                    ts = event_to_received_ts[events[-1].event_id]
                     assert ts is not None
 
                     synapse.metrics.event_processing_lag.labels(
@@ -602,7 +608,9 @@ class FederationSender(AbstractFederationSender):
         room_id = receipt.room_id
 
         # Work out which remote servers should be poked and poke them.
-        domains_set = await self.state.get_current_hosts_in_room(room_id)
+        domains_set = await self._storage_controllers.state.get_current_hosts_in_room(
+            room_id
+        )
         domains = [
             d
             for d in domains_set
