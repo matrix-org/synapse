@@ -563,6 +563,21 @@ class LruCache(Generic[KT, VT]):
             update_metrics: bool = True,
             update_last_access: bool = True,
         ) -> Union[None, T, VT]:
+            """Lookup a key in the cache
+
+            Args:
+                key
+                default
+                callbacks: A collection of callbacks that will fire when the
+                    node is removed from the cache (either due to invalidation
+                    or expiry).
+                update_metrics: Whether to update the hit rate metrics
+                update_last_access: Whether to update the last access metrics
+                    on a node if successfully fetched. These metrics are used
+                    to determine when to remove the node from the cache. Set
+                    to False if this fetch should *not* prevent a node from
+                    being expired.
+            """
             node = cache.get(key, None)
             if node is not None:
                 if update_last_access:
