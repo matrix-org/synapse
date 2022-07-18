@@ -239,6 +239,8 @@ If this option is provided, it parses the given yaml to json and
 serves it on `/.well-known/matrix/client` endpoint
 alongside the standard properties.
 
+*Added in Synapse 1.62.0*
+
 Example configuration:
 ```yaml
 extra_well_known_client_content : 
@@ -1155,6 +1157,9 @@ Caching can be configured through the following sub-options:
   with intermittent connections, at the cost of higher memory usage.
   A value of zero means that sync responses are not cached.
   Defaults to 2m.
+
+  *Changed in Synapse 1.62.0*: The default was changed from 0 to 2m.
+
 * `cache_autotuning` and its sub-options `max_cache_memory_usage`, `target_cache_memory_usage`, and
    `min_cache_ttl` work in conjunction with each other to maintain a balance between cache memory 
    usage and cache entry availability. You must be using [jemalloc](https://github.com/matrix-org/synapse#help-synapse-is-slow-and-eats-all-my-ramcpu) 
