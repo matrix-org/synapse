@@ -1,1 +1,0 @@
-Clarify that homeserver server names are included in the reported data when the `report_stats` config option is enabled.

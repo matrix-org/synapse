@@ -1,3 +1,12 @@
+Synapse 1.63.0 (2022-07-19)
+===========================
+
+Improved Documentation
+----------------------
+
+- Clarify that homeserver server names are included in the reported data when the `report_stats` config option is enabled. ([\#13321](https://github.com/matrix-org/synapse/issues/13321))
+
+
 Synapse 1.63.0rc1 (2022-07-12)
 ==============================
 

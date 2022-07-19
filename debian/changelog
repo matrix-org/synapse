@@ -1,9 +1,10 @@
-matrix-synapse-py3 (1.63.0~rc1+nmu1) UNRELEASED; urgency=medium
+matrix-synapse-py3 (1.63.0) stable; urgency=medium
 
   * Clarify that homeserver server names are included in the data reported
     by opt-in server stats reporting (`report_stats` homeserver config option).
+  * New Synapse release 1.63.0.
 
- -- Synapse Packaging team <packages@matrix.org>  Tue, 19 Jul 2022 12:00:14 +0100
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 19 Jul 2022 14:42:24 +0200
 
 matrix-synapse-py3 (1.63.0~rc1) stable; urgency=medium
 
