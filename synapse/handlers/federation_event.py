@@ -781,8 +781,8 @@ class FederationEventHandler:
         # example, you could get an event from cache that is marked as an
         # `outlier` (fix up that spot though).
         assert not event.internal_metadata.is_outlier(), (
-            "This is a safe-guard to make sure we're not trying to persist an outlier using this function (use something else). "
-            "If you're trying to process/backfill an event, this is the right method but you need pass in an event copy that doesn't have `event.internal_metada.outlier = true`."
+            "Outlier event passed to _process_pulled_event. "
+            "To persist an event as a non-outlier, make sure to pass in a copy without `event.internal_metadata.outlier = true`."
         )
 
         event_id = event.event_id
