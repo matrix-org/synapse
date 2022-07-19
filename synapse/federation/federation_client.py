@@ -400,12 +400,15 @@ class FederationClient(FederationBase):
 
                     pdu_attempts[destination] = now
 
-                    # Prime the cache
-                    self._get_pdu_cache[event_from_remote.event_id] = event_from_remote
+                    if event_from_remote:
+                        # Prime the cache
+                        self._get_pdu_cache[
+                            event_from_remote.event_id
+                        ] = event_from_remote
 
-                    # FIXME: We should add a `break` here to avoid calling every
-                    # destination after we already found a PDU (will follow-up
-                    # in a separate PR)
+                        # FIXME: We should add a `break` here to avoid calling every
+                        # destination after we already found a PDU (will follow-up
+                        # in a separate PR)
 
                 except SynapseError as e:
                     logger.info(
