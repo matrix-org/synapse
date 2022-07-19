@@ -147,41 +147,7 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         """
 
         if dict_keys is None:
-            # First we check if we have cached the full dict.
-            entry = self.cache.get((key, _FullCacheKey.KEY), _Sentinel.sentinel)
-            if entry is not _Sentinel.sentinel:
-                assert isinstance(entry, dict)
-                return DictionaryEntry(True, set(), entry)
-
-            # If not, check if we have cached any dict keys at all for this cache key.
-            all_entries = self.cache.get_multi(
-                (key,),
-                _Sentinel.sentinel,
-            )
-            if all_entries is _Sentinel.sentinel:
-                return DictionaryEntry(False, set(), {})
-
-            # If there are entries we need to unwrap the returned cache nodes
-            # and `_PerKeyValue` into the `DictionaryEntry`.
-            values = {}
-            known_absent = set()
-            for dict_key, dict_value in iterate_tree_cache_items((), all_entries):
-                dict_key = dict_key[0]
-                dict_value = dict_value.value
-
-                # We have explicitly looked for a full cache key, so we
-                # shouldn't see one.
-                assert dict_key != _FullCacheKey.KEY
-
-                # ... therefore the values must be `_PerKeyValue`
-                assert isinstance(dict_value, _PerKeyValue)
-
-                if dict_value.value is _Sentinel.sentinel:
-                    known_absent.add(dict_key)
-                else:
-                    values[dict_key] = dict_value.value
-
-            return DictionaryEntry(False, known_absent, values)
+            return self._get_full_dict(key)
 
         # We are being asked for a subset of keys.
 
@@ -236,6 +202,49 @@ class DictionaryCache(Generic[KT, DKT, DV]):
                 values[dict_key] = value
 
         return DictionaryEntry(True, set(), values)
+
+    def _get_full_dict(
+        self,
+        key: KT,
+    ) -> DictionaryEntry:
+        """Fetch the full dict for the given key."""
+
+        # First we check if we have cached the full dict.
+        entry = self.cache.get((key, _FullCacheKey.KEY), _Sentinel.sentinel)
+        if entry is not _Sentinel.sentinel:
+            assert isinstance(entry, dict)
+            return DictionaryEntry(True, set(), entry)
+
+        # If not, check if we have cached any dict keys at all for this cache
+        # key.
+        all_entries = self.cache.get_multi(
+            (key,),
+            _Sentinel.sentinel,
+        )
+        if all_entries is _Sentinel.sentinel:
+            return DictionaryEntry(False, set(), {})
+
+        # If there are entries we need to unwrap the returned cache nodes
+        # and `_PerKeyValue` into the `DictionaryEntry`.
+        values = {}
+        known_absent = set()
+        for dict_key, dict_value in iterate_tree_cache_items((), all_entries):
+            dict_key = dict_key[0]
+            dict_value = dict_value.value
+
+            # We have explicitly looked for a full cache key, so we
+            # shouldn't see one.
+            assert dict_key != _FullCacheKey.KEY
+
+            # ... therefore the values must be `_PerKeyValue`
+            assert isinstance(dict_value, _PerKeyValue)
+
+            if dict_value.value is _Sentinel.sentinel:
+                known_absent.add(dict_key)
+            else:
+                values[dict_key] = dict_value.value
+
+        return DictionaryEntry(False, known_absent, values)
 
     def invalidate(self, key: KT) -> None:
         self.check_thread()
