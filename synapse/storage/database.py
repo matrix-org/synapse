@@ -294,7 +294,7 @@ class LoggingTransaction:
         self, callback: Callable[P, Awaitable], *args: P.args, **kwargs: P.kwargs
     ) -> None:
         """Call the given asynchronous callback on the main twisted thread after
-        the transaction has finished.
+        the transaction has finished (but before those added in `call_after`).
 
         Mostly used to invalidate remote caches after transactions.
 
