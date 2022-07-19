@@ -239,7 +239,7 @@ If this option is provided, it parses the given yaml to json and
 serves it on `/.well-known/matrix/client` endpoint
 alongside the standard properties.
 
-*Added in Synapse 1.62.0*
+*Added in Synapse 1.62.0.*
 
 Example configuration:
 ```yaml
