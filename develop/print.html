@@ -1652,6 +1652,13 @@ working email server in the <code>email</code> configuration section (including,
 minimum, a <code>notif_from</code> setting.)</p>
 <p>Specifying an <code>email</code> setting under <code>account_threepid_delegates</code> will now cause
 an error at startup.</p>
+<h2 id="changes-to-the-event-replication-streams"><a class="header" href="#changes-to-the-event-replication-streams">Changes to the event replication streams</a></h2>
+<p>Synapse now includes a flag indicating if an event is an outlier when
+replicating it to other workers. This is a forwards- and backwards-incompatible
+change: v1.63 and workers cannot process events replicated by v1.64 workers, and
+vice versa.</p>
+<p>Once all workers are upgraded to v1.64 (or downgraded to v1.63), event
+replication will resume as normal.</p>
 <h1 id="upgrading-to-v1620"><a class="header" href="#upgrading-to-v1620">Upgrading to v1.62.0</a></h1>
 <h2 id="new-signatures-for-spam-checker-callbacks"><a class="header" href="#new-signatures-for-spam-checker-callbacks">New signatures for spam checker callbacks</a></h2>
 <p>As a followup to changes in v1.60.0, the following spam-checker callbacks have changed signature:</p>
@@ -4398,6 +4405,19 @@ can be more computationally expensive than restricting locally). Defaults to
     per_second: 0.03
     burst_count: 12
 </code></pre>
+<hr />
+<h3 id="rc_joins_per_room"><a class="header" href="#rc_joins_per_room"><code>rc_joins_per_room</code></a></h3>
+<p>This option allows admins to ratelimit joins to a room based on the number of recent
+joins (local or remote) to that room. It is intended to mitigate mass-join spam
+waves which target multiple homeservers.</p>
+<p>By default, one join is permitted to a room every second, with an accumulating
+buffer of up to ten instantaneous joins.</p>
+<p>Example configuration (default values):</p>
+<pre><code class="language-yaml">rc_joins_per_room:
+  per_second: 1
+  burst_count: 10
+</code></pre>
+<p><em>Added in Synapse 1.64.0.</em></p>
 <hr />
 <h3 id="rc_3pid_validation"><a class="header" href="#rc_3pid_validation"><code>rc_3pid_validation</code></a></h3>
 <p>This option ratelimits how often a user or IP can attempt to validate a 3PID.

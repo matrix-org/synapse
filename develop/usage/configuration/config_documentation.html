@@ -1378,6 +1378,19 @@ can be more computationally expensive than restricting locally). Defaults to
     burst_count: 12
 </code></pre>
 <hr />
+<h3 id="rc_joins_per_room"><a class="header" href="#rc_joins_per_room"><code>rc_joins_per_room</code></a></h3>
+<p>This option allows admins to ratelimit joins to a room based on the number of recent
+joins (local or remote) to that room. It is intended to mitigate mass-join spam
+waves which target multiple homeservers.</p>
+<p>By default, one join is permitted to a room every second, with an accumulating
+buffer of up to ten instantaneous joins.</p>
+<p>Example configuration (default values):</p>
+<pre><code class="language-yaml">rc_joins_per_room:
+  per_second: 1
+  burst_count: 10
+</code></pre>
+<p><em>Added in Synapse 1.64.0.</em></p>
+<hr />
 <h3 id="rc_3pid_validation"><a class="header" href="#rc_3pid_validation"><code>rc_3pid_validation</code></a></h3>
 <p>This option ratelimits how often a user or IP can attempt to validate a 3PID.
 Defaults to <code>per_second: 0.003</code>, <code>burst_count: 5</code>.</p>
