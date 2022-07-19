@@ -384,7 +384,6 @@ class FederationClient(FederationBase):
             event_copy = make_event_from_dict(
                 event_from_cache.get_pdu_json(),
                 event_from_cache.room_version,
-                internal_metadata_dict=None,
             )
 
             return event_copy
@@ -449,7 +448,6 @@ class FederationClient(FederationBase):
             event_copy = make_event_from_dict(
                 signed_pdu.get_pdu_json(),
                 signed_pdu.room_version,
-                internal_metadata_dict=None,
             )
 
         return event_copy
