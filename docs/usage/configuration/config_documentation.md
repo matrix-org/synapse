@@ -3151,12 +3151,16 @@ Server admins can configure custom templates for email content. See
 This setting has the following sub-options:
 * `smtp_host`: The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.
 * `smtp_port`: The port on the mail server for outgoing SMTP. Defaults to 465 if `implicit_tls` is true, else 25.
+  
+  _Changed in Synapse 1.64.0:_ the default port is now aware of `implicit_tls`.
 * `smtp_user` and `smtp_pass`: Username/password for authentication to the SMTP server. By default, no
    authentication is attempted.
 * `implicit_tls`: By default, Synapse connects over plain text and then optionally upgrades
    to TLS via STARTTLS. If this option is set to true, TLS is used from the start,
    and the options `require_transport_security` and `enable_tls` are ignored.
    It is recommended to enable this if supported by your mail server.
+  
+  _New in Synapse 1.64.0._
 * `require_transport_security`: Set to true to require TLS transport security for SMTP.
    By default, Synapse will connect over plain text, and will then switch to
    TLS via STARTTLS *if the SMTP server supports it*. If this option is set,
