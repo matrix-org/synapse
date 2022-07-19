@@ -24,9 +24,11 @@ from typing import (
     Callable,
     Collection,
     Dict,
+    Generator,
     Generic,
     List,
     Optional,
+    Tuple,
     Type,
     TypeVar,
     Union,
@@ -46,8 +48,8 @@ from synapse.util import Clock, caches
 from synapse.util.caches import CacheMetric, EvictionReason, register_cache
 from synapse.util.caches.treecache import (
     TreeCache,
-    TreeCacheNode,
     iterate_tree_cache_entry,
+    iterate_tree_cache_items,
 )
 from synapse.util.linked_list import ListNode
 
@@ -596,7 +598,7 @@ class LruCache(Generic[KT, VT]):
             key: tuple,
             default: Literal[None] = None,
             update_metrics: bool = True,
-        ) -> Union[None, TreeCacheNode]:
+        ) -> Union[None, Generator[Tuple[KT, VT], None, None]]:
             ...
 
         @overload
@@ -604,7 +606,7 @@ class LruCache(Generic[KT, VT]):
             key: tuple,
             default: T,
             update_metrics: bool = True,
-        ) -> Union[T, TreeCacheNode]:
+        ) -> Union[T, Generator[Tuple[KT, VT], None, None]]:
             ...
 
         @synchronized
@@ -612,8 +614,15 @@ class LruCache(Generic[KT, VT]):
             key: tuple,
             default: Optional[T] = None,
             update_metrics: bool = True,
-        ) -> Union[None, T, TreeCacheNode]:
-            """Used only for `TreeCache` to fetch a subtree."""
+        ) -> Union[None, T, Generator[Tuple[KT, VT], None, None]]:
+            """Returns a generator yielding all entries under the given key.
+
+            Can only be used if backed by a tree cache.
+
+            Returns:
+                Either default if the key doesn't exist, or a generator of the
+                key/value pairs.
+            """
 
             assert isinstance(cache, TreeCache)
 
@@ -621,7 +630,13 @@ class LruCache(Generic[KT, VT]):
             if node is not None:
                 if update_metrics and metrics:
                     metrics.inc_hits()
-                return node
+
+                # Iterating over the node will return values of type `_Node`,
+                # which we need to unwrap.
+                return (
+                    (full_key, lru_node.value)
+                    for full_key, lru_node in iterate_tree_cache_items(key, node)
+                )
             else:
                 if update_metrics and metrics:
                     metrics.inc_misses()

@@ -20,7 +20,7 @@ import attr
 from typing_extensions import Literal
 
 from synapse.util.caches.lrucache import LruCache
-from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_items
+from synapse.util.caches.treecache import TreeCache
 
 logger = logging.getLogger(__name__)
 
@@ -228,9 +228,9 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         # and `_PerKeyValue` into the `DictionaryEntry`.
         values = {}
         known_absent = set()
-        for key_tuple, node in iterate_tree_cache_items((), all_entries):
-            dict_key = key_tuple[0]
-            dict_value = node.value
+        for cache_key, dict_value in all_entries:
+            # The key used for the `TreeCache` is `(key, dict_key)`
+            dict_key = cache_key[1]
 
             # We have explicitly looked for a full cache key, so we
             # shouldn't see one.
