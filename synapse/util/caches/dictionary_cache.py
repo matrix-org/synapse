@@ -228,9 +228,9 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         # and `_PerKeyValue` into the `DictionaryEntry`.
         values = {}
         known_absent = set()
-        for dict_key, dict_value in iterate_tree_cache_items((), all_entries):
-            dict_key = dict_key[0]
-            dict_value = dict_value.value
+        for key_tuple, node in iterate_tree_cache_items((), all_entries):
+            dict_key = key_tuple[0]
+            dict_value = node.value
 
             # We have explicitly looked for a full cache key, so we
             # shouldn't see one.
