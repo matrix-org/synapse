@@ -797,7 +797,7 @@ def extract_text_map(carrier: Dict[str, str]) -> Optional["opentracing.SpanConte
 # Tracing decorators
 
 
-def trace_with_opname(opname: Optional[str] = None):
+def trace_with_opname(opname: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """
     Decorator to trace a function with a custom opname.
 
@@ -805,22 +805,22 @@ def trace_with_opname(opname: Optional[str] = None):
 
     """
 
-    def decorator(func):
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
         if opentracing is None:
             return func  # type: ignore[unreachable]
 
         if inspect.iscoroutinefunction(func):
 
             @wraps(func)
-            async def _trace_inner(*args, **kwargs):
+            async def _trace_inner(*args: P.args, **kwargs: P.kwargs) -> R:
                 with start_active_span(opname):
-                    return await func(*args, **kwargs)
+                    return await func(*args, **kwargs)  # type: ignore[misc]
 
         else:
             # The other case here handles both sync functions and those
             # decorated with inlineDeferred.
             @wraps(func)
-            def _trace_inner(*args, **kwargs):
+            def _trace_inner(*args: P.args, **kwargs: P.kwargs) -> R:
                 scope = start_active_span(opname)
                 scope.__enter__()
 
@@ -855,12 +855,12 @@ def trace_with_opname(opname: Optional[str] = None):
                     scope.__exit__(type(e), None, e.__traceback__)
                     raise
 
-        return _trace_inner
+        return _trace_inner  # type: ignore[return-value]
 
     return decorator
 
 
-def trace(func):
+def trace(func: Callable[P, R]) -> Callable[P, R]:
     """
     Decorator to trace a function.
 
