@@ -153,7 +153,7 @@ class DictionaryCache(Generic[KT, DKT, DV]):
                 assert isinstance(entry, dict)
                 return DictionaryEntry(True, set(), entry)
 
-            # If not, check if we have cached any of dict keys.
+            # If not, check if we have cached any dict keys at all for this cache key.
             all_entries = self.cache.get_multi(
                 (key,),
                 _Sentinel.sentinel,
