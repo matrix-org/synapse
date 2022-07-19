@@ -180,7 +180,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         self.assertEqual(remote_pdu2.internal_metadata.outlier, False)
 
     def _get_pdu_once(self) -> EventBase:
-        """Retrieve an event via `get_pdu()` and asserts that an event was returned.
+        """Retrieve an event via `get_pdu()` and assert that an event was returned.
         Also used to prime the cache for subsequent test logic.
         """
         message_event_dict = self.add_hashes_and_signatures_from_other_server(
