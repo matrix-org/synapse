@@ -2409,9 +2409,14 @@ metrics_flags:
 ---
 ### `report_stats`
 
-Whether or not to report anonymized homeserver usage statistics. This is originally
+Whether or not to report homeserver usage statistics. This is originally
 set when generating the config. Set this option to true or false to change the current
-behavior. 
+behavior. See
+[Reporting Homeserver Usage Statistics](../administration/monitoring/reporting_homeserver_usage_statistics.md)
+for information on what data is reported.
+
+Statistics will be reported 5 minutes after Synapse starts, and then every 3 hours
+after that.
 
 Example configuration:
 ```yaml
@@ -2420,7 +2425,7 @@ report_stats: true
 ---
 ### `report_stats_endpoint`
 
-The endpoint to report the anonymized homeserver usage statistics to.
+The endpoint to report homeserver usage statistics to.
 Defaults to https://matrix.org/report-usage-stats/push
 
 Example configuration:
