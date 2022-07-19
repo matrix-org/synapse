@@ -61,7 +61,7 @@ async def _sendmail(
     require_auth: bool = False,
     require_tls: bool = False,
     enable_tls: bool = True,
-    implicit_tls: bool = False,
+    force_tls: bool = False,
 ) -> None:
     """A simple wrapper around ESMTPSenderFactory, to allow substitution in tests
 
@@ -78,7 +78,7 @@ async def _sendmail(
         require_tls: if TLS is not offered, fail the reqest
         enable_tls: True to enable STARTTLS. If this is False and require_tls is True,
            the request will fail.
-        implicit_tls: True to enable Implicit TLS.
+        force_tls: True to enable Implicit TLS.
     """
     msg = BytesIO(msg_bytes)
     d: "Deferred[object]" = Deferred()
@@ -109,7 +109,7 @@ async def _sendmail(
         # set to enable TLS.
         factory = build_sender_factory(hostname=smtphost if enable_tls else None)
 
-    if implicit_tls:
+    if force_tls:
         reactor.connectSSL(
             smtphost,
             smtpport,
@@ -146,7 +146,7 @@ class SendEmailHandler:
         self._smtp_pass = passwd.encode("utf-8") if passwd is not None else None
         self._require_transport_security = hs.config.email.require_transport_security
         self._enable_tls = hs.config.email.enable_smtp_tls
-        self._implicit_tls = hs.config.email.implicit_tls
+        self._force_tls = hs.config.email.force_tls
 
         self._sendmail = _sendmail
 
@@ -204,5 +204,5 @@ class SendEmailHandler:
             require_auth=self._smtp_user is not None,
             require_tls=self._require_transport_security,
             enable_tls=self._enable_tls,
-            implicit_tls=self._implicit_tls,
+            force_tls=self._force_tls,
         )

@@ -115,11 +115,11 @@ class SendEmailHandlerTestCase(HomeserverTestCase):
         {
             "email": {
                 "notif_from": "noreply@test",
-                "implicit_tls": True,
+                "force_tls": True,
             },
         }
     )
-    def test_send_email_implicit_tls(self):
+    def test_send_email_force_tls(self):
         """Happy-path test that we can send email to an Implicit TLS server."""
         h = self.hs.get_send_email_handler()
         d = ensureDeferred(

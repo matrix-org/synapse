@@ -3150,13 +3150,13 @@ Server admins can configure custom templates for email content. See
 
 This setting has the following sub-options:
 * `smtp_host`: The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.
-* `smtp_port`: The port on the mail server for outgoing SMTP. Defaults to 465 if `implicit_tls` is true, else 25.
+* `smtp_port`: The port on the mail server for outgoing SMTP. Defaults to 465 if `force_tls` is true, else 25.
   
-  _Changed in Synapse 1.64.0:_ the default port is now aware of `implicit_tls`.
+  _Changed in Synapse 1.64.0:_ the default port is now aware of `force_tls`.
 * `smtp_user` and `smtp_pass`: Username/password for authentication to the SMTP server. By default, no
    authentication is attempted.
-* `implicit_tls`: By default, Synapse connects over plain text and then optionally upgrades
-   to TLS via STARTTLS. If this option is set to true, TLS is used from the start,
+* `force_tls`: By default, Synapse connects over plain text and then optionally upgrades
+   to TLS via STARTTLS. If this option is set to true, TLS is used from the start (Implicit TLS),
    and the option `require_transport_security` is ignored.
    It is recommended to enable this if supported by your mail server.
   
@@ -3225,7 +3225,7 @@ email:
   smtp_port: 587
   smtp_user: "exampleusername"
   smtp_pass: "examplepassword"
-  implicit_tls: true
+  force_tls: true
   require_transport_security: true
   enable_tls: false
   notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"

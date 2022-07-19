@@ -85,10 +85,10 @@ class EmailConfig(Config):
         if email_config is None:
             email_config = {}
 
-        self.implicit_tls = email_config.get("implicit_tls", False)
+        self.force_tls = email_config.get("force_tls", False)
         self.email_smtp_host = email_config.get("smtp_host", "localhost")
         self.email_smtp_port = email_config.get(
-            "smtp_port", 465 if self.implicit_tls else 25
+            "smtp_port", 465 if self.force_tls else 25
         )
         self.email_smtp_user = email_config.get("smtp_user", None)
         self.email_smtp_pass = email_config.get("smtp_pass", None)
@@ -96,8 +96,8 @@ class EmailConfig(Config):
             "require_transport_security", False
         )
         self.enable_smtp_tls = email_config.get("enable_tls", True)
-        if self.implicit_tls and not self.enable_smtp_tls:
-            raise ConfigError("email.implicit_tls requires email.enable_tls to be true")
+        if self.force_tls and not self.enable_smtp_tls:
+            raise ConfigError("email.force_tls requires email.enable_tls to be true")
         if self.require_transport_security and not self.enable_smtp_tls:
             raise ConfigError(
                 "email.require_transport_security requires email.enable_tls to be true"
