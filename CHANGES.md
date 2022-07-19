@@ -3,6 +3,15 @@ Synapse vNext
 
 As of this release, Synapse no longer allows the tasks of verifying email address ownership, and password reset confirmation, to be delegated to an identity server. For more information, see the [upgrade notes](https://matrix-org.github.io/synapse/v1.64/upgrade.html#upgrading-to-v1640).
 
+Synapse 1.63.0 (2022-07-19)
+===========================
+
+Improved Documentation
+----------------------
+
+- Clarify that homeserver server names are included in the reported data when the `report_stats` config option is enabled. ([\#13321](https://github.com/matrix-org/synapse/issues/13321))
+
+
 Synapse 1.63.0rc1 (2022-07-12)
 ==============================
 
@@ -11,7 +20,7 @@ Features
 
 - Add a rate limit for local users sending invites. ([\#13125](https://github.com/matrix-org/synapse/issues/13125))
 - Implement [MSC3827](https://github.com/matrix-org/matrix-spec-proposals/pull/3827): Filtering of `/publicRooms` by room type. ([\#13031](https://github.com/matrix-org/synapse/issues/13031))
-- Improve validation logic in Synapse's REST endpoints. ([\#13148](https://github.com/matrix-org/synapse/issues/13148))
+- Improve validation logic in the account data REST endpoints. ([\#13148](https://github.com/matrix-org/synapse/issues/13148))
 
 
 Bugfixes
@@ -39,7 +48,7 @@ Improved Documentation
 - Add an explanation of the `--report-stats` argument to the docs. ([\#13029](https://github.com/matrix-org/synapse/issues/13029))
 - Add a helpful example bash script to the contrib directory for creating multiple worker configuration files of the same type. Contributed by @villepeh. ([\#13032](https://github.com/matrix-org/synapse/issues/13032))
 - Add missing links to config options. ([\#13166](https://github.com/matrix-org/synapse/issues/13166))
-- Add documentation for anonymised homeserver statistics collection. ([\#13086](https://github.com/matrix-org/synapse/issues/13086))
+- Add documentation for homeserver usage statistics collection. ([\#13086](https://github.com/matrix-org/synapse/issues/13086))
 - Add documentation for the existing `databases` option in the homeserver configuration manual. ([\#13212](https://github.com/matrix-org/synapse/issues/13212))
 - Clean up references to sample configuration and redirect users to the configuration manual instead. ([\#13077](https://github.com/matrix-org/synapse/issues/13077), [\#13139](https://github.com/matrix-org/synapse/issues/13139))
 - Document how the Synapse team does reviews. ([\#13132](https://github.com/matrix-org/synapse/issues/13132))

@@ -97,16 +97,16 @@ def format_config_error(e: ConfigError) -> Iterator[str]:
 # We split these messages out to allow packages to override with package
 # specific instructions.
 MISSING_REPORT_STATS_CONFIG_INSTRUCTIONS = """\
-Please opt in or out of reporting anonymized homeserver usage statistics, by
-setting the `report_stats` key in your config file to either True or False.
+Please opt in or out of reporting homeserver usage statistics, by setting
+the `report_stats` key in your config file to either True or False.
 """
 
 MISSING_REPORT_STATS_SPIEL = """\
 We would really appreciate it if you could help our project out by reporting
-anonymized usage statistics from your homeserver. Only very basic aggregate
-data (e.g. number of users) will be reported, but it helps us to track the
-growth of the Matrix community, and helps us to make Matrix a success, as well
-as to convince other networks that they should peer with us.
+homeserver usage statistics from your homeserver. Your homeserver's server name,
+along with very basic aggregate data (e.g. number of users) will be reported. But
+it helps us to track the growth of the Matrix community, and helps us to make Matrix
+a success, as well as to convince other networks that they should peer with us.
 
 Thank you.
 """
@@ -621,7 +621,7 @@ class RootConfig:
         generate_group.add_argument(
             "--report-stats",
             action="store",
-            help="Whether the generated config reports anonymized usage statistics.",
+            help="Whether the generated config reports homeserver usage statistics.",
             choices=["yes", "no"],
         )
         generate_group.add_argument(
