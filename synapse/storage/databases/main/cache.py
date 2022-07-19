@@ -32,8 +32,8 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.engines import PostgresEngine
-from synapse.util.caches.descriptors import _CachedFunction
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
+from synapse.util.caches.descriptors import _CachedFunction
 from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
