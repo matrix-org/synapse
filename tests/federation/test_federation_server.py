@@ -59,7 +59,7 @@ class FederationServerTests(unittest.FederatingHomeserverTestCase):
             "/_matrix/federation/v1/get_missing_events/%s" % (room_1,),
             query_content,
         )
-        self.assertEqual(400, channel.code, channel.result)
+        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_NOT_JSON")
 
 
@@ -120,7 +120,7 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
         channel = self.make_signed_federation_request(
             "GET", "/_matrix/federation/v1/state/%s?event_id=xyz" % (room_1,)
         )
-        self.assertEqual(403, channel.code, channel.result)
+        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
 
 
@@ -154,7 +154,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
             f"/_matrix/federation/v1/make_join/{self._room_id}/{user_id}"
             f"?ver={DEFAULT_ROOM_VERSION}",
         )
-        self.assertEqual(channel.code, 200, channel.json_body)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
         return channel.json_body
 
     def test_send_join(self):
@@ -172,7 +172,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
             f"/_matrix/federation/v2/send_join/{self._room_id}/x",
             content=join_event_dict,
         )
-        self.assertEqual(channel.code, 200, channel.json_body)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
 
         # we should get complete room state back
         returned_state = [
@@ -227,7 +227,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
             f"/_matrix/federation/v2/send_join/{self._room_id}/x?org.matrix.msc3706.partial_state=true",
             content=join_event_dict,
         )
-        self.assertEqual(channel.code, 200, channel.json_body)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
 
         # expect a reduced room state
         returned_state = [

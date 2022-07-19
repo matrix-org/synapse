@@ -1,0 +1,1 @@
+Always use a version of canonicaljson that supports the C implementation of frozendict.
