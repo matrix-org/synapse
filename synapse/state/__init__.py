@@ -14,7 +14,7 @@
 # limitations under the License.
 import heapq
 import logging
-from collections import defaultdict
+from collections import ChainMap, defaultdict
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -92,8 +92,11 @@ class _StateCacheEntry:
         prev_group: Optional[int] = None,
         delta_ids: Optional[StateMap[str]] = None,
     ):
-        if state is None and state_group is None:
-            raise Exception("Either state or state group must be not None")
+        if state is None and state_group is None and prev_group is None:
+            raise Exception("One of state, state_group or prev_group must be not None")
+
+        if prev_group is not None and delta_ids is None:
+            raise Exception("If prev_group is set so must delta_ids")
 
         # A map from (type, state_key) to event_id.
         #
@@ -120,11 +123,31 @@ class _StateCacheEntry:
         if self._state is not None:
             return self._state
 
-        assert self.state_group is not None
+        if self.state_group is not None:
+            return await state_storage.get_state_ids_for_group(
+                self.state_group, state_filter
+            )
 
-        return await state_storage.get_state_ids_for_group(
-            self.state_group, state_filter
+        assert self.prev_group is not None and self.delta_ids is not None
+
+        prev_state = await state_storage.get_state_ids_for_group(
+            self.prev_group, state_filter
         )
+
+        # ChainMap expects MutableMapping, but since we're using it immutably
+        # its safe to give it immutable maps.
+        return ChainMap(self.delta_ids, prev_state)  # type: ignore[arg-type]
+
+    def set_state_group(self, state_group: int) -> None:
+        """Update the state group assigned to this state (e.g. after we've
+        persisted it)
+        """
+
+        self.state_group = state_group
+
+        # We clear out the state as we know longer need to explicitly keep it in
+        # the `state_cache` (as the store state group cache will do that.)
+        self._state = None
 
     def __len__(self) -> int:
         # The len should is used to estimate how large this cache entry is, for
@@ -320,7 +343,7 @@ class StateHandler:
                         current_state_ids=state_ids_before_event,
                     )
                 )
-                entry.state_group = state_group_before_event
+                entry.set_state_group(state_group_before_event)
             else:
                 state_group_before_event = entry.state_group
 
@@ -769,9 +792,14 @@ def _make_state_cache_entry(
             prev_group = old_group
             delta_ids = n_delta_ids
 
-    return _StateCacheEntry(
-        state=new_state, state_group=None, prev_group=prev_group, delta_ids=delta_ids
-    )
+    if prev_group is not None:
+        # If we have a prev group and deltas then we can drop the new state from
+        # the cache (to reduce memory usage).
+        return _StateCacheEntry(
+            state=None, state_group=None, prev_group=prev_group, delta_ids=delta_ids
+        )
+    else:
+        return _StateCacheEntry(state=new_state, state_group=None)
 
 
 @attr.s(slots=True, auto_attribs=True)
