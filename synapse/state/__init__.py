@@ -151,10 +151,18 @@ class _StateCacheEntry:
 
     def __len__(self) -> int:
         # The len should is used to estimate how large this cache entry is, for
-        # cache eviction purposes. This is why if `self.state` is None it's fine
-        # to return 1.
+        # cache eviction purposes. This is why it's fine to return 1 if we're
+        # not storing any state.
 
-        return len(self._state) if self._state else 1
+        length = 0
+
+        if self._state:
+            length += len(self._state)
+
+        if self.delta_ids:
+            length += len(self.delta_ids)
+
+        return length or 1  # Make sure its not 0.
 
 
 class StateHandler:
