@@ -1,1 +1,1 @@
-Fix async get event cache invalidation logic. Contributed by Nick @ Beeper (@fizzadar).
+Use an asynchronous cache wrapper for the get event cache. Contributed by Nick @ Beeper (@fizzadar).
