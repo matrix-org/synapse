@@ -434,16 +434,14 @@ class LruCache(Generic[KT, VT]):
         else:
             self.max_size = int(max_size)
 
-        self._doorkeeper = ScalableCuckooFilter(
-            initial_capacity=self.max_size, error_rate=0.001
-        )
-        self._doorkeeper_2 = ScalableCuckooFilter(self.max_size, 0.001)
+        self._doorkeeper = ScalableCuckooFilter(100, 0.001)
+        self._doorkeeper_2 = ScalableCuckooFilter(100, 0.001)
 
         def _rotate_doorkeeper() -> None:
             self._doorkeeper_2 = self._doorkeeper
-            self._doorkeeper = ScalableCuckooFilter(self.max_size, 0.001)
+            self._doorkeeper = ScalableCuckooFilter(100, 0.001)
 
-        real_clock.looping_call(_rotate_doorkeeper, 5 * 60 * 100)
+        real_clock.looping_call(_rotate_doorkeeper, 60 * 100)
 
         # register_cache might call our "set_cache_factor" callback; there's nothing to
         # do yet when we get resized.
@@ -456,6 +454,8 @@ class LruCache(Generic[KT, VT]):
                 self,
                 collect_callback=metrics_collection_callback,
             )
+            doorkeeper_counter.labels(cache_name)
+            doorkeeper_hit_counter.labels(cache_name)
         else:
             metrics = None
 
