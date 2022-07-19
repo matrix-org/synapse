@@ -136,7 +136,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         )
 
     def test_get_pdu_returns_nothing_when_event_does_not_exist(self):
-        """No event should be returned when there the event does not exist"""
+        """No event should be returned when the event does not exist"""
         remote_pdu = self.get_success(
             self.hs.get_federation_client().get_pdu(
                 ["yet_another_server"],
