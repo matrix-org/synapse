@@ -365,6 +365,10 @@ class FederationClient(FederationBase):
         # TODO: Rate limit the number of times we try and get the same event.
 
         event_copy = None
+        # We might need the same event multiple times in quick succession (before
+        # it gets persisted to the database), so we cache the results of the lookup.
+        # Note that this is separate to the regular get_event cache which caches
+        # events once they have been persisted.
         event_from_cache = self._get_pdu_cache.get(event_id)
         if event_from_cache:
             logger.debug("get_pdu: found event_from_cache=%s", event_from_cache)
