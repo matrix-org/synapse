@@ -8,7 +8,7 @@ It also prints out the example lines for Synapse main configuration file.
 
 Remember to route necessary endpoints directly to a worker associated with it.
 
-If you run the script as-is, it will create workers with the replication listener starting from port 8034 and another, regular http listener  starting from 8044. If you don't need all of stream writers listed in the script, just remove them from the ```STREAM_WRITERS``` array.
+If you run the script as-is, it will create workers with the replication listener starting from port 8034 and another, regular http listener starting from 8044. If you don't need all of the stream writers listed in the script, just remove them from the ```STREAM_WRITERS``` array.
 
 ```sh
 #!/bin/bash
