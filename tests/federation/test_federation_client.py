@@ -163,7 +163,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         # This change should not make it back to the `_get_pdu_cache`.
         remote_pdu.internal_metadata.outlier = True
 
-        # Get the event again
+        # Get the event again. This time it should read it from cache.
         remote_pdu2 = self.get_success(
             self.hs.get_federation_client().get_pdu(
                 ["yet_another_server"],
@@ -172,7 +172,10 @@ class FederationClientTest(FederatingHomeserverTestCase):
             )
         )
 
-        # Make sure event does not include modification earlier
+        # Sanity check that we are working against the same event
+        self.assertEqual(remote_pdu.event_id, remote_pdu2.event_id)
+
+        # Make sure the event does not include modification from earlier
         self.assertIsNotNone(remote_pdu2)
         self.assertEqual(remote_pdu2.internal_metadata.outlier, False)
 

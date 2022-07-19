@@ -367,6 +367,7 @@ class FederationClient(FederationBase):
         event_copy = None
         event_from_cache = self._get_pdu_cache.get(event_id)
         if event_from_cache:
+            logger.debug("get_pdu: found event_from_cache=%s", event_from_cache)
             assert not event_from_cache.internal_metadata.outlier, (
                 "Event from cache unexpectedly an `outlier` when it should be pristine and untouched without metadata set. "
                 "We are probably not be returning a copy of the event because downstream callers are modifying the event reference we have in the cache."
@@ -383,7 +384,6 @@ class FederationClient(FederationBase):
                 internal_metadata_dict=None,
             )
 
-            logger.debug("get_pdu: returning event_from_cache=%s", event_from_cache)
             return event_copy
 
         pdu_attempts = self.pdu_destination_tried.setdefault(event_id, {})
@@ -432,7 +432,7 @@ class FederationClient(FederationBase):
                 continue
 
         if signed_pdu:
-            self._get_pdu_cache[event_id] = signed_pdu
+            self._get_pdu_cache[signed_pdu.event_id] = signed_pdu
 
             # Make sure to return a copy because downstream callers will use this
             # event reference directly and change our original, pristine, untouched
