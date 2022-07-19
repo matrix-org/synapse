@@ -84,14 +84,13 @@ the function becomes the operation name for the span.
        return something_usual_and_useful
 
 
-Operation names can be explicitly set for a function by passing the
-operation name to ``trace``
+Operation names can be explicitly set for a function by using ``trace_with_opname``:
 
 .. code-block:: python
 
-   from synapse.logging.opentracing import trace
+   from synapse.logging.opentracing import trace_with_opname
 
-   @trace(opname="a_better_operation_name")
+   @trace_with_opname("a_better_operation_name")
    def interesting_badly_named_function(*args, **kwargs):
        # Does all kinds of cool and expected things
        return something_usual_and_useful
@@ -798,25 +797,23 @@ def extract_text_map(carrier: Dict[str, str]) -> Optional["opentracing.SpanConte
 # Tracing decorators
 
 
-def trace(func=None, opname: Optional[str] = None):
+def trace_with_opname(opname: Optional[str] = None):
     """
-    Decorator to trace a function.
-    Sets the operation name to that of the function's or that given
-    as operation_name. See the module's doc string for usage
-    examples.
+    Decorator to trace a function with a custom opname.
+
+    See the module's doc string for usage examples.
+
     """
 
     def decorator(func):
         if opentracing is None:
             return func  # type: ignore[unreachable]
 
-        _opname = opname if opname else func.__name__
-
         if inspect.iscoroutinefunction(func):
 
             @wraps(func)
             async def _trace_inner(*args, **kwargs):
-                with start_active_span(_opname):
+                with start_active_span(opname):
                     return await func(*args, **kwargs)
 
         else:
@@ -824,7 +821,7 @@ def trace(func=None, opname: Optional[str] = None):
             # decorated with inlineDeferred.
             @wraps(func)
             def _trace_inner(*args, **kwargs):
-                scope = start_active_span(_opname)
+                scope = start_active_span(opname)
                 scope.__enter__()
 
                 try:
@@ -860,10 +857,19 @@ def trace(func=None, opname: Optional[str] = None):
 
         return _trace_inner
 
-    if func:
-        return decorator(func)
-    else:
-        return decorator
+    return decorator
+
+
+def trace(func):
+    """
+    Decorator to trace a function.
+
+    Sets the operation name to that of the function's name.
+
+    See the module's doc string for usage examples.
+    """
+
+    return trace_with_opname(func.__name__)(func)
 
 
 def tag_args(func: Callable[P, R]) -> Callable[P, R]:
