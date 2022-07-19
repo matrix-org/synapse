@@ -96,6 +96,8 @@ class EmailConfig(Config):
             "require_transport_security", False
         )
         self.enable_smtp_tls = email_config.get("enable_tls", True)
+        if self.implicit_tls and not self.enable_smtp_tls:
+            raise ConfigError("email.implicit_tls requires email.enable_tls to be true")
         if self.require_transport_security and not self.enable_smtp_tls:
             raise ConfigError(
                 "email.require_transport_security requires email.enable_tls to be true"
