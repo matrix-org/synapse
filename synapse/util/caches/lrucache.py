@@ -563,7 +563,7 @@ class LruCache(Generic[KT, VT]):
             update_metrics: bool = True,
             update_last_access: bool = True,
         ) -> Union[None, T, VT]:
-            """Lookup a key in the cache
+            """Look up a key in the cache
 
             Args:
                 key
