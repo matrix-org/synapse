@@ -358,8 +358,13 @@ class FederationClient(FederationBase):
             The requested PDU, or None if we were unable to find it.
         """
 
+        logger.debug(
+            "get_pdu: event_id=%s from destinations=%s", event_id, destinations
+        )
+
         # TODO: Rate limit the number of times we try and get the same event.
 
+        event_copy = None
         event_from_cache = self._get_pdu_cache.get(event_id)
         if event_from_cache:
             assert not event_from_cache.internal_metadata.outlier, (
@@ -378,6 +383,7 @@ class FederationClient(FederationBase):
                 internal_metadata_dict=None,
             )
 
+            logger.debug("get_pdu: returning event_from_cache=%s", event_from_cache)
             return event_copy
 
         pdu_attempts = self.pdu_destination_tried.setdefault(event_id, {})
@@ -387,6 +393,13 @@ class FederationClient(FederationBase):
             now = self._clock.time_msec()
             last_attempt = pdu_attempts.get(destination, 0)
             if last_attempt + PDU_RETRY_TIME_MS > now:
+                logger.debug(
+                    "get_pdu: skipping destination=%s because we tried it recently last_attempt=%s and we only check every %s (now=%s)",
+                    destination,
+                    last_attempt,
+                    PDU_RETRY_TIME_MS,
+                    now,
+                )
                 continue
 
             try:
