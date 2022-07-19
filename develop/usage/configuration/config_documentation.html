@@ -322,6 +322,7 @@ Note that the <code>public_baseurl</code> config option must be provided for Syn
 <p>If this option is provided, it parses the given yaml to json and 
 serves it on <code>/.well-known/matrix/client</code> endpoint
 alongside the standard properties.</p>
+<p><em>Added in Synapse 1.62.0.</em></p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">extra_well_known_client_content : 
   option1: value1
@@ -1074,6 +1075,7 @@ cached for after a successful response is returned. A higher duration can help c
 with intermittent connections, at the cost of higher memory usage.
 A value of zero means that sync responses are not cached.
 Defaults to 2m.</p>
+<p><em>Changed in Synapse 1.62.0</em>: The default was changed from 0 to 2m.</p>
 </li>
 <li>
 <p><code>cache_autotuning</code> and its sub-options <code>max_cache_memory_usage</code>, <code>target_cache_memory_usage</code>, and
