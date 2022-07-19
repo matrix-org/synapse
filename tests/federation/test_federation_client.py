@@ -185,7 +185,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         """
         message_event_dict = self.add_hashes_and_signatures_from_other_server(
             {
-                "room_id": "!room_id",
+                "room_id": self.test_room_id,
                 "type": "m.room.message",
                 "sender": self.creator,
                 "state_key": "",
