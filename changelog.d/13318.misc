@@ -1,1 +1,1 @@
-Validate federation destination and log an error if destination is invalid.
+Validate federation destinations and log an error if a destination is invalid.
