@@ -239,33 +239,7 @@ class DictionaryCache(Generic[KT, DKT, DV]):
             assert isinstance(entry, dict)
             return DictionaryEntry(True, set(), entry)
 
-        # If not, check if we have cached any dict keys at all for this cache
-        # key.
-        all_entries = self.cache.get_multi(
-            (key,),
-            _Sentinel.sentinel,
-        )
-        if all_entries is _Sentinel.sentinel:
-            return DictionaryEntry(False, set(), {})
-
-        # If there are entries we need to unwrap the returned cache nodes
-        # and `_PerKeyValue` into the `DictionaryEntry`.
-        values = {}
-        known_absent = set()
-        for (_, dict_key), dict_value in all_entries:
-            # We have explicitly looked for a full cache key, so we
-            # shouldn't see one.
-            assert dict_key != _FullCacheKey.KEY
-
-            # ... therefore the values must be `_PerKeyValue`
-            assert isinstance(dict_value, _PerKeyValue)
-
-            if dict_value.value is _Sentinel.sentinel:
-                known_absent.add(dict_key)
-            else:
-                values[dict_key] = dict_value.value
-
-        return DictionaryEntry(False, known_absent, values)
+        return DictionaryEntry(False, set(), {})
 
     def invalidate(self, key: KT) -> None:
         self.check_thread()
