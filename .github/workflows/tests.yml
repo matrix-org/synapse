@@ -31,8 +31,8 @@ jobs:
           set -o pipefail
           synapse/scripts-dev/complement.sh --build-only
           while :; do
-          POSTGRES=1 WORKERS=1 SYNAPSE_TEST_LOG_LEVEL=DEBUG COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -f -run TestWriteMDirectAccountData -json 2>&1 | gotestfmt | tee /tmp/xxx
-          if grep ❌ /tmp/xxx; then
+          POSTGRES=1 WORKERS=1 SYNAPSE_TEST_LOG_LEVEL=DEBUG COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -f -json 2>&1 | gotestfmt | tee /tmp/xxx
+          if grep "❌ TestWriteMDirectAccountData" /tmp/xxx; then
             break
           fi
           done
