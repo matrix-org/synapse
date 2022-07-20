@@ -79,8 +79,11 @@ class Codes(str, Enum):
     WEAK_PASSWORD = "M_WEAK_PASSWORD"
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
-    ALREADY_JOINED = "M_ALREADY_JOINED"
-    INSUFFICIENT_POWER = "M_INSUFFICIENT_POWER"
+
+    # Part of MSC3848
+    # https://github.com/matrix-org/matrix-spec-proposals/pull/3848
+    ALREADY_JOINED = "ORG.MATRIX.MSC3848.ALREADY_JOINED"
+    INSUFFICIENT_POWER = "ORG.MATRIX.MSC3848.INSUFFICIENT_POWER"
 
     # The account has been suspended on the server.
     # By opposition to `USER_DEACTIVATED`, this is a reversible measure
