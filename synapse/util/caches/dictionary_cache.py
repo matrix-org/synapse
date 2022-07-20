@@ -326,7 +326,7 @@ class DictionaryCache(Generic[KT, DKT, DV]):
             self.cache[(key, dict_key)] = _PerKeyValue(dict_value)
 
         for dict_key in fetched_keys:
-            if (key, dict_key) in self.cache:
+            if dict_key in value:
                 continue
 
             self.cache[(key, dict_key)] = _PerKeyValue(_Sentinel.sentinel)
