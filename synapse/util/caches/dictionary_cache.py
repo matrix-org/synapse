@@ -86,26 +86,26 @@ class _PerKeyValue(Generic[DV]):
 class DictionaryCache(Generic[KT, DKT, DV]):
     """Caches key -> dictionary lookups, supporting caching partial dicts, i.e.
     fetching a subset of dictionary keys for a particular key.
-    
-    This cache has two levels of key. First there is the "cache key" (of type 
+
+    This cache has two levels of key. First there is the "cache key" (of type
     `KT`), which maps to a dict. The keys to that dict are the "dict key" (of
     type `DKT`). The overall structure is therefore `KT->DKT->DV`. For
     example, it might look like:
-    
+
        {
            1: { 1: "a", 2: "b" },
            2: { 1: "c" },
        }
-    
+
     It is possible to look up either individual dict keys, or the *complete*
     dict for a given cache key.
-    
+
     Each dict item, and the complete dict is treated as a separate LRU
     entry for the purpose of cache expiry. For example, given:
         dict_cache.get(1, None)  -> DictionaryEntry({1: "a", 2: "b"})
         dict_cache.get(1, [1])  -> DictionaryEntry({1: "a"})
         dict_cache.get(1, [2])  -> DictionaryEntry({2: "b"})
-        
+
     ... then the cache entry for the complete dict will expire first,
     followed by the cache entry for the '1' dict key, and finally that
     for the '2' dict key.
