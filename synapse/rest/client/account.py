@@ -147,16 +147,6 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         return 200, ret
 
 
-class PasswordBody(BaseModel):
-    auth: Optional[AuthenticationData] = None
-    logout_devices: StrictBool = True
-    if TYPE_CHECKING:
-        # workaround for https://github.com/samuelcolvin/pydantic/issues/156
-        new_password: Optional[str] = None
-    else:
-        new_password: Optional[constr(max_length=512)] = None
-
-
 class PasswordRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/password$")
 
@@ -169,9 +159,18 @@ class PasswordRestServlet(RestServlet):
         self.password_policy_handler = hs.get_password_policy_handler()
         self._set_password_handler = hs.get_set_password_handler()
 
+    class PostBody(BaseModel):
+        auth: Optional[AuthenticationData] = None
+        logout_devices: StrictBool = True
+        if TYPE_CHECKING:
+            # workaround for https://github.com/samuelcolvin/pydantic/issues/156
+            new_password: Optional[str] = None
+        else:
+            new_password: Optional[constr(max_length=512)] = None
+
     @interactive_auth_handler
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        body = parse_and_validate_json_object_from_request(request, PasswordBody)
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         # we do basic sanity checks here because the auth layer will store these
         # in sessions. Pull out the new password provided to us.
@@ -284,13 +283,6 @@ class PasswordRestServlet(RestServlet):
         return 200, {}
 
 
-class DeactivateAccountBody(BaseModel):
-    auth: Optional[AuthenticationData] = None
-    id_server: Optional[StrictStr] = None
-    # Not specced, see https://github.com/matrix-org/matrix-spec/issues/297
-    erase: StrictBool = False
-
-
 class DeactivateAccountRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/deactivate$")
 
@@ -301,10 +293,16 @@ class DeactivateAccountRestServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
         self._deactivate_account_handler = hs.get_deactivate_account_handler()
 
+    class PostBody(BaseModel):
+        auth: Optional[AuthenticationData] = None
+        id_server: Optional[StrictStr] = None
+        # Not specced, see https://github.com/matrix-org/matrix-spec/issues/297
+        erase: StrictBool = False
+
     @interactive_auth_handler
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         body = parse_and_validate_json_object_from_request(
-            request, DeactivateAccountBody
+            request, self.PostBody
         )
 
         requester = await self.auth.get_user_by_req(request)
