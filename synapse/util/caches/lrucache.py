@@ -631,7 +631,7 @@ class LruCache(Generic[KT, VT]):
                 if update_metrics and metrics:
                     metrics.inc_hits()
 
-                # Iterating over the node will return values of type `_Node`,
+                # We store entries in the `TreeCache` with values of type `_Node`,
                 # which we need to unwrap.
                 return (
                     (full_key, lru_node.value)

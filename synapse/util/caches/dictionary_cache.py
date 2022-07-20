@@ -86,10 +86,33 @@ class _PerKeyValue(Generic[DV]):
 class DictionaryCache(Generic[KT, DKT, DV]):
     """Caches key -> dictionary lookups, supporting caching partial dicts, i.e.
     fetching a subset of dictionary keys for a particular key.
+    
+    This cache has two levels of key. First there is the "cache key" (of type 
+    `KT`), which maps to a dict. The keys to that dict are the "dict key" (of
+    type `DKT`). The overall structure is therefore `KT->DKT->DV`. For
+    example, it might look like:
+    
+       {
+           1: { 1: "a", 2: "b" },
+           2: { 1: "c" },
+       }
+    
+    It is possible to look up either individual dict keys, or the *complete*
+    dict for a given cache key.
+    
+    Each dict item, and the complete dict is treated as a separate LRU
+    entry for the purpose of cache expiry. For example, given:
+        dict_cache.get(1, None)  -> DictionaryEntry({1: "a", 2: "b"})
+        dict_cache.get(1, [1])  -> DictionaryEntry({1: "a"})
+        dict_cache.get(1, [2])  -> DictionaryEntry({2: "b"})
+        
+    ... then the cache entry for the complete dict will expire first,
+    followed by the cache entry for the '1' dict key, and finally that
+    for the '2' dict key.
     """
 
     def __init__(self, name: str, max_entries: int = 1000):
-        # We use a single cache to cache two different types of entries:
+        # We use a single LruCache to store two different types of entries:
         #   1. Map from (key, dict_key) -> dict value (or sentinel, indicating
         #      the key doesn't exist in the dict); and
         #   2. Map from (key, _FullCacheKey.KEY) -> full dict.
@@ -145,13 +168,13 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         Returns:
             DictionaryEntry
         """
-
         if dict_keys is None:
+            # The caller wants the full set of dictionary keys for this cache key
             return self._get_full_dict(key)
 
         # We are being asked for a subset of keys.
 
-        # First got and check for each requested dict key in the cache, tracking
+        # First go and check for each requested dict key in the cache, tracking
         # which we couldn't find.
         values = {}
         known_absent = set()
@@ -173,7 +196,7 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         if not missing:
             return DictionaryEntry(False, known_absent, values)
 
-        # If we are missing any keys check if we happen to have the full dict in
+        # We are missing some keys, so check if we happen to have the full dict in
         # the cache.
         #
         # We don't update the last access time for this cache fetch, as we
@@ -194,7 +217,7 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         values = {}
         for dict_key in dict_keys:
             # We explicitly add each dict key to the cache, so that cache hit
-            # rates for each key can be tracked separately.
+            # rates and LRU times for each key can be tracked separately.
             value = entry.get(dict_key, _Sentinel.sentinel)  # type: ignore[arg-type]
             self.cache[(key, dict_key)] = _PerKeyValue(value)
 
@@ -229,7 +252,7 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         values = {}
         known_absent = set()
         for cache_key, dict_value in all_entries:
-            # The key used for the `TreeCache` is `(key, dict_key)`
+            # The keys in `self.cache` are `(cache_key, dict_key)`
             dict_key = cache_key[1]
 
             # We have explicitly looked for a full cache key, so we
@@ -298,7 +321,7 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         Args:
             key
             value: The dictionary with all the values that we should cache
-            fetched_keys: The full set of keys that were looked up, any keys
+            fetched_keys: The full set of dict keys that were looked up. Any keys
                 here not in `value` should be marked as "known absent".
         """
 

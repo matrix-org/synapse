@@ -166,4 +166,5 @@ def iterate_tree_cache_items(key, value):
         for sub_key, sub_value in value.items():
             yield from iterate_tree_cache_items((*key, sub_key), sub_value)
     else:
+        # we've reached a leaf of the tree.
         yield key, value
