@@ -15,7 +15,6 @@
 # limitations under the License.
 import logging
 import random
-from http import HTTPStatus
 from typing import TYPE_CHECKING, Optional, Tuple
 from urllib.parse import urlparse
 
@@ -83,9 +82,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
                     "User password resets have been disabled due to lack of email config"
                 )
             raise SynapseError(
-                HTTPStatus.NOT_FOUND,
-                "Email-based password resets have been disabled on this server",
-                Codes.NOT_FOUND,
+                400, "Email-based password resets have been disabled on this server"
             )
 
         body = parse_and_validate_json_object_from_request(
