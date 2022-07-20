@@ -435,11 +435,10 @@ class FederationClient(FederationBase):
         if not event:
             return None
 
-        # Make sure to return a copy because downstream callers will use this
-        # event reference directly and change our original, pristine, untouched
-        # PDU. For example when people mark the event as an `outlier`
-        # (`event.internal_metadata.outlier = true`), we don't want that to
-        # propagate back into the cache.
+        # `event` now refers to an object stored in `get_pdu_cache`. Our
+        # callers may need to modify the returned object (eg to set
+        # `event.internal_metadata.outlier = true`), so we return a copy
+        # rather than the original object.
         event_copy = make_event_from_dict(
             event.get_pdu_json(),
             event.room_version,
