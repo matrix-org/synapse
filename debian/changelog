@@ -1,3 +1,9 @@
+matrix-synapse-py3 (1.63.1) stable; urgency=medium
+
+  * New Synapse release 1.63.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 20 Jul 2022 13:36:52 +0100
+
 matrix-synapse-py3 (1.63.0) stable; urgency=medium
 
   * Clarify that homeserver server names are included in the data reported
