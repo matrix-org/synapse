@@ -1,0 +1,1 @@
+Fix `get_pdu` asking every remote destination even after it finds an event.
