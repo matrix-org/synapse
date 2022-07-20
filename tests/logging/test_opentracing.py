@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import cast
+
 from twisted.internet import defer
 from twisted.test.proto_helpers import MemoryReactorClock
 
@@ -69,7 +71,7 @@ class LogContextScopeManagerTestCase(TestCase):
 
             # start_active_span should start and activate a span.
             scope = start_active_span("span", tracer=self._tracer)
-            span = scope.span
+            span = cast(jaeger_client.Span, scope.span)
             self.assertEqual(self._tracer.active_span, span)
             self.assertIsNotNone(span.start_time)
 
@@ -91,6 +93,7 @@ class LogContextScopeManagerTestCase(TestCase):
         with LoggingContext("root context"):
             with start_active_span("root span", tracer=self._tracer) as root_scope:
                 self.assertEqual(self._tracer.active_span, root_scope.span)
+                root_context = cast(jaeger_client.SpanContext, root_scope.span.context)
 
                 scope1 = start_active_span(
                     "child1",
@@ -99,9 +102,8 @@ class LogContextScopeManagerTestCase(TestCase):
                 self.assertEqual(
                     self._tracer.active_span, scope1.span, "child1 was not activated"
                 )
-                self.assertEqual(
-                    scope1.span.context.parent_id, root_scope.span.context.span_id
-                )
+                context1 = cast(jaeger_client.SpanContext, scope1.span.context)
+                self.assertEqual(context1.parent_id, root_context.span_id)
 
                 scope2 = start_active_span_follows_from(
                     "child2",
@@ -109,17 +111,18 @@ class LogContextScopeManagerTestCase(TestCase):
                     tracer=self._tracer,
                 )
                 self.assertEqual(self._tracer.active_span, scope2.span)
-                self.assertEqual(
-                    scope2.span.context.parent_id, scope1.span.context.span_id
-                )
+                context2 = cast(jaeger_client.SpanContext, scope2.span.context)
+                self.assertEqual(context2.parent_id, context1.span_id)
 
                 with scope1, scope2:
                     pass
 
                 # the root scope should be restored
                 self.assertEqual(self._tracer.active_span, root_scope.span)
-                self.assertIsNotNone(scope2.span.end_time)
-                self.assertIsNotNone(scope1.span.end_time)
+                span2 = cast(jaeger_client.Span, scope2.span)
+                span1 = cast(jaeger_client.Span, scope1.span)
+                self.assertIsNotNone(span2.end_time)
+                self.assertIsNotNone(span1.end_time)
 
             self.assertIsNone(self._tracer.active_span)
 
