@@ -619,6 +619,16 @@ class LruCache(Generic[KT, VT]):
 
             Can only be used if backed by a tree cache.
 
+            Example:
+
+                cache = LruCache(10, cache_type=TreeCache)
+                cache[(1, 1)] = "a"
+                cache[(1, 2)] = "b"
+                cache[(2, 1)] = "c"
+
+                items = cache.get_multi((1,))
+                assert list(items) == [((1, 1), "a"), ((1, 2), "b")]
+
             Returns:
                 Either default if the key doesn't exist, or a generator of the
                 key/value pairs.
