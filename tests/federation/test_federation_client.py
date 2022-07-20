@@ -102,7 +102,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         # now fire off the request
         state_resp, auth_resp = self.get_success(
             self.hs.get_federation_client().get_room_state(
-                "yet_another_server",
+                "yet.another.server",
                 test_room_id,
                 "event_id",
                 RoomVersions.V9,
@@ -112,7 +112,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         # check the right call got made to the agent
         self._mock_agent.request.assert_called_once_with(
             b"GET",
-            b"matrix://yet_another_server/_matrix/federation/v1/state/%21room_id?event_id=event_id",
+            b"matrix://yet.another.server/_matrix/federation/v1/state/%21room_id?event_id=event_id",
             headers=mock.ANY,
             bodyProducer=None,
         )
