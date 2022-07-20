@@ -372,7 +372,7 @@ def ensure_active_span(
         ret: return value if opentracing is None or there is no active span.
 
     Returns:
-        The result of the func or ret if opentracing is disabled or there
+        The result of the func, falling back to ret if opentracing is disabled or there
         was no active span.
     """
 
