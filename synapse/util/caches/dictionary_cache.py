@@ -178,11 +178,11 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         # which we couldn't find.
         values = {}
         known_absent = set()
-        missing = set()
+        missing = []
         for dict_key in dict_keys:
             entry = self.cache.get((key, dict_key), _Sentinel.sentinel)
             if entry is _Sentinel.sentinel:
-                missing.add(dict_key)
+                missing.append(dict_key)
                 continue
 
             assert isinstance(entry, _PerKeyValue)
