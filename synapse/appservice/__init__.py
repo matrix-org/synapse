@@ -67,6 +67,9 @@ class ApplicationService:
     # values.
     NS_LIST = [NS_USERS, NS_ALIASES, NS_ROOMS]
 
+    # We assume all appservices support an authorisation header
+    use_auth_header = True
+
     def __init__(
         self,
         token: str,
@@ -352,6 +355,12 @@ class ApplicationService:
         dict_copy["token"] = "<redacted>"
         dict_copy["hs_token"] = "<redacted>"
         return "ApplicationService: %s" % (dict_copy,)
+
+    def can_use_auth_header(self) -> bool:
+        return self.use_auth_header
+
+    def mark_auth_header_as_unsupported(self):
+        self.use_auth_header = False
 
 
 class AppServiceTransaction:

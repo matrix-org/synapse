@@ -313,6 +313,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                 uri=uri,
                 json_body=body,
                 args={"access_token": service.hs_token},
+                headers={"Authorization": [f"Bearer {service.hs_token}"]},
             )
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
@@ -326,6 +327,8 @@ class ApplicationServiceApi(SimpleHttpClient):
             sent_todevice_counter.labels(service.id).inc(len(to_device_messages))
             return True
         except CodeMessageException as e:
+            if e.code == 403:
+                service.mark_auth_header_as_unsupported()
             logger.warning(
                 "push_bulk to %s received code=%s msg=%s",
                 uri,
