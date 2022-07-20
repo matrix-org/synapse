@@ -374,39 +374,14 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
 
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-<<<<<<< HEAD
-        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            assert self.hs.config.registration.account_threepid_delegate_email
-
-            # Have the configured identity server handle the request
-            ret = await self.identity_handler.requestEmailToken(
-                self.hs.config.registration.account_threepid_delegate_email,
-                body.email,
-                body.client_secret,
-                body.send_attempt,
-                body.next_link,
-            )
-        else:
-            # Send threepid validation emails from Synapse
-            sid = await self.identity_handler.send_threepid_validation(
-                body.email,
-                body.client_secret,
-                body.send_attempt,
-                self.mailer.send_add_threepid_mail,
-                body.next_link,
-            )
-
-            # Wrap the session id in a JSON object
-            ret = {"sid": sid}
-=======
+        # Send threepid validation emails from Synapse
         sid = await self.identity_handler.send_threepid_validation(
-            email,
-            client_secret,
-            send_attempt,
+            body.email,
+            body.client_secret,
+            body.send_attempt,
             self.mailer.send_add_threepid_mail,
-            next_link,
+            body.next_link,
         )
->>>>>>> develop
 
         threepid_send_requests.labels(type="email", reason="add_threepid").observe(
             body.send_attempt
