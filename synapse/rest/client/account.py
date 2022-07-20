@@ -285,9 +285,7 @@ class DeactivateAccountRestServlet(RestServlet):
 
     @interactive_auth_handler
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        body = parse_and_validate_json_object_from_request(
-            request, self.PostBody
-        )
+        body = parse_and_validate_json_object_from_request(request, self.PostBody)
 
         requester = await self.auth.get_user_by_req(request)
 
@@ -339,7 +337,8 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                 "Adding emails have been disabled due to lack of an email config"
             )
             raise SynapseError(
-                400, "Adding an email to your account is disabled on this server",
+                400,
+                "Adding an email to your account is disabled on this server",
             )
 
         body = parse_and_validate_json_object_from_request(
