@@ -217,7 +217,7 @@ class FederationClient(FederationBase):
         )
 
     async def claim_client_keys(
-        self, destination: str, content: JsonDict, timeout: int
+        self, destination: str, content: JsonDict, timeout: Optional[int]
     ) -> JsonDict:
         """Claims one-time keys for a device hosted on a remote server.
 
@@ -299,7 +299,8 @@ class FederationClient(FederationBase):
                 moving to the next destination. None indicates no timeout.
 
         Returns:
-            The requested PDU, or None if we were unable to find it.
+            A copy of the requested PDU that is safe to modify, or None if we
+            were unable to find it.
 
         Raises:
             SynapseError, NotRetryingDestination, FederationDeniedError
@@ -343,98 +344,102 @@ class FederationClient(FederationBase):
     ) -> Optional[EventBase]:
         """Requests the PDU with given origin and ID from the remote home
         servers.
-
         Will attempt to get the PDU from each destination in the list until
         one succeeds.
-
         Args:
             destinations: Which homeservers to query
             event_id: event to fetch
             room_version: version of the room
             timeout: How long to try (in ms) each destination for before
                 moving to the next destination. None indicates no timeout.
-
         Returns:
             The requested PDU, or None if we were unable to find it.
         """
 
+        logger.debug(
+            "get_pdu: event_id=%s from destinations=%s", event_id, destinations
+        )
+
         # TODO: Rate limit the number of times we try and get the same event.
 
-        event_from_cache = self._get_pdu_cache.get(event_id)
-        if event_from_cache:
-            assert not event_from_cache.internal_metadata.outlier, (
-                "Event from cache unexpectedly an `outlier` when it should be pristine and untouched without metadata set. "
-                "We are probably not be returning a copy of the event because downstream callers are modifying the event reference we have in the cache."
-            )
+        # We might need the same event multiple times in quick succession (before
+        # it gets persisted to the database), so we cache the results of the lookup.
+        # Note that this is separate to the regular get_event cache which caches
+        # events once they have been persisted.
+        event = self._get_pdu_cache.get(event_id)
 
-            # Make sure to return a copy because downstream callers will use
-            # this event reference directly and change our original, pristine,
-            # untouched PDU. For example when people mark the event as an
-            # `outlier` (`event.internal_metadata.outlier = true`), we don't
-            # want that to propagate back into the cache.
-            event_copy = make_event_from_dict(
-                event_from_cache.get_pdu_json(),
-                event_from_cache.room_version,
-                internal_metadata_dict=None,
-            )
+        # If we don't see the event in the cache, go try to fetch it from the
+        # provided remote federated destinations
+        if not event:
+            pdu_attempts = self.pdu_destination_tried.setdefault(event_id, {})
 
-            return event_copy
+            for destination in destinations:
+                now = self._clock.time_msec()
+                last_attempt = pdu_attempts.get(destination, 0)
+                if last_attempt + PDU_RETRY_TIME_MS > now:
+                    logger.debug(
+                        "get_pdu: skipping destination=%s because we tried it recently last_attempt=%s and we only check every %s (now=%s)",
+                        destination,
+                        last_attempt,
+                        PDU_RETRY_TIME_MS,
+                        now,
+                    )
+                    continue
 
-        pdu_attempts = self.pdu_destination_tried.setdefault(event_id, {})
+                try:
+                    event = await self.get_pdu_from_destination_raw(
+                        destination=destination,
+                        event_id=event_id,
+                        room_version=room_version,
+                        timeout=timeout,
+                    )
 
-        signed_pdu = None
-        for destination in destinations:
-            now = self._clock.time_msec()
-            last_attempt = pdu_attempts.get(destination, 0)
-            if last_attempt + PDU_RETRY_TIME_MS > now:
-                continue
+                    pdu_attempts[destination] = now
 
-            try:
-                signed_pdu = await self.get_pdu_from_destination_raw(
-                    destination=destination,
-                    event_id=event_id,
-                    room_version=room_version,
-                    timeout=timeout,
-                )
+                    if event:
+                        # Prime the cache
+                        self._get_pdu_cache[event.event_id] = event
 
-                pdu_attempts[destination] = now
+                        # FIXME: We should add a `break` here to avoid calling every
+                        # destination after we already found a PDU (will follow-up
+                        # in a separate PR)
 
-            except SynapseError as e:
-                logger.info(
-                    "Failed to get PDU %s from %s because %s", event_id, destination, e
-                )
-                continue
-            except NotRetryingDestination as e:
-                logger.info(str(e))
-                continue
-            except FederationDeniedError as e:
-                logger.info(str(e))
-                continue
-            except Exception as e:
-                pdu_attempts[destination] = now
+                except SynapseError as e:
+                    logger.info(
+                        "Failed to get PDU %s from %s because %s",
+                        event_id,
+                        destination,
+                        e,
+                    )
+                    continue
+                except NotRetryingDestination as e:
+                    logger.info(str(e))
+                    continue
+                except FederationDeniedError as e:
+                    logger.info(str(e))
+                    continue
+                except Exception as e:
+                    pdu_attempts[destination] = now
 
-                logger.info(
-                    "Failed to get PDU %s from %s because %s", event_id, destination, e
-                )
-                continue
+                    logger.info(
+                        "Failed to get PDU %s from %s because %s",
+                        event_id,
+                        destination,
+                        e,
+                    )
+                    continue
 
-        if signed_pdu:
-            self._get_pdu_cache[event_id] = signed_pdu
+        if not event:
+            return None
 
-            # Make sure to return a copy because downstream callers will use this
-            # event reference directly and change our original, pristine, untouched
-            # PDU. For example when people mark the event as an `outlier`
-            # (`event.internal_metadata.outlier = true`), we don't want that to
-            # propagate back into the cache.
-            #
-            # We could get away with only making a new copy of the event when
-            # pulling from cache but it's probably better to have good hygiene and
-            # not dirty the cache in the first place as well.
-            event_copy = make_event_from_dict(
-                signed_pdu.get_pdu_json(),
-                signed_pdu.room_version,
-                internal_metadata_dict=None,
-            )
+        # `event` now refers to an object stored in `get_pdu_cache`. Our
+        # callers may need to modify the returned object (eg to set
+        # `event.internal_metadata.outlier = true`), so we return a copy
+        # rather than the original object.
+        event_copy = make_event_from_dict(
+            event.get_pdu_json(),
+            event.room_version,
+        )
 
         return event_copy
 

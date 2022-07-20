@@ -766,11 +766,13 @@ class FederationEventHandler:
         """
         logger.info("Processing pulled event %s", event)
 
-        # This function should only be used to backfill events. If you're trying
-        # to persist an outlier, use another method. If you happen to run into a
-        # situation where the event you're trying to backfill is marked as an
-        # `outlier`, then you should update that spot to return an `EventBase`
-        # without the `outlier` flag set.
+        # This function should not be used to persist outliers (use something
+        # else) because this does a bunch of operations that aren't necessary
+        # (extra work; in particular, it makes sure we have all the prev_events
+        # and resolves the state across those prev events). If you happen to run
+        # into a situation where the event you're trying to process/backfill is
+        # marked as an `outlier`, then you should update that spot to return an
+        # `EventBase` copy that doesn't have `outlier` flag set.
         #
         # `EventBase` is used to represent both an event we have not yet
         # persisted, and one that we have persisted and now keep in the cache.
@@ -779,8 +781,8 @@ class FederationEventHandler:
         # example, you could get an event from cache that is marked as an
         # `outlier` (fix up that spot though).
         assert not event.internal_metadata.is_outlier(), (
-            "This is a safe-guard to make sure you're not trying to persist an outlier using this function (use something else). "
-            "If you're trying to backfill an event, this is the right method but you need pass in an event copy that doesn't have `event.internal_metada.outlier = true`."
+            "Outlier event passed to _process_pulled_event. "
+            "To persist an event as a non-outlier, make sure to pass in a copy without `event.internal_metadata.outlier = true`."
         )
 
         event_id = event.event_id
@@ -1049,6 +1051,9 @@ class FederationEventHandler:
         # XXX: this doesn't sound right? it means that we'll end up with incomplete
         #   state.
         failed_to_fetch = desired_events - event_metadata.keys()
+        # `event_id` could be missing from `event_metadata` because it's not necessarily
+        # a state event. We've already checked that we've fetched it above.
+        failed_to_fetch.discard(event_id)
         if failed_to_fetch:
             logger.warning(
                 "Failed to fetch missing state events for %s %s",
@@ -2038,6 +2043,10 @@ class FederationEventHandler:
         await self._notifier.on_new_room_event(
             event, event_pos, max_stream_token, extra_users=extra_users
         )
+
+        if event.type == EventTypes.Member and event.membership == Membership.JOIN:
+            # TODO retrieve the previous state, and exclude join -> join transitions
+            self._notifier.notify_user_joined_room(event.event_id, event.room_id)
 
     def _sanity_check_event(self, ev: EventBase) -> None:
         """

@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
 import os
 import re
 from email.parser import Parser
@@ -96,9 +95,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         """
         body = {"type": "m.login.password", "user": username, "password": password}
 
-        channel = self.make_request(
-            "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
-        )
+        channel = self.make_request("POST", "/_matrix/client/r0/login", body)
         self.assertEqual(channel.code, HTTPStatus.FORBIDDEN, channel.result)
 
     def test_basic_password_reset(self) -> None:
@@ -480,16 +477,14 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         self.assertEqual(memberships[0].room_id, room_id, memberships)
 
     def deactivate(self, user_id: str, tok: str) -> None:
-        request_data = json.dumps(
-            {
-                "auth": {
-                    "type": "m.login.password",
-                    "user": user_id,
-                    "password": "test",
-                },
-                "erase": False,
-            }
-        )
+        request_data = {
+            "auth": {
+                "type": "m.login.password",
+                "user": user_id,
+                "password": "test",
+            },
+            "erase": False,
+        }
         channel = self.make_request(
             "POST", "account/deactivate", request_data, access_token=tok
         )
