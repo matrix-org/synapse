@@ -251,10 +251,7 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         # and `_PerKeyValue` into the `DictionaryEntry`.
         values = {}
         known_absent = set()
-        for cache_key, dict_value in all_entries:
-            # The keys in `self.cache` are `(cache_key, dict_key)`
-            dict_key = cache_key[1]
-
+        for (_, dict_key), dict_value in all_entries:
             # We have explicitly looked for a full cache key, so we
             # shouldn't see one.
             assert dict_key != _FullCacheKey.KEY
