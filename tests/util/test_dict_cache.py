@@ -20,7 +20,7 @@ from tests import unittest
 
 class DictCacheTestCase(unittest.TestCase):
     def setUp(self):
-        self.cache = DictionaryCache("foobar")
+        self.cache = DictionaryCache("foobar", max_entries=10)
 
     def test_simple_cache_hit_full(self):
         key = "test_simple_cache_hit_full"
@@ -91,3 +91,26 @@ class DictCacheTestCase(unittest.TestCase):
             c.value,
         )
         self.assertEqual(c.full, False)
+
+    def test_invalidation(self):
+        """Test that the partial dict and full dicts get invalidated
+        separately.
+        """
+        key = "some_key"
+
+        seq = self.cache.sequence
+        self.cache.update(seq, key, {"a": "b", "c": "d"})
+
+        for i in range(20):
+            self.cache.get(key, ["a"])
+            self.cache.update(seq, f"key{i}", {1: 2})
+
+        # We should have evicted the full dict...
+        r = self.cache.get(key)
+        self.assertFalse(r.full)
+        self.assertTrue("c" not in r.value)
+
+        # ... but kept the "a" entry that we kept querying.
+        r = self.cache.get(key, dict_keys=["a"])
+        self.assertFalse(r.full)
+        self.assertEqual(r.value, {"a": "b"})
