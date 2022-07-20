@@ -42,6 +42,14 @@ from tests.unittest import TestCase
 
 
 class LogContextScopeManagerTestCase(TestCase):
+    """
+    Test logging contexts and active opentracing spans.
+
+    There's casts throughout this from generic opentracing objects (e.g.
+    opentracing.Span) to the ones specific to Jaeger since they have additional
+    properties that these tests depend on. This is safe since the only supported
+    opentracing backend is Jaeger.
+    """
     if LogContextScopeManager is None:
         skip = "Requires opentracing"  # type: ignore[unreachable]
     if jaeger_client is None:
