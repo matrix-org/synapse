@@ -356,9 +356,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                     "Adding emails have been disabled due to lack of an email config"
                 )
             raise SynapseError(
-                HTTPStatus.NOT_FOUND,
-                "Adding an email to your account is disabled on this server",
-                Codes.NOT_FOUND,
+                400, "Adding an email to your account is disabled on this server",
             )
 
         body = parse_and_validate_json_object_from_request(
