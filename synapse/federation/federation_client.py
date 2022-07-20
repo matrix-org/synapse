@@ -344,14 +344,17 @@ class FederationClient(FederationBase):
     ) -> Optional[EventBase]:
         """Requests the PDU with given origin and ID from the remote home
         servers.
+
         Will attempt to get the PDU from each destination in the list until
         one succeeds.
+
         Args:
             destinations: Which homeservers to query
             event_id: event to fetch
             room_version: version of the room
             timeout: How long to try (in ms) each destination for before
                 moving to the next destination. None indicates no timeout.
+
         Returns:
             The requested PDU, or None if we were unable to find it.
         """
