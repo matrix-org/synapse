@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.63.0 where push actions were incorrectly calculated for appservice users. This caused performance issues on servers with large numbers of appservices.
