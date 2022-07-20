@@ -24,6 +24,7 @@ from synapse.storage.database import (
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.state import StateFilter
 from synapse.types import MutableStateMap, StateMap
+from synapse.util.caches import intern_string
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -136,7 +137,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                 txn.execute(sql % (where_clause,), args)
                 for row in txn:
                     typ, state_key, event_id = row
-                    key = (typ, state_key)
+                    key = (intern_string(typ), intern_string(state_key))
                     results[group][key] = event_id
         else:
             max_entries_returned = state_filter.max_entries_returned()

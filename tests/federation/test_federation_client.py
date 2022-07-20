@@ -107,7 +107,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         # now fire off the request
         state_resp, auth_resp = self.get_success(
             self.hs.get_federation_client().get_room_state(
-                "yet_another_server",
+                "yet.another.server",
                 self.test_room_id,
                 "event_id",
                 RoomVersions.V9,
@@ -117,7 +117,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         # check the right call got made to the agent
         self._mock_agent.request.assert_called_once_with(
             b"GET",
-            b"matrix://yet_another_server/_matrix/federation/v1/state/%21room_id?event_id=event_id",
+            b"matrix://yet.another.server/_matrix/federation/v1/state/%21room_id?event_id=event_id",
             headers=mock.ANY,
             bodyProducer=None,
         )
@@ -139,7 +139,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         """No event should be returned when the event does not exist"""
         remote_pdu = self.get_success(
             self.hs.get_federation_client().get_pdu(
-                ["yet_another_server"],
+                ["yet.another.server"],
                 "event_should_not_exist",
                 RoomVersions.V9,
             )
@@ -166,7 +166,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         # Get the event again. This time it should read it from cache.
         remote_pdu2 = self.get_success(
             self.hs.get_federation_client().get_pdu(
-                ["yet_another_server"],
+                ["yet.another.server"],
                 remote_pdu.event_id,
                 RoomVersions.V9,
             )
@@ -201,7 +201,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         self._mock_agent.request.side_effect = lambda *args, **kwargs: defer.succeed(
             _mock_response(
                 {
-                    "origin": "yet_another_server",
+                    "origin": "yet.another.server",
                     "origin_server_ts": 900,
                     "pdus": [
                         message_event_dict,
@@ -212,7 +212,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
 
         remote_pdu = self.get_success(
             self.hs.get_federation_client().get_pdu(
-                ["yet_another_server"],
+                ["yet.another.server"],
                 "event_id",
                 RoomVersions.V9,
             )
@@ -221,7 +221,7 @@ class FederationClientTest(FederatingHomeserverTestCase):
         # check the right call got made to the agent
         self._mock_agent.request.assert_called_once_with(
             b"GET",
-            b"matrix://yet_another_server/_matrix/federation/v1/event/event_id",
+            b"matrix://yet.another.server/_matrix/federation/v1/event/event_id",
             headers=mock.ANY,
             bodyProducer=None,
         )
