@@ -272,7 +272,11 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         # raced with the INSERT don't update the cache (SYN-369)
         self.sequence += 1
 
-        # Del-multi accepts truncated tuples.
+        # We want to drop all information about the dict for the given key, so
+        # we use `del_multi` to delete it all in one go.
+        #
+        # We ignore the type error here `del_mutli` accepts a truncated key
+        # (when the key type is a tuple).
         self.cache.del_multi((key,))  # type: ignore[arg-type]
 
     def invalidate_all(self) -> None:
