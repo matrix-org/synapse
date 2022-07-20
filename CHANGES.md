@@ -1,3 +1,12 @@
+Synapse 1.63.1 (2022-07-20)
+===========================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.63.0 where push actions were incorrectly calculated for appservice users. This caused performance issues on servers with large numbers of appservices. ([\#13332](https://github.com/matrix-org/synapse/issues/13332))
+
+
 Synapse 1.63.0 (2022-07-19)
 ===========================
 
