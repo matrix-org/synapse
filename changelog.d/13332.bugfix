@@ -1,0 +1,1 @@
+Fix bug where we incorrectly calculated push for appservice users, leading to performance issues on servers with large numbers of appservics. Introduced in v1.63.0.
