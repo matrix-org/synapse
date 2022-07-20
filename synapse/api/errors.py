@@ -308,10 +308,11 @@ class AuthError(SynapseError):
     ):
         super().__init__(code, msg, errcode, additional_fields)
 
+
 class UnstableSpecAuthError(AuthError):
-    """An error raised when a new error code is being proposed to replace a previous one. 
-       This error will return a "org.matrix.unstable.errcode" property with the new error code,
-       with the previous error code still being defined in the "errcode" property
+    """An error raised when a new error code is being proposed to replace a previous one.
+    This error will return a "org.matrix.unstable.errcode" property with the new error code,
+    with the previous error code still being defined in the "errcode" property
     """
 
     def __init__(
@@ -325,9 +326,14 @@ class UnstableSpecAuthError(AuthError):
         self.previous_errcode = previous_errcode
         super().__init__(code, msg, errcode, additional_fields)
 
-
     def error_dict(self) -> "JsonDict":
-        return cs_error(self.msg, self.previous_errcode, **{"org.matrix.unstable.errcode": self.errcode}, **self._additional_fields)
+        return cs_error(
+            self.msg,
+            self.previous_errcode,
+            **{"org.matrix.unstable.errcode": self.errcode},
+            **self._additional_fields,
+        )
+
 
 class InvalidClientCredentialsError(SynapseError):
     """An error raised when there was a problem with the authorisation credentials

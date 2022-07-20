@@ -30,7 +30,13 @@ from synapse.api.constants import (
     JoinRules,
     Membership,
 )
-from synapse.api.errors import AuthError, Codes, EventSizeError, SynapseError, UnstableSpecAuthError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    EventSizeError,
+    SynapseError,
+    UnstableSpecAuthError,
+)
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
     EventFormatVersions,
@@ -291,7 +297,11 @@ def check_state_dependent_auth_rules(
         invite_level = get_named_level(auth_dict, "invite", 0)
 
         if user_level < invite_level:
-            raise UnstableSpecAuthError(403, "You don't have permission to invite users", errcode=Codes.INSUFFICIENT_POWER)
+            raise UnstableSpecAuthError(
+                403,
+                "You don't have permission to invite users",
+                errcode=Codes.INSUFFICIENT_POWER,
+            )
         else:
             logger.debug("Allowing! %s", event)
             return
@@ -484,10 +494,18 @@ def _is_membership_change_allowed(
         if target_banned:
             raise AuthError(403, "%s is banned from the room" % (target_user_id,))
         elif target_in_room:  # the target is already in the room.
-            raise UnstableSpecAuthError(403, "%s is already in the room." % target_user_id, errcode=Codes.ALREADY_JOINED)
+            raise UnstableSpecAuthError(
+                403,
+                "%s is already in the room." % target_user_id,
+                errcode=Codes.ALREADY_JOINED,
+            )
         else:
             if user_level < invite_level:
-                raise UnstableSpecAuthError(403, "You don't have permission to invite users", errcode=Codes.INSUFFICIENT_POWER)
+                raise UnstableSpecAuthError(
+                    403,
+                    "You don't have permission to invite users",
+                    errcode=Codes.INSUFFICIENT_POWER,
+                )
     elif Membership.JOIN == membership:
         # Joins are valid iff caller == target and:
         # * They are not banned.
@@ -549,15 +567,27 @@ def _is_membership_change_allowed(
     elif Membership.LEAVE == membership:
         # TODO (erikj): Implement kicks.
         if target_banned and user_level < ban_level:
-            raise UnstableSpecAuthError(403, "You cannot unban user %s." % (target_user_id,), errcode=Codes.INSUFFICIENT_POWER)
+            raise UnstableSpecAuthError(
+                403,
+                "You cannot unban user %s." % (target_user_id,),
+                errcode=Codes.INSUFFICIENT_POWER,
+            )
         elif target_user_id != event.user_id:
             kick_level = get_named_level(auth_events, "kick", 50)
 
             if user_level < kick_level or user_level <= target_level:
-                raise UnstableSpecAuthError(403, "You cannot kick user %s." % target_user_id, errcode=Codes.INSUFFICIENT_POWER)
+                raise UnstableSpecAuthError(
+                    403,
+                    "You cannot kick user %s." % target_user_id,
+                    errcode=Codes.INSUFFICIENT_POWER,
+                )
     elif Membership.BAN == membership:
         if user_level < ban_level or user_level <= target_level:
-            raise UnstableSpecAuthError(403, "You don't have permission to ban", errcode=Codes.INSUFFICIENT_POWER)
+            raise UnstableSpecAuthError(
+                403,
+                "You don't have permission to ban",
+                errcode=Codes.INSUFFICIENT_POWER,
+            )
     elif room_version.msc2403_knocking and Membership.KNOCK == membership:
         if join_rule != JoinRules.KNOCK and (
             not room_version.msc3787_knock_restricted_join_rule
@@ -567,7 +597,11 @@ def _is_membership_change_allowed(
         elif target_user_id != event.user_id:
             raise AuthError(403, "You cannot knock for other users")
         elif target_in_room:
-            raise UnstableSpecAuthError(403, "You cannot knock on a room you are already in", errcode=Codes.ALREADY_JOINED)
+            raise UnstableSpecAuthError(
+                403,
+                "You cannot knock on a room you are already in",
+                errcode=Codes.ALREADY_JOINED,
+            )
         elif caller_invited:
             raise AuthError(403, "You are already invited to this room")
         elif target_banned:
@@ -720,7 +754,7 @@ def check_historical(
         raise UnstableSpecAuthError(
             403,
             'You don\'t have permission to send send historical related events ("insertion", "batch", and "marker")',
-            errcode=Codes.INSUFFICIENT_POWER
+            errcode=Codes.INSUFFICIENT_POWER,
         )
 
 
