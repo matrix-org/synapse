@@ -316,7 +316,7 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         """Add the given dictionary values as explicit keys in the cache.
 
         Args:
-            key
+            key: top-level cache key
             value: The dictionary with all the values that we should cache
             fetched_keys: The full set of dict keys that were looked up. Any keys
                 here not in `value` should be marked as "known absent".
