@@ -24,8 +24,8 @@ from typing import (
     Callable,
     Collection,
     Dict,
-    Generator,
     Generic,
+    Iterable,
     List,
     Optional,
     Tuple,
@@ -598,7 +598,7 @@ class LruCache(Generic[KT, VT]):
             key: tuple,
             default: Literal[None] = None,
             update_metrics: bool = True,
-        ) -> Union[None, Generator[Tuple[KT, VT], None, None]]:
+        ) -> Union[None, Iterable[Tuple[KT, VT]]]:
             ...
 
         @overload
@@ -606,7 +606,7 @@ class LruCache(Generic[KT, VT]):
             key: tuple,
             default: T,
             update_metrics: bool = True,
-        ) -> Union[T, Generator[Tuple[KT, VT], None, None]]:
+        ) -> Union[T, Iterable[Tuple[KT, VT]]]:
             ...
 
         @synchronized
@@ -614,7 +614,7 @@ class LruCache(Generic[KT, VT]):
             key: tuple,
             default: Optional[T] = None,
             update_metrics: bool = True,
-        ) -> Union[None, T, Generator[Tuple[KT, VT], None, None]]:
+        ) -> Union[None, T, Iterable[Tuple[KT, VT]]]:
             """Returns a generator yielding all entries under the given key.
 
             Can only be used if backed by a tree cache.
