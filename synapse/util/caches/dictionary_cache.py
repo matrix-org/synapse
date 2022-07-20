@@ -214,8 +214,7 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         # We have the full dict!
         assert isinstance(entry, dict)
 
-        values = {}
-        for dict_key in dict_keys:
+        for dict_key in missing:
             # We explicitly add each dict key to the cache, so that cache hit
             # rates and LRU times for each key can be tracked separately.
             value = entry.get(dict_key, _Sentinel.sentinel)  # type: ignore[arg-type]
