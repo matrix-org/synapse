@@ -369,12 +369,11 @@ class FederationClient(FederationBase):
         # it gets persisted to the database), so we cache the results of the lookup.
         # Note that this is separate to the regular get_event cache which caches
         # events once they have been persisted.
-        event_from_cache = self._get_pdu_cache.get(event_id)
+        event = self._get_pdu_cache.get(event_id)
 
         # If we don't see the event in the cache, go try to fetch it from the
         # provided remote federated destinations
-        event_from_remote = None
-        if not event_from_cache:
+        if not event:
             pdu_attempts = self.pdu_destination_tried.setdefault(event_id, {})
 
             for destination in destinations:
@@ -391,7 +390,7 @@ class FederationClient(FederationBase):
                     continue
 
                 try:
-                    event_from_remote = await self.get_pdu_from_destination_raw(
+                    event = await self.get_pdu_from_destination_raw(
                         destination=destination,
                         event_id=event_id,
                         room_version=room_version,
@@ -400,11 +399,9 @@ class FederationClient(FederationBase):
 
                     pdu_attempts[destination] = now
 
-                    if event_from_remote:
+                    if event:
                         # Prime the cache
-                        self._get_pdu_cache[
-                            event_from_remote.event_id
-                        ] = event_from_remote
+                        self._get_pdu_cache[event.event_id] = event
 
                         # FIXME: We should add a `break` here to avoid calling every
                         # destination after we already found a PDU (will follow-up
@@ -435,7 +432,6 @@ class FederationClient(FederationBase):
                     )
                     continue
 
-        event = event_from_cache or event_from_remote
         if not event:
             return None
 
