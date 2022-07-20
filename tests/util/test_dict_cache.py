@@ -76,11 +76,11 @@ class DictCacheTestCase(unittest.TestCase):
 
         seq = self.cache.sequence
         test_value_1 = {"test": "test_simple_cache_hit_miss_partial"}
-        self.cache.update(seq, key, test_value_1, fetched_keys=set("test"))
+        self.cache.update(seq, key, test_value_1, fetched_keys={"test"})
 
         seq = self.cache.sequence
         test_value_2 = {"test2": "test_simple_cache_hit_miss_partial2"}
-        self.cache.update(seq, key, test_value_2, fetched_keys=set("test2"))
+        self.cache.update(seq, key, test_value_2, fetched_keys={"test2"})
 
         c = self.cache.get(key, dict_keys=["test", "test2"])
         self.assertEqual(
