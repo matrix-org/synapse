@@ -89,6 +89,31 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.64.0
+
+## Delegation of email validation no longer supported
+
+As of this version, Synapse no longer allows the tasks of verifying email address
+ownership, and password reset confirmation, to be delegated to an identity server.
+
+To continue to allow users to add email addresses to their homeserver accounts,
+and perform password resets, make sure that Synapse is configured with a
+working email server in the `email` configuration section (including, at a
+minimum, a `notif_from` setting.)
+
+Specifying an `email` setting under `account_threepid_delegates` will now cause
+an error at startup.
+
+## Changes to the event replication streams
+
+Synapse now includes a flag indicating if an event is an outlier when
+replicating it to other workers. This is a forwards- and backwards-incompatible
+change: v1.63 and workers cannot process events replicated by v1.64 workers, and
+vice versa.
+
+Once all workers are upgraded to v1.64 (or downgraded to v1.63), event
+replication will resume as normal.
+
 # Upgrading to v1.62.0
 
 ## New signatures for spam checker callbacks
