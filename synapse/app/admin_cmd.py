@@ -28,7 +28,6 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.events import EventBase
 from synapse.handlers.admin import ExfiltrationWriter
-from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.deviceinbox import SlavedDeviceInboxStore
@@ -58,7 +57,6 @@ class AdminCmdSlavedStore(
     SlavedDeviceStore,
     SlavedPushRuleStore,
     SlavedEventStore,
-    BaseSlavedStore,
     RoomWorkerStore,
 ):
     def __init__(

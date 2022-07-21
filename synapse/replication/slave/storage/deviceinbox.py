@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.storage.databases.main.deviceinbox import DeviceInboxWorkerStore
 
 
-class SlavedDeviceInboxStore(DeviceInboxWorkerStore, BaseSlavedStore):
+class SlavedDeviceInboxStore(DeviceInboxWorkerStore):
     pass
