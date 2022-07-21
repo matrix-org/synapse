@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+import re
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -54,6 +55,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Regex pattern for detecting a bridge bot (cached here for performance)
+BOT_PATTERN = re.compile(r"^@_.*_bot\:.*")
 
 class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore):
     def __init__(
@@ -526,6 +529,12 @@ class AccountDataWorkerStore(PushRulesWorkerStore, CacheInvalidationWorkerStore)
         content: JsonDict,
     ) -> None:
         content_json = json_encoder.encode(content)
+
+        # If we're ignoring users, silently filter out any bots that may be ignored
+        if account_data_type == AccountDataTypes.IGNORED_USER_LIST:
+            ignored_users = content.get("ignored_users", {})
+            if isinstance(ignored_users, dict):
+                content["ignored_users"] = {u: v for u, v in ignored_users.items() if not BOT_PATTERN.match(u)}
 
         # no need to lock here as account_data has a unique constraint on
         # (user_id, account_data_type) so simple_upsert will retry if
