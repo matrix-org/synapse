@@ -16,7 +16,6 @@ from synapse.api.constants import ReceiptTypes
 from synapse.types import UserID, create_requester
 
 from tests.test_utils.event_injection import create_event
-
 from tests.unittest import HomeserverTestCase
 
 OTHER_USER_ID = "@other:test"
@@ -147,9 +146,7 @@ class SlavedReceiptTestCase(HomeserverTestCase):
 
         # Test we get the latest event when we want only the public receipt
         res = self.get_success(
-            self.store.get_receipts_for_user(
-                OUR_USER_ID, [ReceiptTypes.READ_PRIVATE]
-            )
+            self.store.get_receipts_for_user(OUR_USER_ID, [ReceiptTypes.READ_PRIVATE])
         )
         self.assertEqual(res, {self.room_id1: event1_2_id})
 
