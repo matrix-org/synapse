@@ -140,7 +140,9 @@ class _StateCacheEntry:
 
     def set_state_group(self, state_group: int) -> None:
         """Update the state group assigned to this state (e.g. after we've
-        persisted it)
+        persisted it).
+
+        Note: this will cause the cache entry to drop any stored state.
         """
 
         self.state_group = state_group
