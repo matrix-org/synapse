@@ -292,6 +292,18 @@ async def check_event_for_spam(event):
     return synapse.module_api.NOT_SPAM
 ```
 
+# Upgrading to v1.64.0
+
+## frozendict release
+
+[frozendict 2.3.3](https://github.com/Marco-Sulla/python-frozendict/releases/tag/v2.3.3)
+has recently been released, which fixes a memory leak that occurs during `/sync`
+requests. We advise server administrators who installed Synapse via pip to upgrade
+frozendict with `pip install --upgrade frozendict`. The Docker image
+`matrixdotorg/synapse` and the Debian packages from `packages.matrix.org` already
+include the updated library.
+
+
 # Upgrading to v1.59.0
 
 ## Device name lookup over federation has been disabled by default
