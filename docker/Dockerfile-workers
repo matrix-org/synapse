@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Inherit from the official Synapse docker image
 ARG SYNAPSE_VERSION=latest
 FROM matrixdotorg/synapse:$SYNAPSE_VERSION
