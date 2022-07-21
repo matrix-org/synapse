@@ -1528,7 +1528,7 @@ The `rc_invites.per_user` limit applies to the *receiver* of the invite, rather 
 sender, meaning that a `rc_invite.per_user.burst_count` of 5 mandates that a single user
 cannot *receive* more than a burst of 5 invites at a time.
 
-By opposition, the `rc_invites.per_issuer` limit applies to the *issuer* of the invite, meaning that a `rc_invite.per_issuer.burst_count` of 5 mandates that single user cannot *send* more than a burst of 5 invites at a time.
+In contrast, the `rc_invites.per_issuer` limit applies to the *issuer* of the invite, meaning that a `rc_invite.per_issuer.burst_count` of 5 mandates that single user cannot *send* more than a burst of 5 invites at a time.
 
 Example configuration:
 ```yaml
@@ -1543,6 +1543,9 @@ rc_invites:
     per_second: 0.5
     burst_count: 5
 ```
+
+_Changed in version 1.63:_ added the `per_issuer` limit.
+
 ---
 ### `rc_third_party_invite`
 

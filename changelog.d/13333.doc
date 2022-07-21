@@ -1,1 +1,1 @@
-Documenting the new `rc_invites.per_issuer` throttling option.
+Document the new `rc_invites.per_issuer` throttling option added in Synapse 1.63.
