@@ -22,7 +22,7 @@ Consult the [contributing guide][guideComplementSh] for instructions on how to u
 Under some circumstances, you may wish to build the images manually.
 The instructions below will lead you to doing that.
 
-Note that this image can only be built using [BuildKit](https://docs.docker.com/develop/develop-images/build_enhancements/),
+Note that these images can only be built using [BuildKit](https://docs.docker.com/develop/develop-images/build_enhancements/),
 therefore BuildKit needs to be enabled when calling `docker build`. This can be done by
 setting `DOCKER_BUILDKIT=1` in your environment.
 
