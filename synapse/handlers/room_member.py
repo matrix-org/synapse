@@ -1381,7 +1381,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         txn_id: Optional[str],
         id_access_token: str,
         prev_event_ids: Optional[List[str]] = None,
-        depth: Optional[int] = None
+        depth: Optional[int] = None,
     ) -> Tuple[str, int]:
         """Invite a 3PID to a room.
 

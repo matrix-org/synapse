@@ -3462,3 +3462,34 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
 
         # Also check that it stopped before calling _make_and_store_3pid_invite.
         make_invite_mock.assert_called_once()
+
+    def test_400_without_id_access_token(self) -> None:
+        """
+        Test allowing/blocking threepid invites with a spam-check module.
+
+        In this test, we use the more recent API in which callbacks return a `Union[Codes, Literal["NOT_SPAM"]]`."""
+        make_invite_mock = Mock(return_value=make_awaitable((Mock(event_id="abc"), 0)))
+        self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock
+        self.hs.get_identity_handler().lookup_3pid = Mock(
+            return_value=make_awaitable(None),
+        )
+
+        mock = Mock(
+            return_value=make_awaitable(synapse.module_api.NOT_SPAM),
+            spec=lambda *x: None,
+        )
+        self.hs.get_spam_checker()._user_may_send_3pid_invite_callbacks.append(mock)
+
+        # Send a 3PID invite into the room and check that it succeeded.
+        email_to_invite = "teresa@example.com"
+        channel = self.make_request(
+            method="POST",
+            path="/rooms/" + self.room_id + "/invite",
+            content={
+                "id_server": "example.com",
+                "medium": "email",
+                "address": email_to_invite,
+            },
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 400)

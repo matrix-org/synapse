@@ -762,9 +762,7 @@ class IdentityHandler:
         except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except HttpResponseException as e:
-            if e.code != 404:
-                logger.info("Failed to POST %s with JSON: %s", url, e)
-                raise e
+            logger.info("Failed to POST %s with JSON: %s", url, e)
 
         if data is None:
             key_validity_url = "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (
