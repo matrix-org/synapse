@@ -99,8 +99,11 @@ class DictCacheTestCase(unittest.TestCase):
         key = "some_key"
 
         seq = self.cache.sequence
+        # start by populating a "full dict" entry
         self.cache.update(seq, key, {"a": "b", "c": "d"})
 
+        # add a bunch of individual entries, also keeping the individual
+        # entry for "a" warm.
         for i in range(20):
             self.cache.get(key, ["a"])
             self.cache.update(seq, f"key{i}", {1: 2})

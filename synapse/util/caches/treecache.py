@@ -69,7 +69,7 @@ class TreeCache:
 
         If `key` is only a partial key (i.e. a truncated tuple) then returns a
         `TreeCacheNode`, which can be passed to the `iterate_tree_cache_*`
-        functions to iterate over all values in the cache with keys that start
+        functions to iterate over all entries in the cache with keys that start
         with the given partial key.
         """
 
