@@ -22,7 +22,7 @@ OTHER_USER_ID = "@other:test"
 OUR_USER_ID = "@our:test"
 
 
-class SlavedReceiptTestCase(HomeserverTestCase):
+class ReceiptTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
         super().prepare(reactor, clock, homeserver)
 
