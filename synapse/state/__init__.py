@@ -146,11 +146,11 @@ class _StateCacheEntry:
         self.state_group = state_group
 
         # We clear out the state as we know longer need to explicitly keep it in
-        # the `state_cache` (as the store state group cache will do that.)
+        # the `state_cache` (as the store state group cache will do that).
         self._state = None
 
     def __len__(self) -> int:
-        # The len should is used to estimate how large this cache entry is, for
+        # The len should be used to estimate how large this cache entry is, for
         # cache eviction purposes. This is why it's fine to return 1 if we're
         # not storing any state.
 
