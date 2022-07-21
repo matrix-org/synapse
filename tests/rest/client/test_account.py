@@ -949,7 +949,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         client_secret: str,
         next_link: Optional[str] = None,
         expect_code: int = 200,
-    ) -> str:
+    ) -> Optional[str]:
         """Request a validation token to add an email address to a user's account
 
         Args:
@@ -959,7 +959,8 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
             expect_code: Expected return code of the call
 
         Returns:
-            The ID of the new threepid validation session
+            The ID of the new threepid validation session, or None if the response
+            did not contain a session ID.
         """
         body = {"client_secret": client_secret, "email": email, "send_attempt": 1}
         if next_link:

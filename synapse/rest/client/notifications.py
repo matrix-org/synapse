@@ -58,7 +58,12 @@ class NotificationsServlet(RestServlet):
         )
 
         receipts_by_room = await self.store.get_receipts_for_user_with_orderings(
-            user_id, [ReceiptTypes.READ, ReceiptTypes.BEEPER_INBOX_DONE, ReceiptTypes.READ_PRIVATE]
+            user_id,
+            [
+                ReceiptTypes.READ,
+                ReceiptTypes.BEEPER_INBOX_DONE,
+                ReceiptTypes.READ_PRIVATE,
+            ],
         )
 
         notif_event_ids = [pa.event_id for pa in push_actions]

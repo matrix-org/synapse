@@ -145,7 +145,7 @@ class EmailConfig(Config):
             raise ConfigError(
                 'The config option "trust_identity_server_for_password_resets" '
                 'has been replaced by "account_threepid_delegate". '
-                "Please consult the sample config at docs/sample_config.yaml for "
+                "Please consult the configuration manual at docs/usage/configuration/config_documentation.md for "
                 "details and update your config file."
             )
 

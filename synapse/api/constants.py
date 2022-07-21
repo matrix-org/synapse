@@ -260,3 +260,13 @@ class ReceiptTypes:
     READ_PRIVATE: Final = "org.matrix.msc2285.read.private"
     FULLY_READ: Final = "m.fully_read"
     BEEPER_INBOX_DONE: Final = "com.beeper.inbox.done"
+
+
+class PublicRoomsFilterFields:
+    """Fields in the search filter for `/publicRooms` that we understand.
+
+    As defined in https://spec.matrix.org/v1.3/client-server-api/#post_matrixclientv3publicrooms
+    """
+
+    GENERIC_SEARCH_TERM: Final = "generic_search_term"
+    ROOM_TYPES: Final = "org.matrix.msc3827.room_types"

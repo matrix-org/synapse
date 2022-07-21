@@ -232,7 +232,9 @@ python -m synapse.app.homeserver \
     --report-stats=[yes|no]
 ```
 
-... substituting an appropriate value for `--server-name`.
+... substituting an appropriate value for `--server-name` and choosing whether
+or not to report usage statistics (hostname, Synapse version, uptime, total
+users, etc.) to the developers via the `--report-stats` argument.
 
 This command will generate you a config file that you can then customise, but it will
 also generate a set of keys for you. These keys will allow your homeserver to
@@ -405,11 +407,11 @@ The recommended way to do so is to set up a reverse proxy on port
 Alternatively, you can configure Synapse to expose an HTTPS port. To do
 so, you will need to edit `homeserver.yaml`, as follows:
 
-- First, under the `listeners` section, uncomment the configuration for the
-  TLS-enabled listener. (Remove the hash sign (`#`) at the start of
-  each line). The relevant lines are like this:
+- First, under the `listeners` option, add the configuration for the
+  TLS-enabled listener like so:
 
 ```yaml
+listeners:
   - port: 8448
     type: http
     tls: true
@@ -417,9 +419,11 @@ so, you will need to edit `homeserver.yaml`, as follows:
       - names: [client, federation]
   ```
 
-- You will also need to uncomment the `tls_certificate_path` and
-  `tls_private_key_path` lines under the `TLS` section. You will need to manage
-  provisioning of these certificates yourself.
+- You will also need to add the options `tls_certificate_path` and
+  `tls_private_key_path`. to your configuration file. You will need to manage provisioning of 
+   these certificates yourself.
+- You can find more information about these options as well as how to configure synapse in the 
+  [configuration manual](../usage/configuration/config_documentation.md).
 
   If you are using your own certificate, be sure to use a `.pem` file that
   includes the full certificate chain including any intermediate certificates

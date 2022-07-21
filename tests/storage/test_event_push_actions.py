@@ -86,6 +86,8 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
             event.internal_metadata.is_outlier.return_value = False
             event.depth = stream
 
+            self.store._events_stream_cache.entity_has_changed(room_id, stream)
+
             self.get_success(
                 self.store.db_pool.simple_insert(
                     table="events",
@@ -192,6 +194,13 @@ class EventPushActionsStoreTestCase(HomeserverTestCase):
         _mark_read(8, 8)
         _assert_counts(1, 0)
         _mark_read(10, 10)
+        _assert_counts(0, 0)
+
+        _inject_actions(11, HIGHLIGHT)
+        _assert_counts(1, 1)
+        _mark_read(11, 11)
+        _assert_counts(0, 0)
+        _rotate(11)
         _assert_counts(0, 0)
 
     def test_find_first_stream_ordering_after_ts(self) -> None:

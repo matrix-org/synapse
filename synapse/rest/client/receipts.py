@@ -60,14 +60,13 @@ class ReceiptRestServlet(RestServlet):
                 400,
                 "Receipt type must be 'm.read', 'org.matrix.msc2285.read.private', 'm.fully_read' or 'com.beeper.inbox.done",
             )
-        elif (
-            not self.hs.config.experimental.msc2285_enabled
-            and receipt_type not in [
-                ReceiptTypes.READ,
-                ReceiptTypes.BEEPER_INBOX_DONE,
-            ]
-        ):
-            raise SynapseError(400, "Receipt type must be 'm.read' or 'com.beeper.inbox.done'")
+        elif not self.hs.config.experimental.msc2285_enabled and receipt_type not in [
+            ReceiptTypes.READ,
+            ReceiptTypes.BEEPER_INBOX_DONE,
+        ]:
+            raise SynapseError(
+                400, "Receipt type must be 'm.read' or 'com.beeper.inbox.done'"
+            )
 
         body = parse_json_object_from_request(request, allow_empty_body=False)
 

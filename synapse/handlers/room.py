@@ -453,7 +453,12 @@ class RoomCreationHandler:
 
         spam_check = await self.spam_checker.user_may_create_room(user_id)
         if spam_check != NOT_SPAM:
-            raise SynapseError(403, "You are not permitted to create rooms", spam_check)
+            raise SynapseError(
+                403,
+                "You are not permitted to create rooms",
+                errcode=spam_check[0],
+                additional_fields=spam_check[1],
+            )
 
         creation_content: JsonDict = {
             "room_version": new_room_version.identifier,
@@ -744,7 +749,10 @@ class RoomCreationHandler:
             spam_check = await self.spam_checker.user_may_create_room(user_id)
             if spam_check != NOT_SPAM:
                 raise SynapseError(
-                    403, "You are not permitted to create rooms", spam_check
+                    403,
+                    "You are not permitted to create rooms",
+                    errcode=spam_check[0],
+                    additional_fields=spam_check[1],
                 )
 
         if ratelimit:
@@ -1434,6 +1442,7 @@ class TimestampLookupHandler:
         # the timestamp given and the event we were able to find locally
         is_event_next_to_backward_gap = False
         is_event_next_to_forward_gap = False
+        local_event = None
         if local_event_id:
             local_event = await self.store.get_event(
                 local_event_id, allow_none=False, allow_rejected=False
@@ -1520,7 +1529,10 @@ class TimestampLookupHandler:
                         ex.args,
                     )
 
-        if not local_event_id:
+        # To appease mypy, we have to add both of these conditions to check for
+        # `None`. We only expect `local_event` to be `None` when
+        # `local_event_id` is `None` but mypy isn't as smart and assuming as us.
+        if not local_event_id or not local_event:
             raise SynapseError(
                 404,
                 "Unable to find event from %s in direction %s" % (timestamp, direction),

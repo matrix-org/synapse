@@ -26,6 +26,13 @@
 #   * SYNAPSE_TLS_CERT: Path to a TLS certificate in PEM format.
 #   * SYNAPSE_TLS_KEY: Path to a TLS key. If this and SYNAPSE_TLS_CERT are specified,
 #         Nginx will be configured to serve TLS on port 8448.
+#   * SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER: Whether to use the forking launcher,
+#         only intended for usage in Complement at the moment.
+#         No stability guarantees are provided.
+#   * SYNAPSE_LOG_LEVEL: Set this to DEBUG, INFO, WARNING or ERROR to change the
+#         log level. INFO is the default.
+#   * SYNAPSE_LOG_SENSITIVE: If unset, SQL and SQL values won't be logged,
+#         regardless of the SYNAPSE_LOG_LEVEL setting.
 #
 # NOTE: According to Complement's ENTRYPOINT expectations for a homeserver image (as defined
 # in the project's README), this script may be run multiple times, and functionality should
@@ -35,7 +42,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, MutableMapping, NoReturn, Set
+from typing import Any, Dict, List, Mapping, MutableMapping, NoReturn, Optional, Set
 
 import yaml
 from jinja2 import Environment, FileSystemLoader
@@ -525,6 +532,7 @@ def generate_worker_files(
         "/etc/supervisor/conf.d/synapse.conf",
         workers=worker_descriptors,
         main_config_path=config_path,
+        use_forking_launcher=environ.get("SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER"),
     )
 
     # healthcheck config
@@ -548,18 +556,25 @@ def generate_worker_log_config(
     Returns: the path to the generated file
     """
     # Check whether we should write worker logs to disk, in addition to the console
-    extra_log_template_args = {}
+    extra_log_template_args: Dict[str, Optional[str]] = {}
     if environ.get("SYNAPSE_WORKERS_WRITE_LOGS_TO_DISK"):
-        extra_log_template_args["LOG_FILE_PATH"] = "{dir}/logs/{name}.log".format(
-            dir=data_dir, name=worker_name
-        )
+        extra_log_template_args["LOG_FILE_PATH"] = f"{data_dir}/logs/{worker_name}.log"
+
+    extra_log_template_args["SYNAPSE_LOG_LEVEL"] = environ.get("SYNAPSE_LOG_LEVEL")
+    extra_log_template_args["SYNAPSE_LOG_SENSITIVE"] = environ.get(
+        "SYNAPSE_LOG_SENSITIVE"
+    )
+
     # Render and write the file
-    log_config_filepath = "/conf/workers/{name}.log.config".format(name=worker_name)
+    log_config_filepath = f"/conf/workers/{worker_name}.log.config"
     convert(
         "/conf/log.config",
         log_config_filepath,
         worker_name=worker_name,
         **extra_log_template_args,
+        include_worker_name_in_log_line=environ.get(
+            "SYNAPSE_USE_EXPERIMENTAL_FORKING_LAUNCHER"
+        ),
     )
     return log_config_filepath
 
