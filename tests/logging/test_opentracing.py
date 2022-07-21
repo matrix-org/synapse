@@ -50,6 +50,7 @@ class LogContextScopeManagerTestCase(TestCase):
     properties that these tests depend on. This is safe since the only supported
     opentracing backend is Jaeger.
     """
+
     if LogContextScopeManager is None:
         skip = "Requires opentracing"  # type: ignore[unreachable]
     if jaeger_client is None:
