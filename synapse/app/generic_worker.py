@@ -48,7 +48,6 @@ from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
-from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.deviceinbox import SlavedDeviceInboxStore
@@ -251,7 +250,6 @@ class GenericWorkerSlavedStore(
     TransactionWorkerStore,
     LockStore,
     SessionStore,
-    BaseSlavedStore,
 ):
     # Properties that multiple storage classes define. Tell mypy what the
     # expected type is.

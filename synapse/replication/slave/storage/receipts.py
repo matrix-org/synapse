@@ -15,8 +15,6 @@
 
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 
-from ._base import BaseSlavedStore
 
-
-class SlavedReceiptsStore(ReceiptsWorkerStore, BaseSlavedStore):
+class SlavedReceiptsStore(ReceiptsWorkerStore):
     pass

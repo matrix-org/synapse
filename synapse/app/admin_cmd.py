@@ -28,7 +28,6 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.events import EventBase
 from synapse.handlers.admin import ExfiltrationWriter
-from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.deviceinbox import SlavedDeviceInboxStore
@@ -39,6 +38,7 @@ from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.server import HomeServer
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.room import RoomWorkerStore
 from synapse.types import StateMap
 from synapse.util import SYNAPSE_VERSION
@@ -57,10 +57,19 @@ class AdminCmdSlavedStore(
     SlavedDeviceStore,
     SlavedPushRuleStore,
     SlavedEventStore,
-    BaseSlavedStore,
     RoomWorkerStore,
 ):
-    pass
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
+        super().__init__(database, db_conn, hs)
+
+        # Annoyingly `filter_events_for_client` assumes that this exists. We
+        # should refactor it to take a `Clock` directly.
+        self.clock = hs.get_clock()
 
 
 class AdminCmdServer(HomeServer):

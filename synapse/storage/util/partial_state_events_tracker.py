@@ -166,6 +166,7 @@ class PartialCurrentStateTracker:
             logger.info(
                 "Awaiting un-partial-stating of room %s",
                 room_id,
+                stack_info=True,
             )
 
             await make_deferred_yieldable(d)
