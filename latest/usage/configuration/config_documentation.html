@@ -1402,6 +1402,7 @@ limit only, as Synapse presumes ratelimiting by room will be done by the sending
 <p>The <code>rc_invites.per_user</code> limit applies to the <em>receiver</em> of the invite, rather than the
 sender, meaning that a <code>rc_invite.per_user.burst_count</code> of 5 mandates that a single user
 cannot <em>receive</em> more than a burst of 5 invites at a time.</p>
+<p>In contrast, the <code>rc_invites.per_issuer</code> limit applies to the <em>issuer</em> of the invite, meaning that a <code>rc_invite.per_issuer.burst_count</code> of 5 mandates that single user cannot <em>send</em> more than a burst of 5 invites at a time.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">rc_invites:
   per_room:
@@ -1410,7 +1411,11 @@ cannot <em>receive</em> more than a burst of 5 invites at a time.</p>
   per_user:
     per_second: 0.004
     burst_count: 3
+  per_issuer:
+    per_second: 0.5
+    burst_count: 5
 </code></pre>
+<p><em>Changed in version 1.63:</em> added the <code>per_issuer</code> limit.</p>
 <hr />
 <h3 id="rc_third_party_invite"><a class="header" href="#rc_third_party_invite"><code>rc_third_party_invite</code></a></h3>
 <p>This option ratelimits 3PID invites (i.e. invites sent to a third-party ID
