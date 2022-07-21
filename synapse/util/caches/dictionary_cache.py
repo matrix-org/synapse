@@ -274,11 +274,11 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         """Updates the entry in the cache.
 
         Note: This does *not* invalidate any existing entries for the `key`.
-        In particular, if we add an entry for the cached "full dict" with 
+        In particular, if we add an entry for the cached "full dict" with
         `fetched_keys=None`, existing entries for individual dict keys are
         not invalidated. Likewise, adding entries for individual keys does
         not invalidate any cached value for the full dict.
-        
+
         In other words: if the underlying data is *changed*, the cache must
         be explicitly invalidated via `.invalidate()`.
 
