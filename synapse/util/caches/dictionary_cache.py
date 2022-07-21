@@ -169,7 +169,10 @@ class DictionaryCache(Generic[KT, DKT, DV]):
                 if it is in the cache.
 
         Returns:
-            DictionaryEntry
+            DictionaryEntry: If `dict_keys` is not None then `DictionaryEntry`
+            will contain include the keys that are in the cache. If None then
+            will either return the full dict if in the cache, or the empty
+            dict (with `full` set to False) if it isn't.
         """
         if dict_keys is None:
             # The caller wants the full set of dictionary keys for this cache key
