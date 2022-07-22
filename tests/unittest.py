@@ -16,7 +16,6 @@
 import gc
 import hashlib
 import hmac
-import json
 import logging
 import secrets
 import time
@@ -285,7 +284,7 @@ class HomeserverTestCase(TestCase):
             config=self.hs.config.server.listeners[0],
             resource=self.resource,
             server_version_string="1",
-            max_request_body_size=1234,
+            max_request_body_size=4096,
             reactor=self.reactor,
         )
 
@@ -619,20 +618,16 @@ class HomeserverTestCase(TestCase):
         want_mac.update(nonce.encode("ascii") + b"\x00" + nonce_str)
         want_mac_digest = want_mac.hexdigest()
 
-        body = json.dumps(
-            {
-                "nonce": nonce,
-                "username": username,
-                "displayname": displayname,
-                "password": password,
-                "admin": admin,
-                "mac": want_mac_digest,
-                "inhibit_login": True,
-            }
-        )
-        channel = self.make_request(
-            "POST", "/_synapse/admin/v1/register", body.encode("utf8")
-        )
+        body = {
+            "nonce": nonce,
+            "username": username,
+            "displayname": displayname,
+            "password": password,
+            "admin": admin,
+            "mac": want_mac_digest,
+            "inhibit_login": True,
+        }
+        channel = self.make_request("POST", "/_synapse/admin/v1/register", body)
         self.assertEqual(channel.code, 200, channel.json_body)
 
         user_id = channel.json_body["user_id"]
@@ -676,9 +671,7 @@ class HomeserverTestCase(TestCase):
         custom_headers: Optional[Iterable[CustomHeaderType]] = None,
     ) -> str:
         """
-        Log in a user, and get an access token. Requires the Login API be
-        registered.
-
+        Log in a user, and get an access token. Requires the Login API be registered.
         """
         body = {"type": "m.login.password", "user": username, "password": password}
         if device_id:
@@ -687,7 +680,7 @@ class HomeserverTestCase(TestCase):
         channel = self.make_request(
             "POST",
             "/_matrix/client/r0/login",
-            json.dumps(body).encode("utf8"),
+            body,
             custom_headers=custom_headers,
         )
         self.assertEqual(channel.code, 200, channel.result)
@@ -780,7 +773,7 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
                         verify_key_id,
                         FetchKeyResult(
                             verify_key=verify_key,
-                            valid_until_ts=clock.time_msec() + 1000,
+                            valid_until_ts=clock.time_msec() + 10000,
                         ),
                     )
                 ],
@@ -838,7 +831,7 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
             client_ip=client_ip,
         )
 
-    def add_hashes_and_signatures(
+    def add_hashes_and_signatures_from_other_server(
         self,
         event_dict: JsonDict,
         room_version: RoomVersion = KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],

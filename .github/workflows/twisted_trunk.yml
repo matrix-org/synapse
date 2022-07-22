@@ -127,12 +127,12 @@ jobs:
         run: |
           set -x
           DEBIAN_FRONTEND=noninteractive sudo apt-get install -yqq python3 pipx
-          pipx install poetry==1.1.12
+          pipx install poetry==1.1.14
 
           poetry remove -n twisted
           poetry add -n --extras tls git+https://github.com/twisted/twisted.git#trunk
           poetry lock --no-update
-          # NOT IN 1.1.12 poetry lock --check
+          # NOT IN 1.1.14 poetry lock --check
         working-directory: synapse
 
       - run: |

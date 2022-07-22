@@ -239,6 +239,8 @@ If this option is provided, it parses the given yaml to json and
 serves it on `/.well-known/matrix/client` endpoint
 alongside the standard properties.
 
+*Added in Synapse 1.62.0.*
+
 Example configuration:
 ```yaml
 extra_well_known_client_content : 
@@ -1155,6 +1157,9 @@ Caching can be configured through the following sub-options:
   with intermittent connections, at the cost of higher memory usage.
   A value of zero means that sync responses are not cached.
   Defaults to 2m.
+
+  *Changed in Synapse 1.62.0*: The default was changed from 0 to 2m.
+
 * `cache_autotuning` and its sub-options `max_cache_memory_usage`, `target_cache_memory_usage`, and
    `min_cache_ttl` work in conjunction with each other to maintain a balance between cache memory 
    usage and cache entry availability. You must be using [jemalloc](https://github.com/matrix-org/synapse#help-synapse-is-slow-and-eats-all-my-ramcpu) 
@@ -1472,6 +1477,25 @@ rc_joins:
     burst_count: 12
 ```
 ---
+### `rc_joins_per_room`
+
+This option allows admins to ratelimit joins to a room based on the number of recent
+joins (local or remote) to that room. It is intended to mitigate mass-join spam
+waves which target multiple homeservers.
+
+By default, one join is permitted to a room every second, with an accumulating
+buffer of up to ten instantaneous joins.
+
+Example configuration (default values):
+```yaml
+rc_joins_per_room:
+  per_second: 1
+  burst_count: 10
+```
+
+_Added in Synapse 1.64.0._
+
+---
 ### `rc_3pid_validation`
 
 This option ratelimits how often a user or IP can attempt to validate a 3PID.
@@ -1504,6 +1528,8 @@ The `rc_invites.per_user` limit applies to the *receiver* of the invite, rather 
 sender, meaning that a `rc_invite.per_user.burst_count` of 5 mandates that a single user
 cannot *receive* more than a burst of 5 invites at a time.
 
+In contrast, the `rc_invites.per_issuer` limit applies to the *issuer* of the invite, meaning that a `rc_invite.per_issuer.burst_count` of 5 mandates that single user cannot *send* more than a burst of 5 invites at a time.
+
 Example configuration:
 ```yaml
 rc_invites:
@@ -1513,7 +1539,13 @@ rc_invites:
   per_user:
     per_second: 0.004
     burst_count: 3
+  per_issuer:
+    per_second: 0.5
+    burst_count: 5
 ```
+
+_Changed in version 1.63:_ added the `per_issuer` limit.
+
 ---
 ### `rc_third_party_invite`
 
@@ -2168,30 +2200,26 @@ default_identity_server: https://matrix.org
 ---
 ### `account_threepid_delegates`
 
-Handle threepid (email/phone etc) registration and password resets through a set of
-*trusted* identity servers. Note that this allows the configured identity server to
-reset passwords for accounts!
+Delegate verification of phone numbers to an identity server.
 
-Be aware that if `email` is not set, and SMTP options have not been
-configured in the email config block, registration and user password resets via
-email will be globally disabled.
+When a user wishes to add a phone number to their account, we need to verify that they
+actually own that phone number, which requires sending them a text message (SMS).
+Currently Synapse does not support sending those texts itself and instead delegates the
+task to an identity server. The base URI for the identity server to be used is
+specified by the `account_threepid_delegates.msisdn` option.
 
-Additionally, if `msisdn` is not set, registration and password resets via msisdn
-will be disabled regardless, and users will not be able to associate an msisdn
-identifier to their account. This is due to Synapse currently not supporting
-any method of sending SMS messages on its own.
+If this is left unspecified, Synapse will not allow users to add phone numbers to
+their account.
 
-To enable using an identity server for operations regarding a particular third-party
-identifier type, set the value to the URL of that identity server as shown in the
-examples below.
+(Servers handling the these requests must answer the `/requestToken` endpoints defined
+by the Matrix Identity Service API
+[specification](https://matrix.org/docs/spec/identity_service/latest).)
 
-Servers handling the these requests must answer the `/requestToken` endpoints defined
-by the Matrix Identity Service API [specification](https://matrix.org/docs/spec/identity_service/latest).
+*Updated in Synapse 1.64.0*: No longer accepts an `email` option.
 
 Example configuration:
 ```yaml
 account_threepid_delegates:
-    email: https://example.com     # Delegate email sending to example.com
     msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 ```
 ---
@@ -2409,9 +2437,14 @@ metrics_flags:
 ---
 ### `report_stats`
 
-Whether or not to report anonymized homeserver usage statistics. This is originally
+Whether or not to report homeserver usage statistics. This is originally
 set when generating the config. Set this option to true or false to change the current
-behavior. 
+behavior. See
+[Reporting Homeserver Usage Statistics](../administration/monitoring/reporting_homeserver_usage_statistics.md)
+for information on what data is reported.
+
+Statistics will be reported 5 minutes after Synapse starts, and then every 3 hours
+after that.
 
 Example configuration:
 ```yaml
@@ -2420,7 +2453,7 @@ report_stats: true
 ---
 ### `report_stats_endpoint`
 
-The endpoint to report the anonymized homeserver usage statistics to.
+The endpoint to report homeserver usage statistics to.
 Defaults to https://matrix.org/report-usage-stats/push
 
 Example configuration:

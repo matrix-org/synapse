@@ -21,7 +21,6 @@ from synapse.api.constants import EventTypes, LoginType, Membership
 from synapse.api.errors import SynapseError
 from synapse.api.room_versions import RoomVersion
 from synapse.events import EventBase
-from synapse.events.snapshot import EventContext
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.rest import admin
 from synapse.rest.client import account, login, profile, room
@@ -113,14 +112,8 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
 
         # Have this homeserver skip event auth checks. This is necessary due to
         # event auth checks ensuring that events were signed by the sender's homeserver.
-        async def _check_event_auth(
-            origin: str,
-            event: EventBase,
-            context: EventContext,
-            *args: Any,
-            **kwargs: Any,
-        ) -> EventContext:
-            return context
+        async def _check_event_auth(origin: Any, event: Any, context: Any) -> None:
+            pass
 
         hs.get_federation_event_handler()._check_event_auth = _check_event_auth  # type: ignore[assignment]
 

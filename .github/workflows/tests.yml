@@ -328,9 +328,6 @@ jobs:
           - arrangement: monolith
             database: Postgres
 
-          - arrangement: workers
-            database: Postgres
-
     steps:
       - name: Run actions/checkout@v2 for synapse
         uses: actions/checkout@v2
@@ -343,6 +340,30 @@ jobs:
       - run: |
           set -o pipefail
           POSTGRES=${{ (matrix.database == 'Postgres') && 1 || '' }} WORKERS=${{ (matrix.arrangement == 'workers') && 1 || '' }} COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | gotestfmt
+        shell: bash
+        name: Run Complement Tests
+
+  # XXX When complement with workers is stable, move this back into the standard
+  #     "complement" matrix above.
+  #
+  # See https://github.com/matrix-org/synapse/issues/13161
+  complement-workers:
+    if: "${{ !failure() && !cancelled() }}"
+    needs: linting-done
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run actions/checkout@v2 for synapse
+        uses: actions/checkout@v2
+        with:
+          path: synapse
+
+      - name: Prepare Complement's Prerequisites
+        run: synapse/.ci/scripts/setup_complement_prerequisites.sh
+
+      - run: |
+          set -o pipefail
+          POSTGRES=1 WORKERS=1 COMPLEMENT_DIR=`pwd`/complement synapse/scripts-dev/complement.sh -json 2>&1 | gotestfmt
         shell: bash
         name: Run Complement Tests
 
