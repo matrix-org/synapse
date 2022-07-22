@@ -484,7 +484,11 @@ def _is_membership_change_allowed(
             return
 
         if not caller_in_room:  # caller isn't joined
-            raise AuthError(403, "%s not in room %s." % (event.user_id, event.room_id))
+            raise UnstableSpecAuthError(
+                403,
+                "%s not in room %s." % (event.user_id, event.room_id),
+                errcode=Codes.NOT_JOINED,
+            )
 
     if Membership.INVITE == membership:
         # TODO (erikj): We should probably handle this more intelligently

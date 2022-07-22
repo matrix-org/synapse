@@ -26,6 +26,7 @@ from synapse.api.errors import (
     Codes,
     InvalidClientTokenError,
     MissingClientTokenError,
+    UnstableSpecAuthError,
 )
 from synapse.appservice import ApplicationService
 from synapse.http import get_request_user_agent
@@ -106,8 +107,11 @@ class Auth:
                 forgot = await self.store.did_forget(user_id, room_id)
                 if not forgot:
                     return membership, member_event_id
-
-        raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
+        raise UnstableSpecAuthError(
+            403,
+            "User %s not in room %s" % (user_id, room_id),
+            errcode=Codes.NOT_JOINED,
+        )
 
     async def get_user_by_req(
         self,
@@ -600,8 +604,9 @@ class Auth:
                 == HistoryVisibility.WORLD_READABLE
             ):
                 return Membership.JOIN, None
-            raise AuthError(
+            raise UnstableSpecAuthError(
                 403,
                 "User %s not in room %s, and room previews are disabled"
                 % (user_id, room_id),
+                errcode=Codes.NOT_JOINED,
             )

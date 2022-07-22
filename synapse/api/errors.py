@@ -83,6 +83,7 @@ class Codes(str, Enum):
     # Part of MSC3848
     # https://github.com/matrix-org/matrix-spec-proposals/pull/3848
     ALREADY_JOINED = "ORG.MATRIX.MSC3848.ALREADY_JOINED"
+    NOT_JOINED = "ORG.MATRIX.MSC3848.NOT_JOINED"
     INSUFFICIENT_POWER = "ORG.MATRIX.MSC3848.INSUFFICIENT_POWER"
 
     # The account has been suspended on the server.
