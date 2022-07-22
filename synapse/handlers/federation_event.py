@@ -542,8 +542,24 @@ class FederationEventHandler:
                 destination, event
             )
 
+            # There are three possible cases for (state_ids, partial_state):
+            #   * `state_ids` and `partial_state` are both `None` if we had all the
+            #     prev_events. The prev_events may or may not have partial state and
+            #     we won't know until we compute the event context.
+            #   * `state_ids` is not `None` and `partial_state` is `False` if we were
+            #     missing any prev_events. We calculated the full state after the
+            #     prev_events.
+            #   * `state_ids` is not `None` and `partial_state` is `True` if we were
+            #     missing some, but not all, prev_events. At least one of the
+            #     prev_events we did have had partial state, so we calculated a partial
+            #     state after the prev_events.
+
             context = None
-            if not partial_state:
+            if state_ids is not None and partial_state:
+                # the state after the prev events is still partial. We can't de-partial
+                # state the event, so don't bother building the event context.
+                pass
+            else:
                 # build a new state group for it if need be
                 context = await self._state_handler.compute_event_context(
                     event,
