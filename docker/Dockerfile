@@ -119,8 +119,17 @@ COPY synapse /synapse/synapse/
 # ... and what we need to `pip install`.
 COPY pyproject.toml README.rst /synapse/
 
+# Repeat of earlier build argument declaration, as this is a new build stage.
+ARG TEST_ONLY_IGNORE_POETRY_LOCKFILE
+
 # Install the synapse package itself.
-RUN pip install --prefix="/install" --no-deps --no-warn-script-location /synapse[all]
+# Unless we haven't populated requirements.txt, we don't install any dependencies
+# as we should already have those from the previous `pip install` step.
+RUN if [ -z "$TEST_ONLY_IGNORE_POETRY_LOCKFILE" ]; then \
+    pip install --prefix="/install" --no-deps --no-warn-script-location /synapse[all]; \
+  else \
+    pip install --prefix="/install" --no-warn-script-location /synapse[all]; \
+  fi
 
 ###
 ### Stage 2: runtime
