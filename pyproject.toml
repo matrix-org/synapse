@@ -54,7 +54,7 @@ skip_gitignore = true
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.63.0rc1"
+version = "1.63.1"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -110,7 +110,9 @@ jsonschema = ">=3.0.0"
 frozendict = ">=1,!=2.1.2"
 # We require 2.1.0 or higher for type hints. Previous guard was >= 1.1.0
 unpaddedbase64 = ">=2.1.0"
-canonicaljson = "^1.4.0"
+# We require 1.5.0 to work around an issue when running against the C implementation of
+# frozendict: https://github.com/matrix-org/python-canonicaljson/issues/36
+canonicaljson = "^1.5.0"
 # we use the type definitions added in signedjson 1.1.
 signedjson = "^1.1.0"
 # validating SSL certs for IP addresses requires service_identity 18.1.

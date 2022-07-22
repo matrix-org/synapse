@@ -1,0 +1,1 @@
+Up batch size of `bulk_get_push_rules` and `_get_joined_profiles_from_event_ids`.

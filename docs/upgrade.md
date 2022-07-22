@@ -104,6 +104,25 @@ minimum, a `notif_from` setting.)
 Specifying an `email` setting under `account_threepid_delegates` will now cause
 an error at startup.
 
+## Changes to the event replication streams
+
+Synapse now includes a flag indicating if an event is an outlier when
+replicating it to other workers. This is a forwards- and backwards-incompatible
+change: v1.63 and workers cannot process events replicated by v1.64 workers, and
+vice versa.
+
+Once all workers are upgraded to v1.64 (or downgraded to v1.63), event
+replication will resume as normal.
+
+## frozendict release
+
+[frozendict 2.3.3](https://github.com/Marco-Sulla/python-frozendict/releases/tag/v2.3.3)
+has recently been released, which fixes a memory leak that occurs during `/sync`
+requests. We advise server administrators who installed Synapse via pip to upgrade
+frozendict with `pip install --upgrade frozendict`. The Docker image
+`matrixdotorg/synapse` and the Debian packages from `packages.matrix.org` already
+include the updated library.
+
 # Upgrading to v1.62.0
 
 ## New signatures for spam checker callbacks

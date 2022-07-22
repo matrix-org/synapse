@@ -136,7 +136,7 @@ class RestHelper:
             self.site,
             "POST",
             path,
-            json.dumps(content).encode("utf8"),
+            content,
             custom_headers=custom_headers,
         )
 
@@ -210,7 +210,7 @@ class RestHelper:
             self.site,
             "POST",
             path,
-            json.dumps(data).encode("utf8"),
+            data,
         )
 
         assert (
@@ -309,7 +309,7 @@ class RestHelper:
             self.site,
             "PUT",
             path,
-            json.dumps(data).encode("utf8"),
+            data,
         )
 
         assert (
@@ -392,7 +392,7 @@ class RestHelper:
             self.site,
             "PUT",
             path,
-            json.dumps(content or {}).encode("utf8"),
+            content or {},
             custom_headers=custom_headers,
         )
 

@@ -14,7 +14,7 @@
 # limitations under the License.
 import heapq
 import logging
-from collections import defaultdict
+from collections import ChainMap, defaultdict
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -92,8 +92,11 @@ class _StateCacheEntry:
         prev_group: Optional[int] = None,
         delta_ids: Optional[StateMap[str]] = None,
     ):
-        if state is None and state_group is None:
-            raise Exception("Either state or state group must be not None")
+        if state is None and state_group is None and prev_group is None:
+            raise Exception("One of state, state_group or prev_group must be not None")
+
+        if prev_group is not None and delta_ids is None:
+            raise Exception("If prev_group is set so must delta_ids")
 
         # A map from (type, state_key) to event_id.
         #
@@ -120,18 +123,48 @@ class _StateCacheEntry:
         if self._state is not None:
             return self._state
 
-        assert self.state_group is not None
+        if self.state_group is not None:
+            return await state_storage.get_state_ids_for_group(
+                self.state_group, state_filter
+            )
 
-        return await state_storage.get_state_ids_for_group(
-            self.state_group, state_filter
+        assert self.prev_group is not None and self.delta_ids is not None
+
+        prev_state = await state_storage.get_state_ids_for_group(
+            self.prev_group, state_filter
         )
 
-    def __len__(self) -> int:
-        # The len should is used to estimate how large this cache entry is, for
-        # cache eviction purposes. This is why if `self.state` is None it's fine
-        # to return 1.
+        # ChainMap expects MutableMapping, but since we're using it immutably
+        # its safe to give it immutable maps.
+        return ChainMap(self.delta_ids, prev_state)  # type: ignore[arg-type]
 
-        return len(self._state) if self._state else 1
+    def set_state_group(self, state_group: int) -> None:
+        """Update the state group assigned to this state (e.g. after we've
+        persisted it).
+
+        Note: this will cause the cache entry to drop any stored state.
+        """
+
+        self.state_group = state_group
+
+        # We clear out the state as we know longer need to explicitly keep it in
+        # the `state_cache` (as the store state group cache will do that).
+        self._state = None
+
+    def __len__(self) -> int:
+        # The len should be used to estimate how large this cache entry is, for
+        # cache eviction purposes. This is why it's fine to return 1 if we're
+        # not storing any state.
+
+        length = 0
+
+        if self._state:
+            length += len(self._state)
+
+        if self.delta_ids:
+            length += len(self.delta_ids)
+
+        return length or 1  # Make sure its not 0.
 
 
 class StateHandler:
@@ -153,23 +186,29 @@ class StateHandler:
             ReplicationUpdateCurrentStateRestServlet.make_client(hs)
         )
 
-    async def get_current_state_ids(
+    async def compute_state_after_events(
         self,
         room_id: str,
-        latest_event_ids: Collection[str],
+        event_ids: Collection[str],
+        state_filter: Optional[StateFilter] = None,
     ) -> StateMap[str]:
-        """Get the current state, or the state at a set of events, for a room
+        """Fetch the state after each of the given event IDs. Resolve them and return.
+
+        This is typically used where `event_ids` is a collection of forward extremities
+        in a room, intended to become the `prev_events` of a new event E. If so, the
+        return value of this function represents the state before E.
 
         Args:
-            room_id:
-            latest_event_ids: The forward extremities to resolve.
+            room_id: the room_id containing the given events.
+            event_ids: the events whose state should be fetched and resolved.
 
         Returns:
-            the state dict, mapping from (event_type, state_key) -> event_id
+            the state dict (a mapping from (event_type, state_key) -> event_id) which
+            holds the resolution of the states after the given event IDs.
         """
-        logger.debug("calling resolve_state_groups from get_current_state_ids")
-        ret = await self.resolve_state_groups_for_events(room_id, latest_event_ids)
-        return await ret.get_state(self._state_storage_controller, StateFilter.all())
+        logger.debug("calling resolve_state_groups from compute_state_after_events")
+        ret = await self.resolve_state_groups_for_events(room_id, event_ids)
+        return await ret.get_state(self._state_storage_controller, state_filter)
 
     async def get_current_users_in_room(
         self, room_id: str, latest_event_ids: List[str]
@@ -293,12 +332,18 @@ class StateHandler:
 
             state_group_before_event_prev_group = entry.prev_group
             deltas_to_state_group_before_event = entry.delta_ids
+            state_ids_before_event = None
 
             # We make sure that we have a state group assigned to the state.
             if entry.state_group is None:
-                state_ids_before_event = await entry.get_state(
-                    self._state_storage_controller, StateFilter.all()
-                )
+                # store_state_group requires us to have either a previous state group
+                # (with deltas) or the complete state map. So, if we don't have a
+                # previous state group, load the complete state map now.
+                if state_group_before_event_prev_group is None:
+                    state_ids_before_event = await entry.get_state(
+                        self._state_storage_controller, StateFilter.all()
+                    )
+
                 state_group_before_event = (
                     await self._state_storage_controller.store_state_group(
                         event.event_id,
@@ -308,10 +353,9 @@ class StateHandler:
                         current_state_ids=state_ids_before_event,
                     )
                 )
-                entry.state_group = state_group_before_event
+                entry.set_state_group(state_group_before_event)
             else:
                 state_group_before_event = entry.state_group
-                state_ids_before_event = None
 
         #
         # now if it's not a state event, we're done
@@ -331,19 +375,20 @@ class StateHandler:
         #
         # otherwise, we'll need to create a new state group for after the event
         #
-        if state_ids_before_event is None:
-            state_ids_before_event = await entry.get_state(
-                self._state_storage_controller, StateFilter.all()
-            )
 
         key = (event.type, event.state_key)
-        if key in state_ids_before_event:
-            replaces = state_ids_before_event[key]
-            if replaces != event.event_id:
-                event.unsigned["replaces_state"] = replaces
 
-        state_ids_after_event = dict(state_ids_before_event)
-        state_ids_after_event[key] = event.event_id
+        if state_ids_before_event is not None:
+            replaces = state_ids_before_event.get(key)
+        else:
+            replaces_state_map = await entry.get_state(
+                self._state_storage_controller, StateFilter.from_types([key])
+            )
+            replaces = replaces_state_map.get(key)
+
+        if replaces and replaces != event.event_id:
+            event.unsigned["replaces_state"] = replaces
+
         delta_ids = {key: event.event_id}
 
         state_group_after_event = (
@@ -352,7 +397,7 @@ class StateHandler:
                 event.room_id,
                 prev_group=state_group_before_event,
                 delta_ids=delta_ids,
-                current_state_ids=state_ids_after_event,
+                current_state_ids=None,
             )
         )
 
@@ -735,7 +780,7 @@ def _make_state_cache_entry(
         old_state_event_ids = set(state.values())
         if new_state_event_ids == old_state_event_ids:
             # got an exact match.
-            return _StateCacheEntry(state=new_state, state_group=sg)
+            return _StateCacheEntry(state=None, state_group=sg)
 
     # TODO: We want to create a state group for this set of events, to
     # increase cache hits, but we need to make sure that it doesn't
@@ -757,9 +802,14 @@ def _make_state_cache_entry(
             prev_group = old_group
             delta_ids = n_delta_ids
 
-    return _StateCacheEntry(
-        state=new_state, state_group=None, prev_group=prev_group, delta_ids=delta_ids
-    )
+    if prev_group is not None:
+        # If we have a prev group and deltas then we can drop the new state from
+        # the cache (to reduce memory usage).
+        return _StateCacheEntry(
+            state=None, state_group=None, prev_group=prev_group, delta_ids=delta_ids
+        )
+    else:
+        return _StateCacheEntry(state=new_state, state_group=None)
 
 
 @attr.s(slots=True, auto_attribs=True)
