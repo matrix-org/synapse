@@ -243,7 +243,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             txn: LoggingTransaction,
         ) -> Dict[str, ProfileInfo]:
             clause, ids = make_in_list_sql_clause(
-                self.database_engine, "m.user_id", user_ids
+                self.database_engine, "c.state_key", user_ids
             )
 
             sql = """
@@ -843,7 +843,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # We don't update the event cache hit ratio as it completely throws off
         # the hit ratio counts. After all, we don't populate the cache if we
         # miss it here
-        event_map = self._get_events_from_cache(member_event_ids, update_metrics=False)
+        event_map = await self._get_events_from_cache(
+            member_event_ids, update_metrics=False
+        )
 
         missing_member_event_ids = []
         for event_id in member_event_ids:
@@ -902,7 +904,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             iterable=event_ids,
             retcols=("user_id", "display_name", "avatar_url", "event_id"),
             keyvalues={"membership": Membership.JOIN},
-            batch_size=500,
+            batch_size=1000,
             desc="_get_joined_profiles_from_event_ids",
         )
 
