@@ -833,8 +833,15 @@ class FederationEventHandler:
                 state_ids, partial_state = await self._resolve_state_at_missing_prevs(
                     origin, event
                 )
+
                 # We ought to have full state now, barring some unlikely race where we left and
                 # rejoned the room in the background.
+                if state_ids is not None and partial_state:
+                    raise AssertionError(
+                        f"Event {event.event_id} still has a partial resolved state "
+                        f"after room {event.room_id} was un-partial stated"
+                    )
+
                 await self._process_received_pdu(
                     origin,
                     event,
