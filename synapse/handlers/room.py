@@ -1487,11 +1487,14 @@ class TimestampLookupHandler:
                     # it with `/context` and paginate `/messages` from this
                     # point.
                     #
-                    # FIXME: After this backfill, we might want to run this
-                    # whole `get_event_for_timestamp` function again to make
-                    # sure they didn't give us an event from their gappy
-                    # history. Also need a heuristic for when to stop recursing
-                    # if they keep giving us gappy results.
+                    # TODO: The requested timestamp may lie in a part of the
+                    #   event graph that the remote server *also* didn't have,
+                    #   in which case they will have returned another event
+                    #   which may be nowhere near the requested timestamp. In
+                    #   the future, we may need to reconcile that gap and ask
+                    #   other homeservers, and/or extend `/timestamp_to_event`
+                    #   to return events on *both* sides of the timestamp to
+                    #   help reconcile the gap faster.
                     remote_event = (
                         await self.federation_event_handler.backfill_event_id(
                             domain, room_id, remote_event_id
