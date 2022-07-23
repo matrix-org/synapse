@@ -1,0 +1,1 @@
+Fix long-standing bug where in rare instances Synapse could store the incorrect state for a room after a state resolution.

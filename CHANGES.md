@@ -1,7 +1,26 @@
 Synapse vNext
 =============
 
-As of this release, Synapse no longer allows the tasks of verifying email address ownership, and password reset confirmation, to be delegated to an identity server. For more information, see the [upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.63/docs/upgrade.md#upgrading-to-v1630).
+As of this release, Synapse no longer allows the tasks of verifying email address ownership, and password reset confirmation, to be delegated to an identity server. For more information, see the [upgrade notes](https://matrix-org.github.io/synapse/v1.64/upgrade.html#upgrading-to-v1640).
+
+
+Synapse 1.63.1 (2022-07-20)
+===========================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.63.0 where push actions were incorrectly calculated for appservice users. This caused performance issues on servers with large numbers of appservices. ([\#13332](https://github.com/matrix-org/synapse/issues/13332))
+
+
+Synapse 1.63.0 (2022-07-19)
+===========================
+
+Improved Documentation
+----------------------
+
+- Clarify that homeserver server names are included in the reported data when the `report_stats` config option is enabled. ([\#13321](https://github.com/matrix-org/synapse/issues/13321))
+
 
 Synapse 1.63.0rc1 (2022-07-12)
 ==============================
@@ -11,7 +30,7 @@ Features
 
 - Add a rate limit for local users sending invites. ([\#13125](https://github.com/matrix-org/synapse/issues/13125))
 - Implement [MSC3827](https://github.com/matrix-org/matrix-spec-proposals/pull/3827): Filtering of `/publicRooms` by room type. ([\#13031](https://github.com/matrix-org/synapse/issues/13031))
-- Improve validation logic in Synapse's REST endpoints. ([\#13148](https://github.com/matrix-org/synapse/issues/13148))
+- Improve validation logic in the account data REST endpoints. ([\#13148](https://github.com/matrix-org/synapse/issues/13148))
 
 
 Bugfixes
@@ -39,7 +58,7 @@ Improved Documentation
 - Add an explanation of the `--report-stats` argument to the docs. ([\#13029](https://github.com/matrix-org/synapse/issues/13029))
 - Add a helpful example bash script to the contrib directory for creating multiple worker configuration files of the same type. Contributed by @villepeh. ([\#13032](https://github.com/matrix-org/synapse/issues/13032))
 - Add missing links to config options. ([\#13166](https://github.com/matrix-org/synapse/issues/13166))
-- Add documentation for anonymised homeserver statistics collection. ([\#13086](https://github.com/matrix-org/synapse/issues/13086))
+- Add documentation for homeserver usage statistics collection. ([\#13086](https://github.com/matrix-org/synapse/issues/13086))
 - Add documentation for the existing `databases` option in the homeserver configuration manual. ([\#13212](https://github.com/matrix-org/synapse/issues/13212))
 - Clean up references to sample configuration and redirect users to the configuration manual instead. ([\#13077](https://github.com/matrix-org/synapse/issues/13077), [\#13139](https://github.com/matrix-org/synapse/issues/13139))
 - Document how the Synapse team does reviews. ([\#13132](https://github.com/matrix-org/synapse/issues/13132))
@@ -124,7 +143,7 @@ Bugfixes
 - Update [MSC3786](https://github.com/matrix-org/matrix-spec-proposals/pull/3786) implementation to check `state_key`. ([\#12939](https://github.com/matrix-org/synapse/issues/12939))
 - Fix a bug introduced in Synapse 1.58 where Synapse would not report full version information when installed from a git checkout. This is a best-effort affair and not guaranteed to be stable. ([\#12973](https://github.com/matrix-org/synapse/issues/12973))
 - Fix a bug introduced in Synapse 1.60 where Synapse would fail to start if the `sqlite3` module was not available. ([\#12979](https://github.com/matrix-org/synapse/issues/12979))
-- Fix a bug where non-standard information was required when requesting the `/hierarchy` API over federation. Introduced 
+- Fix a bug where non-standard information was required when requesting the `/hierarchy` API over federation. Introduced
   in Synapse v1.41.0. ([\#12991](https://github.com/matrix-org/synapse/issues/12991))
 - Fix a long-standing bug which meant that rate limiting was not restrictive enough in some cases. ([\#13018](https://github.com/matrix-org/synapse/issues/13018))
 - Fix a bug introduced in Synapse 1.58 where profile requests for a malformed user ID would ccause an internal error. Synapse now returns 400 Bad Request in this situation. ([\#13041](https://github.com/matrix-org/synapse/issues/13041))

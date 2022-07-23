@@ -16,13 +16,23 @@ from typing import Dict, Optional, Set, Tuple, Union
 
 import frozendict
 
+from twisted.test.proto_helpers import MemoryReactor
+
+import synapse.rest.admin
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
+from synapse.appservice import ApplicationService
 from synapse.events import FrozenEvent
 from synapse.push import push_rule_evaluator
 from synapse.push.push_rule_evaluator import PushRuleEvaluatorForEvent
+from synapse.rest.client import login, register, room
+from synapse.server import HomeServer
+from synapse.storage.databases.main.appservice import _make_exclusive_regex
 from synapse.types import JsonDict
+from synapse.util import Clock
 
 from tests import unittest
+from tests.test_utils.event_injection import create_event, inject_member_event
 
 
 class PushRuleEvaluatorTestCase(unittest.TestCase):
@@ -354,3 +364,78 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             "event_type": "*.reaction",
         }
         self.assertTrue(evaluator.matches(condition, "@user:test", "foo"))
+
+
+class TestBulkPushRuleEvaluator(unittest.HomeserverTestCase):
+    """Tests for the bulk push rule evaluator"""
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        register.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer):
+        # Define an application service so that we can register appservice users
+        self._service_token = "some_token"
+        self._service = ApplicationService(
+            self._service_token,
+            "as1",
+            "@as.sender:test",
+            namespaces={
+                "users": [
+                    {"regex": "@_as_.*:test", "exclusive": True},
+                    {"regex": "@as.sender:test", "exclusive": True},
+                ]
+            },
+            msc3202_transaction_extensions=True,
+        )
+        self.hs.get_datastores().main.services_cache = [self._service]
+        self.hs.get_datastores().main.exclusive_user_regex = _make_exclusive_regex(
+            [self._service]
+        )
+
+        self._as_user, _ = self.register_appservice_user(
+            "_as_user", self._service_token
+        )
+
+        self.evaluator = self.hs.get_bulk_push_rule_evaluator()
+
+    def test_ignore_appservice_users(self) -> None:
+        "Test that we don't generate push for appservice users"
+
+        user_id = self.register_user("user", "pass")
+        token = self.login("user", "pass")
+
+        room_id = self.helper.create_room_as(user_id, tok=token)
+        self.get_success(
+            inject_member_event(self.hs, room_id, self._as_user, Membership.JOIN)
+        )
+
+        event, context = self.get_success(
+            create_event(
+                self.hs,
+                type=EventTypes.Message,
+                room_id=room_id,
+                sender=user_id,
+                content={"body": "test", "msgtype": "m.text"},
+            )
+        )
+
+        # Assert the returned push rules do not contain the app service user
+        rules = self.get_success(self.evaluator._get_rules_for_event(event))
+        self.assertTrue(self._as_user not in rules)
+
+        # Assert that no push actions have been added to the staging table (the
+        # sender should not be pushed for the event)
+        users_with_push_actions = self.get_success(
+            self.hs.get_datastores().main.db_pool.simple_select_onecol(
+                table="event_push_actions_staging",
+                keyvalues={"event_id": event.event_id},
+                retcol="user_id",
+                desc="test_ignore_appservice_users",
+            )
+        )
+
+        self.assertEqual(len(users_with_push_actions), 0)

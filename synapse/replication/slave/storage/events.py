@@ -29,8 +29,6 @@ from synapse.storage.databases.main.stream import StreamWorkerStore
 from synapse.storage.databases.main.user_erasure_store import UserErasureWorkerStore
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
-from ._base import BaseSlavedStore
-
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
@@ -56,7 +54,6 @@ class SlavedEventStore(
     EventsWorkerStore,
     UserErasureWorkerStore,
     RelationsWorkerStore,
-    BaseSlavedStore,
 ):
     def __init__(
         self,

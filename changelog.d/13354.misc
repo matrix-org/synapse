@@ -1,0 +1,1 @@
+Faster room joins: skip soft fail checks while Synapse only has partial room state, since the current membership of event senders may not be accurately known.
