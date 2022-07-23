@@ -268,4 +268,4 @@ class PublicRoomsFilterFields:
     """
 
     GENERIC_SEARCH_TERM: Final = "generic_search_term"
-    ROOM_TYPES: Final = "org.matrix.msc3827.room_types"
+    ROOM_TYPES: Final = "room_types"

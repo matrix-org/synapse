@@ -2070,7 +2070,6 @@ class PublicRoomsRoomTypeFilterTestCase(unittest.HomeserverTestCase):
 
         config = self.default_config()
         config["allow_public_rooms_without_auth"] = True
-        config["experimental_features"] = {"msc3827_enabled": True}
         self.hs = self.setup_test_homeserver(config=config)
         self.url = b"/_matrix/client/r0/publicRooms"
 
@@ -2123,13 +2122,13 @@ class PublicRoomsRoomTypeFilterTestCase(unittest.HomeserverTestCase):
         chunk, count = self.make_public_rooms_request([None])
 
         self.assertEqual(count, 1)
-        self.assertEqual(chunk[0].get("org.matrix.msc3827.room_type", None), None)
+        self.assertEqual(chunk[0].get("room_type", None), None)
 
     def test_returns_only_space_based_on_filter(self) -> None:
         chunk, count = self.make_public_rooms_request(["m.space"])
 
         self.assertEqual(count, 1)
-        self.assertEqual(chunk[0].get("org.matrix.msc3827.room_type", None), "m.space")
+        self.assertEqual(chunk[0].get("room_type", None), "m.space")
 
     def test_returns_both_rooms_and_space_based_on_filter(self) -> None:
         chunk, count = self.make_public_rooms_request(["m.space", None])

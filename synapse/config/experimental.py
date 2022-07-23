@@ -87,6 +87,3 @@ class ExperimentalConfig(Config):
 
         # MSC3715: dir param on /relations.
         self.msc3715_enabled: bool = experimental.get("msc3715_enabled", False)
-
-        # MSC3827: Filtering of /publicRooms by room type
-        self.msc3827_enabled: bool = experimental.get("msc3827_enabled", False)
