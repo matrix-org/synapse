@@ -7,16 +7,8 @@ server admin. (Note that a server admin is distinct from a room admin.)
 
 An existing user can be marked as a server admin by updating the database directly.
 
-When using PostgreSQL, switch to the `postgres` user and start the command line tool.
-```sh
-su - postgres
-psql
-```
-
-Check your  [database settings](config_documentation.md#database) in the `homeserver.yaml`, connect to the
-specified database called e.g. `synapse` and elevate the user `@foo:bar.com` to administrator.
+Check your [database settings](config_documentation.md#database) in the configuration file, connect to the correct database using either `psql [database name]` (if using PostgreSQL) or `sqlite3 path/to/your/database.db` (if using SQLite) and elevate the user `@foo:bar.com` to administrator.
 ```sql
-\c synapse
 UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 ```
 
