@@ -205,7 +205,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
                 # If there are private read receipts, additional logic is necessary.
                 if (
                     ReceiptTypes.READ_PRIVATE in event_content
-                    or "org.matrix.msc2285.read.private" in event_content
+                    or ReceiptTypes.READ_PRIVATE_UNSTABLE in event_content
                 ):
                     # Make a copy without private read receipts to avoid leaking
                     # other user's private read receipts..
@@ -215,7 +215,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
                         if receipt_type
                         not in [
                             ReceiptTypes.READ_PRIVATE,
-                            "org.matrix.msc2285.read.private",
+                            ReceiptTypes.READ_PRIVATE_UNSTABLE,
                         ]
                     }
 
