@@ -1,0 +1,1 @@
+Fixed bug when user tries getting joined_members after already having left the room. Contributed by @andrewdoh.
