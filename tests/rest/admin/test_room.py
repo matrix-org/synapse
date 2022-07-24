@@ -1772,6 +1772,21 @@ class RoomTestCase(unittest.HomeserverTestCase):
             tok=admin_user_tok,
         )
 
+    def test_get_joined_members_after_leave_room(self):
+        """Test that room members can be requested correctly"""
+
+        # create the room
+        user_1 = self.register_user("foo", "pass")
+        user_tok_1 = self.login("foo", "pass")
+        room_id_1 = self.helper.create_room_as(user_1, tok=user_tok_1)
+        self.helper.leave(room_id_1, user_1, tok=user_tok_1)
+
+        # delete the rooms and get joined roomed membership
+        url = f"/_matrix/client/r0/rooms/{room_id_1}/joined_members"
+        channel = self.make_request("GET", url.encode("ascii"), access_token=user_tok_1)
+        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
 
 class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
 
