@@ -1772,7 +1772,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
             tok=admin_user_tok,
         )
 
-    def test_get_joined_members_after_leave_room(self):
+    def test_get_joined_members_after_leave_room(self) -> None:
         """Test that room members can be requested correctly"""
 
         # create the room
