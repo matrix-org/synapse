@@ -128,7 +128,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             prefilled_cache=device_outbox_prefill,
         )
 
-    async def process_replication_rows(
+    def process_replication_rows(
         self,
         stream_name: str,
         instance_name: str,
@@ -148,9 +148,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                     self._device_federation_outbox_stream_cache.entity_has_changed(
                         row.entity, token
                     )
-        return await super().process_replication_rows(
-            stream_name, instance_name, token, rows
-        )
+        return super().process_replication_rows(stream_name, instance_name, token, rows)
 
     def get_to_device_stream_token(self) -> int:
         return self._device_inbox_id_gen.get_current_token()
@@ -438,7 +436,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             (user_id, device_id), None
         )
 
-        set_tag("last_deleted_stream_id", last_deleted_stream_id)
+        set_tag("last_deleted_stream_id", str(last_deleted_stream_id))
 
         if last_deleted_stream_id:
             has_changed = self._device_inbox_stream_cache.has_entity_changed(

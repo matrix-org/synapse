@@ -32,6 +32,7 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.engines import PostgresEngine
+from synapse.storage.util.id_generators import MultiWriterIdGenerator
 from synapse.util.caches.descriptors import _CachedFunction
 from synapse.util.iterutils import batch_iter
 
@@ -64,6 +65,31 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             columns=("instance_name", "stream_id"),
             psql_only=True,  # The table is only on postgres DBs.
         )
+
+        self._cache_id_gen: Optional[MultiWriterIdGenerator]
+        if isinstance(self.database_engine, PostgresEngine):
+            # We set the `writers` to an empty list here as we don't care about
+            # missing updates over restarts, as we'll not have anything in our
+            # caches to invalidate. (This reduces the amount of writes to the DB
+            # that happen).
+            self._cache_id_gen = MultiWriterIdGenerator(
+                db_conn,
+                database,
+                stream_name="caches",
+                instance_name=hs.get_instance_name(),
+                tables=[
+                    (
+                        "cache_invalidation_stream_by_instance",
+                        "instance_name",
+                        "stream_id",
+                    )
+                ],
+                sequence_name="cache_invalidation_stream_seq",
+                writers=[],
+            )
+
+        else:
+            self._cache_id_gen = None
 
     async def get_all_updated_caches(
         self, instance_name: str, last_id: int, current_id: int, limit: int
@@ -119,7 +145,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             "get_all_updated_caches", get_all_updated_caches_txn
         )
 
-    async def process_replication_rows(
+    def process_replication_rows(
         self, stream_name: str, instance_name: str, token: int, rows: Iterable[Any]
     ) -> None:
         if stream_name == EventsStream.NAME:
@@ -154,7 +180,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
                 else:
                     self._attempt_to_invalidate_cache(row.cache_func, row.keys)
 
-        await super().process_replication_rows(stream_name, instance_name, token, rows)
+        super().process_replication_rows(stream_name, instance_name, token, rows)
 
     def _process_event_stream_row(self, token: int, row: EventsStreamRow) -> None:
         data = row.data

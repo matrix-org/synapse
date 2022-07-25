@@ -292,7 +292,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
                 # than the id that the client has.
                 pass
 
-    async def process_replication_rows(
+    def process_replication_rows(
         self,
         stream_name: str,
         instance_name: str,
@@ -305,7 +305,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
                 self.get_tags_for_user.invalidate((row.user_id,))
                 self._account_data_stream_cache.entity_has_changed(row.user_id, token)
 
-        await super().process_replication_rows(stream_name, instance_name, token, rows)
+        super().process_replication_rows(stream_name, instance_name, token, rows)
 
 
 class TagsStore(TagsWorkerStore):

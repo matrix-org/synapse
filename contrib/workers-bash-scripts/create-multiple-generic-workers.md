@@ -1,4 +1,4 @@
-# Creating multiple workers with a bash script
+# Creating multiple generic workers with a bash script
 
 Setting up multiple worker configuration files manually can be time-consuming.
 You can alternatively create multiple worker configuration files with a simple `bash` script. For example:

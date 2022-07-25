@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # This dockerfile builds on top of 'docker/Dockerfile-workers' in matrix-org/synapse
 # by including a built-in postgres instance, as well as setting up the homeserver so
 # that it is ready for testing via Complement.

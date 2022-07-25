@@ -766,10 +766,24 @@ class FederationEventHandler:
         """
         logger.info("Processing pulled event %s", event)
 
-        # these should not be outliers.
-        assert (
-            not event.internal_metadata.is_outlier()
-        ), "pulled event unexpectedly flagged as outlier"
+        # This function should not be used to persist outliers (use something
+        # else) because this does a bunch of operations that aren't necessary
+        # (extra work; in particular, it makes sure we have all the prev_events
+        # and resolves the state across those prev events). If you happen to run
+        # into a situation where the event you're trying to process/backfill is
+        # marked as an `outlier`, then you should update that spot to return an
+        # `EventBase` copy that doesn't have `outlier` flag set.
+        #
+        # `EventBase` is used to represent both an event we have not yet
+        # persisted, and one that we have persisted and now keep in the cache.
+        # In an ideal world this method would only be called with the first type
+        # of event, but it turns out that's not actually the case and for
+        # example, you could get an event from cache that is marked as an
+        # `outlier` (fix up that spot though).
+        assert not event.internal_metadata.is_outlier(), (
+            "Outlier event passed to _process_pulled_event. "
+            "To persist an event as a non-outlier, make sure to pass in a copy without `event.internal_metadata.outlier = true`."
+        )
 
         event_id = event.event_id
 
@@ -779,7 +793,7 @@ class FederationEventHandler:
         if existing:
             if not existing.internal_metadata.is_outlier():
                 logger.info(
-                    "Ignoring received event %s which we have already seen",
+                    "_process_pulled_event: Ignoring received event %s which we have already seen",
                     event_id,
                 )
                 return
@@ -1037,6 +1051,9 @@ class FederationEventHandler:
         # XXX: this doesn't sound right? it means that we'll end up with incomplete
         #   state.
         failed_to_fetch = desired_events - event_metadata.keys()
+        # `event_id` could be missing from `event_metadata` because it's not necessarily
+        # a state event. We've already checked that we've fetched it above.
+        failed_to_fetch.discard(event_id)
         if failed_to_fetch:
             logger.warning(
                 "Failed to fetch missing state events for %s %s",
@@ -1311,6 +1328,53 @@ class FederationEventHandler:
             insertion_event,
             marker_event,
         )
+
+    async def backfill_event_id(
+        self, destination: str, room_id: str, event_id: str
+    ) -> EventBase:
+        """Backfill a single event and persist it as a non-outlier which means
+        we also pull in all of the state and auth events necessary for it.
+
+        Args:
+            destination: The homeserver to pull the given event_id from.
+            room_id: The room where the event is from.
+            event_id: The event ID to backfill.
+
+        Raises:
+            FederationError if we are unable to find the event from the destination
+        """
+        logger.info(
+            "backfill_event_id: event_id=%s from destination=%s", event_id, destination
+        )
+
+        room_version = await self._store.get_room_version(room_id)
+
+        event_from_response = await self._federation_client.get_pdu(
+            [destination],
+            event_id,
+            room_version,
+        )
+
+        if not event_from_response:
+            raise FederationError(
+                "ERROR",
+                404,
+                "Unable to find event_id=%s from destination=%s to backfill."
+                % (event_id, destination),
+                affected=event_id,
+            )
+
+        # Persist the event we just fetched, including pulling all of the state
+        # and auth events to de-outlier it. This also sets up the necessary
+        # `state_groups` for the event.
+        await self._process_pulled_events(
+            destination,
+            [event_from_response],
+            # Prevent notifications going to clients
+            backfilled=True,
+        )
+
+        return event_from_response
 
     async def _get_events_and_persist(
         self, destination: str, room_id: str, event_ids: Collection[str]
@@ -1647,11 +1711,21 @@ class FederationEventHandler:
         """Checks if we should soft fail the event; if so, marks the event as
         such.
 
+        Does nothing for events in rooms with partial state, since we may not have an
+        accurate membership event for the sender in the current state.
+
         Args:
             event
             state_ids: The state at the event if we don't have all the event's prev events
             origin: The host the event originates from.
         """
+        if await self._store.is_partial_state_room(event.room_id):
+            # We might not know the sender's membership in the current state, so don't
+            # soft fail anything. Even if we do have a membership for the sender in the
+            # current state, it may have been derived from state resolution between
+            # partial and full state and may not be accurate.
+            return
+
         extrem_ids_list = await self._store.get_latest_event_ids_in_room(event.room_id)
         extrem_ids = set(extrem_ids_list)
         prev_event_ids = set(event.prev_event_ids())
@@ -1979,6 +2053,10 @@ class FederationEventHandler:
         await self._notifier.on_new_room_event(
             event, event_pos, max_stream_token, extra_users=extra_users
         )
+
+        if event.type == EventTypes.Member and event.membership == Membership.JOIN:
+            # TODO retrieve the previous state, and exclude join -> join transitions
+            self._notifier.notify_user_joined_room(event.event_id, event.room_id)
 
     def _sanity_check_event(self, ev: EventBase) -> None:
         """

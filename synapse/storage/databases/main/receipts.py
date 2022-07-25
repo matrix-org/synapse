@@ -589,7 +589,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             "get_unread_event_push_actions_by_room_for_user", (room_id,)
         )
 
-    async def process_replication_rows(
+    def process_replication_rows(
         self,
         stream_name: str,
         instance_name: str,
@@ -604,9 +604,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 )
                 self._receipts_stream_cache.entity_has_changed(row.room_id, token)
 
-        return await super().process_replication_rows(
-            stream_name, instance_name, token, rows
-        )
+        return super().process_replication_rows(stream_name, instance_name, token, rows)
 
     def _insert_linearized_receipt_txn(
         self,

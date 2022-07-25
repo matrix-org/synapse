@@ -148,7 +148,7 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
         tok2 = self.login("fozzie", "bear")
         self.helper.join(self._room_id, second_member_user_id, tok=tok2)
 
-    def _make_join(self, user_id) -> JsonDict:
+    def _make_join(self, user_id: str) -> JsonDict:
         channel = self.make_signed_federation_request(
             "GET",
             f"/_matrix/federation/v1/make_join/{self._room_id}/{user_id}"
@@ -259,6 +259,67 @@ class SendJoinFederationTests(unittest.FederatingHomeserverTestCase):
             self._storage_controllers.state.get_current_state(self._room_id)
         )
         self.assertEqual(r[("m.room.member", joining_user)].membership, "join")
+
+    @override_config({"rc_joins_per_room": {"per_second": 0, "burst_count": 3}})
+    def test_make_join_respects_room_join_rate_limit(self) -> None:
+        # In the test setup, two users join the room. Since the rate limiter burst
+        # count is 3, a new make_join request to the room should be accepted.
+
+        joining_user = "@ronniecorbett:" + self.OTHER_SERVER_NAME
+        self._make_join(joining_user)
+
+        # Now have a new local user join the room. This saturates the rate limiter
+        # bucket, so the next make_join should be denied.
+        new_local_user = self.register_user("animal", "animal")
+        token = self.login("animal", "animal")
+        self.helper.join(self._room_id, new_local_user, tok=token)
+
+        joining_user = "@ronniebarker:" + self.OTHER_SERVER_NAME
+        channel = self.make_signed_federation_request(
+            "GET",
+            f"/_matrix/federation/v1/make_join/{self._room_id}/{joining_user}"
+            f"?ver={DEFAULT_ROOM_VERSION}",
+        )
+        self.assertEqual(channel.code, HTTPStatus.TOO_MANY_REQUESTS, channel.json_body)
+
+    @override_config({"rc_joins_per_room": {"per_second": 0, "burst_count": 3}})
+    def test_send_join_contributes_to_room_join_rate_limit_and_is_limited(self) -> None:
+        # Make two make_join requests up front. (These are rate limited, but do not
+        # contribute to the rate limit.)
+        join_event_dicts = []
+        for i in range(2):
+            joining_user = f"@misspiggy{i}:{self.OTHER_SERVER_NAME}"
+            join_result = self._make_join(joining_user)
+            join_event_dict = join_result["event"]
+            self.add_hashes_and_signatures_from_other_server(
+                join_event_dict,
+                KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
+            )
+            join_event_dicts.append(join_event_dict)
+
+        # In the test setup, two users join the room. Since the rate limiter burst
+        # count is 3, the first send_join should be accepted...
+        channel = self.make_signed_federation_request(
+            "PUT",
+            f"/_matrix/federation/v2/send_join/{self._room_id}/join0",
+            content=join_event_dicts[0],
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # ... but the second should be denied.
+        channel = self.make_signed_federation_request(
+            "PUT",
+            f"/_matrix/federation/v2/send_join/{self._room_id}/join1",
+            content=join_event_dicts[1],
+        )
+        self.assertEqual(channel.code, HTTPStatus.TOO_MANY_REQUESTS, channel.json_body)
+
+    # NB: we could write a test which checks that the send_join event is seen
+    #   by other workers over replication, and that they update their rate limit
+    #   buckets accordingly. I'm going to assume that the join event gets sent over
+    #   replication, at which point the tests.handlers.room_member test
+    #       test_local_users_joining_on_another_worker_contribute_to_rate_limit
+    #   is probably sufficient to reassure that the bucket is updated.
 
 
 def _create_acl_event(content):
