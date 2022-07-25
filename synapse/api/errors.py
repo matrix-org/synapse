@@ -318,7 +318,7 @@ class UnstableSpecAuthError(AuthError):
     This error will return a "org.matrix.unstable.errcode" property with the new error code,
     with the previous error code still being defined in the "errcode" property.
 
-    This error will include `org.matrix.MSC3848.unstable.errcode` in the C-S error body.
+    This error will include `org.matrix.msc3848.unstable.errcode` in the C-S error body.
     """
 
     def __init__(
@@ -336,7 +336,7 @@ class UnstableSpecAuthError(AuthError):
         return cs_error(
             self.msg,
             self.previous_errcode,
-            **{"org.matrix.MSC3848.unstable.errcode": self.errcode},
+            **{"org.matrix.msc3848.unstable.errcode": self.errcode},
             **self._additional_fields,
         )
 
