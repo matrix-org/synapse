@@ -1,1 +1,1 @@
-Fix long-standing bug where Synapse sometimes asked many different remote hosts for the same event.
+Fix long-standing bug in `get_pdu` asking every remote destination even after it finds an event.
