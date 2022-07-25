@@ -316,7 +316,9 @@ class AuthError(SynapseError):
 class UnstableSpecAuthError(AuthError):
     """An error raised when a new error code is being proposed to replace a previous one.
     This error will return a "org.matrix.unstable.errcode" property with the new error code,
-    with the previous error code still being defined in the "errcode" property
+    with the previous error code still being defined in the "errcode" property.
+
+    This error will include `org.matrix.MSC3848.unstable.errcode` in the C-S error body.
     """
 
     def __init__(
@@ -334,7 +336,7 @@ class UnstableSpecAuthError(AuthError):
         return cs_error(
             self.msg,
             self.previous_errcode,
-            **{"org.matrix.unstable.errcode": self.errcode},
+            **{"org.matrix.MSC3848.unstable.errcode": self.errcode},
             **self._additional_fields,
         )
 
