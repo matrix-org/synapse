@@ -1,0 +1,1 @@
+Make `DictionaryCache` expire full entries if they haven't been queried in a while, even if specific keys have been queried recently.
