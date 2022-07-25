@@ -2823,11 +2823,19 @@ adding a 3PID).</p>
 <p><code>smtp_host</code>: The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.</p>
 </li>
 <li>
-<p><code>smtp_port</code>: The port on the mail server for outgoing SMTP. Defaults to 25.</p>
+<p><code>smtp_port</code>: The port on the mail server for outgoing SMTP. Defaults to 465 if <code>force_tls</code> is true, else 25.</p>
+<p><em>Changed in Synapse 1.64.0:</em> the default port is now aware of <code>force_tls</code>.</p>
 </li>
 <li>
 <p><code>smtp_user</code> and <code>smtp_pass</code>: Username/password for authentication to the SMTP server. By default, no
 authentication is attempted.</p>
+</li>
+<li>
+<p><code>force_tls</code>: By default, Synapse connects over plain text and then optionally upgrades
+to TLS via STARTTLS. If this option is set to true, TLS is used from the start (Implicit TLS),
+and the option <code>require_transport_security</code> is ignored.
+It is recommended to enable this if supported by your mail server.</p>
+<p><em>New in Synapse 1.64.0.</em></p>
 </li>
 <li>
 <p><code>require_transport_security</code>: Set to true to require TLS transport security for SMTP.
@@ -2913,6 +2921,7 @@ ownership. Defaults to &quot;[%(server_name)s] Validate your email&quot;</li>
   smtp_port: 587
   smtp_user: &quot;exampleusername&quot;
   smtp_pass: &quot;examplepassword&quot;
+  force_tls: true
   require_transport_security: true
   enable_tls: false
   notif_from: &quot;Your Friendly %(app)s homeserver &lt;noreply@example.com&gt;&quot;
