@@ -547,8 +547,8 @@ class FederationEventHandler:
             #     prev_events. The prev_events may or may not have partial state and
             #     we won't know until we compute the event context.
             #   * `state_ids` is not `None` and `partial_state` is `False` if we were
-            #     missing any prev_events. We calculated the full state after the
-            #     prev_events.
+            #     missing some prev_events (but we have full state for any we did
+            #     have). We calculated the full state after the prev_events.
             #   * `state_ids` is not `None` and `partial_state` is `True` if we were
             #     missing some, but not all, prev_events. At least one of the
             #     prev_events we did have had partial state, so we calculated a partial
