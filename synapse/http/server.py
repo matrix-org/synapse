@@ -161,16 +161,17 @@ def return_json_error(
 ) -> None:
     """Sends a JSON error response to clients."""
 
-    if f.check(SynapseError):
+    if f.check(UnstableSpecAuthError):
+        # mypy doesn't understand that f.check asserts the type.
+        exc: UnstableSpecAuthError = f.value  # type: ignore
+        error_code = exc.code
+        error_dict = exc.error_dict(allow_unstable_fields)
+        logger.info("%s SynapseError: %s - %s", request, error_code, exc.msg)
+    elif f.check(SynapseError):
         # mypy doesn't understand that f.check asserts the type.
         exc: SynapseError = f.value  # type: ignore
         error_code = exc.code
-        if f.check(UnstableSpecAuthError):
-            unstable_exc: UnstableSpecAuthError = f.value  # type: ignore
-            error_dict = unstable_exc.error_dict(allow_unstable_fields)
-        else:
-            error_dict = exc.error_dict()
-
+        error_dict = exc.error_dict()
         logger.info("%s SynapseError: %s - %s", request, error_code, exc.msg)
     elif f.check(CancelledError):
         error_code = HTTP_STATUS_REQUEST_CANCELLED
