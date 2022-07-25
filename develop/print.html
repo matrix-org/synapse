@@ -909,57 +909,27 @@ to proxied traffic.)</p>
     }
 }
 </code></pre>
-<h3 id="caddy-v1"><a class="header" href="#caddy-v1">Caddy v1</a></h3>
-<pre><code>matrix.example.com {
-  proxy /_matrix http://localhost:8008 {
-    transparent
-  }
-
-  proxy /_synapse/client http://localhost:8008 {
-    transparent
-  }
-}
-
-example.com:8448 {
-  proxy / http://localhost:8008 {
-    transparent
-  }
-}
-</code></pre>
 <h3 id="caddy-v2"><a class="header" href="#caddy-v2">Caddy v2</a></h3>
 <pre><code>matrix.example.com {
-  reverse_proxy /_matrix/* http://localhost:8008
-  reverse_proxy /_synapse/client/* http://localhost:8008
+  reverse_proxy /_matrix/* localhost:8008
+  reverse_proxy /_synapse/client/* localhost:8008
 }
 
 example.com:8448 {
-  reverse_proxy http://localhost:8008
+  reverse_proxy localhost:8008
 }
 </code></pre>
 <p><a href="delegate.html">Delegation</a> example:</p>
-<pre><code>(matrix-well-known-header) {
-    # Headers
-    header Access-Control-Allow-Origin &quot;*&quot;
-    header Access-Control-Allow-Methods &quot;GET, POST, PUT, DELETE, OPTIONS&quot;
-    header Access-Control-Allow-Headers &quot;Origin, X-Requested-With, Content-Type, Accept, Authorization&quot;
-    header Content-Type &quot;application/json&quot;
-}
-
-example.com {
-    handle /.well-known/matrix/server {
-        import matrix-well-known-header
-        respond `{&quot;m.server&quot;:&quot;matrix.example.com:443&quot;}`
-    }
-
-    handle /.well-known/matrix/client {
-        import matrix-well-known-header
-        respond `{&quot;m.homeserver&quot;:{&quot;base_url&quot;:&quot;https://matrix.example.com&quot;},&quot;m.identity_server&quot;:{&quot;base_url&quot;:&quot;https://identity.example.com&quot;}}`
-    }
+<pre><code>example.com {
+	header /.well-known/matrix/* Content-Type application/json
+	header /.well-known/matrix/* Access-Control-Allow-Origin *
+	respond /.well-known/matrix/server `{&quot;m.server&quot;: &quot;matrix.example.com:443&quot;}`
+	respond /.well-known/matrix/client `{&quot;m.homeserver&quot;:{&quot;base_url&quot;:&quot;https://matrix.example.com&quot;},&quot;m.identity_server&quot;:{&quot;base_url&quot;:&quot;https://identity.example.com&quot;}}`
 }
 
 matrix.example.com {
-    reverse_proxy /_matrix/* http://localhost:8008
-    reverse_proxy /_synapse/client/* http://localhost:8008
+    reverse_proxy /_matrix/* localhost:8008
+    reverse_proxy /_synapse/client/* localhost:8008
 }
 </code></pre>
 <h3 id="apache"><a class="header" href="#apache">Apache</a></h3>
