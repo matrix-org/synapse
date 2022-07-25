@@ -1773,7 +1773,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         )
 
     def test_get_joined_members_after_leave_room(self) -> None:
-        """Test that room members can be requested correctly"""
+        """Test that requesting room members after leaving the room raises a 403 error."""
 
         # create the room
         user = self.register_user("foo", "pass")
