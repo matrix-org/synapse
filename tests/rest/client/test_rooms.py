@@ -3470,7 +3470,7 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
             content={
                 "id_server": "example.com",
                 "medium": "email",
-                "address": "teresa@example.com"
+                "address": "teresa@example.com",
             },
             access_token=self.tok,
         )
