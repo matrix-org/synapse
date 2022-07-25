@@ -746,9 +746,11 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     async def _do_users_share_a_room(
         self, user_id: str, other_user_ids: Collection[str]
     ) -> Mapping[str, Optional[bool]]:
-        """Return mapping from user ID to whether they share a room with the given user.
+        """Return mapping from user ID to whether they share a room with the
+        given user.
 
-        Note: `None` and `False` are equivalent and mean they don't share a room.
+        Note: `None` and `False` are equivalent and mean they don't share a
+        room.
         """
 
         def do_users_share_a_room_txn(
