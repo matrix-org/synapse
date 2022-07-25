@@ -168,9 +168,10 @@ jobs:
         shell: bash
         name: Run Complement Tests
 
-  # open an issue if the build fails, so we know about it.
+  # Open an issue if the build fails, so we know about it.
+  # Only do this if we're not experimenting with this action in a PR.
   open-issue:
-    if: failure()
+    if: "failure() && github.event_name != 'push' && github.event_name != 'pull_request'"
     needs:
       # TODO: should mypy be included here? It feels more brittle than the other two.
       - mypy
