@@ -50,6 +50,7 @@ from synapse.api.errors import (
     LoginError,
     StoreError,
     SynapseError,
+    UnstableSpecAuthError,
     UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
@@ -562,6 +563,8 @@ class AuthHandler:
                     await self.store.mark_ui_auth_stage_complete(
                         session.session_id, login_type, result
                     )
+            except UnstableSpecAuthError as e:
+                errordict = e.error_dict(self.hs.config.experimental.msc3848_enabled)
             except LoginError as e:
                 # this step failed. Merge the error dict into the response
                 # so that the client can have another go.

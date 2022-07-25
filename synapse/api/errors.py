@@ -332,11 +332,14 @@ class UnstableSpecAuthError(AuthError):
         self.previous_errcode = previous_errcode
         super().__init__(code, msg, errcode, additional_fields)
 
-    def error_dict(self) -> "JsonDict":
+    def error_dict(self, allow_unstable_fields: bool = False) -> "JsonDict":
+        fields = {}
+        if allow_unstable_fields:
+            fields["org.matrix.msc3848.unstable.errcode"] = self.errcode
         return cs_error(
             self.msg,
             self.previous_errcode,
-            **{"org.matrix.msc3848.unstable.errcode": self.errcode},
+            **fields,
             **self._additional_fields,
         )
 

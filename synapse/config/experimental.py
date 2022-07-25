@@ -90,3 +90,6 @@ class ExperimentalConfig(Config):
 
         # MSC3827: Filtering of /publicRooms by room type
         self.msc3827_enabled: bool = experimental.get("msc3827_enabled", False)
+
+        # MSC3848: Introduce errcodes for specific event sending failures
+        self.msc3848_enabled: bool = experimental.get("msc3848_enabled", False)
