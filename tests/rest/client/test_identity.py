@@ -25,7 +25,6 @@ from tests import unittest
 
 
 class IdentityTestCase(unittest.HomeserverTestCase):
-
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
@@ -33,7 +32,6 @@ class IdentityTestCase(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
-
         config = self.default_config()
         config["enable_3pid_lookup"] = False
         self.hs = self.setup_test_homeserver(config=config)
@@ -61,15 +59,3 @@ class IdentityTestCase(unittest.HomeserverTestCase):
             b"POST", request_url, request_data, access_token=tok
         )
         self.assertEqual(channel.code, HTTPStatus.FORBIDDEN, channel.result)
-
-
-# {'version': b'1.1', 'code': b'400', 'reason': b'Bad Request',
-# 'headers': [
-#     (b'Server', b'1'), (b'Date', b'Mon,
-#         11 Jul 2022 10: 58: 19 GMT'),
-#         (b'Content-Type', b'application/json'), (b'Cache-Control', b'no-cache, no-store, must-revalidate'), (b'Access-Control-Allow-Origin', b'*'), (b'Access-Control-Allow-Methods', b'GET, HEAD, POST, PUT, DELETE, OPTIONS'), (b'Access-Control-Allow-Headers', b'X-Requested-With, Content-Type, Authorization, Date')
-#     ], 'body': b'{
-#         "errcode": "M_MISSING_PARAM",
-#         "error":"Missing params: [\'user_id\']"
-#     }', 'done': True
-# }

@@ -763,45 +763,22 @@ class IdentityHandler:
             raise SynapseError(500, "Timed out contacting identity server")
         except HttpResponseException as e:
             logger.info("Failed to POST %s with JSON: %s", url, e)
-
         if data is None:
-            key_validity_url = "%s%s/_matrix/identity/api/v1/pubkey/isvalid" % (
-                id_server_scheme,
-                id_server,
-            )
-            url = base_url + "/api/v1/store-invite"
-
+            # Some identity servers may only support application/x-www-form-urlencoded
+            # types. This is especially true with old instances of Sydent, see
+            # https://github.com/matrix-org/sydent/pull/170
             try:
-                data = await self.blacklisting_http_client.post_json_get_json(
+                data = await self.blacklisting_http_client.post_urlencoded_get_json(
                     url, invite_config
                 )
-            except RequestTimedOutError:
-                raise SynapseError(500, "Timed out contacting identity server")
             except HttpResponseException as e:
                 logger.warning(
-                    "Error trying to call /store-invite on %s%s: %s",
+                    "Error calling /store-invite on %s%s with fallback " "encoding: %s",
                     id_server_scheme,
                     id_server,
                     e,
                 )
-
-            if data is None:
-                # Some identity servers may only support application/x-www-form-urlencoded
-                # types. This is especially true with old instances of Sydent, see
-                # https://github.com/matrix-org/sydent/pull/170
-                try:
-                    data = await self.blacklisting_http_client.post_urlencoded_get_json(
-                        url, invite_config
-                    )
-                except HttpResponseException as e:
-                    logger.warning(
-                        "Error calling /store-invite on %s%s with fallback "
-                        "encoding: %s",
-                        id_server_scheme,
-                        id_server,
-                        e,
-                    )
-                    raise e
+                raise e
 
         # TODO: Check for success
         token = data["token"]

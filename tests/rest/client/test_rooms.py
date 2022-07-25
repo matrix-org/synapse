@@ -3463,7 +3463,11 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         # Also check that it stopped before calling _make_and_store_3pid_invite.
         make_invite_mock.assert_called_once()
 
-    def test_400_without_id_access_token(self) -> None:
+    def test_400_missing_param_without_id_access_token(self) -> None:
+        """
+        Test checking that invite returns 400 missing param
+        if we do not include id_access_token.
+        """
         channel = self.make_request(
             method="POST",
             path="/rooms/" + self.room_id + "/invite",
@@ -3475,3 +3479,4 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 400)
+        self.assertEqual(channel.json_body["errcode"], "M_MISSING_PARAM")
