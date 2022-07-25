@@ -213,10 +213,10 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
                         receipt_type: receipt_value
                         for receipt_type, receipt_value in event_content.items()
                         if receipt_type
-                        not in [
+                        not in (
                             ReceiptTypes.READ_PRIVATE,
                             ReceiptTypes.READ_PRIVATE_UNSTABLE,
-                        ]
+                        )
                     }
 
                     # Copy the current user's private read receipt from the
