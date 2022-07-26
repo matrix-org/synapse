@@ -68,7 +68,7 @@ from synapse.logging.context import (
 from synapse.rest import RegisterServletsFunc
 from synapse.server import HomeServer
 from synapse.storage.keys import FetchKeyResult
-from synapse.types import JsonDict, UserID, create_requester
+from synapse.types import JsonDict, Requester, UserID, create_requester
 from synapse.util import Clock
 from synapse.util.httpresourcetree import create_resource_tree
 
@@ -171,7 +171,7 @@ class TestCase(unittest.TestCase):
 
             return ret
 
-    def assertObjectHasAttributes(self, attrs, obj):
+    def assertObjectHasAttributes(self, attrs: Dict[str, object], obj: object) -> None:
         """Asserts that the given object has each of the attributes given, and
         that the value of each matches according to assertEqual."""
         for key in attrs.keys():
@@ -259,7 +259,7 @@ class HomeserverTestCase(TestCase):
         method = getattr(self, methodName)
         self._extra_config = getattr(method, "_extra_config", None)
 
-    def setUp(self):
+    def setUp(self) -> None:
         """
         Set up the TestCase by calling the homeserver constructor, optionally
         hijacking the authentication system to return a fixed user, and then
@@ -310,7 +310,9 @@ class HomeserverTestCase(TestCase):
                     )
                 )
 
-                async def get_user_by_access_token(token=None, allow_guest=False):
+                async def get_user_by_access_token(
+                    token: Optional[str] = None, allow_guest: bool = False
+                ) -> JsonDict:
                     assert self.helper.auth_user_id is not None
                     return {
                         "user": UserID.from_string(self.helper.auth_user_id),
@@ -318,7 +320,11 @@ class HomeserverTestCase(TestCase):
                         "is_guest": False,
                     }
 
-                async def get_user_by_req(request, allow_guest=False):
+                async def get_user_by_req(
+                    request: SynapseRequest,
+                    allow_guest: bool = False,
+                    allow_expired: bool = False,
+                ) -> Requester:
                     assert self.helper.auth_user_id is not None
                     return create_requester(
                         UserID.from_string(self.helper.auth_user_id),
@@ -343,11 +349,11 @@ class HomeserverTestCase(TestCase):
         if hasattr(self, "prepare"):
             self.prepare(self.reactor, self.clock, self.hs)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         # Reset to not use frozen dicts.
         events.USE_FROZEN_DICTS = False
 
-    def wait_on_thread(self, deferred, timeout=10):
+    def wait_on_thread(self, deferred: Deferred, timeout: int = 10) -> None:
         """
         Wait until a Deferred is done, where it's waiting on a real thread.
         """
@@ -378,7 +384,7 @@ class HomeserverTestCase(TestCase):
             clock (synapse.util.Clock): The Clock, associated with the reactor.
 
         Returns:
-            A homeserver (synapse.server.HomeServer) suitable for testing.
+            A homeserver suitable for testing.
 
         Function to be overridden in subclasses.
         """
@@ -412,7 +418,7 @@ class HomeserverTestCase(TestCase):
             "/_synapse/admin": servlet_resource,
         }
 
-    def default_config(self):
+    def default_config(self) -> JsonDict:
         """
         Get a default HomeServer config dict.
         """
@@ -525,7 +531,7 @@ class HomeserverTestCase(TestCase):
         config_obj.parse_config_dict(config, "", "")
         kwargs["config"] = config_obj
 
-        async def run_bg_updates():
+        async def run_bg_updates() -> None:
             with LoggingContext("run_bg_updates"):
                 self.get_success(stor.db_pool.updates.run_background_updates(False))
 
@@ -544,11 +550,7 @@ class HomeserverTestCase(TestCase):
         """
         self.reactor.pump([by] * 100)
 
-    def get_success(
-        self,
-        d: Awaitable[TV],
-        by: float = 0.0,
-    ) -> TV:
+    def get_success(self, d: Awaitable[TV], by: float = 0.0) -> TV:
         deferred: Deferred[TV] = ensureDeferred(d)  # type: ignore[arg-type]
         self.pump(by=by)
         return self.successResultOf(deferred)
