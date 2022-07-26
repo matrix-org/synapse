@@ -2,19 +2,19 @@
 import argparse
 import logging
 import sys
-from collections import defaultdict, Counter
+from collections import defaultdict
 from graphlib import TopologicalSorter
 from pprint import pformat
 from typing import (
-    Mapping,
-    Sequence,
+    Awaitable,
+    Callable,
+    Collection,
     Dict,
     List,
-    Tuple,
-    Iterable,
-    Collection,
+    Mapping,
     Optional,
-    Callable, Awaitable,
+    Sequence,
+    Tuple,
 )
 from unittest.mock import MagicMock, patch
 
@@ -37,7 +37,7 @@ from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.room import RoomWorkerStore
 from synapse.storage.databases.main.state import StateGroupWorkerStore
 from synapse.storage.state import StateFilter
-from synapse.types import ISynapseReactor, StateMap, MutableStateMap
+from synapse.types import ISynapseReactor, StateMap
 
 logger = logging.getLogger(sys.argv[0])
 
@@ -152,7 +152,7 @@ async def dump_mainlines(
     hs: MockHomeserver,
     starting_event: EventBase,
     watch_func: Optional[Callable[[EventBase], Awaitable[str]]] = None,
-    extras: Collection[EventBase] = tuple(),
+    extras: Collection[EventBase] = (),
 ):
     graph = pydot.Dot(rankdir="BT")
     graph.set_node_defaults(shape="box", style="filled")
@@ -202,7 +202,7 @@ async def dump_mainlines(
                         graph.add_node(await new_node(auth_event))
                     seen.add(auth_event.event_id)
                     todo.append(auth_event)
-                graph.add_edge(edge(event, auth_event))
+                graph.add_edge(edge(event, auth_event), style=style)
 
     graph.write_raw("mainlines.dot")
     graph.write_svg("mainlines.svg")
@@ -249,6 +249,7 @@ async def debug_specific_stateres(
                 event.event_id, filter
             )
             return f"{key_pair}: {result.get(key_pair, '<Missing>')}"
+
     else:
         watch_func = None
 
@@ -289,7 +290,13 @@ debug_parser = subparsers.add_parser(
     description="debug the stateres calculation of a specific event",
 )
 debug_parser.add_argument("event_id", help="the event ID to be resolved")
-debug_parser.add_argument("--watch", help="track a piece of state in the auth DAG", default=None, nargs=2, metavar=("TYPE", "STATE_KEY"))
+debug_parser.add_argument(
+    "--watch",
+    help="track a piece of state in the auth DAG",
+    default=None,
+    nargs=2,
+    metavar=("TYPE", "STATE_KEY"),
+)
 debug_parser.set_defaults(func=debug_specific_stateres)
 
 
@@ -350,8 +357,6 @@ async def debug_specific_room(
                 state_res_store=StateResolutionStore(hs.get_datastores().main),
             )
         )
-
-        ## Extra dict above is to keep mypy happy
 
         state_delta = (
             {(event.type, event.state_key): event.event_id}

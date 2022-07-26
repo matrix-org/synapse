@@ -79,10 +79,10 @@ __all__ = [
 ]
 
 
-def summarise(event_map, eids: Iterable[str]) -> Dict[str, int]:
-    return Counter(
-        event_map[eid].type  for eid in eids
-    )
+def summarise(
+    event_map: Mapping[str, EventBase], eids: Iterable[str]
+) -> Dict[str, int]:
+    return Counter(event_map[eid].type for eid in eids)
 
 
 async def resolve_events_with_store(
@@ -151,7 +151,10 @@ async def resolve_events_with_store(
     )
     event_map.update(events)
 
-    logger.debug("conflicted_state_set: %s", summarise(event_map, {eid for k, v in conflicted_state.items() for eid in v }))
+    logger.debug(
+        "conflicted_state_set: %s",
+        summarise(event_map, {eid for k, v in conflicted_state.items() for eid in v}),
+    )
     logger.debug("auth_diff: %s", summarise(event_map, auth_diff))
 
     # everything in the event map should be in the right room
