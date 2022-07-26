@@ -177,7 +177,7 @@ optional = false
 python-versions = "*"
 
 [package.extras]
-test = ["flake8 (==3.7.8)", "hypothesis (==3.55.3)"]
+test = ["hypothesis (==3.55.3)", "flake8 (==3.7.8)"]
 
 [[package]]
 name = "constantly"
@@ -435,8 +435,8 @@ optional = false
 python-versions = ">=3.6"
 
 [package.extras]
-test = ["pytest", "pytest-trio", "pytest-asyncio", "testpath", "trio", "async-timeout"]
-trio = ["trio", "async-generator"]
+trio = ["async-generator", "trio"]
+test = ["async-timeout", "trio", "testpath", "pytest-asyncio", "pytest-trio", "pytest"]
 
 [[package]]
 name = "jinja2"
@@ -535,8 +535,8 @@ attrs = "*"
 importlib-metadata = {version = ">=1.4", markers = "python_version < \"3.8\""}
 
 [package.extras]
-dev = ["tox", "twisted", "aiounittest", "mypy (==0.910)", "black (==22.3.0)", "flake8 (==4.0.1)", "isort (==5.9.3)", "build (==0.8.0)", "twine (==4.0.1)"]
-test = ["tox", "twisted", "aiounittest"]
+test = ["aiounittest", "twisted", "tox"]
+dev = ["twine (==4.0.1)", "build (==0.8.0)", "isort (==5.9.3)", "flake8 (==4.0.1)", "black (==22.3.0)", "mypy (==0.910)", "aiounittest", "twisted", "tox"]
 
 [[package]]
 name = "matrix-synapse-ldap3"
@@ -552,7 +552,7 @@ service-identity = "*"
 Twisted = ">=15.1.0"
 
 [package.extras]
-dev = ["matrix-synapse", "tox", "ldaptor", "mypy (==0.910)", "types-setuptools", "black (==22.3.0)", "flake8 (==4.0.1)", "isort (==5.9.3)"]
+dev = ["isort (==5.9.3)", "flake8 (==4.0.1)", "black (==22.3.0)", "types-setuptools", "mypy (==0.910)", "ldaptor", "tox", "matrix-synapse"]
 
 [[package]]
 name = "mccabe"
@@ -820,10 +820,10 @@ optional = false
 python-versions = ">=3.6"
 
 [package.extras]
+tests = ["coverage[toml] (==5.0.4)", "pytest (>=6.0.0,<7.0.0)"]
+docs = ["zope.interface", "sphinx-rtd-theme", "sphinx"]
+dev = ["pre-commit", "mypy", "coverage[toml] (==5.0.4)", "pytest (>=6.0.0,<7.0.0)", "cryptography (>=3.3.1)", "zope.interface", "sphinx-rtd-theme", "sphinx"]
 crypto = ["cryptography (>=3.3.1)"]
-dev = ["sphinx", "sphinx-rtd-theme", "zope.interface", "cryptography (>=3.3.1)", "pytest (>=6.0.0,<7.0.0)", "coverage[toml] (==5.0.4)", "mypy", "pre-commit"]
-docs = ["sphinx", "sphinx-rtd-theme", "zope.interface"]
-tests = ["pytest (>=6.0.0,<7.0.0)", "coverage[toml] (==5.0.4)"]
 
 [[package]]
 name = "pymacaroons"
@@ -1006,6 +1006,21 @@ python-versions = ">=3.7"
 
 [package.extras]
 idna2008 = ["idna"]
+
+[[package]]
+name = "rust-python-jaeger-reporter"
+version = "0.1.20"
+description = "A faster reporter for the python `jaeger-client` that reports spans in a native background thread."
+category = "main"
+optional = false
+python-versions = ">=3.6"
+develop = false
+
+[package.source]
+type = "git"
+url = "https://github.com/erikjohnston/rust-jaeger-python-client.git"
+reference = "master"
+resolved_reference = "27754b5f56b4099374c389f677911f7af852a00e"
 
 [[package]]
 name = "secretstorage"
@@ -1563,7 +1578,7 @@ url_preview = ["lxml"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7.1"
-content-hash = "c24bbcee7e86dbbe7cdbf49f91a25b310bf21095452641e7440129f59b077f78"
+content-hash = "0fc4f4fc7606ac12a18e1e5657f0f45cfa46442d46053ea106e0e28c53bcbaaf"
 
 [metadata.files]
 attrs = [
@@ -2394,6 +2409,7 @@ rfc3986 = [
     {file = "rfc3986-2.0.0-py2.py3-none-any.whl", hash = "sha256:50b1502b60e289cb37883f3dfd34532b8873c7de9f49bb546641ce9cbd256ebd"},
     {file = "rfc3986-2.0.0.tar.gz", hash = "sha256:97aacf9dbd4bfd829baad6e6309fa6573aaf1be3f6fa735c8ab05e46cecb261c"},
 ]
+rust-python-jaeger-reporter = []
 secretstorage = [
     {file = "SecretStorage-3.3.1-py3-none-any.whl", hash = "sha256:422d82c36172d88d6a0ed5afdec956514b189ddbfb72fefab0c8a1cee4eaf71f"},
     {file = "SecretStorage-3.3.1.tar.gz", hash = "sha256:fd666c51a6bf200643495a04abb261f83229dcb6fd8472ec393df7ffc8b6f195"},
