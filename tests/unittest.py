@@ -879,7 +879,7 @@ def _auth_header_for_request(
     )
 
 
-def override_config(extra_config):
+def override_config(extra_config: JsonDict) -> Callable[[TV], TV]:
     """A decorator which can be applied to test functions to give additional HS config
 
     For use
@@ -892,12 +892,13 @@ def override_config(extra_config):
                 ...
 
     Args:
-        extra_config(dict): Additional config settings to be merged into the default
+        extra_config: Additional config settings to be merged into the default
             config dict before instantiating the test homeserver.
     """
 
-    def decorator(func):
-        func._extra_config = extra_config
+    def decorator(func: TV) -> TV:
+        # This attribute is being defined.
+        func._extra_config = extra_config  # type: ignore[attr-defined]
         return func
 
     return decorator
