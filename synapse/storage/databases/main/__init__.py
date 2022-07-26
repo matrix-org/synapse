@@ -173,26 +173,6 @@ class DataStore(
         # TODO: shouldn't this be moved to `DeviceWorkerStore`?
         return self._device_list_id_gen.get_current_token()
 
-    async def get_users(self) -> List[JsonDict]:
-        """Function to retrieve a list of users in users table.
-
-        Returns:
-            A list of dictionaries representing users.
-        """
-        return await self.db_pool.simple_select_list(
-            table="users",
-            keyvalues={},
-            retcols=[
-                "name",
-                "password_hash",
-                "is_guest",
-                "admin",
-                "user_type",
-                "deactivated",
-            ],
-            desc="get_users",
-        )
-
     async def get_users_paginate(
         self,
         start: int,
