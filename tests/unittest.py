@@ -29,6 +29,7 @@ from typing import (
     Iterable,
     List,
     Optional,
+    NoReturn,
     Tuple,
     Type,
     TypeVar,
@@ -194,31 +195,31 @@ class TestCase(unittest.TestCase):
             )
 
 
-def DEBUG(target):
+def DEBUG(target: TV) -> TV:
     """A decorator to set the .loglevel attribute to logging.DEBUG.
     Can apply to either a TestCase or an individual test method."""
-    target.loglevel = logging.DEBUG
+    target.loglevel = logging.DEBUG  # type: ignore[attr-defined]
     return target
 
 
-def INFO(target):
+def INFO(target: TV) -> TV:
     """A decorator to set the .loglevel attribute to logging.INFO.
     Can apply to either a TestCase or an individual test method."""
-    target.loglevel = logging.INFO
+    target.loglevel = logging.INFO  # type: ignore[attr-defined]
     return target
 
 
-def logcontext_clean(target):
+def logcontext_clean(target: TV) -> TV:
     """A decorator which marks the TestCase or method as 'logcontext_clean'
 
     ... ie, any logcontext errors should cause a test failure
     """
 
-    def logcontext_error(msg):
+    def logcontext_error(msg: str) -> NoReturn:
         raise AssertionError("logcontext error: %s" % (msg))
 
     patcher = patch("synapse.logging.context.logcontext_error", new=logcontext_error)
-    return patcher(target)
+    return patcher(target)  # type: ignore[call-overload]
 
 
 class HomeserverTestCase(TestCase):
