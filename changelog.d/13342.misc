@@ -1,1 +1,0 @@
-When reporting metrics is enabled, use ~8x less data to describe DB transaction metrics.
