@@ -193,9 +193,12 @@ class PushRuleEvaluatorForEvent:
         elif condition["kind"] == "related_event_match":
             if not self._related_event:
                 return False
-            return self._event_match(
+            is_match = self._event_match(
                 condition, user_id, self._related_event, self._related_event_value_cache
             )
+            if condition.get("inverse_match"):
+                return not is_match
+            return is_match
         elif condition["kind"] == "contains_display_name":
             return self._contains_display_name(display_name)
         elif condition["kind"] == "room_member_count":

@@ -342,6 +342,18 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
                 "display_name",
             )
         )
+        self.assertFalse(
+            evaluator.matches(
+                {
+                    "kind": "related_event_match",
+                    "key": "sender",
+                    "pattern_type": "user_id",
+                    "inverse_match": True,
+                },
+                "@other_user:test",
+                "display_name",
+            )
+        )
 
     def test_related_event_match_no_related_event(self):
         evaluator = self._get_evaluator(

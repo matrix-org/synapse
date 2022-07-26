@@ -313,6 +313,29 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": True}],
     },
+    # NOTE: upstream has a blanket rule that blocks all notifications for reactions,
+    # this is a modified rule that blocks reactions to *other users* events. This means
+    # any user supplied "noisy" rules don't accidentally trigger notifications for reactions
+    # to other users messages.
+    {
+        "rule_id": "global/override/.com.beeper.reaction",
+        "conditions": [
+            {
+                "kind": "event_match",
+                "key": "type",
+                "pattern": "m.reaction",
+                "_cache_key": "_reaction",
+            },
+            # Don't notify if this reaction is to someone elses event
+            {
+                "kind": "related_event_match",
+                "key": "sender",
+                "pattern_type": "user_id",
+                "inverse_match": True,
+            },
+        ],
+        "actions": ["dont_notify"],
+    },
     # XXX: This is an experimental rule that is only enabled if msc3786_enabled
     # is enabled, if it is not the rule gets filtered out in _load_rules() in
     # PushRulesWorkerStore
