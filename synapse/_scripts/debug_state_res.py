@@ -2,19 +2,8 @@
 import argparse
 import logging
 import sys
-from collections import defaultdict
-from graphlib import TopologicalSorter
 from pprint import pformat
-from typing import (
-    Awaitable,
-    Callable,
-    Collection,
-    Dict,
-    Optional,
-    Sequence,
-    Tuple,
-    cast,
-)
+from typing import Awaitable, Callable, Collection, Optional, Tuple, cast
 from unittest.mock import MagicMock, patch
 
 import dictdiffer
@@ -35,11 +24,17 @@ from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.room import RoomWorkerStore
 from synapse.storage.databases.main.state import StateGroupWorkerStore
 from synapse.storage.state import StateFilter
-from synapse.types import ISynapseReactor, StateMap
+from synapse.types import ISynapseReactor
+
+"""This monstrosity is useful for visualising and debugging state resolution problems.
+
+
+"""
 
 logger = logging.getLogger(sys.argv[0])
 
 
+# Bits of the HomeServer Machinery we need to talk to the DB.
 class Config(RootConfig):
     config_classes = [DatabaseConfig, WorkerConfig, CacheConfig]
 
@@ -73,6 +68,7 @@ class MockHomeserver(HomeServer):
         )
 
 
+# Functions for drawing graphviz diagrams via `pydot`.
 def node(
     event: EventBase, suffix: Optional[str] = None, **kwargs: object
 ) -> pydot.Node:
@@ -102,6 +98,21 @@ async def dump_mainlines(
     watch_func: Optional[Callable[[EventBase], Awaitable[str]]] = None,
     extras: Collection[EventBase] = (),
 ) -> None:
+    """Visualise the auth DAG above a given `starting_event`.
+
+    Starting with the given event's parents and any `extras` of interest, we search in
+    their auth events for power levels, join rules and sender membership events.
+    We recursively repeat this process for any events found during the search
+    until we have no more auth-ancestors of interest to find.
+
+    In this way we build up a subset of the auth chain of the `starting_event`.
+    (In particular we omit edges to m.room.create: they are everywhere and convey no
+    information.)
+
+    An optional `watch_func` allows us to annotate the events we see with a string of
+    our choice. This can be useful if we want to track a single piece of state through
+    the auth DAG.
+    """
     graph = pydot.Dot(rankdir="BT")
     graph.set_node_defaults(shape="box", style="filled")
 
@@ -150,10 +161,11 @@ async def dump_mainlines(
                     todo.append(auth_event)
                 graph.add_edge(edge(event, auth_event, style=style))
 
-    graph.write_raw("mainlines.dot")
+    # TODO: make this location configurable
     graph.write_svg("mainlines.svg")
 
 
+# The main logic and the arguments we need to invoke it.
 parser = argparse.ArgumentParser(
     description="Debug the stateres calculation of a specific event."
 )
@@ -173,9 +185,18 @@ parser.add_argument(
     metavar=("TYPE", "STATE_KEY"),
 )
 
+
 async def debug_specific_stateres(
     reactor: ISynapseReactor, hs: MockHomeserver, args: argparse.Namespace
 ) -> None:
+    """Recompute the state at the given event.
+
+    This produces
+    - a file called `mainline.svg` representing the auth chain of the given event,
+    - logging from state resolution calculations, written to stdout,
+    - the recomputed and stored state, written to stdout, and
+    - their difference, written to stdout.
+    """
     # Fetch the event in question.
     event = await hs.get_datastores().main.get_event(args.event_id)
     assert event is not None
@@ -225,19 +246,21 @@ async def debug_specific_stateres(
     )
     logger.info(pformat(stored_state))
 
-    logger.info("Diff from stored to resolved:")
+    # TODO make this a like-for-like comparison.
+    logger.info("Diff from stored (after event) to resolved (before event):")
     for change in dictdiffer.diff(stored_state, result):
         logger.info(pformat(change))
 
     if args.debug:
         print(
-            f"see state_after_parents[i] for i in range({len(state_after_parents)})"
-            " and result",
+            f"see `state_after_parents[i]` for 0 <= i < {len(state_after_parents)}"
+            " and `result`",
             file=sys.stderr,
         )
         breakpoint()
 
 
+# Entrypoint.
 if __name__ == "__main__":
     args = parser.parse_args()
     logging.basicConfig(
@@ -245,11 +268,13 @@ if __name__ == "__main__":
         level=logging.DEBUG if args.verbose else logging.INFO,
         stream=sys.stdout,
     )
+    # Suppress logs weren't not interested in.
     logging.getLogger("synapse.util").setLevel(logging.ERROR)
     logging.getLogger("synapse.storage").setLevel(logging.ERROR)
 
     config = load_config(args.config_file)
     hs = MockHomeserver(config)
+    # Patch out enough stuff so we can work with a readonly DB connection.
     with patch("synapse.storage.databases.prepare_database"), patch(
         "synapse.storage.database.BackgroundUpdater"
     ), patch("synapse.storage.databases.main.events_worker.MultiWriterIdGenerator"):
