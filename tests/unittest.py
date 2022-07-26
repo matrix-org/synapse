@@ -421,7 +421,9 @@ class HomeserverTestCase(TestCase):
 
         return config
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer):
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         """
         Prepare for the test.  This involves things like mocking out parts of
         the homeserver, or building test data common across the whole test
@@ -755,7 +757,7 @@ class FederatingHomeserverTestCase(HomeserverTestCase):
     OTHER_SERVER_NAME = "other.example.com"
     OTHER_SERVER_SIGNATURE_KEY = signedjson.key.generate_signing_key("test")
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         super().prepare(reactor, clock, hs)
 
         # poke the other server's signing key into the key store, so that we don't
