@@ -248,7 +248,7 @@ async def debug_specific_stateres(
 
     if args.debug:
         print(
-            f"see state_after_parents[i] for i in range({len(state_after_parents)}"
+            f"see state_after_parents[i] for i in range({len(state_after_parents)})"
             " and result",
             file=sys.stderr,
         )
