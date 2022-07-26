@@ -39,7 +39,7 @@ from unittest.mock import Mock, patch
 import canonicaljson
 import signedjson.key
 import unpaddedbase64
-from typing_extensions import Protocol
+from typing_extensions import ParamSpec, Protocol
 
 from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.python.failure import Failure
@@ -88,6 +88,9 @@ setup_logging()
 TV = TypeVar("TV")
 _ExcType = TypeVar("_ExcType", bound=BaseException, covariant=True)
 
+P = ParamSpec("P")
+R = TypeVar("R")
+
 
 class _TypedFailure(Generic[_ExcType], Protocol):
     """Extension to twisted.Failure, where the 'value' has a certain type."""
@@ -97,7 +100,7 @@ class _TypedFailure(Generic[_ExcType], Protocol):
         ...
 
 
-def around(target):
+def around(target: TV) -> Callable[[Callable[P, R]], None]:
     """A CLOS-style 'around' modifier, which wraps the original method of the
     given instance with another piece of code.
 
@@ -106,11 +109,11 @@ def around(target):
         return orig(*args, **kwargs)
     """
 
-    def _around(code):
+    def _around(code: Callable[P, R]) -> None:
         name = code.__name__
         orig = getattr(target, name)
 
-        def new(*args, **kwargs):
+        def new(*args: P.args, **kwargs: P.kwargs) -> R:
             return code(orig, *args, **kwargs)
 
         setattr(target, name, new)
@@ -131,7 +134,7 @@ class TestCase(unittest.TestCase):
         level = getattr(method, "loglevel", getattr(self, "loglevel", None))
 
         @around(self)
-        def setUp(orig):
+        def setUp(orig: Callable[[], R]) -> R:
             # if we're not starting in the sentinel logcontext, then to be honest
             # all future bets are off.
             if current_context():
@@ -144,7 +147,7 @@ class TestCase(unittest.TestCase):
             if level is not None and old_level != level:
 
                 @around(self)
-                def tearDown(orig):
+                def tearDown(orig: Callable[[], R]) -> R:
                     ret = orig()
                     logging.getLogger().setLevel(old_level)
                     return ret
@@ -158,7 +161,7 @@ class TestCase(unittest.TestCase):
             return orig()
 
         @around(self)
-        def tearDown(orig):
+        def tearDown(orig: Callable[[], R]) -> R:
             ret = orig()
             # force a GC to workaround problems with deferreds leaking logcontexts when
             # they are GCed (see the logcontext docs)
