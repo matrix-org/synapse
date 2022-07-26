@@ -3,24 +3,26 @@ Synapse 1.64.0rc1 (2022-07-26)
 
 As of this release, Synapse no longer allows the tasks of verifying email address ownership, and password reset confirmation, to be delegated to an identity server. For more information, see the [upgrade notes](https://matrix-org.github.io/synapse/v1.64/upgrade.html#upgrading-to-v1640).
 
+We have also stopped building `.deb` packages for Ubuntu 21.10 as it is no longer an active version of Ubuntu.
+
 
 Features
 --------
 
 - Provide more info why we don't have any thumbnails to serve. ([\#13038](https://github.com/matrix-org/synapse/issues/13038))
 - Allow pagination from remote event after discovering it from MSC3030 `/timestamp_to_event`. ([\#13205](https://github.com/matrix-org/synapse/issues/13205))
-- Add a `room_type` field in the responses for the list room and room details admin API. Contributed by @andrewdoh. ([\#13208](https://github.com/matrix-org/synapse/issues/13208))
+- Add a `room_type` field in the responses for the list room and room details admin APIs. Contributed by @andrewdoh. ([\#13208](https://github.com/matrix-org/synapse/issues/13208))
 - Add support for room version 10. ([\#13220](https://github.com/matrix-org/synapse/issues/13220))
-- Add per-room rate limiting for room joins. For each room, Synapse now monitors the rate of join events in that room, and throttle additional joins if that rate grows too large. ([\#13276](https://github.com/matrix-org/synapse/issues/13276))
+- Add per-room rate limiting for room joins. For each room, Synapse now monitors the rate of join events in that room, and throttles additional joins if that rate grows too large. ([\#13276](https://github.com/matrix-org/synapse/issues/13276))
 - Support Implicit TLS for sending emails, enabled by the new option `force_tls`. Contributed by Jan Schär. ([\#13317](https://github.com/matrix-org/synapse/issues/13317))
 
 
 Bugfixes
 --------
 
-- Fix a bug introduced in Synapse 1.15.0 where adding a user through the Synapse Admin API with a phone number would fail if the "enable_email_notifs" and "email_notifs_for_new_users" options were enabled. Contributed by @thomasweston12. ([\#13263](https://github.com/matrix-org/synapse/issues/13263))
-- Fix a bug introduced in Synapse 1.40 where a user invited to a restricted room would be briefly unable to join. ([\#13270](https://github.com/matrix-org/synapse/issues/13270))
-- Fix long-standing bug where in rare instances Synapse could store the incorrect state for a room after a state resolution. ([\#13278](https://github.com/matrix-org/synapse/issues/13278))
+- Fix a bug introduced in Synapse 1.15.0 where adding a user through the Synapse Admin API with a phone number would fail if the `enable_email_notifs` and `email_notifs_for_new_users` options were enabled. Contributed by @thomasweston12. ([\#13263](https://github.com/matrix-org/synapse/issues/13263))
+- Fix a bug introduced in Synapse 1.40.0 where a user invited to a restricted room would be briefly unable to join. ([\#13270](https://github.com/matrix-org/synapse/issues/13270))
+- Fix a long-standing bug where, in rare instances, Synapse could store the incorrect state for a room after a state resolution. ([\#13278](https://github.com/matrix-org/synapse/issues/13278))
 - Fix a bug introduced in v1.18.0 where the `synapse_pushers` metric would overcount pushers when they are replaced. ([\#13296](https://github.com/matrix-org/synapse/issues/13296))
 - Disable autocorrection and autocapitalisation on the username text field shown during registration when using SSO. ([\#13350](https://github.com/matrix-org/synapse/issues/13350))
 - Update locked version of `frozendict` to 2.3.3, which has fixes for memory leaks affecting `/sync`. ([\#13352](https://github.com/matrix-org/synapse/issues/13352))
@@ -32,7 +34,7 @@ Improved Documentation
 - Provide an example of using the Admin API. Contributed by @jejo86. ([\#13231](https://github.com/matrix-org/synapse/issues/13231))
 - Move the documentation for how URL previews work to the URL preview module. ([\#13233](https://github.com/matrix-org/synapse/issues/13233), [\#13261](https://github.com/matrix-org/synapse/issues/13261))
 - Add another `contrib` script to help set up worker processes. Contributed by @villepeh. ([\#13271](https://github.com/matrix-org/synapse/issues/13271))
-- Add notes when config options where changed. Contributed by @behrmann. ([\#13314](https://github.com/matrix-org/synapse/issues/13314))
+- Add notes when config options were changed. Contributed by @behrmann. ([\#13314](https://github.com/matrix-org/synapse/issues/13314))
 - Document the new `rc_invites.per_issuer` throttling option added in Synapse 1.63. ([\#13333](https://github.com/matrix-org/synapse/issues/13333))
 - Mention that BuildKit is needed when building Docker images for tests. ([\#13338](https://github.com/matrix-org/synapse/issues/13338))
 - Improve Caddy reverse proxy documentation. ([\#13344](https://github.com/matrix-org/synapse/issues/13344))
@@ -41,16 +43,16 @@ Improved Documentation
 Deprecations and Removals
 -------------------------
 
-- Drop tables used for groups/communities. ([\#12967](https://github.com/matrix-org/synapse/issues/12967))
+- Drop tables that were formerly used for groups/communities. ([\#12967](https://github.com/matrix-org/synapse/issues/12967))
 - Drop support for delegating email verification to an external server. ([\#13192](https://github.com/matrix-org/synapse/issues/13192))
 - Drop support for calling `/_matrix/client/v3/account/3pid/bind` without an `id_access_token`, which was not permitted by the spec. Contributed by @Vetchu. ([\#13239](https://github.com/matrix-org/synapse/issues/13239))
-- Stop builindg `.deb` packages for Ubuntu 21.10 (Impish Indri), which has reached end of life. ([\#13326](https://github.com/matrix-org/synapse/issues/13326))
+- Stop building `.deb` packages for Ubuntu 21.10 (Impish Indri), which has reached end of life. ([\#13326](https://github.com/matrix-org/synapse/issues/13326))
 
 
 Internal Changes
 ----------------
 
-- Use lower isolation level when purging rooms to avoid serialization errors. Contributed by Nick @ Beeper. ([\#12942](https://github.com/matrix-org/synapse/issues/12942))
+- Use lower transaction isolation level when purging rooms to avoid serialization errors. Contributed by Nick @ Beeper. ([\#12942](https://github.com/matrix-org/synapse/issues/12942))
 - Remove code which incorrectly attempted to reconcile state with remote servers when processing incoming events. ([\#12943](https://github.com/matrix-org/synapse/issues/12943))
 - Make the AS login method call `Auth.get_user_by_req` for checking the AS token. ([\#13094](https://github.com/matrix-org/synapse/issues/13094))
 - Always use a version of canonicaljson that supports the C implementation of frozendict. ([\#13172](https://github.com/matrix-org/synapse/issues/13172))
