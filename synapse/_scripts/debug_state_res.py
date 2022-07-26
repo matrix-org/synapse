@@ -155,7 +155,7 @@ async def dump_mainlines(
 
 
 parser = argparse.ArgumentParser(
-    description="Explain the calculation which resolves state prior before an event"
+    description="Debug the stateres calculation of a specific event."
 )
 parser.add_argument(
     "config_file", help="Synapse config file", type=argparse.FileType("r")
@@ -164,8 +164,14 @@ parser.add_argument("--verbose", "-v", help="Log verbosely", action="store_true"
 parser.add_argument(
     "--debug", "-d", help="Enter debugger after state is resolved", action="store_true"
 )
-subparsers = parser.add_subparsers()
-
+parser.add_argument("event_id", help="The event ID to be resolved")
+parser.add_argument(
+    "--watch",
+    help="Track a piece of state in the auth DAG",
+    default=None,
+    nargs=2,
+    metavar=("TYPE", "STATE_KEY"),
+)
 
 async def debug_specific_stateres(
     reactor: ISynapseReactor, hs: MockHomeserver, args: argparse.Namespace
@@ -232,21 +238,6 @@ async def debug_specific_stateres(
         breakpoint()
 
 
-debug_parser = subparsers.add_parser(
-    "debug",
-    description="debug the stateres calculation of a specific event",
-)
-debug_parser.add_argument("event_id", help="the event ID to be resolved")
-debug_parser.add_argument(
-    "--watch",
-    help="track a piece of state in the auth DAG",
-    default=None,
-    nargs=2,
-    metavar=("TYPE", "STATE_KEY"),
-)
-debug_parser.set_defaults(func=debug_specific_stateres)
-
-
 if __name__ == "__main__":
     args = parser.parse_args()
     logging.basicConfig(
@@ -264,4 +255,4 @@ if __name__ == "__main__":
     ), patch("synapse.storage.databases.main.events_worker.MultiWriterIdGenerator"):
         hs.setup()
 
-    task.react(args.func, [hs, parser.parse_args()])
+    task.react(debug_specific_stateres, [hs, parser.parse_args()])
