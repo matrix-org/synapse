@@ -14,7 +14,7 @@ Features
 - Add a `room_type` field in the responses for the list room and room details admin APIs. Contributed by @andrewdoh. ([\#13208](https://github.com/matrix-org/synapse/issues/13208))
 - Add support for room version 10. ([\#13220](https://github.com/matrix-org/synapse/issues/13220))
 - Add per-room rate limiting for room joins. For each room, Synapse now monitors the rate of join events in that room, and throttles additional joins if that rate grows too large. ([\#13253](https://github.com/matrix-org/synapse/issues/13253), [\#13254](https://github.com/matrix-org/synapse/issues/13254), [\#13255](https://github.com/matrix-org/synapse/issues/13255), [\#13276](https://github.com/matrix-org/synapse/issues/13276))
-- Support Implicit TLS for sending emails, enabled by the new option `force_tls`. Contributed by Jan Schär. ([\#13317](https://github.com/matrix-org/synapse/issues/13317))
+- Support Implicit TLS (TLS without using a STARTTLS upgrade, typically on port 465) for sending emails, enabled by the new option `force_tls`. Contributed by Jan Schär. ([\#13317](https://github.com/matrix-org/synapse/issues/13317))
 
 
 Bugfixes
