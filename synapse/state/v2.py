@@ -15,8 +15,6 @@
 import heapq
 import itertools
 import logging
-from collections import Counter
-from pprint import pformat
 from typing import (
     Any,
     Awaitable,
@@ -79,12 +77,6 @@ __all__ = [
 ]
 
 
-def summarise(
-    event_map: Mapping[str, EventBase], eids: Iterable[str]
-) -> Dict[str, int]:
-    return Counter(event_map[eid].type for eid in eids)
-
-
 async def resolve_events_with_store(
     clock: Clock,
     room_id: str,
@@ -115,7 +107,6 @@ async def resolve_events_with_store(
         A map from (type, state_key) to event_id.
     """
 
-    logger.debug("Input: %d state maps", len(state_sets))
     logger.debug("Computing conflicted state")
 
     # We use event_map as a cache, so if its None we need to initialize it
@@ -128,7 +119,6 @@ async def resolve_events_with_store(
     if not conflicted_state:
         return unconflicted_state
 
-    logger.debug("%d unconflicted state entries", len(unconflicted_state))
     logger.debug("%d conflicted state entries", len(conflicted_state))
     logger.debug("Calculating auth chain difference")
 
@@ -137,7 +127,6 @@ async def resolve_events_with_store(
     auth_diff = await _get_auth_chain_difference(
         room_id, state_sets, event_map, state_res_store
     )
-    logger.debug("Auth chain difference has %d events", len(auth_diff))
 
     full_conflicted_set = set(
         itertools.chain(
@@ -150,12 +139,6 @@ async def resolve_events_with_store(
         allow_rejected=True,
     )
     event_map.update(events)
-
-    logger.debug(
-        "conflicted_state_set: %s",
-        summarise(event_map, {eid for k, v in conflicted_state.items() for eid in v}),
-    )
-    logger.debug("auth_diff: %s", summarise(event_map, auth_diff))
 
     # everything in the event map should be in the right room
     for event in event_map.values():
@@ -183,10 +166,6 @@ async def resolve_events_with_store(
     )
 
     logger.debug("sorted %d power events", len(sorted_power_events))
-    for e in sorted_power_events:
-        logger.debug(
-            "%s %s %s", event_map[e].event_id, event_map[e].type, event_map[e].state_key
-        )
 
     # Now sequentially auth each one
     resolved_state = await _iterative_auth_checks(
@@ -200,8 +179,6 @@ async def resolve_events_with_store(
     )
 
     logger.debug("resolved power events")
-    logger.debug("resolved state is now")
-    logger.debug(pformat(resolved_state))
 
     # OK, so we've now resolved the power events. Now sort the remaining
     # events using the mainline of the resolved power level.
@@ -345,7 +322,6 @@ async def _get_auth_chain_difference(
     # Note: If the `event_map` is empty (which is the common case), we can do a
     # much simpler calculation.
     if event_map:
-        logger.debug("event_map is nonempty")
         # The list of state sets to pass to the store, where each state set is a set
         # of the event ids making up the state. This is similar to `state_sets`,
         # except that (a) we only have event ids, not the complete
@@ -387,7 +363,6 @@ async def _get_auth_chain_difference(
 
         difference_from_event_map: Collection[str] = union - intersection
     else:
-        logger.debug("event_map is empty")
         difference_from_event_map = ()
         state_sets_ids = [set(state_set.values()) for state_set in state_sets]
 
@@ -598,34 +573,14 @@ async def _iterative_auth_checks(
                     auth_events[key] = event_map[ev_id]
 
         try:
-            if _is_power_event(event):
-                logger.warning(
-                    "Considering power event %s %s %s %s",
-                    event.event_id,
-                    event.type,
-                    event.state_key,
-                    pformat(event.content),
-                )
-
             event_auth.check_auth_rules_for_event(
                 event,
                 auth_events.values(),
             )
 
-            if (event.type, event.state_key) == ("m.room.power_levels", ""):
-                logger.warning(
-                    "POWER LEVELS: %s -> %s(%d)",
-                    resolved_state.get((event.type, event.state_key)),
-                    event_id,
-                    event.depth,
-                )
-                logger.warning(pformat(event.content))
             resolved_state[(event.type, event.state_key)] = event_id
-        except AuthError as e:
-            if _is_power_event(event):
-                logger.debug(
-                    "Rejecting %s from %s: %s", event.event_id, event.sender, e
-                )
+        except AuthError:
+            pass
 
         # We await occasionally when we're working with large data sets to
         # ensure that we don't block the reactor loop for too long.
