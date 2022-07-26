@@ -1,0 +1,1 @@
+Change `get_users_in_room` and `get_rooms_for_user` caches to enable pruning of old entries.
