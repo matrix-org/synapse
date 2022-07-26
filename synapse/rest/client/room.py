@@ -319,9 +319,10 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, TransactionRestServlet):
 
         try:
             content = parse_json_object_from_request(request)
-        except Exception:
+        except Exception as e:
             # Turns out we used to ignore the body entirely, and some clients
             # cheekily send invalid bodies.
+            logger.warning("Ignoring invalid body on POST %s: %s", request.path, e)
             content = {}
 
         # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
@@ -855,9 +856,10 @@ class RoomMembershipRestServlet(TransactionRestServlet):
 
         try:
             content = parse_json_object_from_request(request)
-        except Exception:
+        except Exception as e:
             # Turns out we used to ignore the body entirely, and some clients
             # cheekily send invalid bodies.
+            logger.warning("Ignoring invalid body on POST %s: %s", request.path, e)
             content = {}
 
         if membership_action == "invite" and self._has_3pid_invite_keys(content):
