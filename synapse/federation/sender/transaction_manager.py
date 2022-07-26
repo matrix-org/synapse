@@ -21,7 +21,7 @@ from synapse.api.errors import HttpResponseException
 from synapse.events import EventBase
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
-from synapse.logging.opentracing import (
+from synapse.logging.opentelemetry import (
     extract_text_map,
     set_tag,
     start_active_span_follows_from,

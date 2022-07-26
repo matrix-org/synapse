@@ -36,7 +36,7 @@ from synapse.appservice import (
     TransactionOneTimeKeyCounts,
     TransactionUnusedFallbackKeys,
 )
-from synapse.logging.opentracing import log_kv, set_tag, trace
+from synapse.logging.opentelemetry import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import (
     DatabasePool,

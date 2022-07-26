@@ -23,7 +23,7 @@ from twisted.internet.interfaces import IDelayedCall
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.logging import opentracing
+from synapse.logging import opentelemetry
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import Pusher, PusherConfig, PusherConfigException
 from synapse.storage.databases.main.event_push_actions import HttpPushAction
@@ -198,7 +198,7 @@ class HttpPusher(Pusher):
         )
 
         for push_action in unprocessed:
-            with opentracing.start_active_span(
+            with opentelemetry.start_active_span(
                 "http-push",
                 tags={
                     "authenticated_entity": self.user_id,

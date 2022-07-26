@@ -28,7 +28,7 @@ from twisted.internet import defer
 from synapse.api.constants import EduTypes
 from synapse.api.errors import CodeMessageException, Codes, NotFoundError, SynapseError
 from synapse.logging.context import make_deferred_yieldable, run_in_background
-from synapse.logging.opentracing import log_kv, set_tag, tag_args, trace
+from synapse.logging.opentelemetry import log_kv, set_tag, tag_args, trace
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.types import (
     JsonDict,

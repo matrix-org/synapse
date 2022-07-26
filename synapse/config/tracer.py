@@ -24,33 +24,34 @@ class TracerConfig(Config):
     section = "tracing"
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
-        opentracing_config = config.get("opentracing")
-        if opentracing_config is None:
-            opentracing_config = {}
+        opentelemetry_config = config.get("opentelemetry")
+        if opentelemetry_config is None:
+            opentelemetry_config = {}
 
-        self.opentracer_enabled = opentracing_config.get("enabled", False)
+        self.opentelemetry_enabled = opentelemetry_config.get("enabled", False)
 
-        self.jaeger_config = opentracing_config.get(
+        # TODO: no more
+        self.jaeger_config = opentelemetry_config.get(
             "jaeger_config",
             {"sampler": {"type": "const", "param": 1}, "logging": False},
         )
 
         self.force_tracing_for_users: Set[str] = set()
 
-        if not self.opentracer_enabled:
+        if not self.opentelemetry_enabled:
             return
 
-        check_requirements("opentracing")
+        check_requirements("opentelemetry")
 
         # The tracer is enabled so sanitize the config
 
-        self.opentracer_whitelist: List[str] = opentracing_config.get(
+        self.opentelemetry_whitelist: List[str] = opentelemetry_config.get(
             "homeserver_whitelist", []
         )
-        if not isinstance(self.opentracer_whitelist, list):
+        if not isinstance(self.opentelemetry_whitelist, list):
             raise ConfigError("Tracer homeserver_whitelist config is malformed")
 
-        force_tracing_for_users = opentracing_config.get("force_tracing_for_users", [])
+        force_tracing_for_users = opentelemetry_config.get("force_tracing_for_users", [])
         if not isinstance(force_tracing_for_users, list):
             raise ConfigError(
                 "Expected a list", ("opentracing", "force_tracing_for_users")

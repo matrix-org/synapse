@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from prometheus_client import Counter, Histogram
 
-from synapse.logging import opentracing
+from synapse.logging import opentelemetry
 from synapse.logging.context import make_deferred_yieldable
 from synapse.util import json_decoder, json_encoder
 
@@ -94,9 +94,9 @@ class ExternalCache:
 
         logger.debug("Caching %s %s: %r", cache_name, key, encoded_value)
 
-        with opentracing.start_active_span(
+        with opentelemetry.start_active_span(
             "ExternalCache.set",
-            tags={opentracing.SynapseTags.CACHE_NAME: cache_name},
+            tags={opentelemetry.SynapseTags.CACHE_NAME: cache_name},
         ):
             with response_timer.labels("set").time():
                 return await make_deferred_yieldable(
@@ -113,9 +113,9 @@ class ExternalCache:
         if self._redis_connection is None:
             return None
 
-        with opentracing.start_active_span(
+        with opentelemetry.start_active_span(
             "ExternalCache.get",
-            tags={opentracing.SynapseTags.CACHE_NAME: cache_name},
+            tags={opentelemetry.SynapseTags.CACHE_NAME: cache_name},
         ):
             with response_timer.labels("get").time():
                 result = await make_deferred_yieldable(

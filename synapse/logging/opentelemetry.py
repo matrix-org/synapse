@@ -234,54 +234,15 @@ class _DummyTagNames:
     SPAN_KIND_RPC_CLIENT = INVALID_TAG
     SPAN_KIND_RPC_SERVER = INVALID_TAG
 
-
+# These dependencies are optional so they can fail to import
+# and we 
 try:
-    import opentracing
-    import opentracing.tags
+    import opentelemetry
 
-    tags = opentracing.tags
+    # TODO: tags?
 except ImportError:
-    opentracing = None  # type: ignore[assignment]
+    opentelemetry = None  # type: ignore[assignment]
     tags = _DummyTagNames  # type: ignore[assignment]
-try:
-    from jaeger_client import Config as JaegerConfig
-
-    from synapse.logging.scopecontextmanager import LogContextScopeManager
-except ImportError:
-    JaegerConfig = None  # type: ignore
-    LogContextScopeManager = None  # type: ignore
-
-
-try:
-    from rust_python_jaeger_reporter import Reporter
-
-    # jaeger-client 4.7.0 requires that reporters inherit from BaseReporter, which
-    # didn't exist before that version.
-    try:
-        from jaeger_client.reporter import BaseReporter
-    except ImportError:
-
-        class BaseReporter:  # type: ignore[no-redef]
-            pass
-
-    @attr.s(slots=True, frozen=True, auto_attribs=True)
-    class _WrappedRustReporter(BaseReporter):
-        """Wrap the reporter to ensure `report_span` never throws."""
-
-        _reporter: Reporter = attr.Factory(Reporter)
-
-        def set_process(self, *args: Any, **kwargs: Any) -> None:
-            return self._reporter.set_process(*args, **kwargs)
-
-        def report_span(self, span: "opentracing.Span") -> None:
-            try:
-                return self._reporter.report_span(span)
-            except Exception:
-                logger.exception("Failed to report span")
-
-    RustReporter: Optional[Type[_WrappedRustReporter]] = _WrappedRustReporter
-except ImportError:
-    RustReporter = None
 
 
 logger = logging.getLogger(__name__)
@@ -338,7 +299,7 @@ def only_if_tracing(func: Callable[P, R]) -> Callable[P, Optional[R]]:
 
     @wraps(func)
     def _only_if_tracing_inner(*args: P.args, **kwargs: P.kwargs) -> Optional[R]:
-        if opentracing:
+        if opentelemetry:
             return func(*args, **kwargs)
         else:
             return None
@@ -363,16 +324,16 @@ def ensure_active_span(
 def ensure_active_span(
     message: str, ret: Optional[T] = None
 ) -> Callable[[Callable[P, R]], Callable[P, Union[Optional[T], R]]]:
-    """Executes the operation only if opentracing is enabled and there is an active span.
+    """Executes the operation only if opentelemetry is enabled and there is an active span.
     If there is no active span it logs message at the error level.
 
     Args:
         message: Message which fills in "There was no active span when trying to %s"
-            in the error log if there is no active span and opentracing is enabled.
-        ret: return value if opentracing is None or there is no active span.
+            in the error log if there is no active span and opentelemetry is enabled.
+        ret: return value if opentelemetry is None or there is no active span.
 
     Returns:
-        The result of the func, falling back to ret if opentracing is disabled or there
+        The result of the func, falling back to ret if opentelemetry is disabled or there
         was no active span.
     """
 
@@ -383,10 +344,10 @@ def ensure_active_span(
         def ensure_active_span_inner_2(
             *args: P.args, **kwargs: P.kwargs
         ) -> Union[Optional[T], R]:
-            if not opentracing:
+            if not opentelemetry:
                 return ret
 
-            if not opentracing.tracer.active_span:
+            if not opentelemetry.trace.get_current_span():
                 logger.error(
                     "There was no active span when trying to %s."
                     " Did you forget to start one or did a context slip?",
@@ -408,41 +369,29 @@ def ensure_active_span(
 
 def init_tracer(hs: "HomeServer") -> None:
     """Set the whitelists and initialise the JaegerClient tracer"""
-    global opentracing
-    if not hs.config.tracing.opentracer_enabled:
+    global opentelemetry
+    if not hs.config.tracing.opentelemetry_enabled:
         # We don't have a tracer
-        opentracing = None  # type: ignore[assignment]
+        opentelemetry = None  # type: ignore[assignment]
         return
 
-    if not opentracing or not JaegerConfig:
+    if not opentelemetry:
         raise ConfigError(
-            "The server has been configured to use opentracing but opentracing is not "
+            "The server has been configured to use OpenTelemetry but OpenTelemetry is not "
             "installed."
         )
 
-    # Pull out the jaeger config if it was given. Otherwise set it to something sensible.
-    # See https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/config.py
+    # Pull out of the config if it was given. Otherwise set it to something sensible.
+    set_homeserver_whitelist(hs.config.tracing.opentelemetry_whitelist)
 
-    set_homeserver_whitelist(hs.config.tracing.opentracer_whitelist)
+    # TODO: opentelemetry_whitelist
 
-    from jaeger_client.metrics.prometheus import PrometheusMetricsFactory
+    provider = opentelemetry.TracerProvider()
+    processor = opentelemetry.BatchSpanProcessor(opentelemetry.ConsoleSpanExporter())
+    provider.add_span_processor(processor)
 
-    config = JaegerConfig(
-        config=hs.config.tracing.jaeger_config,
-        service_name=f"{hs.config.server.server_name} {hs.get_instance_name()}",
-        scope_manager=LogContextScopeManager(),
-        metrics_factory=PrometheusMetricsFactory(),
-    )
-
-    # If we have the rust jaeger reporter available let's use that.
-    if RustReporter:
-        logger.info("Using rust_python_jaeger_reporter library")
-        assert config.sampler is not None
-        tracer = config.create_tracer(RustReporter(), config.sampler)
-        opentracing.set_global_tracer(tracer)
-    else:
-        config.initialize_tracer()
-
+    # Sets the global default tracer provider
+    trace.set_tracer_provider(provider)
 
 # Whitelisting
 
@@ -500,14 +449,14 @@ def start_active_span(
         scope (Scope) or contextlib.nullcontext
     """
 
-    if opentracing is None:
+    if opentelemetry is None:
         return contextlib.nullcontext()  # type: ignore[unreachable]
 
     if tracer is None:
         # use the global tracer by default
-        tracer = opentracing.tracer
+        tracer = opentelemetry.trace.get_tracer(__name__)
 
-    return tracer.start_active_span(
+    return tracer.start_as_current_span(
         operation_name,
         child_of=child_of,
         references=references,

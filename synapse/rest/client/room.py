@@ -46,7 +46,7 @@ from synapse.http.servlet import (
     parse_strings_from_args,
 )
 from synapse.http.site import SynapseRequest
-from synapse.logging.opentracing import set_tag
+from synapse.logging.opentelemetry import set_tag
 from synapse.rest.client._base import client_patterns
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.storage.state import StateFilter

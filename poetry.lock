@@ -177,7 +177,7 @@ optional = false
 python-versions = "*"
 
 [package.extras]
-test = ["flake8 (==3.7.8)", "hypothesis (==3.55.3)"]
+test = ["hypothesis (==3.55.3)", "flake8 (==3.7.8)"]
 
 [[package]]
 name = "constantly"
@@ -218,7 +218,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 name = "deprecated"
 version = "1.2.13"
 description = "Python @deprecated decorator to deprecate old python classes, functions or methods."
-category = "dev"
+category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
@@ -410,23 +410,6 @@ requirements_deprecated_finder = ["pipreqs", "pip-api"]
 colors = ["colorama (>=0.4.3,<0.5.0)"]
 
 [[package]]
-name = "jaeger-client"
-version = "4.8.0"
-description = "Jaeger Python OpenTracing Tracer implementation"
-category = "main"
-optional = true
-python-versions = ">=3.7"
-
-[package.dependencies]
-opentracing = ">=2.1,<3.0"
-threadloop = ">=1,<2"
-thrift = "*"
-tornado = ">=4.3"
-
-[package.extras]
-tests = ["mock", "pycurl", "pytest", "pytest-cov", "coverage", "pytest-timeout", "pytest-tornado", "pytest-benchmark", "pytest-localserver", "flake8", "flake8-quotes", "flake8-typing-imports", "codecov", "tchannel (==2.1.0)", "opentracing_instrumentation (>=3,<4)", "prometheus_client (==0.11.0)", "mypy"]
-
-[[package]]
 name = "jeepney"
 version = "0.7.1"
 description = "Low-level, pure Python DBus protocol wrapper."
@@ -435,8 +418,8 @@ optional = false
 python-versions = ">=3.6"
 
 [package.extras]
-test = ["pytest", "pytest-trio", "pytest-asyncio", "testpath", "trio", "async-timeout"]
-trio = ["trio", "async-generator"]
+trio = ["async-generator", "trio"]
+test = ["async-timeout", "trio", "testpath", "pytest-asyncio", "pytest-trio", "pytest"]
 
 [[package]]
 name = "jinja2"
@@ -535,8 +518,8 @@ attrs = "*"
 importlib-metadata = {version = ">=1.4", markers = "python_version < \"3.8\""}
 
 [package.extras]
-dev = ["tox", "twisted", "aiounittest", "mypy (==0.910)", "black (==22.3.0)", "flake8 (==4.0.1)", "isort (==5.9.3)", "build (==0.8.0)", "twine (==4.0.1)"]
-test = ["tox", "twisted", "aiounittest"]
+test = ["aiounittest", "twisted", "tox"]
+dev = ["twine (==4.0.1)", "build (==0.8.0)", "isort (==5.9.3)", "flake8 (==4.0.1)", "black (==22.3.0)", "mypy (==0.910)", "aiounittest", "twisted", "tox"]
 
 [[package]]
 name = "matrix-synapse-ldap3"
@@ -552,7 +535,7 @@ service-identity = "*"
 Twisted = ">=15.1.0"
 
 [package.extras]
-dev = ["matrix-synapse", "tox", "ldaptor", "mypy (==0.910)", "types-setuptools", "black (==22.3.0)", "flake8 (==4.0.1)", "isort (==5.9.3)"]
+dev = ["isort (==5.9.3)", "flake8 (==4.0.1)", "black (==22.3.0)", "types-setuptools", "mypy (==0.910)", "ldaptor", "tox", "matrix-synapse"]
 
 [[package]]
 name = "mccabe"
@@ -622,15 +605,36 @@ optional = false
 python-versions = "*"
 
 [[package]]
-name = "opentracing"
-version = "2.4.0"
-description = "OpenTracing API for Python. See documentation at http://opentracing.io"
+name = "opentelemetry-api"
+version = "1.11.1"
+description = "OpenTelemetry Python API"
 category = "main"
 optional = true
-python-versions = "*"
+python-versions = ">=3.6"
 
-[package.extras]
-tests = ["doubles", "flake8", "flake8-quotes", "mock", "pytest", "pytest-cov", "pytest-mock", "sphinx", "sphinx-rtd-theme", "six (>=1.10.0,<2.0)", "gevent", "tornado"]
+[package.dependencies]
+Deprecated = ">=1.2.6"
+
+[[package]]
+name = "opentelemetry-sdk"
+version = "1.11.1"
+description = "OpenTelemetry Python SDK"
+category = "main"
+optional = true
+python-versions = ">=3.6"
+
+[package.dependencies]
+opentelemetry-api = "1.11.1"
+opentelemetry-semantic-conventions = "0.30b1"
+typing-extensions = ">=3.7.4"
+
+[[package]]
+name = "opentelemetry-semantic-conventions"
+version = "0.30b1"
+description = "OpenTelemetry Semantic Conventions"
+category = "main"
+optional = true
+python-versions = ">=3.6"
 
 [[package]]
 name = "packaging"
@@ -820,10 +824,10 @@ optional = false
 python-versions = ">=3.6"
 
 [package.extras]
+tests = ["coverage[toml] (==5.0.4)", "pytest (>=6.0.0,<7.0.0)"]
+docs = ["zope.interface", "sphinx-rtd-theme", "sphinx"]
+dev = ["pre-commit", "mypy", "coverage[toml] (==5.0.4)", "pytest (>=6.0.0,<7.0.0)", "cryptography (>=3.3.1)", "zope.interface", "sphinx-rtd-theme", "sphinx"]
 crypto = ["cryptography (>=3.3.1)"]
-dev = ["sphinx", "sphinx-rtd-theme", "zope.interface", "cryptography (>=3.3.1)", "pytest (>=6.0.0,<7.0.0)", "coverage[toml] (==5.0.4)", "mypy", "pre-commit"]
-docs = ["sphinx", "sphinx-rtd-theme", "zope.interface"]
-tests = ["pytest (>=6.0.0,<7.0.0)", "coverage[toml] (==5.0.4)"]
 
 [[package]]
 name = "pymacaroons"
@@ -1129,47 +1133,12 @@ optional = true
 python-versions = "*"
 
 [[package]]
-name = "threadloop"
-version = "1.0.2"
-description = "Tornado IOLoop Backed Concurrent Futures"
-category = "main"
-optional = true
-python-versions = "*"
-
-[package.dependencies]
-tornado = "*"
-
-[[package]]
-name = "thrift"
-version = "0.15.0"
-description = "Python bindings for the Apache Thrift RPC system"
-category = "main"
-optional = true
-python-versions = "*"
-
-[package.dependencies]
-six = ">=1.7.2"
-
-[package.extras]
-all = ["tornado (>=4.0)", "twisted"]
-tornado = ["tornado (>=4.0)"]
-twisted = ["twisted"]
-
-[[package]]
 name = "tomli"
 version = "1.2.3"
 description = "A lil' TOML parser"
 category = "dev"
 optional = false
 python-versions = ">=3.6"
-
-[[package]]
-name = "tornado"
-version = "6.1"
-description = "Tornado is a Python web framework and asynchronous networking library, originally developed at FriendFeed."
-category = "main"
-optional = true
-python-versions = ">= 3.5"
 
 [[package]]
 name = "towncrier"
@@ -1472,7 +1441,7 @@ python-versions = "*"
 name = "wrapt"
 version = "1.13.3"
 description = "Module for decorators, wrappers and monkey patching."
-category = "dev"
+category = "main"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7"
 
@@ -1546,12 +1515,12 @@ docs = ["sphinx", "repoze.sphinx.autointerface"]
 test = ["zope.i18nmessageid", "zope.testing", "zope.testrunner"]
 
 [extras]
-all = ["matrix-synapse-ldap3", "psycopg2", "psycopg2cffi", "psycopg2cffi-compat", "pysaml2", "authlib", "lxml", "sentry-sdk", "jaeger-client", "opentracing", "txredisapi", "hiredis", "Pympler"]
+all = ["matrix-synapse-ldap3", "psycopg2", "psycopg2cffi", "psycopg2cffi-compat", "pysaml2", "authlib", "lxml", "sentry-sdk", "txredisapi", "hiredis", "Pympler"]
 cache_memory = ["Pympler"]
 jwt = ["authlib"]
 matrix-synapse-ldap3 = ["matrix-synapse-ldap3"]
 oidc = ["authlib"]
-opentracing = ["jaeger-client", "opentracing"]
+opentracing = []
 postgres = ["psycopg2", "psycopg2cffi", "psycopg2cffi-compat"]
 redis = ["txredisapi", "hiredis"]
 saml2 = ["pysaml2"]
@@ -1563,7 +1532,7 @@ url_preview = ["lxml"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7.1"
-content-hash = "c24bbcee7e86dbbe7cdbf49f91a25b310bf21095452641e7440129f59b077f78"
+content-hash = "8e54010315066ba2049baf7617b73ad055d4f34122c1d3c4ffa50bf0a8c4e36e"
 
 [metadata.files]
 attrs = [
@@ -1910,9 +1879,6 @@ isort = [
     {file = "isort-5.7.0-py3-none-any.whl", hash = "sha256:fff4f0c04e1825522ce6949973e83110a6e907750cd92d128b0d14aaaadbffdc"},
     {file = "isort-5.7.0.tar.gz", hash = "sha256:c729845434366216d320e936b8ad6f9d681aab72dc7cbc2d51bedc3582f3ad1e"},
 ]
-jaeger-client = [
-    {file = "jaeger-client-4.8.0.tar.gz", hash = "sha256:3157836edab8e2c209bd2d6ae61113db36f7ee399e66b1dcbb715d87ab49bfe0"},
-]
 jeepney = [
     {file = "jeepney-0.7.1-py3-none-any.whl", hash = "sha256:1b5a0ea5c0e7b166b2f5895b91a08c14de8915afda4407fb5022a195224958ac"},
     {file = "jeepney-0.7.1.tar.gz", hash = "sha256:fa9e232dfa0c498bd0b8a3a73b8d8a31978304dcef0515adc859d4e096f96f4f"},
@@ -2135,8 +2101,17 @@ netaddr = [
     {file = "netaddr-0.8.0-py2.py3-none-any.whl", hash = "sha256:9666d0232c32d2656e5e5f8d735f58fd6c7457ce52fc21c98d45f2af78f990ac"},
     {file = "netaddr-0.8.0.tar.gz", hash = "sha256:d6cc57c7a07b1d9d2e917aa8b36ae8ce61c35ba3fcd1b83ca31c5a0ee2b5a243"},
 ]
-opentracing = [
-    {file = "opentracing-2.4.0.tar.gz", hash = "sha256:a173117e6ef580d55874734d1fa7ecb6f3655160b8b8974a2a1e98e5ec9c840d"},
+opentelemetry-api = [
+    {file = "opentelemetry-api-1.11.1.tar.gz", hash = "sha256:80abf335432930fd7c0635a71f79fda09e9c760ced3430c080aba4155e659c46"},
+    {file = "opentelemetry_api-1.11.1-py3-none-any.whl", hash = "sha256:4041e7dbe6380e51555a2e2c50a690a6f3bc3b1fee2954e75bc61348b8840c1a"},
+]
+opentelemetry-sdk = [
+    {file = "opentelemetry-sdk-1.11.1.tar.gz", hash = "sha256:43e0e9ffc22aa3aa61bcbe4c95704fee608d7b0f961d7ff01bc88caf5e8cb9a8"},
+    {file = "opentelemetry_sdk-1.11.1-py3-none-any.whl", hash = "sha256:435545512280d988f8555ba0a42383ec2cd95623a3062f278c19eb084b265d30"},
+]
+opentelemetry-semantic-conventions = [
+    {file = "opentelemetry-semantic-conventions-0.30b1.tar.gz", hash = "sha256:2fac7c7202602566b87b2ee3c90fbc272be6094725479f8102f083bf425cc253"},
+    {file = "opentelemetry_semantic_conventions-0.30b1-py3-none-any.whl", hash = "sha256:5213268cd0a7a8fb94c054e4c1bac8c17586f732eca91769463320f3dcd910bb"},
 ]
 packaging = [
     {file = "packaging-21.3-py3-none-any.whl", hash = "sha256:ef103e05f519cdc783ae24ea4e2e0f508a9c99b2d4969652eed6a2e1ea5bd522"},
@@ -2488,59 +2463,9 @@ sortedcontainers = [
 systemd-python = [
     {file = "systemd-python-234.tar.gz", hash = "sha256:fd0e44bf70eadae45aadc292cb0a7eb5b0b6372cd1b391228047d33895db83e7"},
 ]
-threadloop = [
-    {file = "threadloop-1.0.2-py2-none-any.whl", hash = "sha256:5c90dbefab6ffbdba26afb4829d2a9df8275d13ac7dc58dccb0e279992679599"},
-    {file = "threadloop-1.0.2.tar.gz", hash = "sha256:8b180aac31013de13c2ad5c834819771992d350267bddb854613ae77ef571944"},
-]
-thrift = [
-    {file = "thrift-0.15.0.tar.gz", hash = "sha256:87c8205a71cf8bbb111cb99b1f7495070fbc9cabb671669568854210da5b3e29"},
-]
 tomli = [
     {file = "tomli-1.2.3-py3-none-any.whl", hash = "sha256:e3069e4be3ead9668e21cb9b074cd948f7b3113fd9c8bba083f48247aab8b11c"},
     {file = "tomli-1.2.3.tar.gz", hash = "sha256:05b6166bff487dc068d322585c7ea4ef78deed501cc124060e0f238e89a9231f"},
-]
-tornado = [
-    {file = "tornado-6.1-cp35-cp35m-macosx_10_9_x86_64.whl", hash = "sha256:d371e811d6b156d82aa5f9a4e08b58debf97c302a35714f6f45e35139c332e32"},
-    {file = "tornado-6.1-cp35-cp35m-manylinux1_i686.whl", hash = "sha256:0d321a39c36e5f2c4ff12b4ed58d41390460f798422c4504e09eb5678e09998c"},
-    {file = "tornado-6.1-cp35-cp35m-manylinux1_x86_64.whl", hash = "sha256:9de9e5188a782be6b1ce866e8a51bc76a0fbaa0e16613823fc38e4fc2556ad05"},
-    {file = "tornado-6.1-cp35-cp35m-manylinux2010_i686.whl", hash = "sha256:61b32d06ae8a036a6607805e6720ef00a3c98207038444ba7fd3d169cd998910"},
-    {file = "tornado-6.1-cp35-cp35m-manylinux2010_x86_64.whl", hash = "sha256:3e63498f680547ed24d2c71e6497f24bca791aca2fe116dbc2bd0ac7f191691b"},
-    {file = "tornado-6.1-cp35-cp35m-manylinux2014_aarch64.whl", hash = "sha256:6c77c9937962577a6a76917845d06af6ab9197702a42e1346d8ae2e76b5e3675"},
-    {file = "tornado-6.1-cp35-cp35m-win32.whl", hash = "sha256:6286efab1ed6e74b7028327365cf7346b1d777d63ab30e21a0f4d5b275fc17d5"},
-    {file = "tornado-6.1-cp35-cp35m-win_amd64.whl", hash = "sha256:fa2ba70284fa42c2a5ecb35e322e68823288a4251f9ba9cc77be04ae15eada68"},
-    {file = "tornado-6.1-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:0a00ff4561e2929a2c37ce706cb8233b7907e0cdc22eab98888aca5dd3775feb"},
-    {file = "tornado-6.1-cp36-cp36m-manylinux1_i686.whl", hash = "sha256:748290bf9112b581c525e6e6d3820621ff020ed95af6f17fedef416b27ed564c"},
-    {file = "tornado-6.1-cp36-cp36m-manylinux1_x86_64.whl", hash = "sha256:e385b637ac3acaae8022e7e47dfa7b83d3620e432e3ecb9a3f7f58f150e50921"},
-    {file = "tornado-6.1-cp36-cp36m-manylinux2010_i686.whl", hash = "sha256:25ad220258349a12ae87ede08a7b04aca51237721f63b1808d39bdb4b2164558"},
-    {file = "tornado-6.1-cp36-cp36m-manylinux2010_x86_64.whl", hash = "sha256:65d98939f1a2e74b58839f8c4dab3b6b3c1ce84972ae712be02845e65391ac7c"},
-    {file = "tornado-6.1-cp36-cp36m-manylinux2014_aarch64.whl", hash = "sha256:e519d64089b0876c7b467274468709dadf11e41d65f63bba207e04217f47c085"},
-    {file = "tornado-6.1-cp36-cp36m-win32.whl", hash = "sha256:b87936fd2c317b6ee08a5741ea06b9d11a6074ef4cc42e031bc6403f82a32575"},
-    {file = "tornado-6.1-cp36-cp36m-win_amd64.whl", hash = "sha256:cc0ee35043162abbf717b7df924597ade8e5395e7b66d18270116f8745ceb795"},
-    {file = "tornado-6.1-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:7250a3fa399f08ec9cb3f7b1b987955d17e044f1ade821b32e5f435130250d7f"},
-    {file = "tornado-6.1-cp37-cp37m-manylinux1_i686.whl", hash = "sha256:ed3ad863b1b40cd1d4bd21e7498329ccaece75db5a5bf58cd3c9f130843e7102"},
-    {file = "tornado-6.1-cp37-cp37m-manylinux1_x86_64.whl", hash = "sha256:dcef026f608f678c118779cd6591c8af6e9b4155c44e0d1bc0c87c036fb8c8c4"},
-    {file = "tornado-6.1-cp37-cp37m-manylinux2010_i686.whl", hash = "sha256:70dec29e8ac485dbf57481baee40781c63e381bebea080991893cd297742b8fd"},
-    {file = "tornado-6.1-cp37-cp37m-manylinux2010_x86_64.whl", hash = "sha256:d3f7594930c423fd9f5d1a76bee85a2c36fd8b4b16921cae7e965f22575e9c01"},
-    {file = "tornado-6.1-cp37-cp37m-manylinux2014_aarch64.whl", hash = "sha256:3447475585bae2e77ecb832fc0300c3695516a47d46cefa0528181a34c5b9d3d"},
-    {file = "tornado-6.1-cp37-cp37m-win32.whl", hash = "sha256:e7229e60ac41a1202444497ddde70a48d33909e484f96eb0da9baf8dc68541df"},
-    {file = "tornado-6.1-cp37-cp37m-win_amd64.whl", hash = "sha256:cb5ec8eead331e3bb4ce8066cf06d2dfef1bfb1b2a73082dfe8a161301b76e37"},
-    {file = "tornado-6.1-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:20241b3cb4f425e971cb0a8e4ffc9b0a861530ae3c52f2b0434e6c1b57e9fd95"},
-    {file = "tornado-6.1-cp38-cp38-manylinux1_i686.whl", hash = "sha256:c77da1263aa361938476f04c4b6c8916001b90b2c2fdd92d8d535e1af48fba5a"},
-    {file = "tornado-6.1-cp38-cp38-manylinux1_x86_64.whl", hash = "sha256:fba85b6cd9c39be262fcd23865652920832b61583de2a2ca907dbd8e8a8c81e5"},
-    {file = "tornado-6.1-cp38-cp38-manylinux2010_i686.whl", hash = "sha256:1e8225a1070cd8eec59a996c43229fe8f95689cb16e552d130b9793cb570a288"},
-    {file = "tornado-6.1-cp38-cp38-manylinux2010_x86_64.whl", hash = "sha256:d14d30e7f46a0476efb0deb5b61343b1526f73ebb5ed84f23dc794bdb88f9d9f"},
-    {file = "tornado-6.1-cp38-cp38-manylinux2014_aarch64.whl", hash = "sha256:8f959b26f2634a091bb42241c3ed8d3cedb506e7c27b8dd5c7b9f745318ddbb6"},
-    {file = "tornado-6.1-cp38-cp38-win32.whl", hash = "sha256:34ca2dac9e4d7afb0bed4677512e36a52f09caa6fded70b4e3e1c89dbd92c326"},
-    {file = "tornado-6.1-cp38-cp38-win_amd64.whl", hash = "sha256:6196a5c39286cc37c024cd78834fb9345e464525d8991c21e908cc046d1cc02c"},
-    {file = "tornado-6.1-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:f0ba29bafd8e7e22920567ce0d232c26d4d47c8b5cf4ed7b562b5db39fa199c5"},
-    {file = "tornado-6.1-cp39-cp39-manylinux1_i686.whl", hash = "sha256:33892118b165401f291070100d6d09359ca74addda679b60390b09f8ef325ffe"},
-    {file = "tornado-6.1-cp39-cp39-manylinux1_x86_64.whl", hash = "sha256:7da13da6f985aab7f6f28debab00c67ff9cbacd588e8477034c0652ac141feea"},
-    {file = "tornado-6.1-cp39-cp39-manylinux2010_i686.whl", hash = "sha256:e0791ac58d91ac58f694d8d2957884df8e4e2f6687cdf367ef7eb7497f79eaa2"},
-    {file = "tornado-6.1-cp39-cp39-manylinux2010_x86_64.whl", hash = "sha256:66324e4e1beede9ac79e60f88de548da58b1f8ab4b2f1354d8375774f997e6c0"},
-    {file = "tornado-6.1-cp39-cp39-manylinux2014_aarch64.whl", hash = "sha256:a48900ecea1cbb71b8c71c620dee15b62f85f7c14189bdeee54966fbd9a0c5bd"},
-    {file = "tornado-6.1-cp39-cp39-win32.whl", hash = "sha256:d3d20ea5782ba63ed13bc2b8c291a053c8d807a8fa927d941bd718468f7b950c"},
-    {file = "tornado-6.1-cp39-cp39-win_amd64.whl", hash = "sha256:548430be2740e327b3fe0201abe471f314741efcb0067ec4f2d7dcfb4825f3e4"},
-    {file = "tornado-6.1.tar.gz", hash = "sha256:33c6e81d7bd55b468d2e793517c909b139960b6c790a60b7991b9b6b76fb9791"},
 ]
 towncrier = [
     {file = "towncrier-21.9.0-py2.py3-none-any.whl", hash = "sha256:fc5a88a2a54988e3a8ed2b60d553599da8330f65722cc607c839614ed87e0f92"},

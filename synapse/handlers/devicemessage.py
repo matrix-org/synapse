@@ -19,7 +19,7 @@ from synapse.api.constants import EduTypes, ToDeviceEventTypes
 from synapse.api.errors import SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.logging.context import run_in_background
-from synapse.logging.opentracing import (
+from synapse.logging.opentelemetry import (
     SynapseTags,
     get_active_span_text_map,
     log_kv,

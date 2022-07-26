@@ -25,7 +25,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
-from synapse.logging.opentracing import log_kv, trace
+from synapse.logging.opentelemetry import log_kv, trace
 from synapse.storage.databases.main.e2e_room_keys import RoomKey
 from synapse.types import JsonDict
 from synapse.util.async_helpers import Linearizer

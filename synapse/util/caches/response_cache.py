@@ -29,7 +29,7 @@ import attr
 from twisted.internet import defer
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
-from synapse.logging.opentracing import (
+from synapse.logging.opentelemetry import (
     active_span,
     start_active_span,
     start_active_span_follows_from,

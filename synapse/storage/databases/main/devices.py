@@ -32,7 +32,7 @@ from typing_extensions import Literal
 
 from synapse.api.constants import EduTypes
 from synapse.api.errors import Codes, StoreError
-from synapse.logging.opentracing import (
+from synapse.logging.opentelemetry import (
     get_active_span_text_map,
     set_tag,
     trace,

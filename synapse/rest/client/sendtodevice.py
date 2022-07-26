@@ -19,7 +19,7 @@ from synapse.http import servlet
 from synapse.http.server import HttpServer
 from synapse.http.servlet import assert_params_in_dict, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
-from synapse.logging.opentracing import set_tag, trace_with_opname
+from synapse.logging.opentelemetry import set_tag, trace_with_opname
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.types import JsonDict
 

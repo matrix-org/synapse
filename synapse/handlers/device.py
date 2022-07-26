@@ -36,7 +36,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
-from synapse.logging.opentracing import log_kv, set_tag, trace
+from synapse.logging.opentelemetry import log_kv, set_tag, trace
 from synapse.metrics.background_process_metrics import (
     run_as_background_process,
     wrap_as_background_process,

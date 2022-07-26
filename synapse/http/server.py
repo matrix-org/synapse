@@ -60,7 +60,7 @@ from synapse.api.errors import (
 )
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread, preserve_fn, run_in_background
-from synapse.logging.opentracing import active_span, start_active_span, trace_servlet
+from synapse.logging.opentelemetry import active_span, start_active_span, trace_servlet
 from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
 from synapse.util.iterutils import chunk_seq

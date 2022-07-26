@@ -25,7 +25,7 @@ from synapse.http.server import HttpServer, ServletCallback, is_method_cancellab
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import run_in_background
-from synapse.logging.opentracing import (
+from synapse.logging.opentelemetry import (
     active_span,
     set_tag,
     span_context_from_request,
