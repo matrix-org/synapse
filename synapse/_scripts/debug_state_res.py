@@ -96,72 +96,18 @@ def edge(source: EventBase, target: EventBase, **kwargs) -> pydot.Edge:
     )
 
 
-async def dump_auth_chains(
-    hs: MockHomeserver, state_after_parents: Mapping[str, StateMap[str]]
-):
-    graph = pydot.Dot(rankdir="BT")
-    graph.set_node_defaults(shape="box", style="filled")
-    q = pydot.quote_if_necessary
-
-    # Key: event id
-    # Value: bitmaps. ith bit is set iff this belongs to the auth chain of the ith
-    # starting event.
-    seen: Dict[str, int] = defaultdict(int)
-    edges = set()
-
-    for i, start in enumerate(state_after_parents):
-        bitmask = 1 << i
-        # DFS starting at `start`. Entries are (event, auth event index).
-        stack: List[Tuple[str, int]] = [(start, 0)]
-        while stack:
-            # Fetch the event we're considering and our progress through its auth events.
-            eid, pindex = stack[-1]
-            event = await hs.get_datastores().main.get_event(eid, allow_none=True)
-            assert event is not None
-
-            # If we've already considered all of its auth events, we can mark this one
-            # As having been seen by `start`.
-            if pindex >= len(event.auth_event_ids()):
-                seen[eid] |= bitmask
-                stack.pop()
-                continue
-
-            pid = event.auth_event_ids()[pindex]
-            edges.add((eid, pid))
-            # If we've already marked that `start` can see `pid`, try the next auth event
-            if seen.get(pid, 0) & bitmask:
-                stack[-1] = (eid, pindex + 1)
-                continue
-
-            # Otherwise, continue DFS at pid
-            stack.append((pid, 0))
-
-    for eid, bitmask in seen.items():
-        event = await hs.get_datastores().main.get_event(eid, allow_none=True)
-        assert event is not None
-        colors = ["gray", "orangered", "lightskyblue", "mediumorchid1"]
-        graph.add_node(node(event, fillcolor=colors[bitmask]))
-    for eid, pid in edges:
-        graph.add_edge(pydot.Edge(q(eid), q(pid)))
-
-    graph.write_raw("auth_chains.dot")
-    graph.write_svg("auth_chains.svg")
-
-
 async def dump_mainlines(
     hs: MockHomeserver,
     starting_event: EventBase,
     watch_func: Optional[Callable[[EventBase], Awaitable[str]]] = None,
     extras: Collection[EventBase] = (),
-):
+) -> None:
     graph = pydot.Dot(rankdir="BT")
     graph.set_node_defaults(shape="box", style="filled")
 
     async def new_node(event: EventBase, **kwargs: object) -> pydot.Node:
-        if watch_func:
-            return node(event, suffix=await watch_func(event), **kwargs)
-        else:
-            return node(event, **kwargs)
+        suffix = await watch_func(event) if watch_func else None
+        return node(event, suffix, **kwargs)
 
     graph.add_node(await new_node(starting_event, fillcolor="#6699cc"))
     seen = {starting_event.event_id}
@@ -239,7 +185,6 @@ async def debug_specific_stateres(
         for prev_event_id in event.prev_event_ids()
     ]
 
-    await dump_auth_chains(hs, state_after_parents)
     if args.watch is not None:
         key_pair = tuple(args.watch)
         filter = StateFilter.from_types([key_pair])
