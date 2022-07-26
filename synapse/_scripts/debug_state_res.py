@@ -5,7 +5,17 @@ import sys
 from collections import defaultdict, Counter
 from graphlib import TopologicalSorter
 from pprint import pformat
-from typing import Mapping, Sequence, Dict, List, Tuple, Iterable, Collection
+from typing import (
+    Mapping,
+    Sequence,
+    Dict,
+    List,
+    Tuple,
+    Iterable,
+    Collection,
+    Optional,
+    Callable, Awaitable,
+)
 from unittest.mock import MagicMock, patch
 
 import dictdiffer
@@ -26,6 +36,7 @@ from synapse.storage.databases.main.event_federation import EventFederationWorke
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.room import RoomWorkerStore
 from synapse.storage.databases.main.state import StateGroupWorkerStore
+from synapse.storage.state import StateFilter
 from synapse.types import ISynapseReactor, StateMap, MutableStateMap
 
 logger = logging.getLogger(sys.argv[0])
@@ -64,14 +75,14 @@ class MockHomeserver(HomeServer):
         )
 
 
-def node(event: EventBase, **kwargs) -> pydot.Node:
-    kwargs.setdefault(
-        "label",
-        f"{event.event_id}\n{event.type}",
-    )
+def node(event: EventBase, suffix: Optional[str] = None, **kwargs) -> pydot.Node:
+    label = f"{event.event_id}\n{event.type}"
+    if suffix:
+        label += f"\n{suffix}"
+    kwargs.setdefault("label", label)
     type_to_shape = {"m.room.member": "oval"}
-    if "shape" not in kwargs and event.type in type_to_shape:
-        kwargs["shape"] = type_to_shape[event.type]
+    if event.type in type_to_shape:
+        kwargs.setdefault("shape", type_to_shape[event.type])
 
     q = pydot.quote_if_necessary
     return pydot.Node(q(event.event_id), **kwargs)
@@ -140,23 +151,30 @@ async def dump_auth_chains(
 async def dump_mainlines(
     hs: MockHomeserver,
     starting_event: EventBase,
+    watch_func: Optional[Callable[[EventBase], Awaitable[str]]] = None,
     extras: Collection[EventBase] = tuple(),
 ):
     graph = pydot.Dot(rankdir="BT")
     graph.set_node_defaults(shape="box", style="filled")
 
-    graph.add_node(node(starting_event, fillcolor="#6699cc"))
+    async def new_node(event: EventBase, **kwargs: object) -> pydot.Node:
+        if watch_func:
+            return node(event, suffix=await watch_func(event), **kwargs)
+        else:
+            return node(event, **kwargs)
+
+    graph.add_node(await new_node(starting_event, fillcolor="#6699cc"))
     seen = {starting_event.event_id}
 
     todo = []
     for extra in extras:
-        graph.add_node(node(extra, fillcolor="#cc9966"))
+        graph.add_node(await new_node(extra, fillcolor="#cc9966"))
         seen.add(extra.event_id)
         todo.append(extra)
 
     for pid in starting_event.prev_event_ids():
         parent = await hs.get_datastores().main.get_event(pid)
-        graph.add_node(node(parent, fillcolor="#6699cc"))
+        graph.add_node(await new_node(parent, fillcolor="#6699cc"))
         seen.add(pid)
         graph.add_edge(edge(starting_event, parent, style="dashed"))
         todo.append(parent)
@@ -179,9 +197,9 @@ async def dump_mainlines(
             if auth_event:
                 if auth_event.event_id not in seen:
                     if key[0] == "m.room.power_levels":
-                        graph.add_node(node(auth_event, fillcolor="#ffcccc"))
+                        graph.add_node(await new_node(auth_event, fillcolor="#ffcccc"))
                     else:
-                        graph.add_node(node(auth_event))
+                        graph.add_node(await new_node(auth_event))
                     seen.add(auth_event.event_id)
                     todo.append(auth_event)
                 graph.add_edge(edge(event, auth_event))
@@ -209,21 +227,32 @@ async def debug_specific_stateres(
     # Fetch the event in question.
     event = await hs.get_datastores().main.get_event(args.event_id)
     assert event is not None
-    logger.info("event %s has %d parents, %s", event.event_id, len(event.prev_event_ids()), event.prev_event_ids())
+    logger.info(
+        "event %s has %d parents, %s",
+        event.event_id,
+        len(event.prev_event_ids()),
+        event.prev_event_ids(),
+    )
 
     state_after_parents = [
         await hs.get_storage_controllers().state.get_state_ids_for_event(prev_event_id)
         for prev_event_id in event.prev_event_ids()
     ]
 
-    # await dump_auth_chains(hs, state_after_parents)
-    extras = await hs.get_datastores().main.get_events(
-        [
-            "$SIRWGpXP-CV6XtCdeHgFY_PIJXUzOHkaCUMsRN6RFes",
-            "$LgVDro6FUgz-qQJhGgeLGmvgc9xFZRJlyiHuia_VH78",
-        ]
-    )
-    await dump_mainlines(hs, event, extras.values())
+    await dump_auth_chains(hs, state_after_parents)
+    if args.watch is not None:
+        key_pair = tuple(args.watch)
+        filter = StateFilter.from_types([key_pair])
+
+        async def watch_func(event: EventBase) -> str:
+            result = await hs.get_storage_controllers().state.get_state_ids_for_event(
+                event.event_id, filter
+            )
+            return f"{key_pair}: {result.get(key_pair, '<Missing>')}"
+    else:
+        watch_func = None
+
+    await dump_mainlines(hs, event, watch_func)
 
     result = await hs.get_state_resolution_handler().resolve_events_with_store(
         event.room_id,
@@ -260,6 +289,7 @@ debug_parser = subparsers.add_parser(
     description="debug the stateres calculation of a specific event",
 )
 debug_parser.add_argument("event_id", help="the event ID to be resolved")
+debug_parser.add_argument("--watch", help="track a piece of state in the auth DAG", default=None, nargs=2, metavar=("TYPE", "STATE_KEY"))
 debug_parser.set_defaults(func=debug_specific_stateres)
 
 
