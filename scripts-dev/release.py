@@ -32,6 +32,7 @@ import click
 import commonmark
 import git
 from click.exceptions import ClickException
+from git import GitCommandError, Repo
 from github import Github
 from packaging import version
 
@@ -77,6 +78,8 @@ def cli() -> None:
         ./scripts-dev/release.py upload
 
         # Optional: generate some nice links for the announcement
+
+        ./scripts-dev/release.py merge-back
 
         ./scripts-dev/release.py announce
 
@@ -439,6 +442,71 @@ def upload() -> None:
     click.echo(
         f"Done! Remember to merge the tag {tag_name} into the appropriate branches"
     )
+
+
+def _merge_into(repo: Repo, source: str, target: str) -> None:
+    """
+    Merges branch `source` into branch `target`.
+    Pulls both before merging and pushes the result.
+    """
+
+    # Update our branches and switch to the target branch
+    for branch in [source, target]:
+        click.echo(f"Switching to {branch} and pulling...")
+        repo.heads[branch].checkout()
+        # Pull so we're up to date
+        repo.remote().pull()
+
+    assert repo.active_branch.name == target
+
+    try:
+        # TODO This seemed easier than using GitPython directly
+        click.echo(f"Merging {source}")
+        repo.git.merge(source)
+    except GitCommandError as exc:
+        # If a merge conflict occurs, give some context and try to
+        # make it easy to abort if necessary.
+        click.echo(exc)
+        if not click.confirm(
+            f"Likely merge conflict whilst merging ({source} → {target}). "
+            f"Have you resolved it?"
+        ):
+            repo.git.merge("--abort")
+            return
+
+    # Push result.
+    click.echo("Pushing")
+    repo.remote().push()
+
+
+@cli.command()
+def merge_back() -> None:
+    """Merge the release branch back into the appropriate branches.
+    All branches will be automatically pulled from the remote and the results
+    will be pushed to the remote."""
+
+    repo = get_repo_and_check_clean_checkout()
+    branch_name = repo.active_branch.name
+
+    if not branch_name.startswith("release-v"):
+        raise RuntimeError("Not on a release branch. This does not seem sensible.")
+
+    # Pull so we're up to date
+    repo.remote().pull()
+
+    current_version = get_package_version()
+
+    if current_version.is_prerelease:
+        # Release candidate
+        if click.confirm(f"Merge {branch_name} → develop?", default=True):
+            _merge_into(repo, branch_name, "develop")
+    else:
+        # Full release
+        if click.confirm(f"Merge {branch_name} → master?", default=True):
+            _merge_into(repo, branch_name, "master")
+
+        if click.confirm("Merge master → develop?", default=True):
+            _merge_into(repo, "master", "develop")
 
 
 @cli.command()
