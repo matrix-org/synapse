@@ -178,12 +178,12 @@ class TestCase(unittest.TestCase):
             except AssertionError as e:
                 raise (type(e))(f"Assert error for '.{key}':") from e
 
-    def assert_dict(self, required, actual):
+    def assert_dict(self, required: dict, actual: dict) -> None:
         """Does a partial assert of a dict.
 
         Args:
-            required (dict): The keys and value which MUST be in 'actual'.
-            actual (dict): The test result. Extra keys will not be checked.
+            required: The keys and value which MUST be in 'actual'.
+            actual: The test result. Extra keys will not be checked.
         """
         for key in required:
             self.assertEqual(
