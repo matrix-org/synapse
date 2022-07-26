@@ -1,1 +1,0 @@
-Update locked version of `frozendict` to 2.3.3, which has fixes for memory leaks affecting `/sync`.

@@ -23,10 +23,12 @@ from pkg_resources import parse_version
 
 import twisted
 from twisted.internet.defer import Deferred
-from twisted.internet.interfaces import IOpenSSLContextFactory, IReactorTCP
+from twisted.internet.interfaces import IOpenSSLContextFactory
+from twisted.internet.ssl import optionsForClientTLS
 from twisted.mail.smtp import ESMTPSender, ESMTPSenderFactory
 
 from synapse.logging.context import make_deferred_yieldable
+from synapse.types import ISynapseReactor
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -48,7 +50,7 @@ class _NoTLSESMTPSender(ESMTPSender):
 
 
 async def _sendmail(
-    reactor: IReactorTCP,
+    reactor: ISynapseReactor,
     smtphost: str,
     smtpport: int,
     from_addr: str,
@@ -59,6 +61,7 @@ async def _sendmail(
     require_auth: bool = False,
     require_tls: bool = False,
     enable_tls: bool = True,
+    force_tls: bool = False,
 ) -> None:
     """A simple wrapper around ESMTPSenderFactory, to allow substitution in tests
 
@@ -73,8 +76,9 @@ async def _sendmail(
         password: password to give when authenticating
         require_auth: if auth is not offered, fail the request
         require_tls: if TLS is not offered, fail the reqest
-        enable_tls: True to enable TLS. If this is False and require_tls is True,
+        enable_tls: True to enable STARTTLS. If this is False and require_tls is True,
            the request will fail.
+        force_tls: True to enable Implicit TLS.
     """
     msg = BytesIO(msg_bytes)
     d: "Deferred[object]" = Deferred()
@@ -105,13 +109,23 @@ async def _sendmail(
         # set to enable TLS.
         factory = build_sender_factory(hostname=smtphost if enable_tls else None)
 
-    reactor.connectTCP(
-        smtphost,
-        smtpport,
-        factory,
-        timeout=30,
-        bindAddress=None,
-    )
+    if force_tls:
+        reactor.connectSSL(
+            smtphost,
+            smtpport,
+            factory,
+            optionsForClientTLS(smtphost),
+            timeout=30,
+            bindAddress=None,
+        )
+    else:
+        reactor.connectTCP(
+            smtphost,
+            smtpport,
+            factory,
+            timeout=30,
+            bindAddress=None,
+        )
 
     await make_deferred_yieldable(d)
 
@@ -132,6 +146,7 @@ class SendEmailHandler:
         self._smtp_pass = passwd.encode("utf-8") if passwd is not None else None
         self._require_transport_security = hs.config.email.require_transport_security
         self._enable_tls = hs.config.email.enable_smtp_tls
+        self._force_tls = hs.config.email.force_tls
 
         self._sendmail = _sendmail
 
@@ -189,4 +204,5 @@ class SendEmailHandler:
             require_auth=self._smtp_user is not None,
             require_tls=self._require_transport_security,
             enable_tls=self._enable_tls,
+            force_tls=self._force_tls,
         )
