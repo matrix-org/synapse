@@ -59,6 +59,28 @@ class WellKnownTests(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, HTTPStatus.NOT_FOUND)
 
+    @unittest.override_config(
+        {
+            "public_baseurl": "https://tesths",
+            "default_identity_server": "https://testis",
+            "extra_well_known_client_content": {"custom": False},
+        }
+    )
+    def test_client_well_known_custom(self) -> None:
+        channel = self.make_request(
+            "GET", "/.well-known/matrix/client", shorthand=False
+        )
+
+        self.assertEqual(channel.code, HTTPStatus.OK)
+        self.assertEqual(
+            channel.json_body,
+            {
+                "m.homeserver": {"base_url": "https://tesths/"},
+                "m.identity_server": {"base_url": "https://testis"},
+                "custom": False,
+            },
+        )
+
     @unittest.override_config({"serve_server_wellknown": True})
     def test_server_well_known(self) -> None:
         channel = self.make_request(

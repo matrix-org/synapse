@@ -1,0 +1,1 @@
+Refactor receipts servlet logic to avoid duplicated code.

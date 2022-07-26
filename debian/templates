@@ -10,12 +10,13 @@ _Description: Name of the server:
 Template: matrix-synapse/report-stats
 Type: boolean
 Default: false
-_Description: Report anonymous statistics?
+_Description: Report homeserver usage statistics?
  Developers of Matrix and Synapse really appreciate helping the
- project out by reporting anonymized usage statistics from this
- homeserver. Only very basic aggregate data (e.g. number of users)
- will be reported, but it helps track the growth of the Matrix
- community, and helps in making Matrix a success, as well as to
- convince other networks that they should peer with Matrix.
+ project out by reporting homeserver usage statistics from this
+ homeserver. Your homeserver's server name, along with very basic
+ aggregate data (e.g. number of users) will be reported. But it
+ helps track the growth of the Matrix community, and helps in
+ making Matrix a success, as well as to convince other networks
+ that they should peer with Matrix.
  .
  Thank you.

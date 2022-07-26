@@ -26,7 +26,6 @@ DISTS = (
     "debian:bookworm",
     "debian:sid",
     "ubuntu:focal",  # 20.04 LTS (our EOL forced by Py38 on 2024-10-14)
-    "ubuntu:impish",  # 21.10  (EOL 2022-07)
     "ubuntu:jammy",  # 22.04 LTS (EOL 2027-04)
 )
 

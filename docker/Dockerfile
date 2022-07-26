@@ -45,7 +45,7 @@ RUN \
 
 # We install poetry in its own build stage to avoid its dependencies conflicting with
 # synapse's dependencies.
-# We use a specific commit from poetry's master branch instead of our usual 1.1.12,
+# We use a specific commit from poetry's master branch instead of our usual 1.1.14,
 # to incorporate fixes to some bugs in `poetry export`. This commit corresponds to
 #    https://github.com/python-poetry/poetry/pull/5156 and
 #    https://github.com/python-poetry/poetry/issues/5141 ;
@@ -62,7 +62,13 @@ WORKDIR /synapse
 # Copy just what we need to run `poetry export`...
 COPY pyproject.toml poetry.lock /synapse/
 
-RUN /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt
+
+# If specified, we won't verify the hashes of dependencies.
+# This is only needed if the hashes of dependencies cannot be checked for some
+# reason, such as when a git repository is used directly as a dependency.
+ARG TEST_ONLY_SKIP_DEP_HASH_VERIFICATION
+
+RUN /root/.local/bin/poetry export --extras all -o /synapse/requirements.txt ${TEST_ONLY_SKIP_DEP_HASH_VERIFICATION:+--without-hashes}
 
 ###
 ### Stage 1: builder
@@ -85,6 +91,7 @@ RUN \
     openssl \
     rustc \
     zlib1g-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # To speed up rebuilds, install all of the dependencies before we copy over

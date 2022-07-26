@@ -573,7 +573,7 @@ async def _iterative_auth_checks(
                     auth_events[key] = event_map[ev_id]
 
         try:
-            event_auth.check_auth_rules_for_event(
+            event_auth.check_state_dependent_auth_rules(
                 event,
                 auth_events.values(),
             )
