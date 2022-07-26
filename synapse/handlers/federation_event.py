@@ -544,8 +544,8 @@ class FederationEventHandler:
             if context.partial_state:
                 # this can happen if some or all of the event's prev_events still have
                 # partial state. We were careful to only pick events from the db without
-                # partial-state, so that implies that the prev event has been persisted
-                # (with partial state) since we did the query.
+                # partial-state prev events, so that implies that a prev event has
+                # been persisted (with partial state) since we did the query.
                 #
                 # So, let's just ignore `event` for now; when we re-run the db query
                 # we should instead get its partial-state prev event, which we will
