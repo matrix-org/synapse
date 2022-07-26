@@ -490,8 +490,9 @@ class TypingNotificationEventSource(EventSource[int, JsonDict]):
 
             events = []
 
-            # Work on a copy of things here as these may change when this coroutine awaits the
-            # is_interested_in_room call. Shallow copy is safe as no nested data is present.
+            # Work on a copy of things here as these may change in the handler while
+            # waiting for the AS `is_interested_in_room` call to complete.
+            # Shallow copy is safe as no nested data is present.
             latest_room_serial = handler._latest_room_serial
             room_serials = handler._room_serials.copy()
 
