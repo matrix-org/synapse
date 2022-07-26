@@ -1,1 +1,1 @@
-Fix long-standing bug in `get_pdu` asking every remote destination even after it finds an event.
+Fix long-standing bugged logic which was never hit in `get_pdu` asking every remote destination even after it finds an event.
