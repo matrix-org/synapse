@@ -10,11 +10,10 @@ from typing import (
     Callable,
     Collection,
     Dict,
-    List,
-    Mapping,
     Optional,
     Sequence,
     Tuple,
+    cast,
 )
 from unittest.mock import MagicMock, patch
 
@@ -27,7 +26,6 @@ from twisted.internet import task
 from synapse.config._base import RootConfig
 from synapse.config.cache import CacheConfig
 from synapse.config.database import DatabaseConfig
-from synapse.config.homeserver import HomeServerConfig
 from synapse.config.workers import WorkerConfig
 from synapse.events import EventBase
 from synapse.server import HomeServer
@@ -68,14 +66,16 @@ class DataStore(
 class MockHomeserver(HomeServer):
     DATASTORE_CLASS = DataStore  # type: ignore [assignment]
 
-    def __init__(self, config: HomeServerConfig):
+    def __init__(self, config: Config):
         super(MockHomeserver, self).__init__(
             hostname="stateres-debug",
-            config=config,
+            config=config,  # type: ignore[arg-type]
         )
 
 
-def node(event: EventBase, suffix: Optional[str] = None, **kwargs) -> pydot.Node:
+def node(
+    event: EventBase, suffix: Optional[str] = None, **kwargs: object
+) -> pydot.Node:
     label = f"{event.event_id}\n{event.type}"
     if suffix:
         label += f"\n{suffix}"
@@ -88,7 +88,7 @@ def node(event: EventBase, suffix: Optional[str] = None, **kwargs) -> pydot.Node
     return pydot.Node(q(event.event_id), **kwargs)
 
 
-def edge(source: EventBase, target: EventBase, **kwargs) -> pydot.Edge:
+def edge(source: EventBase, target: EventBase, **kwargs: object) -> pydot.Edge:
     return pydot.Edge(
         pydot.quote_if_necessary(source.event_id),
         pydot.quote_if_necessary(target.event_id),
@@ -186,8 +186,10 @@ async def debug_specific_stateres(
     ]
 
     if args.watch is not None:
-        key_pair = tuple(args.watch)
+        key_pair = cast(Tuple[str, str], tuple(args.watch))
         filter = StateFilter.from_types([key_pair])
+
+        watch_func: Optional[Callable[[EventBase], Awaitable[str]]]
 
         async def watch_func(event: EventBase) -> str:
             result = await hs.get_storage_controllers().state.get_state_ids_for_event(
