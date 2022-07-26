@@ -184,3 +184,18 @@ trusted_key_servers:
 
 password_config:
    enabled: true
+
+opentracing:
+    enabled: true
+    jaeger_config:
+      # Sample everything
+      sampler:
+        type: const
+        param: 1
+      # via https://github.com/jaegertracing/jaeger-client-python/issues/47#issuecomment-493497439
+      local_agent:
+        reporting_host: "host.docker.internal"
+        reporting_port: 6831
+      #  Logging whether spans were started and reported
+      #
+      logging: true
