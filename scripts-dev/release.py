@@ -215,9 +215,7 @@ def prepare() -> None:
         # as well push it now (and only when we create a release branch;
         # not on subsequent RCs or full releases).
         if click.confirm("Push new SyTest branch?", default=True):
-            sytest_repo.git.push(
-                "-u", sytest_repo.remote().name, sytest_repo.active_branch.name
-            )
+            sytest_repo.git.push("-u", sytest_repo.remote().name, release_branch_name)
 
     # Switch to the release branch and ensure it's up to date.
     synapse_repo.git.checkout(release_branch_name)
