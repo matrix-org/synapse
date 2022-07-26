@@ -148,7 +148,7 @@ async def dump_mainlines(
                         graph.add_node(await new_node(auth_event))
                     seen.add(auth_event.event_id)
                     todo.append(auth_event)
-                graph.add_edge(edge(event, auth_event), style=style)
+                graph.add_edge(edge(event, auth_event, style=style))
 
     graph.write_raw("mainlines.dot")
     graph.write_svg("mainlines.svg")
