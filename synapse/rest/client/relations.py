@@ -113,6 +113,9 @@ class ThreadsServlet(RestServlet):
         limit = parse_integer(request, "limit", default=5)
         from_token_str = parse_string(request, "from")
         to_token_str = parse_string(request, "to")
+        include = parse_string(
+            request, "include", default="all", allowed_values=["all", "participated"]
+        )
 
         # Return the relations
         from_token = None
@@ -125,6 +128,7 @@ class ThreadsServlet(RestServlet):
         result = await self._relations_handler.get_threads(
             requester=requester,
             room_id=room_id,
+            include=include,
             limit=limit,
             from_token=from_token,
             to_token=to_token,

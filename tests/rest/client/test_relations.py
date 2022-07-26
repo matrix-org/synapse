@@ -1750,4 +1750,50 @@ class ThreadsTestCase(BaseRelationsTestCase):
 
         self.assertNotIn("next_batch", channel.json_body, channel.json_body)
 
+    @unittest.override_config({"experimental_features": {"msc3856_enabled": True}})
+    def test_include(self) -> None:
+        """Filtering threads to all or participated in should work."""
+        # Thread 1 has the user as the root event.
+        thread_1 = self.parent_id
+        self._send_relation(
+            RelationTypes.THREAD, "m.room.test", access_token=self.user2_token
+        )
+
+        # Thread 2 has the user replying.
+        res = self.helper.send(self.room, body="Thread Root!", tok=self.user2_token)
+        thread_2 = res["event_id"]
+        self._send_relation(RelationTypes.THREAD, "m.room.test", parent_id=thread_2)
+
+        # Thread 3 has the user not participating in.
+        res = self.helper.send(self.room, body="Another thread!", tok=self.user2_token)
+        thread_3 = res["event_id"]
+        self._send_relation(
+            RelationTypes.THREAD,
+            "m.room.test",
+            access_token=self.user2_token,
+            parent_id=thread_3,
+        )
+
+        # All threads in the room.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/org.matrix.msc3856/rooms/{self.room}/threads",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(
+            thread_roots, [thread_3, thread_2, thread_1], channel.json_body
+        )
+
+        # Only participated threads.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/unstable/org.matrix.msc3856/rooms/{self.room}/threads?include=participated",
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        thread_roots = [ev["event_id"] for ev in channel.json_body["chunk"]]
+        self.assertEqual(thread_roots, [thread_2, thread_1], channel.json_body)
+
     # XXX Test ignoring users.

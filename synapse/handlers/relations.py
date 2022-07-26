@@ -485,6 +485,7 @@ class RelationsHandler:
         self,
         requester: Requester,
         room_id: str,
+        include: str,
         limit: int = 5,
         from_token: Optional[StreamToken] = None,
         to_token: Optional[StreamToken] = None,
@@ -494,6 +495,8 @@ class RelationsHandler:
         Args:
             requester: The user requesting the relations.
             room_id: The room the event belongs to.
+            include: One of "all" or "participated" to indicate which threads should
+                be returned.
             limit: Only fetch the most recent `limit` events.
             from_token: Fetch rows from the given token, or from the start if None.
             to_token: Fetch rows up to the given token, or up to the end if None.
@@ -517,6 +520,21 @@ class RelationsHandler:
         )
 
         events = await self._main_store.get_events_as_list(thread_roots)
+
+        if include == "participated":
+            # Pre-seed thread participation with whether the requester sent the event.
+            participated = {event.event_id: event.sender == user_id for event in events}
+            # For events the requester did not send, check the database for whether
+            # the requester sent a threaded reply.
+            participated.update(
+                await self._main_store.get_threads_participated(
+                    [eid for eid, p in participated.items() if not p],
+                    user_id,
+                )
+            )
+
+            # Limit the returned threads to those the user has participated in.
+            events = [event for event in events if participated[event.event_id]]
 
         events = await filter_events_for_client(
             self._storage_controllers,
