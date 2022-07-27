@@ -30,7 +30,6 @@ class TracerConfig(Config):
 
         self.opentelemetry_enabled = opentelemetry_config.get("enabled", False)
 
-        # TODO: no more
         self.jaeger_exporter_config = opentelemetry_config.get(
             "jaeger_exporter_config",
             {},
