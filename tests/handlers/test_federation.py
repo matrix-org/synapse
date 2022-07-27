@@ -280,14 +280,21 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
 
             # we poke this directly into _process_received_pdu, to avoid the
             # federation handler wanting to backfill the fake event.
+            state_handler = self.hs.get_state_handler()
+            context = self.get_success(
+                state_handler.compute_event_context(
+                    event,
+                    state_ids_before_event={
+                        (e.type, e.state_key): e.event_id for e in current_state
+                    },
+                    partial_state=False,
+                )
+            )
             self.get_success(
                 federation_event_handler._process_received_pdu(
                     self.OTHER_SERVER_NAME,
                     event,
-                    state_ids={
-                        (e.type, e.state_key): e.event_id for e in current_state
-                    },
-                    partial_state=False,
+                    context=context,
                 )
             )
 
