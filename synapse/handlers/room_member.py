@@ -1679,7 +1679,11 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         ]
 
         if len(remote_room_hosts) == 0:
-            raise SynapseError(404, "No known servers")
+            raise SynapseError(
+                404,
+                "Can't join remote room because no servers "
+                "that are in the room have been provided.",
+            )
 
         check_complexity = self.hs.config.server.limit_remote_rooms.enabled
         if (
