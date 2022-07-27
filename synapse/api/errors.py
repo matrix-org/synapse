@@ -23,11 +23,11 @@ from typing import Any, Dict, List, Optional, Union
 
 from twisted.web import http
 
-from synapse.config.homeserver import HomeServerConfig
 from synapse.util import json_decoder
 
 if typing.TYPE_CHECKING:
     from synapse.types import JsonDict
+    from synapse.config.homeserver import HomeServerConfig 
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +174,7 @@ class SynapseError(CodeMessageException):
         else:
             self._additional_fields = dict(additional_fields)
 
-    def error_dict(self, config: HomeServerConfig) -> "JsonDict":
+    def error_dict(self, config: "HomeServerConfig") -> "JsonDict":
         return cs_error(self.msg, self.errcode, **self._additional_fields)
 
 
@@ -220,7 +220,7 @@ class ConsentNotGivenError(SynapseError):
         )
         self._consent_uri = consent_uri
 
-    def error_dict(self, config: HomeServerConfig) -> "JsonDict":
+    def error_dict(self, config: "HomeServerConfig") -> "JsonDict":
         return cs_error(self.msg, self.errcode, consent_uri=self._consent_uri)
 
 
@@ -333,7 +333,7 @@ class UnstableSpecAuthError(AuthError):
         self.previous_errcode = previous_errcode
         super().__init__(code, msg, errcode, additional_fields)
 
-    def error_dict(self, config: HomeServerConfig) -> "JsonDict":
+    def error_dict(self, config: "HomeServerConfig") -> "JsonDict":
         fields = {}
         if config.experimental.msc3848_enabled:
             fields["org.matrix.msc3848.unstable.errcode"] = self.errcode
@@ -376,7 +376,7 @@ class InvalidClientTokenError(InvalidClientCredentialsError):
         super().__init__(msg=msg, errcode="M_UNKNOWN_TOKEN")
         self._soft_logout = soft_logout
 
-    def error_dict(self, config: HomeServerConfig) -> "JsonDict":
+    def error_dict(self, config: "HomeServerConfig") -> "JsonDict":
         d = super().error_dict(config)
         d["soft_logout"] = self._soft_logout
         return d
@@ -400,7 +400,7 @@ class ResourceLimitError(SynapseError):
         self.limit_type = limit_type
         super().__init__(code, msg, errcode=errcode)
 
-    def error_dict(self, config: HomeServerConfig) -> "JsonDict":
+    def error_dict(self, config: "HomeServerConfig") -> "JsonDict":
         return cs_error(
             self.msg,
             self.errcode,
@@ -435,7 +435,7 @@ class InvalidCaptchaError(SynapseError):
         super().__init__(code, msg, errcode)
         self.error_url = error_url
 
-    def error_dict(self, config: HomeServerConfig) -> "JsonDict":
+    def error_dict(self, config: "HomeServerConfig") -> "JsonDict":
         return cs_error(self.msg, self.errcode, error_url=self.error_url)
 
 
@@ -452,7 +452,7 @@ class LimitExceededError(SynapseError):
         super().__init__(code, msg, errcode)
         self.retry_after_ms = retry_after_ms
 
-    def error_dict(self, config: HomeServerConfig) -> "JsonDict":
+    def error_dict(self, config: "HomeServerConfig") -> "JsonDict":
         return cs_error(self.msg, self.errcode, retry_after_ms=self.retry_after_ms)
 
 
@@ -467,7 +467,7 @@ class RoomKeysVersionError(SynapseError):
         super().__init__(403, "Wrong room_keys version", Codes.WRONG_ROOM_KEYS_VERSION)
         self.current_version = current_version
 
-    def error_dict(self, config: HomeServerConfig) -> "JsonDict":
+    def error_dict(self, config: "HomeServerConfig") -> "JsonDict":
         return cs_error(self.msg, self.errcode, current_version=self.current_version)
 
 
@@ -507,7 +507,7 @@ class IncompatibleRoomVersionError(SynapseError):
 
         self._room_version = room_version
 
-    def error_dict(self, config: HomeServerConfig) -> "JsonDict":
+    def error_dict(self, config: "HomeServerConfig") -> "JsonDict":
         return cs_error(self.msg, self.errcode, room_version=self._room_version)
 
 
@@ -553,7 +553,7 @@ class UnredactedContentDeletedError(SynapseError):
         )
         self.content_keep_ms = content_keep_ms
 
-    def error_dict(self, config: HomeServerConfig) -> "JsonDict":
+    def error_dict(self, config: "HomeServerConfig") -> "JsonDict":
         extra = {}
         if self.content_keep_ms is not None:
             extra = {"fi.mau.msc2815.content_keep_ms": self.content_keep_ms}
