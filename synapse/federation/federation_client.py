@@ -403,9 +403,9 @@ class FederationClient(FederationBase):
                         # Prime the cache
                         self._get_pdu_cache[event.event_id] = event
 
-                        # FIXME: We should add a `break` here to avoid calling every
-                        # destination after we already found a PDU (will follow-up
-                        # in a separate PR)
+                        # Now that we have an event, we can break out of this
+                        # loop and stop asking other destinations.
+                        break
 
                 except SynapseError as e:
                     logger.info(
