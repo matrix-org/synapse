@@ -216,7 +216,10 @@ class _DummyLookup(object):
 # These dependencies are optional so they can fail to import
 # and we
 try:
+    import opentelemetry
     import opentelemetry.trace
+    import opentelemetry.sdk.trace
+    import opentelemetry.sdk.trace.export
     import opentelemetry.semconv.trace
 
     SpanKind = opentelemetry.trace.SpanKind
@@ -370,12 +373,12 @@ def init_tracer(hs: "HomeServer") -> None:
 
     # TODO: opentelemetry_whitelist
 
-    provider = opentelemetry.TracerProvider()
-    processor = opentelemetry.BatchSpanProcessor(opentelemetry.ConsoleSpanExporter())
+    provider = opentelemetry.sdk.trace.TracerProvider()
+    processor = opentelemetry.sdk.trace.export.BatchSpanProcessor(opentelemetry.sdk.trace.export.ConsoleSpanExporter())
     provider.add_span_processor(processor)
 
     # Sets the global default tracer provider
-    trace.set_tracer_provider(provider)
+    opentelemetry.trace.set_tracer_provider(provider)
 
 
 # Whitelisting
