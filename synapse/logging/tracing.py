@@ -210,7 +210,7 @@ class _DummyLookup(object):
         self.value = value
 
     def __getattribute__(self, name):
-        return self.value
+        return object.__getattribute__(self, "value")
 
 
 # These dependencies are optional so they can fail to import
@@ -220,7 +220,9 @@ try:
     import opentelemetry.trace
     import opentelemetry.sdk.trace
     import opentelemetry.sdk.trace.export
+    import opentelemetry.sdk.resources
     import opentelemetry.semconv.trace
+    import opentelemetry.exporter.jaeger.thrift
 
     SpanKind = opentelemetry.trace.SpanKind
     SpanAttributes = opentelemetry.semconv.trace.SpanAttributes
@@ -231,6 +233,7 @@ except ImportError:
     SpanKind = _DummyLookup(0)
     SpanAttributes = _DummyLookup("fake-attribute")
     StatusCode = _DummyLookup(0)
+
 
 logger = logging.getLogger(__name__)
 
@@ -373,9 +376,26 @@ def init_tracer(hs: "HomeServer") -> None:
 
     # TODO: opentelemetry_whitelist
 
-    provider = opentelemetry.sdk.trace.TracerProvider()
-    processor = opentelemetry.sdk.trace.export.BatchSpanProcessor(opentelemetry.sdk.trace.export.ConsoleSpanExporter())
-    provider.add_span_processor(processor)
+    resource = opentelemetry.sdk.resources.Resource(
+        attributes={
+            opentelemetry.sdk.resources.SERVICE_NAME: f"{hs.config.server.server_name} {hs.get_instance_name()}"
+        }
+    )
+
+    provider = opentelemetry.sdk.trace.TracerProvider(resource=resource)
+
+    # consoleProcessor = opentelemetry.sdk.trace.export.BatchSpanProcessor(
+    #     opentelemetry.sdk.trace.export.ConsoleSpanExporter()
+    # )
+    # provider.add_span_processor(consoleProcessor)
+
+    jaeger_exporter = opentelemetry.exporter.jaeger.thrift.JaegerExporter(
+        **hs.config.tracing.jaeger_exporter_config
+    )
+    jaeger_processor = opentelemetry.sdk.trace.export.BatchSpanProcessor(
+        jaeger_exporter
+    )
+    provider.add_span_processor(jaeger_processor)
 
     # Sets the global default tracer provider
     opentelemetry.trace.set_tracer_provider(provider)
@@ -419,7 +439,7 @@ def start_active_span(
     name: str,
     *,
     context: Optional["opentelemetry.context.context.Context"] = None,
-    kind: Optional["opentelemetry.trace.SpanKind"] = None,
+    kind: Optional["opentelemetry.trace.SpanKind"] = SpanKind.INTERNAL,
     attributes: "opentelemetry.util.types.Attributes" = None,
     links: Optional[Sequence["opentelemetry.trace.Link"]] = None,
     start_time: Optional[int] = None,
@@ -759,7 +779,8 @@ def trace_servlet(
         SynapseTags.REQUEST_ID: request.get_request_id(),
         SpanAttributes.HTTP_METHOD: request.get_method(),
         SpanAttributes.HTTP_URL: request.get_redacted_uri(),
-        SpanAttributes.PEER_HOST_IPV6: request.getClientAddress().host,
+        # TODO: Is this the correct attribute to use for this?
+        SpanAttributes.NET_PEER_IP: request.getClientAddress().host,
     }
 
     request_name = request.request_metrics.name
@@ -768,27 +789,27 @@ def trace_servlet(
     # we configure the scope not to finish the span immediately on exit, and instead
     # pass the span into the SynapseRequest, which will finish it once we've finished
     # sending the response to the client.
-    span = start_active_span(
+    with start_active_span(
         request_name,
-        kind=opentelemetry.trace.SpanKind.SERVER,
-        child_of=context,
+        kind=SpanKind.SERVER,
+        context=context,
         end_on_exit=False,
-    )
-    request.set_opentracing_span(span)
+    ) as span:
+        request.set_tracing_span(span)
 
-    inject_response_headers(request.responseHeaders)
-    try:
-        yield
-    finally:
-        # We set the operation name again in case its changed (which happens
-        # with JsonResource).
-        span.update_name(request.request_metrics.name)
+        inject_response_headers(request.responseHeaders)
+        try:
+            yield
+        finally:
+            # We set the operation name again in case its changed (which happens
+            # with JsonResource).
+            span.update_name(request.request_metrics.name)
 
-        # set the tags *after* the servlet completes, in case it decided to
-        # prioritise the span (tags will get dropped on unprioritised spans)
-        request_attrs[
-            SynapseTags.REQUEST_TAG
-        ] = request.request_metrics.start_context.tag
+            # set the tags *after* the servlet completes, in case it decided to
+            # prioritise the span (tags will get dropped on unprioritised spans)
+            request_attrs[
+                SynapseTags.REQUEST_TAG
+            ] = request.request_metrics.start_context.tag
 
-        for k, v in request_attrs.items():
-            span.set_attribute(k, v)
+            for k, v in request_attrs.items():
+                span.set_attribute(k, v)

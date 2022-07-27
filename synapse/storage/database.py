@@ -928,9 +928,7 @@ class DatabasePool:
             with LoggingContext(
                 str(curr_context), parent_context=parent_context
             ) as context:
-                with tracing.start_active_span(
-                    operation_name="db.connection",
-                ):
+                with tracing.start_active_span("db.connection"):
                     sched_duration_sec = monotonic_time() - start_time
                     sql_scheduling_timer.observe(sched_duration_sec)
                     context.add_database_scheduled(sched_duration_sec)

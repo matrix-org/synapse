@@ -87,7 +87,7 @@ class SynapseRequest(Request):
 
         # An opentracing span for this request. Will be closed when the request is
         # completely processed.
-        self._opentracing_span: Optional["opentelemetry.trace.span.Span"] = None
+        self._tracing_span: Optional["opentelemetry.trace.span.Span"] = None
 
         # we can't yet create the logcontext, as we don't know the method.
         self.logcontext: Optional[LoggingContext] = None
@@ -164,12 +164,12 @@ class SynapseRequest(Request):
         # If there's no authenticated entity, it was the requester.
         self.logcontext.request.authenticated_entity = authenticated_entity or requester
 
-    def set_opentracing_span(self, span: "opentelemetry.trace.span.Span") -> None:
+    def set_tracing_span(self, span: "opentelemetry.trace.span.Span") -> None:
         """attach an opentracing span to this request
 
         Doing so will cause the span to be closed when we finish processing the request
         """
-        self._opentracing_span = span
+        self._tracing_span = span
 
     def get_request_id(self) -> str:
         return "%s-%i" % (self.get_method(), self.request_seq)
@@ -309,8 +309,10 @@ class SynapseRequest(Request):
             self._processing_finished_time = time.time()
             self._is_processing = False
 
-            if self._opentracing_span:
-                self._opentracing_span.log_kv({"event": "finished processing"})
+            if self._tracing_span:
+                self._tracing_span.add_event(
+                    "finished processing", attributes={"event": "finished processing"}
+                )
 
             # if we've already sent the response, log it now; otherwise, we wait for the
             # response to be sent.
@@ -325,8 +327,10 @@ class SynapseRequest(Request):
         """
         self.finish_time = time.time()
         Request.finish(self)
-        if self._opentracing_span:
-            self._opentracing_span.log_kv({"event": "response sent"})
+        if self._tracing_span:
+            self._tracing_span.add_event(
+                "response sent", attributes={"event": "response sent"}
+            )
         if not self._is_processing:
             assert self.logcontext is not None
             with PreserveLoggingContext(self.logcontext):
@@ -361,9 +365,13 @@ class SynapseRequest(Request):
         with PreserveLoggingContext(self.logcontext):
             logger.info("Connection from client lost before response was sent")
 
-            if self._opentracing_span:
-                self._opentracing_span.log_kv(
-                    {"event": "client connection lost", "reason": str(reason.value)}
+            if self._tracing_span:
+                self._tracing_span.add_event(
+                    "client connection lost",
+                    attributes={
+                        "event": "client connection lost",
+                        "reason": str(reason.value),
+                    },
                 )
 
             if self._is_processing:
@@ -472,8 +480,8 @@ class SynapseRequest(Request):
         )
 
         # complete the opentracing span, if any.
-        if self._opentracing_span:
-            self._opentracing_span.finish()
+        if self._tracing_span:
+            self._tracing_span.end()
 
         try:
             self.request_metrics.stop(self.finish_time, self.code, self.sentLength)

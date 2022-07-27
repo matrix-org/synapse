@@ -182,6 +182,7 @@ parameterized = { version = ">=0.7.4", optional = true }
 idna = { version = ">=2.5", optional = true }
 opentelemetry-api = {version = "^1.11.1", optional = true}
 opentelemetry-sdk = {version = "^1.11.1", optional = true}
+opentelemetry-exporter-jaeger = {version = "^1.11.1", optional = true}
 
 [tool.poetry.extras]
 # NB: Packages that should be part of `pip install matrix-synapse[all]` need to be specified
@@ -196,7 +197,7 @@ oidc = ["authlib"]
 systemd = ["systemd-python"]
 url_preview = ["lxml"]
 sentry = ["sentry-sdk"]
-opentelemetry = ["opentelemetry-api", "opentelemetry-sdk"]
+opentelemetry = ["opentelemetry-api", "opentelemetry-sdk", "opentelemetry-exporter-jaeger"]
 jwt = ["authlib"]
 # hiredis is not a *strict* dependency, but it makes things much faster.
 # (if it is not installed, we fall back to slow code.)
@@ -230,7 +231,7 @@ all = [
     # sentry
     "sentry-sdk",
     # opentelemetry
-    "opentelemetry-api", "opentelemetry-sdk",
+    "opentelemetry-api", "opentelemetry-sdk", "opentelemetry-exporter-jaeger",
     # redis
     "txredisapi", "hiredis",
     # cache_memory

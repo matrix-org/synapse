@@ -31,9 +31,9 @@ class TracerConfig(Config):
         self.opentelemetry_enabled = opentelemetry_config.get("enabled", False)
 
         # TODO: no more
-        self.jaeger_config = opentelemetry_config.get(
-            "jaeger_config",
-            {"sampler": {"type": "const", "param": 1}, "logging": False},
+        self.jaeger_exporter_config = opentelemetry_config.get(
+            "jaeger_exporter_config",
+            {},
         )
 
         self.force_tracing_for_users: Set[str] = set()
