@@ -186,7 +186,7 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         """
 
         class NastyHackException(SynapseError):
-            def error_dict(self, config: HomeServerConfig) -> JsonDict:
+            def error_dict(self, config: Optional[HomeServerConfig]) -> JsonDict:
                 """
                 This overrides SynapseError's `error_dict` to nastily inject
                 JSON into the error response.

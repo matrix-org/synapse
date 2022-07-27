@@ -335,7 +335,7 @@ class UnstableSpecAuthError(AuthError):
 
     def error_dict(self, config: Optional["HomeServerConfig"]) -> "JsonDict":
         fields = {}
-        if config != None and config.experimental.msc3848_enabled:
+        if config is not None and config.experimental.msc3848_enabled:
             fields["org.matrix.msc3848.unstable.errcode"] = self.errcode
         return cs_error(
             self.msg,
