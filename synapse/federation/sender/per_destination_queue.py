@@ -32,7 +32,7 @@ from synapse.events import EventBase
 from synapse.federation.units import Edu
 from synapse.handlers.presence import format_user_presence_state
 from synapse.logging import issue9533_logger
-from synapse.logging.opentelemetry import SynapseTags, set_tag
+from synapse.logging.tracing import SynapseTags, set_attribute
 from synapse.metrics import sent_transactions_counter
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import ReadReceipt
@@ -596,7 +596,7 @@ class PerDestinationQueue:
             if not message_id:
                 continue
 
-            set_tag(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
+            set_attribute(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
 
         edus = [
             Edu(

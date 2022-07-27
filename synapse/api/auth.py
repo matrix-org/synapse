@@ -30,7 +30,7 @@ from synapse.api.errors import (
 from synapse.appservice import ApplicationService
 from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
-from synapse.logging.opentelemetry import active_span, force_tracing, start_active_span
+from synapse.logging.tracing import active_span, force_tracing, start_active_span
 from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import Requester, UserID, create_requester
 
@@ -147,14 +147,14 @@ class Auth:
                     # so we also force it on for that.
                     force_tracing()
                     force_tracing(parent_span)
-                parent_span.set_tag(
+                parent_span.set_attribute(
                     "authenticated_entity", requester.authenticated_entity
                 )
-                parent_span.set_tag("user_id", requester.user.to_string())
+                parent_span.set_attribute("user_id", requester.user.to_string())
                 if requester.device_id is not None:
-                    parent_span.set_tag("device_id", requester.device_id)
+                    parent_span.set_attribute("device_id", requester.device_id)
                 if requester.app_service is not None:
-                    parent_span.set_tag("appservice_id", requester.app_service.id)
+                    parent_span.set_attribute("appservice_id", requester.app_service.id)
             return requester
 
     async def _wrapped_get_user_by_req(

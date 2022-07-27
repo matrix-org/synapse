@@ -19,11 +19,11 @@ from synapse.api.constants import EduTypes, ToDeviceEventTypes
 from synapse.api.errors import SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.logging.context import run_in_background
-from synapse.logging.opentelemetry import (
+from synapse.logging.tracing import (
     SynapseTags,
     get_active_span_text_map,
     log_kv,
-    set_tag,
+    set_attribute,
 )
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.types import JsonDict, Requester, StreamKeyType, UserID, get_domain_from_id
@@ -217,10 +217,10 @@ class DeviceMessageHandler:
         sender_user_id = requester.user.to_string()
 
         message_id = random_string(16)
-        set_tag(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
+        set_attribute(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
 
         log_kv({"number_of_to_device_messages": len(messages)})
-        set_tag("sender", sender_user_id)
+        set_attribute("sender", sender_user_id)
         local_messages = {}
         remote_messages: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
         for user_id, by_device in messages.items():

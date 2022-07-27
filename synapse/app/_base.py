@@ -62,7 +62,7 @@ from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.logging.context import PreserveLoggingContext
-from synapse.logging.opentelemetry import init_tracer
+from synapse.logging.tracing import init_tracer
 from synapse.metrics import install_gc_manager, register_threadpool
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.metrics.jemalloc import setup_jemalloc_stats
@@ -549,7 +549,7 @@ def setup_sentry(hs: "HomeServer") -> None:
 
     # We set some default tags that give some context to this instance
     with sentry_sdk.configure_scope() as scope:
-        scope.set_tag("matrix_server_name", hs.config.server.server_name)
+        scope.set_attribute("matrix_server_name", hs.config.server.server_name)
 
         app = (
             hs.config.worker.worker_app
@@ -557,8 +557,8 @@ def setup_sentry(hs: "HomeServer") -> None:
             else "synapse.app.homeserver"
         )
         name = hs.get_instance_name()
-        scope.set_tag("worker_app", app)
-        scope.set_tag("worker_name", name)
+        scope.set_attribute("worker_app", app)
+        scope.set_attribute("worker_name", name)
 
 
 def setup_sdnotify(hs: "HomeServer") -> None:

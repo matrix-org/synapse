@@ -64,7 +64,7 @@ exited. This is usually done by using ``with``.
 Forgetting to enter or exit a scope will result in some mysterious and grievous log
 context errors.
 
-At anytime where there is an active span ``opentracing.set_tag`` can be used to
+At anytime where there is an active span ``opentracing.set_attribute`` can be used to
 set a tag on the current active span.
 
 Tracing functions
@@ -102,9 +102,9 @@ To set a tag on the active span do
 
 .. code-block:: python
 
-   from synapse.logging.opentracing import set_tag
+   from synapse.logging.opentracing import set_attribute
 
-   set_tag(tag_name, tag_value)
+   set_attribute(tag_name, tag_value)
 
 There's a convenient decorator to tag all the args of the method. It uses
 inspection in order to use the formal parameter names prefixed with 'ARG_' as
@@ -179,6 +179,7 @@ from typing import (
     List,
     Optional,
     Pattern,
+    Sequence,
     Type,
     TypeVar,
     Union,
@@ -206,7 +207,7 @@ if TYPE_CHECKING:
 class _DummyTagNames:
     """wrapper of opentracings tags. We need to have them if we
     want to reference them without opentracing around. Clearly they
-    should never actually show up in a trace. `set_tags` overwrites
+    should never actually show up in a trace. `set_attributes` overwrites
     these with the correct ones."""
 
     INVALID_TAG = "invalid-tag"
@@ -234,14 +235,17 @@ class _DummyTagNames:
     SPAN_KIND_RPC_CLIENT = INVALID_TAG
     SPAN_KIND_RPC_SERVER = INVALID_TAG
 
+
 # These dependencies are optional so they can fail to import
-# and we 
+# and we
 try:
     import opentelemetry
+    import opentracing
 
     # TODO: tags?
 except ImportError:
     opentelemetry = None  # type: ignore[assignment]
+    opentracing = None  # type: ignore[assignment]
     tags = _DummyTagNames  # type: ignore[assignment]
 
 
@@ -368,7 +372,7 @@ def ensure_active_span(
 
 
 def init_tracer(hs: "HomeServer") -> None:
-    """Set the whitelists and initialise the JaegerClient tracer"""
+    """Set the whitelists and initialise the OpenTelemetry tracer"""
     global opentelemetry
     if not hs.config.tracing.opentelemetry_enabled:
         # We don't have a tracer
@@ -392,6 +396,7 @@ def init_tracer(hs: "HomeServer") -> None:
 
     # Sets the global default tracer provider
     trace.set_tracer_provider(provider)
+
 
 # Whitelisting
 
@@ -429,20 +434,23 @@ def whitelisted_homeserver(destination: str) -> bool:
 # Could use kwargs but I want these to be explicit
 def start_active_span(
     operation_name: str,
-    child_of: Optional[Union["opentracing.Span", "opentracing.SpanContext"]] = None,
+    child_of: Optional[
+        Union[
+            opentelemetry.shim.opentracing_shim.SpanShim,
+            opentelemetry.shim.opentracing_shim.SpanContextShim,
+        ]
+    ] = None,
     references: Optional[List["opentracing.Reference"]] = None,
     tags: Optional[Dict[str, str]] = None,
     start_time: Optional[float] = None,
     ignore_active_span: bool = False,
     finish_on_close: bool = True,
     *,
-    tracer: Optional["opentracing.Tracer"] = None,
-) -> "opentracing.Scope":
+    tracer: Optional[opentelemetry.shim.opentracing_shim.TracerShim] = None,
+) -> opentelemetry.shim.opentracing_shim.ScopeShim:
     """Starts an active opentracing span.
-
     Records the start time for the span, and sets it as the "active span" in the
     scope manager.
-
     Args:
         See opentracing.tracer
     Returns:
@@ -454,9 +462,11 @@ def start_active_span(
 
     if tracer is None:
         # use the global tracer by default
-        tracer = opentelemetry.trace.get_tracer(__name__)
+        otel_tracer = opentelemetry.trace.get_tracer(__name__)
+        tracerShim = opentelemetry.shim.opentracing_shim.create_tracer(otel_tracer)
+        tracer = tracerShim
 
-    return tracer.start_as_current_span(
+    return tracer.start_active_span(
         operation_name,
         child_of=child_of,
         references=references,
@@ -470,30 +480,31 @@ def start_active_span(
 def start_active_span_follows_from(
     operation_name: str,
     contexts: Collection,
-    child_of: Optional[Union["opentracing.Span", "opentracing.SpanContext"]] = None,
+    child_of: Optional[
+        Union[
+            opentelemetry.shim.opentracing_shim.SpanShim,
+            opentelemetry.shim.opentracing_shim.SpanContextShim,
+        ]
+    ] = None,
     start_time: Optional[float] = None,
     *,
     inherit_force_tracing: bool = False,
-    tracer: Optional["opentracing.Tracer"] = None,
-) -> "opentracing.Scope":
+    tracer: Optional[opentelemetry.shim.opentracing_shim.TracerShim] = None,
+) -> opentelemetry.shim.opentracing_shim.ScopeShim:
     """Starts an active opentracing span, with additional references to previous spans
-
     Args:
         operation_name: name of the operation represented by the new span
         contexts: the previous spans to inherit from
-
         child_of: optionally override the parent span. If unset, the currently active
            span will be the parent. (If there is no currently active span, the first
            span in `contexts` will be the parent.)
-
         start_time: optional override for the start time of the created span. Seconds
             since the epoch.
-
         inherit_force_tracing: if set, and any of the previous contexts have had tracing
            forced, the new span will also have tracing forced.
         tracer: override the opentracing tracer. By default the global tracer is used.
     """
-    if opentracing is None:
+    if opentelemetry is None:
         return contextlib.nullcontext()  # type: ignore[unreachable]
 
     references = [opentracing.follows_from(context) for context in contexts]
@@ -521,7 +532,7 @@ def start_active_span_from_edu(
     start_time: Optional[float] = None,
     ignore_active_span: bool = False,
     finish_on_close: bool = True,
-) -> "opentracing.Scope":
+) -> opentelemetry.shim.opentracing_shim.ScopeShim:
     """
     Extracts a span context from an edu and uses it to start a new active span
 
@@ -533,15 +544,22 @@ def start_active_span_from_edu(
     """
     references = references or []
 
-    if opentracing is None:
+    if opentelemetry is None:
         return contextlib.nullcontext()  # type: ignore[unreachable]
 
     carrier = json_decoder.decode(edu_content.get("context", "{}")).get(
         "opentracing", {}
     )
-    context = opentracing.tracer.extract(opentracing.Format.TEXT_MAP, carrier)
+
+    otel_tracer = opentelemetry.trace.get_tracer(__name__)
+    tracerShim = opentelemetry.shim.opentracing_shim.create_tracer(otel_tracer)
+
+    context = tracerShim.extract(opentracing.Format.TEXT_MAP, carrier)
     _references = [
-        opentracing.child_of(span_context_from_string(x))
+        opentracing.Reference(
+            type=opentracing.ReferenceType.CHILD_OF,
+            referenced_context=span_context_from_string(x),
+        )
         for x in carrier.get("references", [])
     ]
 
@@ -551,7 +569,7 @@ def start_active_span_from_edu(
 
     references += _references
 
-    scope = opentracing.tracer.start_active_span(
+    scope = tracerShim.start_active_span(
         operation_name,
         child_of=context,
         references=references,
@@ -561,41 +579,39 @@ def start_active_span_from_edu(
         finish_on_close=finish_on_close,
     )
 
-    scope.span.set_tag("references", carrier.get("references", []))
+    scope.span.set_attribute("references", carrier.get("references", []))
     return scope
 
 
-# Opentracing setters for tags, logs, etc
+# OpenTelemetry setters for attributes, logs, etc
 @only_if_tracing
-def active_span() -> Optional["opentracing.Span"]:
+def active_span() -> Optional[opentelemetry.trace.span.Span]:
     """Get the currently active span, if any"""
-    return opentracing.tracer.active_span
+    return opentelemetry.trace.get_current_span()
 
 
 @ensure_active_span("set a tag")
-def set_tag(key: str, value: Union[str, bool, int, float]) -> None:
+def set_attribute(key: str, value: Union[str, bool, int, float]) -> None:
     """Sets a tag on the active span"""
-    assert opentracing.tracer.active_span is not None
-    opentracing.tracer.active_span.set_tag(key, value)
+    active_span = active_span()
+    assert active_span is not None
+    active_span.set_attribute(key, value)
 
 
 @ensure_active_span("log")
 def log_kv(key_values: Dict[str, Any], timestamp: Optional[float] = None) -> None:
     """Log to the active span"""
-    assert opentracing.tracer.active_span is not None
-    opentracing.tracer.active_span.log_kv(key_values, timestamp)
-
-
-@ensure_active_span("set the traces operation name")
-def set_operation_name(operation_name: str) -> None:
-    """Sets the operation name of the active span"""
-    assert opentracing.tracer.active_span is not None
-    opentracing.tracer.active_span.set_operation_name(operation_name)
+    active_span = active_span()
+    assert active_span is not None
+    event_name = opentelemetry.ext.opentracing_shim.util.event_name_from_kv(key_values)
+    active_span.add_event(event_name, timestamp, key_values)
 
 
 @only_if_tracing
 def force_tracing(
-    span: Union["opentracing.Span", _Sentinel] = _Sentinel.sentinel
+    span: Union[
+        opentelemetry.shim.opentracing_shim.SpanShim, _Sentinel
+    ] = _Sentinel.sentinel
 ) -> None:
     """Force sampling for the active/given span and its children.
 
@@ -603,14 +619,14 @@ def force_tracing(
         span: span to force tracing for. By default, the active span.
     """
     if isinstance(span, _Sentinel):
-        span_to_trace = opentracing.tracer.active_span
+        span_to_trace = opentelemetry.trace.get_current_span()
     else:
         span_to_trace = span
     if span_to_trace is None:
         logger.error("No active span in force_tracing")
         return
 
-    span_to_trace.set_tag(opentracing.tags.SAMPLING_PRIORITY, 1)
+    span_to_trace.set_attribute(opentracing.tags.SAMPLING_PRIORITY, 1)
 
     # also set a bit of baggage, so that we have a way of figuring out if
     # it is enabled later
@@ -618,7 +634,7 @@ def force_tracing(
 
 
 def is_context_forced_tracing(
-    span_context: Optional["opentracing.SpanContext"],
+    span_context: Optional[opentelemetry.shim.opentracing_shim.SpanContextShim],
 ) -> bool:
     """Check if sampling has been force for the given span context."""
     if span_context is None:
@@ -661,11 +677,15 @@ def inject_header_dict(
         if not whitelisted_homeserver(destination):
             return
 
-    span = opentracing.tracer.active_span
+    otel_tracer = opentelemetry.trace.get_tracer(__name__)
+    tracerShim = opentelemetry.shim.opentracing_shim.create_tracer(otel_tracer)
+
+    span = tracerShim.active_span
 
     carrier: Dict[str, str] = {}
     assert span is not None
-    opentracing.tracer.inject(span.context, opentracing.Format.HTTP_HEADERS, carrier)
+
+    tracerShim.inject(span.context, opentracing.Format.HTTP_HEADERS, carrier)
 
     for key, value in carrier.items():
         headers[key.encode()] = [value.encode()]
@@ -673,9 +693,9 @@ def inject_header_dict(
 
 def inject_response_headers(response_headers: Headers) -> None:
     """Inject the current trace id into the HTTP response headers"""
-    if not opentracing:
+    if not opentelemetry:
         return
-    span = opentracing.tracer.active_span
+    span = opentelemetry.trace.get_current_span()
     if not span:
         return
 
@@ -709,10 +729,10 @@ def get_active_span_text_map(destination: Optional[str] = None) -> Dict[str, str
         return {}
 
     carrier: Dict[str, str] = {}
-    assert opentracing.tracer.active_span is not None
-    opentracing.tracer.inject(
-        opentracing.tracer.active_span.context, opentracing.Format.TEXT_MAP, carrier
-    )
+    otel_tracer = opentelemetry.trace.get_tracer(__name__)
+    tracerShim = opentelemetry.shim.opentracing_shim.create_tracer(otel_tracer)
+    assert tracerShim.active_span is not None
+    tracerShim.inject(tracerShim.context, opentracing.Format.TEXT_MAP, carrier)
 
     return carrier
 
@@ -724,10 +744,12 @@ def active_span_context_as_string() -> str:
         The active span context encoded as a string.
     """
     carrier: Dict[str, str] = {}
-    if opentracing:
-        assert opentracing.tracer.active_span is not None
-        opentracing.tracer.inject(
-            opentracing.tracer.active_span.context, opentracing.Format.TEXT_MAP, carrier
+    if opentelemetry:
+        otel_tracer = opentelemetry.trace.get_tracer(__name__)
+        tracerShim = opentelemetry.shim.opentracing_shim.create_tracer(otel_tracer)
+        assert tracerShim.active_span is not None
+        tracerShim.inject(
+            tracerShim.active_span.context, opentracing.Format.TEXT_MAP, carrier
         )
     return json_encoder.encode(carrier)
 
@@ -747,7 +769,9 @@ def span_context_from_request(request: Request) -> "Optional[opentracing.SpanCon
 
 
 @only_if_tracing
-def span_context_from_string(carrier: str) -> Optional["opentracing.SpanContext"]:
+def span_context_from_string(
+    carrier: str,
+) -> Optional[opentelemetry.shim.opentracing_shim.SpanContextShim]:
     """
     Returns:
         The active span context decoded from a string.
@@ -757,7 +781,9 @@ def span_context_from_string(carrier: str) -> Optional["opentracing.SpanContext"
 
 
 @only_if_tracing
-def extract_text_map(carrier: Dict[str, str]) -> Optional["opentracing.SpanContext"]:
+def extract_text_map(
+    carrier: Dict[str, str]
+) -> Optional[opentelemetry.shim.opentracing_shim.SpanContextShim]:
     """
     Wrapper method for opentracing's tracer.extract for TEXT_MAP.
     Args:
@@ -859,9 +885,9 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
     def _tag_args_inner(*args: P.args, **kwargs: P.kwargs) -> R:
         argspec = inspect.getfullargspec(func)
         for i, arg in enumerate(argspec.args[1:]):
-            set_tag("ARG_" + arg, args[i])  # type: ignore[index]
-        set_tag("args", args[len(argspec.args) :])  # type: ignore[index]
-        set_tag("kwargs", str(kwargs))
+            set_attribute("ARG_" + arg, args[i])  # type: ignore[index]
+        set_attribute("args", args[len(argspec.args) :])  # type: ignore[index]
+        set_attribute("kwargs", str(kwargs))
         return func(*args, **kwargs)
 
     return _tag_args_inner
@@ -909,7 +935,7 @@ def trace_servlet(
         finally:
             # We set the operation name again in case its changed (which happens
             # with JsonResource).
-            scope.span.set_operation_name(request.request_metrics.name)
+            scope.span.update_name(request.request_metrics.name)
 
             # set the tags *after* the servlet completes, in case it decided to
             # prioritise the span (tags will get dropped on unprioritised spans)
@@ -918,4 +944,4 @@ def trace_servlet(
             ] = request.request_metrics.start_context.tag
 
             for k, v in request_tags.items():
-                scope.span.set_tag(k, v)
+                scope.span.set_attribute(k, v)

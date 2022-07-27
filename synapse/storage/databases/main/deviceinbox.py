@@ -27,7 +27,7 @@ from typing import (
 )
 
 from synapse.logging import issue9533_logger
-from synapse.logging.opentelemetry import log_kv, set_tag, trace
+from synapse.logging.tracing import log_kv, set_attribute, trace
 from synapse.replication.tcp.streams import ToDeviceStream
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import (
@@ -436,7 +436,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             (user_id, device_id), None
         )
 
-        set_tag("last_deleted_stream_id", str(last_deleted_stream_id))
+        set_attribute("last_deleted_stream_id", str(last_deleted_stream_id))
 
         if last_deleted_stream_id:
             has_changed = self._device_inbox_stream_cache.has_entity_changed(
@@ -485,10 +485,10 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             A list of messages for the device and where in the stream the messages got to.
         """
 
-        set_tag("destination", destination)
-        set_tag("last_stream_id", last_stream_id)
-        set_tag("current_stream_id", current_stream_id)
-        set_tag("limit", limit)
+        set_attribute("destination", destination)
+        set_attribute("last_stream_id", last_stream_id)
+        set_attribute("current_stream_id", current_stream_id)
+        set_attribute("limit", limit)
 
         has_changed = self._device_federation_outbox_stream_cache.has_entity_changed(
             destination, last_stream_id

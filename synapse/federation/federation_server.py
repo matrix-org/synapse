@@ -61,7 +61,7 @@ from synapse.logging.context import (
     nested_logging_context,
     run_in_background,
 )
-from synapse.logging.opentelemetry import log_kv, start_active_span_from_edu, trace
+from synapse.logging.tracing import log_kv, start_active_span_from_edu, trace
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.replication.http.federation import (
     ReplicationFederationSendEduRestServlet,

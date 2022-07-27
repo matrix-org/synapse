@@ -42,7 +42,7 @@ from synapse.logging.context import (
     LoggingContext,
     PreserveLoggingContext,
 )
-from synapse.logging.opentelemetry import SynapseTags, start_active_span
+from synapse.logging.tracing import SynapseTags, start_active_span
 from synapse.metrics._types import Collector
 
 if TYPE_CHECKING:

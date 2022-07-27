@@ -74,7 +74,7 @@ from synapse.http.federation.matrix_federation_agent import MatrixFederationAgen
 from synapse.http.types import QueryParams
 from synapse.logging import opentelemetry
 from synapse.logging.context import make_deferred_yieldable, run_in_background
-from synapse.logging.opentelemetry import set_tag, start_active_span, tags
+from synapse.logging.tracing import set_attribute, start_active_span, tags
 from synapse.types import JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import AwakenableSleeper, timeout_deferred
@@ -614,7 +614,7 @@ class MatrixFederationHttpClient:
                         request.method, response.code
                     ).inc()
 
-                    set_tag(tags.HTTP_STATUS_CODE, response.code)
+                    set_attribute(tags.HTTP_STATUS_CODE, response.code)
                     response_phrase = response.phrase.decode("ascii", errors="replace")
 
                     if 200 <= response.code < 300:

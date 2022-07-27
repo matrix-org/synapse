@@ -19,7 +19,7 @@ from synapse.http import servlet
 from synapse.http.server import HttpServer
 from synapse.http.servlet import assert_params_in_dict, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
-from synapse.logging.opentelemetry import set_tag, trace_with_opname
+from synapse.logging.tracing import set_attribute, trace_with_opname
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.types import JsonDict
 
@@ -47,8 +47,8 @@ class SendToDeviceRestServlet(servlet.RestServlet):
     def on_PUT(
         self, request: SynapseRequest, message_type: str, txn_id: str
     ) -> Awaitable[Tuple[int, JsonDict]]:
-        set_tag("message_type", message_type)
-        set_tag("txn_id", txn_id)
+        set_attribute("message_type", message_type)
+        set_attribute("txn_id", txn_id)
         return self.txns.fetch_or_execute_request(
             request, self._put, request, message_type, txn_id
         )

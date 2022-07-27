@@ -25,9 +25,9 @@ from synapse.http.server import HttpServer, ServletCallback, is_method_cancellab
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import run_in_background
-from synapse.logging.opentelemetry import (
+from synapse.logging.tracing import (
     active_span,
-    set_tag,
+    set_attribute,
     span_context_from_request,
     start_active_span,
     start_active_span_follows_from,
@@ -309,7 +309,7 @@ class BaseFederationServlet:
                 raise
 
             # update the active opentracing span with the authenticated entity
-            set_tag("authenticated_entity", str(origin))
+            set_attribute("authenticated_entity", str(origin))
 
             # if the origin is authenticated and whitelisted, use its span context
             # as the parent.

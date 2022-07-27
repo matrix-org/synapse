@@ -51,15 +51,17 @@ class TracerConfig(Config):
         if not isinstance(self.opentelemetry_whitelist, list):
             raise ConfigError("Tracer homeserver_whitelist config is malformed")
 
-        force_tracing_for_users = opentelemetry_config.get("force_tracing_for_users", [])
+        force_tracing_for_users = opentelemetry_config.get(
+            "force_tracing_for_users", []
+        )
         if not isinstance(force_tracing_for_users, list):
             raise ConfigError(
-                "Expected a list", ("opentracing", "force_tracing_for_users")
+                "Expected a list", ("opentelemetry", "force_tracing_for_users")
             )
         for i, u in enumerate(force_tracing_for_users):
             if not isinstance(u, str):
                 raise ConfigError(
                     "Expected a string",
-                    ("opentracing", "force_tracing_for_users", f"index {i}"),
+                    ("opentelemetry", "force_tracing_for_users", f"index {i}"),
                 )
             self.force_tracing_for_users.add(u)

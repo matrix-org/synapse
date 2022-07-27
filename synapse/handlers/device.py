@@ -36,7 +36,7 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
-from synapse.logging.opentelemetry import log_kv, set_tag, trace
+from synapse.logging.tracing import log_kv, set_attribute, trace
 from synapse.metrics.background_process_metrics import (
     run_as_background_process,
     wrap_as_background_process,
@@ -86,7 +86,7 @@ class DeviceWorkerHandler:
             info on each device
         """
 
-        set_tag("user_id", user_id)
+        set_attribute("user_id", user_id)
         device_map = await self.store.get_devices_by_user(user_id)
 
         ips = await self.store.get_last_client_ip_by_device(user_id, device_id=None)
@@ -118,8 +118,8 @@ class DeviceWorkerHandler:
         ips = await self.store.get_last_client_ip_by_device(user_id, device_id)
         _update_device_from_client_ips(device, ips)
 
-        set_tag("device", str(device))
-        set_tag("ips", str(ips))
+        set_attribute("device", str(device))
+        set_attribute("ips", str(ips))
 
         return device
 
@@ -169,8 +169,8 @@ class DeviceWorkerHandler:
         joined a room, that `user_id` may be interested in.
         """
 
-        set_tag("user_id", user_id)
-        set_tag("from_token", str(from_token))
+        set_attribute("user_id", user_id)
+        set_attribute("from_token", str(from_token))
         now_room_key = self.store.get_room_max_token()
 
         room_ids = await self.store.get_rooms_for_user(user_id)
@@ -461,8 +461,8 @@ class DeviceHandler(DeviceWorkerHandler):
         except errors.StoreError as e:
             if e.code == 404:
                 # no match
-                set_tag("error", True)
-                set_tag("reason", "User doesn't have that device id.")
+                set_attribute("error", True)
+                set_attribute("reason", "User doesn't have that device id.")
             else:
                 raise
 
@@ -794,8 +794,8 @@ class DeviceListUpdater:
         for parsing the EDU and adding to pending updates list.
         """
 
-        set_tag("origin", origin)
-        set_tag("edu_content", str(edu_content))
+        set_attribute("origin", origin)
+        set_attribute("edu_content", str(edu_content))
         user_id = edu_content.pop("user_id")
         device_id = edu_content.pop("device_id")
         stream_id = str(edu_content.pop("stream_id"))  # They may come as ints
@@ -815,7 +815,7 @@ class DeviceListUpdater:
                 origin,
             )
 
-            set_tag("error", True)
+            set_attribute("error", True)
             log_kv(
                 {
                     "message": "Got a device list update edu from a user and "
@@ -830,7 +830,7 @@ class DeviceListUpdater:
         if not room_ids:
             # We don't share any rooms with this user. Ignore update, as we
             # probably won't get any further updates.
-            set_tag("error", True)
+            set_attribute("error", True)
             log_kv(
                 {
                     "message": "Got an update from a user for which "
@@ -1027,12 +1027,12 @@ class DeviceListUpdater:
             # eventually become consistent.
             return None
         except FederationDeniedError as e:
-            set_tag("error", True)
+            set_attribute("error", True)
             log_kv({"reason": "FederationDeniedError"})
             logger.info(e)
             return None
         except Exception as e:
-            set_tag("error", True)
+            set_attribute("error", True)
             log_kv(
                 {"message": "Exception raised by federation request", "exception": e}
             )

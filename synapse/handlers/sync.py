@@ -25,7 +25,12 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
 from synapse.handlers.relations import BundledAggregations
 from synapse.logging.context import current_context
-from synapse.logging.opentelemetry import SynapseTags, log_kv, set_tag, start_active_span
+from synapse.logging.tracing import (
+    SynapseTags,
+    log_kv,
+    set_attribute,
+    start_active_span,
+)
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.storage.databases.main.event_push_actions import NotifCounts
 from synapse.storage.roommember import MemberSummary
@@ -396,7 +401,7 @@ class SyncHandler:
                 sync_config, since_token, full_state
             )
 
-            set_tag(SynapseTags.SYNC_RESULT, bool(sync_result))
+            set_attribute(SynapseTags.SYNC_RESULT, bool(sync_result))
             return sync_result
 
     async def push_rules_for_user(self, user: UserID) -> Dict[str, Dict[str, list]]:
@@ -1337,7 +1342,7 @@ class SyncHandler:
                 # `/sync`
                 message_id = message.pop("message_id", None)
                 if message_id:
-                    set_tag(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
+                    set_attribute(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
 
             logger.debug(
                 "Returning %d to-device messages between %d and %d (current token: %d)",
@@ -1997,7 +2002,7 @@ class SyncHandler:
         upto_token = room_builder.upto_token
 
         with start_active_span("sync.generate_room_entry"):
-            set_tag("room_id", room_id)
+            set_attribute("room_id", room_id)
             log_kv({"events": len(events or ())})
 
             log_kv(

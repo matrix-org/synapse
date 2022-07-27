@@ -28,7 +28,7 @@ from twisted.internet import defer
 from synapse.api.constants import EduTypes
 from synapse.api.errors import CodeMessageException, Codes, NotFoundError, SynapseError
 from synapse.logging.context import make_deferred_yieldable, run_in_background
-from synapse.logging.opentelemetry import log_kv, set_tag, tag_args, trace
+from synapse.logging.tracing import log_kv, set_attribute, tag_args, trace
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.types import (
     JsonDict,
@@ -138,8 +138,8 @@ class E2eKeysHandler:
                 else:
                     remote_queries[user_id] = device_ids
 
-            set_tag("local_key_query", str(local_query))
-            set_tag("remote_key_query", str(remote_queries))
+            set_attribute("local_key_query", str(local_query))
+            set_attribute("remote_key_query", str(remote_queries))
 
             # First get local devices.
             # A map of destination -> failure response.
@@ -342,8 +342,8 @@ class E2eKeysHandler:
         except Exception as e:
             failure = _exception_to_failure(e)
             failures[destination] = failure
-            set_tag("error", True)
-            set_tag("reason", str(failure))
+            set_attribute("error", True)
+            set_attribute("reason", str(failure))
 
         return
 
@@ -405,7 +405,7 @@ class E2eKeysHandler:
         Returns:
             A map from user_id -> device_id -> device details
         """
-        set_tag("local_query", str(query))
+        set_attribute("local_query", str(query))
         local_query: List[Tuple[str, Optional[str]]] = []
 
         result_dict: Dict[str, Dict[str, dict]] = {}
@@ -420,7 +420,7 @@ class E2eKeysHandler:
                         "user_id": user_id,
                     }
                 )
-                set_tag("error", True)
+                set_attribute("error", True)
                 raise SynapseError(400, "Not a user here")
 
             if not device_ids:
@@ -477,8 +477,8 @@ class E2eKeysHandler:
                 domain = get_domain_from_id(user_id)
                 remote_queries.setdefault(domain, {})[user_id] = one_time_keys
 
-        set_tag("local_key_query", str(local_query))
-        set_tag("remote_key_query", str(remote_queries))
+        set_attribute("local_key_query", str(local_query))
+        set_attribute("remote_key_query", str(remote_queries))
 
         results = await self.store.claim_e2e_one_time_keys(local_query)
 
@@ -494,7 +494,7 @@ class E2eKeysHandler:
 
         @trace
         async def claim_client_keys(destination: str) -> None:
-            set_tag("destination", destination)
+            set_attribute("destination", destination)
             device_keys = remote_queries[destination]
             try:
                 remote_result = await self.federation.claim_client_keys(
@@ -507,8 +507,8 @@ class E2eKeysHandler:
             except Exception as e:
                 failure = _exception_to_failure(e)
                 failures[destination] = failure
-                set_tag("error", True)
-                set_tag("reason", str(failure))
+                set_attribute("error", True)
+                set_attribute("reason", str(failure))
 
         await make_deferred_yieldable(
             defer.gatherResults(
@@ -611,7 +611,7 @@ class E2eKeysHandler:
 
         result = await self.store.count_e2e_one_time_keys(user_id, device_id)
 
-        set_tag("one_time_key_counts", str(result))
+        set_attribute("one_time_key_counts", str(result))
         return {"one_time_key_counts": result}
 
     async def _upload_one_time_keys_for_user(

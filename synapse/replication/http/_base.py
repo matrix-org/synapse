@@ -29,7 +29,7 @@ from synapse.http import RequestTimedOutError
 from synapse.http.server import HttpServer, is_method_cancellable
 from synapse.http.site import SynapseRequest
 from synapse.logging import opentelemetry
-from synapse.logging.opentelemetry import trace_with_opname
+from synapse.logging.tracing import trace_with_opname
 from synapse.types import JsonDict
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import random_string

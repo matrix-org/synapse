@@ -164,7 +164,9 @@ class SynapseRequest(Request):
         # If there's no authenticated entity, it was the requester.
         self.logcontext.request.authenticated_entity = authenticated_entity or requester
 
-    def set_opentracing_span(self, span: "opentracing.Span") -> None:
+    def set_opentracing_span(
+        self, span: opentelemetry.shim.opentracing_shim.SpanShim
+    ) -> None:
         """attach an opentracing span to this request
 
         Doing so will cause the span to be closed when we finish processing the request

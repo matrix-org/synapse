@@ -36,7 +36,7 @@ from synapse.appservice import (
     TransactionOneTimeKeyCounts,
     TransactionUnusedFallbackKeys,
 )
-from synapse.logging.opentelemetry import log_kv, set_tag, trace
+from synapse.logging.tracing import log_kv, set_attribute, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import (
     DatabasePool,
@@ -146,7 +146,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             key data.  The key data will be a dict in the same format as the
             DeviceKeys type returned by POST /_matrix/client/r0/keys/query.
         """
-        set_tag("query_list", str(query_list))
+        set_attribute("query_list", str(query_list))
         if not query_list:
             return {}
 
@@ -228,8 +228,8 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
             Dict mapping from user-id to dict mapping from device_id to
             key data.
         """
-        set_tag("include_all_devices", include_all_devices)
-        set_tag("include_deleted_devices", include_deleted_devices)
+        set_attribute("include_all_devices", include_all_devices)
+        set_attribute("include_deleted_devices", include_deleted_devices)
 
         result = await self.db_pool.runInteraction(
             "get_e2e_device_keys",
@@ -416,9 +416,9 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore, CacheInvalidationWorker
         """
 
         def _add_e2e_one_time_keys(txn: LoggingTransaction) -> None:
-            set_tag("user_id", user_id)
-            set_tag("device_id", device_id)
-            set_tag("new_keys", str(new_keys))
+            set_attribute("user_id", user_id)
+            set_attribute("device_id", device_id)
+            set_attribute("new_keys", str(new_keys))
             # We are protected from race between lookup and insertion due to
             # a unique constraint. If there is a race of two calls to
             # `add_e2e_one_time_keys` then they'll conflict and we will only
@@ -1158,10 +1158,10 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         """
 
         def _set_e2e_device_keys_txn(txn: LoggingTransaction) -> bool:
-            set_tag("user_id", user_id)
-            set_tag("device_id", device_id)
-            set_tag("time_now", time_now)
-            set_tag("device_keys", str(device_keys))
+            set_attribute("user_id", user_id)
+            set_attribute("device_id", device_id)
+            set_attribute("time_now", time_now)
+            set_attribute("device_keys", str(device_keys))
 
             old_key_json = self.db_pool.simple_select_one_onecol_txn(
                 txn,

@@ -24,7 +24,7 @@ from synapse.http.servlet import (
     parse_strings_from_args,
 )
 from synapse.http.site import SynapseRequest
-from synapse.logging.opentelemetry import set_tag
+from synapse.logging.tracing import set_attribute
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.types import JsonDict, RoomAlias, RoomID
 
@@ -97,7 +97,7 @@ class KnockRoomAliasServlet(RestServlet):
     def on_PUT(
         self, request: SynapseRequest, room_identifier: str, txn_id: str
     ) -> Awaitable[Tuple[int, JsonDict]]:
-        set_tag("txn_id", txn_id)
+        set_attribute("txn_id", txn_id)
 
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_identifier, txn_id

@@ -46,7 +46,7 @@ from synapse.http.servlet import (
     parse_strings_from_args,
 )
 from synapse.http.site import SynapseRequest
-from synapse.logging.opentelemetry import set_tag
+from synapse.logging.tracing import set_attribute
 from synapse.rest.client._base import client_patterns
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.storage.state import StateFilter
@@ -82,7 +82,7 @@ class RoomCreateRestServlet(TransactionRestServlet):
     def on_PUT(
         self, request: SynapseRequest, txn_id: str
     ) -> Awaitable[Tuple[int, JsonDict]]:
-        set_tag("txn_id", txn_id)
+        set_attribute("txn_id", txn_id)
         return self.txns.fetch_or_execute_request(request, self.on_POST, request)
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
@@ -194,7 +194,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         if txn_id:
-            set_tag("txn_id", txn_id)
+            set_attribute("txn_id", txn_id)
 
         content = parse_json_object_from_request(request)
 
@@ -229,7 +229,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         except ShadowBanError:
             event_id = "$" + random_string(43)
 
-        set_tag("event_id", event_id)
+        set_attribute("event_id", event_id)
         ret = {"event_id": event_id}
         return 200, ret
 
@@ -279,7 +279,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         except ShadowBanError:
             event_id = "$" + random_string(43)
 
-        set_tag("event_id", event_id)
+        set_attribute("event_id", event_id)
         return 200, {"event_id": event_id}
 
     def on_GET(
@@ -290,7 +290,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
     def on_PUT(
         self, request: SynapseRequest, room_id: str, event_type: str, txn_id: str
     ) -> Awaitable[Tuple[int, JsonDict]]:
-        set_tag("txn_id", txn_id)
+        set_attribute("txn_id", txn_id)
 
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id, event_type, txn_id
@@ -348,7 +348,7 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, TransactionRestServlet):
     def on_PUT(
         self, request: SynapseRequest, room_identifier: str, txn_id: str
     ) -> Awaitable[Tuple[int, JsonDict]]:
-        set_tag("txn_id", txn_id)
+        set_attribute("txn_id", txn_id)
 
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_identifier, txn_id
@@ -816,7 +816,7 @@ class RoomForgetRestServlet(TransactionRestServlet):
     def on_PUT(
         self, request: SynapseRequest, room_id: str, txn_id: str
     ) -> Awaitable[Tuple[int, JsonDict]]:
-        set_tag("txn_id", txn_id)
+        set_attribute("txn_id", txn_id)
 
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id, txn_id
@@ -916,7 +916,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
     def on_PUT(
         self, request: SynapseRequest, room_id: str, membership_action: str, txn_id: str
     ) -> Awaitable[Tuple[int, JsonDict]]:
-        set_tag("txn_id", txn_id)
+        set_attribute("txn_id", txn_id)
 
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id, membership_action, txn_id
@@ -962,13 +962,13 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         except ShadowBanError:
             event_id = "$" + random_string(43)
 
-        set_tag("event_id", event_id)
+        set_attribute("event_id", event_id)
         return 200, {"event_id": event_id}
 
     def on_PUT(
         self, request: SynapseRequest, room_id: str, event_id: str, txn_id: str
     ) -> Awaitable[Tuple[int, JsonDict]]:
-        set_tag("txn_id", txn_id)
+        set_attribute("txn_id", txn_id)
 
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id, event_id, txn_id

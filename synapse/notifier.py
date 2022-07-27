@@ -39,7 +39,7 @@ from synapse.events import EventBase
 from synapse.handlers.presence import format_user_presence_state
 from synapse.logging import issue9533_logger
 from synapse.logging.context import PreserveLoggingContext
-from synapse.logging.opentelemetry import log_kv, start_active_span
+from synapse.logging.tracing import log_kv, start_active_span
 from synapse.metrics import LaterGauge
 from synapse.streams.config import PaginationConfig
 from synapse.types import (

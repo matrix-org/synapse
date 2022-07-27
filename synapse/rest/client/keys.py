@@ -26,7 +26,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.http.site import SynapseRequest
-from synapse.logging.opentelemetry import log_kv, set_tag, trace_with_opname
+from synapse.logging.tracing import log_kv, set_attribute, trace_with_opname
 from synapse.types import JsonDict, StreamToken
 
 from ._base import client_patterns, interactive_auth_handler
@@ -88,7 +88,7 @@ class KeyUploadServlet(RestServlet):
                     user_id
                 )
                 if dehydrated_device is not None and device_id != dehydrated_device[0]:
-                    set_tag("error", True)
+                    set_attribute("error", True)
                     log_kv(
                         {
                             "message": "Client uploading keys for a different device",
@@ -204,13 +204,13 @@ class KeyChangesServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         from_token_string = parse_string(request, "from", required=True)
-        set_tag("from", from_token_string)
+        set_attribute("from", from_token_string)
 
         # We want to enforce they do pass us one, but we ignore it and return
         # changes after the "to" as well as before.
         #
         # XXX This does not enforce that "to" is passed.
-        set_tag("to", str(parse_string(request, "to")))
+        set_attribute("to", str(parse_string(request, "to")))
 
         from_token = await StreamToken.from_string(self.store, from_token_string)
 

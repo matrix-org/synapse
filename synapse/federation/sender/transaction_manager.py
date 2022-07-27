@@ -21,9 +21,9 @@ from synapse.api.errors import HttpResponseException
 from synapse.events import EventBase
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
-from synapse.logging.opentelemetry import (
+from synapse.logging.tracing import (
     extract_text_map,
-    set_tag,
+    set_attribute,
     start_active_span_follows_from,
     tags,
     whitelisted_homeserver,
@@ -166,7 +166,7 @@ class TransactionManager:
             except HttpResponseException as e:
                 code = e.code
 
-                set_tag(tags.ERROR, True)
+                set_attribute(tags.ERROR, True)
 
                 logger.info("TX [%s] {%s} got %d response", destination, txn_id, code)
                 raise

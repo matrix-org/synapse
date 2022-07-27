@@ -32,9 +32,9 @@ from typing_extensions import Literal
 
 from synapse.api.constants import EduTypes
 from synapse.api.errors import Codes, StoreError
-from synapse.logging.opentelemetry import (
+from synapse.logging.tracing import (
     get_active_span_text_map,
-    set_tag,
+    set_attribute,
     trace,
     whitelisted_homeserver,
 )
@@ -706,8 +706,8 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
             else:
                 results[user_id] = await self.get_cached_devices_for_user(user_id)
 
-        set_tag("in_cache", str(results))
-        set_tag("not_in_cache", str(user_ids_not_in_cache))
+        set_attribute("in_cache", str(results))
+        set_attribute("not_in_cache", str(user_ids_not_in_cache))
 
         return user_ids_not_in_cache, results
 

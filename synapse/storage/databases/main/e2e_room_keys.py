@@ -18,7 +18,7 @@ from typing import Dict, Iterable, Mapping, Optional, Tuple, cast
 from typing_extensions import Literal, TypedDict
 
 from synapse.api.errors import StoreError
-from synapse.logging.opentelemetry import log_kv, trace
+from synapse.logging.tracing import log_kv, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import LoggingTransaction
 from synapse.types import JsonDict, JsonSerializable, StreamKeyType
