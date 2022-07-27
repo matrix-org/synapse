@@ -157,7 +157,7 @@ def is_method_cancellable(method: Callable[..., Any]) -> bool:
 
 
 def return_json_error(
-    f: failure.Failure, request: SynapseRequest, config: HomeServerConfig | None
+    f: failure.Failure, request: SynapseRequest, config: Optional[HomeServerConfig]
 ) -> None:
     """Sends a JSON error response to clients."""
 
