@@ -40,7 +40,7 @@ from unittest.mock import Mock, patch
 import canonicaljson
 import signedjson.key
 import unpaddedbase64
-from typing_extensions import ParamSpec, Protocol
+from typing_extensions import Concatenate, ParamSpec, Protocol
 
 from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.python.failure import Failure
@@ -101,7 +101,7 @@ class _TypedFailure(Generic[_ExcType], Protocol):
         ...
 
 
-def around(target: TV) -> Callable[[Callable[P, R]], None]:
+def around(target: TV) -> Callable[[Callable[Concatenate[TV, P], R]], None]:
     """A CLOS-style 'around' modifier, which wraps the original method of the
     given instance with another piece of code.
 
@@ -110,7 +110,7 @@ def around(target: TV) -> Callable[[Callable[P, R]], None]:
         return orig(*args, **kwargs)
     """
 
-    def _around(code: Callable[P, R]) -> None:
+    def _around(code: Callable[Concatenate[TV, P], R]) -> None:
         name = code.__name__
         orig = getattr(target, name)
 
