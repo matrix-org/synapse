@@ -91,6 +91,7 @@ _ExcType = TypeVar("_ExcType", bound=BaseException, covariant=True)
 
 P = ParamSpec("P")
 R = TypeVar("R")
+S = TypeVar("S")
 
 
 class _TypedFailure(Generic[_ExcType], Protocol):
@@ -101,7 +102,7 @@ class _TypedFailure(Generic[_ExcType], Protocol):
         ...
 
 
-def around(target: TV) -> Callable[[Callable[Concatenate[TV, P], R]], None]:
+def around(target: TV) -> Callable[[Callable[Concatenate[S, P], R]], None]:
     """A CLOS-style 'around' modifier, which wraps the original method of the
     given instance with another piece of code.
 
@@ -110,7 +111,7 @@ def around(target: TV) -> Callable[[Callable[Concatenate[TV, P], R]], None]:
         return orig(*args, **kwargs)
     """
 
-    def _around(code: Callable[Concatenate[TV, P], R]) -> None:
+    def _around(code: Callable[Concatenate[S, P], R]) -> None:
         name = code.__name__
         orig = getattr(target, name)
 
