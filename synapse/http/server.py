@@ -158,17 +158,11 @@ def is_method_cancellable(method: Callable[..., Any]) -> bool:
 
 
 def return_json_error(
-    f: failure.Failure, request: SynapseRequest, config: HomeServerConfig
+    f: failure.Failure, request: SynapseRequest, config: HomeServerConfig|None
 ) -> None:
     """Sends a JSON error response to clients."""
 
-    if f.check(UnstableSpecAuthError):
-        # mypy doesn't understand that f.check asserts the type.
-        exc: UnstableSpecAuthError = f.value  # type: ignore
-        error_code = exc.code
-        error_dict = exc.error_dict(config)
-        logger.info("%s SynapseError: %s - %s", request, error_code, exc.msg)
-    elif f.check(SynapseError):
+    if f.check(SynapseError):
         # mypy doesn't understand that f.check asserts the type.
         exc: SynapseError = f.value  # type: ignore
         error_code = exc.code
@@ -459,7 +453,7 @@ class DirectServeJsonResource(_AsyncResource):
         request: SynapseRequest,
     ) -> None:
         """Implements _AsyncResource._send_error_response"""
-        return_json_error(f, request)
+        return_json_error(f, request, None)
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
