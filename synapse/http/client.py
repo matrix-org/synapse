@@ -75,7 +75,13 @@ from synapse.http import QuieterFileBodyProducer, RequestTimedOutError, redact_u
 from synapse.http.proxyagent import ProxyAgent
 from synapse.http.types import QueryParams
 from synapse.logging.context import make_deferred_yieldable
-from synapse.logging.tracing import set_attribute, start_active_span, tags
+from synapse.logging.tracing import (
+    set_status,
+    start_active_span,
+    SpanKind,
+    SpanAttributes,
+    StatusCode,
+)
 from synapse.types import ISynapseReactor
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
@@ -402,12 +408,12 @@ class SimpleHttpClient:
 
         with start_active_span(
             "outgoing-client-request",
-            tags={
-                tags.SPAN_KIND: tags.SPAN_KIND_RPC_CLIENT,
-                tags.HTTP_METHOD: method,
-                tags.HTTP_URL: uri,
+            kind=SpanKind.CLIENT,
+            attributes={
+                SpanAttributes.HTTP_METHOD: method,
+                SpanAttributes.HTTP_URL: uri,
             },
-            finish_on_close=True,
+            end_on_exit=True,
         ):
             try:
                 body_producer = None
@@ -459,8 +465,7 @@ class SimpleHttpClient:
                     type(e).__name__,
                     e.args[0],
                 )
-                set_attribute(tags.ERROR, True)
-                set_attribute("error_reason", e.args[0])
+                set_status(StatusCode.ERROR, e.args[0])
                 raise
 
     async def post_urlencoded_get_json(

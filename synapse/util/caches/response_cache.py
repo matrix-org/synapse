@@ -41,7 +41,7 @@ from synapse.util.caches import register_cache
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    import opentracing
+    import opentelemetry
 
 # the type of the key in the cache
 KV = TypeVar("KV")
@@ -82,7 +82,7 @@ class ResponseCacheEntry:
     easier to cache Failure results.
     """
 
-    opentracing_span_context: "Optional[opentracing.SpanContext]"
+    opentracing_span_context: Optional["opentelemetry.trace.span.SpanContext"]
     """The opentracing span which generated/is generating the result"""
 
 
@@ -141,7 +141,7 @@ class ResponseCache(Generic[KV]):
         self,
         context: ResponseCacheContext[KV],
         deferred: "defer.Deferred[RV]",
-        opentracing_span_context: "Optional[opentracing.SpanContext]",
+        opentracing_span_context: Optional["opentelemetry.trace.span.SpanContext"],
     ) -> ResponseCacheEntry:
         """Set the entry for the given key to the given deferred.
 
@@ -234,7 +234,7 @@ class ResponseCache(Generic[KV]):
             if cache_context:
                 kwargs["cache_context"] = context
 
-            span_context: Optional[opentracing.SpanContext] = None
+            span_context: Optional["opentelemetry.trace.span.SpanContext"] = None
 
             async def cb() -> RV:
                 # NB it is important that we do not `await` before setting span_context!

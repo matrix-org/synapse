@@ -72,9 +72,14 @@ from synapse.http.client import (
 )
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.http.types import QueryParams
-from synapse.logging import opentelemetry
+from synapse.logging import tracing
 from synapse.logging.context import make_deferred_yieldable, run_in_background
-from synapse.logging.tracing import set_attribute, start_active_span, tags
+from synapse.logging.tracing import (
+    set_attribute,
+    start_active_span,
+    SpanKind,
+    SpanAttributes,
+)
 from synapse.types import JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import AwakenableSleeper, timeout_deferred
@@ -517,18 +522,18 @@ class MatrixFederationHttpClient:
 
         scope = start_active_span(
             "outgoing-federation-request",
-            tags={
-                tags.SPAN_KIND: tags.SPAN_KIND_RPC_CLIENT,
-                tags.PEER_ADDRESS: request.destination,
-                tags.HTTP_METHOD: request.method,
-                tags.HTTP_URL: request.path,
+            kind=SpanKind.CLIENT,
+            attributes={
+                SpanAttributes.PEER_ADDRESS: request.destination,
+                SpanAttributes.HTTP_METHOD: request.method,
+                SpanAttributes.HTTP_URL: request.path,
             },
-            finish_on_close=True,
+            end_on_exit=True,
         )
 
         # Inject the span into the headers
         headers_dict: Dict[bytes, List[bytes]] = {}
-        opentelemetry.inject_header_dict(headers_dict, request.destination)
+        tracing.inject_header_dict(headers_dict, request.destination)
 
         headers_dict[b"User-Agent"] = [self.version_string_bytes]
 
@@ -614,7 +619,7 @@ class MatrixFederationHttpClient:
                         request.method, response.code
                     ).inc()
 
-                    set_attribute(tags.HTTP_STATUS_CODE, response.code)
+                    set_attribute(SpanAttributes.HTTP_STATUS_CODE, response.code)
                     response_phrase = response.phrase.decode("ascii", errors="replace")
 
                     if 200 <= response.code < 300:

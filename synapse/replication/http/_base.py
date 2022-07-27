@@ -28,7 +28,7 @@ from synapse.api.errors import HttpResponseException, SynapseError
 from synapse.http import RequestTimedOutError
 from synapse.http.server import HttpServer, is_method_cancellable
 from synapse.http.site import SynapseRequest
-from synapse.logging import opentelemetry
+from synapse.logging import tracing
 from synapse.logging.tracing import trace_with_opname
 from synapse.types import JsonDict
 from synapse.util.caches.response_cache import ResponseCache
@@ -248,7 +248,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                 # Add an authorization header, if configured.
                 if replication_secret:
                     headers[b"Authorization"] = [b"Bearer " + replication_secret]
-                opentelemetry.inject_header_dict(headers, check_destination=False)
+                tracing.inject_header_dict(headers, check_destination=False)
 
                 try:
                     # Keep track of attempts made so we can bail if we don't manage to

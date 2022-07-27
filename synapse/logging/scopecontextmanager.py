@@ -57,12 +57,12 @@ class LogContextScopeManager(ScopeManager):
         ctx = current_context()
         return ctx.scope
 
-    def activate(self, span: Span, finish_on_close: bool) -> Scope:
+    def activate(self, span: Span, end_on_exit: bool) -> Scope:
         """
         Makes a Span active.
         Args
             span: the span that should become active.
-            finish_on_close: whether Span should be automatically finished when
+            end_on_exit: whether Span should be automatically finished when
                 Scope.close() is called.
 
         Returns:
@@ -93,7 +93,7 @@ class LogContextScopeManager(ScopeManager):
             # "Re-starting finished log context" errors).
             enter_logcontext = False
 
-        scope = _LogContextScope(self, span, ctx, enter_logcontext, finish_on_close)
+        scope = _LogContextScope(self, span, ctx, enter_logcontext, end_on_exit)
         ctx.scope = scope
         if enter_logcontext:
             ctx.__enter__()
@@ -118,7 +118,7 @@ class _LogContextScope(Scope):
         span: Span,
         logcontext: LoggingContext,
         enter_logcontext: bool,
-        finish_on_close: bool,
+        end_on_exit: bool,
     ):
         """
         Args:
@@ -131,12 +131,12 @@ class _LogContextScope(Scope):
                 the log context to which this scope is attached.
             enter_logcontext:
                 if True the log context will be exited when the scope is finished
-            finish_on_close:
+            end_on_exit:
                 if True finish the span when the scope is closed
         """
         super().__init__(manager, span)
         self.logcontext = logcontext
-        self._finish_on_close = finish_on_close
+        self._end_on_exit = end_on_exit
         self._enter_logcontext = enter_logcontext
 
     def __exit__(
@@ -162,7 +162,7 @@ class _LogContextScope(Scope):
                 active_scope,
             )
 
-        if self._finish_on_close:
+        if self._end_on_exit:
             self.span.finish()
 
         self.logcontext.scope = None

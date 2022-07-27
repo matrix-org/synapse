@@ -66,7 +66,7 @@ from synapse.util.caches import intern_dict
 from synapse.util.iterutils import chunk_seq
 
 if TYPE_CHECKING:
-    import opentracing
+    import opentelemetry
 
     from synapse.server import HomeServer
 
@@ -868,15 +868,15 @@ async def _async_write_json_to_request_in_thread(
     expensive.
     """
 
-    def encode(opentracing_span: "Optional[opentracing.Span]") -> bytes:
+    def encode(tracing_span: Optional["opentelemetry.trace.span.Span"]) -> bytes:
         # it might take a while for the threadpool to schedule us, so we write
         # opentracing logs once we actually get scheduled, so that we can see how
         # much that contributed.
-        if opentracing_span:
-            opentracing_span.log_kv({"event": "scheduled"})
+        if tracing_span:
+            tracing_span.add_event("scheduled", attributes={"event": "scheduled"})
         res = json_encoder(json_object)
-        if opentracing_span:
-            opentracing_span.log_kv({"event": "encoded"})
+        if tracing_span:
+            tracing_span.add_event("scheduled", attributes={"event": "encoded"})
         return res
 
     with start_active_span("encode_json_response"):

@@ -37,7 +37,7 @@ from synapse.logging.context import (
 from synapse.types import Requester
 
 if TYPE_CHECKING:
-    import opentracing
+    import opentelemetry
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ class SynapseRequest(Request):
 
         # An opentracing span for this request. Will be closed when the request is
         # completely processed.
-        self._opentracing_span: "Optional[opentracing.Span]" = None
+        self._opentracing_span: Optional["opentelemetry.trace.span.Span"] = None
 
         # we can't yet create the logcontext, as we don't know the method.
         self.logcontext: Optional[LoggingContext] = None
@@ -164,9 +164,7 @@ class SynapseRequest(Request):
         # If there's no authenticated entity, it was the requester.
         self.logcontext.request.authenticated_entity = authenticated_entity or requester
 
-    def set_opentracing_span(
-        self, span: opentelemetry.shim.opentracing_shim.SpanShim
-    ) -> None:
+    def set_opentracing_span(self, span: "opentelemetry.trace.span.Span") -> None:
         """attach an opentracing span to this request
 
         Doing so will cause the span to be closed when we finish processing the request

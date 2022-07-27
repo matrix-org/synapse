@@ -1568,7 +1568,7 @@ class SyncHandler:
                 sync_result_builder,
                 room_entry,
                 ephemeral=ephemeral_by_room.get(room_entry.room_id, []),
-                tags=tags_by_room.get(room_entry.room_id),
+                attributes=tags_by_room.get(room_entry.room_id),
                 account_data=account_data_by_room.get(room_entry.room_id, {}),
                 always_include=sync_result_builder.full_state,
             )

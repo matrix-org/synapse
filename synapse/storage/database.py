@@ -47,7 +47,7 @@ from twisted.internet.interfaces import IReactorCore
 
 from synapse.api.errors import StoreError
 from synapse.config.database import DatabaseConnectionConfig
-from synapse.logging import opentelemetry
+from synapse.logging import tracing
 from synapse.logging.context import (
     LoggingContext,
     current_context,
@@ -422,11 +422,11 @@ class LoggingTransaction:
         start = time.time()
 
         try:
-            with opentelemetry.start_active_span(
+            with tracing.start_active_span(
                 "db.query",
-                tags={
-                    opentelemetry.tags.DATABASE_TYPE: "sql",
-                    opentelemetry.tags.DATABASE_STATEMENT: one_line_sql,
+                attributes={
+                    tracing.SpanAttributes.DB_SYSTEM: "sql",
+                    tracing.SpanAttributes.DB_STATEMENT: one_line_sql,
                 },
             ):
                 return func(sql, *args, **kwargs)
@@ -701,15 +701,15 @@ class DatabasePool:
                     exception_callbacks=exception_callbacks,
                 )
                 try:
-                    with opentelemetry.start_active_span(
+                    with tracing.start_active_span(
                         "db.txn",
-                        tags={
-                            opentelemetry.SynapseTags.DB_TXN_DESC: desc,
-                            opentelemetry.SynapseTags.DB_TXN_ID: name,
+                        attributes={
+                            tracing.SynapseTags.DB_TXN_DESC: desc,
+                            tracing.SynapseTags.DB_TXN_ID: name,
                         },
                     ):
                         r = func(cursor, *args, **kwargs)
-                        opentelemetry.log_kv({"message": "commit"})
+                        tracing.log_kv({"message": "commit"})
                         conn.commit()
                         return r
                 except self.engine.module.OperationalError as e:
@@ -725,7 +725,7 @@ class DatabasePool:
                     if i < N:
                         i += 1
                         try:
-                            with opentelemetry.start_active_span("db.rollback"):
+                            with tracing.start_active_span("db.rollback"):
                                 conn.rollback()
                         except self.engine.module.Error as e1:
                             transaction_logger.warning("[TXN EROLL] {%s} %s", name, e1)
@@ -739,7 +739,7 @@ class DatabasePool:
                         if i < N:
                             i += 1
                             try:
-                                with opentelemetry.start_active_span("db.rollback"):
+                                with tracing.start_active_span("db.rollback"):
                                     conn.rollback()
                             except self.engine.module.Error as e1:
                                 transaction_logger.warning(
@@ -845,7 +845,7 @@ class DatabasePool:
                 logger.warning("Starting db txn '%s' from sentinel context", desc)
 
             try:
-                with opentelemetry.start_active_span(f"db.{desc}"):
+                with tracing.start_active_span(f"db.{desc}"):
                     result = await self.runWithConnection(
                         self.new_transaction,
                         desc,
@@ -928,7 +928,7 @@ class DatabasePool:
             with LoggingContext(
                 str(curr_context), parent_context=parent_context
             ) as context:
-                with opentelemetry.start_active_span(
+                with tracing.start_active_span(
                     operation_name="db.connection",
                 ):
                     sched_duration_sec = monotonic_time() - start_time
@@ -944,15 +944,13 @@ class DatabasePool:
                                 "Reconnecting database connection over transaction limit"
                             )
                             conn.reconnect()
-                            opentelemetry.log_kv(
-                                {"message": "reconnected due to txn limit"}
-                            )
+                            tracing.log_kv({"message": "reconnected due to txn limit"})
                             self._txn_counters[tid] = 1
 
                     if self.engine.is_connection_closed(conn):
                         logger.debug("Reconnecting closed database connection")
                         conn.reconnect()
-                        opentelemetry.log_kv({"message": "reconnected"})
+                        tracing.log_kv({"message": "reconnected"})
                         if self._txn_limit > 0:
                             self._txn_counters[tid] = 1
 

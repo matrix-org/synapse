@@ -232,7 +232,8 @@ def run_as_background_process(
             try:
                 if bg_start_span:
                     ctx = start_active_span(
-                        f"bgproc.{desc}", tags={SynapseTags.REQUEST_ID: str(context)}
+                        f"bgproc.{desc}",
+                        attributes={SynapseTags.REQUEST_ID: str(context)},
                     )
                 else:
                     ctx = nullcontext()  # type: ignore[assignment]
