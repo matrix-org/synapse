@@ -549,7 +549,7 @@ def setup_sentry(hs: "HomeServer") -> None:
 
     # We set some default tags that give some context to this instance
     with sentry_sdk.configure_scope() as scope:
-        scope.set_attribute("matrix_server_name", hs.config.server.server_name)
+        scope.set_tag("matrix_server_name", hs.config.server.server_name)
 
         app = (
             hs.config.worker.worker_app
@@ -557,8 +557,8 @@ def setup_sentry(hs: "HomeServer") -> None:
             else "synapse.app.homeserver"
         )
         name = hs.get_instance_name()
-        scope.set_attribute("worker_app", app)
-        scope.set_attribute("worker_name", name)
+        scope.set_tag("worker_app", app)
+        scope.set_tag("worker_name", name)
 
 
 def setup_sdnotify(hs: "HomeServer") -> None:
