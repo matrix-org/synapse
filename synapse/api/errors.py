@@ -26,7 +26,7 @@ from twisted.web import http
 from synapse.util import json_decoder
 
 if typing.TYPE_CHECKING:
-    from synapse.config.homeserver import HomeServerConfig 
+    from synapse.config.homeserver import HomeServerConfig
     from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
