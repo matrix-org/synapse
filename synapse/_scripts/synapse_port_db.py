@@ -166,22 +166,6 @@ IGNORED_TABLES = {
     "ui_auth_sessions",
     "ui_auth_sessions_credentials",
     "ui_auth_sessions_ips",
-    # Groups/communities is no longer supported.
-    "group_attestations_remote",
-    "group_attestations_renewals",
-    "group_invites",
-    "group_roles",
-    "group_room_categories",
-    "group_rooms",
-    "group_summary_roles",
-    "group_summary_room_categories",
-    "group_summary_rooms",
-    "group_summary_users",
-    "group_users",
-    "groups",
-    "local_group_membership",
-    "local_group_updates",
-    "remote_profile_cache",
 }
 
 
@@ -418,12 +402,15 @@ class Porter:
             self.progress.update(table, table_size)  # Mark table as done
             return
 
+        # We sweep over rowids in two directions: one forwards (rowids 1, 2, 3, ...)
+        # and another backwards (rowids 0, -1, -2, ...).
         forward_select = (
             "SELECT rowid, * FROM %s WHERE rowid >= ? ORDER BY rowid LIMIT ?" % (table,)
         )
 
         backward_select = (
-            "SELECT rowid, * FROM %s WHERE rowid <= ? ORDER BY rowid LIMIT ?" % (table,)
+            "SELECT rowid, * FROM %s WHERE rowid <= ? ORDER BY rowid DESC LIMIT ?"
+            % (table,)
         )
 
         do_forward = [True]
@@ -621,6 +608,25 @@ class Porter:
                 self.postgres_store.db_pool.updates.has_completed_background_updates()
             )
 
+    @staticmethod
+    def _is_sqlite_autovacuum_enabled(txn: LoggingTransaction) -> bool:
+        """
+        Returns true if auto_vacuum is enabled in SQLite.
+        https://www.sqlite.org/pragma.html#pragma_auto_vacuum
+
+        Vacuuming changes the rowids on rows in the database.
+        Auto-vacuuming is therefore dangerous when used in conjunction with this script.
+
+        Note that the auto_vacuum setting can't be changed without performing
+        a VACUUM after trying to change the pragma.
+        """
+        txn.execute("PRAGMA auto_vacuum")
+        row = txn.fetchone()
+        assert row is not None, "`PRAGMA auto_vacuum` did not give a row."
+        (autovacuum_setting,) = row
+        # 0 means off. 1 means full. 2 means incremental.
+        return autovacuum_setting != 0
+
     async def run(self) -> None:
         """Ports the SQLite database to a PostgreSQL database.
 
@@ -636,6 +642,21 @@ class Porter:
                 DatabaseConnectionConfig("master-sqlite", self.sqlite_config),
                 allow_outdated_version=True,
             )
+
+            # For safety, ensure auto_vacuums are disabled.
+            if await self.sqlite_store.db_pool.runInteraction(
+                "is_sqlite_autovacuum_enabled", self._is_sqlite_autovacuum_enabled
+            ):
+                end_error = (
+                    "auto_vacuum is enabled in the SQLite database."
+                    " (This is not the default configuration.)\n"
+                    " This script relies on rowids being consistent and must not"
+                    " be used if the database could be vacuumed between re-runs.\n"
+                    " To disable auto_vacuum, you need to stop Synapse and run the following SQL:\n"
+                    " PRAGMA auto_vacuum=off;\n"
+                    " VACUUM;"
+                )
+                return
 
             # Check if all background updates are done, abort if not.
             updates_complete = (

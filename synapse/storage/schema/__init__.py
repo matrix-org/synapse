@@ -74,13 +74,14 @@ Changes in SCHEMA_VERSION = 71:
 
 Changes in SCHEMA_VERSION = 72:
     - event_edges.(room_id, is_state) are no longer written to.
+    - Tables related to groups are dropped.
 """
 
 
 SCHEMA_COMPAT_VERSION = (
-    # We no longer maintain `event_edges.room_id`, so synapses with SCHEMA_VERSION < 71
-    # will break.
-    71
+    # The groups tables are no longer accessible, so synapses with SCHEMA_VERSION < 72
+    # could break.
+    72
 )
 """Limit on how far the synapse codebase can be rolled back without breaking db compat
 
