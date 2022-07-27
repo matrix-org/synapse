@@ -59,6 +59,7 @@ from synapse.api.errors import (
     UnrecognizedRequestError,
     UnstableSpecAuthError,
 )
+from synapse.config.homeserver import HomeServerConfig
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread, preserve_fn, run_in_background
 from synapse.logging.opentracing import active_span, start_active_span, trace_servlet
@@ -157,7 +158,7 @@ def is_method_cancellable(method: Callable[..., Any]) -> bool:
 
 
 def return_json_error(
-    f: failure.Failure, request: SynapseRequest, allow_unstable_fields: bool = False
+    f: failure.Failure, request: SynapseRequest, config: HomeServerConfig
 ) -> None:
     """Sends a JSON error response to clients."""
 
@@ -165,13 +166,13 @@ def return_json_error(
         # mypy doesn't understand that f.check asserts the type.
         exc: UnstableSpecAuthError = f.value  # type: ignore
         error_code = exc.code
-        error_dict = exc.error_dict(allow_unstable_fields)
+        error_dict = exc.error_dict(config)
         logger.info("%s SynapseError: %s - %s", request, error_code, exc.msg)
     elif f.check(SynapseError):
         # mypy doesn't understand that f.check asserts the type.
         exc: SynapseError = f.value  # type: ignore
         error_code = exc.code
-        error_dict = exc.error_dict()
+        error_dict = exc.error_dict(config)
         logger.info("%s SynapseError: %s - %s", request, error_code, exc.msg)
     elif f.check(CancelledError):
         error_code = HTTP_STATUS_REQUEST_CANCELLED
@@ -589,7 +590,7 @@ class JsonResource(DirectServeJsonResource):
         request: SynapseRequest,
     ) -> None:
         """Implements _AsyncResource._send_error_response"""
-        return_json_error(f, request, self.hs.config.experimental.msc3848_enabled)
+        return_json_error(f, request, self.hs.config)
 
 
 class DirectServeHtmlResource(_AsyncResource):

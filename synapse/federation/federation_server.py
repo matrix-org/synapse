@@ -42,7 +42,6 @@ from synapse.api.errors import (
     IncompatibleRoomVersionError,
     NotFoundError,
     SynapseError,
-    UnstableSpecAuthError,
     UnsupportedRoomVersionError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
@@ -470,12 +469,7 @@ class FederationServer(FederationBase):
                     )
                     for pdu in pdus_by_room[room_id]:
                         event_id = pdu.event_id
-                        if isinstance(e, UnstableSpecAuthError):
-                            pdu_results[event_id] = e.error_dict(
-                                self.hs.config.experimental.msc3848_enabled
-                            )
-                        else:
-                            pdu_results[event_id] = e.error_dict()
+                        pdu_results[event_id] = e.error_dict(self.hs.config)
                     return
 
                 for pdu in pdus_by_room[room_id]:
