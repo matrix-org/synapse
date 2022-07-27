@@ -495,10 +495,8 @@ class RoomStateTestCase(RoomBase):
         )
 
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
-        # json_body is defined as JsonDict, but it can be any valid JSON.
-        json_body: List[JsonDict] = channel.json_body  # type: ignore[assignment]
         self.assertCountEqual(
-            [state_event["type"] for state_event in json_body],
+            [state_event["type"] for state_event in channel.json_list],
             {
                 "m.room.create",
                 "m.room.power_levels",
