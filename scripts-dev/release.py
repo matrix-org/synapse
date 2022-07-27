@@ -485,28 +485,28 @@ def merge_back() -> None:
     All branches will be automatically pulled from the remote and the results
     will be pushed to the remote."""
 
-    repo = get_repo_and_check_clean_checkout()
-    branch_name = repo.active_branch.name
+    synapse_repo = get_repo_and_check_clean_checkout()
+    branch_name = synapse_repo.active_branch.name
 
     if not branch_name.startswith("release-v"):
         raise RuntimeError("Not on a release branch. This does not seem sensible.")
 
     # Pull so we're up to date
-    repo.remote().pull()
+    synapse_repo.remote().pull()
 
     current_version = get_package_version()
 
     if current_version.is_prerelease:
         # Release candidate
         if click.confirm(f"Merge {branch_name} → develop?", default=True):
-            _merge_into(repo, branch_name, "develop")
+            _merge_into(synapse_repo, branch_name, "develop")
     else:
         # Full release
         if click.confirm(f"Merge {branch_name} → master?", default=True):
-            _merge_into(repo, branch_name, "master")
+            _merge_into(synapse_repo, branch_name, "master")
 
         if click.confirm("Merge master → develop?", default=True):
-            _merge_into(repo, "master", "develop")
+            _merge_into(synapse_repo, "master", "develop")
 
 
 @cli.command()
