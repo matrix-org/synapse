@@ -41,6 +41,7 @@ from synapse.api.errors import (
     NotFoundError,
     ShadowBanError,
     SynapseError,
+    UnstableSpecAuthError,
     UnsupportedRoomVersionError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
@@ -149,7 +150,11 @@ class MessageHandler:
                 "Attempted to retrieve data from a room for a user that has never been in it. "
                 "This should not have happened."
             )
-            raise SynapseError(403, "User not in room", errcode=Codes.FORBIDDEN)
+            raise UnstableSpecAuthError(
+                403,
+                "User not in room",
+                errcode=Codes.NOT_JOINED,
+            )
 
         return data
 
@@ -334,7 +339,11 @@ class MessageHandler:
                     break
             else:
                 # Loop fell through, AS has no interested users in room
-                raise AuthError(403, "Appservice not in room")
+                raise UnstableSpecAuthError(
+                    403,
+                    "Appservice not in room",
+                    errcode=Codes.NOT_JOINED,
+                )
 
         return {
             user_id: {
