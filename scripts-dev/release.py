@@ -502,11 +502,19 @@ def merge_back() -> None:
             _merge_into(synapse_repo, branch_name, "develop")
     else:
         # Full release
+        sytest_repo = get_repo_and_check_clean_checkout("../sytest", "sytest")
+
         if click.confirm(f"Merge {branch_name} → master?", default=True):
             _merge_into(synapse_repo, branch_name, "master")
 
         if click.confirm("Merge master → develop?", default=True):
             _merge_into(synapse_repo, "master", "develop")
+
+        if click.confirm(f"On SyTest, merge {branch_name} → master?", default=True):
+            _merge_into(sytest_repo, branch_name, "master")
+
+        if click.confirm("On SyTest, merge master → develop?", default=True):
+            _merge_into(sytest_repo, "master", "develop")
 
 
 @cli.command()
