@@ -287,6 +287,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
                     state_ids={
                         (e.type, e.state_key): e.event_id for e in current_state
                     },
+                    partial_state=False,
                 )
             )
 

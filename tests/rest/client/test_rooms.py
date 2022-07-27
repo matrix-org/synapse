@@ -496,7 +496,7 @@ class RoomStateTestCase(RoomBase):
 
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.result["body"])
         self.assertCountEqual(
-            [state_event["type"] for state_event in channel.json_body],
+            [state_event["type"] for state_event in channel.json_list],
             {
                 "m.room.create",
                 "m.room.power_levels",

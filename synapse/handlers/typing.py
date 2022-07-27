@@ -489,8 +489,15 @@ class TypingNotificationEventSource(EventSource[int, JsonDict]):
             handler = self.get_typing_handler()
 
             events = []
-            for room_id in handler._room_serials.keys():
-                if handler._room_serials[room_id] <= from_key:
+
+            # Work on a copy of things here as these may change in the handler while
+            # waiting for the AS `is_interested_in_room` call to complete.
+            # Shallow copy is safe as no nested data is present.
+            latest_room_serial = handler._latest_room_serial
+            room_serials = handler._room_serials.copy()
+
+            for room_id, serial in room_serials.items():
+                if serial <= from_key:
                     continue
 
                 if not await service.is_interested_in_room(room_id, self._main_store):
@@ -498,7 +505,7 @@ class TypingNotificationEventSource(EventSource[int, JsonDict]):
 
                 events.append(self._make_event_for(room_id))
 
-            return events, handler._latest_room_serial
+            return events, latest_room_serial
 
     async def get_new_events(
         self,

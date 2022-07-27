@@ -1,1 +1,0 @@
-Don't pull out state in `compute_event_context` for unconflicted state.
