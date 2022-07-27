@@ -76,11 +76,11 @@ from synapse.http.proxyagent import ProxyAgent
 from synapse.http.types import QueryParams
 from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.tracing import (
+    SpanAttributes,
+    SpanKind,
+    StatusCode,
     set_status,
     start_active_span,
-    SpanKind,
-    SpanAttributes,
-    StatusCode,
 )
 from synapse.types import ISynapseReactor
 from synapse.util import json_decoder

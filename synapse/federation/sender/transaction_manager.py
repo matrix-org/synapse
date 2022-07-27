@@ -22,10 +22,10 @@ from synapse.events import EventBase
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
 from synapse.logging.tracing import (
+    StatusCode,
     extract_text_map,
     set_status,
     start_active_span_follows_from,
-    StatusCode,
     whitelisted_homeserver,
 )
 from synapse.types import JsonDict

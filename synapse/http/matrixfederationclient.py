@@ -75,10 +75,10 @@ from synapse.http.types import QueryParams
 from synapse.logging import tracing
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.tracing import (
+    SpanAttributes,
+    SpanKind,
     set_attribute,
     start_active_span,
-    SpanKind,
-    SpanAttributes,
 )
 from synapse.types import JsonDict
 from synapse.util import json_decoder
