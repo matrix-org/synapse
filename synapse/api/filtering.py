@@ -134,6 +134,9 @@ USER_FILTER_SCHEMA = {
                 "pattern": r"^((?!\\\\).)*$",
             },
         },
+        # This is an experiment, a MSC will follow if it happens to be useful
+        # for clients sync performance
+        "do_not_use_to_device_limit": {"type": "number"},
     },
     "additionalProperties": False,
 }
@@ -218,6 +221,13 @@ class FilterCollection:
         self.include_leave = filter_json.get("room", {}).get("include_leave", False)
         self.event_fields = filter_json.get("event_fields", [])
         self.event_format = filter_json.get("event_format", "client")
+
+        self.to_device_limit = 100
+        if hs.config.experimental.to_device_limit_enabled:
+            self.to_device_limit = filter_json.get("do_not_use_to_device_limit", 100)
+            # We don't want to overload the server so let's keep the limit under a thousand
+            if self.to_device_limit > 1000:
+                self.to_device_limit = 1000
 
     def __repr__(self) -> str:
         return "<FilterCollection %s>" % (json.dumps(self._filter_json),)

@@ -90,3 +90,9 @@ class ExperimentalConfig(Config):
 
         # MSC3848: Introduce errcodes for specific event sending failures
         self.msc3848_enabled: bool = experimental.get("msc3848_enabled", False)
+
+        # Experimental feature to optimize client sync performance
+        # Will become a proper MSC if it appears to be useful
+        self.to_device_limit_enabled: bool = experimental.get(
+            "to_device_limit_enabled", False
+        )

@@ -28,7 +28,16 @@ from synapse.api.constants import (
     ReceiptTypes,
     RelationTypes,
 )
-from synapse.rest.client import devices, knock, login, read_marker, receipts, room, sync
+from synapse.rest.client import (
+    devices,
+    knock,
+    login,
+    read_marker,
+    receipts,
+    room,
+    sendtodevice,
+    sync,
+)
 from synapse.server import HomeServer
 from synapse.types import JsonDict
 from synapse.util import Clock
@@ -948,3 +957,119 @@ class ExcludeRoomTestCase(unittest.HomeserverTestCase):
 
         self.assertNotIn(self.excluded_room_id, channel.json_body["rooms"]["invite"])
         self.assertIn(self.included_room_id, channel.json_body["rooms"]["invite"])
+
+
+class ToDeviceLimitTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        sendtodevice.register_servlets,
+        sync.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.next_batch = "s0"
+
+        # Register the first user (used to check the received to_device messages).
+        self.user_id = self.register_user("kermit", "monkey")
+        self.tok = self.login("kermit", "monkey")
+
+        # Register the second user (used to send to_device messages to user1device).
+        self.user2 = self.register_user("kermit2", "monkey")
+        self.tok2 = self.login("kermit2", "monkey")
+
+        self.tx_id = 0
+
+    # This will send one to_device message from kermit device to all kermit2 devices
+    def _send_to_device(self) -> None:
+        self.tx_id += 1
+        chan = self.make_request(
+            "PUT",
+            f"/_matrix/client/v3/sendToDevice/m.test/{self.tx_id}",
+            content={"messages": {self.user_id: {"*": {"tx_id": self.tx_id}}}},
+            access_token=self.tok2,
+        )
+        self.assertEqual(chan.code, 200, chan.result)
+
+    # This does an incremental sync for user kermit with do_not_use_to_device_limit
+    # setted and check the number of returned to_device msgs against
+    # expected_to_device_msgs value
+    def _limited_sync_and_check(
+        self, to_device_limit: int, expected_to_device_msgs: int
+    ) -> None:
+        channel = self.make_request(
+            "GET",
+            f'/sync?since={self.next_batch}&filter={{"do_not_use_to_device_limit": {to_device_limit}}}',
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200)
+        self.next_batch = channel.json_body["next_batch"]
+
+        if expected_to_device_msgs > 0:
+            self.assertIn("to_device", channel.json_body)
+            self.assertIn("events", channel.json_body["to_device"])
+            self.assertEqual(
+                expected_to_device_msgs, len(channel.json_body["to_device"]["events"])
+            )
+
+    def test_to_device(self) -> None:
+        """Tests that to_device messages are correctly flowing to sync,
+        and that to_device_limit is ignored when the experimetal feature is not enabled.
+        """
+        channel = self.make_request(
+            "GET",
+            "/sync",
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200)
+        self.next_batch = channel.json_body["next_batch"]
+
+        for _ in range(4):
+            self._send_to_device()
+
+        # 100 is the default limit, we should get back our 4 messages
+        self._limited_sync_and_check(100, 4)
+
+        for _ in range(4):
+            self._send_to_device()
+
+        # limit of 3 is setted but the experimental feature is not enabled,
+        # so we are still expecting 4 messages
+        self._limited_sync_and_check(3, 4)
+
+    @override_config(
+        {
+            "experimental_features": {
+                "to_device_limit_enabled": True,
+            }
+        }
+    )
+    def test_to_device_limit(self) -> None:
+        """Tests that to_device messages are correctly batched in incremental syncs
+        according to the specified to_device_limit. The limit can change between sync calls.
+        """
+        channel = self.make_request(
+            "GET",
+            "/sync",
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200)
+        self.next_batch = channel.json_body["next_batch"]
+
+        for _ in range(8):
+            self._send_to_device()
+
+        self._limited_sync_and_check(3, 3)
+        self._limited_sync_and_check(4, 4)
+        self._limited_sync_and_check(0, 0)
+        self._limited_sync_and_check(3, 1)
+
+        self._limited_sync_and_check(3, 0)
+
+        for _ in range(1100):
+            self._send_to_device()
+
+        # This tests the hardcoded 1000 limit used to avoid
+        # overloading a server
+        self._limited_sync_and_check(2000, 1000)
+        self._limited_sync_and_check(2000, 100)
