@@ -121,6 +121,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 lambda: self._known_servers_count,
             )
 
+        self._rooms_excluded_from_sync = hs.config.server.rooms_to_exclude_from_sync
+
     @wrap_as_background_process("_count_known_servers")
     async def _count_known_servers(self) -> int:
         """
@@ -565,7 +567,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cached(max_entries=500000, iterable=True)
     async def get_rooms_for_user_with_stream_ordering(
-        self, user_id: str
+        self,
+        user_id: str,
+        exclude_for_sync: bool = False,
     ) -> FrozenSet[GetRoomsForUserWithStreamOrdering]:
         """Returns a set of room_ids the user is currently joined to.
 
@@ -574,6 +578,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         Args:
             user_id
+            exclude_for_sync: Whether to exclude rooms that the configuration says
+                should be excluded from sync results.
 
         Returns:
             Returns the rooms the user is in currently, along with the stream
@@ -584,10 +590,11 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             "get_rooms_for_user_with_stream_ordering",
             self._get_rooms_for_user_with_stream_ordering_txn,
             user_id,
+            exclude_for_sync,
         )
 
     def _get_rooms_for_user_with_stream_ordering_txn(
-        self, txn: LoggingTransaction, user_id: str
+        self, txn: LoggingTransaction, user_id: str, exclude_for_sync: bool
     ) -> FrozenSet[GetRoomsForUserWithStreamOrdering]:
         # We use `current_state_events` here and not `local_current_membership`
         # as a) this gets called with remote users and b) this only gets called
@@ -620,6 +627,10 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 room_id, PersistedEventPosition(instance, stream_id)
             )
             for room_id, instance, stream_id in txn
+            if (
+                exclude_for_sync is False
+                or room_id not in self._rooms_excluded_from_sync
+            )
         )
 
     @cachedList(
@@ -729,9 +740,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         If a remote user only returns rooms this server is currently
         participating in.
         """
-        rooms = await self.get_rooms_for_user_with_stream_ordering(
-            user_id, on_invalidate=on_invalidate
-        )
+        rooms = await self.get_rooms_for_user_with_stream_ordering(user_id)
         return frozenset(r.room_id for r in rooms)
 
     @cached(max_entries=10000)
