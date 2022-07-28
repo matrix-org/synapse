@@ -20,6 +20,7 @@ from twisted.test.proto_helpers import MemoryReactor
 from synapse.api.constants import EventTypes, LoginType, Membership
 from synapse.api.errors import SynapseError
 from synapse.api.room_versions import RoomVersion
+from synapse.config.homeserver import HomeServerConfig
 from synapse.events import EventBase
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.rest import admin
@@ -185,12 +186,12 @@ class ThirdPartyRulesTestCase(unittest.FederatingHomeserverTestCase):
         """
 
         class NastyHackException(SynapseError):
-            def error_dict(self) -> JsonDict:
+            def error_dict(self, config: Optional[HomeServerConfig]) -> JsonDict:
                 """
                 This overrides SynapseError's `error_dict` to nastily inject
                 JSON into the error response.
                 """
-                result = super().error_dict()
+                result = super().error_dict(config)
                 result["nasty"] = "very"
                 return result
 
