@@ -142,7 +142,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             assert self.hs.config.registration.account_threepid_delegate_email
 
             # Have the configured identity server handle the request
-            ret = await self.identity_handler.requestEmailToken(
+            ret = await self.identity_handler.request_email_token(
                 self.hs.config.registration.account_threepid_delegate_email,
                 email,
                 client_secret,

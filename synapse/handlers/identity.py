@@ -416,7 +416,7 @@ class IdentityHandler:
 
         return session_id
 
-    async def requestEmailToken(
+    async def request_email_token(
         self,
         id_server: str,
         email: str,
