@@ -533,7 +533,9 @@ class MatrixFederationHttpClient:
 
         # Inject the span into the headers
         headers_dict: Dict[bytes, List[bytes]] = {}
-        tracing.inject_header_dict(headers_dict, request.destination)
+        tracing.inject_active_span_context_into_header_dict(
+            headers_dict, request.destination
+        )
 
         headers_dict[b"User-Agent"] = [self.version_string_bytes]
 

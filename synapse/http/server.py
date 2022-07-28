@@ -60,7 +60,7 @@ from synapse.api.errors import (
 )
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread, preserve_fn, run_in_background
-from synapse.logging.tracing import active_span, start_active_span, trace_servlet
+from synapse.logging.tracing import get_active_span, start_active_span, trace_servlet
 from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
 from synapse.util.iterutils import chunk_seq
@@ -880,7 +880,7 @@ async def _async_write_json_to_request_in_thread(
         return res
 
     with start_active_span("encode_json_response"):
-        span = active_span()
+        span = get_active_span()
         json_str = await defer_to_thread(request.reactor, encode, span)
 
     _write_bytes_to_request(request, json_str)

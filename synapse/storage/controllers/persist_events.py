@@ -223,7 +223,7 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
             queue.append(end_item)
 
         # also add our active opentracing span to the item so that we get a link back
-        span = tracing.active_span()
+        span = tracing.get_active_span()
         if span:
             end_item.parent_opentracing_span_contexts.append(span.context)
 

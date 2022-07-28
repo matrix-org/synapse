@@ -30,7 +30,7 @@ from twisted.internet import defer
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.tracing import (
-    active_span,
+    get_active_span,
     start_active_span,
     start_active_span_follows_from,
 )
@@ -240,7 +240,7 @@ class ResponseCache(Generic[KV]):
                 # NB it is important that we do not `await` before setting span_context!
                 nonlocal span_context
                 with start_active_span(f"ResponseCache[{self._name}].calculate"):
-                    span = active_span()
+                    span = get_active_span()
                     if span:
                         span_context = span.context
                     return await callback(*args, **kwargs)

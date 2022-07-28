@@ -30,7 +30,7 @@ from synapse.api.errors import (
 from synapse.appservice import ApplicationService
 from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
-from synapse.logging.tracing import active_span, force_tracing, start_active_span
+from synapse.logging.tracing import get_active_span, force_tracing, start_active_span
 from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import Requester, UserID, create_requester
 
@@ -132,7 +132,7 @@ class Auth:
                 is invalid.
             AuthError if access is denied for the user in the access token
         """
-        parent_span = active_span()
+        parent_span = get_active_span()
         with start_active_span("get_user_by_req"):
             requester = await self._wrapped_get_user_by_req(
                 request, allow_guest, allow_expired

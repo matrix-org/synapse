@@ -26,7 +26,7 @@ from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import run_in_background
 from synapse.logging.tracing import (
-    active_span,
+    get_active_span,
     set_attribute,
     span_context_from_request,
     start_active_span,
@@ -318,7 +318,7 @@ class BaseFederationServlet:
                 context = span_context_from_request(request)
 
             if context:
-                servlet_span = active_span()
+                servlet_span = get_active_span()
                 # a scope which uses the origin's context as a parent
                 processing_start_time = time.time()
                 scope = start_active_span_follows_from(
