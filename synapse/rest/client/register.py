@@ -150,17 +150,17 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
                 next_link,
             )
         else:
-            # Send registration emails from Synapse
-            sid = await self.identity_handler.send_threepid_validation(
-                email,
-                client_secret,
-                send_attempt,
-                self.mailer.send_registration_mail,
-                next_link,
-            )
-
-            # Wrap the session id in a JSON object
-            ret = {"sid": sid}
+            # Send registration emails from Synapse,
+            # wrapping the session id in a JSON object.
+            ret = {
+                "sid": await self.identity_handler.send_threepid_validation(
+                    email,
+                    client_secret,
+                    send_attempt,
+                    self.mailer.send_registration_mail,
+                    next_link,
+                )
+            }
 
         threepid_send_requests.labels(type="email", reason="register").observe(
             send_attempt
