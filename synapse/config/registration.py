@@ -13,12 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
+import logging
 from typing import Any, Optional
 
 from synapse.api.constants import RoomCreationPreset
 from synapse.config._base import Config, ConfigError
 from synapse.types import JsonDict, RoomAlias, UserID
 from synapse.util.stringutils import random_string_with_symbols, strtobool
+
+logger = logging.getLogger(__name__)
+
+LEGACY_EMAIL_DELEGATE_WARNING = """\
+Delegation of email verification to an identity server is now deprecated. To
+continue to allow users to add email addresses to their accounts, and use them for
+password resets, configure Synapse with an SMTP server via the `email` setting, and
+remove `account_threepid_delegates.email`.
+
+This will be an error in a future version.
+"""
 
 
 class RegistrationConfig(Config):
@@ -51,6 +63,9 @@ class RegistrationConfig(Config):
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
 
         account_threepid_delegates = config.get("account_threepid_delegates") or {}
+        if "email" in account_threepid_delegates:
+            logger.warning(LEGACY_EMAIL_DELEGATE_WARNING)
+
         self.account_threepid_delegate_email = account_threepid_delegates.get("email")
         self.account_threepid_delegate_msisdn = account_threepid_delegates.get("msisdn")
         self.default_identity_server = config.get("default_identity_server")
