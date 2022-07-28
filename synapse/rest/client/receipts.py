@@ -16,7 +16,7 @@ import logging
 from typing import TYPE_CHECKING, Optional, Tuple
 
 from synapse.api.constants import ReceiptTypes
-from synapse.api.errors import SynapseError
+from synapse.api.errors import SynapseError, UnrecognizedRequestError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -53,6 +53,8 @@ class ReceiptRestServlet(RestServlet):
         if hs.config.experimental.msc2285_enabled:
             self._known_receipt_types.add(ReceiptTypes.UNSTABLE_READ_PRIVATE)
 
+        self._msc3771_enabled = hs.config.experimental.msc3771_enabled
+
     async def on_POST(
         self,
         request: SynapseRequest,
@@ -68,6 +70,9 @@ class ReceiptRestServlet(RestServlet):
                 400,
                 f"Receipt type must be {', '.join(self._known_receipt_types)}",
             )
+
+        if thread_id and not self._msc3771_enabled:
+            raise UnrecognizedRequestError()
 
         parse_json_object_from_request(request, allow_empty_body=False)
 
