@@ -84,6 +84,7 @@ ROOM_EVENT_FILTER_SCHEMA = {
         "contains_url": {"type": "boolean"},
         "lazy_load_members": {"type": "boolean"},
         "include_redundant_members": {"type": "boolean"},
+        "unread_thread_notifications": {"type": "boolean"},
         # Include or exclude events with the provided labels.
         # cf https://github.com/matrix-org/matrix-doc/pull/2326
         "org.matrix.labels": {"type": "array", "items": {"type": "string"}},
@@ -240,6 +241,9 @@ class FilterCollection:
     def include_redundant_members(self) -> bool:
         return self._room_state_filter.include_redundant_members
 
+    def unread_thread_notifications(self) -> bool:
+        return self._room_timeline_filter.unread_thread_notifications
+
     async def filter_presence(
         self, events: Iterable[UserPresenceState]
     ) -> List[UserPresenceState]:
@@ -303,6 +307,9 @@ class Filter:
         self.lazy_load_members = filter_json.get("lazy_load_members", False)
         self.include_redundant_members = filter_json.get(
             "include_redundant_members", False
+        )
+        self.unread_thread_notifications = filter_json.get(
+            "unread_thread_notifications", False
         )
 
         self.types = filter_json.get("types", None)

@@ -2133,8 +2133,11 @@ class SyncHandler:
                     highlight_count = notifs.highlight_count
                     unread_count = notifs.unread_count
 
-                    # XXX Check the sync configuration.
-                    if self._msc3773_enabled:
+                    # Check the sync configuration.
+                    if (
+                        self._msc3773_enabled
+                        and sync_config.filter_collection.unread_thread_notifications()
+                    ):
                         # And add info for each thread.
                         room_sync.unread_thread_notifications = {
                             thread_id: {
