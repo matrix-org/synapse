@@ -31,6 +31,7 @@ from synapse.api.errors import (
 )
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.config import ConfigError
+from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.server import is_threepid_reserved
@@ -73,7 +74,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         self.identity_handler = hs.get_identity_handler()
         self.config = hs.config
 
-        if self.hs.config.email.can_verify_email:
+        if self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self.mailer = Mailer(
                 hs=self.hs,
                 app_name=self.config.email.email_app_name,
@@ -82,10 +83,13 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             )
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        if not self.hs.config.email.can_verify_email:
-            logger.warning(
-                "Email registration has been disabled due to lack of email config"
-            )
+        if self.hs.config.email.threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if (
+                self.hs.config.email.local_threepid_handling_disabled_due_to_email_config
+            ):
+                logger.warning(
+                    "Email registration has been disabled due to lack of email config"
+                )
             raise SynapseError(
                 400, "Email-based registration has been disabled on this server"
             )
@@ -134,21 +138,35 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
-        # Send registration emails from Synapse
-        sid = await self.identity_handler.send_threepid_validation(
-            email,
-            client_secret,
-            send_attempt,
-            self.mailer.send_registration_mail,
-            next_link,
-        )
+        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            assert self.hs.config.registration.account_threepid_delegate_email
+
+            # Have the configured identity server handle the request
+            ret = await self.identity_handler.requestEmailToken(
+                self.hs.config.registration.account_threepid_delegate_email,
+                email,
+                client_secret,
+                send_attempt,
+                next_link,
+            )
+        else:
+            # Send registration emails from Synapse
+            sid = await self.identity_handler.send_threepid_validation(
+                email,
+                client_secret,
+                send_attempt,
+                self.mailer.send_registration_mail,
+                next_link,
+            )
+
+            # Wrap the session id in a JSON object
+            ret = {"sid": sid}
 
         threepid_send_requests.labels(type="email", reason="register").observe(
             send_attempt
         )
 
-        # Wrap the session id in a JSON object
-        return 200, {"sid": sid}
+        return 200, ret
 
 
 class MsisdnRegisterRequestTokenRestServlet(RestServlet):
@@ -242,7 +260,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
         self.clock = hs.get_clock()
         self.store = hs.get_datastores().main
 
-        if self.config.email.can_verify_email:
+        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self._failure_email_template = (
                 self.config.email.email_registration_template_failure_html
             )
@@ -252,10 +270,11 @@ class RegistrationSubmitTokenServlet(RestServlet):
             raise SynapseError(
                 400, "This medium is currently not supported for registration"
             )
-        if not self.config.email.can_verify_email:
-            logger.warning(
-                "User registration via email has been disabled due to lack of email config"
-            )
+        if self.config.email.threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if self.config.email.local_threepid_handling_disabled_due_to_email_config:
+                logger.warning(
+                    "User registration via email has been disabled due to lack of email config"
+                )
             raise SynapseError(
                 400, "Email-based registration is disabled on this server"
             )

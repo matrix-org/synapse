@@ -586,9 +586,9 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
                 "require_at_registration": True,
             },
             "account_threepid_delegates": {
+                "email": "https://id_server",
                 "msisdn": "https://id_server",
             },
-            "email": {"notif_from": "Synapse <synapse@example.com>"},
         }
     )
     def test_advertised_flows_captcha_and_terms_and_3pids(self) -> None:
