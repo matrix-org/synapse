@@ -80,6 +80,10 @@ class SQLBaseStore(metaclass=ABCMeta):
             )
             self._attempt_to_invalidate_cache("get_local_users_in_room", (room_id,))
 
+            # There's no easy way of invalidating this cache for just the users
+            # that have changed, so we just clear the entire thing.
+            self._attempt_to_invalidate_cache("does_pair_of_users_share_a_room", None)
+
         for user_id in members_changed:
             self._attempt_to_invalidate_cache(
                 "get_user_in_room_with_profile", (room_id, user_id)
