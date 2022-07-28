@@ -24,7 +24,7 @@ from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.room import RoomWorkerStore
 from synapse.storage.databases.main.state import StateGroupWorkerStore
 from synapse.storage.state import StateFilter
-from synapse.types import ISynapseReactor
+from synapse.types import ISynapseReactor, StateMap
 
 """This monstrosity is useful for visualising and debugging state resolution problems.
 
@@ -72,11 +72,14 @@ class MockHomeserver(HomeServer):
 def node(
     event: EventBase, suffix: Optional[str] = None, **kwargs: object
 ) -> pydot.Node:
-    label = f"{event.event_id}\n{event.type}"
-    if suffix:
-        label += f"\n{suffix}"
-    kwargs.setdefault("label", label)
-    type_to_shape = {"m.room.member": "oval"}
+    if "label" not in kwargs:
+        label = f"{event.event_id}\n{event.sender}: {(event.type,event.state_key)}"
+        if event.type == "m.room.member":
+            label += f" ({event.membership.upper()})"
+        if suffix:
+            label += f"\n{suffix}"
+        kwargs["label"] = label
+    type_to_shape = {}  # {"m.room.member": "oval"}
     if event.type in type_to_shape:
         kwargs.setdefault("shape", type_to_shape[event.type])
 
@@ -136,30 +139,43 @@ async def dump_mainlines(
         graph.add_edge(edge(starting_event, parent, style="dashed"))
         todo.append(parent)
 
-    while todo:
-        event = todo.pop()
-        auth_events = {
+    async def fetch_auth_events(event: EventBase) -> StateMap[EventBase]:
+        return {
             (e.type, e.state_key): e
             for e in (
                 await hs.get_datastores().main.get_events(event.auth_event_ids())
             ).values()
         }
 
-        for key, style in [
-            (("m.room.power_levels", ""), "dashed"),
-            (("m.room.join_rules", ""), "dashed"),
+    while todo:
+        event = todo.pop()
+        auth_events = await fetch_auth_events(event)
+
+        for key, edge_style in [
+            (("m.room.power_levels", ""), "solid"),
+            (("m.room.join_rules", ""), "solid"),
             (("m.room.member", event.sender), "dotted"),
         ]:
             auth_event = auth_events.get(key)
             if auth_event:
                 if auth_event.event_id not in seen:
+                    node_options = {}
                     if key[0] == "m.room.power_levels":
-                        graph.add_node(await new_node(auth_event, fillcolor="#ffcccc"))
-                    else:
-                        graph.add_node(await new_node(auth_event))
+                        node_options["fillcolor"] = "#ffcccc"
+                    elif key[0] == "m.room.join_rules":
+                        node_options["fillcolor"] = "#cc9966"
+                    elif key == ("m.room.member", event.sender):
+                        auth_events_2 = await fetch_auth_events(auth_event)
+                        if ("m.room.member", event.sender) not in auth_events_2:
+                            # auth_event is the first join of that sender
+                            node_options["fillcolor"] = "#33ff33"
+                        else:
+                            node_options["fillcolor"] = "#ccffcc"
+
+                    graph.add_node(await new_node(auth_event, **node_options))
                     seen.add(auth_event.event_id)
                     todo.append(auth_event)
-                graph.add_edge(edge(event, auth_event, style=style))
+                graph.add_edge(edge(event, auth_event, style=edge_style))
 
     # TODO: make this location configurable
     graph.write_svg("mainlines.svg")
@@ -222,7 +238,7 @@ async def debug_specific_stateres(
             result = await hs.get_storage_controllers().state.get_state_ids_for_event(
                 event.event_id, filter
             )
-            return f"{key_pair}: {result.get(key_pair, '<Missing>')}"
+            return f"\n{key_pair}: {result.get(key_pair, '<Missing>')}"
 
     else:
         watch_func = None
