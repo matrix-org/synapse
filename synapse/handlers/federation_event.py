@@ -849,9 +849,9 @@ class FederationEventHandler:
         This is used when we have pulled a batch of events from a remote server, and may
         not have all the prev_events.
 
-        To build an EventContext, we need to calculate the state at the event. If we
-        already have all the prev_events for `event`, we can simply use the state at the
-        prev_events to calculate the state at `event`.
+        To build an EventContext, we need to calculate the state before the event. If we
+        already have all the prev_events for `event`, we can simply use the state after
+        the prev_events to calculate the state before `event`.
 
         Otherwise, the missing prevs become new backwards extremities, and we fall back
         to asking the remote server for the state after each missing `prev_event`,
