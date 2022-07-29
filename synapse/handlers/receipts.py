@@ -203,27 +203,20 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
             for event_id, orig_event_content in room.get("content", {}).items():
                 event_content = orig_event_content
                 # If there are private read receipts, additional logic is necessary.
-                if (
-                    ReceiptTypes.READ_PRIVATE in event_content
-                    or ReceiptTypes.READ_PRIVATE_UNSTABLE in event_content
-                ):
+                if ReceiptTypes.READ_PRIVATE in event_content:
                     # Make a copy without private read receipts to avoid leaking
                     # other user's private read receipts..
                     event_content = {
                         receipt_type: receipt_value
                         for receipt_type, receipt_value in event_content.items()
-                        if receipt_type
-                        not in (
-                            ReceiptTypes.READ_PRIVATE,
-                            ReceiptTypes.READ_PRIVATE_UNSTABLE,
-                        )
+                        if receipt_type != ReceiptTypes.READ_PRIVATE
                     }
 
                     # Copy the current user's private read receipt from the
                     # original content, if it exists.
-                    user_private_read_receipt = orig_event_content.get(
-                        ReceiptTypes.READ_PRIVATE, {}
-                    ).get(user_id, None)
+                    user_private_read_receipt = orig_event_content[
+                        ReceiptTypes.READ_PRIVATE
+                    ].get(user_id, None)
                     if user_private_read_receipt:
                         event_content[ReceiptTypes.READ_PRIVATE] = {
                             user_id: user_private_read_receipt
