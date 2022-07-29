@@ -202,8 +202,13 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             self._curr_state_delta_stream_cache.entity_has_changed(data.room_id, token)
 
             if data.type == EventTypes.Member:
+                # We need to invalidate the cache for get_rooms_for_user_with_stream_ordering
+                # both with and without excluding rooms for sync results.
                 self.get_rooms_for_user_with_stream_ordering.invalidate(
-                    (data.state_key,)
+                    (data.state_key, False)
+                )
+                self.get_rooms_for_user_with_stream_ordering.invalidate(
+                    (data.state_key, True)
                 )
         else:
             raise Exception("Unknown events stream row type %s" % (row.type,))
