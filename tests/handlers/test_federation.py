@@ -491,12 +491,12 @@ class PartialJoinTestCase(unittest.FederatingHomeserverTestCase):
                 "type": "m.room.create",
                 "sender": "@kristina:example.com",
                 "state_key": "",
-                "event_id": "$e",
                 "depth": 0,
                 "content": {"creator": "@kristina:example.com", "room_version": "10"},
                 "auth_events": [],
                 "origin_server_ts": 1,
-            }
+            },
+            room_version=RoomVersions.V10,
         )
         EVENT_CREATOR_MEMBERSHIP = make_event_from_dict(
             {
@@ -505,12 +505,12 @@ class PartialJoinTestCase(unittest.FederatingHomeserverTestCase):
                 "sender": "@kristina:example.com",
                 "state_key": "@kristina:example.com",
                 "content": {"membership": "join"},
-                "event_id": "$f",
                 "depth": 1,
-                "prev_events": ["$e"],
-                "auth_events": ["$e"],
+                "prev_events": [EVENT_CREATE.event_id],
+                "auth_events": [EVENT_CREATE.event_id],
                 "origin_server_ts": 1,
-            }
+            },
+            room_version=RoomVersions.V10,
         )
         EVENT_INVITATION_MEMBERSHIP = make_event_from_dict(
             {
@@ -519,12 +519,15 @@ class PartialJoinTestCase(unittest.FederatingHomeserverTestCase):
                 "sender": "@kristina:example.com",
                 "state_key": "@alice:test",
                 "content": {"membership": "invite"},
-                "event_id": "$g:test",
                 "depth": 2,
-                "prev_events": ["$f"],
-                "auth_events": ["$e", "$f"],
+                "prev_events": [EVENT_CREATOR_MEMBERSHIP.event_id],
+                "auth_events": [
+                    EVENT_CREATE.event_id,
+                    EVENT_CREATOR_MEMBERSHIP.event_id,
+                ],
                 "origin_server_ts": 1,
-            }
+            },
+            room_version=RoomVersions.V10,
         )
         mock_send_join = Mock(
             return_value=make_awaitable(
