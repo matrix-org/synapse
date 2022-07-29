@@ -551,8 +551,7 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
         elif self.config.email.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
             raise SynapseError(
                 400,
-                "This homeserver is not validating threepids. Use an identity server "
-                "instead.",
+                "This homeserver is not validating threepids.",
             )
 
         sid = parse_string(request, "sid", required=True)
