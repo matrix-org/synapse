@@ -33,7 +33,7 @@ class Cursor(Protocol):
     def fetchone(self) -> Optional[Tuple]:
         ...
 
-    def fetchmany(self, size: Optional[int] = ...) -> List[Tuple]:
+    def fetchmany(self, size: int = ...) -> List[Tuple]:
         ...
 
     def fetchall(self) -> List[Tuple]:
@@ -42,22 +42,7 @@ class Cursor(Protocol):
     @property
     def description(
         self,
-    ) -> Optional[
-        Sequence[
-            # Note that this is an approximate typing based on sqlite3 and other
-            # drivers, and may not be entirely accurate.
-            # FWIW, the DBAPI 2 spec is: https://peps.python.org/pep-0249/#description
-            Tuple[
-                str,
-                Optional[Any],
-                Optional[int],
-                Optional[int],
-                Optional[int],
-                Optional[int],
-                Optional[int],
-            ]
-        ]
-    ]:
+    ) -> Optional[Sequence[Any]]:
         ...
 
     @property

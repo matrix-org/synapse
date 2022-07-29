@@ -21,7 +21,7 @@ from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
 # installed. To account for this, create dummy classes on import failure so we can
 # still run `isinstance()` checks.
 def dummy_engine(name: str, module: str) -> BaseDatabaseEngine:
-    class Engine(BaseDatabaseEngine):  # type: ignore[no-redef]
+    class Engine(BaseDatabaseEngine):
         def __new__(cls, *args: object, **kwargs: object) -> NoReturn:  # type: ignore[misc]
             raise RuntimeError(
                 f"Cannot create {name}Engine -- {module} module is not installed"
@@ -33,17 +33,17 @@ def dummy_engine(name: str, module: str) -> BaseDatabaseEngine:
 try:
     from .postgres import PostgresEngine
 except ImportError:
-    PostgresEngine = dummy_engine("PostgresEngine", "psycopg2")
+    PostgresEngine = dummy_engine("PostgresEngine", "psycopg2")  # type: ignore[misc,assignment]
 
 try:
     from .psycopg import PsycopgEngine
 except ImportError:
-    PsycopgEngine = dummy_engine("PsycopgEngine", "psycopg")
+    PsycopgEngine = dummy_engine("PsycopgEngine", "psycopg")  # type: ignore[misc,assignment]
 
 try:
     from .sqlite import Sqlite3Engine
 except ImportError:
-    Sqlite3Engine = dummy_engine("Sqlite3Engine", "sqlite3")
+    Sqlite3Engine = dummy_engine("Sqlite3Engine", "sqlite3")  # type: ignore[misc,assignment]
 
 
 def create_engine(database_config: Mapping[str, Any]) -> BaseDatabaseEngine:

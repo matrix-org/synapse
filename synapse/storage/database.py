@@ -56,7 +56,7 @@ from synapse.logging.context import (
 from synapse.metrics import register_threadpool
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
-from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, PsycopgEngine, Sqlite3Engine
 from synapse.storage.types import Connection, Cursor
 from synapse.util.async_helpers import delay_cancellation
 from synapse.util.iterutils import batch_iter
@@ -334,7 +334,8 @@ class LoggingTransaction:
     def fetchone(self) -> Optional[Tuple]:
         return self.txn.fetchone()
 
-    def fetchmany(self, size: Optional[int] = None) -> List[Tuple]:
+    def fetchmany(self, size: int = 0) -> List[Tuple]:
+        # XXX This can also be called with no arguments.
         return self.txn.fetchmany(size=size)
 
     def fetchall(self) -> List[Tuple]:
@@ -400,6 +401,11 @@ class LoggingTransaction:
 
     def _make_sql_one_line(self, sql: str) -> str:
         "Strip newlines out of SQL so that the loggers in the DB are on one line"
+        if isinstance(self.database_engine, PsycopgEngine):
+            import psycopg.sql
+            if isinstance(sql, psycopg.sql.Composed):
+                return sql.as_string(None)
+
         return " ".join(line.strip() for line in sql.splitlines() if line.strip())
 
     def _do_execute(
@@ -440,7 +446,7 @@ class LoggingTransaction:
         finally:
             secs = time.time() - start
             sql_logger.debug("[SQL time] {%s} %f sec", self.name, secs)
-            sql_query_timer.labels(sql.split()[0]).observe(secs)
+            sql_query_timer.labels(one_line_sql.split()[0]).observe(secs)
 
     def close(self) -> None:
         self.txn.close()
