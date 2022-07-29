@@ -296,26 +296,6 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def test_filters_out_unstable_private_receipt(self):
-        self._test_filters_private(
-            [
-                {
-                    "content": {
-                        "$1435641916114394fHBLK:matrix.org": {
-                            "org.matrix.msc2285.read.private": {
-                                "@rikj:jki.re": {
-                                    "ts": 1436451550453,
-                                }
-                            }
-                        }
-                    },
-                    "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
-                    "type": EduTypes.RECEIPT,
-                }
-            ],
-            [],
-        )
-
     def test_we_do_not_mutate(self):
         """Ensure the input values are not modified."""
         events = [
