@@ -13,5 +13,5 @@
  * limitations under the License.
  */
 
-DELETE FROM receipts_linearized WHERE receipt_type = "org.matrix.msc2285.read.private";
-DELETE FROM receipts_graph WHERE receipt_type = "org.matrix.msc2285.read.private";
+DELETE FROM receipts_linearized WHERE receipt_type = 'org.matrix.msc2285.read.private';
+DELETE FROM receipts_graph WHERE receipt_type = 'org.matrix.msc2285.read.private';
