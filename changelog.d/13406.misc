@@ -1,1 +1,0 @@
-Warn instead of error when using `account_threepid_delegates.email`, which was deprecated in 1.64.0rc1.

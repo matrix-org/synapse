@@ -1,3 +1,12 @@
+Synapse 1.64.0rc2 (2022-07-29)
+==============================
+
+Internal Changes
+----------------
+
+- Warn instead of error when using `account_threepid_delegates.email`, which was deprecated in 1.64.0rc1. ([\#13406](https://github.com/matrix-org/synapse/issues/13406))
+
+
 Synapse 1.64.0rc1 (2022-07-26)
 ==============================
 
