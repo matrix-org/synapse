@@ -278,7 +278,9 @@ class FederationEventHandler:
                 )
 
         try:
-            await self._process_received_pdu(origin, pdu, state_ids=None)
+            await self._process_received_pdu(
+                origin, pdu, state_ids=None, partial_state=None
+            )
         except PartialStateConflictError:
             # The room was un-partial stated while we were processing the PDU.
             # Try once more, with full state this time.
@@ -286,7 +288,9 @@ class FederationEventHandler:
                 "Room %s was un-partial stated while processing the PDU, trying again.",
                 room_id,
             )
-            await self._process_received_pdu(origin, pdu, state_ids=None)
+            await self._process_received_pdu(
+                origin, pdu, state_ids=None, partial_state=None
+            )
 
     async def on_send_membership_event(
         self, origin: str, event: EventBase
@@ -534,24 +538,46 @@ class FederationEventHandler:
             #
             # This is the same operation as we do when we receive a regular event
             # over federation.
-            state_ids = await self._resolve_state_at_missing_prevs(destination, event)
-
-            # build a new state group for it if need be
-            context = await self._state_handler.compute_event_context(
-                event,
-                state_ids_before_event=state_ids,
+            state_ids, partial_state = await self._resolve_state_at_missing_prevs(
+                destination, event
             )
-            if context.partial_state:
+
+            # There are three possible cases for (state_ids, partial_state):
+            #   * `state_ids` and `partial_state` are both `None` if we had all the
+            #     prev_events. The prev_events may or may not have partial state and
+            #     we won't know until we compute the event context.
+            #   * `state_ids` is not `None` and `partial_state` is `False` if we were
+            #     missing some prev_events (but we have full state for any we did
+            #     have). We calculated the full state after the prev_events.
+            #   * `state_ids` is not `None` and `partial_state` is `True` if we were
+            #     missing some, but not all, prev_events. At least one of the
+            #     prev_events we did have had partial state, so we calculated a partial
+            #     state after the prev_events.
+
+            context = None
+            if state_ids is not None and partial_state:
+                # the state after the prev events is still partial. We can't de-partial
+                # state the event, so don't bother building the event context.
+                pass
+            else:
+                # build a new state group for it if need be
+                context = await self._state_handler.compute_event_context(
+                    event,
+                    state_ids_before_event=state_ids,
+                    partial_state=partial_state,
+                )
+
+            if context is None or context.partial_state:
                 # this can happen if some or all of the event's prev_events still have
-                # partial state - ie, an event has an earlier stream_ordering than one
-                # or more of its prev_events, so we de-partial-state it before its
-                # prev_events.
+                # partial state. We were careful to only pick events from the db without
+                # partial-state prev events, so that implies that a prev event has
+                # been persisted (with partial state) since we did the query.
                 #
-                # TODO(faster_joins): we probably need to be more intelligent, and
-                #    exclude partial-state prev_events from consideration
-                #    https://github.com/matrix-org/synapse/issues/13001
+                # So, let's just ignore `event` for now; when we re-run the db query
+                # we should instead get its partial-state prev event, which we will
+                # de-partial-state, and then come back to event.
                 logger.warning(
-                    "%s still has partial state: can't de-partial-state it yet",
+                    "%s still has prev_events with partial state: can't de-partial-state it yet",
                     event.event_id,
                 )
                 return
@@ -806,14 +832,39 @@ class FederationEventHandler:
             return
 
         try:
-            state_ids = await self._resolve_state_at_missing_prevs(origin, event)
-            # TODO(faster_joins): make sure that _resolve_state_at_missing_prevs does
-            #   not return partial state
-            #   https://github.com/matrix-org/synapse/issues/13002
+            try:
+                state_ids, partial_state = await self._resolve_state_at_missing_prevs(
+                    origin, event
+                )
+                await self._process_received_pdu(
+                    origin,
+                    event,
+                    state_ids=state_ids,
+                    partial_state=partial_state,
+                    backfilled=backfilled,
+                )
+            except PartialStateConflictError:
+                # The room was un-partial stated while we were processing the event.
+                # Try once more, with full state this time.
+                state_ids, partial_state = await self._resolve_state_at_missing_prevs(
+                    origin, event
+                )
 
-            await self._process_received_pdu(
-                origin, event, state_ids=state_ids, backfilled=backfilled
-            )
+                # We ought to have full state now, barring some unlikely race where we left and
+                # rejoned the room in the background.
+                if state_ids is not None and partial_state:
+                    raise AssertionError(
+                        f"Event {event.event_id} still has a partial resolved state "
+                        f"after room {event.room_id} was un-partial stated"
+                    )
+
+                await self._process_received_pdu(
+                    origin,
+                    event,
+                    state_ids=state_ids,
+                    partial_state=partial_state,
+                    backfilled=backfilled,
+                )
         except FederationError as e:
             if e.code == 403:
                 logger.warning("Pulled event %s failed history check.", event_id)
@@ -822,7 +873,7 @@ class FederationEventHandler:
 
     async def _resolve_state_at_missing_prevs(
         self, dest: str, event: EventBase
-    ) -> Optional[StateMap[str]]:
+    ) -> Tuple[Optional[StateMap[str]], Optional[bool]]:
         """Calculate the state at an event with missing prev_events.
 
         This is used when we have pulled a batch of events from a remote server, and
@@ -849,8 +900,10 @@ class FederationEventHandler:
             event: an event to check for missing prevs.
 
         Returns:
-            if we already had all the prev events, `None`. Otherwise, returns
-            the event ids of the state at `event`.
+            if we already had all the prev events, `None, None`. Otherwise, returns a
+            tuple containing:
+             * the event ids of the state at `event`.
+             * a boolean indicating whether the state may be partial.
 
         Raises:
             FederationError if we fail to get the state from the remote server after any
@@ -864,7 +917,7 @@ class FederationEventHandler:
         missing_prevs = prevs - seen
 
         if not missing_prevs:
-            return None
+            return None, None
 
         logger.info(
             "Event %s is missing prev_events %s: calculating state for a "
@@ -876,9 +929,15 @@ class FederationEventHandler:
         # resolve them to find the correct state at the current event.
 
         try:
+            # Determine whether we may be about to retrieve partial state
+            # Events may be un-partial stated right after we compute the partial state
+            # flag, but that's okay, as long as the flag errs on the conservative side.
+            partial_state_flags = await self._store.get_partial_state_events(seen)
+            partial_state = any(partial_state_flags.values())
+
             # Get the state of the events we know about
             ours = await self._state_storage_controller.get_state_groups_ids(
-                room_id, seen
+                room_id, seen, await_full_state=False
             )
 
             # state_maps is a list of mappings from (type, state_key) to event_id
@@ -924,7 +983,7 @@ class FederationEventHandler:
                 "We can't get valid state history.",
                 affected=event_id,
             )
-        return state_map
+        return state_map, partial_state
 
     async def _get_state_ids_after_missing_prev_event(
         self,
@@ -1094,6 +1153,7 @@ class FederationEventHandler:
         origin: str,
         event: EventBase,
         state_ids: Optional[StateMap[str]],
+        partial_state: Optional[bool],
         backfilled: bool = False,
     ) -> None:
         """Called when we have a new non-outlier event.
@@ -1117,14 +1177,21 @@ class FederationEventHandler:
 
             state_ids: Normally None, but if we are handling a gap in the graph
                 (ie, we are missing one or more prev_events), the resolved state at the
-                event. Must not be partial state.
+                event
+
+            partial_state:
+                `True` if `state_ids` is partial and omits non-critical membership
+                events.
+                `False` if `state_ids` is the full state.
+                `None` if `state_ids` is not provided. In this case, the flag will be
+                calculated based on `event`'s prev events.
 
             backfilled: True if this is part of a historical batch of events (inhibits
                 notification to clients, and validation of device keys.)
 
         PartialStateConflictError: if the room was un-partial stated in between
             computing the state at the event and persisting it. The caller should retry
-            exactly once in this case. Will never be raised if `state_ids` is provided.
+            exactly once in this case.
         """
         logger.debug("Processing event: %s", event)
         assert not event.internal_metadata.outlier
@@ -1132,6 +1199,7 @@ class FederationEventHandler:
         context = await self._state_handler.compute_event_context(
             event,
             state_ids_before_event=state_ids,
+            partial_state=partial_state,
         )
         try:
             await self._check_event_auth(origin, event, context)

@@ -1,0 +1,1 @@
+Fix bug in handling of typing events for appservices. Contributed by Nick @ Beeper (@fizzadar).
