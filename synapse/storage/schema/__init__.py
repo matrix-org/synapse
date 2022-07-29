@@ -75,7 +75,6 @@ Changes in SCHEMA_VERSION = 71:
 Changes in SCHEMA_VERSION = 72:
     - event_edges.(room_id, is_state) are no longer written to.
     - Tables related to groups are dropped.
-    - Remove unstable private read receipts
 """
 
 
