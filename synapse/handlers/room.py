@@ -440,7 +440,12 @@ class RoomCreationHandler:
 
         spam_check = await self.spam_checker.user_may_create_room(user_id)
         if spam_check != NOT_SPAM:
-            raise SynapseError(403, "You are not permitted to create rooms", spam_check)
+            raise SynapseError(
+                403,
+                "You are not permitted to create rooms",
+                errcode=spam_check[0],
+                additional_fields=spam_check[1],
+            )
 
         creation_content: JsonDict = {
             "room_version": new_room_version.identifier,
@@ -731,7 +736,10 @@ class RoomCreationHandler:
             spam_check = await self.spam_checker.user_may_create_room(user_id)
             if spam_check != NOT_SPAM:
                 raise SynapseError(
-                    403, "You are not permitted to create rooms", spam_check
+                    403,
+                    "You are not permitted to create rooms",
+                    errcode=spam_check[0],
+                    additional_fields=spam_check[1],
                 )
 
         if ratelimit:
@@ -881,7 +889,11 @@ class RoomCreationHandler:
         # override any attempt to set room versions via the creation_content
         creation_content["room_version"] = room_version.identifier
 
-        last_stream_id = await self._send_events_for_new_room(
+        (
+            last_stream_id,
+            last_sent_event_id,
+            depth,
+        ) = await self._send_events_for_new_room(
             requester,
             room_id,
             preset_config=preset_config,
@@ -897,7 +909,7 @@ class RoomCreationHandler:
         if "name" in config:
             name = config["name"]
             (
-                _,
+                name_event,
                 last_stream_id,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
@@ -909,12 +921,16 @@ class RoomCreationHandler:
                     "content": {"name": name},
                 },
                 ratelimit=False,
+                prev_event_ids=[last_sent_event_id],
+                depth=depth,
             )
+            last_sent_event_id = name_event.event_id
+            depth += 1
 
         if "topic" in config:
             topic = config["topic"]
             (
-                _,
+                topic_event,
                 last_stream_id,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
@@ -926,7 +942,11 @@ class RoomCreationHandler:
                     "content": {"topic": topic},
                 },
                 ratelimit=False,
+                prev_event_ids=[last_sent_event_id],
+                depth=depth,
             )
+            last_sent_event_id = topic_event.event_id
+            depth += 1
 
         # we avoid dropping the lock between invites, as otherwise joins can
         # start coming in and making the createRoom slow.
@@ -941,7 +961,7 @@ class RoomCreationHandler:
 
             for invitee in invite_list:
                 (
-                    _,
+                    member_event_id,
                     last_stream_id,
                 ) = await self.room_member_handler.update_membership_locked(
                     requester,
@@ -951,7 +971,11 @@ class RoomCreationHandler:
                     ratelimit=False,
                     content=content,
                     new_room=True,
+                    prev_event_ids=[last_sent_event_id],
+                    depth=depth,
                 )
+                last_sent_event_id = member_event_id
+                depth += 1
 
         for invite_3pid in invite_3pid_list:
             id_server = invite_3pid["id_server"]
@@ -960,7 +984,10 @@ class RoomCreationHandler:
             medium = invite_3pid["medium"]
             # Note that do_3pid_invite can raise a  ShadowBanError, but this was
             # handled above by emptying invite_3pid_list.
-            last_stream_id = await self.hs.get_room_member_handler().do_3pid_invite(
+            (
+                member_event_id,
+                last_stream_id,
+            ) = await self.hs.get_room_member_handler().do_3pid_invite(
                 room_id,
                 requester.user,
                 medium,
@@ -969,7 +996,11 @@ class RoomCreationHandler:
                 requester,
                 txn_id=None,
                 id_access_token=id_access_token,
+                prev_event_ids=[last_sent_event_id],
+                depth=depth,
             )
+            last_sent_event_id = member_event_id
+            depth += 1
 
         result = {"room_id": room_id}
 
@@ -997,19 +1028,23 @@ class RoomCreationHandler:
         power_level_content_override: Optional[JsonDict] = None,
         creator_join_profile: Optional[JsonDict] = None,
         ratelimit: bool = True,
-    ) -> int:
+    ) -> Tuple[int, str, int]:
         """Sends the initial events into a new room.
 
         `power_level_content_override` doesn't apply when initial state has
         power level state event content.
 
         Returns:
-            The stream_id of the last event persisted.
+            A tuple containing the stream ID, event ID and depth of the last
+            event sent to the room.
         """
 
         creator_id = creator.user.to_string()
 
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
+
+        depth = 1
+        last_sent_event_id: Optional[str] = None
 
         def create(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
             e = {"type": etype, "content": content}
@@ -1020,19 +1055,30 @@ class RoomCreationHandler:
             return e
 
         async def send(etype: str, content: JsonDict, **kwargs: Any) -> int:
+            nonlocal last_sent_event_id
+            nonlocal depth
+
             event = create(etype, content, **kwargs)
             logger.debug("Sending %s in new room", etype)
             # Allow these events to be sent even if the user is shadow-banned to
             # allow the room creation to complete.
             (
-                _,
+                sent_event,
                 last_stream_id,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 creator,
                 event,
                 ratelimit=False,
                 ignore_shadow_ban=True,
+                # Note: we don't pass state_event_ids here because this triggers
+                # an additional query per event to look them up from the events table.
+                prev_event_ids=[last_sent_event_id] if last_sent_event_id else [],
+                depth=depth,
             )
+
+            last_sent_event_id = sent_event.event_id
+            depth += 1
+
             return last_stream_id
 
         try:
@@ -1046,7 +1092,9 @@ class RoomCreationHandler:
         await send(etype=EventTypes.Create, content=creation_content)
 
         logger.debug("Sending %s in new room", EventTypes.Member)
-        await self.room_member_handler.update_membership(
+        # Room create event must exist at this point
+        assert last_sent_event_id is not None
+        member_event_id, _ = await self.room_member_handler.update_membership(
             creator,
             creator.user,
             room_id,
@@ -1054,7 +1102,10 @@ class RoomCreationHandler:
             ratelimit=ratelimit,
             content=creator_join_profile,
             new_room=True,
+            prev_event_ids=[last_sent_event_id],
+            depth=depth,
         )
+        last_sent_event_id = member_event_id
 
         # We treat the power levels override specially as this needs to be one
         # of the first events that get sent into a room.
@@ -1146,7 +1197,7 @@ class RoomCreationHandler:
                 content={"algorithm": RoomEncryptionAlgorithms.DEFAULT},
             )
 
-        return last_sent_stream_id
+        return last_sent_stream_id, last_sent_event_id, depth
 
     def _generate_room_id(self) -> str:
         """Generates a random room ID.
@@ -1333,6 +1384,7 @@ class TimestampLookupHandler:
         self.store = hs.get_datastores().main
         self.state_handler = hs.get_state_handler()
         self.federation_client = hs.get_federation_client()
+        self.federation_event_handler = hs.get_federation_event_handler()
         self._storage_controllers = hs.get_storage_controllers()
 
     async def get_event_for_timestamp(
@@ -1428,38 +1480,68 @@ class TimestampLookupHandler:
                         remote_response,
                     )
 
-                    # TODO: Do we want to persist this as an extremity?
-                    # TODO: I think ideally, we would try to backfill from
-                    # this event and run this whole
-                    # `get_event_for_timestamp` function again to make sure
-                    # they didn't give us an event from their gappy history.
                     remote_event_id = remote_response.event_id
-                    origin_server_ts = remote_response.origin_server_ts
+                    remote_origin_server_ts = remote_response.origin_server_ts
+
+                    # Backfill this event so we can get a pagination token for
+                    # it with `/context` and paginate `/messages` from this
+                    # point.
+                    #
+                    # TODO: The requested timestamp may lie in a part of the
+                    #   event graph that the remote server *also* didn't have,
+                    #   in which case they will have returned another event
+                    #   which may be nowhere near the requested timestamp. In
+                    #   the future, we may need to reconcile that gap and ask
+                    #   other homeservers, and/or extend `/timestamp_to_event`
+                    #   to return events on *both* sides of the timestamp to
+                    #   help reconcile the gap faster.
+                    remote_event = (
+                        await self.federation_event_handler.backfill_event_id(
+                            domain, room_id, remote_event_id
+                        )
+                    )
+
+                    # XXX: When we see that the remote server is not trustworthy,
+                    # maybe we should not ask them first in the future.
+                    if remote_origin_server_ts != remote_event.origin_server_ts:
+                        logger.info(
+                            "get_event_for_timestamp: Remote server (%s) claimed that remote_event_id=%s occured at remote_origin_server_ts=%s but that isn't true (actually occured at %s). Their claims are dubious and we should consider not trusting them.",
+                            domain,
+                            remote_event_id,
+                            remote_origin_server_ts,
+                            remote_event.origin_server_ts,
+                        )
 
                     # Only return the remote event if it's closer than the local event
                     if not local_event or (
-                        abs(origin_server_ts - timestamp)
+                        abs(remote_event.origin_server_ts - timestamp)
                         < abs(local_event.origin_server_ts - timestamp)
                     ):
-                        return remote_event_id, origin_server_ts
+                        logger.info(
+                            "get_event_for_timestamp: returning remote_event_id=%s (%s) since it's closer to timestamp=%s than local_event=%s (%s)",
+                            remote_event_id,
+                            remote_event.origin_server_ts,
+                            timestamp,
+                            local_event.event_id if local_event else None,
+                            local_event.origin_server_ts if local_event else None,
+                        )
+                        return remote_event_id, remote_origin_server_ts
                 except (HttpResponseException, InvalidResponseError) as ex:
                     # Let's not put a high priority on some other homeserver
                     # failing to respond or giving a random response
                     logger.debug(
-                        "Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",
+                        "get_event_for_timestamp: Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",
                         domain,
                         type(ex).__name__,
                         ex,
                         ex.args,
                     )
-                except Exception as ex:
+                except Exception:
                     # But we do want to see some exceptions in our code
                     logger.warning(
-                        "Failed to fetch /timestamp_to_event from %s because of exception(%s) %s args=%s",
+                        "get_event_for_timestamp: Failed to fetch /timestamp_to_event from %s because of exception",
                         domain,
-                        type(ex).__name__,
-                        ex,
-                        ex.args,
+                        exc_info=True,
                     )
 
         # To appease mypy, we have to add both of these conditions to check for

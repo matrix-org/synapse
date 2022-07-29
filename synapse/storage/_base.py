@@ -75,6 +75,19 @@ class SQLBaseStore(metaclass=ABCMeta):
             self._attempt_to_invalidate_cache(
                 "get_users_in_room_with_profiles", (room_id,)
             )
+            self._attempt_to_invalidate_cache(
+                "get_number_joined_users_in_room", (room_id,)
+            )
+            self._attempt_to_invalidate_cache("get_local_users_in_room", (room_id,))
+
+            # There's no easy way of invalidating this cache for just the users
+            # that have changed, so we just clear the entire thing.
+            self._attempt_to_invalidate_cache("does_pair_of_users_share_a_room", None)
+
+        for user_id in members_changed:
+            self._attempt_to_invalidate_cache(
+                "get_user_in_room_with_profile", (room_id, user_id)
+            )
 
         # Purge other caches based on room state.
         self._attempt_to_invalidate_cache("get_room_summary", (room_id,))
@@ -86,6 +99,10 @@ class SQLBaseStore(metaclass=ABCMeta):
         """Attempts to invalidate the cache of the given name, ignoring if the
         cache doesn't exist. Mainly used for invalidating caches on workers,
         where they may not have the cache.
+
+        Note that this function does not invalidate any remote caches, only the
+        local in-memory ones. Any remote invalidation must be performed before
+        calling this.
 
         Args:
             cache_name
@@ -103,7 +120,10 @@ class SQLBaseStore(metaclass=ABCMeta):
         if key is None:
             cache.invalidate_all()
         else:
-            cache.invalidate(tuple(key))
+            # Prefer any local-only invalidation method. Invalidating any non-local
+            # cache must be be done before this.
+            invalidate_method = getattr(cache, "invalidate_local", cache.invalidate)
+            invalidate_method(tuple(key))
 
 
 def db_to_json(db_content: Union[memoryview, bytes, bytearray, str]) -> Any:
