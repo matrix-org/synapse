@@ -361,6 +361,7 @@ class ReceiptsStream(Stream):
         receipt_type: str
         user_id: str
         event_id: str
+        thread_id: Optional[str]
         data: dict
 
     NAME = "receipts"
