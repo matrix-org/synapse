@@ -879,15 +879,13 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
 
             return True
 
-        end = await self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "_background_remove_unstable_private_read_receipts",
             _background_remove_unstable_private_read_receipts_txn,
         )
-
-        if end:
-            await self.db_pool.updates._end_background_update(
-                _BackgroundUpdates.REMOVE_UNSTABLE_PRIVATE_READ_RECEIPTS
-            )
+        await self.db_pool.updates._end_background_update(
+            _BackgroundUpdates.REMOVE_UNSTABLE_PRIVATE_READ_RECEIPTS
+        )
 
         return 0
 
