@@ -535,7 +535,7 @@ class FederationEventHandler:
             #
             # This is the same operation as we do when we receive a regular event
             # over federation.
-            context = await self._compute_event_context_with_missing_prevs(
+            context = await self._compute_event_context_with_maybe_missing_prevs(
                 destination, event
             )
             if context.partial_state:
@@ -804,7 +804,7 @@ class FederationEventHandler:
 
         try:
             try:
-                context = await self._compute_event_context_with_missing_prevs(
+                context = await self._compute_event_context_with_maybe_missing_prevs(
                     origin, event
                 )
                 await self._process_received_pdu(
@@ -816,7 +816,7 @@ class FederationEventHandler:
             except PartialStateConflictError:
                 # The room was un-partial stated while we were processing the event.
                 # Try once more, with full state this time.
-                context = await self._compute_event_context_with_missing_prevs(
+                context = await self._compute_event_context_with_maybe_missing_prevs(
                     origin, event
                 )
 
@@ -840,7 +840,7 @@ class FederationEventHandler:
             else:
                 raise
 
-    async def _compute_event_context_with_missing_prevs(
+    async def _compute_event_context_with_maybe_missing_prevs(
         self, dest: str, event: EventBase
     ) -> EventContext:
         """Build an EventContext structure for a non-outlier event whose prev_events may
