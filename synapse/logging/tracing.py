@@ -610,6 +610,8 @@ def inject_active_span_context_into_header_dict(
             return
 
     active_span = get_active_span()
+    # This doesn't affect the current context at all, it just converts a span
+    # into `Context` object basically (bad name).
     ctx = opentelemetry.trace.propagation.set_span_in_context(active_span)
 
     propagator = opentelemetry.propagate.get_global_textmap()
@@ -649,6 +651,8 @@ def get_active_span_text_map(destination: Optional[str] = None) -> Dict[str, str
         return {}
 
     active_span = get_active_span()
+    # This doesn't affect the current context at all, it just converts a span
+    # into `Context` object basically (bad name).
     ctx = opentelemetry.trace.propagation.set_span_in_context(active_span)
 
     carrier_text_map: Dict[str, str] = {}
