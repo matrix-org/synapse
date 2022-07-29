@@ -148,8 +148,7 @@ class EmailConfig(Config):
 
         if config.get("trust_identity_server_for_password_resets"):
             raise ConfigError(
-                'The config option "trust_identity_server_for_password_resets" '
-                'has been replaced by "account_threepid_delegate". '
+                'The config option "trust_identity_server_for_password_resets" has been removed.'
                 "Please consult the configuration manual at docs/usage/configuration/config_documentation.md for "
                 "details and update your config file."
             )
