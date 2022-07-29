@@ -528,11 +528,15 @@ def set_attribute(key: str, value: Union[str, bool, int, float]) -> None:
 
 
 @ensure_active_span("set the status")
-def set_status(key: str, status: "opentelemetry.trace.StatusCode") -> None:
+def set_status(
+    status: "opentelemetry.trace.StatusCode", exc: Optional(Exception)
+) -> None:
     """Sets a tag on the active span"""
-    span = get_active_span()
-    assert span is not None
-    span.set_status(status)
+    active_span = get_active_span()
+    assert active_span is not None
+    active_span.set_status(status)
+    if exc:
+        active_span.record_exception(exc)
 
 
 DEFAULT_LOG_NAME = "log"

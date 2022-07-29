@@ -166,7 +166,7 @@ class TransactionManager:
             except HttpResponseException as e:
                 code = e.code
 
-                set_status(StatusCode.ERROR)
+                set_status(StatusCode.ERROR, e)
 
                 logger.info("TX [%s] {%s} got %d response", destination, txn_id, code)
                 raise

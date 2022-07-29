@@ -465,7 +465,7 @@ class SimpleHttpClient:
                     type(e).__name__,
                     e.args[0],
                 )
-                set_status(StatusCode.ERROR, e.args[0])
+                set_status(StatusCode.ERROR, e)
                 raise
 
     async def post_urlencoded_get_json(
