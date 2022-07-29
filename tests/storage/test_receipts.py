@@ -273,6 +273,8 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
         `receipts_graph` tables.
         """
 
+        READ_PRIVATE_UNSTABLE = "org.matrix.msc2285.read.private"
+
         # Fake a receipt of unstable private read receipt type in
         # `receipt_linearized`
         self.get_success(
@@ -280,7 +282,7 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
                 table="receipts_linearized",
                 values={
                     "room_id": "room_id",
-                    "receipt_type": ReceiptTypes.READ_PRIVATE_UNSTABLE,
+                    "receipt_type": READ_PRIVATE_UNSTABLE,
                     "user_id": OUR_USER_ID,
                     "stream_id": "stream_id",
                     "event_id": "event_id",
@@ -295,7 +297,7 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
                 table="receipts_graph",
                 values={
                     "room_id": "room_id",
-                    "receipt_type": ReceiptTypes.READ_PRIVATE_UNSTABLE,
+                    "receipt_type": READ_PRIVATE_UNSTABLE,
                     "user_id": OUR_USER_ID,
                     "event_ids": "{}",
                     "data": "{}",
@@ -325,7 +327,7 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
         receipts_linearized = self.get_success(
             self.store.db_pool.simple_select_list(
                 table="receipts_linearized",
-                keyvalues={"receipt_type": ReceiptTypes.READ_PRIVATE_UNSTABLE},
+                keyvalues={"receipt_type": READ_PRIVATE_UNSTABLE},
                 retcols={"room_id"},
             )
         )
@@ -335,7 +337,7 @@ class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
         receipts_graph = self.get_success(
             self.store.db_pool.simple_select_list(
                 table="receipts_graph",
-                keyvalues={"receipt_type": ReceiptTypes.READ_PRIVATE_UNSTABLE},
+                keyvalues={"receipt_type": READ_PRIVATE_UNSTABLE},
                 retcols={"room_id"},
             )
         )

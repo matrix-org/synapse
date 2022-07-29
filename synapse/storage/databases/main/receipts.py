@@ -26,7 +26,7 @@ from typing import (
     cast,
 )
 
-from synapse.api.constants import EduTypes, ReceiptTypes
+from synapse.api.constants import EduTypes
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import ReceiptsStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
@@ -861,18 +861,20 @@ class ReceiptsBackgroundUpdateStore(SQLBaseStore):
         `receipts_graph` tables.
         """
 
+        READ_PRIVATE_UNSTABLE = "org.matrix.msc2285.read.private"
+
         def _background_remove_unstable_private_read_receipts_txn(
             txn: LoggingTransaction,
         ) -> bool:
             self.db_pool.simple_delete_txn(
                 txn,
                 "receipts_linearized",
-                {"receipt_type": ReceiptTypes.READ_PRIVATE_UNSTABLE},
+                {"receipt_type": READ_PRIVATE_UNSTABLE},
             )
             self.db_pool.simple_delete_txn(
                 txn,
                 "receipts_graph",
-                {"receipt_type": ReceiptTypes.READ_PRIVATE_UNSTABLE},
+                {"receipt_type": READ_PRIVATE_UNSTABLE},
             )
 
             return True
