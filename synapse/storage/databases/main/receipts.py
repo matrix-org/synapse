@@ -522,7 +522,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     async def get_all_updated_receipts(
         self, instance_name: str, last_id: int, current_id: int, limit: int
-    ) -> Tuple[List[Tuple[int, list]], int, bool]:
+    ) -> Tuple[List[Tuple[int, Tuple[str, str, str, str, str, JsonDict]]], int, bool]:
         """Get updates for receipts replication stream.
 
         Args:
@@ -549,9 +549,11 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         def get_all_updated_receipts_txn(
             txn: LoggingTransaction,
-        ) -> Tuple[List[Tuple[int, list]], int, bool]:
+        ) -> Tuple[
+            List[Tuple[int, Tuple[str, str, str, str, str, JsonDict]]], int, bool
+        ]:
             sql = """
-                SELECT stream_id, room_id, receipt_type, user_id, event_id, data
+                SELECT stream_id, room_id, receipt_type, user_id, event_id, thread_id, data
                 FROM receipts_linearized
                 WHERE ? < stream_id AND stream_id <= ?
                 ORDER BY stream_id ASC
@@ -560,8 +562,8 @@ class ReceiptsWorkerStore(SQLBaseStore):
             txn.execute(sql, (last_id, current_id, limit))
 
             updates = cast(
-                List[Tuple[int, list]],
-                [(r[0], r[1:5] + (db_to_json(r[5]),)) for r in txn],
+                List[Tuple[int, Tuple[str, str, str, str, str, JsonDict]]],
+                [(r[0], r[1:6] + (db_to_json(r[6]),)) for r in txn],
             )
 
             limited = False

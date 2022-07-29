@@ -423,7 +423,7 @@ class FederationSenderHandler:
                 receipt.receipt_type,
                 receipt.user_id,
                 [receipt.event_id],
-                thread_id=None,  # TODO
+                thread_id=receipt.thread_id,
                 data=receipt.data,
             )
             await self.federation_sender.send_read_receipt(receipt_info)
