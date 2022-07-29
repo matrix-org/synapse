@@ -218,12 +218,12 @@ class _DummyLookup(object):
 try:
     import opentelemetry
     import opentelemetry.exporter.jaeger.thrift
+    import opentelemetry.propagate
     import opentelemetry.sdk.resources
     import opentelemetry.sdk.trace
     import opentelemetry.sdk.trace.export
     import opentelemetry.semconv.trace
     import opentelemetry.trace
-    import opentelemetry.propagate
 
     SpanKind = opentelemetry.trace.SpanKind
     SpanAttributes = opentelemetry.semconv.trace.SpanAttributes
