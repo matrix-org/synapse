@@ -536,7 +536,7 @@ class Notifier:
                         log_kv(
                             {
                                 "wait_for_events": "sleep",
-                                "token": prev_token,
+                                "token": str(prev_token),
                             }
                         )
 
@@ -546,7 +546,7 @@ class Notifier:
                         log_kv(
                             {
                                 "wait_for_events": "woken",
-                                "token": user_stream.current_token,
+                                "token": str(user_stream.current_token),
                             }
                         )
 

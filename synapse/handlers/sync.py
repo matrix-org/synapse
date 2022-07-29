@@ -396,7 +396,7 @@ class SyncHandler:
         indoctrination.
         """
         with start_active_span("sync.current_sync_for_user"):
-            log_kv({"since_token": since_token})
+            log_kv({"since_token": str(since_token)})
             sync_result = await self.generate_sync_result(
                 sync_config, since_token, full_state
             )
@@ -1089,7 +1089,7 @@ class SyncHandler:
         # to query up to a given point.
         # Always use the `now_token` in `SyncResultBuilder`
         now_token = self.event_sources.get_current_token()
-        log_kv({"now_token": now_token})
+        log_kv({"now_token": str(now_token)})
 
         logger.debug(
             "Calculating sync response for %r between %s and %s",
@@ -2007,8 +2007,8 @@ class SyncHandler:
 
             log_kv(
                 {
-                    "since_token": since_token,
-                    "upto_token": upto_token,
+                    "since_token": str(since_token),
+                    "upto_token": str(upto_token),
                 }
             )
 
@@ -2023,7 +2023,7 @@ class SyncHandler:
             log_kv(
                 {
                     "batch_events": len(batch.events),
-                    "prev_batch": batch.prev_batch,
+                    "prev_batch": str(batch.prev_batch),
                     "batch_limited": batch.limited,
                 }
             )
