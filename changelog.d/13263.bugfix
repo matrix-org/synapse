@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse 1.15.0 where adding a user through the Synapse Admin API with a phone number would fail if the "enable_email_notifs" and "email_notifs_for_new_users" options were enabled. Contributed by @thomasweston12.

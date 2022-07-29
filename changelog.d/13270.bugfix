@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse 1.40 where a user invited to a restricted room would be briefly unable to join.

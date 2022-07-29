@@ -14,7 +14,7 @@
 # limitations under the License.
 import heapq
 import logging
-from collections import defaultdict
+from collections import ChainMap, defaultdict
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -92,8 +92,11 @@ class _StateCacheEntry:
         prev_group: Optional[int] = None,
         delta_ids: Optional[StateMap[str]] = None,
     ):
-        if state is None and state_group is None:
-            raise Exception("Either state or state group must be not None")
+        if state is None and state_group is None and prev_group is None:
+            raise Exception("One of state, state_group or prev_group must be not None")
+
+        if prev_group is not None and delta_ids is None:
+            raise Exception("If prev_group is set so must delta_ids")
 
         # A map from (type, state_key) to event_id.
         #
@@ -120,18 +123,48 @@ class _StateCacheEntry:
         if self._state is not None:
             return self._state
 
-        assert self.state_group is not None
+        if self.state_group is not None:
+            return await state_storage.get_state_ids_for_group(
+                self.state_group, state_filter
+            )
 
-        return await state_storage.get_state_ids_for_group(
-            self.state_group, state_filter
+        assert self.prev_group is not None and self.delta_ids is not None
+
+        prev_state = await state_storage.get_state_ids_for_group(
+            self.prev_group, state_filter
         )
 
-    def __len__(self) -> int:
-        # The len should is used to estimate how large this cache entry is, for
-        # cache eviction purposes. This is why if `self.state` is None it's fine
-        # to return 1.
+        # ChainMap expects MutableMapping, but since we're using it immutably
+        # its safe to give it immutable maps.
+        return ChainMap(self.delta_ids, prev_state)  # type: ignore[arg-type]
 
-        return len(self._state) if self._state else 1
+    def set_state_group(self, state_group: int) -> None:
+        """Update the state group assigned to this state (e.g. after we've
+        persisted it).
+
+        Note: this will cause the cache entry to drop any stored state.
+        """
+
+        self.state_group = state_group
+
+        # We clear out the state as we know longer need to explicitly keep it in
+        # the `state_cache` (as the store state group cache will do that).
+        self._state = None
+
+    def __len__(self) -> int:
+        # The len should be used to estimate how large this cache entry is, for
+        # cache eviction purposes. This is why it's fine to return 1 if we're
+        # not storing any state.
+
+        length = 0
+
+        if self._state:
+            length += len(self._state)
+
+        if self.delta_ids:
+            length += len(self.delta_ids)
+
+        return length or 1  # Make sure its not 0.
 
 
 class StateHandler:
@@ -157,6 +190,7 @@ class StateHandler:
         self,
         room_id: str,
         event_ids: Collection[str],
+        state_filter: Optional[StateFilter] = None,
     ) -> StateMap[str]:
         """Fetch the state after each of the given event IDs. Resolve them and return.
 
@@ -174,7 +208,7 @@ class StateHandler:
         """
         logger.debug("calling resolve_state_groups from compute_state_after_events")
         ret = await self.resolve_state_groups_for_events(room_id, event_ids)
-        return await ret.get_state(self._state_storage_controller, StateFilter.all())
+        return await ret.get_state(self._state_storage_controller, state_filter)
 
     async def get_current_users_in_room(
         self, room_id: str, latest_event_ids: List[str]
@@ -221,7 +255,7 @@ class StateHandler:
         self,
         event: EventBase,
         state_ids_before_event: Optional[StateMap[str]] = None,
-        partial_state: bool = False,
+        partial_state: Optional[bool] = None,
     ) -> EventContext:
         """Build an EventContext structure for a non-outlier event.
 
@@ -236,8 +270,12 @@ class StateHandler:
                 it can't be calculated from existing events. This is normally
                 only specified when receiving an event from federation where we
                 don't have the prev events, e.g. when backfilling.
-            partial_state: True if `state_ids_before_event` is partial and omits
-                non-critical membership events
+            partial_state:
+                `True` if `state_ids_before_event` is partial and omits non-critical
+                membership events.
+                `False` if `state_ids_before_event` is the full state.
+                `None` when `state_ids_before_event` is not provided. In this case, the
+                flag will be calculated based on `event`'s prev events.
         Returns:
             The event context.
         """
@@ -264,12 +302,14 @@ class StateHandler:
                 )
             )
 
+            # the partial_state flag must be provided
+            assert partial_state is not None
         else:
             # otherwise, we'll need to resolve the state across the prev_events.
 
             # partial_state should not be set explicitly in this case:
             # we work it out dynamically
-            assert not partial_state
+            assert partial_state is None
 
             # if any of the prev-events have partial state, so do we.
             # (This is slightly racy - the prev-events might get fixed up before we use
@@ -279,13 +319,13 @@ class StateHandler:
             incomplete_prev_events = await self.store.get_partial_state_events(
                 prev_event_ids
             )
-            if any(incomplete_prev_events.values()):
+            partial_state = any(incomplete_prev_events.values())
+            if partial_state:
                 logger.debug(
                     "New/incoming event %s refers to prev_events %s with partial state",
                     event.event_id,
                     [k for (k, v) in incomplete_prev_events.items() if v],
                 )
-                partial_state = True
 
             logger.debug("calling resolve_state_groups from compute_event_context")
             # we've already taken into account partial state, so no need to wait for
@@ -319,7 +359,7 @@ class StateHandler:
                         current_state_ids=state_ids_before_event,
                     )
                 )
-                entry.state_group = state_group_before_event
+                entry.set_state_group(state_group_before_event)
             else:
                 state_group_before_event = entry.state_group
 
@@ -746,7 +786,7 @@ def _make_state_cache_entry(
         old_state_event_ids = set(state.values())
         if new_state_event_ids == old_state_event_ids:
             # got an exact match.
-            return _StateCacheEntry(state=new_state, state_group=sg)
+            return _StateCacheEntry(state=None, state_group=sg)
 
     # TODO: We want to create a state group for this set of events, to
     # increase cache hits, but we need to make sure that it doesn't
@@ -768,9 +808,14 @@ def _make_state_cache_entry(
             prev_group = old_group
             delta_ids = n_delta_ids
 
-    return _StateCacheEntry(
-        state=new_state, state_group=None, prev_group=prev_group, delta_ids=delta_ids
-    )
+    if prev_group is not None:
+        # If we have a prev group and deltas then we can drop the new state from
+        # the cache (to reduce memory usage).
+        return _StateCacheEntry(
+            state=None, state_group=None, prev_group=prev_group, delta_ids=delta_ids
+        )
+    else:
+        return _StateCacheEntry(state=new_state, state_group=None)
 
 
 @attr.s(slots=True, auto_attribs=True)
