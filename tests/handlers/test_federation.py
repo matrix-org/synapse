@@ -294,7 +294,7 @@ class FederationTestCase(unittest.FederatingHomeserverTestCase):
                 federation_event_handler._process_received_pdu(
                     self.OTHER_SERVER_NAME,
                     event,
-                    context=context,
+                    context,
                 )
             )
 

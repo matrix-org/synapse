@@ -23,7 +23,6 @@ from typing import (
     Dict,
     Iterable,
     List,
-    Optional,
     Sequence,
     Set,
     Tuple,
@@ -278,7 +277,8 @@ class FederationEventHandler:
                 )
 
         try:
-            await self._process_received_pdu(origin, pdu, context=None)
+            context = await self._state_handler.compute_event_context(pdu)
+            await self._process_received_pdu(origin, pdu, context)
         except PartialStateConflictError:
             # The room was un-partial stated while we were processing the PDU.
             # Try once more, with full state this time.
@@ -286,7 +286,8 @@ class FederationEventHandler:
                 "Room %s was un-partial stated while processing the PDU, trying again.",
                 room_id,
             )
-            await self._process_received_pdu(origin, pdu, context=None)
+            context = await self._state_handler.compute_event_context(pdu)
+            await self._process_received_pdu(origin, pdu, context)
 
     async def on_send_membership_event(
         self, origin: str, event: EventBase
@@ -810,7 +811,7 @@ class FederationEventHandler:
                 await self._process_received_pdu(
                     origin,
                     event,
-                    context=context,
+                    context,
                     backfilled=backfilled,
                 )
             except PartialStateConflictError:
@@ -831,7 +832,7 @@ class FederationEventHandler:
                 await self._process_received_pdu(
                     origin,
                     event,
-                    context=context,
+                    context,
                     backfilled=backfilled,
                 )
         except FederationError as e:
@@ -1123,7 +1124,7 @@ class FederationEventHandler:
         self,
         origin: str,
         event: EventBase,
-        context: Optional[EventContext],
+        context: EventContext,
         backfilled: bool = False,
     ) -> None:
         """Called when we have a new non-outlier event.
@@ -1151,15 +1152,11 @@ class FederationEventHandler:
                 notification to clients, and validation of device keys.)
 
         PartialStateConflictError: if the room was un-partial stated in between
-            computing the state at the event and persisting it. The caller should retry
-            exactly once in this case. If a `context` was provided, it should be
-            recomputed.
+            computing the state at the event and persisting it. The caller should
+            recompute `context` and retry exactly once when this happens.
         """
         logger.debug("Processing event: %s", event)
         assert not event.internal_metadata.outlier
-
-        if context is None:
-            context = await self._state_handler.compute_event_context(event)
 
         try:
             await self._check_event_auth(origin, event, context)
