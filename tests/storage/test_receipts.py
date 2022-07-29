@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from synapse.api.constants import ReceiptTypes
+from synapse.storage.databases.main.receipts import _BackgroundUpdates
 from synapse.types import UserID, create_requester
 
 from tests.test_utils.event_injection import create_event
@@ -259,3 +260,83 @@ class ReceiptTestCase(HomeserverTestCase):
             )
         )
         self.assertEqual(res, event2_1_id)
+
+
+class ReceiptsBackgroundUpdateStoreTestCase(HomeserverTestCase):
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastores().main
+
+    def test_background_remove_unstable_private_read_receipts(self):
+        """
+        Test that the background update removes unstable private read receipts
+        (org.matrix.msc2285.read.private) from the `receipts_linearized` and
+        `receipts_graph` tables.
+        """
+
+        # Fake a receipt of unstable private read receipt type in
+        # `receipt_linearized`
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                table="receipts_linearized",
+                values={
+                    "room_id": "room_id",
+                    "receipt_type": ReceiptTypes.READ_PRIVATE_UNSTABLE,
+                    "user_id": OUR_USER_ID,
+                    "stream_id": "stream_id",
+                    "event_id": "event_id",
+                    "data": "{}",
+                },
+            )
+        )
+        # Fake a receipt of unstable private read receipt type in
+        # `receipt_graph`
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                table="receipts_graph",
+                values={
+                    "room_id": "room_id",
+                    "receipt_type": ReceiptTypes.READ_PRIVATE_UNSTABLE,
+                    "user_id": OUR_USER_ID,
+                    "event_ids": "{}",
+                    "data": "{}",
+                },
+            )
+        )
+
+        # Insert and run the background update
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                "background_updates",
+                {
+                    "update_name": _BackgroundUpdates.REMOVE_UNSTABLE_PRIVATE_READ_RECEIPTS,
+                    "progress_json": "{}",
+                },
+            )
+        )
+
+        # ... and tell the DataStore that it hasn't finished all updates yet
+        self.store.db_pool.updates._all_done = False
+
+        # Now let's actually drive the updates to completion
+        self.wait_for_background_updates()
+
+        # Make sure the background update removed unstable private read receipt
+        # from `receipts_linearized`
+        receipts_linearized = self.get_success(
+            self.store.db_pool.simple_select_list(
+                table="receipts_linearized",
+                keyvalues={"receipt_type": ReceiptTypes.READ_PRIVATE_UNSTABLE},
+                retcols={"room_id"},
+            )
+        )
+        # Make sure the background update removed unstable private read receipt
+        # from `receipts_graph`
+        self.assertEqual(receipts_linearized, [])
+        receipts_graph = self.get_success(
+            self.store.db_pool.simple_select_list(
+                table="receipts_graph",
+                keyvalues={"receipt_type": ReceiptTypes.READ_PRIVATE_UNSTABLE},
+                retcols={"room_id"},
+            )
+        )
+        self.assertEqual(receipts_graph, [])

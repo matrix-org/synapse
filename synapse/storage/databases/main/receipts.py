@@ -26,7 +26,7 @@ from typing import (
     cast,
 )
 
-from synapse.api.constants import EduTypes
+from synapse.api.constants import EduTypes, ReceiptTypes
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import ReceiptsStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
@@ -834,5 +834,61 @@ class ReceiptsWorkerStore(SQLBaseStore):
         )
 
 
-class ReceiptsStore(ReceiptsWorkerStore):
+class _BackgroundUpdates:
+    REMOVE_UNSTABLE_PRIVATE_READ_RECEIPTS = "remove_unstable_private_read_receipts"
+
+
+class ReceiptsBackgroundUpdateStore(SQLBaseStore):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
+        super().__init__(database, db_conn, hs)
+
+        self.db_pool.updates.register_background_update_handler(
+            _BackgroundUpdates.REMOVE_UNSTABLE_PRIVATE_READ_RECEIPTS,
+            self._background_remove_unstable_private_read_receipts,
+        )
+
+    async def _background_remove_unstable_private_read_receipts(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """
+        Background update to go and remove unstable private read receipts
+        (org.matrix.msc2285.read.private) from the `receipts_linearized` and
+        `receipts_graph` tables.
+        """
+
+        def _background_remove_unstable_private_read_receipts_txn(
+            txn: LoggingTransaction,
+        ) -> bool:
+            self.db_pool.simple_delete_txn(
+                txn,
+                "receipts_linearized",
+                {"receipt_type": ReceiptTypes.READ_PRIVATE_UNSTABLE},
+            )
+            self.db_pool.simple_delete_txn(
+                txn,
+                "receipts_graph",
+                {"receipt_type": ReceiptTypes.READ_PRIVATE_UNSTABLE},
+            )
+
+            return True
+
+        end = await self.db_pool.runInteraction(
+            "_background_remove_unstable_private_read_receipts",
+            _background_remove_unstable_private_read_receipts_txn,
+        )
+
+        if end:
+            await self.db_pool.updates._end_background_update(
+                _BackgroundUpdates.REMOVE_UNSTABLE_PRIVATE_READ_RECEIPTS
+            )
+
+        return 0
+
+
+class ReceiptsStore(ReceiptsBackgroundUpdateStore, ReceiptsWorkerStore):
     pass
