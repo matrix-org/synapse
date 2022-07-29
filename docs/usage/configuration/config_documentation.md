@@ -1,11 +1,11 @@
 # Configuring Synapse
 
-This is intended as a guide to the Synapse configuration. The behavior of a Synapse instance can be modified 
-through the many configuration settings documented here — each config option is explained, 
+This is intended as a guide to the Synapse configuration. The behavior of a Synapse instance can be modified
+through the many configuration settings documented here — each config option is explained,
 including what the default is, how to change the default and what sort of behaviour the setting governs.
-Also included is an example configuration for each setting. If you don't want to spend a lot of time 
+Also included is an example configuration for each setting. If you don't want to spend a lot of time
 thinking about options, the config as generated sets sensible defaults for all values. Do note however that the
-database defaults to SQLite, which is not recommended for production usage. You can read more on this subject 
+database defaults to SQLite, which is not recommended for production usage. You can read more on this subject
 [here](../../setup/installation.md#using-postgresql).
 
 ## Config Conventions
@@ -26,17 +26,17 @@ messages from the database after 5 minutes, rather than 5 months.
 In addition, configuration options referring to size use the following suffixes:
 
 * `M` = MiB, or 1,048,576 bytes
-* `K` = KiB, or 1024 bytes 
+* `K` = KiB, or 1024 bytes
 
 For example, setting `max_avatar_size: 10M` means that Synapse will not accept files larger than 10,485,760 bytes
-for a user avatar. 
+for a user avatar.
 
-### YAML 
+### YAML
 The configuration file is a [YAML](https://yaml.org/) file, which means that certain syntax rules
 apply if you want your config file to be read properly. A few helpful things to know:
-* `#` before any option in the config will comment out that setting and either a default (if available) will 
+* `#` before any option in the config will comment out that setting and either a default (if available) will
    be applied or Synapse will ignore the setting. Thus, in example #1 below, the setting will be read and
-   applied, but in example #2 the setting will not be read and a default will be applied.  
+   applied, but in example #2 the setting will not be read and a default will be applied.
 
    Example #1:
    ```yaml
@@ -50,13 +50,13 @@ apply if you want your config file to be read properly. A few helpful things to 
   will determine whether a given setting is read as part of another
   setting, or considered on its own. Thus, in example #1, the `enabled` setting
   is read as a sub-option of the `presence` setting, and will be properly applied.
-  
+
   However, the lack of indentation before the `enabled` setting in example #2 means
   that when reading the config, Synapse will consider both `presence` and `enabled` as
   different settings. In this case, `presence` has no value, and thus a default applied, and `enabled`
   is an option that Synapse doesn't recognize and thus ignores.
-  
-  Example #1: 
+
+  Example #1:
   ```yaml
   presence:
     enabled: false
@@ -66,11 +66,11 @@ apply if you want your config file to be read properly. A few helpful things to 
   presence:
   enabled: false
   ```
-  In this manual, all top-level settings (ones with no indentation) are identified 
-  at the beginning of their section (i.e. "### `example_setting`") and 
-  the sub-options, if any, are identified and listed in the body of the section. 
+  In this manual, all top-level settings (ones with no indentation) are identified
+  at the beginning of their section (i.e. "### `example_setting`") and
+  the sub-options, if any, are identified and listed in the body of the section.
   In addition, each setting has an example of its usage, with the proper indentation
-  shown. 
+  shown.
 
 ## Contents
 [Modules](#modules)
@@ -126,7 +126,7 @@ documentation on how to configure or create custom modules for Synapse.
 ---
 ### `modules`
 
-Use the `module` sub-option to add modules under this option to extend functionality. 
+Use the `module` sub-option to add modules under this option to extend functionality.
 The `module` setting then has a sub-option, `config`, which can be used to define some configuration
 for the `module`.
 
@@ -166,11 +166,11 @@ The `server_name` cannot be changed later so it is important to
 configure this correctly before you start Synapse. It should be all
 lowercase and may contain an explicit port.
 
-There is no default for this option. 
- 
+There is no default for this option.
+
 Example configuration #1:
 ```yaml
-server_name: matrix.org 
+server_name: matrix.org
 ```
 Example configuration #2:
 ```yaml
@@ -188,7 +188,7 @@ pid_file: DATADIR/homeserver.pid
 ---
 ### `web_client_location`
 
-The absolute URL to the web client which `/` will redirect to. Defaults to none. 
+The absolute URL to the web client which `/` will redirect to. Defaults to none.
 
 Example configuration:
 ```yaml
@@ -217,7 +217,7 @@ By default, other servers will try to reach our server on port 8448, which can
 be inconvenient in some environments.
 
 Provided `https://<server_name>/` on port 443 is routed to Synapse, this
-option configures Synapse to serve a file at `https://<server_name>/.well-known/matrix/server`. 
+option configures Synapse to serve a file at `https://<server_name>/.well-known/matrix/server`.
 This will tell other servers to send traffic to port 443 instead.
 
 This option currently defaults to false.
@@ -235,7 +235,7 @@ serve_server_wellknown: true
 This option allows server runners to add arbitrary key-value pairs to the [client-facing `.well-known` response](https://spec.matrix.org/latest/client-server-api/#well-known-uri).
 Note that the `public_baseurl` config option must be provided for Synapse to serve a response to `/.well-known/matrix/client` at all.
 
-If this option is provided, it parses the given yaml to json and 
+If this option is provided, it parses the given yaml to json and
 serves it on `/.well-known/matrix/client` endpoint
 alongside the standard properties.
 
@@ -243,16 +243,16 @@ alongside the standard properties.
 
 Example configuration:
 ```yaml
-extra_well_known_client_content : 
+extra_well_known_client_content :
   option1: value1
   option2: value2
 ```
 ---
 ### `soft_file_limit`
- 
+
 Set the soft limit on the number of file descriptors synapse can use.
 Zero is used to indicate synapse should set the soft limit to the hard limit.
-Defaults to 0. 
+Defaults to 0.
 
 Example configuration:
 ```yaml
@@ -262,8 +262,8 @@ soft_file_limit: 3
 ### `presence`
 
 Presence tracking allows users to see the state (e.g online/offline)
-of other local and remote users. Set the `enabled` sub-option to false to  
-disable presence tracking on this homeserver. Defaults to true. 
+of other local and remote users. Set the `enabled` sub-option to false to
+disable presence tracking on this homeserver. Defaults to true.
 This option replaces the previous top-level 'use_presence' option.
 
 Example configuration:
@@ -274,8 +274,8 @@ presence:
 ---
 ### `require_auth_for_profile_requests`
 
-Whether to require authentication to retrieve profile data (avatars, display names) of other 
-users through the client API. Defaults to false. Note that profile data is also available 
+Whether to require authentication to retrieve profile data (avatars, display names) of other
+users through the client API. Defaults to false. Note that profile data is also available
 via the federation API, unless `allow_profile_lookup_over_federation` is set to false.
 
 Example configuration:
@@ -286,11 +286,11 @@ require_auth_for_profile_requests: true
 ### `limit_profile_requests_to_users_who_share_rooms`
 
 Use this option to require a user to share a room with another user in order
-to retrieve their profile information. Only checked on Client-Server 
+to retrieve their profile information. Only checked on Client-Server
 requests. Profile requests from other servers should be checked by the
 requesting server. Defaults to false.
 
-Example configuration: 
+Example configuration:
 ```yaml
 limit_profile_requests_to_users_who_share_rooms: true
 ```
@@ -336,7 +336,7 @@ The default room version for newly created rooms on this server.
 Known room versions are listed [here](https://spec.matrix.org/latest/rooms/#complete-list-of-room-versions)
 
 For example, for room version 1, `default_room_version` should be set
-to "1". 
+to "1".
 
 Currently defaults to "9".
 
@@ -348,7 +348,7 @@ default_room_version: "8"
 ### `gc_thresholds`
 
 The garbage collection threshold parameters to pass to `gc.set_threshold`, if defined.
-Defaults to none. 
+Defaults to none.
 
 Example configuration:
 ```yaml
@@ -358,7 +358,7 @@ gc_thresholds: [700, 10, 10]
 ### `gc_min_interval`
 
 The minimum time in seconds between each GC for a generation, regardless of
-the GC thresholds. This ensures that we don't do GC too frequently. A value of `[1s, 10s, 30s]` 
+the GC thresholds. This ensures that we don't do GC too frequently. A value of `[1s, 10s, 30s]`
 indicates that a second must pass between consecutive generation 0 GCs, etc.
 
 Defaults to `[1s, 10s, 30s]`.
@@ -400,7 +400,7 @@ enable_search: false
 ```
 ---
 ### `ip_range_blacklist`
- 
+
 This option prevents outgoing requests from being sent to the specified blacklisted IP address
 CIDR ranges. If this option is not specified then it defaults to private IP
 address ranges (see the example below).
@@ -463,13 +463,13 @@ configuration.
 
 Sub-options for each listener include:
 
-* `port`: the TCP port to bind to. 
+* `port`: the TCP port to bind to.
 
 * `bind_addresses`: a list of local addresses to listen on. The default is
        'all local interfaces'.
 
 * `type`: the type of listener. Normally `http`, but other valid options are:
-    
+
    * `manhole`: (see the docs [here](../../manhole.md)),
 
    * `metrics`: (see the docs [here](../../metrics-howto.md)),
@@ -585,7 +585,7 @@ forward extremities reaches a given threshold, Synapse will send an
 `org.matrix.dummy_event` event, which will reduce the forward extremities
 in the room.
 
-This setting defines the threshold (i.e. number of forward extremities in the room) at which dummy events are sent. 
+This setting defines the threshold (i.e. number of forward extremities in the room) at which dummy events are sent.
 The default value is 10.
 
 Example configuration:
@@ -612,7 +612,7 @@ Useful options for Synapse admins.
 
 ### `admin_contact`
 
-How to reach the server admin, used in `ResourceLimitError`. Defaults to none. 
+How to reach the server admin, used in `ResourceLimitError`. Defaults to none.
 
 Example configuration:
 ```yaml
@@ -622,7 +622,7 @@ admin_contact: 'mailto:admin@server.com'
 ### `hs_disabled` and `hs_disabled_message`
 
 Blocks users from connecting to the homeserver and provides a human-readable reason
-why the connection was blocked. Defaults to false. 
+why the connection was blocked. Defaults to false.
 
 Example configuration:
 ```yaml
@@ -632,20 +632,20 @@ hs_disabled_message: 'Reason for why the HS is blocked'
 ---
 ### `limit_usage_by_mau`
 
-This option disables/enables monthly active user blocking. Used in cases where the admin or 
-server owner wants to limit to the number of monthly active users. When enabled and a limit is 
+This option disables/enables monthly active user blocking. Used in cases where the admin or
+server owner wants to limit to the number of monthly active users. When enabled and a limit is
 reached the server returns a `ResourceLimitError` with error type `Codes.RESOURCE_LIMIT_EXCEEDED`.
 Defaults to false. If this is enabled, a value for `max_mau_value` must also be set.
 
 Example configuration:
 ```yaml
-limit_usage_by_mau: true 
+limit_usage_by_mau: true
 ```
 ---
 ### `max_mau_value`
 
-This option sets the hard limit of monthly active users above which the server will start 
-blocking user actions if `limit_usage_by_mau` is enabled. Defaults to 0.  
+This option sets the hard limit of monthly active users above which the server will start
+blocking user actions if `limit_usage_by_mau` is enabled. Defaults to 0.
 
 Example configuration:
 ```yaml
@@ -658,7 +658,7 @@ The option `mau_trial_days` is a means to add a grace period for active users. I
 means that users must be active for the specified number of days before they
 can be considered active and guards against the case where lots of users
 sign up in a short space of time never to return after their initial
-session. Defaults to 0. 
+session. Defaults to 0.
 
 Example configuration:
 ```yaml
@@ -674,7 +674,7 @@ use the value of `mau_trial_days` instead.
 
 Example configuration:
 ```yaml
-mau_appservice_trial_days: 
+mau_appservice_trial_days:
   my_appservice_id: 3
   another_appservice_id: 6
 ```
@@ -696,7 +696,7 @@ mau_limit_alerting: false
 
 If enabled, the metrics for the number of monthly active users will
 be populated, however no one will be limited based on these numbers. If `limit_usage_by_mau`
-is true, this is implied to be true. Defaults to false. 
+is true, this is implied to be true. Defaults to false.
 
 Example configuration:
 ```yaml
@@ -720,7 +720,7 @@ mau_limit_reserved_threepids:
 ### `server_context`
 
 This option is used by phonehome stats to group together related servers.
-Defaults to none. 
+Defaults to none.
 
 Example configuration:
 ```yaml
@@ -736,11 +736,11 @@ resource-constrained. Options for this setting include:
 * `enabled`: whether this check is enabled. Defaults to false.
 * `complexity`: the limit above which rooms cannot be joined. The default is 1.0.
 * `complexity_error`: override the error which is returned when the room is too complex with a
-   custom message. 
+   custom message.
 * `admins_can_join`: allow server admins to join complex rooms. Default is false.
 
 Room complexity is an arbitrary measure based on factors such as the number of
-users in the room. 
+users in the room.
 
 Example configuration:
 ```yaml
@@ -775,7 +775,7 @@ allow_per_room_profiles: false
 ### `max_avatar_size`
 
 The largest permissible file size in bytes for a user avatar. Defaults to no restriction.
-Use M for MB and K for KB. 
+Use M for MB and K for KB.
 
 Note that user avatar changes will not work if this is set without using Synapse's media repository.
 
@@ -808,7 +808,7 @@ Example configuration:
 redaction_retention_period: 28d
 ```
 ---
-### `user_ips_max_age` 
+### `user_ips_max_age`
 
 How long to track users' last seen time and IPs in the database.
 
@@ -823,7 +823,7 @@ user_ips_max_age: 14d
 
 Inhibits the `/requestToken` endpoints from returning an error that might leak
 information about whether an e-mail address is in use or not on this
-homeserver. Defaults to false. 
+homeserver. Defaults to false.
 Note that for some endpoints the error situation is the e-mail already being
 used, and for others the error is entering the e-mail being unused.
 If this option is enabled, instead of returning an error, these endpoints will
@@ -859,9 +859,9 @@ next_link_domain_whitelist: ["matrix.org"]
 ### `templates` and `custom_template_directory`
 
 These options define templates to use when generating email or HTML page contents.
-The `custom_template_directory` determines which directory Synapse will try to 
+The `custom_template_directory` determines which directory Synapse will try to
 find template files in to use to generate email or HTML page contents.
-If not set, or a file is not found within the template directory, a default 
+If not set, or a file is not found within the template directory, a default
 template from within the Synapse package will be used.
 
 See [here](../../templates.md) for more
@@ -884,26 +884,26 @@ the `allowed_lifetime_min` and `allowed_lifetime_max` config options.
 
 If this feature is enabled, Synapse will regularly look for and purge events
 which are older than the room's maximum retention period. Synapse will also
-filter events received over federation so that events that should have been 
-purged are ignored and not stored again. 
+filter events received over federation so that events that should have been
+purged are ignored and not stored again.
 
 The message retention policies feature is disabled by default.
 
 This setting has the following sub-options:
 * `default_policy`: Default retention policy. If set, Synapse will apply it to rooms that lack the
-   'm.room.retention' state event. This option is further specified by the 
-   `min_lifetime` and `max_lifetime` sub-options associated with it. Note that the 
-    value of `min_lifetime` doesn't matter much because Synapse doesn't take it into account yet. 
+   'm.room.retention' state event. This option is further specified by the
+   `min_lifetime` and `max_lifetime` sub-options associated with it. Note that the
+    value of `min_lifetime` doesn't matter much because Synapse doesn't take it into account yet.
 
-* `allowed_lifetime_min` and `allowed_lifetime_max`: Retention policy limits. If 
-   set, and the state of a room contains a `m.room.retention` event in its state 
+* `allowed_lifetime_min` and `allowed_lifetime_max`: Retention policy limits. If
+   set, and the state of a room contains a `m.room.retention` event in its state
    which contains a `min_lifetime` or a `max_lifetime` that's out of these bounds,
    Synapse will cap the room's policy to these limits when running purge jobs.
 
 * `purge_jobs` and the associated `shortest_max_lifetime` and `longest_max_lifetime` sub-options:
    Server admins can define the settings of the background jobs purging the
    events whose lifetime has expired under the `purge_jobs` section.
-   
+
   If no configuration is provided for this option, a single job will be set up to delete
   expired events in every room daily.
 
@@ -915,7 +915,7 @@ This setting has the following sub-options:
   range are optional, e.g. a job with no `shortest_max_lifetime` and a
   `longest_max_lifetime` of '3d' will handle every room with a retention policy
   whose `max_lifetime` is lower than or equal to three days.
-  
+
   The rationale for this per-job configuration is that some rooms might have a
   retention policy with a low `max_lifetime`, where history needs to be purged
   of outdated messages on a more frequent basis than for the rest of the rooms
@@ -944,7 +944,7 @@ retention:
     - longest_max_lifetime: 3d
       interval: 12h
     - shortest_max_lifetime: 3d
-      interval: 1d  
+      interval: 1d
 ```
 ---
 ## TLS ##
@@ -956,11 +956,11 @@ Options related to TLS.
 
 This option specifies a PEM-encoded X509 certificate for TLS.
 This certificate, as of Synapse 1.0, will need to be a valid and verifiable
-certificate, signed by a recognised Certificate Authority. Defaults to none. 
+certificate, signed by a recognised Certificate Authority. Defaults to none.
 
 Be sure to use a `.pem` file that includes the full certificate chain including
 any intermediate certificates (for instance, if using certbot, use
-`fullchain.pem` as your certificate, not `cert.pem`). 
+`fullchain.pem` as your certificate, not `cert.pem`).
 
 Example configuration:
 ```yaml
@@ -969,7 +969,7 @@ tls_certificate_path: "CONFDIR/SERVERNAME.tls.crt"
 ---
 ### `tls_private_key_path`
 
-PEM-encoded private key for TLS. Defaults to none. 
+PEM-encoded private key for TLS. Defaults to none.
 
 Example configuration:
 ```yaml
@@ -1126,31 +1126,31 @@ Caching can be configured through the following sub-options:
   This can also be set by the `SYNAPSE_CACHE_FACTOR` environment
   variable. Setting by environment variable takes priority over
   setting through the config file.
-  
+
   Defaults to 0.5, which will halve the size of all caches.
 
 * `per_cache_factors`: A dictionary of cache name to cache factor for that individual
    cache. Overrides the global cache factor for a given cache.
-  
+
    These can also be set through environment variables comprised
    of `SYNAPSE_CACHE_FACTOR_` + the name of the cache in capital
    letters and underscores. Setting by environment variable
    takes priority over setting through the config file.
    Ex. `SYNAPSE_CACHE_FACTOR_GET_USERS_WHO_SHARE_ROOM_WITH_USER=2.0`
-  
+
    Some caches have '*' and other characters that are not
    alphanumeric or underscores. These caches can be named with or
    without the special characters stripped. For example, to specify
    the cache factor for `*stateGroupCache*` via an environment
    variable would be `SYNAPSE_CACHE_FACTOR_STATEGROUPCACHE=2.0`.
- 
+
 * `expire_caches`: Controls whether cache entries are evicted after a specified time
    period. Defaults to true. Set to false to disable this feature. Note that never expiring
-   caches may result in excessive memory usage. 
+   caches may result in excessive memory usage.
 
 * `cache_entry_ttl`: If `expire_caches` is enabled, this flag controls how long an entry can
   be in a cache without having been accessed before being evicted.
-  Defaults to 30m. 
+  Defaults to 30m.
 
 * `sync_response_cache_duration`: Controls how long the results of a /sync request are
   cached for after a successful response is returned. A higher duration can help clients
@@ -1161,8 +1161,8 @@ Caching can be configured through the following sub-options:
   *Changed in Synapse 1.62.0*: The default was changed from 0 to 2m.
 
 * `cache_autotuning` and its sub-options `max_cache_memory_usage`, `target_cache_memory_usage`, and
-   `min_cache_ttl` work in conjunction with each other to maintain a balance between cache memory 
-   usage and cache entry availability. You must be using [jemalloc](https://github.com/matrix-org/synapse#help-synapse-is-slow-and-eats-all-my-ramcpu) 
+   `min_cache_ttl` work in conjunction with each other to maintain a balance between cache memory
+   usage and cache entry availability. You must be using [jemalloc](https://github.com/matrix-org/synapse#help-synapse-is-slow-and-eats-all-my-ramcpu)
    to utilize this option, and all three of the options must be specified for this feature to work. This option
    defaults to off, enable it by providing values for the sub-options listed below. Please note that the feature will not work
    and may cause unstable behavior (such as excessive emptying of caches or exceptions) if all of the values are not provided.
@@ -1175,7 +1175,7 @@ Caching can be configured through the following sub-options:
         for this option.
      * `min_cache_ttl` sets a limit under which newer cache entries are not evicted and is only applied when
         caches are actively being evicted/`max_cache_memory_usage` has been exceeded. This is to protect hot caches
-        from being emptied while Synapse is evicting due to memory. There is no default value for this option. 
+        from being emptied while Synapse is evicting due to memory. There is no default value for this option.
 
 Example configuration:
 ```yaml
@@ -1199,7 +1199,7 @@ The cache factors (i.e. `caches.global_factor` and `caches.per_cache_factors`)  
 kill -HUP [PID_OF_SYNAPSE_PROCESS]
 ```
 
-If you are running multiple workers, you must individually update the worker 
+If you are running multiple workers, you must individually update the worker
 config file and send this signal to each worker process.
 
 If you're using the [example systemd service](https://github.com/matrix-org/synapse/blob/develop/contrib/systemd/matrix-synapse.service)
@@ -1219,7 +1219,7 @@ its data.
 Associated sub-options:
 
 * `name`: this option specifies the database engine to use: either `sqlite3` (for SQLite)
-  or `psycopg2` (for PostgreSQL). If no name is specified Synapse will default to SQLite. 
+  or `psycopg2` (for PostgreSQL). If no name is specified Synapse will default to SQLite.
 
 * `txn_limit` gives the maximum number of transactions to run per connection
   before reconnecting. Defaults to 0, which means no limit.
@@ -1355,7 +1355,7 @@ databases:
 ```
 ---
 ## Logging ##
-Config options related to logging. 
+Config options related to logging.
 
 ---
 ### `log_config`
@@ -1368,7 +1368,7 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 ```
 ---
 ## Ratelimiting ##
-Options related to ratelimiting in Synapse. 
+Options related to ratelimiting in Synapse.
 
 Each ratelimiting configuration is made of two parameters:
    - `per_second`: number of requests a client can send per second.
@@ -1378,7 +1378,7 @@ Each ratelimiting configuration is made of two parameters:
 
 
 Ratelimiting settings for client messaging.
-   
+
 This is a ratelimiting option for messages that ratelimits sending based on the account the client
 is using. It defaults to: `per_second: 0.2`, `burst_count: 10`.
 
@@ -1392,7 +1392,7 @@ rc_message:
 ### `rc_registration`
 
 This option ratelimits registration requests based on the client's IP address.
-It defaults to `per_second: 0.17`, `burst_count: 3`. 
+It defaults to `per_second: 0.17`, `burst_count: 3`.
 
 Example configuration:
 ```yaml
@@ -1403,7 +1403,7 @@ rc_registration:
 ---
 ### `rc_registration_token_validity`
 
-This option checks the validity of registration tokens that ratelimits requests based on 
+This option checks the validity of registration tokens that ratelimits requests based on
 the client's IP address.
 Defaults to `per_second: 0.1`, `burst_count: 5`.
 
@@ -1412,18 +1412,18 @@ Example configuration:
 rc_registration_token_validity:
   per_second: 0.3
   burst_count: 6
-```   
+```
 ---
 ### `rc_login`
 
 This option specifies several limits for login:
 * `address` ratelimits login requests based on the client's IP
       address. Defaults to `per_second: 0.17`, `burst_count: 3`.
-    
+
 * `account` ratelimits login requests based on the account the
   client is attempting to log into. Defaults to `per_second: 0.17`,
   `burst_count: 3`.
-    
+
 * `failted_attempts` ratelimits login requests based on the account the
   client is attempting to log into, based on the amount of failed login
   attempts for this account. Defaults to `per_second: 0.17`, `burst_count: 3`.
@@ -1444,9 +1444,9 @@ rc_login:
 ---
 ### `rc_admin_redaction`
 
-This option sets ratelimiting redactions by room admins. If this is not explicitly 
+This option sets ratelimiting redactions by room admins. If this is not explicitly
 set then it uses the same ratelimiting as per `rc_message`. This is useful
-to allow room admins to deal with abuse quickly. 
+to allow room admins to deal with abuse quickly.
 
 Example configuration:
 ```yaml
@@ -1459,12 +1459,12 @@ rc_admin_redaction:
 
 This option allows for ratelimiting number of rooms a user can join. This setting has the following sub-options:
 
-* `local`: ratelimits when users are joining rooms the server is already in. 
+* `local`: ratelimits when users are joining rooms the server is already in.
    Defaults to `per_second: 0.1`, `burst_count: 10`.
 
 * `remote`: ratelimits when users are trying to join rooms not on the server (which
   can be more computationally expensive than restricting locally). Defaults to
-  `per_second: 0.01`, `burst_count: 10` 
+  `per_second: 0.01`, `burst_count: 10`
 
 Example configuration:
 ```yaml
@@ -1510,9 +1510,9 @@ rc_3pid_validation:
 ---
 ### `rc_invites`
 
-This option sets ratelimiting how often invites can be sent in a room or to a 
+This option sets ratelimiting how often invites can be sent in a room or to a
 specific user. `per_room` defaults to `per_second: 0.3`, `burst_count: 10` and
-`per_user` defaults to `per_second: 0.003`, `burst_count: 5`. 
+`per_user` defaults to `per_second: 0.003`, `burst_count: 5`.
 
 Client requests that invite user(s) when [creating a
 room](https://spec.matrix.org/v1.2/client-server-api/#post_matrixclientv3createroom)
@@ -1562,7 +1562,7 @@ rc_third_party_invite:
 ---
 ### `rc_federation`
 
-Defines limits on federation requests. 
+Defines limits on federation requests.
 
 The `rc_federation` configuration has the following sub-options:
 * `window_size`: window size in milliseconds. Defaults to 1000.
@@ -1591,7 +1591,7 @@ Sets outgoing federation transaction frequency for sending read-receipts,
 per-room.
 
 If we end up trying to send out more read-receipts, they will get buffered up
-into fewer transactions. Defaults to 50. 
+into fewer transactions. Defaults to 50.
 
 Example configuration:
 ```yaml
@@ -1602,9 +1602,9 @@ federation_rr_transactions_per_room_per_second: 40
 Config options related to Synapse's media store.
 
 ---
-### `enable_media_repo` 
+### `enable_media_repo`
 
-Enable the media store service in the Synapse master. Defaults to true. 
+Enable the media store service in the Synapse master. Defaults to true.
 Set to false if you are using a separate media store worker.
 
 Example configuration:
@@ -1629,7 +1629,7 @@ locations. Defaults to none. Associated sub-options are:
 * `store_local`: whether to store newly uploaded local files
 * `store_remote`: whether to store newly downloaded local files
 * `store_synchronous`: whether to wait for successful storage for local uploads
-* `config`: sets a path to the resource through the `directory` option 
+* `config`: sets a path to the resource through the `directory` option
 
 Example configuration:
 ```yaml
@@ -1648,7 +1648,7 @@ The largest allowed upload size in bytes.
 
 If you are using a reverse proxy you may also need to set this value in
 your reverse proxy's config. Defaults to 50M. Notably Nginx has a small max body size by default.
-See [here](../../reverse_proxy.md) for more on using a reverse proxy with Synapse. 
+See [here](../../reverse_proxy.md) for more on using a reverse proxy with Synapse.
 
 Example configuration:
 ```yaml
@@ -1670,14 +1670,14 @@ Whether to generate new thumbnails on the fly to precisely match
 the resolution requested by the client. If true then whenever
 a new resolution is requested by the client the server will
 generate a new thumbnail. If false the server will pick a thumbnail
-from a precalculated list. Defaults to false. 
+from a precalculated list. Defaults to false.
 
 Example configuration:
 ```yaml
 dynamic_thumbnails: true
 ```
 ---
-### `thumbnail_sizes`  
+### `thumbnail_sizes`
 
 List of thumbnails to precalculate when an image is uploaded. Associated sub-options are:
 * `width`
@@ -1795,7 +1795,7 @@ This option sets a list of IP address CIDR ranges that the URL preview spider is
 to access even if they are specified in `url_preview_ip_range_blacklist`.
 This is useful for specifying exceptions to wide-ranging blacklisted
 target IP ranges - e.g. for enabling URL previews for a specific private
-website only visible in your network. Defaults to none. 
+website only visible in your network. Defaults to none.
 
 Example configuration:
 ```yaml
@@ -1813,7 +1813,7 @@ This is more useful if you know there is an entire shape of URL that
 you know that will never want synapse to try to spider.
 
 Each list entry is a dictionary of url component attributes as returned
-by urlparse.urlsplit as applied to the absolute form of the URL.  See 
+by urlparse.urlsplit as applied to the absolute form of the URL.  See
 [here](https://docs.python.org/2/library/urlparse.html#urlparse.urlsplit) for more
 information. Some examples are:
 
@@ -1888,8 +1888,8 @@ Example configuration:
 oEmbed allows for easier embedding content from a website. It can be
 used for generating URLs previews of services which support it. A default list of oEmbed providers
 is included with Synapse. Set `disable_default_providers` to true to disable using
-these default oEmbed URLs. Use `additional_providers` to specify additional files with oEmbed configuration (each 
-should be in the form of providers.json). By default this list is empty. 
+these default oEmbed URLs. Use `additional_providers` to specify additional files with oEmbed configuration (each
+should be in the form of providers.json). By default this list is empty.
 
 Example configuration:
 ```yaml
@@ -1906,7 +1906,7 @@ See [here](../../CAPTCHA_SETUP.md) for full details on setting up captcha.
 ---
 ### `recaptcha_public_key`
 
-This homeserver's ReCAPTCHA public key. Must be specified if `enable_registration_captcha` is 
+This homeserver's ReCAPTCHA public key. Must be specified if `enable_registration_captcha` is
 enabled.
 
 Example configuration:
@@ -1914,9 +1914,9 @@ Example configuration:
 recaptcha_public_key: "YOUR_PUBLIC_KEY"
 ```
 ---
-### `recaptcha_private_key` 
+### `recaptcha_private_key`
 
-This homeserver's ReCAPTCHA private key. Must be specified if `enable_registration_captcha` is 
+This homeserver's ReCAPTCHA private key. Must be specified if `enable_registration_captcha` is
 enabled.
 
 Example configuration:
@@ -1927,7 +1927,7 @@ recaptcha_private_key: "YOUR_PRIVATE_KEY"
 ### `enable_registration_captcha`
 
 Set to true to enable ReCaptcha checks when registering, preventing signup
-unless a captcha is answered. Requires a valid ReCaptcha public/private key. 
+unless a captcha is answered. Requires a valid ReCaptcha public/private key.
 Defaults to false.
 
 Example configuration:
@@ -2005,7 +2005,7 @@ Registration can be rate-limited using the parameters in the [Ratelimiting](#rat
 ### `enable_registration`
 
 Enable registration for new users. Defaults to false. It is highly recommended that if you enable registration,
-you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration 
+you use either captcha, email, or token-based verification to verify that new users are not bots. In order to enable registration
 without any verification, you must also set `enable_registration_without_verification` to true.
 
 Example configuration:
@@ -2029,7 +2029,7 @@ Time that a user's session remains valid for, after they log in.
 
 Note that this is not currently compatible with guest logins.
 
-Note also that this is calculated at login time: changes are not applied retrospectively to users who have already 
+Note also that this is calculated at login time: changes are not applied retrospectively to users who have already
 logged in.
 
 By default, this is infinite.
@@ -2047,7 +2047,7 @@ For more information about refresh tokens, please see the [manual](user_authenti
 
 Note that this only applies to clients which advertise support for refresh tokens.
 
-Note also that this is calculated at login time and refresh time: changes are not applied to 
+Note also that this is calculated at login time and refresh time: changes are not applied to
 existing sessions until they are refreshed.
 
 By default, this is 5 minutes.
@@ -2145,7 +2145,7 @@ Require users to submit a token during registration.
 Tokens can be managed using the admin [API](../administration/admin_api/registration_tokens.md).
 Note that `enable_registration` must be set to true.
 Disabling this option will not delete any tokens previously generated.
-Defaults to false. Set to true to enable.  
+Defaults to false. Set to true to enable.
 
 Example configuration:
 ```yaml
@@ -2215,7 +2215,7 @@ their account.
 by the Matrix Identity Service API
 [specification](https://matrix.org/docs/spec/identity_service/latest).)
 
-*Updated in Synapse 1.64.0*: No longer accepts an `email` option.
+*Updated in Synapse 1.64.0*: The `email` option is deprecated.
 
 Example configuration:
 ```yaml
@@ -2270,7 +2270,7 @@ By default, any room aliases included in this list will be created
 as a publicly joinable room when the first user registers for the
 homeserver. If the room already exists, make certain it is a publicly joinable
 room, i.e. the join rule of the room must be set to 'public'. You can find more options
-relating to auto-joining rooms below. 
+relating to auto-joining rooms below.
 
 Example configuration:
 ```yaml
@@ -2324,9 +2324,9 @@ effect if `autocreate_auto_join_rooms` is true.
 Possible values for this option are:
 * "public_chat": the room is joinable by anyone, including
   federated servers if `autocreate_auto_join_rooms_federated` is true (the default).
-* "private_chat": an invitation is required to join these rooms. 
+* "private_chat": an invitation is required to join these rooms.
 * "trusted_private_chat": an invitation is required to join this room and the invitee is
-  assigned a power level of 100 upon joining the room. 
+  assigned a power level of 100 upon joining the room.
 
 If a value of "private_chat" or "trusted_private_chat" is used then
 `auto_join_mxid_localpart` must also be configured.
@@ -2363,7 +2363,7 @@ auto_join_mxid_localpart: system
 ```
 ---
 ### `auto_join_rooms_for_guests`
- 
+
 When `auto_join_rooms` is specified, setting this flag to false prevents
 guest accounts from being automatically joined to the rooms.
 
@@ -2375,7 +2375,7 @@ auto_join_rooms_for_guests: false
 ```
 ---
 ### `inhibit_user_in_use_error`
- 
+
 Whether to inhibit errors raised when registering a new account if the user ID
 already exists. If turned on, requests to `/register/available` will always
 show a user ID as available, and Synapse won't raise an error when starting
@@ -2395,7 +2395,7 @@ Config options related to metrics.
 ---
 ### `enable_metrics`
 
-Set to true to enable collection and rendering of performance metrics. 
+Set to true to enable collection and rendering of performance metrics.
 Defaults to false.
 
 Example configuration:
@@ -2406,11 +2406,11 @@ enable_metrics: true
 ### `sentry`
 
 Use this option to enable sentry integration. Provide the DSN assigned to you by sentry
-with the `dsn` setting. 
+with the `dsn` setting.
 
 NOTE: While attempts are made to ensure that the logs don't contain
 any sensitive information, this cannot be guaranteed. By enabling
-this option the sentry server may therefore receive sensitive 
+this option the sentry server may therefore receive sensitive
 information, and it in turn may then disseminate sensitive information
 through insecure notification channels if so configured.
 
@@ -2424,7 +2424,7 @@ sentry:
 
 Flags to enable Prometheus metrics which are not suitable to be
 enabled by default, either for performance reasons or limited use.
-Currently the only option is `known_servers`, which publishes 
+Currently the only option is `known_servers`, which publishes
 `synapse_federation_known_servers`, a gauge of the number of
 servers this homeserver knows about, including itself. May cause
 performance problems on large homeservers.
@@ -2468,7 +2468,7 @@ Config settings related to the client/server API
 ### `room_prejoin_state:`
 
 Controls for the state that is shared with users who receive an invite
-to a room. By default, the following state event types are shared with users who 
+to a room. By default, the following state event types are shared with users who
 receive invites to the room:
 - m.room.join_rules
 - m.room.canonical_alias
@@ -2479,7 +2479,7 @@ receive invites to the room:
 - m.room.topic
 
 To change the default behavior, use the following sub-options:
-* `disable_default_event_types`: set to true to disable the above defaults. If this 
+* `disable_default_event_types`: set to true to disable the above defaults. If this
    is enabled, only the event types listed in `additional_event_types` are shared.
    Defaults to false.
 * `additional_event_types`: Additional state event types to share with users when they are invited
@@ -2569,7 +2569,7 @@ Example configuration:
 ```yaml
 signing_key_path: "CONFDIR/SERVERNAME.signing.key"
 ```
---- 
+---
 ### `old_signing_keys`
 
 The keys that the server used to sign messages with but won't use
@@ -2621,7 +2621,7 @@ Options for each entry in the list include:
    If specified, we will check that the response is signed by at least
    one of the given keys.
 * `accept_keys_insecurely`: a boolean. Normally, if `verify_keys` is unset,
-   and `federation_verify_certificates` is not `true`, synapse will refuse 
+   and `federation_verify_certificates` is not `true`, synapse will refuse
    to start, because this would allow anyone who can spoof DNS responses
    to masquerade as the trusted key server. If you know what you are doing
    and are sure that your network environment provides a secure connection
@@ -2699,15 +2699,15 @@ This setting has the following sub-options:
    * `service`: By default, the user has to go to our login page first. If you'd like
      to allow IdP-initiated login, set `allow_unsolicited` to true under `sp` in the `service`
      section.
-* `config_path`: specify a separate pysaml2 configuration file thusly: 
+* `config_path`: specify a separate pysaml2 configuration file thusly:
   `config_path: "CONFDIR/sp_conf.py"`
 * `saml_session_lifetime`: The lifetime of a SAML session. This defines how long a user has to
    complete the authentication process, if `allow_unsolicited` is unset. The default is 15 minutes.
-* `user_mapping_provider`: Using this option, an external module can be provided as a 
-   custom solution to mapping attributes returned from a saml provider onto a matrix user. The 
+* `user_mapping_provider`: Using this option, an external module can be provided as a
+   custom solution to mapping attributes returned from a saml provider onto a matrix user. The
    `user_mapping_provider` has the following attributes:
-  * `module`: The custom module's class. 
-  * `config`: Custom configuration values for the module. Use the values provided in the 
+  * `module`: The custom module's class.
+  * `config`: Custom configuration values for the module. Use the values provided in the
      example if you are using the built-in user_mapping_provider, or provide your own
      config values for a custom class if you are using one. This section will be passed as a Python
      dictionary to the module's `parse_config` method. The built-in provider takes the following two
@@ -2724,7 +2724,7 @@ This setting has the following sub-options:
    MXID was always calculated dynamically rather than stored in a table. For backwards- compatibility, we will look for `user_ids`
    matching such a pattern before creating a new account. This setting controls the SAML attribute which will be used for this
    backwards-compatibility lookup. Typically it should be 'uid', but if the attribute maps are changed, it may be necessary to change it.
-   The default is 'uid'. 
+   The default is 'uid'.
 * `attribute_requirements`: It is possible to configure Synapse to only allow logins if SAML attributes
     match particular values. The requirements can be listed under
    `attribute_requirements` as shown in the example. All of the listed attributes must
@@ -2732,7 +2732,7 @@ This setting has the following sub-options:
 * `idp_entityid`: If the metadata XML contains multiple IdP entities then the `idp_entityid`
    option must be set to the entity to redirect users to.
    Most deployments only have a single IdP entity and so should omit this option.
-  
+
 
 Once SAML support is enabled, a metadata file will be exposed at
 `https://<server>:<port>/_synapse/client/saml2/metadata.xml`, which you may be able to
@@ -2793,16 +2793,16 @@ saml2_config:
         sur_name: "the Sysadmin"
         email_address": ["admin@example.com"]
         contact_type": technical
-        
+
   saml_session_lifetime: 5m
-  
+
   user_mapping_provider:
-    # Below options are intended for the built-in provider, they should be 
-    # changed if using a custom module. 
+    # Below options are intended for the built-in provider, they should be
+    # changed if using a custom module.
     config:
       mxid_source_attribute: displayName
       mxid_mapping: dotreplace
-  
+
   grandfathered_mxid_source_attribute: upn
 
   attribute_requirements:
@@ -2930,7 +2930,7 @@ Options for each entry include:
 
        * `localpart_template`: Jinja2 template for the localpart of the MXID.
           If this is not set, the user will be prompted to choose their
-          own username (see the documentation for the `sso_auth_account_details.html` 
+          own username (see the documentation for the `sso_auth_account_details.html`
           template). This template can use the `localpart_from_email` filter.
 
        * `confirm_localpart`: Whether to prompt the user to validate (or
@@ -2943,7 +2943,7 @@ Options for each entry include:
 
        * `email_template`: Jinja2 template for the email address of the user.
           If unset, no email address will be added to the account.
-                 
+
        * `extra_attributes`: a map of Jinja2 templates for extra attributes
           to send back to the client during login. Note that these are non-standard and clients will ignore them
           without modifications.
@@ -2953,7 +2953,7 @@ Options for each entry include:
      in the ID Token.
 
 
-It is possible to configure Synapse to only allow logins if certain attributes 
+It is possible to configure Synapse to only allow logins if certain attributes
 match particular values in the OIDC userinfo. The requirements can be listed under
 `attribute_requirements` as shown here:
 ```yaml
@@ -2968,7 +2968,7 @@ userinfo by expanding the `scopes` section of the OIDC config to retrieve
 additional information from the OIDC provider.
 
 If the OIDC claim is a list, then the attribute must match any value in the list.
-Otherwise, it must exactly match the value of the claim. Using the example 
+Otherwise, it must exactly match the value of the claim. Using the example
 above, the `family_name` claim MUST be "Stephensson", but the `groups`
 claim MUST contain "admin".
 
@@ -3033,7 +3033,7 @@ cas_config:
 Additional settings to use with single-sign on systems such as OpenID Connect,
 SAML2 and CAS.
 
-Server admins can configure custom templates for pages related to SSO. See 
+Server admins can configure custom templates for pages related to SSO. See
 [here](../../templates.md) for more information.
 
 Options include:
@@ -3049,7 +3049,7 @@ Options include:
    required login flows) is whitelisted in addition to any URLs in this list.
    By default, this list contains only the login fallback page.
 * `update_profile_information`: Use this setting to keep a user's profile fields in sync with information from
-   the identity provider. Currently only syncing the displayname is supported. Fields 
+   the identity provider. Currently only syncing the displayname is supported. Fields
    are checked on every SSO login, and are updated if necessary.
    Note that enabling this option will override user profile information,
    regardless of whether users have opted-out of syncing that
@@ -3093,7 +3093,7 @@ Additional sub-options for this setting include:
    Required if `enabled` is set to true.
 * `subject_claim`: Name of the claim containing a unique identifier for the user.
    Optional, defaults to `sub`.
-* `issuer`: The issuer to validate the "iss" claim against. Optional. If provided the 
+* `issuer`: The issuer to validate the "iss" claim against. Optional. If provided the
    "iss" claim will be required and validated for all JSON web tokens.
 * `audiences`: A list of audiences to validate the "aud" claim against. Optional.
    If provided the "aud" claim will be required and validated for all JSON web tokens.
@@ -3103,7 +3103,7 @@ Additional sub-options for this setting include:
 Example configuration:
 ```yaml
 jwt_config:
-    enabled: true 
+    enabled: true
     secret: "provided-by-your-issuer"
     algorithm: "provided-by-your-issuer"
     subject_claim: "name_of_claim"
@@ -3114,7 +3114,7 @@ jwt_config:
 ---
 ### `password_config`
 
-Use this setting to enable password-based logins. 
+Use this setting to enable password-based logins.
 
 This setting has the following sub-options:
 * `enabled`: Defaults to true.
@@ -3123,10 +3123,10 @@ This setting has the following sub-options:
    to log in and reauthenticate, whilst preventing new users from setting passwords.
 * `localdb_enabled`: Set to false to disable authentication against the local password
    database. This is ignored if `enabled` is false, and is only useful
-   if you have other `password_providers`. Defaults to true. 
+   if you have other `password_providers`. Defaults to true.
 * `pepper`: Set the value here to a secret random string for extra security.
    DO NOT CHANGE THIS AFTER INITIAL SETUP!
-* `policy`: Define and enforce a password policy, such as minimum lengths for passwords, etc. 
+* `policy`: Define and enforce a password policy, such as minimum lengths for passwords, etc.
    Each parameter is optional. This is an implementation of MSC2000. Parameters are as follows:
    * `enabled`: Defaults to false. Set to true to enable.
    * `minimum_length`: Minimum accepted length for a password. Defaults to 0.
@@ -3138,7 +3138,7 @@ This setting has the following sub-options:
       Defaults to false.
    * `require_uppercase`: Whether a password must contain at least one uppercase letter.
       Defaults to false.
-      
+
 
 Example configuration:
 ```yaml
@@ -3160,7 +3160,7 @@ password_config:
 
 The amount of time to allow a user-interactive authentication session to be active.
 
-This defaults to 0, meaning the user is queried for their credentials 
+This defaults to 0, meaning the user is queried for their credentials
 before every action, but this can be overridden to allow a single
 validation to be re-used.  This weakens the protections afforded by
 the user-interactive authentication process, by allowing for multiple
@@ -3188,7 +3188,7 @@ Server admins can configure custom templates for email content. See
 This setting has the following sub-options:
 * `smtp_host`: The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.
 * `smtp_port`: The port on the mail server for outgoing SMTP. Defaults to 465 if `force_tls` is true, else 25.
-  
+
   _Changed in Synapse 1.64.0:_ the default port is now aware of `force_tls`.
 * `smtp_user` and `smtp_pass`: Username/password for authentication to the SMTP server. By default, no
    authentication is attempted.
@@ -3196,7 +3196,7 @@ This setting has the following sub-options:
    to TLS via STARTTLS. If this option is set to true, TLS is used from the start (Implicit TLS),
    and the option `require_transport_security` is ignored.
    It is recommended to enable this if supported by your mail server.
-  
+
   _New in Synapse 1.64.0._
 * `require_transport_security`: Set to true to require TLS transport security for SMTP.
    By default, Synapse will connect over plain text, and will then switch to
@@ -3231,8 +3231,8 @@ This setting has the following sub-options:
    message(s) have been sent to, e.g. "My super room". In addition, emails related to account administration will
    can use the '%(server_name)s' placeholder, which will be replaced by the value of the
    `server_name` setting in your Synapse configuration.
-   
-   Here is a list of subjects for notification emails that can be set: 
+
+   Here is a list of subjects for notification emails that can be set:
      * `message_from_person_in_room`: Subject to use to notify about one message from one or more user(s) in a
         room which has a name. Defaults to "[%(app)s] You have a message on %(app)s from %(person)s in the %(room)s room..."
      * `message_from_person`: Subject to use to notify about one message from one or more user(s) in a
@@ -3241,13 +3241,13 @@ This setting has the following sub-options:
         a room which doesn't have a name. Defaults to "[%(app)s] You have messages on %(app)s from %(person)s..."
      * `messages_in_room`: Subject to use to notify about multiple messages in a room which has a
         name. Defaults to "[%(app)s] You have messages on %(app)s in the %(room)s room..."
-     * `messages_in_room_and_others`: Subject to use to notify about multiple messages in multiple rooms. 
+     * `messages_in_room_and_others`: Subject to use to notify about multiple messages in multiple rooms.
         Defaults to "[%(app)s] You have messages on %(app)s in the %(room)s room and others..."
      * `messages_from_person_and_others`: Subject to use to notify about multiple messages from multiple persons in
         multiple rooms. This is similar to the setting above except it's used when
-        the room in which the notification was triggered has no name. Defaults to 
+        the room in which the notification was triggered has no name. Defaults to
         "[%(app)s] You have messages on %(app)s from %(person)s and others..."
-     * `invite_from_person_to_room`: Subject to use to notify about an invite to a room which has a name. 
+     * `invite_from_person_to_room`: Subject to use to notify about an invite to a room which has a name.
         Defaults to  "[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s..."
      * `invite_from_person`: Subject to use to notify about an invite to a room which doesn't have a
         name. Defaults to "[%(app)s] %(person)s has invited you to chat on %(app)s..."
@@ -3292,7 +3292,7 @@ Configuration settings related to push notifications
 ---
 ### `push`
 
-This setting defines options for push notifications. 
+This setting defines options for push notifications.
 
 This option has a number of sub-options. They are as follows:
 * `include_content`: Clients requesting push notifications can either have the body of
@@ -3307,7 +3307,7 @@ This option has a number of sub-options. They are as follows:
    notification saying only that a message arrived and who it came from.
    Defaults to true. Set to false to only include the event ID and room ID in push notification payloads.
 * `group_unread_count_by_room: false`: When a push notification is received, an unread count is also sent.
-   This number can either be calculated as the number of unread messages  for the user, or the number of *rooms* the 
+   This number can either be calculated as the number of unread messages  for the user, or the number of *rooms* the
    user has unread messages in. Defaults to true, meaning push clients will see the number of
    rooms with unread messages in them. Set to false to instead send the number
    of unread messages.
@@ -3347,7 +3347,7 @@ encryption_enabled_by_default_for_room_type: invite
 ---
 ### `user_directory`
 
-This setting defines options related to the user directory. 
+This setting defines options related to the user directory.
 
 This option has the following sub-options:
 * `enabled`:  Defines whether users can search the user directory. If false then
@@ -3365,7 +3365,7 @@ This option has the following sub-options:
     Set to true to return search results containing all known users, even if that
     user does not share a room with the requester.
 * `prefer_local_users`: Defines whether to prefer local users in search query results.
-   If set to true, local users are more likely to appear above remote users when searching the 
+   If set to true, local users are more likely to appear above remote users when searching the
    user directory. Defaults to false.
 
 Example configuration:
@@ -3430,15 +3430,15 @@ user_consent:
 ### `stats`
 
 Settings for local room and user statistics collection. See [here](../../room_and_user_statistics.md)
-for more. 
+for more.
 
 * `enabled`: Set to false to disable room and user statistics. Note that doing
    so may cause certain features (such as the room directory) not to work
-   correctly. Defaults to true. 
+   correctly. Defaults to true.
 
 Example configuration:
 ```yaml
-stats:  
+stats:
   enabled: false
 ```
 ---
@@ -3470,7 +3470,7 @@ server_notices:
 
 Set to false to disable searching the public room list. When disabled
 blocks searching local and remote room lists for local and remote
-users by always returning an empty list for all queries. Defaults to true. 
+users by always returning an empty list for all queries. Defaults to true.
 
 Example configuration:
 ```yaml
@@ -3496,7 +3496,7 @@ Options for the rules include:
 * `user_id`: Matches against the creator of the alias. Defaults to "*".
 * `alias`: Matches against the alias being created. Defaults to "*".
 * `room_id`: Matches against the room ID the alias is being pointed at. Defaults to "*"
-* `action`: Whether to "allow" or "deny" the request if the rule matches. Defaults to allow. 
+* `action`: Whether to "allow" or "deny" the request if the rule matches. Defaults to allow.
 
 Example configuration:
 ```yaml
@@ -3526,7 +3526,7 @@ Options for the rules include:
 * `user_id`: Matches against the creator of the alias. Defaults to "*".
 * `alias`: Matches against any current local or canonical aliases associated with the room. Defaults to "*".
 * `room_id`: Matches against the room ID being published. Defaults to "*".
-* `action`: Whether to "allow" or "deny" the request if the rule matches. Defaults to allow. 
+* `action`: Whether to "allow" or "deny" the request if the rule matches. Defaults to allow.
 
 Example configuration:
 ```yaml
@@ -3578,14 +3578,14 @@ synapse or any other services which support opentracing
 Sub-options include:
 * `enabled`: whether tracing is enabled. Set to true to enable. Disabled by default.
 * `homeserver_whitelist`: The list of homeservers we wish to send and receive span contexts and span baggage.
-   See [here](../../opentracing.md) for more. 
+   See [here](../../opentracing.md) for more.
    This is a list of regexes which are matched against the `server_name` of the homeserver.
    By default, it is empty, so no servers are matched.
 * `force_tracing_for_users`: # A list of the matrix IDs of users whose requests will always be traced,
    even if the tracing system would otherwise drop the traces due to probabilistic sampling.
     By default, the list is empty.
 * `jaeger_config`: Jaeger can be configured to sample traces at different rates.
-   All configuration options provided by Jaeger can be set here. Jaeger's configuration is 
+   All configuration options provided by Jaeger can be set here. Jaeger's configuration is
    mostly related to trace sampling which is documented [here](https://www.jaegertracing.io/docs/latest/sampling/).
 
 Example configuration:
@@ -3613,7 +3613,7 @@ Configuration options related to workers.
 ### `send_federation`
 
 Controls sending of outbound federation transactions on the main process.
-Set to false if using a federation sender worker. Defaults to true. 
+Set to false if using a federation sender worker. Defaults to true.
 
 Example configuration:
 ```yaml
@@ -3623,12 +3623,12 @@ send_federation: false
 ### `federation_sender_instances`
 
 It is possible to run multiple federation sender workers, in which case the
-work is balanced across them. Use this setting to list the senders. 
+work is balanced across them. Use this setting to list the senders.
 
 This configuration setting must be shared between all federation sender workers, and if
 changed all federation sender workers must be stopped at the same time and then
 started, to ensure that all instances are running with the same config (otherwise
-events may be dropped). 
+events may be dropped).
 
 Example configuration:
 ```yaml
@@ -3639,7 +3639,7 @@ federation_sender_instances:
 ### `instance_map`
 
 When using workers this should be a map from worker name to the
-HTTP replication listener of the worker, if configured. 
+HTTP replication listener of the worker, if configured.
 
 Example configuration:
 ```yaml
@@ -3688,7 +3688,7 @@ worker_replication_secret: "secret_secret"
 Configuration for Redis when using workers. This *must* be enabled when
 using workers (unless using old style direct TCP configuration).
 This setting has the following sub-options:
-* `enabled`: whether to use Redis support. Defaults to false. 
+* `enabled`: whether to use Redis support. Defaults to false.
 * `host` and `port`: Optional host and port to use to connect to redis. Defaults to
    localhost and 6379
 * `password`: Optional password if configured on the Redis instance.
@@ -3702,7 +3702,7 @@ redis:
   password: <secret_password>
 ```
 ## Background Updates ##
-Configuration settings related to background updates. 
+Configuration settings related to background updates.
 
 ---
 ### `background_updates`
@@ -3711,7 +3711,7 @@ Background updates are database updates that are run in the background in batche
 The duration, minimum batch size, default batch size, whether to sleep between batches and if so, how long to
 sleep can all be configured. This is helpful to speed up or slow down the updates.
 This setting has the following sub-options:
-* `background_update_duration_ms`: How long in milliseconds to run a batch of background updates for. Defaults to 100. 
+* `background_update_duration_ms`: How long in milliseconds to run a batch of background updates for. Defaults to 100.
    Set a different time to change the default.
 * `sleep_enabled`: Whether to sleep between updates. Defaults to true. Set to false to change the default.
 * `sleep_duration_ms`: If sleeping between updates, how long in milliseconds to sleep for. Defaults to 1000.
@@ -3721,7 +3721,7 @@ This setting has the following sub-options:
 * `default_batch_size`: The batch size to use for the first iteration of a new background update. The default is 100.
    Set a size to change the default.
 
-Example configuration: 
+Example configuration:
 ```yaml
 background_updates:
     background_update_duration_ms: 500

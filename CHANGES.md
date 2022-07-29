@@ -1,7 +1,13 @@
+Synapse 1.64.0rc2 (2022-07-29)
+==============================
+
+This RC reintroduces support for `account_threepid_delegates.email`, which was removed in 1.64.0rc1. It remains deprecated and will be removed altogether in a future release. ([\#13406](https://github.com/matrix-org/synapse/issues/13406))
+
+
 Synapse 1.64.0rc1 (2022-07-26)
 ==============================
 
-As of this release, Synapse no longer allows the tasks of verifying email address ownership, and password reset confirmation, to be delegated to an identity server. For more information, see the [upgrade notes](https://matrix-org.github.io/synapse/v1.64/upgrade.html#upgrading-to-v1640).
+This RC removed the ability to delegate the tasks of verifying email address ownership, and password reset confirmation, to an identity server.
 
 We have also stopped building `.deb` packages for Ubuntu 21.10 as it is no longer an active version of Ubuntu.
 
