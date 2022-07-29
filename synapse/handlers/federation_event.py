@@ -1770,7 +1770,10 @@ class FederationEventHandler:
         seen_event_ids = await self._store.have_events_in_timeline(prev_event_ids)
         has_missing_prevs = bool(prev_event_ids - seen_event_ids)
         if has_missing_prevs:
-            # We don't have all the prev events, and have a gap in the graph.
+            # We don't have all the prev_events of this event, which means we have a
+            # gap in the graph, and the new event is going to become a new backwards
+            # extremity.
+            #
             # In this case we want to be a little careful as we might have been
             # down for a while and have an incorrect view of the current state,
             # however we still want to do checks as gaps are easy to
