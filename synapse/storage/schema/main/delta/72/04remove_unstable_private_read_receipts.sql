@@ -13,5 +13,5 @@
  * limitations under the License.
  */
 
-INSERT INTO background_updates (update_name, progress_json)
-    VALUES ('remove_unstable_private_read_receipts', '{}');
+DELETE FROM receipts_linearized WHERE receipt_type = "org.matrix.msc2285.read.private";
+DELETE FROM receipts_graph WHERE receipt_type = "org.matrix.msc2285.read.private";
