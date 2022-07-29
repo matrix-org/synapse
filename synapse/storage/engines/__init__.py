@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Mapping, NoReturn
+from typing import Any, Mapping, NoReturn, cast
 
 from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
 
@@ -20,26 +20,30 @@ from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
 # and sqlite. But the database driver modules are both optional: they may not be
 # installed. To account for this, create dummy classes on import failure so we can
 # still run `isinstance()` checks.
+def dummy_engine(name: str, module: str) -> BaseDatabaseEngine:
+    class Engine(BaseDatabaseEngine):  # type: ignore[no-redef]
+        def __new__(cls, *args: object, **kwargs: object) -> NoReturn:  # type: ignore[misc]
+            raise RuntimeError(
+                f"Cannot create {name}Engine -- {module} module is not installed"
+            )
+
+    return cast(BaseDatabaseEngine, Engine)
+
+
 try:
     from .postgres import PostgresEngine
 except ImportError:
+    PostgresEngine = dummy_engine("PostgresEngine", "psycopg2")
 
-    class PostgresEngine(BaseDatabaseEngine):  # type: ignore[no-redef]
-        def __new__(cls, *args: object, **kwargs: object) -> NoReturn:  # type: ignore[misc]
-            raise RuntimeError(
-                f"Cannot create {cls.__name__} -- psycopg2 module is not installed"
-            )
-
+try:
+    from .psycopg import PsycopgEngine
+except ImportError:
+    PsycopgEngine = dummy_engine("PsycopgEngine", "psycopg")
 
 try:
     from .sqlite import Sqlite3Engine
 except ImportError:
-
-    class Sqlite3Engine(BaseDatabaseEngine):  # type: ignore[no-redef]
-        def __new__(cls, *args: object, **kwargs: object) -> NoReturn:  # type: ignore[misc]
-            raise RuntimeError(
-                f"Cannot create {cls.__name__} -- sqlite3 module is not installed"
-            )
+    Sqlite3Engine = dummy_engine("Sqlite3Engine", "sqlite3")
 
 
 def create_engine(database_config: Mapping[str, Any]) -> BaseDatabaseEngine:
@@ -50,6 +54,9 @@ def create_engine(database_config: Mapping[str, Any]) -> BaseDatabaseEngine:
 
     if name == "psycopg2":
         return PostgresEngine(database_config)
+
+    if name == "psycopg":
+        return PsycopgEngine(database_config)
 
     raise RuntimeError("Unsupported database engine '%s'" % (name,))
 

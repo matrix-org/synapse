@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class PostgresEngine(BaseDatabaseEngine[psycopg2.extensions.connection]):
+class PsycopgEngine(BaseDatabaseEngine[psycopg2.extensions.connection]):
     def __init__(self, database_config: Mapping[str, Any]):
         super().__init__(psycopg2, database_config)
         psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
@@ -173,6 +173,16 @@ class PostgresEngine(BaseDatabaseEngine[psycopg2.extensions.connection]):
     @property
     def supports_returning(self) -> bool:
         """Do we support the `RETURNING` clause in insert/update/delete?"""
+        return True
+
+    @property
+    def supports_select_distinct_on(self) -> bool:
+        """Do we support the `DISTINCT ON` clause in SELECT?"""
+        return True
+
+    @property
+    def supports_sequences(self) -> bool:
+        """Do we support the `CREATE SEQUENCE` clause?"""
         return True
 
     def is_deadlock(self, error: Exception) -> bool:

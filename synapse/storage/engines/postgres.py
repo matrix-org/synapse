@@ -170,6 +170,16 @@ class PostgresEngine(
         """Do we support the `RETURNING` clause in insert/update/delete?"""
         return True
 
+    @property
+    def supports_select_distinct_on(self) -> bool:
+        """Do we support the `DISTINCT ON` clause in SELECT?"""
+        return True
+
+    @property
+    def supports_sequences(self) -> bool:
+        """Do we support the `CREATE SEQUENCE` clause?"""
+        return True
+
     def is_deadlock(self, error: Exception) -> bool:
         if isinstance(error, psycopg2.DatabaseError):
             # https://www.postgresql.org/docs/current/static/errcodes-appendix.html

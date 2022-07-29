@@ -1,7 +1,6 @@
 import logging
 from io import StringIO
 
-from synapse.storage.engines import PostgresEngine
 from synapse.storage.prepare_database import execute_statements_from_stream
 
 logger = logging.getLogger(__name__)
@@ -21,7 +20,7 @@ def run_upgrade(cur, database_engine, *args, **kwargs):
 
 
 def run_create(cur, database_engine, *args, **kwargs):
-    if isinstance(database_engine, PostgresEngine):
+    if database_engine.supports_select_distinct_on:
         select_clause = """
             SELECT DISTINCT ON (user_id, filter_id) user_id, filter_id, filter_json
             FROM user_filters

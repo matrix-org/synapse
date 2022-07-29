@@ -23,7 +23,7 @@ from typing_extensions import Counter as CounterType
 
 from synapse.config.homeserver import HomeServerConfig
 from synapse.storage.database import LoggingDatabaseConnection
-from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, PsycopgEngine
 from synapse.storage.schema import SCHEMA_COMPAT_VERSION, SCHEMA_VERSION
 from synapse.storage.types import Cursor
 
@@ -255,7 +255,7 @@ def _setup_new_database(
             for file_name in os.listdir(directory)
         )
 
-    if isinstance(database_engine, PostgresEngine):
+    if isinstance(database_engine, (PostgresEngine, PsycopgEngine)):
         specific = "postgres"
     else:
         specific = "sqlite"
@@ -399,7 +399,7 @@ def _upgrade_existing_database(
 
     logger.debug("applied_delta_files: %s", current_schema_state.applied_deltas)
 
-    if isinstance(database_engine, PostgresEngine):
+    if isinstance(database_engine, (PostgresEngine, PsycopgEngine)):
         specific_engine_extension = ".postgres"
     else:
         specific_engine_extension = ".sqlite"

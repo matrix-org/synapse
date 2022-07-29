@@ -21,7 +21,7 @@ from synapse.storage.engines import PostgresEngine
 
 
 def run_create(cur, database_engine, *args, **kwargs):
-    if isinstance(database_engine, PostgresEngine):
+    if database_engine.supports_sequences:
         # If we already have some AS TXNs we want to start from the current
         # maximum value. There are two potential places this is stored - the
         # actual TXNs themselves *and* the AS state table. At time of migration
