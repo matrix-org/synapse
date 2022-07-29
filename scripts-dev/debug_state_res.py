@@ -235,10 +235,14 @@ async def debug_specific_stateres(
         watch_func: Optional[Callable[[EventBase], Awaitable[str]]]
 
         async def watch_func(event: EventBase) -> str:
-            result = await hs.get_storage_controllers().state.get_state_ids_for_event(
-                event.event_id, filter
-            )
-            return f"\n{key_pair}: {result.get(key_pair, '<Missing>')}"
+            try:
+                result = await hs.get_storage_controllers().state.get_state_ids_for_event(
+                    event.event_id, filter
+                )
+            except RuntimeError:
+                return f"\n{key_pair}: <Event unavailable :(>"
+            else:
+                return f"\n{key_pair}: {result.get(key_pair, '<No event in state>')}"
 
     else:
         watch_func = None
