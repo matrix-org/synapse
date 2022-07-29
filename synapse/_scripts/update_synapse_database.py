@@ -15,7 +15,6 @@
 
 import argparse
 import logging
-import sys
 from typing import cast
 
 import yaml
