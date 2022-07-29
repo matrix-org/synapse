@@ -219,6 +219,7 @@ try:
     import opentelemetry
     import opentelemetry.exporter.jaeger.thrift
     import opentelemetry.propagate
+    import opentelemetry.trace.propagation
     import opentelemetry.sdk.resources
     import opentelemetry.sdk.trace
     import opentelemetry.sdk.trace.export
@@ -605,11 +606,11 @@ def inject_active_span_context_into_header_dict(
             return
 
     active_span = get_active_span()
-    active_span_context = active_span.get_span_context()
+    ctx = opentelemetry.trace.propagation.set_span_in_context(active_span)
 
     propagator = opentelemetry.propagate.get_global_textmap()
     # Put all of SpanContext properties into the headers dict
-    propagator.inject(headers, context=active_span_context)
+    propagator.inject(headers, context=ctx)
 
 
 def inject_response_headers(response_headers: Headers) -> None:
@@ -640,13 +641,16 @@ def get_active_span_text_map(destination: Optional[str] = None) -> Dict[str, str
     Returns:
         dict: the active span's context if opentracing is enabled, otherwise empty.
     """
+    if destination and not whitelisted_homeserver(destination):
+        return {}
+
     active_span = get_active_span()
-    active_span_context = active_span.get_span_context()
+    ctx = opentelemetry.trace.propagation.set_span_in_context(active_span)
 
     carrier_text_map: Dict[str, str] = {}
     propagator = opentelemetry.propagate.get_global_textmap()
     # Put all of SpanContext properties onto the carrier text map that we can return
-    propagator.inject(carrier_text_map, context=active_span_context)
+    propagator.inject(carrier_text_map, context=ctx)
 
     return carrier_text_map
 
