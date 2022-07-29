@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
+
 import logging
 from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Set, Tuple, cast
 
@@ -1440,40 +1440,28 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             if row:
                 endpoint = row[0]
 
-            where_clause = "e.stream_ordering > ?"
+            where_clause = "stream_ordering > ?"
             args = [min_stream_ordering_exclusive]
             if endpoint:
-                where_clause += " AND e.stream_ordering <= ?"
+                where_clause += " AND stream_ordering <= ?"
                 args.append(endpoint)
 
-            # now do the updates. We consider rows within our range of stream orderings,
-            # but only those with a non-null rejection reason or state_key (since there
-            # is nothing to update for rows where rejection reason and state_key are
-            # both null.
+            # now do the updates.
             txn.execute(
                 f"""
-                WITH t AS (
-                   SELECT e.event_id, r.reason, se.state_key
-                   FROM events e
-                   LEFT JOIN rejections r USING (event_id)
-                   LEFT JOIN state_events se USING (event_id)
-                   WHERE ({where_clause}) AND (
-                       r.reason IS NOT NULL OR se.state_key IS NOT NULL
-                   )
-                )
                 UPDATE events
-                SET rejection_reason=t.reason, state_key=t.state_key
-                FROM t WHERE events.event_id = t.event_id
+                SET state_key = (SELECT state_key FROM state_events se WHERE se.event_id = events.event_id),
+                    rejection_reason = (SELECT reason FROM rejections rej WHERE rej.event_id = events.event_id)
+                WHERE ({where_clause})
                 """,
                 args,
             )
 
             logger.info(
-                "populated new `events` columns up to %s/%i: updated %i/%i rows",
+                "populated new `events` columns up to %s/%i: updated %i rows",
                 endpoint,
                 max_stream_ordering_inclusive,
                 txn.rowcount,
-                batch_size,
             )
 
             if endpoint is None:
