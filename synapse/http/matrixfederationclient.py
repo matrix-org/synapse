@@ -524,7 +524,7 @@ class MatrixFederationHttpClient:
             "outgoing-federation-request",
             kind=SpanKind.CLIENT,
             attributes={
-                SpanAttributes.PEER_ADDRESS: request.destination,
+                SpanAttributes.HTTP_HOST: request.destination,
                 SpanAttributes.HTTP_METHOD: request.method,
                 SpanAttributes.HTTP_URL: request.path,
             },

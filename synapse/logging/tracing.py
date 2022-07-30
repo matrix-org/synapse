@@ -822,8 +822,7 @@ def trace_servlet(
         SynapseTags.REQUEST_ID: request.get_request_id(),
         SpanAttributes.HTTP_METHOD: request.get_method(),
         SpanAttributes.HTTP_URL: request.get_redacted_uri(),
-        # TODO: Is this the correct attribute to use for this?
-        SpanAttributes.NET_PEER_IP: request.getClientAddress().host,
+        SpanAttributes.HTTP_HOST: request.getClientAddress().host,
     }
 
     request_name = request.request_metrics.name
