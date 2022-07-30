@@ -73,13 +73,10 @@ class DomainGlobSet:
                     glob_to_regex(entry.encode("ascii").decode("ascii"))
                 )
             except UnicodeEncodeError:
-                raise ConfigError(
-                    "IDNA domain names are not allowed in the "
-                    "federation_certificate_verification_whitelist: %s" % (entry,)
-                )
+                raise ConfigError("IDNA domain names are not allowed: %s " % (entry,))
 
     def __contains__(self, item: object) -> bool:
         for regex in self._entries:
-            if regex.match(item):
+            if regex.match(str(item)):
                 return True
         return False
