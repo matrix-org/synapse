@@ -15,7 +15,6 @@
 import functools
 import logging
 import re
-import time
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Optional, Tuple, cast
 
@@ -26,13 +25,12 @@ from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import run_in_background
 from synapse.logging.tracing import (
-    get_active_span,
     Link,
     create_non_recording_span,
+    get_active_span,
     set_attribute,
     span_context_from_request,
     start_active_span,
-    start_active_span_follows_from,
     whitelisted_homeserver,
 )
 from synapse.types import JsonDict

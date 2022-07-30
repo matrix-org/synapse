@@ -335,24 +335,6 @@ class LoggingContext:
         return self.name
 
     @classmethod
-    def current_context(cls) -> LoggingContextOrSentinel:
-        """Get the current logging context from thread local storage
-
-        This exists for backwards compatibility. ``current_context()`` should be
-        called directly.
-
-        Returns:
-            LoggingContext: the current logging context
-        """
-        warnings.warn(
-            "synapse.logging.context.LoggingContext.current_context() is deprecated "
-            "in favor of synapse.logging.context.current_context().",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return current_context()
-
-    @classmethod
     def set_current_context(
         cls, context: LoggingContextOrSentinel
     ) -> LoggingContextOrSentinel:

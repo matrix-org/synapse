@@ -22,10 +22,11 @@ from synapse.events import EventBase
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
 from synapse.logging.tracing import (
+    Link,
     StatusCode,
     extract_text_map,
     set_status,
-    start_active_span_follows_from,
+    start_active_span,
     whitelisted_homeserver,
 )
 from synapse.types import JsonDict
@@ -94,7 +95,10 @@ class TransactionManager:
             if keep_destination:
                 edu.strip_context()
 
-        with start_active_span_follows_from("send_transaction", span_contexts):
+        with start_active_span(
+            "send_transaction",
+            links=[Link(context) for context in span_contexts],
+        ):
             logger.debug("TX [%s] _attempt_new_transaction", destination)
 
             txn_id = str(self._next_txn_id)

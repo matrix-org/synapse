@@ -162,12 +162,12 @@ Gotchas
   than one caller? Will all of those calling functions have be in a context
   with an active span?
 """
-from abc import ABC
 import contextlib
 import enum
 import inspect
 import logging
 import re
+from abc import ABC
 from functools import wraps
 from typing import (
     TYPE_CHECKING,
@@ -235,12 +235,12 @@ try:
     import opentelemetry
     import opentelemetry.exporter.jaeger.thrift
     import opentelemetry.propagate
-    import opentelemetry.trace.propagation
     import opentelemetry.sdk.resources
     import opentelemetry.sdk.trace
     import opentelemetry.sdk.trace.export
     import opentelemetry.semconv.trace
     import opentelemetry.trace
+    import opentelemetry.trace.propagation
 
     SpanKind = opentelemetry.trace.SpanKind
     SpanAttributes = opentelemetry.semconv.trace.SpanAttributes
@@ -492,52 +492,6 @@ def start_active_span(
         set_status_on_exception=set_status_on_exception,
         end_on_exit=end_on_exit,
     )
-
-
-# TODO: I don't think we even need this function over the normal `start_active_span`.
-#  The only difference is the `inherit_force_tracing` stuff.
-def start_active_span_follows_from(
-    operation_name: str,
-    contexts: Collection,
-    child_of: Optional[
-        Union[
-            "opentelemetry.shim.opentracing_shim.SpanShim",
-            "opentelemetry.shim.opentracing_shim.SpanContextShim",
-        ]
-    ] = None,
-    start_time: Optional[float] = None,
-    *,
-    inherit_force_tracing: bool = False,
-    tracer: Optional["opentelemetry.shim.opentracing_shim.TracerShim"] = None,
-) -> Iterator["opentelemetry.trace.span.Span"]:
-    """Starts an active opentracing span, with additional references to previous spans
-    Args:
-        operation_name: name of the operation represented by the new span
-        contexts: the previous spans to inherit from
-        child_of: optionally override the parent span. If unset, the currently active
-           span will be the parent. (If there is no currently active span, the first
-           span in `contexts` will be the parent.)
-        start_time: optional override for the start time of the created span. Seconds
-            since the epoch.
-        inherit_force_tracing: if set, and any of the previous contexts have had tracing
-           forced, the new span will also have tracing forced.
-        tracer: override the opentracing tracer. By default the global tracer is used.
-    """
-    if opentelemetry is None:
-        return contextlib.nullcontext()  # type: ignore[unreachable]
-
-    links = [opentelemetry.trace.Link(context) for context in contexts]
-    span = start_active_span(
-        name=operation_name,
-        links=links,
-    )
-
-    if inherit_force_tracing and any(
-        is_context_forced_tracing(ctx) for ctx in contexts
-    ):
-        force_tracing(span)
-
-    return span
 
 
 def start_active_span_from_edu(
