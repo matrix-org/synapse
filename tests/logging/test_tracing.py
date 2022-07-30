@@ -103,16 +103,17 @@ class LogContextScopeManagerTestCase(TestCase):
                 )
                 self.assertEqual(child_span1.parent.span_id, root_context.span_id)
 
-            ctx1 = opentelemetry.trace.propagation.set_span_in_context(child_span1)
-            with start_active_span(
-                "child_span2",
-                context=ctx1,
-                tracer=self._tracer,
-            ) as child_span2:
-                self.assertEqual(opentelemetry.trace.get_current_span(), child_span2)
-                self.assertEqual(
-                    child_span2.parent.span_id, child_span1.get_span_context().span_id
-                )
+                with start_active_span(
+                    "child_span2",
+                    tracer=self._tracer,
+                ) as child_span2:
+                    self.assertEqual(
+                        opentelemetry.trace.get_current_span(), child_span2
+                    )
+                    self.assertEqual(
+                        child_span2.parent.span_id,
+                        child_span1.get_span_context().span_id,
+                    )
 
             # the root scope should be restored
             self.assertEqual(opentelemetry.trace.get_current_span(), root_span)
@@ -125,8 +126,9 @@ class LogContextScopeManagerTestCase(TestCase):
         )
 
         # the spans should be reported in order of their finishing.
-        self.assertEqual(
-            self._reporter.get_spans(), [scope2.span, scope1.span, root_scope.span]
+        self.assertListEqual(
+            [span.name for span in self._exporter.get_finished_spans()],
+            ["child_span2", "child_span1", "root_span"],
         )
 
     # def test_overlapping_spans(self) -> None:
