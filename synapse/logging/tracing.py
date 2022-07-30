@@ -173,6 +173,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    ContextManager,
     Dict,
     Generator,
     Iterable,
@@ -476,7 +477,7 @@ def start_active_span(
     end_on_exit: bool = True,
     # For testing only
     tracer: Optional["opentelemetry.sdk.trace.TracerProvider"] = None,
-) -> Iterator["opentelemetry.trace.span.Span"]:
+) -> ContextManager["opentelemetry.trace.span.Span"]:
     if opentelemetry is None:
         return contextlib.nullcontext()  # type: ignore[unreachable]
 
