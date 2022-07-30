@@ -12,21 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-from typing import cast
-
 from twisted.internet import defer
 from twisted.test.proto_helpers import MemoryReactorClock
 
-from synapse.logging.context import (
-    LoggingContext,
-    make_deferred_yieldable,
-    run_in_background,
-)
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.tracing import start_active_span
 from synapse.util import Clock
 
-logger = logging.getLogger(__name__)
+from tests.unittest import TestCase
 
 try:
     import opentelemetry
@@ -37,8 +30,6 @@ try:
     import opentelemetry.trace.propagation
 except ImportError:
     opentelemetry = None  # type: ignore[assignment]
-
-from tests.unittest import TestCase
 
 
 class LogContextScopeManagerTestCase(TestCase):
@@ -120,7 +111,7 @@ class LogContextScopeManagerTestCase(TestCase):
             self.assertIsNotNone(child_span1.end_time)
             self.assertIsNotNone(child_span2.end_time)
 
-        # Active span is unset outside of the with scopes
+        # Active span is unset now that we're outside of the `with` scopes
         self.assertEqual(
             opentelemetry.trace.get_current_span(), opentelemetry.trace.INVALID_SPAN
         )
@@ -131,57 +122,53 @@ class LogContextScopeManagerTestCase(TestCase):
             ["child_span2", "child_span1", "root_span"],
         )
 
-    # def test_overlapping_spans(self) -> None:
-    #     """Overlapping spans which are not neatly nested should work"""
-    #     reactor = MemoryReactorClock()
-    #     clock = Clock(reactor)
+    def test_overlapping_spans(self) -> None:
+        """Overlapping spans which are not neatly nested should work"""
+        reactor = MemoryReactorClock()
+        clock = Clock(reactor)
 
-    #     scopes = []
+        async def task(i: int):
+            with start_active_span(
+                f"task{i}",
+                tracer=self._tracer,
+            ) as span1:
+                self.assertEqual(opentelemetry.trace.get_current_span(), span1)
+                await clock.sleep(4)
+                self.assertEqual(opentelemetry.trace.get_current_span(), span1)
 
-    #     async def task(i: int):
-    #         scope = start_active_span(
-    #             f"task{i}",
-    #             tracer=self._tracer,
-    #         )
-    #         scopes.append(scope)
+        async def root():
+            with start_active_span("root_span", tracer=self._tracer) as root_span:
+                self.assertEqual(opentelemetry.trace.get_current_span(), root_span)
 
-    #         self.assertEqual(self._tracer.active_span, scope.span)
-    #         await clock.sleep(4)
-    #         self.assertEqual(self._tracer.active_span, scope.span)
-    #         scope.close()
+                d1 = run_in_background(task, 1)
+                await clock.sleep(2)
+                d2 = run_in_background(task, 2)
 
-    #     async def root():
-    #         with start_active_span("root span", tracer=self._tracer) as root_scope:
-    #             self.assertEqual(self._tracer.active_span, root_scope.span)
-    #             scopes.append(root_scope)
+                # because we did run_in_background, the active span should still be the
+                # root.
+                self.assertEqual(opentelemetry.trace.get_current_span(), root_span)
 
-    #             d1 = run_in_background(task, 1)
-    #             await clock.sleep(2)
-    #             d2 = run_in_background(task, 2)
+                await make_deferred_yieldable(
+                    defer.gatherResults([d1, d2], consumeErrors=True)
+                )
 
-    #             # because we did run_in_background, the active span should still be the
-    #             # root.
-    #             self.assertEqual(self._tracer.active_span, root_scope.span)
+                self.assertEqual(opentelemetry.trace.get_current_span(), root_span)
 
-    #             await make_deferred_yieldable(
-    #                 defer.gatherResults([d1, d2], consumeErrors=True)
-    #             )
+        # start the test off
+        d1 = defer.ensureDeferred(root())
 
-    #             self.assertEqual(self._tracer.active_span, root_scope.span)
+        # let the tasks complete
+        reactor.pump((2,) * 8)
 
-    #     with LoggingContext("root context"):
-    #         # start the test off
-    #         d1 = defer.ensureDeferred(root())
+        self.successResultOf(d1)
+        # Active span is unset now that we're outside of the `with` scopes
+        self.assertEqual(
+            opentelemetry.trace.get_current_span(), opentelemetry.trace.INVALID_SPAN
+        )
 
-    #         # let the tasks complete
-    #         reactor.pump((2,) * 8)
-
-    #         self.successResultOf(d1)
-    #         self.assertIsNone(self._tracer.active_span)
-
-    #     # the spans should be reported in order of their finishing: task 1, task 2,
-    #     # root.
-    #     self.assertEqual(
-    #         self._reporter.get_spans(),
-    #         [scopes[1].span, scopes[2].span, scopes[0].span],
-    #     )
+        # the spans should be reported in order of their finishing: task 1, task 2,
+        # root.
+        self.assertListEqual(
+            [span.name for span in self._exporter.get_finished_spans()],
+            ["task1", "task2", "root_span"],
+        )
