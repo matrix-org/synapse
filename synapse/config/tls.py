@@ -13,15 +13,15 @@
 # limitations under the License.
 
 import logging
-from typing import Any, List, Optional, Pattern
-
-from matrix_common.regex import glob_to_regex
+from typing import Any, Optional
 
 from OpenSSL import SSL, crypto
 from twisted.internet._sslverify import Certificate, trustRootFromCertificates
 
 from synapse.config._base import Config, ConfigError
 from synapse.types import JsonDict
+
+from ._util import DomainGlobSet
 
 logger = logging.getLogger(__name__)
 
@@ -78,18 +78,9 @@ class TlsConfig(Config):
             fed_whitelist_entries = []
 
         # Support globs (*) in whitelist values
-        self.federation_certificate_verification_whitelist: List[Pattern] = []
-        for entry in fed_whitelist_entries:
-            try:
-                entry_regex = glob_to_regex(entry.encode("ascii").decode("ascii"))
-            except UnicodeEncodeError:
-                raise ConfigError(
-                    "IDNA domain names are not allowed in the "
-                    "federation_certificate_verification_whitelist: %s" % (entry,)
-                )
-
-            # Convert globs to regex
-            self.federation_certificate_verification_whitelist.append(entry_regex)
+        self.federation_certificate_verification_whitelist = DomainGlobSet(
+            fed_whitelist_entries
+        )
 
         # List of custom certificate authorities for federation traffic validation
         custom_ca_list = config.get("federation_custom_ca_list", None)

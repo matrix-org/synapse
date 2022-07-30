@@ -142,14 +142,9 @@ class FederationPolicyForHTTPS:
         ascii_host = host.decode("ascii")
 
         # Check if certificate verification has been enabled
-        should_verify = self._should_verify
-
-        # Check if we've disabled certificate verification for this host
-        if self._should_verify:
-            for regex in self._federation_certificate_verification_whitelist:
-                if regex.match(ascii_host):
-                    should_verify = False
-                    break
+        should_verify = self._should_verify and not (
+            ascii_host in self._federation_certificate_verification_whitelist
+        )
 
         ssl_context = (
             self._verify_ssl_context if should_verify else self._no_verify_ssl_context

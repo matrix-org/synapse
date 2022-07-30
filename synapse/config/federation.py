@@ -11,12 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from fnmatch import fnmatch
 from typing import Any, Optional
 
 from synapse.config._base import Config
 from synapse.config._util import validate_config
 from synapse.types import JsonDict
+
+from ._util import DomainGlobSet
 
 
 class FederationConfig(Config):
@@ -24,11 +25,10 @@ class FederationConfig(Config):
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         # FIXME: federation_domain_whitelist needs sytests
-        self.federation_domain_whitelist: Optional[FederationDomainWhitelist] = None
+        self.federation_domain_whitelist: Optional[DomainGlobSet] = None
         federation_domain_whitelist = config.get("federation_domain_whitelist", None)
-
         if federation_domain_whitelist is not None:
-            self.federation_domain_whitelist = FederationDomainWhitelist(
+            self.federation_domain_whitelist = DomainGlobSet(
                 federation_domain_whitelist
             )
 
@@ -47,14 +47,6 @@ class FederationConfig(Config):
         self.allow_device_name_lookup_over_federation = config.get(
             "allow_device_name_lookup_over_federation", False
         )
-
-
-class FederationDomainWhitelist(list):
-    def __contains__(self, item: object) -> bool:
-        for x in self:
-            if fnmatch(str(item), x):
-                return True
-        return False
 
 
 _METRICS_FOR_DOMAINS_SCHEMA = {"type": "array", "items": {"type": "string"}}

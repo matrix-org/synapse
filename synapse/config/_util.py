@@ -14,6 +14,7 @@
 from typing import Any, Iterable
 
 import jsonschema
+from matrix_common.regex import glob_to_regex
 
 from synapse.config._base import ConfigError
 from synapse.types import JsonDict
@@ -61,3 +62,24 @@ def json_error_to_config_error(
         else:
             path.append(str(p))
     return ConfigError(e.message, path)
+
+
+class DomainGlobSet:
+    def __init__(self, globs: list):
+        self._entries = []
+        for entry in globs:
+            try:
+                self._entries.append(
+                    glob_to_regex(entry.encode("ascii").decode("ascii"))
+                )
+            except UnicodeEncodeError:
+                raise ConfigError(
+                    "IDNA domain names are not allowed in the "
+                    "federation_certificate_verification_whitelist: %s" % (entry,)
+                )
+
+    def __contains__(self, item: object) -> bool:
+        for regex in self._entries:
+            if regex.match(item):
+                return True
+        return False
