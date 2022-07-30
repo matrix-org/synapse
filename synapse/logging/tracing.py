@@ -162,6 +162,7 @@ Gotchas
   than one caller? Will all of those calling functions have be in a context
   with an active span?
 """
+from abc import ABC
 import contextlib
 import enum
 import inspect
@@ -204,13 +205,28 @@ if TYPE_CHECKING:
 
 # Helper class
 
-# Always returns the fixed value given for any accessed property
+# This will always returns the fixed value given for any accessed property
 class _DummyLookup(object):
     def __init__(self, value):
         self.value = value
 
     def __getattribute__(self, name):
         return object.__getattribute__(self, "value")
+
+
+class DummyLink(ABC):
+    def __init__(self):
+        self.not_implemented_message = (
+            "opentelemetry wasn't imported so this is just a dummy link placeholder"
+        )
+
+    @property
+    def context(self):
+        raise NotImplementedError(self.not_implemented_message)
+
+    @property
+    def context(self):
+        raise NotImplementedError(self.not_implemented_message)
 
 
 # These dependencies are optional so they can fail to import
@@ -229,12 +245,13 @@ try:
     SpanKind = opentelemetry.trace.SpanKind
     SpanAttributes = opentelemetry.semconv.trace.SpanAttributes
     StatusCode = opentelemetry.trace.StatusCode
-
+    Link = opentelemetry.trace.Link
 except ImportError:
     opentelemetry = None  # type: ignore[assignment]
     SpanKind = _DummyLookup(0)
     SpanAttributes = _DummyLookup("fake-attribute")
     StatusCode = _DummyLookup(0)
+    Link = DummyLink
 
 
 logger = logging.getLogger(__name__)
@@ -435,6 +452,15 @@ def whitelisted_homeserver(destination: str) -> bool:
 # Start spans and scopes
 
 
+def create_non_recording_span():
+    if opentelemetry is None:
+        return contextlib.nullcontext()  # type: ignore[unreachable]
+
+    return opentelemetry.trace.NonRecordingSpan(
+        opentelemetry.trace.INVALID_SPAN_CONTEXT
+    )
+
+
 def start_active_span(
     name: str,
     *,
@@ -446,11 +472,15 @@ def start_active_span(
     record_exception: bool = True,
     set_status_on_exception: bool = True,
     end_on_exit: bool = True,
+    # For testing only
+    tracer: Optional["opentelemetry.sdk.trace.TracerProvider"] = None,
 ) -> Iterator["opentelemetry.trace.span.Span"]:
     if opentelemetry is None:
         return contextlib.nullcontext()  # type: ignore[unreachable]
 
-    tracer = opentelemetry.trace.get_tracer(__name__)
+    if tracer is None:
+        tracer = opentelemetry.trace.get_tracer(__name__)
+
     return tracer.start_as_current_span(
         name=name,
         context=context,
@@ -464,6 +494,8 @@ def start_active_span(
     )
 
 
+# TODO: I don't think we even need this function over the normal `start_active_span`.
+#  The only difference is the `inherit_force_tracing` stuff.
 def start_active_span_follows_from(
     operation_name: str,
     contexts: Collection,
@@ -491,8 +523,21 @@ def start_active_span_follows_from(
            forced, the new span will also have tracing forced.
         tracer: override the opentracing tracer. By default the global tracer is used.
     """
-    # TODO
-    pass
+    if opentelemetry is None:
+        return contextlib.nullcontext()  # type: ignore[unreachable]
+
+    links = [opentelemetry.trace.Link(context) for context in contexts]
+    span = start_active_span(
+        name=operation_name,
+        links=links,
+    )
+
+    if inherit_force_tracing and any(
+        is_context_forced_tracing(ctx) for ctx in contexts
+    ):
+        force_tracing(span)
+
+    return span
 
 
 def start_active_span_from_edu(
@@ -529,7 +574,7 @@ def set_attribute(key: str, value: Union[str, bool, int, float]) -> None:
 
 @ensure_active_span("set the status")
 def set_status(
-    status: "opentelemetry.trace.StatusCode", exc: Optional(Exception)
+    status: "opentelemetry.trace.StatusCode", exc: Optional[Exception]
 ) -> None:
     """Sets a tag on the active span"""
     active_span = get_active_span()
@@ -825,15 +870,16 @@ def trace_servlet(
     }
 
     request_name = request.request_metrics.name
-    context = span_context_from_request(request) if extract_context else None
+    span_context = span_context_from_request(request) if extract_context else None
 
     # we configure the scope not to finish the span immediately on exit, and instead
     # pass the span into the SynapseRequest, which will finish it once we've finished
     # sending the response to the client.
+
     with start_active_span(
         request_name,
         kind=SpanKind.SERVER,
-        context=context,
+        context=span_context,
         end_on_exit=False,
     ) as span:
         request.set_tracing_span(span)

@@ -27,6 +27,8 @@ from synapse.http.site import SynapseRequest
 from synapse.logging.context import run_in_background
 from synapse.logging.tracing import (
     get_active_span,
+    Link,
+    create_non_recording_span,
     set_attribute,
     span_context_from_request,
     start_active_span,
@@ -313,55 +315,61 @@ class BaseFederationServlet:
 
             # if the origin is authenticated and whitelisted, use its span context
             # as the parent.
-            context = None
+            origin_span_context = None
             if origin and whitelisted_homeserver(origin):
-                context = span_context_from_request(request)
+                origin_span_context = span_context_from_request(request)
 
-            if context:
-                servlet_span = get_active_span()
-                # a scope which uses the origin's context as a parent
-                processing_start_time = time.time()
-                scope = start_active_span_follows_from(
+            if origin_span_context:
+                local_servlet_span = get_active_span()
+                # Create a span which uses the `origin_span_context` as a parent
+                # so we can see how the incoming payload was processed while
+                # we're looking at the outgoing trace. Since the parent is set
+                # to a remote span (from the origin), it won't show up in the
+                # local trace which is why we create another span below for the
+                # local trace. A span can only have one parent so we have to
+                # create two separate ones.
+                remote_parent_span = start_active_span(
                     "incoming-federation-request",
-                    child_of=context,
-                    contexts=(servlet_span,),
-                    start_time=processing_start_time,
+                    context=origin_span_context,
+                    # Cross-link back to the local trace so we can jump
+                    # to the incoming side from the remote origin trace.
+                    links=[Link(local_servlet_span.get_span_context())],
+                )
+
+                # Create a local span to appear in the local trace
+                local_parent_span = start_active_span(
+                    "process-federation-request",
+                    # Cross-link back to the remote outgoing trace so we jump over
+                    # there.
+                    links=[Link(remote_parent_span.get_span_context())],
                 )
 
             else:
-                # just use our context as a parent
-                scope = start_active_span(
-                    "incoming-federation-request",
+                # Otherwise just use our local context as a parent
+                local_parent_span = start_active_span(
+                    "process-federation-request",
                 )
 
-            try:
-                with scope:
-                    if origin and self.RATELIMIT:
-                        with ratelimiter.ratelimit(origin) as d:
-                            await d
-                            if request._disconnected:
-                                logger.warning(
-                                    "client disconnected before we started processing "
-                                    "request"
-                                )
-                                return None
-                            response = await func(
-                                origin, content, request.args, *args, **kwargs
+                # Don't need to record anything for the remote
+                remote_parent_span = create_non_recording_span()
+
+            with remote_parent_span, local_parent_span:
+                if origin and self.RATELIMIT:
+                    with ratelimiter.ratelimit(origin) as d:
+                        await d
+                        if request._disconnected:
+                            logger.warning(
+                                "client disconnected before we started processing "
+                                "request"
                             )
-                    else:
+                            return None
                         response = await func(
                             origin, content, request.args, *args, **kwargs
                         )
-            finally:
-                # if we used the origin's context as the parent, add a new span using
-                # the servlet span as a parent, so that we have a link
-                if context:
-                    scope2 = start_active_span_follows_from(
-                        "process-federation_request",
-                        contexts=(scope.span,),
-                        start_time=processing_start_time,
+                else:
+                    response = await func(
+                        origin, content, request.args, *args, **kwargs
                     )
-                    scope2.close()
 
             return response
 
