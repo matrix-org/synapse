@@ -345,10 +345,9 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         self.assertFalse(
             evaluator.matches(
                 {
-                    "kind": "related_event_match",
+                    "kind": "inverse_related_event_match",
                     "key": "sender",
                     "pattern_type": "user_id",
-                    "inverse_match": True,
                 },
                 "@other_user:test",
                 "display_name",

@@ -328,10 +328,9 @@ BASE_APPEND_OVERRIDE_RULES: List[Dict[str, Any]] = [
             },
             # Don't notify if this reaction is to someone elses event
             {
-                "kind": "related_event_match",
+                "kind": "inverse_related_event_match",
                 "key": "sender",
                 "pattern_type": "user_id",
-                "inverse_match": True,
             },
         ],
         "actions": ["dont_notify"],
