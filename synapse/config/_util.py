@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from functools import lru_cache
 from typing import Any, Iterable
 
 import jsonschema
@@ -66,17 +67,16 @@ def json_error_to_config_error(
 
 class DomainGlobSet:
     def __init__(self, globs: list):
-        self._entries = []
+        self._globs = []
         for entry in globs:
             try:
-                self._entries.append(
-                    glob_to_regex(entry.encode("ascii").decode("ascii"))
-                )
+                self._globs.append(glob_to_regex(entry.encode("ascii").decode("ascii")))
             except UnicodeEncodeError:
                 raise ConfigError("IDNA domain names are not allowed: %s " % (entry,))
 
+    @lru_cache(maxsize=100000)
     def __contains__(self, item: object) -> bool:
-        for regex in self._entries:
+        for regex in self._globs:
             if regex.match(str(item)):
                 return True
         return False
