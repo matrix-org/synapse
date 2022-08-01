@@ -16,10 +16,11 @@ import binascii
 import logging
 import pickle
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 import jump
 from prometheus_client import Counter, Histogram
+from txredisapi import RedisError
 
 from twisted.internet import defer
 
@@ -82,6 +83,7 @@ class ExternalShardedCache:
                         host=shard["host"],
                         port=shard["port"],
                         reconnect=True,
+                        replyTimeout=5,
                     ),
                 )
 
@@ -131,9 +133,12 @@ class ExternalShardedCache:
                     self._redis_shards[shard_id].mset(values)
                     for shard_id, values in shard_id_to_encoded_values.items()
                 ]
-                await make_deferred_yieldable(
-                    defer.gatherResults(deferreds, consumeErrors=True)
-                ).addErrback(unwrapFirstError)
+                try:
+                    await make_deferred_yieldable(
+                        defer.gatherResults(deferreds, consumeErrors=True)
+                    ).addErrback(unwrapFirstError)
+                except RedisError as e:
+                    logger.error("Failed to set on one or more Redis shards: %r", e)
 
     async def set(self, cache_name: str, key: str, value: Any) -> None:
         await self.mset(cache_name, {key: value})
@@ -141,7 +146,12 @@ class ExternalShardedCache:
     async def _mget_shard(
         self, shard_id: int, key_mapping: Dict[str, str]
     ) -> Dict[str, Any]:
-        results = await self._redis_shards[shard_id].mget(list(key_mapping.values()))
+        shard = self._redis_shards[shard_id]
+        try:
+            results = await shard.mget(list(key_mapping.values()))
+        except RedisError as e:
+            logger.error("Failed to get from Redis %r: %r", shard, e)
+            return {}
         original_keys = list(key_mapping.keys())
         mapped_results: Dict[str, Any] = {}
         for i, result in enumerate(results):
@@ -150,12 +160,12 @@ class ExternalShardedCache:
             try:
                 result = pickle.loads(result)
             except Exception as e:
-                logger.warning("Failed to decode cache result: %r", e)
+                logger.error("Failed to decode cache result: %r", e)
             else:
                 mapped_results[original_keys[i]] = result
         return mapped_results
 
-    async def mget(self, cache_name: str, keys: Iterable[str]) -> Dict[str, Any]:
+    async def mget(self, cache_name: str, keys: List[str]) -> Dict[str, Any]:
         """Look up a key/value combinations in the named cache."""
 
         if not self.is_enabled():
