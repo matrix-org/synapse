@@ -193,6 +193,9 @@ class LimitBlockingTypes:
 class EventContentFields:
     """Fields found in events' content, regardless of type."""
 
+    # Synapse internal content field for tracing
+    TRACING_CONTEXT: Final = "org.matrix.tracing_context"
+
     # Labels for the event, cf https://github.com/matrix-org/matrix-doc/pull/2326
     LABELS: Final = "org.matrix.labels"
 

@@ -1399,7 +1399,7 @@ class FederationHandlerRegistry:
         # Check if we have a handler on this instance
         handler = self.edu_handlers.get(edu_type)
         if handler:
-            with start_active_span_from_edu(content, "handle_edu"):
+            with start_active_span_from_edu("handle_edu", edu_content=content):
                 try:
                     await handler(origin, content)
                 except SynapseError as e:

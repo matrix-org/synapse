@@ -15,7 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Any, Dict
 
-from synapse.api.constants import EduTypes, ToDeviceEventTypes
+from synapse.api.constants import EduTypes, EventContentFields, ToDeviceEventTypes
 from synapse.api.errors import SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.logging.context import run_in_background
@@ -273,7 +273,7 @@ class DeviceMessageHandler:
                 "sender": sender_user_id,
                 "type": message_type,
                 "message_id": message_id,
-                "org.matrix.tracing_context": json_encoder.encode(context),
+                EventContentFields.TRACING_CONTEXT: json_encoder.encode(context),
             }
 
         # Add messages to the database.

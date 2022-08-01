@@ -30,7 +30,7 @@ from typing import (
 
 from typing_extensions import Literal
 
-from synapse.api.constants import EduTypes
+from synapse.api.constants import EduTypes, EventContentFields
 from synapse.api.errors import Codes, StoreError
 from synapse.logging.tracing import (
     get_active_span_text_map,
@@ -537,7 +537,7 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
                     "device_id": device_id,
                     "prev_id": [prev_id] if prev_id else [],
                     "stream_id": stream_id,
-                    "org.matrix.tracing_context": tracing_context,
+                    EventContentFields.TRACING_CONTEXT: tracing_context,
                 }
 
                 prev_id = stream_id

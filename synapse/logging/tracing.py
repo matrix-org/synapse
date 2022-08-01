@@ -177,7 +177,6 @@ from typing import (
     Dict,
     Generator,
     Iterable,
-    Iterator,
     List,
     Optional,
     Pattern,
@@ -194,7 +193,9 @@ from twisted.internet import defer
 from twisted.web.http import Request
 from twisted.web.http_headers import Headers
 
+from synapse.api.constants import EventContentFields
 from synapse.config import ConfigError
+from synapse.util import json_decoder
 
 if TYPE_CHECKING:
     from synapse.http.site import SynapseRequest
@@ -555,20 +556,28 @@ def start_active_span(
 
 
 def start_active_span_from_edu(
-    edu_content: Dict[str, Any],
     operation_name: str,
-) -> Iterator["opentelemetry.trace.span.Span"]:
+    *,
+    edu_content: Dict[str, Any],
+) -> ContextManager["opentelemetry.trace.span.Span"]:
     """
     Extracts a span context from an edu and uses it to start a new active span
 
     Args:
+        operation_name: The label for the chunk of time used to process the given edu.
         edu_content: an edu_content with a `context` field whose value is
-        canonical json for a dict which contains opentracing information.
-
-        For the other args see opentracing.tracer
+            canonical json for a dict which contains opentracing information.
     """
-    # TODO
-    pass
+    if opentelemetry is None:
+        return contextlib.nullcontext()  # type: ignore[unreachable]
+
+    carrier = json_decoder.decode(edu_content.get("context", "{}")).get(
+        EventContentFields.TRACING_CONTEXT, {}
+    )
+
+    context = extract_text_map(carrier)
+
+    return start_active_span(name=operation_name, context=context)
 
 
 # OpenTelemetry setters for attributes, logs, etc
@@ -588,12 +597,12 @@ def set_attribute(key: str, value: Union[str, bool, int, float]) -> None:
 
 @ensure_active_span("set the status")
 def set_status(
-    status: "opentelemetry.trace.status.StatusCode", exc: Optional[Exception]
+    status_code: "opentelemetry.trace.status.StatusCode", exc: Optional[Exception]
 ) -> None:
     """Sets a tag on the active span"""
     active_span = get_active_span()
     assert active_span is not None
-    active_span.set_status(status)
+    active_span.set_status(opentelemetry.trace.status.Status(status_code=status_code))
     if exc:
         active_span.record_exception(exc)
 
