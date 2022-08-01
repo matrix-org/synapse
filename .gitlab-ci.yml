@@ -9,9 +9,10 @@ lint:
     name: $CI_REGISTRY_IMAGE:latest
     entrypoint: [""]
   before_script:
-    - pip install -e ".[all]"
+    - pip install poetry
+    - poetry install
   script:
-    - ./scripts-dev/lint.sh
+    - poetry run ./scripts-dev/lint.sh
 
 test-trial:
   stage: test
