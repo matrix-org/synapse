@@ -571,8 +571,8 @@ def start_active_span_from_edu(
     if opentelemetry is None:
         return contextlib.nullcontext()  # type: ignore[unreachable]
 
-    carrier = json_decoder.decode(edu_content.get("context", "{}")).get(
-        EventContentFields.TRACING_CONTEXT, {}
+    carrier = json_decoder.decode(
+        edu_content.get(EventContentFields.TRACING_CONTEXT, "{}")
     )
 
     context = extract_text_map(carrier)
@@ -678,6 +678,7 @@ def inject_active_span_context_into_header_dict(
             return
 
     active_span = get_active_span()
+    assert active_span is not None
     # This doesn't affect the current context at all, it just converts a span
     # into `Context` object basically (bad name).
     ctx = opentelemetry.trace.propagation.set_span_in_context(active_span)
@@ -719,6 +720,7 @@ def get_active_span_text_map(destination: Optional[str] = None) -> Dict[str, str
         return {}
 
     active_span = get_active_span()
+    assert active_span is not None
     # This doesn't affect the current context at all, it just converts a span
     # into `Context` object basically (bad name).
     ctx = opentelemetry.trace.propagation.set_span_in_context(active_span)
