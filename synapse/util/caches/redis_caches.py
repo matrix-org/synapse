@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 
 def redisCachedList(
-    redis_shard_cache: ExternalShardedCache, cache_name: str, list_name: str
+    redis_shard_cache: "ExternalShardedCache", cache_name: str, list_name: str
 ) -> Callable:
     def decorator(f: Callable) -> Callable:
         @wraps(f)

@@ -534,7 +534,7 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
             else:
                 return defer.succeed(results)
 
-        def enable_redis_cache(external_sharded_cache: ExternalShardedCache) -> None:
+        def enable_redis_cache(external_sharded_cache: "ExternalShardedCache") -> None:
             if getattr(cached_method, "redis_enabled", False):
                 return
 
