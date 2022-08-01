@@ -9,6 +9,8 @@ lint:
     name: $CI_REGISTRY_IMAGE:latest
     entrypoint: [""]
   before_script:
+    - apt-get update
+    - apt-get install -yqq git
     - pip install poetry
     - poetry install
   script:
