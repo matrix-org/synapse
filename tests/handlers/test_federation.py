@@ -554,6 +554,7 @@ class PartialJoinTestCase(unittest.FederatingHomeserverTestCase):
             fed_client, "make_membership_event", mock_make_membership_event
         ), patch.object(fed_client, "send_join", mock_send_join):
             # Join and check that our join event is rejected
+            # (The join event is rejected because it doesn't have any signatures)
             join_exc = self.get_failure(
                 fed_handler.do_invite_join(["example.com"], room_id, "@alice:test", {}),
                 SynapseError,
