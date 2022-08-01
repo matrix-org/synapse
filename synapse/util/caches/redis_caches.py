@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Generic, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, List, Optional, Union
 
 from synapse.util.caches.lrucache import KT, VT, AsyncLruCache, T
 
@@ -7,14 +7,16 @@ if TYPE_CHECKING:
     from synapse.replication.tcp.external_sharded_cache import ExternalShardedCache
 
 
-def redisCachedList(redis_shard_cache, cache_name, list_name):
-    def decorator(f):
+def redisCachedList(
+    redis_shard_cache: ExternalShardedCache, cache_name: str, list_name: str
+) -> Callable:
+    def decorator(f: Callable) -> Callable:
         @wraps(f)
-        async def _wrapped(**kwargs):
-            keys = kwargs[list_name]
+        async def _wrapped(**kwargs: Any) -> Dict[str, Any]:
+            keys: List[str] = kwargs[list_name]
             values = await redis_shard_cache.mget(cache_name, keys)
 
-            missing_keys = set(keys) - set(values.keys())
+            missing_keys = list(set(keys) - set(values.keys()))
             kwargs[list_name] = missing_keys
             missing_values = await f(**kwargs)
             await redis_shard_cache.mset(cache_name, missing_values)

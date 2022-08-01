@@ -40,6 +40,7 @@ from twisted.internet import defer
 from twisted.python.failure import Failure
 
 from synapse.logging.context import make_deferred_yieldable, preserve_fn
+from synapse.replication.tcp.external_sharded_cache import ExternalShardedCache
 from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import delay_cancellation
 from synapse.util.caches.deferred_cache import DeferredCache
@@ -59,6 +60,7 @@ class _CachedFunction(Generic[F]):
     prefill: Any = None
     cache: Any = None
     num_args: Any = None
+    tree: bool = False
 
     __name__: str
 
@@ -529,7 +531,7 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
             else:
                 return defer.succeed(results)
 
-        def enable_redis_cache(external_sharded_cache):
+        def enable_redis_cache(external_sharded_cache: ExternalShardedCache) -> None:
             if getattr(cached_method, "redis_enabled", False):
                 return
 
@@ -545,13 +547,14 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
             assert not self.add_cache_context
 
             # Cache invalidations are not allowed with Redis backed caches (currently)
-            def block_invalidate():
+            def block_invalidate() -> None:
                 raise Exception("Cannot invalidate Redis backed @cachedList")
+
             cached_method.invalidate = block_invalidate
             cached_method.invalidate_all = block_invalidate
             cached_method.redis_enabled = True
 
-        wrapped.enable_redis_cache = enable_redis_cache
+        wrapped.enable_redis_cache = enable_redis_cache  # type: ignore
         obj.__dict__[self.orig.__name__] = wrapped
 
         return wrapped

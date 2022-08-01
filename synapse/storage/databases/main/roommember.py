@@ -121,7 +121,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             )
 
         external_sharded_cache = self.hs.get_external_sharded_cache()
-        self._get_joined_profiles_from_event_ids.enable_redis_cache(external_sharded_cache)
+        self._get_joined_profiles_from_event_ids.enable_redis_cache(  # type: ignore
+            external_sharded_cache
+        )
 
     @wrap_as_background_process("_count_known_servers")
     async def _count_known_servers(self) -> int:

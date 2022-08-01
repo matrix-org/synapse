@@ -98,7 +98,9 @@ def main() -> None:
     hs_config = yaml.safe_load(args.database_config)
 
     if "database" not in hs_config and "databases" not in hs_config:
-        sys.stderr.write("The configuration file must have a 'database' or 'databases' section.\n")
+        sys.stderr.write(
+            "The configuration file must have a 'database' or 'databases' section.\n"
+        )
         sys.exit(4)
 
     config = HomeServerConfig()
