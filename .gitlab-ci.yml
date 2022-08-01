@@ -14,7 +14,9 @@ lint:
     - pip install poetry
     - poetry install
   script:
-    - poetry run ./scripts-dev/lint.sh
+    - poetry run isort --check synapse
+    - poetry run black --check synapse
+    - poetry run mypy
 
 test-trial:
   stage: test
