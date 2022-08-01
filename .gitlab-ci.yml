@@ -1,14 +1,26 @@
 stages:
+  - lint
   - test
   - build
+
+lint:
+  stage: lint
+  image:
+    name: $CI_REGISTRY_IMAGE:latest
+    entrypoint: [""]
+  before_script:
+    - pip install -e ".[all]"
+  script:
+    - ./scripts-dev/lint.sh
 
 test-trial:
   stage: test
   image:
     name: $CI_REGISTRY_IMAGE:latest
     entrypoint: [""]
-  script:
+  before_script:
     - pip install -e ".[all]"
+  script:
     - trial -j 4 tests
 
 test-sytest:
