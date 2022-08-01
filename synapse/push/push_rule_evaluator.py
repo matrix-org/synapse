@@ -190,7 +190,10 @@ class PushRuleEvaluatorForEvent:
         """
         if condition["kind"] == "event_match":
             return self._event_match(condition, user_id, self._event, self._value_cache)
-        elif condition["kind"] in ("related_event_match", "inverse_related_event_match"):
+        elif condition["kind"] in (
+            "related_event_match",
+            "inverse_related_event_match",
+        ):
             if not self._related_event:
                 return False
             is_match = self._event_match(
