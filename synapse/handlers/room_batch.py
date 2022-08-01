@@ -285,7 +285,7 @@ class RoomBatchHandler:
         app_service_requester: Requester,
         also_allow_user: Optional[str],
         beeper_new_messages: bool,
-        beeper_initial_prev_event_ids: List[str] = None,
+        beeper_initial_prev_event_ids: Optional[List[str]] = None,
     ) -> List[str]:
         """Create and persists all events provided sequentially. Handles the
         complexity of creating events in chronological order so they can
@@ -426,13 +426,13 @@ class RoomBatchHandler:
         self,
         events_to_create: List[JsonDict],
         room_id: str,
-        batch_id_to_connect_to: str,
+        batch_id_to_connect_to: Optional[str],
         inherited_depth: int,
         initial_state_event_ids: List[str],
         app_service_requester: Requester,
         also_allow_user: Optional[str],
         beeper_new_messages: bool,
-        beeper_initial_prev_event_ids: List[str] = None,
+        beeper_initial_prev_event_ids: Optional[List[str]] = None,
     ) -> Tuple[List[str], str]:
         """
         Handles creating and persisting all of the historical events as well as

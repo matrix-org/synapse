@@ -48,7 +48,7 @@ class StateStoreTestCase(HomeserverTestCase):
             )
         )
 
-        self.clock._reactor.advance(1)
+        self.clock._reactor.advance(1)  # type: ignore
 
     def inject_state_event(self, room, sender, typ, state_key, content):
         builder = self.event_builder_factory.for_room_version(

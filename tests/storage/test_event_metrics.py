@@ -20,7 +20,7 @@ from tests.unittest import HomeserverTestCase
 
 class ExtremStatisticsTestCase(HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
-        self.clock._reactor.advance(1)
+        self.clock._reactor.advance(1)  # type: ignore
 
     def test_exposed_to_prometheus(self):
         """

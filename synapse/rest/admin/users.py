@@ -94,7 +94,7 @@ class UsersRestServletV2(RestServlet):
         name = parse_string(request, "name")
         guests = parse_boolean(request, "guests", default=True)
         deactivated = parse_boolean(request, "deactivated", default=False)
-        appservice = parse_string(request, "appservice", default=False)
+        appservice = parse_string(request, "appservice")
 
         order_by = parse_string(
             request,

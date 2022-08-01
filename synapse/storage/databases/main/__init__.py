@@ -228,7 +228,7 @@ class DataStore(
         deactivated: bool = False,
         order_by: str = UserSortOrder.USER_ID.value,
         direction: str = "f",
-        appservice: bool = False,
+        appservice: Optional[str] = None,
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users from
         users list. This will return a json list of users and the

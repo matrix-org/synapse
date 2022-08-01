@@ -101,5 +101,5 @@ def get_request_user_agent(request: IRequest, default: str = "") -> str:
 
 
 def get_request_beeper_bridge(request: IRequest) -> str:
-    h = request.getHeader(b"X-Beeper-Bridge")  # type: ignore
+    h = request.getHeader(b"X-Beeper-Bridge")
     return h.decode("ascii", "replace") if h else ""

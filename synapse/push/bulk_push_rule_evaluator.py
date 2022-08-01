@@ -61,7 +61,7 @@ def _should_count_as_unread(
             return isinstance(body, str) and bool(body)
         # Beeper: We want reactions to only count as unread if they're reactions to the current user in rooms that
         # have fewer than 20 users.
-        elif event.type == "m.reaction":
+        elif event.type == "m.reaction" and related_event:
             return (
                 related_event.sender == current_user and non_bot_room_members_count < 20
             )

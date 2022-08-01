@@ -407,7 +407,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     async def get_number_joined_non_bot_users_in_room(self, room_id: str) -> int:
         def _get_number_joined_non_bot_users_in_room_txn(
             txn: LoggingTransaction,
-        ) -> Dict[str, MemberSummary]:
+        ) -> int:
             sql = """
                 SELECT COUNT(*)
                 FROM current_state_events

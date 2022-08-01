@@ -47,7 +47,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         # User elsewhere on another host
         self.u_charlie = UserID.from_string("@charlie:elsewhere")
 
-        self.clock._reactor.advance(1)
+        self.clock._reactor.advance(1)  # type: ignore
 
     def test_one_member(self) -> None:
 
@@ -220,7 +220,7 @@ class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
         self.store = hs.get_datastores().main
         self.room_creator = hs.get_room_creation_handler()
 
-        self.clock._reactor.advance(1)
+        self.clock._reactor.advance(1)  # type: ignore
 
     def test_can_rerun_update(self) -> None:
         # First make sure we have completed all updates.

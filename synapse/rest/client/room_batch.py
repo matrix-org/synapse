@@ -15,7 +15,7 @@
 import logging
 import re
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Awaitable, Tuple
+from typing import TYPE_CHECKING, Awaitable, Optional, Tuple
 
 from twisted.web.server import Request
 
@@ -107,8 +107,8 @@ class RoomBatchSendEventRestServlet(RestServlet):
             if self.enable_also_allow_user
             else None
         )
-        beeper_new_messages = parse_boolean_from_args(
-            request.args, "com.beeper.new_messages"
+        beeper_new_messages = (
+            parse_boolean_from_args(request.args, "com.beeper.new_messages") or False
         )
 
         if prev_event_ids_from_query is None:
@@ -227,6 +227,8 @@ class RoomBatchSendEventRestServlet(RestServlet):
             batch_id_to_connect_to = base_insertion_event.content[
                 EventContentFields.MSC2716_NEXT_BATCH_ID
             ]
+
+        next_batch_id: Optional[str]
 
         # Create and persist all of the historical events as well as insertion
         # and batch meta events to make the batch navigable in the DAG.

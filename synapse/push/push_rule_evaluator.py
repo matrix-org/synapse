@@ -136,7 +136,7 @@ class PushRuleEvaluatorForEvent:
 
         self._related_event = related_event
         self._related_event_value_cache = (
-            _flatten_dict(related_event) if related_event else None
+            _flatten_dict(related_event) if related_event else {}
         )
 
         # Maps cache keys to final values.

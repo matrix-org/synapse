@@ -475,7 +475,7 @@ class _Recoverer:
         self.as_api = as_api
         self.service = service
         self.callback = callback
-        self.backoff_counter = 0
+        self.backoff_counter = 0.0
 
     def recover(self) -> None:
         def _retry() -> None:
