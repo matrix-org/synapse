@@ -1452,6 +1452,65 @@ class ModuleApi:
             start_timestamp, end_timestamp
         )
 
+    async def create_room(
+        self,
+        user_id: str,
+        config: JsonDict,
+        ratelimit: bool = True,
+        creator_join_profile: Optional[JsonDict] = None,
+    ) -> Tuple[dict, int]:
+        """Creates a new room.
+
+        Args:
+            user_id:
+                The user who requested the room creation.
+            config : A dict of configuration options. See "Request body" of:
+                https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3createroom
+            ratelimit: set to False to disable the rate limiter.
+
+            creator_join_profile:
+                Set to override the displayname and avatar for the creating
+                user in this room. If unset, displayname and avatar will be
+                derived from the user's profile. If set, should contain the
+                values to go in the body of the 'join' event (typically
+                `avatar_url` and/or `displayname`.
+
+        Returns:
+                First, a dict containing the keys `room_id` and, if an alias
+                was, requested, `room_alias`. Secondly, the stream_id of the
+                last persisted event.
+        Raises:
+            SynapseError if the user does not exist, room ID couldn't be stored, or
+            something went horribly wrong.
+            ResourceLimitError if server is blocked to some resource being
+            exceeded.
+        """
+        user_info = await self.get_userinfo_by_id(user_id)
+        if user_info is None:
+            raise SynapseError(400, f"User ({user_id}) not found")
+
+        if user_info.appservice_id is not None:
+            app_service = self._store.get_app_service_by_id(
+                str(user_info.appservice_id)
+            )
+        else:
+            app_service = None
+
+        requester = create_requester(
+            user_id=user_id,
+            is_guest=user_info.is_guest,
+            shadow_banned=user_info.is_shadow_banned,
+            app_service=app_service,
+            authenticated_entity=self.server_name,
+        )
+
+        return await self._hs.get_room_creation_handler().create_room(
+            requester=requester,
+            config=config,
+            ratelimit=ratelimit,
+            creator_join_profile=creator_join_profile,
+        )
+
 
 class PublicRoomListManager:
     """Contains methods for adding to, removing from and querying whether a room
