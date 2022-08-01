@@ -10,9 +10,9 @@ lint:
     entrypoint: [""]
   before_script:
     - apt-get update
-    - apt-get install -yqq git
+    - apt-get install -yqq git libpq-dev build-essential
     - pip install poetry
-    - poetry install
+    - poetry install --extras all
   script:
     - poetry run isort --check synapse
     - poetry run black --check synapse
@@ -24,9 +24,10 @@ test-trial:
     name: $CI_REGISTRY_IMAGE:latest
     entrypoint: [""]
   before_script:
-    - pip install -e ".[all]"
+    - pip install poetry
+    - poetry install
   script:
-    - trial -j 4 tests
+    - poetry run trial -j 4 tests
 
 test-sytest:
   stage: test
