@@ -1,0 +1,1 @@
+Faster room joins: Fix error when running out of servers to sync partial state with, so that Synapse raises the intended error instead.
