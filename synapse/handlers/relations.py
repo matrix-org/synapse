@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import enum
 import logging
 from typing import TYPE_CHECKING, Dict, FrozenSet, Iterable, List, Optional, Tuple
 
@@ -28,6 +29,13 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+
+class ThreadsListInclude(str, enum.Enum):
+    """Valid values for the 'include' flag of /threads."""
+
+    all = "all"
+    participated = "participated"
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -485,7 +493,7 @@ class RelationsHandler:
         self,
         requester: Requester,
         room_id: str,
-        include: str,
+        include: ThreadsListInclude,
         limit: int = 5,
         from_token: Optional[StreamToken] = None,
         to_token: Optional[StreamToken] = None,
@@ -521,7 +529,7 @@ class RelationsHandler:
 
         events = await self._main_store.get_events_as_list(thread_roots)
 
-        if include == "participated":
+        if include == ThreadsListInclude.participated:
             # Pre-seed thread participation with whether the requester sent the event.
             participated = {event.event_id: event.sender == user_id for event in events}
             # For events the requester did not send, check the database for whether

@@ -16,6 +16,7 @@ import logging
 import re
 from typing import TYPE_CHECKING, Optional, Tuple
 
+from synapse.handlers.relations import ThreadsListInclude
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
@@ -114,7 +115,10 @@ class ThreadsServlet(RestServlet):
         from_token_str = parse_string(request, "from")
         to_token_str = parse_string(request, "to")
         include = parse_string(
-            request, "include", default="all", allowed_values=["all", "participated"]
+            request,
+            "include",
+            default=ThreadsListInclude.all.value,
+            allowed_values=[v.value for v in ThreadsListInclude],
         )
 
         # Return the relations
@@ -128,7 +132,7 @@ class ThreadsServlet(RestServlet):
         result = await self._relations_handler.get_threads(
             requester=requester,
             room_id=room_id,
-            include=include,
+            include=ThreadsListInclude(include),
             limit=limit,
             from_token=from_token,
             to_token=to_token,
