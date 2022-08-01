@@ -46,7 +46,6 @@ from twisted.internet import defer, threads
 from twisted.python.threadpool import ThreadPool
 
 if TYPE_CHECKING:
-    from synapse.logging.scopecontextmanager import _LogContextScope
     from synapse.types import ISynapseReactor
 
 logger = logging.getLogger(__name__)
@@ -221,14 +220,13 @@ LoggingContextOrSentinel = Union["LoggingContext", "_Sentinel"]
 class _Sentinel:
     """Sentinel to represent the root context"""
 
-    __slots__ = ["previous_context", "finished", "request", "scope", "tag"]
+    __slots__ = ["previous_context", "finished", "request", "tag"]
 
     def __init__(self) -> None:
         # Minimal set for compatibility with LoggingContext
         self.previous_context = None
         self.finished = False
         self.request = None
-        self.scope = None
         self.tag = None
 
     def __str__(self) -> str:
@@ -281,7 +279,6 @@ class LoggingContext:
         "finished",
         "request",
         "tag",
-        "scope",
     ]
 
     def __init__(
@@ -302,7 +299,6 @@ class LoggingContext:
         self.main_thread = get_thread_id()
         self.request = None
         self.tag = ""
-        self.scope: Optional["_LogContextScope"] = None
 
         # keep track of whether we have hit the __exit__ block for this context
         # (suggesting that the the thing that created the context thinks it should
@@ -314,9 +310,6 @@ class LoggingContext:
         if self.parent_context is not None:
             # we track the current request_id
             self.request = self.parent_context.request
-
-            # we also track the current scope:
-            self.scope = self.parent_context.scope
 
         if request is not None:
             # the request param overrides the request from the parent context
