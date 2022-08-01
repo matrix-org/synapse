@@ -23,6 +23,7 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Optional,
     Sequence,
     Set,
     Tuple,
