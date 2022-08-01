@@ -17,6 +17,7 @@ import functools
 import inspect
 import logging
 from typing import (
+    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
@@ -40,12 +41,14 @@ from twisted.internet import defer
 from twisted.python.failure import Failure
 
 from synapse.logging.context import make_deferred_yieldable, preserve_fn
-from synapse.replication.tcp.external_sharded_cache import ExternalShardedCache
 from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import delay_cancellation
 from synapse.util.caches.deferred_cache import DeferredCache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.redis_caches import redisCachedList
+
+if TYPE_CHECKING:
+    from synapse.replication.tcp.external_sharded_cache import ExternalShardedCache
 
 logger = logging.getLogger(__name__)
 
