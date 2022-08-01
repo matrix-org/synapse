@@ -338,6 +338,10 @@ class StateStorageController:
             event_ids: events to get state groups for
             await_full_state: if true, will block if we do not yet have complete
                state at these events.
+
+        Raises:
+            RuntimeError if we don't have a state group for one or more of the events
+               (ie. they are outliers or unknown)
         """
         if await_full_state:
             await self._partial_state_events_tracker.await_full_state(event_ids)
