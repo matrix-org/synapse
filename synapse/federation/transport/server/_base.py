@@ -357,6 +357,7 @@ class BaseFederationServlet:
 
             remote_parent_span_cm = use_span(remote_parent_span, end_on_exit=True)
 
+            # TODO: Make sure this works (traces as expected)
             with remote_parent_span_cm, local_parent_span_cm:
                 if origin and self.RATELIMIT:
                     with ratelimiter.ratelimit(origin) as d:

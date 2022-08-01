@@ -529,6 +529,11 @@ def start_active_span(
     if opentelemetry is None:
         return contextlib.nullcontext()  # type: ignore[unreachable]
 
+    # TODO: Why is this necessary to satisfy this error? It has a default?
+    #  ` error: Argument "kind" to "start_span" of "Tracer" has incompatible type "Optional[SpanKind]"; expected "SpanKind"  [arg-type]`
+    if kind is None:
+        kind = SpanKind.INTERNAL
+
     span = start_span(
         name=name,
         context=context,
