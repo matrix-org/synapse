@@ -24,8 +24,10 @@ test-trial:
     name: $CI_REGISTRY_IMAGE:latest
     entrypoint: [""]
   before_script:
+    - apt-get update
+    - apt-get install -yqq git libpq-dev build-essential
     - pip install poetry
-    - poetry install
+    - poetry install --extras all
   script:
     - poetry run trial -j 4 tests
 
