@@ -333,12 +333,12 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
         # (user_id, device_id) entries into a map, with the value being
         # the max stream_id across each set of duplicate entries
         #
-        # maps (user_id, device_id) -> (stream_id, opentracing_context)
+        # maps (user_id, device_id) -> (stream_id,tracing_context)
         #
-        # opentracing_context contains the opentracing metadata for the request
+        # tracing_context contains the opentelemetry metadata for the request
         # that created the poke
         #
-        # The most recent request's opentracing_context is used as the
+        # The most recent request's tracing_context is used as the
         # context which created the Edu.
 
         # This is the stream ID that we will return for the consumer to resume
@@ -468,11 +468,11 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
                 - user_id
                 - device_id
                 - stream_id
-                - opentracing_context
+                - tracing_context
         """
         # get the list of device updates that need to be sent
         sql = """
-            SELECT user_id, device_id, stream_id, opentracing_context FROM device_lists_outbound_pokes
+            SELECT user_id, device_id, stream_id, tracing_context FROM device_lists_outbound_pokes
             WHERE destination = ? AND ? < stream_id AND stream_id <= ?
             ORDER BY stream_id
             LIMIT ?
@@ -531,13 +531,13 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
 
             for device_id in device_ids:
                 device = user_devices[device_id]
-                stream_id, opentracing_context = query_map[(user_id, device_id)]
+                stream_id, tracing_context = query_map[(user_id, device_id)]
                 result = {
                     "user_id": user_id,
                     "device_id": device_id,
                     "prev_id": [prev_id] if prev_id else [],
                     "stream_id": stream_id,
-                    "org.matrix.opentracing_context": opentracing_context,
+                    "org.matrix.tracing_context": tracing_context,
                 }
 
                 prev_id = stream_id
@@ -1801,7 +1801,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 "device_id",
                 "sent",
                 "ts",
-                "opentracing_context",
+                "tracing_context",
             ),
             values=[
                 (
@@ -1846,7 +1846,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 "room_id",
                 "stream_id",
                 "converted_to_destinations",
-                "opentracing_context",
+                "tracing_context",
             ),
             values=[
                 (
@@ -1870,11 +1870,11 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         written to `device_lists_outbound_pokes`.
 
         Returns:
-            A list of user ID, device ID, room ID, stream ID and optional opentracing context.
+            A list of user ID, device ID, room ID, stream ID and optional opentelemetry context.
         """
 
         sql = """
-            SELECT user_id, device_id, room_id, stream_id, opentracing_context
+            SELECT user_id, device_id, room_id, stream_id, tracing_context
             FROM device_lists_changes_in_room
             WHERE NOT converted_to_destinations
             ORDER BY stream_id
@@ -1892,9 +1892,9 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                     device_id,
                     room_id,
                     stream_id,
-                    db_to_json(opentracing_context),
+                    db_to_json(tracing_context),
                 )
-                for user_id, device_id, room_id, stream_id, opentracing_context in txn
+                for user_id, device_id, room_id, stream_id, tracing_context in txn
             ]
 
         return await self.db_pool.runInteraction(

@@ -688,7 +688,7 @@ class DeviceHandler(DeviceWorkerHandler):
                     else:
                         return
 
-                for user_id, device_id, room_id, stream_id, opentracing_context in rows:
+                for user_id, device_id, room_id, stream_id, tracing_context in rows:
                     hosts = set()
 
                     # Ignore any users that aren't ours
@@ -707,7 +707,7 @@ class DeviceHandler(DeviceWorkerHandler):
                         room_id=room_id,
                         stream_id=stream_id,
                         hosts=hosts,
-                        context=opentracing_context,
+                        context=tracing_context,
                     )
 
                     # Notify replication that we've updated the device list stream.

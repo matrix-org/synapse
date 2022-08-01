@@ -273,7 +273,7 @@ class DeviceMessageHandler:
                 "sender": sender_user_id,
                 "type": message_type,
                 "message_id": message_id,
-                "org.matrix.opentracing_context": json_encoder.encode(context),
+                "org.matrix.tracing_context": json_encoder.encode(context),
             }
 
         # Add messages to the database.

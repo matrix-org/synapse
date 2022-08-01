@@ -97,7 +97,7 @@ class TransactionManager:
 
         with start_active_span(
             "send_transaction",
-            links=[Link(context) for context in span_contexts],
+            links=[Link(span_context) for span_context in span_contexts],
         ):
             logger.debug("TX [%s] _attempt_new_transaction", destination)
 

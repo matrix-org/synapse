@@ -26,11 +26,13 @@ from synapse.http.site import SynapseRequest
 from synapse.logging.context import run_in_background
 from synapse.logging.tracing import (
     Link,
+    context_from_request,
     create_non_recording_span,
     get_active_span,
     set_attribute,
-    span_context_from_request,
     start_active_span,
+    start_span,
+    use_span,
     whitelisted_homeserver,
 )
 from synapse.types import JsonDict
@@ -313,45 +315,49 @@ class BaseFederationServlet:
 
             # if the origin is authenticated and whitelisted, use its span context
             # as the parent.
-            origin_span_context = None
+            origin_context = None
             if origin and whitelisted_homeserver(origin):
-                origin_span_context = span_context_from_request(request)
+                origin_context = context_from_request(request)
 
-            if origin_span_context:
+            if origin_context:
                 local_servlet_span = get_active_span()
-                # Create a span which uses the `origin_span_context` as a parent
+                # Create a span which uses the `origin_context` as a parent
                 # so we can see how the incoming payload was processed while
                 # we're looking at the outgoing trace. Since the parent is set
                 # to a remote span (from the origin), it won't show up in the
                 # local trace which is why we create another span below for the
                 # local trace. A span can only have one parent so we have to
                 # create two separate ones.
-                remote_parent_span = start_active_span(
+                remote_parent_span = start_span(
                     "incoming-federation-request",
-                    context=origin_span_context,
+                    context=origin_context,
                     # Cross-link back to the local trace so we can jump
                     # to the incoming side from the remote origin trace.
-                    links=[Link(local_servlet_span.get_span_context())],
+                    links=[Link(local_servlet_span.get_span_context())]
+                    if local_servlet_span
+                    else None,
                 )
 
                 # Create a local span to appear in the local trace
-                local_parent_span = start_active_span(
+                local_parent_span_cm = start_active_span(
                     "process-federation-request",
-                    # Cross-link back to the remote outgoing trace so we jump over
-                    # there.
+                    # Cross-link back to the remote outgoing trace so we can
+                    # jump over there.
                     links=[Link(remote_parent_span.get_span_context())],
                 )
-
             else:
-                # Otherwise just use our local context as a parent
-                local_parent_span = start_active_span(
+                # Otherwise just use our local active servlet context as a parent
+                local_parent_span_cm = start_active_span(
                     "process-federation-request",
                 )
 
-                # Don't need to record anything for the remote
+                # Don't need to record anything for the remote because no remote
+                # trace context given.
                 remote_parent_span = create_non_recording_span()
 
-            with remote_parent_span, local_parent_span:
+            remote_parent_span_cm = use_span(remote_parent_span, end_on_exit=True)
+
+            with remote_parent_span_cm, local_parent_span_cm:
                 if origin and self.RATELIMIT:
                     with ratelimiter.ratelimit(origin) as d:
                         await d

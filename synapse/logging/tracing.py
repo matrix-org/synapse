@@ -202,31 +202,33 @@ if TYPE_CHECKING:
 
 # Helper class
 
+T = TypeVar("T")
+
 
 class _DummyLookup(object):
     """This will always returns the fixed value given for any accessed property"""
 
-    def __init__(self, value):
+    def __init__(self, value: T) -> None:
         self.value = value
 
-    def __getattribute__(self, name):
+    def __getattribute__(self, name: str) -> T:
         return object.__getattribute__(self, "value")
 
 
 class DummyLink(ABC):
     """Dummy placeholder for `opentelemetry.trace.Link`"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.not_implemented_message = (
-            "opentelemetry wasn't imported so this is just a dummy link placeholder"
+            "opentelemetry isn't installed so this is just a dummy link placeholder"
         )
 
     @property
-    def context(self):
+    def context(self) -> None:
         raise NotImplementedError(self.not_implemented_message)
 
     @property
-    def attributes(self):
+    def attributes(self) -> None:
         raise NotImplementedError(self.not_implemented_message)
 
 
@@ -242,17 +244,18 @@ try:
     import opentelemetry.semconv.trace
     import opentelemetry.trace
     import opentelemetry.trace.propagation
+    import opentelemetry.trace.status
 
     SpanKind = opentelemetry.trace.SpanKind
     SpanAttributes = opentelemetry.semconv.trace.SpanAttributes
-    StatusCode = opentelemetry.trace.StatusCode
+    StatusCode = opentelemetry.trace.status.StatusCode
     Link = opentelemetry.trace.Link
 except ImportError:
     opentelemetry = None  # type: ignore[assignment]
-    SpanKind = _DummyLookup(0)
-    SpanAttributes = _DummyLookup("fake-attribute")
-    StatusCode = _DummyLookup(0)
-    Link = DummyLink
+    SpanKind = _DummyLookup(0)  # type: ignore
+    SpanAttributes = _DummyLookup("fake-attribute")  # type: ignore
+    StatusCode = _DummyLookup(0)  # type: ignore
+    Link = DummyLink  # type: ignore
 
 
 logger = logging.getLogger(__name__)
@@ -303,7 +306,6 @@ class _Sentinel(enum.Enum):
 
 P = ParamSpec("P")
 R = TypeVar("R")
-T = TypeVar("T")
 
 
 def only_if_tracing(func: Callable[P, R]) -> Callable[P, Optional[R]]:
@@ -455,12 +457,58 @@ def whitelisted_homeserver(destination: str) -> bool:
 # Start spans and scopes
 
 
-def create_non_recording_span():
+def use_span(
+    span: "opentelemetry.trace.span.Span",
+    end_on_exit: bool = True,
+) -> ContextManager["opentelemetry.trace.span.Span"]:
     if opentelemetry is None:
         return contextlib.nullcontext()  # type: ignore[unreachable]
 
+    return opentelemetry.trace.use_span(span=span, end_on_exit=end_on_exit)
+
+
+def create_non_recording_span() -> "opentelemetry.trace.span.Span":
+    """Create a no-op span that does not record or become part of a recorded trace"""
+
     return opentelemetry.trace.NonRecordingSpan(
         opentelemetry.trace.INVALID_SPAN_CONTEXT
+    )
+
+
+def start_span(
+    name: str,
+    *,
+    context: Optional["opentelemetry.context.context.Context"] = None,
+    kind: Optional["opentelemetry.trace.SpanKind"] = SpanKind.INTERNAL,
+    attributes: "opentelemetry.util.types.Attributes" = None,
+    links: Optional[Sequence["opentelemetry.trace.Link"]] = None,
+    start_time: Optional[int] = None,
+    record_exception: bool = True,
+    set_status_on_exception: bool = True,
+    end_on_exit: bool = True,
+    # For testing only
+    tracer: Optional["opentelemetry.trace.Tracer"] = None,
+) -> "opentelemetry.trace.span.Span":
+    if opentelemetry is None:
+        raise Exception("Not able to create span without opentelemetry installed.")
+
+    if tracer is None:
+        tracer = opentelemetry.trace.get_tracer(__name__)
+
+    # TODO: Why is this necessary to satisfy this error? It has a default?
+    #  ` error: Argument "kind" to "start_span" of "Tracer" has incompatible type "Optional[SpanKind]"; expected "SpanKind"  [arg-type]`
+    if kind is None:
+        kind = SpanKind.INTERNAL
+
+    return tracer.start_span(
+        name=name,
+        context=context,
+        kind=kind,
+        attributes=attributes,
+        links=links,
+        start_time=start_time,
+        record_exception=record_exception,
+        set_status_on_exception=set_status_on_exception,
     )
 
 
@@ -476,15 +524,12 @@ def start_active_span(
     set_status_on_exception: bool = True,
     end_on_exit: bool = True,
     # For testing only
-    tracer: Optional["opentelemetry.sdk.trace.TracerProvider"] = None,
+    tracer: Optional["opentelemetry.trace.Tracer"] = None,
 ) -> ContextManager["opentelemetry.trace.span.Span"]:
     if opentelemetry is None:
         return contextlib.nullcontext()  # type: ignore[unreachable]
 
-    if tracer is None:
-        tracer = opentelemetry.trace.get_tracer(__name__)
-
-    return tracer.start_as_current_span(
+    span = start_span(
         name=name,
         context=context,
         kind=kind,
@@ -493,7 +538,14 @@ def start_active_span(
         start_time=start_time,
         record_exception=record_exception,
         set_status_on_exception=set_status_on_exception,
+    )
+
+    # Equivalent to `tracer.start_as_current_span`
+    return opentelemetry.trace.use_span(
+        span,
         end_on_exit=end_on_exit,
+        record_exception=record_exception,
+        set_status_on_exception=set_status_on_exception,
     )
 
 
@@ -531,7 +583,7 @@ def set_attribute(key: str, value: Union[str, bool, int, float]) -> None:
 
 @ensure_active_span("set the status")
 def set_status(
-    status: "opentelemetry.trace.StatusCode", exc: Optional[Exception]
+    status: "opentelemetry.trace.status.StatusCode", exc: Optional[Exception]
 ) -> None:
     """Sets a tag on the active span"""
     active_span = get_active_span()
@@ -545,7 +597,7 @@ DEFAULT_LOG_NAME = "log"
 
 
 @ensure_active_span("log")
-def log_kv(key_values: Dict[str, Any], timestamp: Optional[float] = None) -> None:
+def log_kv(key_values: Dict[str, Any], timestamp: Optional[int] = None) -> None:
     """Log to the active span"""
     active_span = get_active_span()
     assert active_span is not None
@@ -665,9 +717,9 @@ def get_active_span_text_map(destination: Optional[str] = None) -> Dict[str, str
     return carrier_text_map
 
 
-def span_context_from_request(
+def context_from_request(
     request: Request,
-) -> Optional["opentelemetry.trace.span.SpanContext"]:
+) -> Optional["opentelemetry.context.context.Context"]:
     """Extract an opentracing context from the headers on an HTTP request
 
     This is useful when we have received an HTTP request from another part of our
@@ -687,18 +739,18 @@ def span_context_from_request(
 @only_if_tracing
 def extract_text_map(
     carrier: Dict[str, str]
-) -> Optional["opentelemetry.shim.opentracing_shim.SpanContextShim"]:
+) -> Optional["opentelemetry.context.context.Context"]:
     """
     Wrapper method for opentracing's tracer.extract for TEXT_MAP.
     Args:
-        carrier: a dict possibly containing a span context.
+        carrier: a dict possibly containing a context.
 
     Returns:
-        The active span context extracted from carrier.
+        The active context extracted from carrier.
     """
     propagator = opentelemetry.propagate.get_global_textmap()
     # Extract all of the relevant values from the `carrier` to construct a
-    # SpanContext to return.
+    # Context to return.
     return propagator.extract(carrier)
 
 
@@ -826,7 +878,7 @@ def trace_servlet(
     }
 
     request_name = request.request_metrics.name
-    span_context = span_context_from_request(request) if extract_context else None
+    tracing_context = context_from_request(request) if extract_context else None
 
     # we configure the scope not to finish the span immediately on exit, and instead
     # pass the span into the SynapseRequest, which will finish it once we've finished
@@ -835,7 +887,7 @@ def trace_servlet(
     with start_active_span(
         request_name,
         kind=SpanKind.SERVER,
-        context=span_context,
+        context=tracing_context,
         end_on_exit=False,
     ) as span:
         request.set_tracing_span(span)

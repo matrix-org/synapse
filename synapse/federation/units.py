@@ -55,10 +55,10 @@ class Edu:
         }
 
     def get_context(self) -> str:
-        return getattr(self, "content", {}).get("org.matrix.opentracing_context", "{}")
+        return getattr(self, "content", {}).get("org.matrix.tracing_context", "{}")
 
     def strip_context(self) -> None:
-        getattr(self, "content", {})["org.matrix.opentracing_context"] = "{}"
+        getattr(self, "content", {})["org.matrix.tracing_context"] = "{}"
 
 
 def _none_to_list(edus: Optional[List[JsonDict]]) -> List[JsonDict]:
