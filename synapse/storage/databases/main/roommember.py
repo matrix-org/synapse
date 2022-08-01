@@ -565,8 +565,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cached(max_entries=500000, iterable=True)
     async def get_rooms_for_user_with_stream_ordering(
-        self,
-        user_id: str,
+        self, user_id: str
     ) -> FrozenSet[GetRoomsForUserWithStreamOrdering]:
         """Returns a set of room_ids the user is currently joined to.
 
@@ -575,8 +574,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         Args:
             user_id
-            exclude_for_sync: Whether to exclude rooms that the configuration says
-                should be excluded from sync results.
 
         Returns:
             Returns the rooms the user is in currently, along with the stream
@@ -590,9 +587,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
     def _get_rooms_for_user_with_stream_ordering_txn(
-        self,
-        txn: LoggingTransaction,
-        user_id: str,
+        self, txn: LoggingTransaction, user_id: str
     ) -> FrozenSet[GetRoomsForUserWithStreamOrdering]:
         # We use `current_state_events` here and not `local_current_membership`
         # as a) this gets called with remote users and b) this only gets called
