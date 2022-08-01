@@ -414,11 +414,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 WHERE room_id = ? AND membership = ? AND state_key NOT LIKE ?
             """
 
-            txn.execute(sql, (room_id, Membership.JOIN, '@_%_bot:%'))
+            txn.execute(sql, (room_id, Membership.JOIN, "@_%_bot:%"))
             return [r[0] for r in txn][0]
 
         return await self.db_pool.runInteraction(
-            "get_number_joined_non_bot_users_in_room", _get_number_joined_non_bot_users_in_room_txn
+            "get_number_joined_non_bot_users_in_room",
+            _get_number_joined_non_bot_users_in_room_txn,
         )
 
     @cached()
