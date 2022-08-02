@@ -834,7 +834,15 @@ class AsyncLruCache(Generic[KT, VT]):
     ) -> Optional[VT]:
         return self._lru_cache.get(key, update_metrics=update_metrics)
 
+    def get_local(
+        self, key: KT, default: Optional[T] = None, update_metrics: bool = True
+    ) -> Optional[VT]:
+        return self._lru_cache.get(key, update_metrics=update_metrics)
+
     async def set(self, key: KT, value: VT) -> None:
+        self._lru_cache.set(key, value)
+
+    def set_local(self, key: KT, value: VT) -> None:
         self._lru_cache.set(key, value)
 
     async def invalidate(self, key: KT) -> None:
