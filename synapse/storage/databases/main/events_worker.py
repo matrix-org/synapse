@@ -246,7 +246,9 @@ class EventsWorkerStore(SQLBaseStore):
         ]
 
         external_sharded_cache = hs.get_external_sharded_cache()
-        if external_sharded_cache.is_enabled():
+        # TODO: temporary explicit disable of this cache due to thrashing requests
+        # burning CPU. Possibly need to move this cache to where we get events from DB.
+        if external_sharded_cache.is_enabled() and False:
             self._get_event_cache = RedisLruCache(
                 cache_name="*getEvent*",
                 max_size=hs.config.caches.event_cache_size,
