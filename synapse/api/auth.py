@@ -138,15 +138,7 @@ class Auth:
             AuthError if access is denied for the user in the access token
         """
         parent_span = get_active_span()
-        with start_active_span(
-            "get_user_by_req",
-            attributes={
-                # We still haven't determined whether to force tracing yet so we
-                # need to make sure the sampler set our span as recording so we
-                # don't lose anything.
-                SynapseTags.FORCE_RECORD_MAYBE_SAMPLE: True,
-            },
-        ):
+        with start_active_span("get_user_by_req"):
             requester = await self._wrapped_get_user_by_req(
                 request, allow_guest, allow_expired
             )
