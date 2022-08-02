@@ -30,7 +30,12 @@ from synapse.api.errors import (
 from synapse.appservice import ApplicationService
 from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
-from synapse.logging.tracing import force_tracing, get_active_span, start_active_span
+from synapse.logging.tracing import (
+    force_tracing,
+    get_active_span,
+    start_active_span,
+    SynapseTags,
+)
 from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import Requester, UserID, create_requester
 
@@ -133,7 +138,15 @@ class Auth:
             AuthError if access is denied for the user in the access token
         """
         parent_span = get_active_span()
-        with start_active_span("get_user_by_req"):
+        with start_active_span(
+            "get_user_by_req",
+            attributes={
+                # We still haven't determined whether to force tracing yet so we
+                # need to make sure the sampler set our span as recording so we
+                # don't lose anything.
+                SynapseTags.FORCE_RECORD_MAYBE_SAMPLE: True,
+            },
+        ):
             requester = await self._wrapped_get_user_by_req(
                 request, allow_guest, allow_expired
             )
@@ -142,11 +155,10 @@ class Auth:
                 if requester.authenticated_entity in self._force_tracing_for_users:
                     # request tracing is enabled for this user, so we need to force it
                     # tracing on for the parent span (which will be the servlet span).
-                    #
+                    force_tracing(parent_span)
                     # It's too late for the get_user_by_req span to inherit the setting,
                     # so we also force it on for that.
                     force_tracing()
-                    force_tracing(parent_span)
                 parent_span.set_attribute(
                     "authenticated_entity", requester.authenticated_entity
                 )

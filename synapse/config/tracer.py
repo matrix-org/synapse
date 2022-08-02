@@ -24,35 +24,38 @@ class TracerConfig(Config):
     section = "tracing"
 
     def read_config(self, config: JsonDict, **kwargs: Any) -> None:
-        opentelemetry_config = config.get("opentelemetry")
-        if opentelemetry_config is None:
-            opentelemetry_config = {}
+        tracing_config = config.get("tracing")
+        if tracing_config is None:
+            tracing_config = {}
 
-        self.opentelemetry_enabled = opentelemetry_config.get("enabled", False)
+        self.tracing_enabled = tracing_config.get("enabled", False)
 
-        self.jaeger_exporter_config = opentelemetry_config.get(
+        self.jaeger_exporter_config = tracing_config.get(
             "jaeger_exporter_config",
             {},
         )
 
         self.force_tracing_for_users: Set[str] = set()
 
-        if not self.opentelemetry_enabled:
+        if not self.tracing_enabled:
             return
 
         check_requirements("opentelemetry")
 
         # The tracer is enabled so sanitize the config
 
-        self.opentelemetry_whitelist: List[str] = opentelemetry_config.get(
+        # Default to always sample. Range: [0.0 - 1.0]
+        self.sample_rate: float = float(tracing_config.get("sample_rate", 1))
+        if self.sample_rate < 0.0 or self.sample_rate > 1.0:
+            raise ConfigError("Tracing sample_rate must be in range [0.0, 1.0].")
+
+        self.homeserver_whitelist: List[str] = tracing_config.get(
             "homeserver_whitelist", []
         )
-        if not isinstance(self.opentelemetry_whitelist, list):
-            raise ConfigError("Tracer homeserver_whitelist config is malformed")
+        if not isinstance(self.homeserver_whitelist, list):
+            raise ConfigError("Tracing homeserver_whitelist config is malformed")
 
-        force_tracing_for_users = opentelemetry_config.get(
-            "force_tracing_for_users", []
-        )
+        force_tracing_for_users = tracing_config.get("force_tracing_for_users", [])
         if not isinstance(force_tracing_for_users, list):
             raise ConfigError(
                 "Expected a list", ("opentelemetry", "force_tracing_for_users")
