@@ -222,7 +222,7 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
             )
             queue.append(end_item)
 
-        # also add our active opentracing span to the item so that we get a link back
+        # also add our active tracing span to the item so that we get a link back
         span = get_active_span()
         if span:
             end_item.parent_tracing_span_contexts.append(span.get_span_context())
@@ -233,7 +233,7 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
         # wait for the queue item to complete
         res = await make_deferred_yieldable(end_item.deferred.observe())
 
-        # add another opentracing span which links to the persist trace.
+        # add another tracing span which links to the persist trace.
         with start_active_span(
             f"{task.name}_complete",
             links=[Link(end_item.tracing_span_context)],

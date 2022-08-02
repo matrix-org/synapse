@@ -327,7 +327,7 @@ class HttpServer(Protocol):
                 subsequent arguments will be any matched groups from the regex.
                 This should return either tuple of (code, response), or None.
             servlet_classname (str): The name of the handler to be used in prometheus
-                and opentracing logs.
+                and tracing logs.
         """
 
 
@@ -338,7 +338,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
     requests by method, or override `_async_render` to handle all requests.
 
     Args:
-        extract_context: Whether to attempt to extract the opentracing
+        extract_context: Whether to attempt to extract the tracing
             context from the request the servlet is handling.
     """
 
@@ -508,7 +508,7 @@ class JsonResource(DirectServeJsonResource):
             callback: The handler for the request. Usually a Servlet
 
             servlet_classname: The name of the handler to be used in prometheus
-                and opentracing logs.
+                and tracing logs.
         """
         method_bytes = method.encode("utf-8")
 

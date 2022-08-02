@@ -573,7 +573,7 @@ def start_active_span_from_edu(
     Args:
         operation_name: The label for the chunk of time used to process the given edu.
         edu_content: an edu_content with a `context` field whose value is
-            canonical json for a dict which contains opentracing information.
+            canonical json for a dict which contains tracing information.
     """
     if opentelemetry is None:
         return contextlib.nullcontext()  # type: ignore[unreachable]
@@ -731,14 +731,15 @@ def inject_trace_id_into_response_headers(response_headers: Headers) -> None:
 )
 def get_active_span_text_map(destination: Optional[str] = None) -> Dict[str, str]:
     """
-    Gets the active tracing Context as a dict. This can be used instead of manually
-    injecting a span into an empty carrier.
+    Gets the active tracing Context serialized as a dict. This can be used
+    instead of manually injecting a span into an empty carrier.
 
     Args:
         destination: the name of the remote server.
 
     Returns:
-        dict: the active span's context if opentracing is enabled, otherwise empty.
+        dict: the serialized active span's context if opentelemetry is enabled, otherwise
+        empty.
     """
     if destination and not whitelisted_homeserver(destination):
         return {}
@@ -758,7 +759,7 @@ def get_active_span_text_map(destination: Optional[str] = None) -> Dict[str, str
 def context_from_request(
     request: Request,
 ) -> Optional["opentelemetry.context.context.Context"]:
-    """Extract an opentracing context from the headers on an HTTP request
+    """Extract an opentelemetry context from the headers on an HTTP request
 
     This is useful when we have received an HTTP request from another part of our
     system, and want to link our spans to those of the remote system.
@@ -779,7 +780,7 @@ def extract_text_map(
     carrier: Dict[str, str]
 ) -> Optional["opentelemetry.context.context.Context"]:
     """
-    Wrapper method for opentracing's tracer.extract for TEXT_MAP.
+    Wrapper method for opentelemetry's propagator.extract for TEXT_MAP.
     Args:
         carrier: a dict possibly containing a context.
 

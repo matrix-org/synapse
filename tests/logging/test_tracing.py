@@ -42,7 +42,7 @@ class TracingTestCase(TestCase):
 
     def setUp(self) -> None:
         # since this is a unit test, we don't really want to mess around with the
-        # global variables that power opentracing. We create our own tracer instance
+        # global variables that power opentelemetry. We create our own tracer instance
         # and test with it.
 
         self._tracer_provider = opentelemetry.sdk.trace.TracerProvider()

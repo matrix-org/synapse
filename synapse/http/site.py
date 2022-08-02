@@ -85,7 +85,7 @@ class SynapseRequest(Request):
         # server name, for client requests this is the Requester object.
         self._requester: Optional[Union[Requester, str]] = None
 
-        # An opentracing span for this request. Will be closed when the request is
+        # An tracing span for this request. Will be closed when the request is
         # completely processed.
         self._tracing_span: Optional["opentelemetry.trace.Span"] = None
 
@@ -165,7 +165,7 @@ class SynapseRequest(Request):
         self.logcontext.request.authenticated_entity = authenticated_entity or requester
 
     def set_tracing_span(self, span: "opentelemetry.trace.Span") -> None:
-        """attach an opentracing span to this request
+        """attach an tracing span to this request
 
         Doing so will cause the span to be closed when we finish processing the request
         """
@@ -479,7 +479,7 @@ class SynapseRequest(Request):
             usage.evt_db_fetch_count,
         )
 
-        # complete the opentracing span, if any.
+        # complete the tracing span, if any.
         if self._tracing_span:
             self._tracing_span.end()
 

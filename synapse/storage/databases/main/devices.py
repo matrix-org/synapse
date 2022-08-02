@@ -401,8 +401,8 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
 
                 if update_stream_id > previous_update_stream_id:
                     # FIXME If this overwrites an older update, this discards the
-                    #  previous OpenTracing context.
-                    #  It might make it harder to track down issues using OpenTracing.
+                    #  previous tracing context.
+                    #  It might make it harder to track down issues using tracing.
                     #  If there's a good reason why it doesn't matter, a comment here
                     #  about that would not hurt.
                     query_map[key] = (update_stream_id, update_context)
@@ -493,7 +493,7 @@ class DeviceWorkerStore(EndToEndKeyWorkerStore):
             destination: The host the device updates are intended for
             from_stream_id: The minimum stream_id to filter updates by, exclusive
             query_map: Dictionary mapping (user_id, device_id) to
-                (update stream_id, the relevant json-encoded opentracing context)
+                (update stream_id, the relevant json-encoded tracing context)
 
         Returns:
             List of objects representing a device update EDU.

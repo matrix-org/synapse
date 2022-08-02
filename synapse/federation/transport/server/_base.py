@@ -310,7 +310,7 @@ class BaseFederationServlet:
                 logger.warning("authenticate_request failed: %s", e)
                 raise
 
-            # update the active opentracing span with the authenticated entity
+            # update the active tracing span with the authenticated entity
             set_attribute("authenticated_entity", str(origin))
 
             # if the origin is authenticated and whitelisted, use its span context

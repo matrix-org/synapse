@@ -85,7 +85,7 @@
   - [Git Usage](development/git.md)
   - [Testing]()
     - [Demo scripts](development/demo.md)
-  - [OpenTracing](opentracing.md)
+  - [Tracing](tracing.md)
   - [Database Schemas](development/database_schema.md)
   - [Experimental features](development/experimental_features.md)
   - [Dependency management](development/dependencies.md)

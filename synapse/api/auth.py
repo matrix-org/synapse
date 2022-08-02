@@ -164,7 +164,7 @@ class Auth:
     ) -> Requester:
         """Helper for get_user_by_req
 
-        Once get_user_by_req has set up the opentracing span, this does the actual work.
+        Once get_user_by_req has set up the tracing span, this does the actual work.
         """
         try:
             ip_addr = request.getClientAddress().host
