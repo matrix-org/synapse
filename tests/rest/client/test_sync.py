@@ -1033,7 +1033,7 @@ class ToDeviceLimitTestCase(unittest.HomeserverTestCase):
         for _ in range(4):
             self._send_to_device()
 
-        # limit of 3 is setted but the experimental feature is not enabled,
+        # limit of 3 is used but the experimental feature is not enabled,
         # so we are still expecting 4 messages
         self._limited_sync_and_check(3, 4)
 

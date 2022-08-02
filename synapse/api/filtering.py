@@ -225,7 +225,7 @@ class FilterCollection:
         self.to_device_limit = 100
         if hs.config.experimental.to_device_limit_enabled:
             self.to_device_limit = filter_json.get("do_not_use_to_device_limit", 100)
-            # We don't want to overload the server so let's keep the limit under a thousand
+            # We don't want to overload the server so let's limit it to under a thousand
             if self.to_device_limit > 1000:
                 self.to_device_limit = 1000
 
