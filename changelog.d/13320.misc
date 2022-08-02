@@ -1,1 +1,0 @@
-Fix `FederationClient.get_pdu()` returning events from the cache as `outliers` instead of original events we saw over federation.

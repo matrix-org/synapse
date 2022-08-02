@@ -18,6 +18,7 @@
 import email.utils
 import logging
 import os
+from enum import Enum
 from typing import Any
 
 import attr
@@ -85,14 +86,19 @@ class EmailConfig(Config):
         if email_config is None:
             email_config = {}
 
+        self.force_tls = email_config.get("force_tls", False)
         self.email_smtp_host = email_config.get("smtp_host", "localhost")
-        self.email_smtp_port = email_config.get("smtp_port", 25)
+        self.email_smtp_port = email_config.get(
+            "smtp_port", 465 if self.force_tls else 25
+        )
         self.email_smtp_user = email_config.get("smtp_user", None)
         self.email_smtp_pass = email_config.get("smtp_pass", None)
         self.require_transport_security = email_config.get(
             "require_transport_security", False
         )
         self.enable_smtp_tls = email_config.get("enable_tls", True)
+        if self.force_tls and not self.enable_smtp_tls:
+            raise ConfigError("email.force_tls requires email.enable_tls to be true")
         if self.require_transport_security and not self.enable_smtp_tls:
             raise ConfigError(
                 "email.require_transport_security requires email.enable_tls to be true"
@@ -130,22 +136,40 @@ class EmailConfig(Config):
 
         self.email_enable_notifs = email_config.get("enable_notifs", False)
 
+        self.threepid_behaviour_email = (
+            # Have Synapse handle the email sending if account_threepid_delegates.email
+            # is not defined
+            # msisdn is currently always remote while Synapse does not support any method of
+            # sending SMS messages
+            ThreepidBehaviour.REMOTE
+            if self.root.registration.account_threepid_delegate_email
+            else ThreepidBehaviour.LOCAL
+        )
+
         if config.get("trust_identity_server_for_password_resets"):
             raise ConfigError(
-                'The config option "trust_identity_server_for_password_resets" '
-                "is no longer supported. Please remove it from the config file."
+                'The config option "trust_identity_server_for_password_resets" has been removed.'
+                "Please consult the configuration manual at docs/usage/configuration/config_documentation.md for "
+                "details and update your config file."
             )
 
-        # If we have email config settings, assume that we can verify ownership of
-        # email addresses.
-        self.can_verify_email = email_config != {}
+        self.local_threepid_handling_disabled_due_to_email_config = False
+        if (
+            self.threepid_behaviour_email == ThreepidBehaviour.LOCAL
+            and email_config == {}
+        ):
+            # We cannot warn the user this has happened here
+            # Instead do so when a user attempts to reset their password
+            self.local_threepid_handling_disabled_due_to_email_config = True
+
+            self.threepid_behaviour_email = ThreepidBehaviour.OFF
 
         # Get lifetime of a validation token in milliseconds
         self.email_validation_token_lifetime = self.parse_duration(
             email_config.get("validation_token_lifetime", "1h")
         )
 
-        if self.can_verify_email:
+        if self.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             missing = []
             if not self.email_notif_from:
                 missing.append("email.notif_from")
@@ -336,3 +360,18 @@ class EmailConfig(Config):
                     "Config option email.invite_client_location must be a http or https URL",
                     path=("email", "invite_client_location"),
                 )
+
+
+class ThreepidBehaviour(Enum):
+    """
+    Enum to define the behaviour of Synapse with regards to when it contacts an identity
+    server for 3pid registration and password resets
+
+    REMOTE = use an external server to send tokens
+    LOCAL = send tokens ourselves
+    OFF = disable registration via 3pid and password resets
+    """
+
+    REMOTE = "remote"
+    LOCAL = "local"
+    OFF = "off"

@@ -878,8 +878,8 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
     def _tag_args_inner(*args: P.args, **kwargs: P.kwargs) -> R:
         argspec = inspect.getfullargspec(func)
         for i, arg in enumerate(argspec.args[1:]):
-            set_attribute("ARG_" + arg, args[i])  # type: ignore[index]
-        set_attribute("args", args[len(argspec.args) :])  # type: ignore[index]
+            set_attribute("ARG_" + arg, str(args[i]))  # type: ignore[index]
+        set_attribute("args", str(args[len(argspec.args) :]))  # type: ignore[index]
         set_attribute("kwargs", str(kwargs))
         return func(*args, **kwargs)
 

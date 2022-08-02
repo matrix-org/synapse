@@ -79,63 +79,32 @@ server {
 }
 ```
 
-### Caddy v1
-
-```
-matrix.example.com {
-  proxy /_matrix http://localhost:8008 {
-    transparent
-  }
-
-  proxy /_synapse/client http://localhost:8008 {
-    transparent
-  }
-}
-
-example.com:8448 {
-  proxy / http://localhost:8008 {
-    transparent
-  }
-}
-```
-
 ### Caddy v2
 
 ```
 matrix.example.com {
-  reverse_proxy /_matrix/* http://localhost:8008
-  reverse_proxy /_synapse/client/* http://localhost:8008
+  reverse_proxy /_matrix/* localhost:8008
+  reverse_proxy /_synapse/client/* localhost:8008
 }
 
 example.com:8448 {
-  reverse_proxy http://localhost:8008
+  reverse_proxy localhost:8008
 }
 ```
+
 [Delegation](delegate.md) example:
+
 ```
-(matrix-well-known-header) {
-    # Headers
-    header Access-Control-Allow-Origin "*"
-    header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-    header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
-    header Content-Type "application/json"
-}
-
 example.com {
-    handle /.well-known/matrix/server {
-        import matrix-well-known-header
-        respond `{"m.server":"matrix.example.com:443"}`
-    }
-
-    handle /.well-known/matrix/client {
-        import matrix-well-known-header
-        respond `{"m.homeserver":{"base_url":"https://matrix.example.com"},"m.identity_server":{"base_url":"https://identity.example.com"}}`
-    }
+	header /.well-known/matrix/* Content-Type application/json
+	header /.well-known/matrix/* Access-Control-Allow-Origin *
+	respond /.well-known/matrix/server `{"m.server": "matrix.example.com:443"}`
+	respond /.well-known/matrix/client `{"m.homeserver":{"base_url":"https://matrix.example.com"},"m.identity_server":{"base_url":"https://identity.example.com"}}`
 }
 
 matrix.example.com {
-    reverse_proxy /_matrix/* http://localhost:8008
-    reverse_proxy /_synapse/client/* http://localhost:8008
+    reverse_proxy /_matrix/* localhost:8008
+    reverse_proxy /_synapse/client/* localhost:8008
 }
 ```
 

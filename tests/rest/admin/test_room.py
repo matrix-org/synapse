@@ -1873,7 +1873,10 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
-        self.assertEqual("No known servers", channel.json_body["error"])
+        self.assertEqual(
+            "Can't join remote room because no servers that are in the room have been provided.",
+            channel.json_body["error"],
+        )
 
     def test_room_is_not_valid(self) -> None:
         """
