@@ -1859,7 +1859,7 @@ Example configuration:
 max_spider_size: 8M
 ```
 ---
-### `url_preview_language`
+### `url_preview_accept_language`
 
 A list of values for the Accept-Language HTTP header used when
 downloading webpages during URL preview generation. This allows
