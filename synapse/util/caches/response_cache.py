@@ -78,7 +78,7 @@ class ResponseCacheEntry:
     easier to cache Failure results.
     """
 
-    tracing_span_context: Optional["opentelemetry.trace.span.SpanContext"]
+    tracing_span_context: Optional["opentelemetry.trace.SpanContext"]
     """The tracing span which generated/is generating the result"""
 
 
@@ -137,7 +137,7 @@ class ResponseCache(Generic[KV]):
         self,
         context: ResponseCacheContext[KV],
         deferred: "defer.Deferred[RV]",
-        tracing_span_context: Optional["opentelemetry.trace.span.SpanContext"],
+        tracing_span_context: Optional["opentelemetry.trace.SpanContext"],
     ) -> ResponseCacheEntry:
         """Set the entry for the given key to the given deferred.
 
@@ -230,7 +230,7 @@ class ResponseCache(Generic[KV]):
             if cache_context:
                 kwargs["cache_context"] = context
 
-            span_context: Optional["opentelemetry.trace.span.SpanContext"] = None
+            span_context: Optional["opentelemetry.trace.SpanContext"] = None
 
             async def cb() -> RV:
                 # NB it is important that we do not `await` before setting span_context!

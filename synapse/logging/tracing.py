@@ -163,7 +163,6 @@ Gotchas
   with an active span?
 """
 import contextlib
-import enum
 import inspect
 import logging
 import re
@@ -299,12 +298,6 @@ _homeserver_whitelist: Optional[Pattern[str]] = None
 # Util methods
 
 
-class _Sentinel(enum.Enum):
-    # defining a sentinel in this way allows mypy to correctly handle the
-    # type of a dictionary lookup.
-    sentinel = object()
-
-
 P = ParamSpec("P")
 R = TypeVar("R")
 
@@ -405,6 +398,13 @@ def init_tracer(hs: "HomeServer") -> None:
         }
     )
 
+    # TODO: `force_tracing_for_users` is not compatible with OTEL samplers
+    # because you can only determine `opentelemetry.trace.TraceFlags.SAMPLED`
+    # and whether it uses a recording span when the span is created and we don't
+    # have enough information at that time (we can determine in
+    # `synapse/api/auth.py`). There isn't a way to change the trace flags after
+    # the fact so there is no way to programmatically force
+    # recording/tracing/sampling like there was in opentracing.
     sampler = opentelemetry.sdk.trace.sampling.ParentBasedTraceIdRatio(
         hs.config.tracing.sample_rate
     )
@@ -465,16 +465,16 @@ def whitelisted_homeserver(destination: str) -> bool:
 
 
 def use_span(
-    span: "opentelemetry.trace.span.Span",
+    span: "opentelemetry.trace.Span",
     end_on_exit: bool = True,
-) -> ContextManager["opentelemetry.trace.span.Span"]:
+) -> ContextManager["opentelemetry.trace.Span"]:
     if opentelemetry is None:
         return contextlib.nullcontext()  # type: ignore[unreachable]
 
     return opentelemetry.trace.use_span(span=span, end_on_exit=end_on_exit)
 
 
-def create_non_recording_span() -> "opentelemetry.trace.span.Span":
+def create_non_recording_span() -> "opentelemetry.trace.Span":
     """Create a no-op span that does not record or become part of a recorded trace"""
 
     return opentelemetry.trace.NonRecordingSpan(
@@ -495,7 +495,7 @@ def start_span(
     end_on_exit: bool = True,
     # For testing only
     tracer: Optional["opentelemetry.trace.Tracer"] = None,
-) -> "opentelemetry.trace.span.Span":
+) -> "opentelemetry.trace.Span":
     if opentelemetry is None:
         raise Exception("Not able to create span without opentelemetry installed.")
 
@@ -532,7 +532,7 @@ def start_active_span(
     end_on_exit: bool = True,
     # For testing only
     tracer: Optional["opentelemetry.trace.Tracer"] = None,
-) -> ContextManager["opentelemetry.trace.span.Span"]:
+) -> ContextManager["opentelemetry.trace.Span"]:
     if opentelemetry is None:
         return contextlib.nullcontext()  # type: ignore[unreachable]
 
@@ -566,7 +566,7 @@ def start_active_span_from_edu(
     operation_name: str,
     *,
     edu_content: Dict[str, Any],
-) -> ContextManager["opentelemetry.trace.span.Span"]:
+) -> ContextManager["opentelemetry.trace.Span"]:
     """
     Extracts a span context from an edu and uses it to start a new active span
 
@@ -589,14 +589,14 @@ def start_active_span_from_edu(
 
 # OpenTelemetry setters for attributes, logs, etc
 @only_if_tracing
-def get_active_span() -> Optional["opentelemetry.trace.span.Span"]:
+def get_active_span() -> Optional["opentelemetry.trace.Span"]:
     """Get the currently active span, if any"""
     return opentelemetry.trace.get_current_span()
 
 
 def get_span_context_from_context(
     context: "opentelemetry.context.context.Context",
-) -> Optional["opentelemetry.trace.span.SpanContext"]:
+) -> Optional["opentelemetry.trace.SpanContext"]:
     """Utility function to convert a `Context` to a `SpanContext`
 
     Based on https://github.com/open-telemetry/opentelemetry-python/blob/43288ca9a36144668797c11ca2654836ec8b5e99/opentelemetry-api/src/opentelemetry/trace/propagation/tracecontext.py#L99-L102
@@ -609,7 +609,7 @@ def get_span_context_from_context(
 
 
 def get_context_from_span(
-    span: "opentelemetry.trace.span.Span",
+    span: "opentelemetry.trace.Span",
 ) -> "opentelemetry.context.context.Context":
     # This doesn't affect the current context at all, it just converts a span
     # into `Context` object basically (bad name).
@@ -650,7 +650,7 @@ def log_kv(key_values: Dict[str, Any], timestamp: Optional[int] = None) -> None:
 
 
 @only_if_tracing
-def force_tracing(span: Optional["opentelemetry.trace.span.Span"] = None) -> None:
+def force_tracing(span: Optional["opentelemetry.trace.Span"] = None) -> None:
     """Force sampling for the active/given span and its children.
 
     Args:
@@ -661,7 +661,7 @@ def force_tracing(span: Optional["opentelemetry.trace.span.Span"] = None) -> Non
 
 
 def is_context_forced_tracing(
-    span_context: Optional["opentelemetry.shim.opentracing_shim.SpanContextShim"],
+    context: "opentelemetry.context.context.Context",
 ) -> bool:
     """Check if sampling has been force for the given span context."""
     # TODO
@@ -942,6 +942,7 @@ def trace_servlet(
             # with JsonResource).
             span.update_name(request.request_metrics.name)
 
-            span.set_attribute(
-                SynapseTags.REQUEST_TAG, request.request_metrics.start_context.tag
-            )
+            if request.request_metrics.start_context.tag is not None:
+                span.set_attribute(
+                    SynapseTags.REQUEST_TAG, request.request_metrics.start_context.tag
+                )

@@ -30,12 +30,7 @@ from synapse.api.errors import (
 from synapse.appservice import ApplicationService
 from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
-from synapse.logging.tracing import (
-    force_tracing,
-    get_active_span,
-    start_active_span,
-    SynapseTags,
-)
+from synapse.logging.tracing import force_tracing, get_active_span, start_active_span
 from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import Requester, UserID, create_requester
 

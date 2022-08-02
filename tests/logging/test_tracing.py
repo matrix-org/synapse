@@ -64,13 +64,13 @@ class TracingTestCase(TestCase):
         # start_active_span should start and activate a span.
         with start_active_span("new-span", tracer=self._tracer) as span:
             self.assertEqual(opentelemetry.trace.get_current_span(), span)
-            self.assertIsNotNone(span.start_time)
+            self.assertIsNotNone(span.start_time)  # type: ignore[attr-defined]
 
         # ... but leaving it unsets the active span, and finishes the span.
         self.assertEqual(
             opentelemetry.trace.get_current_span(), opentelemetry.trace.INVALID_SPAN
         )
-        self.assertIsNotNone(span.end_time)
+        self.assertIsNotNone(span.end_time)  # type: ignore[attr-defined]
 
         # the span should have been reported
         self.assertListEqual(
@@ -92,7 +92,10 @@ class TracingTestCase(TestCase):
                     child_span1,
                     "child_span1 was not activated",
                 )
-                self.assertEqual(child_span1.parent.span_id, root_context.span_id)
+                self.assertEqual(
+                    child_span1.parent.span_id,  # type: ignore[attr-defined]
+                    root_context.span_id,
+                )
 
                 with start_active_span(
                     "child_span2",
@@ -102,14 +105,14 @@ class TracingTestCase(TestCase):
                         opentelemetry.trace.get_current_span(), child_span2
                     )
                     self.assertEqual(
-                        child_span2.parent.span_id,
+                        child_span2.parent.span_id,  # type: ignore[attr-defined]
                         child_span1.get_span_context().span_id,
                     )
 
             # the root scope should be restored
             self.assertEqual(opentelemetry.trace.get_current_span(), root_span)
-            self.assertIsNotNone(child_span1.end_time)
-            self.assertIsNotNone(child_span2.end_time)
+            self.assertIsNotNone(child_span1.end_time)  # type: ignore[attr-defined]
+            self.assertIsNotNone(child_span2.end_time)  # type: ignore[attr-defined]
 
         # Active span is unset now that we're outside of the `with` scopes
         self.assertEqual(

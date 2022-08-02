@@ -273,8 +273,6 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
                                 Link(span_context)
                                 for span_context in item.parent_tracing_span_contexts
                             ],
-                            # TODO: inherit_force_tracing
-                            inherit_force_tracing=True,
                         ) as span:
                             if span:
                                 item.tracing_span_context = span.get_span_context()
