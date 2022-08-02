@@ -880,7 +880,7 @@ async def _async_write_json_to_request_in_thread(
 
     def encode(tracing_span: Optional["opentelemetry.trace.Span"]) -> bytes:
         # it might take a while for the threadpool to schedule us, so we write
-        # opentracing logs once we actually get scheduled, so that we can see how
+        # tracing logs once we actually get scheduled, so that we can see how
         # much that contributed.
         if tracing_span:
             tracing_span.add_event("scheduled", attributes={"event": "scheduled"})
