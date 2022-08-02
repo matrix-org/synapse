@@ -533,7 +533,7 @@ class MatrixFederationHttpClient:
 
         # Inject the span into the headers
         headers_dict: Dict[bytes, List[bytes]] = {}
-        tracing.inject_active_span_context_into_header_dict(
+        tracing.inject_active_tracing_context_into_header_dict(
             headers_dict, request.destination
         )
 

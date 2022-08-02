@@ -248,7 +248,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                 # Add an authorization header, if configured.
                 if replication_secret:
                     headers[b"Authorization"] = [b"Bearer " + replication_secret]
-                tracing.inject_active_span_context_into_header_dict(
+                tracing.inject_active_tracing_context_into_header_dict(
                     headers, check_destination=False
                 )
 

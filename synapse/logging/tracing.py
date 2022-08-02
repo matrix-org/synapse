@@ -671,14 +671,14 @@ def is_context_forced_tracing(
 # Injection and extraction
 
 
-@ensure_active_span("inject the span into a header dict")
-def inject_active_span_context_into_header_dict(
+@ensure_active_span("inject the active tracing context into a header dict")
+def inject_active_tracing_context_into_header_dict(
     headers: Dict[bytes, List[bytes]],
     destination: Optional[str] = None,
     check_destination: bool = True,
 ) -> None:
     """
-    Injects a span context into a dict of HTTP headers
+    Injects the active tracing context into a dict of HTTP headers
 
     Args:
         headers: the dict to inject headers into
@@ -712,7 +712,7 @@ def inject_active_span_context_into_header_dict(
     propagator.inject(headers, context=ctx)
 
 
-def inject_response_headers(response_headers: Headers) -> None:
+def inject_trace_id_into_response_headers(response_headers: Headers) -> None:
     """Inject the current trace id into the HTTP response headers"""
     if not opentelemetry:
         return
@@ -731,7 +731,7 @@ def inject_response_headers(response_headers: Headers) -> None:
 )
 def get_active_span_text_map(destination: Optional[str] = None) -> Dict[str, str]:
     """
-    Gets a span context as a dict. This can be used instead of manually
+    Gets the active tracing Context as a dict. This can be used instead of manually
     injecting a span into an empty carrier.
 
     Args:
@@ -749,7 +749,7 @@ def get_active_span_text_map(destination: Optional[str] = None) -> Dict[str, str
 
     carrier_text_map: Dict[str, str] = {}
     propagator = opentelemetry.propagate.get_global_textmap()
-    # Put all of SpanContext properties onto the carrier text map that we can return
+    # Put all of Context properties onto the carrier text map that we can return
     propagator.inject(carrier_text_map, context=ctx)
 
     return carrier_text_map
@@ -934,7 +934,7 @@ def trace_servlet(
     ) as span:
         request.set_tracing_span(span)
 
-        inject_response_headers(request.responseHeaders)
+        inject_trace_id_into_response_headers(request.responseHeaders)
         try:
             yield
         finally:
