@@ -635,7 +635,9 @@ class EventsWorkerStore(SQLBaseStore):
 
         if missing_events_ids:
 
-            async def get_missing_events_from_cache_or_db() -> Dict[str, EventCacheEntry]:
+            async def get_missing_events_from_cache_or_db() -> Dict[
+                str, EventCacheEntry
+            ]:
                 """Fetches the events in `missing_event_ids` from the database.
 
                 Also creates entries in `self._current_event_fetches` to allow
@@ -773,7 +775,9 @@ class EventsWorkerStore(SQLBaseStore):
             events: list of event_ids to fetch
             update_metrics: Whether to update the cache hit ratio metrics
         """
-        event_map = self._get_events_from_local_cache(events, update_metrics=update_metrics)
+        event_map = self._get_events_from_local_cache(
+            events, update_metrics=update_metrics
+        )
 
         missing_event_ids = {e for e in events if e not in event_map}
 
