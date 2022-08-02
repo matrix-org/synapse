@@ -233,6 +233,11 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </li>
 </ul>
 <h1 id="upgrading-to-v1640"><a class="header" href="#upgrading-to-v1640">Upgrading to v1.64.0</a></h1>
+<h2 id="deprecation-of-the-ability-to-delegate-e-mail-verification-to-identity-servers"><a class="header" href="#deprecation-of-the-ability-to-delegate-e-mail-verification-to-identity-servers">Deprecation of the ability to delegate e-mail verification to identity servers</a></h2>
+<p>Synapse v1.66.0 will remove the ability to delegate the tasks of verifying email address ownership, and password reset confirmation, to an identity server.</p>
+<p>If you require your homeserver to verify e-mail addresses or to support password resets via e-mail, please configure your homeserver with SMTP access so that it can send e-mails on its own behalf.
+<a href="https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#email">Consult the configuration documentation for more information.</a></p>
+<p>The option that will be removed is <code>account_threepid_delegates.email</code>.</p>
 <h2 id="changes-to-the-event-replication-streams"><a class="header" href="#changes-to-the-event-replication-streams">Changes to the event replication streams</a></h2>
 <p>Synapse now includes a flag indicating if an event is an outlier when
 replicating it to other workers. This is a forwards- and backwards-incompatible
