@@ -310,7 +310,7 @@ R = TypeVar("R")
 
 
 def only_if_tracing(func: Callable[P, R]) -> Callable[P, Optional[R]]:
-    """Executes the function only if we're tracing. Otherwise returns None."""
+    """Decorator function that executes the function only if we're tracing. Otherwise returns None."""
 
     @wraps(func)
     def _only_if_tracing_inner(*args: P.args, **kwargs: P.kwargs) -> Optional[R]:
@@ -544,7 +544,11 @@ def start_active_span(
         start_time=start_time,
         record_exception=record_exception,
         set_status_on_exception=set_status_on_exception,
+        tracer=tracer,
     )
+
+    ctx = opentelemetry.trace.propagation.set_span_in_context(span)
+    logger.info("efwfewaafwewffew ctx=%s span_context=%s", ctx, span.get_span_context())
 
     # Equivalent to `tracer.start_as_current_span`
     return opentelemetry.trace.use_span(
@@ -585,6 +589,20 @@ def start_active_span_from_edu(
 def get_active_span() -> Optional["opentelemetry.trace.span.Span"]:
     """Get the currently active span, if any"""
     return opentelemetry.trace.get_current_span()
+
+
+def get_span_context_from_context(
+    context: "opentelemetry.context.context.Context",
+) -> Optional["opentelemetry.trace.span.SpanContext"]:
+    """Utility function to convert a `Context` to a `SpanContext`
+
+    Based on https://github.com/open-telemetry/opentelemetry-python/blob/43288ca9a36144668797c11ca2654836ec8b5e99/opentelemetry-api/src/opentelemetry/trace/propagation/tracecontext.py#L99-L102
+    """
+    span = opentelemetry.trace.get_current_span(context=context)
+    span_context = span.get_span_context()
+    if span_context == opentelemetry.trace.INVALID_SPAN_CONTEXT:
+        return None
+    return span_context
 
 
 @ensure_active_span("set a tag")

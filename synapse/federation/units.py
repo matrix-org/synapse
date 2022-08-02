@@ -55,12 +55,12 @@ class Edu:
             "destination": self.destination,
         }
 
-    def get_context(self) -> str:
+    def get_tracing_context_json(self) -> str:
         return getattr(self, "content", {}).get(
             EventContentFields.TRACING_CONTEXT, "{}"
         )
 
-    def strip_context(self) -> None:
+    def strip_tracing_context(self) -> None:
         getattr(self, "content", {})[EventContentFields.TRACING_CONTEXT] = "{}"
 
 

@@ -25,6 +25,7 @@ from synapse.logging.tracing import (
     Link,
     StatusCode,
     extract_text_map,
+    get_span_context_from_context,
     set_status,
     start_active_span,
     whitelisted_homeserver,
@@ -89,11 +90,15 @@ class TransactionManager:
         keep_destination = whitelisted_homeserver(destination)
 
         for edu in edus:
-            context = edu.get_context()
-            if context:
-                span_contexts.append(extract_text_map(json_decoder.decode(context)))
+            tracing_context_json = edu.get_tracing_context_json()
+            if tracing_context_json:
+                context = extract_text_map(json_decoder.decode(tracing_context_json))
+                if context:
+                    span_context = get_span_context_from_context(context)
+                    if span_context:
+                        span_contexts.append(span_context)
             if keep_destination:
-                edu.strip_context()
+                edu.strip_tracing_context()
 
         with start_active_span(
             "send_transaction",

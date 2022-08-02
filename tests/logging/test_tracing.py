@@ -32,7 +32,7 @@ except ImportError:
     opentelemetry = None  # type: ignore[assignment]
 
 
-class LogContextScopeManagerTestCase(TestCase):
+class TracingTestCase(TestCase):
     """
     Test logging contexts and active opentelemetry spans.
     """
