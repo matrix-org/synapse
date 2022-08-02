@@ -218,6 +218,9 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 * The last-processed stream ID. Subsequent calls of this function with the
                   same device should pass this value as 'from_stream_id'.
         """
+        if limit == 0:
+            return {}, from_stream_id
+
         (
             user_id_device_id_to_messages,
             last_processed_stream_id,
@@ -228,6 +231,10 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             to_stream_id=to_stream_id,
             limit=limit,
         )
+
+        if not user_id_device_id_to_messages:
+            # There were no messages!
+            return [], to_stream_id
 
         # Extract the messages, no need to return the user and device ID again
         to_device_messages = user_id_device_id_to_messages.get((user_id, device_id), [])
@@ -292,9 +299,6 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 "Programming error: _get_device_messages was passed 'limit' "
                 "without a specific user_id/device_id"
             )
-
-        if limit == 0:
-            return {}, from_stream_id
 
         user_ids_to_query: Set[str] = set()
         device_ids_to_query: Set[str] = set()
