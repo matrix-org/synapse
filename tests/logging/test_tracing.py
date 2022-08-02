@@ -113,9 +113,9 @@ class TracingTestCase(TestCase):
         )
 
     def test_side_by_side_spans(self) -> None:
-        with start_active_span(
-            "span1", tracer=self._tracer
-        ) as span1, start_active_span("span2", tracer=self._tracer) as span2:
+        with start_active_span("span1", tracer=self._tracer), start_active_span(
+            "span2", tracer=self._tracer
+        ) as span2:
             # We expect the last span in `with` list to be active
             self.assertEqual(opentelemetry.trace.get_current_span(), span2)
 

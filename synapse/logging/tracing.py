@@ -686,9 +686,7 @@ def inject_active_tracing_context_into_header_dict(
     Note:
         The headers set by the tracer are custom to the tracer implementation which
         should be unique enough that they don't interfere with any headers set by
-        synapse or twisted. If we're still using jaeger these headers would be those
-        here:
-        https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
+        synapse or twisted.
     """
     if check_destination:
         if destination is None:
