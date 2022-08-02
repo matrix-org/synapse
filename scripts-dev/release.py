@@ -461,7 +461,7 @@ def _merge_into(repo: Repo, source: str, target: str) -> None:
 
     try:
         # TODO This seemed easier than using GitPython directly
-        click.echo(f"Merging {source}")
+        click.echo(f"Merging {source}...")
         repo.git.merge(source)
     except GitCommandError as exc:
         # If a merge conflict occurs, give some context and try to
@@ -475,7 +475,7 @@ def _merge_into(repo: Repo, source: str, target: str) -> None:
             return
 
     # Push result.
-    click.echo("Pushing")
+    click.echo("Pushing...")
     repo.remote().push()
 
 
