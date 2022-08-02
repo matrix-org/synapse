@@ -528,7 +528,6 @@ class MatrixFederationHttpClient:
                 SpanAttributes.HTTP_METHOD: request.method,
                 SpanAttributes.HTTP_URL: request.path,
             },
-            end_on_exit=True,
         )
 
         # Inject the span into the headers

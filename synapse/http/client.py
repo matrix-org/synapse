@@ -413,7 +413,6 @@ class SimpleHttpClient:
                 SpanAttributes.HTTP_METHOD: method,
                 SpanAttributes.HTTP_URL: uri,
             },
-            end_on_exit=True,
         ):
             try:
                 body_producer = None
