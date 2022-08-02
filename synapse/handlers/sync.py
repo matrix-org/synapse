@@ -28,7 +28,7 @@ from synapse.logging.context import current_context
 from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, start_active_span
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.storage.databases.main.event_push_actions import NotifCounts
-from synapse.storage.roommember import GetRoomsForUserWithStreamOrdering, MemberSummary
+from synapse.storage.roommember import MemberSummary
 from synapse.storage.state import StateFilter
 from synapse.types import (
     DeviceListUpdates,
@@ -42,7 +42,6 @@ from synapse.types import (
     UserID,
 )
 from synapse.util.async_helpers import concurrently_execute
-from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.response_cache import ResponseCache, ResponseCacheContext
@@ -2166,7 +2165,7 @@ class SyncHandler:
         ReturnValue:
             Set of room_ids the user is in at given stream_ordering.
         """
-        joined_rooms = await self._get_filtered_joined_rooms(user_id)
+        joined_rooms = await self.store.get_rooms_for_user_with_stream_ordering(user_id)
 
         joined_room_ids = set()
 
@@ -2177,7 +2176,12 @@ class SyncHandler:
         # If the membership's stream ordering is after the given stream
         # ordering, we need to go and work out if the user was in the room
         # before.
+        # We also need to check whether the room should be excluded from sync
+        # responses as per the homeserver config.
         for joined_room in joined_rooms:
+            if joined_room.room_id in self.rooms_to_exclude:
+                continue
+
             if not joined_room.event_pos.persisted_after(room_key):
                 joined_room_ids.add(joined_room.room_id)
                 continue
@@ -2196,22 +2200,6 @@ class SyncHandler:
                 joined_room_ids.add(joined_room.room_id)
 
         return frozenset(joined_room_ids)
-
-    @cached(cache_context=True, iterable=True)
-    async def _get_filtered_joined_rooms(
-        self, user_id: str, cache_context: _CacheContext
-    ) -> FrozenSet[GetRoomsForUserWithStreamOrdering]:
-        joined_rooms = await self.store.get_rooms_for_user_with_stream_ordering(
-            user_id,
-            on_invalidate=cache_context.invalidate,
-        )
-
-        if len(self.rooms_to_exclude) == 0:
-            return joined_rooms
-
-        return frozenset(
-            r for r in joined_rooms if r.room_id not in self.rooms_to_exclude
-        )
 
 
 def _action_has_highlight(actions: List[JsonDict]) -> bool:
