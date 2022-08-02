@@ -112,6 +112,24 @@ class TracingTestCase(TestCase):
             ["child_span2", "child_span1", "root_span"],
         )
 
+    def test_side_by_side_spans(self) -> None:
+        with start_active_span(
+            "span1", tracer=self._tracer
+        ) as span1, start_active_span("span2", tracer=self._tracer) as span2:
+            # We expect the last span in `with` list to be active
+            self.assertEqual(opentelemetry.trace.get_current_span(), span2)
+
+        # Active span is unset now that we're outside of the `with` scopes
+        self.assertEqual(
+            opentelemetry.trace.get_current_span(), opentelemetry.trace.INVALID_SPAN
+        )
+
+        # the spans should be reported in order of their finishing.
+        self.assertListEqual(
+            [span.name for span in self._exporter.get_finished_spans()],
+            ["span2", "span1"],
+        )
+
     def test_overlapping_spans(self) -> None:
         """Overlapping spans which are not neatly nested should work"""
         reactor = MemoryReactorClock()
