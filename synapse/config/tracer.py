@@ -47,23 +47,27 @@ class TracerConfig(Config):
         # Default to always sample. Range: [0.0 - 1.0]
         self.sample_rate: float = float(tracing_config.get("sample_rate", 1))
         if self.sample_rate < 0.0 or self.sample_rate > 1.0:
-            raise ConfigError("Tracing sample_rate must be in range [0.0, 1.0].")
+            raise ConfigError(
+                "Tracing sample_rate must be in range [0.0, 1.0].",
+                ("tracing", "sample_rate"),
+            )
 
         self.homeserver_whitelist: List[str] = tracing_config.get(
             "homeserver_whitelist", []
         )
         if not isinstance(self.homeserver_whitelist, list):
-            raise ConfigError("Tracing homeserver_whitelist config is malformed")
+            raise ConfigError(
+                "Tracing homeserver_whitelist config is malformed",
+                ("tracing", "homeserver_whitelist"),
+            )
 
         force_tracing_for_users = tracing_config.get("force_tracing_for_users", [])
         if not isinstance(force_tracing_for_users, list):
-            raise ConfigError(
-                "Expected a list", ("opentelemetry", "force_tracing_for_users")
-            )
+            raise ConfigError("Expected a list", ("tracing", "force_tracing_for_users"))
         for i, u in enumerate(force_tracing_for_users):
             if not isinstance(u, str):
                 raise ConfigError(
                     "Expected a string",
-                    ("opentelemetry", "force_tracing_for_users", f"index {i}"),
+                    ("tracing", "force_tracing_for_users", f"index {i}"),
                 )
             self.force_tracing_for_users.add(u)
