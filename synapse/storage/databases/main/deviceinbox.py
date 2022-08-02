@@ -219,7 +219,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                   same device should pass this value as 'from_stream_id'.
         """
         if limit == 0:
-            return {}, from_stream_id
+            return [], from_stream_id
 
         (
             user_id_device_id_to_messages,
