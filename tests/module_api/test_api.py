@@ -16,12 +16,13 @@ from unittest.mock import Mock
 from twisted.internet import defer
 
 from synapse.api.constants import EduTypes, EventTypes
+from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
 from synapse.handlers.push_rules import InvalidRuleException
 from synapse.rest import admin
-from synapse.rest.client import login, notifications, presence, profile, room
+from synapse.rest.client import directory, login, notifications, presence, profile, room
 from synapse.types import create_requester
 
 from tests.events.test_presence_router import send_presence_update, sync_presence
@@ -40,6 +41,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         presence.register_servlets,
         profile.register_servlets,
         notifications.register_servlets,
+        directory.register_servlets,
     ]
 
     def prepare(self, reactor, clock, homeserver):
@@ -634,6 +636,30 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.module_api.check_push_rule_actions(
             [{"set_tweak": "sound", "value": "default"}]
         )
+
+    def test_create_room(self) -> None:
+        """Test that modules can create a room."""
+        # First test user existence verification.
+        self.get_failure(
+            self.module_api.create_room(
+                user_id="@user:test", config={}, ratelimit=False
+            ),
+            SynapseError,
+        )
+
+        # Now do the happy path.
+        user_id = self.register_user("user", "password")
+
+        (result, _) = self.get_success(
+            self.module_api.create_room(user_id=user_id, config={}, ratelimit=False)
+        )
+        room_id = result["room_id"]
+
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/r0/directory/list/room/{room_id}",
+        )
+        self.assertEqual(channel.code, 200, channel.result)
 
 
 class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
