@@ -208,7 +208,7 @@ def run_as_background_process(
     Args:
         desc: a description for this background process type
         func: a function, which may return a Deferred or a coroutine
-        bg_start_span: Whether to start an opentracing span. Defaults to True.
+        bg_start_span: Whether to start an tracing span. Defaults to True.
             Should only be disabled for processes that will not log to or tag
             a span.
         args: positional args for func

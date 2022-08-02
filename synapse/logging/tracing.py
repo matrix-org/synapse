@@ -13,87 +13,88 @@
 # limitations under the License.
 
 
-# NOTE
-# This is a small wrapper around opentracing because opentracing is not currently
-# packaged downstream (specifically debian). Since opentracing instrumentation is
-# fairly invasive it was awkward to make it optional. As a result we opted to encapsulate
-# all opentracing state in these methods which effectively noop if opentracing is
-# not present. We should strongly consider encouraging the downstream distributers
-# to package opentracing and making opentracing a full dependency. In order to facilitate
-# this move the methods have work very similarly to opentracing's and it should only
-# be a matter of few regexes to move over to opentracing's access patterns proper.
+# NOTE This is a small wrapper around opentelemetry because tracing is optional
+# and not always packaged downstream. Since opentelemetry instrumentation is
+# fairly invasive it was awkward to make it optional. As a result we opted to
+# encapsulate all opentelemetry state in these methods which effectively noop if
+# opentelemetry is not present. We should strongly consider encouraging the
+# downstream distributers to package opentelemetry and making opentelemetry a
+# full dependency. In order to facilitate this move the methods have work very
+# similarly to opentelemetry's and it should only be a matter of few regexes to
+# move over to opentelemetry's access patterns proper.
 
 """
 ============================
-Using OpenTracing in Synapse
+Using OpenTelemetry in Synapse
 ============================
 
-Python-specific tracing concepts are at https://opentracing.io/guides/python/.
-Note that Synapse wraps OpenTracing in a small module (this one) in order to make the
-OpenTracing dependency optional. That means that the access patterns are
-different to those demonstrated in the OpenTracing guides. However, it is
-still useful to know, especially if OpenTracing is included as a full dependency
-in the future or if you are modifying this module.
+Python-specific tracing concepts are at
+https://opentelemetry.io/docs/instrumentation/python/. Note that Synapse wraps
+OpenTelemetry in a small module (this one) in order to make the OpenTelemetry
+dependency optional. That means that some access patterns are different to those
+demonstrated in the OpenTelemetry guides. However, it is still useful to know,
+especially if OpenTelemetry is included as a full dependency in the future or if
+you are modifying this module.
 
 
-OpenTracing is encapsulated so that
-no span objects from OpenTracing are exposed in Synapse's code. This allows
-OpenTracing to be easily disabled in Synapse and thereby have OpenTracing as
-an optional dependency. This does however limit the number of modifiable spans
-at any point in the code to one. From here out references to `opentracing`
-in the code snippets refer to the Synapses module.
-Most methods provided in the module have a direct correlation to those provided
-by opentracing. Refer to docs there for a more in-depth documentation on some of
-the args and methods.
+OpenTelemetry is encapsulated so that no span objects from OpenTelemetry are
+exposed in Synapse's code. This allows OpenTelemetry to be easily disabled in
+Synapse and thereby have OpenTelemetry as an optional dependency. This does
+however limit the number of modifiable spans at any point in the code to one.
+From here out references to `tracing` in the code snippets refer to the Synapses
+module. Most methods provided in the module have a direct correlation to those
+provided by OpenTelemetry. Refer to docs there for a more in-depth documentation
+on some of the args and methods.
 
 Tracing
 -------
 
-In Synapse it is not possible to start a non-active span. Spans can be started
-using the ``start_active_span`` method. This returns a scope (see
-OpenTracing docs) which is a context manager that needs to be entered and
-exited. This is usually done by using ``with``.
+In Synapse, it is not possible to start a non-active span. Spans can be started
+using the ``start_active_span`` method. This returns a context manager that
+needs to be entered and exited to expose the ``span``. This is usually done by
+using a ``with`` statement.
 
 .. code-block:: python
 
-   from synapse.logging.opentracing import start_active_span
+   from synapse.logging.tracing import start_active_span
 
    with start_active_span("operation name"):
-       # Do something we want to tracer
+       # Do something we want to trace
 
-Forgetting to enter or exit a scope will result in some mysterious and grievous log
-context errors.
+Forgetting to enter or exit a scope will result in unstarted and unfinished
+spans that will not be reported (exported).
 
-At anytime where there is an active span ``opentracing.set_attribute`` can be used to
-set a tag on the current active span.
+At anytime where there is an active span ``set_attribute`` can be
+used to set a tag on the current active span.
 
 Tracing functions
 -----------------
 
-Functions can be easily traced using decorators. The name of
-the function becomes the operation name for the span.
+Functions can be easily traced using decorators. The name of the function
+becomes the operation name for the span.
 
 .. code-block:: python
 
-   from synapse.logging.opentracing import trace
+   from synapse.logging.tracing import trace
 
    # Start a span using 'interesting_function' as the operation name
    @trace
    def interesting_function(*args, **kwargs):
-       # Does all kinds of cool and expected things
-       return something_usual_and_useful
+       # Does all kinds of cool and expected things return
+       something_usual_and_useful
 
 
-Operation names can be explicitly set for a function by using ``trace_with_opname``:
+Operation names can be explicitly set for a function by using
+``trace_with_opname``:
 
 .. code-block:: python
 
-   from synapse.logging.opentracing import trace_with_opname
+   from synapse.logging.tracing import trace_with_opname
 
    @trace_with_opname("a_better_operation_name")
    def interesting_badly_named_function(*args, **kwargs):
-       # Does all kinds of cool and expected things
-       return something_usual_and_useful
+       # Does all kinds of cool and expected things return
+       something_usual_and_useful
 
 Setting Tags
 ------------
@@ -102,7 +103,7 @@ To set a tag on the active span do
 
 .. code-block:: python
 
-   from synapse.logging.opentracing import set_attribute
+   from synapse.logging.tracing import set_attribute
 
    set_attribute(tag_name, tag_value)
 
@@ -111,13 +112,10 @@ inspection in order to use the formal parameter names prefixed with 'ARG_' as
 tag names. It uses kwarg names as tag names without the prefix.
 
 .. code-block:: python
-
-   from synapse.logging.opentracing import tag_args
-
+   from synapse.logging.tracing import tag_args
    @tag_args
    def set_fates(clotho, lachesis, atropos, father="Zues", mother="Themis"):
        pass
-
    set_fates("the story", "the end", "the act")
    # This will have the following tags
    #  - ARG_clotho: "the story"
@@ -130,25 +128,22 @@ Contexts and carriers
 ---------------------
 
 There are a selection of wrappers for injecting and extracting contexts from
-carriers provided. Unfortunately OpenTracing's three context injection
-techniques are not adequate for our inject of OpenTracing span-contexts into
-Twisted's http headers, EDU contents and our database tables. Also note that
-the binary encoding format mandated by OpenTracing is not actually implemented
-by jaeger_client v4.0.0 - it will silently noop.
-Please refer to the end of ``logging/opentracing.py`` for the available
-injection and extraction methods.
+carriers provided. We use these to inject of OpenTelemetry Contexts into
+Twisted's http headers, EDU contents and our database tables. Please refer to
+the end of ``logging/tracing.py`` for the available injection and extraction
+methods.
 
 Homeserver whitelisting
 -----------------------
 
-Most of the whitelist checks are encapsulated in the modules's injection
-and extraction method but be aware that using custom carriers or crossing
+Most of the whitelist checks are encapsulated in the modules's injection and
+extraction method but be aware that using custom carriers or crossing
 unchartered waters will require the enforcement of the whitelist.
-``logging/opentracing.py`` has a ``whitelisted_homeserver`` method which takes
+``logging/tracing.py`` has a ``whitelisted_homeserver`` method which takes
 in a destination and compares it to the whitelist.
 
-Most injection methods take a 'destination' arg. The context will only be injected
-if the destination matches the whitelist or the destination is None.
+Most injection methods take a 'destination' arg. The context will only be
+injected if the destination matches the whitelist or the destination is None.
 
 =======
 Gotchas
@@ -157,10 +152,10 @@ Gotchas
 - Checking whitelists on span propagation
 - Inserting pii
 - Forgetting to enter or exit a scope
-- Span source: make sure that the span you expect to be active across a
-  function call really will be that one. Does the current function have more
-  than one caller? Will all of those calling functions have be in a context
-  with an active span?
+- Span source: make sure that the span you expect to be active across a function
+  call really will be that one. Does the current function have more than one
+  caller? Will all of those calling functions have be in a context with an
+  active span?
 """
 import contextlib
 import inspect
@@ -901,7 +896,7 @@ def trace_servlet(
 
     Args:
         request
-        extract_context: Whether to attempt to extract the opentracing
+        extract_context: Whether to attempt to extract the tracing
             context from the request the servlet is handling.
     """
 

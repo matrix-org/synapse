@@ -109,7 +109,7 @@ apply if you want your config file to be read properly. A few helpful things to 
 
 [Rooms](#rooms)
 
-[Opentracing](#opentracing)
+[Tracing](#tracing)
 
 [Workers](#workers)
 
@@ -3554,47 +3554,47 @@ default_power_level_content_override:
 ```
 
 ---
-## Opentracing ##
-Configuration options related to Opentracing support.
+## Tracing ##
+Configuration options related to tracing support.
 
 ---
-### `opentracing`
+### `tracing`
 
-These settings enable and configure opentracing, which implements distributed tracing.
-This allows you to observe the causal chains of events across servers
-including requests, key lookups etc., across any server running
-synapse or any other services which support opentracing
-(specifically those implemented with Jaeger).
+These settings enable and configure tracing. This allows you to observe the
+causal chains of events across servers including requests, key lookups etc.,
+across any server running synapse or any other services which support
+OpenTelemetry.
 
 Sub-options include:
 * `enabled`: whether tracing is enabled. Set to true to enable. Disabled by default.
 * `homeserver_whitelist`: The list of homeservers we wish to send and receive span contexts and span baggage.
-   See [here](../../opentracing.md) for more. 
+   See [here](../../tracing.md) for more. 
    This is a list of regexes which are matched against the `server_name` of the homeserver.
    By default, it is empty, so no servers are matched.
-* `force_tracing_for_users`: # A list of the matrix IDs of users whose requests will always be traced,
+* `sample_rate`: The probability that a given span and subsequent child spans in the trace will be      
+   recorded. This controls the amount of spans that record and are exported from Synapse.
+* `force_tracing_for_users`: A list of the matrix IDs of users whose requests will always be traced,
    even if the tracing system would otherwise drop the traces due to probabilistic sampling.
     By default, the list is empty.
-* `jaeger_config`: Jaeger can be configured to sample traces at different rates.
-   All configuration options provided by Jaeger can be set here. Jaeger's configuration is 
-   mostly related to trace sampling which is documented [here](https://www.jaegertracing.io/docs/latest/sampling/).
+* `jaeger_exporter_config`: Configure authentication and where you Jaeger instance is located.
+   Full options available in the [`JaegerExporter` API docs](https://opentelemetry-python.readthedocs.io/en/latest/exporter/jaeger/jaeger.html#opentelemetry.exporter.jaeger.thrift.JaegerExporter).
 
 Example configuration:
 ```yaml
-opentracing:
+tracing:
     enabled: true
     homeserver_whitelist:
       - ".*"
+
+    sample_rate: 1
     force_tracing_for_users:
       - "@user1:server_name"
       - "@user2:server_name"
 
-    jaeger_config:
-      sampler:
-        type: const
-        param: 1
-      logging:
-        false
+    jaeger_exporter_config:
+      agent_host_name: localhost
+      agent_port: 6831
+      collector_endpoint: "http://localhost:14268/api/traces?format=jaeger.thrift"
 ```
 ---
 ## Workers ##
