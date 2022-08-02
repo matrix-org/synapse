@@ -619,6 +619,32 @@ def start_span(
     if kind is None:
         kind = SpanKind.INTERNAL
 
+    if context is None:
+        context = get_context_from_span(get_active_span())
+
+    logger.info(
+        "is_context_forced_tracing(context)=%s context=%s",
+        is_context_forced_tracing(context),
+        context,
+    )
+
+    if is_context_forced_tracing(context):
+        parent_span_context = get_span_context_from_context(context)
+        if parent_span_context:
+            force_sample_span_context = opentelemetry.trace.span.SpanContext(
+                trace_id=parent_span_context.trace_id,
+                span_id=parent_span_context.span_id,
+                is_remote=False,
+                # Force sampled so this trace is exported
+                trace_flags=opentelemetry.trace.TraceFlags(
+                    opentelemetry.trace.TraceFlags.SAMPLED
+                ),
+            )
+            # Overwrite the context with the sampled flag on
+            context = trace.set_span_in_context(
+                opentelemetry.trace.NonRecordingSpan(force_sample_span_context)
+            )
+
     return tracer.start_span(
         name=name,
         context=context,
@@ -777,18 +803,38 @@ def force_tracing(span: Optional["opentelemetry.trace.span.Span"] = None) -> Non
         # regardless of what IsRecording/Sampled on the SpanContext says
         span.set_attribute(SynapseTags.FORCE_TRACING, True)
 
-        # ctx = get_context_from_span(span)
-        # opentelemetry.baggage.set_baggage(
-        #     SynapseBaggage.FORCE_TRACING, "1", context=ctx
-        # )
+        ctx = get_context_from_span(span)
+        logger.info("set_baggage on ctx=%s", ctx)
+        # This doesn't work because `set_baggage` returns a new context
+        # that we can't apply back to the span so the baggage is lost
+        opentelemetry.baggage.set_baggage(
+            SynapseBaggage.FORCE_TRACING, "1", context=ctx
+        )
+
+        force_tracing_baggage = opentelemetry.baggage.get_baggage(
+            SynapseBaggage.FORCE_TRACING, context=ctx
+        )
+        opentelemetry.baggage.set_baggage("foo", "bar", context=ctx)
+        foo_baggage = opentelemetry.baggage.get_baggage("foo", context=ctx)
+        # TODO: Why is this still None after we just set it?
+        logger.info(
+            "after set_baggage on force_tracing_baggage=%s foo_baggage=%s",
+            force_tracing_baggage,
+            foo_baggage,
+        )
 
 
 def is_context_forced_tracing(
-    span_context: Optional["opentelemetry.shim.opentracing_shim.SpanContextShim"],
+    context: "opentelemetry.context.context.Context",
 ) -> bool:
     """Check if sampling has been force for the given span context."""
-    # TODO
-    return False
+    force_tracing_baggage = opentelemetry.baggage.get_baggage(
+        SynapseBaggage.FORCE_TRACING, context=context
+    )
+    logger.info(
+        "is_context_forced_tracing force_tracing_baggage=%s", force_tracing_baggage
+    )
+    return force_tracing_baggage is not None
 
 
 # Injection and extraction
