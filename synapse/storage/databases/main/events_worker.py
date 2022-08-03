@@ -602,7 +602,8 @@ class EventsWorkerStore(SQLBaseStore):
         """
         # Shortcut: check if we have any events in the *in memory* cache - this function
         # may be called repeatedly for the same event so at this point we cannot reach
-        # out to any external cache for performance reasons.
+        # out to any external cache for performance reasons, this is done later on in
+        # the `get_missing_events_from_cache_or_db` function below.
         event_entry_map = self._get_events_from_local_cache(
             event_ids,
         )
@@ -664,8 +665,8 @@ class EventsWorkerStore(SQLBaseStore):
                 #
                 missing_events = {}
                 try:
-                    # First fetch from the cache - including any external caches
-                    missing_events = await self._get_events_from_cache(
+                    # Try to fetch from any external cache, in-memory cache checked above
+                    missing_events = await self._get_events_from_external_cache(
                         missing_events_ids,
                     )
                     # Now actually fetch any remaining events from the DB
@@ -779,9 +780,27 @@ class EventsWorkerStore(SQLBaseStore):
         )
 
         missing_event_ids = {e for e in events if e not in event_map}
+        event_map.update(self._get_events_from_external_cache(
+            events=missing_event_ids, update_metrics=update_metrics,
+        ))
 
-        for event_id in missing_event_ids:
-            ret = await self._get_event_cache.get(
+        return event_map
+
+    async def _get_events_from_external_cache(
+        self, events: Iterable[str], update_metrics: bool = True
+    ) -> Dict[str, EventCacheEntry]:
+        """Fetch events from any configured external cache.
+
+        May return rejected events.
+
+        Args:
+            events: list of event_ids to fetch
+            update_metrics: Whether to update the cache hit ratio metrics
+        """
+        event_map = {}
+
+        for event_id in events:
+            ret = await self._get_event_cache.get_external(
                 (event_id,), None, update_metrics=update_metrics
             )
             if ret:
