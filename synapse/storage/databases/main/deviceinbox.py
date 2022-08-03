@@ -219,6 +219,8 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                   same device should pass this value as 'from_stream_id'.
         """
         if limit == 0:
+            # We return the from token so that if a sync later on asks for
+            # non-zero number of to-device messages we won't have dropped any.
             return [], from_stream_id
 
         (
