@@ -1267,17 +1267,22 @@ telegram = ["requests"]
 
 [[package]]
 name = "treq"
-version = "15.1.0"
-description = "A requests-like API built on top of twisted.web's Agent"
+version = "22.2.0"
+description = "High-level Twisted HTTP Client API"
 category = "main"
 optional = false
-python-versions = "*"
+python-versions = ">=3.6"
 
 [package.dependencies]
-pyOpenSSL = {version = ">=0.15.1", markers = "python_version > \"3.0\""}
+attrs = "*"
+hyperlink = ">=21.0.0"
+incremental = "*"
 requests = ">=2.1.0"
-service_identity = ">=14.0.0"
-Twisted = {version = ">=15.5.0", markers = "python_version > \"3.0\""}
+Twisted = {version = ">=18.7.0", extras = ["tls"]}
+
+[package.extras]
+dev = ["pep8", "pyflakes", "httpbin (==0.5.0)"]
+docs = ["sphinx (>=1.4.8)"]
 
 [[package]]
 name = "twine"
@@ -1304,7 +1309,7 @@ name = "Twisted"
 version = "22.4.0.post0"
 description = "An asynchronous networking framework written in Python"
 category = "main"
-optional = false
+optional = true
 python-versions = ">=3.7.1"
 develop = false
 
@@ -1615,7 +1620,7 @@ url_preview = ["lxml"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7.1"
-content-hash = "c2cfbb348a49e088c404148c1b682fc5af5abb6278cf4479c6a51fff1656328c"
+content-hash = "b3cf8776561c62340d50bf8a07b99e25fd67f2063075ceb0047946c4314c5882"
 
 [metadata.files]
 attrs = [
@@ -2642,8 +2647,8 @@ tqdm = [
     {file = "tqdm-4.63.0.tar.gz", hash = "sha256:1d9835ede8e394bb8c9dcbffbca02d717217113adc679236873eeaac5bc0b3cd"},
 ]
 treq = [
-    {file = "treq-15.1.0-py2.py3-none-any.whl", hash = "sha256:1ad1ba89ddc62ae877084b290bd327755b13f6e7bc7076dc4d8e2efb701bfd63"},
-    {file = "treq-15.1.0.tar.gz", hash = "sha256:425a47d5d52a993d51211028fb6ade252e5fbea094e878bb4b644096a7322de8"},
+    {file = "treq-22.2.0-py3-none-any.whl", hash = "sha256:27d95b07c5c14be3e7b280416139b036087617ad5595be913b1f9b3ce981b9b2"},
+    {file = "treq-22.2.0.tar.gz", hash = "sha256:df757e3f141fc782ede076a604521194ffcb40fa2645cf48e5a37060307f52ec"},
 ]
 twine = [
     {file = "twine-3.8.0-py3-none-any.whl", hash = "sha256:d0550fca9dc19f3d5e8eadfce0c227294df0a2a951251a4385797c8a6198b7c8"},
