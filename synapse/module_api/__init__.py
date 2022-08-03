@@ -1458,7 +1458,7 @@ class ModuleApi:
         config: JsonDict,
         ratelimit: bool = True,
         creator_join_profile: Optional[JsonDict] = None,
-    ) -> Tuple[dict, int]:
+    ) -> Tuple[str, Optional[str]]:
         """Creates a new room.
 
         Added in Synapse v1.66.0.
@@ -1478,9 +1478,8 @@ class ModuleApi:
                 `avatar_url` and/or `displayname`.
 
         Returns:
-                First, a dict containing the keys `room_id` and, if an alias
-                was, requested, `room_alias`. Secondly, the stream_id of the
-                last persisted event.
+                A tuple containing: 1) the room ID (str), 2) if an alias was requested,
+                the room alias (str), otherwise None if no alias was requested.
         Raises:
             SynapseError if the user_id is invalid, room ID couldn't be stored, or
             something went horribly wrong.
@@ -1494,13 +1493,14 @@ class ModuleApi:
             )
 
         requester = create_requester(user_id)
-
-        return await self._hs.get_room_creation_handler().create_room(
+        room_id_and_alias, _ = await self._hs.get_room_creation_handler().create_room(
             requester=requester,
             config=config,
             ratelimit=ratelimit,
             creator_join_profile=creator_join_profile,
         )
+
+        return room_id_and_alias["room_id"], room_id_and_alias.get("room_alias", None)
 
 
 class PublicRoomListManager:
