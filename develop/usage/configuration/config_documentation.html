@@ -2167,9 +2167,14 @@ Implicitly enables MAU tracking for application service users.</p>
 </code></pre>
 <hr />
 <h3 id="macaroon_secret_key"><a class="header" href="#macaroon_secret_key"><code>macaroon_secret_key</code></a></h3>
-<p>A secret which is used to sign access tokens. If none is specified,
-the <code>registration_shared_secret</code> is used, if one is given; otherwise,
-a secret key is derived from the signing key.</p>
+<p>A secret which is used to sign</p>
+<ul>
+<li>access token for guest users,</li>
+<li>short-term login token used during SSO logins (OIDC or SAML2) and</li>
+<li>token used for unsubscribing from email notifications.</li>
+</ul>
+<p>If none is specified, the <code>registration_shared_secret</code> is used, if one is given;
+otherwise, a secret key is derived from the signing key.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">macaroon_secret_key: &lt;PRIVATE STRING&gt;
 </code></pre>
