@@ -665,13 +665,12 @@ class EventsWorkerStore(SQLBaseStore):
                 missing_events = {}
                 try:
                     # First fetch from the cache - including any external caches
-                    cache_missing_events = await self._get_events_from_cache(
+                    missing_events = await self._get_events_from_cache(
                         missing_events_ids,
                     )
-                    missing_events.update(cache_missing_events)
                     # Now actually fetch any remaining events from the DB
                     db_missing_events = await self._get_events_from_db(
-                        missing_events_ids - set(cache_missing_events.keys()),
+                        missing_events_ids - missing_events.keys(),
                     )
                     missing_events.update(db_missing_events)
                 except Exception as e:
