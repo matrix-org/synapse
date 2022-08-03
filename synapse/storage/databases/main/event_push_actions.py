@@ -205,10 +205,11 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
         self._rotate_count = 10000
         self._doing_notif_rotation = False
-        if hs.config.worker.run_background_tasks:
-            self._rotate_notif_loop = self._clock.looping_call(
-                self._rotate_notifs, 30 * 1000
-            )
+        # XXX Do not rotate summaries for now, they're broken.
+        # if hs.config.worker.run_background_tasks:
+        #     self._rotate_notif_loop = self._clock.looping_call(
+        #         self._rotate_notifs, 30 * 1000
+        #     )
 
         self.db_pool.updates.register_background_index_update(
             "event_push_summary_unique_index",
@@ -310,41 +311,43 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         # date (as the row was written by an older version of Synapse that
         # updated `event_push_summary` synchronously when persisting a new read
         # receipt).
-        txn.execute(
-            """
-                SELECT notif_count, COALESCE(unread_count, 0), thread_id, MAX(events.stream_ordering)
-                FROM event_push_summary
-                LEFT JOIN receipts_linearized USING (room_id, user_id, thread_id)
-                LEFT JOIN events ON (
-                    events.room_id = receipts_linearized.room_id AND
-                    events.event_id = receipts_linearized.event_id
-                )
-                WHERE event_push_summary.room_id = ? AND user_id = ?
-                AND (
-                    (
-                        last_receipt_stream_ordering IS NULL
-                        AND event_push_summary.stream_ordering > COALESCE(events.stream_ordering, ?)
-                    )
-                    OR last_receipt_stream_ordering = COALESCE(events.stream_ordering, ?)
-                )
-                AND (receipt_type = 'm.read' OR receipt_type = 'org.matrix.msc2285.read.private')
-            """,
-            (room_id, user_id, stream_ordering, stream_ordering),
-        )
-        for notif_count, unread_count, thread_id, _ in txn:
-            # XXX Why are these returned? Related to MAX(...) aggregation.
-            if notif_count is None:
-                continue
 
-            if not thread_id:
-                counts = NotifCounts(
-                    notify_count=notif_count, unread_count=unread_count
-                )
-            # TODO Delete zeroed out threads completely from the database.
-            elif notif_count or unread_count:
-                thread_counts[thread_id] = NotifCounts(
-                    notify_count=notif_count, unread_count=unread_count
-                )
+        # XXX event_push_summary is not currently filled in. broken.
+        # txn.execute(
+        #     """
+        #         SELECT notif_count, COALESCE(unread_count, 0), thread_id, MAX(events.stream_ordering)
+        #         FROM event_push_summary
+        #         LEFT JOIN receipts_linearized USING (room_id, user_id, thread_id)
+        #         LEFT JOIN events ON (
+        #             events.room_id = receipts_linearized.room_id AND
+        #             events.event_id = receipts_linearized.event_id
+        #         )
+        #         WHERE event_push_summary.room_id = ? AND user_id = ?
+        #         AND (
+        #             (
+        #                 last_receipt_stream_ordering IS NULL
+        #                 AND event_push_summary.stream_ordering > COALESCE(events.stream_ordering, ?)
+        #             )
+        #             OR last_receipt_stream_ordering = COALESCE(events.stream_ordering, ?)
+        #         )
+        #         AND (receipt_type = 'm.read' OR receipt_type = 'org.matrix.msc2285.read.private')
+        #     """,
+        #     (room_id, user_id, stream_ordering, stream_ordering),
+        # )
+        # for notif_count, unread_count, thread_id, _ in txn:
+        #     # XXX Why are these returned? Related to MAX(...) aggregation.
+        #     if notif_count is None:
+        #         continue
+        #
+        #     if not thread_id:
+        #         counts = NotifCounts(
+        #             notify_count=notif_count, unread_count=unread_count
+        #         )
+        #     # TODO Delete zeroed out threads completely from the database.
+        #     elif notif_count or unread_count:
+        #         thread_counts[thread_id] = NotifCounts(
+        #             notify_count=notif_count, unread_count=unread_count
+        #         )
 
         # Next we need to count highlights, which aren't summarised
         sql = """
