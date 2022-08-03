@@ -1461,6 +1461,8 @@ class ModuleApi:
     ) -> Tuple[dict, int]:
         """Creates a new room.
 
+        Added in Synapse v1.66.0.
+
         Args:
             user_id:
                 The user who requested the room creation.
