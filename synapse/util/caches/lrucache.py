@@ -835,7 +835,10 @@ class AsyncLruCache(Generic[KT, VT]):
         return self._lru_cache.get(key, update_metrics=update_metrics)
 
     async def get_external(
-        self, key: KT, default: Optional[T] = None, update_metrics: bool = True,
+        self,
+        key: KT,
+        default: Optional[T] = None,
+        update_metrics: bool = True,
     ) -> Optional[VT]:
         # This method should fetch from any configured external cache, in this case noop.
         return None
