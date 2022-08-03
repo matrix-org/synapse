@@ -3604,7 +3604,10 @@ tracing:
     jaeger_exporter_config:
       agent_host_name: localhost
       agent_port: 6831
-      collector_endpoint: "http://localhost:14268/api/traces?format=jaeger.thrift"
+      # Split UDP packets so they fit within the limit (UDP_PACKET_MAX_LENGTH is set to 65k in OpenTelemetry)
+      udp_split_oversized_batches: true
+      # If you define a collector, it will communicate directly to the collector, bypassing the agent
+      #collector_endpoint: "http://localhost:14268/api/traces?format=jaeger.thrift"
 ```
 ---
 ## Workers ##

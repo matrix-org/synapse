@@ -15,3 +15,4 @@
 
 -- Rename to generalized `tracing_context` since we're moving from opentracing to opentelemetry
 ALTER TABLE device_lists_outbound_pokes RENAME COLUMN opentracing_context TO tracing_context;
+ALTER TABLE device_lists_changes_in_room RENAME COLUMN opentracing_context TO tracing_context;
