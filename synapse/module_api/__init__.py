@@ -1456,7 +1456,7 @@ class ModuleApi:
         """
         Get the room ID associated with a room alias.
 
-        Added in Synapse v1.66.0.
+        Added in Synapse v1.65.0.
 
         Args:
             room_alias: The alias to look up.
