@@ -635,6 +635,25 @@ class ModuleApiTestCase(HomeserverTestCase):
             [{"set_tweak": "sound", "value": "default"}]
         )
 
+    def test_lookup_room_alias(self) -> None:
+        """Test that modules can resolve a room alias to a room ID."""
+        password = "password"
+        user_id = self.register_user("user", password)
+        access_token = self.login(user_id, password)
+        room_alias = "my-alias"
+        reference_room_id = self.helper.create_room_as(
+            tok=access_token, extra_content={"room_alias_name": room_alias}
+        )
+        self.assertIsNotNone(reference_room_id)
+
+        (room_id, _) = self.get_success(
+            self.module_api.lookup_room_alias(
+                f"#{room_alias}:{self.module_api.server_name}"
+            )
+        )
+
+        self.assertEqual(room_id, reference_room_id)
+
 
 class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
     """For testing ModuleApi functionality in a multi-worker setup"""

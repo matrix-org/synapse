@@ -1772,6 +1772,21 @@ class RoomTestCase(unittest.HomeserverTestCase):
             tok=admin_user_tok,
         )
 
+    def test_get_joined_members_after_leave_room(self) -> None:
+        """Test that requesting room members after leaving the room raises a 403 error."""
+
+        # create the room
+        user = self.register_user("foo", "pass")
+        user_tok = self.login("foo", "pass")
+        room_id = self.helper.create_room_as(user, tok=user_tok)
+        self.helper.leave(room_id, user, tok=user_tok)
+
+        # delete the rooms and get joined roomed membership
+        url = f"/_matrix/client/r0/rooms/{room_id}/joined_members"
+        channel = self.make_request("GET", url.encode("ascii"), access_token=user_tok)
+        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
 
 class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
 

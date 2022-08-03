@@ -29,6 +29,7 @@ from typing import (
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
+from synapse.logging.opentracing import trace
 from synapse.storage.state import StateFilter
 from synapse.storage.util.partial_state_events_tracker import (
     PartialCurrentStateTracker,
@@ -179,6 +180,7 @@ class StateStorageController:
 
         return self.stores.state._get_state_groups_from_groups(groups, state_filter)
 
+    @trace
     async def get_state_for_events(
         self, event_ids: Collection[str], state_filter: Optional[StateFilter] = None
     ) -> Dict[str, StateMap[EventBase]]:
@@ -225,6 +227,7 @@ class StateStorageController:
 
         return {event: event_to_state[event] for event in event_ids}
 
+    @trace
     async def get_state_ids_for_events(
         self,
         event_ids: Collection[str],
@@ -287,6 +290,7 @@ class StateStorageController:
         )
         return state_map[event_id]
 
+    @trace
     async def get_state_ids_for_event(
         self, event_id: str, state_filter: Optional[StateFilter] = None
     ) -> StateMap[str]:
@@ -327,6 +331,7 @@ class StateStorageController:
             groups, state_filter or StateFilter.all()
         )
 
+    @trace
     async def get_state_group_for_events(
         self,
         event_ids: Collection[str],
