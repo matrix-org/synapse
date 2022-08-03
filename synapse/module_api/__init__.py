@@ -1480,12 +1480,13 @@ class ModuleApi:
         Returns:
                 A tuple containing: 1) the room ID (str), 2) if an alias was requested,
                 the room alias (str), otherwise None if no alias was requested.
+
         Raises:
-            SynapseError if the user_id is invalid, room ID couldn't be stored, or
-            something went horribly wrong.
             ResourceLimitError if server is blocked to some resource being
             exceeded.
             RuntimeError if the user_id does not refer to a local user.
+            SynapseError if the user_id is invalid, room ID couldn't be stored, or
+            something went horribly wrong.
         """
         if not self.is_mine(user_id):
             raise RuntimeError(
