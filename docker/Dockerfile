@@ -45,7 +45,7 @@ RUN \
 
 # We install poetry in its own build stage to avoid its dependencies conflicting with
 # synapse's dependencies.
-# We use a specific commit from poetry's master branch instead of our usual 1.1.12,
+# We use a specific commit from poetry's master branch instead of our usual 1.1.14,
 # to incorporate fixes to some bugs in `poetry export`. This commit corresponds to
 #    https://github.com/python-poetry/poetry/pull/5156 and
 #    https://github.com/python-poetry/poetry/issues/5141 ;

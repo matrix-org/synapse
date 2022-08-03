@@ -133,7 +133,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             assert self.hs.config.registration.account_threepid_delegate_email
 
             # Have the configured identity server handle the request
-            ret = await self.identity_handler.requestEmailToken(
+            ret = await self.identity_handler.request_email_token(
                 self.hs.config.registration.account_threepid_delegate_email,
                 email,
                 client_secret,
@@ -417,7 +417,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             assert self.hs.config.registration.account_threepid_delegate_email
 
             # Have the configured identity server handle the request
-            ret = await self.identity_handler.requestEmailToken(
+            ret = await self.identity_handler.request_email_token(
                 self.hs.config.registration.account_threepid_delegate_email,
                 email,
                 client_secret,
@@ -551,8 +551,7 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
         elif self.config.email.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
             raise SynapseError(
                 400,
-                "This homeserver is not validating threepids. Use an identity server "
-                "instead.",
+                "This homeserver is not validating threepids.",
             )
 
         sid = parse_string(request, "sid", required=True)
@@ -743,10 +742,12 @@ class ThreepidBindRestServlet(RestServlet):
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         body = parse_json_object_from_request(request)
 
-        assert_params_in_dict(body, ["id_server", "sid", "client_secret"])
+        assert_params_in_dict(
+            body, ["id_server", "sid", "id_access_token", "client_secret"]
+        )
         id_server = body["id_server"]
         sid = body["sid"]
-        id_access_token = body.get("id_access_token")  # optional
+        id_access_token = body["id_access_token"]
         client_secret = body["client_secret"]
         assert_valid_client_secret(client_secret)
 

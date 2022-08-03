@@ -382,6 +382,7 @@ class UserRestServletV2(RestServlet):
                     if (
                         self.hs.config.email.email_enable_notifs
                         and self.hs.config.email.email_notif_for_new_users
+                        and medium == "email"
                     ):
                         await self.pusher_pool.add_pusher(
                             user_id=user_id,

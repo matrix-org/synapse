@@ -89,6 +89,37 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.64.0
+
+## Deprecation of the ability to delegate e-mail verification to identity servers
+
+Synapse v1.66.0 will remove the ability to delegate the tasks of verifying email address ownership, and password reset confirmation, to an identity server.
+
+If you require your homeserver to verify e-mail addresses or to support password resets via e-mail, please configure your homeserver with SMTP access so that it can send e-mails on its own behalf.
+[Consult the configuration documentation for more information.](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#email)
+
+The option that will be removed is `account_threepid_delegates.email`.
+
+
+## Changes to the event replication streams
+
+Synapse now includes a flag indicating if an event is an outlier when
+replicating it to other workers. This is a forwards- and backwards-incompatible
+change: v1.63 and workers cannot process events replicated by v1.64 workers, and
+vice versa.
+
+Once all workers are upgraded to v1.64 (or downgraded to v1.63), event
+replication will resume as normal.
+
+## frozendict release
+
+[frozendict 2.3.3](https://github.com/Marco-Sulla/python-frozendict/releases/tag/v2.3.3)
+has recently been released, which fixes a memory leak that occurs during `/sync`
+requests. We advise server administrators who installed Synapse via pip to upgrade
+frozendict with `pip install --upgrade frozendict`. The Docker image
+`matrixdotorg/synapse` and the Debian packages from `packages.matrix.org` already
+include the updated library.
+
 # Upgrading to v1.62.0
 
 ## New signatures for spam checker callbacks
