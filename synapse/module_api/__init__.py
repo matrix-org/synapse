@@ -1460,10 +1460,12 @@ class ModuleApi:
 
         Args:
             room_alias: The alias to look up.
+
         Returns:
             A tuple of:
                 The room ID (str).
                 Hosts likely to be participating in the room ([str]).
+
         Raises:
             SynapseError if room alias is invalid or could not be found.
         """
