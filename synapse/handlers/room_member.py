@@ -32,6 +32,7 @@ from synapse.event_auth import get_named_level, get_power_level_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
+from synapse.logging import tracing
 from synapse.module_api import NOT_SPAM
 from synapse.storage.state import StateFilter
 from synapse.types import (
@@ -428,14 +429,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 await self._join_rate_per_room_limiter.ratelimit(
                     requester, key=room_id, update=False
                 )
-
-        result_event = await self.event_creation_handler.handle_new_client_event(
-            requester,
-            event,
-            context,
-            extra_users=[target],
-            ratelimit=ratelimit,
-        )
+        with tracing.start_active_span("handle_new_client_event"):
+            result_event = await self.event_creation_handler.handle_new_client_event(
+                requester,
+                event,
+                context,
+                extra_users=[target],
+                ratelimit=ratelimit,
+            )
 
         if event.membership == Membership.LEAVE:
             if prev_member_event_id:
@@ -564,25 +565,26 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # by application services), and then by room ID.
         async with self.member_as_limiter.queue(as_id):
             async with self.member_linearizer.queue(key):
-                result = await self.update_membership_locked(
-                    requester,
-                    target,
-                    room_id,
-                    action,
-                    txn_id=txn_id,
-                    remote_room_hosts=remote_room_hosts,
-                    third_party_signed=third_party_signed,
-                    ratelimit=ratelimit,
-                    content=content,
-                    new_room=new_room,
-                    require_consent=require_consent,
-                    outlier=outlier,
-                    historical=historical,
-                    allow_no_prev_events=allow_no_prev_events,
-                    prev_event_ids=prev_event_ids,
-                    state_event_ids=state_event_ids,
-                    depth=depth,
-                )
+                with tracing.start_active_span("update_membership_locked"):
+                    result = await self.update_membership_locked(
+                        requester,
+                        target,
+                        room_id,
+                        action,
+                        txn_id=txn_id,
+                        remote_room_hosts=remote_room_hosts,
+                        third_party_signed=third_party_signed,
+                        ratelimit=ratelimit,
+                        content=content,
+                        new_room=new_room,
+                        require_consent=require_consent,
+                        outlier=outlier,
+                        historical=historical,
+                        allow_no_prev_events=allow_no_prev_events,
+                        prev_event_ids=prev_event_ids,
+                        state_event_ids=state_event_ids,
+                        depth=depth,
+                    )
 
         return result
 
@@ -649,6 +651,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         Returns:
             A tuple of the new event ID and stream ID.
         """
+
         content_specified = bool(content)
         if content is None:
             content = {}

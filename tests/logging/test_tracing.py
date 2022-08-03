@@ -139,10 +139,10 @@ class TracingTestCase(TestCase):
             with start_active_span(
                 f"task{i}",
                 tracer=self._tracer,
-            ) as span1:
-                self.assertEqual(opentelemetry.trace.get_current_span(), span1)
+            ) as span:
+                self.assertEqual(opentelemetry.trace.get_current_span(), span)
                 await clock.sleep(4)
-                self.assertEqual(opentelemetry.trace.get_current_span(), span1)
+                self.assertEqual(opentelemetry.trace.get_current_span(), span)
 
         async def root():
             with start_active_span("root_span", tracer=self._tracer) as root_span:
@@ -163,12 +163,12 @@ class TracingTestCase(TestCase):
                 self.assertEqual(opentelemetry.trace.get_current_span(), root_span)
 
         # start the test off
-        d1 = defer.ensureDeferred(root())
+        root_defferred = defer.ensureDeferred(root())
 
         # let the tasks complete
         reactor.pump((2,) * 8)
 
-        self.successResultOf(d1)
+        self.successResultOf(root_defferred)
         # Active span is unset now that we're outside of the `with` scopes
         self.assertEqual(
             opentelemetry.trace.get_current_span(), opentelemetry.trace.INVALID_SPAN
