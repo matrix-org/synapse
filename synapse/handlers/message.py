@@ -52,7 +52,7 @@ from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.handlers.directory import DirectoryHandler
-from synapse.logging import opentracing
+from synapse.logging import tracing
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
@@ -1375,7 +1375,7 @@ class EventCreationHandler:
         # and `state_groups` because they have `prev_events` that aren't persisted yet
         # (historical messages persisted in reverse-chronological order).
         if not event.internal_metadata.is_historical():
-            with opentracing.start_active_span("calculate_push_actions"):
+            with tracing.start_active_span("calculate_push_actions"):
                 await self._bulk_push_rule_evaluator.action_for_event_by_user(
                     event, context
                 )
@@ -1465,7 +1465,7 @@ class EventCreationHandler:
             state = await state_entry.get_state(
                 self._storage_controllers.state, StateFilter.all()
             )
-            with opentracing.start_active_span("get_joined_hosts"):
+            with tracing.start_active_span("get_joined_hosts"):
                 joined_hosts = await self.store.get_joined_hosts(
                     event.room_id, state, state_entry
                 )

@@ -32,7 +32,7 @@ from synapse.event_auth import get_named_level, get_power_level_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
-from synapse.logging import opentracing
+from synapse.logging import tracing
 from synapse.module_api import NOT_SPAM
 from synapse.storage.state import StateFilter
 from synapse.types import (
@@ -429,7 +429,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 await self._join_rate_per_room_limiter.ratelimit(
                     requester, key=room_id, update=False
                 )
-        with opentracing.start_active_span("handle_new_client_event"):
+        with tracing.start_active_span("handle_new_client_event"):
             result_event = await self.event_creation_handler.handle_new_client_event(
                 requester,
                 event,
@@ -565,7 +565,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # by application services), and then by room ID.
         async with self.member_as_limiter.queue(as_id):
             async with self.member_linearizer.queue(key):
-                with opentracing.start_active_span("update_membership_locked"):
+                with tracing.start_active_span("update_membership_locked"):
                     result = await self.update_membership_locked(
                         requester,
                         target,

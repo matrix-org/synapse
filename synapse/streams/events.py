@@ -21,7 +21,7 @@ from synapse.handlers.presence import PresenceEventSource
 from synapse.handlers.receipts import ReceiptEventSource
 from synapse.handlers.room import RoomEventSource
 from synapse.handlers.typing import TypingNotificationEventSource
-from synapse.logging.opentracing import trace
+from synapse.logging.tracing import trace
 from synapse.streams import EventSource
 from synapse.types import StreamToken
 

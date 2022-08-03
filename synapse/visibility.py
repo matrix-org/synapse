@@ -23,7 +23,7 @@ from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.utils import prune_event
-from synapse.logging.opentracing import trace
+from synapse.logging.tracing import trace
 from synapse.storage.controllers import StorageControllers
 from synapse.storage.databases.main import DataStore
 from synapse.storage.state import StateFilter
