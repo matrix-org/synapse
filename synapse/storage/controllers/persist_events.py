@@ -778,7 +778,7 @@ class EventsPersistenceStorageController:
             stale_forward_extremities_counter.observe(len(stale))
 
         return result
-    
+
     async def _get_new_state_after_events(
         self,
         room_id: str,
