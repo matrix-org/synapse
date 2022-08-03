@@ -58,7 +58,7 @@ from twisted.internet import defer
 from synapse.api.filtering import Filter
 from synapse.events import EventBase
 from synapse.logging.context import make_deferred_yieldable, run_in_background
-from synapse.logging.opentracing import trace
+from synapse.logging.tracing import trace
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
     DatabasePool,
