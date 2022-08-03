@@ -37,7 +37,8 @@ as Synapse). The Synapse config is then modified to point to the mapping provide
 ## OpenID Mapping Providers
 
 The OpenID mapping provider can be customized by editing the
-`oidc_providers.user_mapping_provider.module` config option.
+[`oidc_providers.user_mapping_provider.module`](usage/configuration/config_documentation.md#oidc_providers)
+config option.
 
 `oidc_providers.user_mapping_provider.config` allows you to provide custom
 configuration options to the module. Check with the module's documentation for
@@ -113,7 +114,8 @@ specified in the config. It is located at
 ## SAML Mapping Providers
 
 The SAML mapping provider can be customized by editing the
-`saml2_config.user_mapping_provider.module` config option.
+[`saml2_config.user_mapping_provider.module`](docs/usage/configuration/config_documentation.md#saml2_config)
+config option.
 
 `saml2_config.user_mapping_provider.config` allows you to provide custom
 configuration options to the module. Check with the module's documentation for
