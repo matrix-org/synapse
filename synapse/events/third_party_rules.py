@@ -554,19 +554,18 @@ class ThirdPartyEventRules:
             was raised at some point.
         """
 
-        global_changed = True
+        global_changed = False
         for callback in self._on_threepid_unbind_callbacks:
             try:
                 (changed, stop) = await callback(
                     user_id, medium, address, identity_server
                 )
-                global_changed &= changed
+                global_changed |= changed
                 if stop:
-                    return (global_changed, True)
+                    return global_changed, True
             except Exception as e:
                 logger.exception(
                     "Failed to run module API callback %s: %s", callback, e
                 )
-                raise e
 
-        return (global_changed, False)
+        return global_changed, False
