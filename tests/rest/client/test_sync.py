@@ -991,7 +991,7 @@ class ToDeviceLimitTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(chan.code, 200, chan.result)
 
-    # This does an incremental sync for user kermit with do_not_use_to_device_limit
+    # This does an incremental sync for user kermit with org.matrix.unstable.to_device_limit
     # setted and check the number of returned to_device msgs against
     # expected_to_device_msgs value
     def _limited_sync_and_check(
@@ -999,7 +999,7 @@ class ToDeviceLimitTestCase(unittest.HomeserverTestCase):
     ) -> None:
         channel = self.make_request(
             "GET",
-            f'/sync?since={self.next_batch}&filter={{"do_not_use_to_device_limit": {to_device_limit}}}',
+            f'/sync?since={self.next_batch}&filter={{"org.matrix.unstable.to_device_limit": {to_device_limit}}}',
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 200)
