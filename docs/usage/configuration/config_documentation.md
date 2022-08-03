@@ -3540,7 +3540,7 @@ OpenTelemetry.
 Sub-options include:
 * `enabled`: whether tracing is enabled. Set to true to enable. Disabled by default.
 * `homeserver_whitelist`: The list of homeservers we wish to send and receive span contexts and span baggage.
-   See [here](../../tracing.md) for more. 
+   See [here](../../tracing.md#homeserver-whitelisting) for more. 
    This is a list of regexes which are matched against the `server_name` of the homeserver.
    By default, it is empty, so no servers are matched.
 * `sample_rate`: The probability that a given span and subsequent child spans in the trace will be      

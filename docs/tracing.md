@@ -1,14 +1,12 @@
-# OpenTracing
+# Tracing
 
 ## Background
 
-OpenTracing is a semi-standard being adopted by a number of distributed
-tracing platforms. It is a common api for facilitating vendor-agnostic
-tracing instrumentation. That is, we can use the OpenTracing api and
-select one of a number of tracer implementations to do the heavy lifting
-in the background. Our current selected implementation is Jaeger.
+OpenTelemetry is a semi-standard being adopted by a number of distributed
+tracing platforms. It is a common API for facilitating vendor-agnostic
+tracing instrumentation.
 
-OpenTracing is a tool which gives an insight into the causal
+Tracing is a tool which gives an insight into the causal
 relationship of work done in and between servers. The servers each track
 events and report them to a centralised server - in Synapse's case:
 Jaeger. The basic unit used to represent events is the span. The span
@@ -22,7 +20,7 @@ finish.
 Since this is undertaken in a distributed environment a request to
 another server, such as an RPC or a simple GET, can be considered a span
 (a unit or work) for the local server. This causal link is what
-OpenTracing aims to capture and visualise. In order to do this metadata
+tracing aims to capture and visualise. In order to do this metadata
 about the local server's span, i.e the 'span context', needs to be
 included with the request to the remote.
 
@@ -30,15 +28,18 @@ It is up to the remote server to decide what it does with the spans it
 creates. This is called the sampling policy and it can be configured
 through Jaeger's settings.
 
-For OpenTracing concepts see
-<https://opentracing.io/docs/overview/what-is-tracing/>.
+For OpenTelemetry concepts, see
+<https://opentelemetry.io/docs/concepts/>.
 
-For more information about Jaeger's implementation see
+For more information about the Python implementation of OpenTelemetry we're using, see
+<https://opentelemetry.io/docs/instrumentation/python/>
+
+For more information about Jaeger, see
 <https://www.jaegertracing.io/docs/>
 
-## Setting up OpenTracing
+## Setting up tracing
 
-To receive OpenTracing spans, start up a Jaeger server. This can be done
+To receive tracing spans, start up a Jaeger server. This can be done
 using docker like so:
 
 ```sh
@@ -54,15 +55,15 @@ docker run -d --name jaeger \
 Latest documentation is probably at
 https://www.jaegertracing.io/docs/latest/getting-started.
 
-## Enable OpenTracing in Synapse
+## Enable tracing in Synapse
 
-OpenTracing is not enabled by default. It must be enabled in the
-homeserver config by adding the `opentracing` option to your config file. You can find 
-documentation about how to do this in the [config manual under the header 'Opentracing'](usage/configuration/config_documentation.md#opentracing).
-See below for an example Opentracing configuration: 
+Tracing is not enabled by default. It must be enabled in the
+homeserver config by adding the `tracing` option to your config file. You can find 
+documentation about how to do this in the [config manual under the header 'Tracing'](usage/configuration/config_documentation.md#tracing).
+See below for an example tracing configuration: 
 
 ```yaml
-opentracing:
+tracing:
   enabled: true
   homeserver_whitelist:
     - "mytrustedhomeserver.org"
@@ -86,9 +87,4 @@ to two problems, namely:
 -   Sending servers can attach arbitrary data to spans, known as
     'baggage'. For safety this has been disabled in Synapse but that
     doesn't prevent another server sending you baggage which will be
-    logged to OpenTracing's logs.
-
-## Configuring Jaeger
-
-Sampling strategies can be set as in this document:
-<https://www.jaegertracing.io/docs/latest/sampling/>.
+    logged in the trace.
