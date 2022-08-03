@@ -117,6 +117,7 @@ from synapse.types import (
     JsonMapping,
     Requester,
     RoomAlias,
+    RoomID,
     StateMap,
     UserID,
     UserInfo,
@@ -929,6 +930,7 @@ class ModuleApi:
         room_id: str,
         new_membership: str,
         content: Optional[JsonDict] = None,
+        is_remote_join: bool = False,
     ) -> EventBase:
         """Updates the membership of a user to the given value.
 
@@ -946,6 +948,9 @@ class ModuleApi:
                 https://spec.matrix.org/unstable/client-server-api/#mroommember for the
                 list of allowed values.
             content: Additional values to include in the resulting event's content.
+            is_remote_join: Must be True if room_id refers to a remote room and
+                new_membership is "join" (i.e. a remote join is needed), otherwise must
+                be False.
 
         Returns:
             The newly created membership event.
@@ -999,11 +1004,16 @@ class ModuleApi:
             if "displayname" not in content:
                 content["displayname"] = profile["displayname"]
 
+        remote_room_hosts = None
+        if is_remote_join:
+            remote_room_hosts = [RoomID.from_string(room_id).domain]
+
         event_id, _ = await self._hs.get_room_member_handler().update_membership(
             requester=requester,
             target=target_user_id,
             room_id=room_id,
             action=new_membership,
+            remote_room_hosts=remote_room_hosts,
             content=content,
         )
 
