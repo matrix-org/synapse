@@ -24,13 +24,12 @@ the calculated actions for a given user (which were calculated by the
 `BulkPushRuleEvaluator`).
 
 For the latter we could simply count the number of rows in `event_push_actions`
-table for a given room/user, but in practice this could be *very* heavyweight
-when there were a large number of notifications (due to e.g. the user never
-reading a room). Plus, keeping all push actions indefinitely uses a lot of disk
-space.
+table for a given room/user, but in practice this is *very* heavyweight when there
+were a large number of notifications (due to e.g. the user never reading a room).
+Plus, keeping all push actions indefinitely uses a lot of disk space.
 
 To fix these issues, we add a new table `event_push_summary` that tracks
-per-user per-room count of all notifications that happened before a stream
+per-user per-room counts of all notifications that happened before a stream
 ordering S. Thus, to get the notification count for a user / room we can simply
 query a single row in `event_push_summary` and count the number of rows in
 `event_push_actions` with a stream ordering larger than S (and as long as S is
