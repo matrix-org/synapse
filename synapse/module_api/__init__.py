@@ -1480,29 +1480,18 @@ class ModuleApi:
                 was, requested, `room_alias`. Secondly, the stream_id of the
                 last persisted event.
         Raises:
-            SynapseError if the user does not exist, room ID couldn't be stored, or
+            SynapseError if the user_id is invalid, room ID couldn't be stored, or
             something went horribly wrong.
             ResourceLimitError if server is blocked to some resource being
             exceeded.
+            RuntimeError if the user_id does not refer to a local user.
         """
-        user_info = await self.get_userinfo_by_id(user_id)
-        if user_info is None:
-            raise SynapseError(400, f"User ({user_id}) not found")
-
-        if user_info.appservice_id is not None:
-            app_service = self._store.get_app_service_by_id(
-                str(user_info.appservice_id)
+        if not self.is_mine(user_id):
+            raise RuntimeError(
+                "Tried to create a room as a user that isn't local to this homeserver",
             )
-        else:
-            app_service = None
 
-        requester = create_requester(
-            user_id=user_id,
-            is_guest=user_info.is_guest,
-            shadow_banned=user_info.is_shadow_banned,
-            app_service=app_service,
-            authenticated_entity=self.server_name,
-        )
+        requester = create_requester(user_id)
 
         return await self._hs.get_room_creation_handler().create_room(
             requester=requester,
