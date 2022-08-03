@@ -324,8 +324,10 @@ class MessageHandler:
                 room_id, user_id, allow_departed_users=True
             )
             if membership != Membership.JOIN:
-                raise NotImplementedError(
-                    "Getting joined members after leaving is not implemented"
+                raise SynapseError(
+                    code=403,
+                    errcode=Codes.FORBIDDEN,
+                    msg="Getting joined members while not being a current member of the room is forbidden.",
                 )
 
         users_with_profile = await self.store.get_users_in_room_with_profiles(room_id)
