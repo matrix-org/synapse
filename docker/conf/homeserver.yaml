@@ -184,3 +184,21 @@ trusted_key_servers:
 
 password_config:
    enabled: true
+
+
+# foo
+tracing:
+  enabled: true
+  sample_rate: 1
+  jaeger_exporter_config:
+    agent_host_name: host.docker.internal
+    agent_port: 6831
+    # Split UDP packets (UDP_PACKET_MAX_LENGTH is set to 65k in OpenTelemetry)
+    udp_split_oversized_batches: true
+    # If you define a collector, it will communicate directly to the collector,
+    # bypassing the agent
+    #
+    # It does not seem like the agent can keep up with the massive UDP load
+    # (1065 spans in one trace) so lets just use the HTTP collector endpoint
+    # instead which seems to work.
+    collector_endpoint: "http://host.docker.internal:14268/api/traces?format=jaeger.thrift"
