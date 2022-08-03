@@ -16,7 +16,6 @@ from unittest.mock import Mock
 from twisted.internet import defer
 
 from synapse.api.constants import EduTypes, EventTypes
-from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
@@ -639,27 +638,31 @@ class ModuleApiTestCase(HomeserverTestCase):
 
     def test_create_room(self) -> None:
         """Test that modules can create a room."""
-        # First test user existence verification.
+        # First test user validation (i.e. user is local).
         self.get_failure(
             self.module_api.create_room(
-                user_id="@user:test", config={}, ratelimit=False
+                user_id=f"@user:{self.module_api.server_name}abc",
+                config={},
+                ratelimit=False,
             ),
-            SynapseError,
+            RuntimeError,
         )
 
         # Now do the happy path.
         user_id = self.register_user("user", "password")
+        access_token = self.login(user_id, "password")
 
-        (result, _) = self.get_success(
+        room_id, _ = self.get_success(
             self.module_api.create_room(user_id=user_id, config={}, ratelimit=False)
         )
-        room_id = result["room_id"]
 
         channel = self.make_request(
             "GET",
-            f"/_matrix/client/r0/directory/list/room/{room_id}",
+            f"/_matrix/client/v3/rooms/{room_id}/state/m.room.create",
+            access_token=access_token,
         )
         self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.json_body["creator"], user_id)
 
 
 class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
