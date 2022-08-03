@@ -2542,6 +2542,7 @@ A secret which is used to sign
 - access token for guest users,
 - short-term login token used during SSO logins (OIDC or SAML2) and
 - token used for unsubscribing from email notifications.
+
 If none is specified, the `registration_shared_secret` is used, if one is given;
 otherwise, a secret key is derived from the signing key.
 
