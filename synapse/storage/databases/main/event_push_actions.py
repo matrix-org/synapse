@@ -24,9 +24,9 @@ the calculated actions for a given user (which were calculated by the
 `BulkPushRuleEvaluator`).
 
 For the latter we could simply count the number of rows in `event_push_actions`
-table for a given room/user, but in practice this is *very* heavyweight when there
-were a large number of notifications (due to e.g. the user never reading a room).
-Plus, keeping all push actions indefinitely uses a lot of disk space.
+table for a given room/user, but in practice this is *very* heavyweight when
+there were a large number of notifications (due to e.g. the user never reading a
+room). Plus, keeping all push actions indefinitely uses a lot of disk space.
 
 To fix these issues, we add a new table `event_push_summary` that tracks
 per-user per-room counts of all notifications that happened before a stream
@@ -36,9 +36,9 @@ query a single row in `event_push_summary` and count the number of rows in
 "recent", the number of rows needing to be scanned will be small).
 
 The `event_push_summary` table is updated via a background job that periodically
-chooses a new stream ordering S' (usually the latest stream ordering), counts all
-notifications in `event_push_actions` between the existing S and S', and adds
-them to the existing counts in `event_push_summary`.
+chooses a new stream ordering S' (usually the latest stream ordering), counts
+all notifications in `event_push_actions` between the existing S and S', and
+adds them to the existing counts in `event_push_summary`.
 
 This allows us to delete old rows from `event_push_actions` once those rows have
 been counted and added to `event_push_summary` (we call this process
