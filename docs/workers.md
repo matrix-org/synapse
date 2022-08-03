@@ -589,7 +589,7 @@ regular expressions:
 
     ^/_matrix/client/(r0|v3|unstable)/keys/upload
 
-If `use_presence` is False in the homeserver config, it can also handle REST
+If `use_presence` is set to `false` in the homeserver config, it can also handle REST
 endpoints matching the following regular expressions:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/[^/]+/status
@@ -597,7 +597,7 @@ endpoints matching the following regular expressions:
 This "stub" presence handler will pass through `GET` request but make the
 `PUT` effectively a no-op.
 
-It will proxy any requests it cannot handle to the main synapse instance. It
+It will proxy not cached requests to the main synapse instance. It
 must therefore be configured with the location of the main instance, via
 the `worker_main_http_uri` setting in the `frontend_proxy` worker configuration
 file. For example:
