@@ -36,7 +36,7 @@ query a single row in `event_push_summary` and count the number of rows in
 "recent", the number of rows needing to be scanned will be small).
 
 The `event_push_summary` table is updated via a background job that periodically
-choses a new stream ordering S' (usually the latest stream ordering), counts all
+chooses a new stream ordering S' (usually the latest stream ordering), counts all
 notifications in `event_push_actions` between the existing S and S', and adds
 them to the existing counts in `event_push_summary`.
 
