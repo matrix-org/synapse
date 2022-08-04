@@ -1,7 +1,22 @@
+Synapse 1.64.0 (2022-08-02)
+===========================
+
+No significant changes since 1.64.0rc2.
+
+
+Deprecation Warning
+-------------------
+
+Synapse v1.66.0 will remove the ability to delegate the tasks of verifying email address ownership, and password reset confirmation, to an identity server.
+
+If you require your homeserver to verify e-mail addresses or to support password resets via e-mail, please configure your homeserver with SMTP access so that it can send e-mails on its own behalf.
+[Consult the configuration documentation for more information.](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#email)
+
+
 Synapse 1.64.0rc2 (2022-07-29)
 ==============================
 
-This RC reintroduces support for `account_threepid_delegates.email`, which was removed in 1.64.0rc1. It remains deprecated and will be removed altogether in a future release. ([\#13406](https://github.com/matrix-org/synapse/issues/13406))
+This RC reintroduces support for `account_threepid_delegates.email`, which was removed in 1.64.0rc1. It remains deprecated and will be removed altogether in Synapse v1.66.0. ([\#13406](https://github.com/matrix-org/synapse/issues/13406))
 
 
 Synapse 1.64.0rc1 (2022-07-26)
