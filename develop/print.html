@@ -9414,7 +9414,7 @@ class MyAuthProvider:
             return None
 
         if self.credentials.get(username) == login_dict.get(&quot;my_field&quot;):
-            return self.api.get_qualified_user_id(username)
+            return (self.api.get_qualified_user_id(username), None)
 
     async def check_pass(
         self,
@@ -9431,7 +9431,7 @@ class MyAuthProvider:
             return None
 
         if self.credentials.get(username) == login_dict.get(&quot;password&quot;):
-            return self.api.get_qualified_user_id(username)
+            return (self.api.get_qualified_user_id(username), None)
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="background-update-controller-callbacks"><a class="header" href="#background-update-controller-callbacks">Background update controller callbacks</a></h1>
 <p>Background update controller callbacks allow module developers to control (e.g. rate-limit)
