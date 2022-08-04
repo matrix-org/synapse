@@ -917,8 +917,8 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
     @contextlib.contextmanager
     def _wrapping_logic(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
         argspec = inspect.getfullargspec(func)
-        for i, arg in enumerate(argspec.args[1:]):
-            set_attribute("ARG_" + arg, str(args[i + 1]))  # type: ignore[index]
+        for i, arg in enumerate(args[1:]):
+            set_attribute("ARG_" + argspec.args[i + 1], str(arg))  # type: ignore[index]
         set_attribute("args", str(args[len(argspec.args) :]))  # type: ignore[index]
         set_attribute("kwargs", str(kwargs))
         yield

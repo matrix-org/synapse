@@ -59,7 +59,7 @@ from synapse.events.validator import EventValidator
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import nested_logging_context
-from synapse.logging.tracing import trace
+from synapse.logging.tracing import trace, set_attribute
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import NOT_SPAM
 from synapse.replication.http.federation import (
@@ -319,7 +319,8 @@ class FederationHandler:
         # attempting to paginate before backfill reached the visible history.
 
         extremities_to_request: List[str] = []
-        for bp in sorted_backfill_points:
+        for i, bp in enumerate(sorted_backfill_points):
+            set_attribute("backfill_point" + str(i), str(bp))
             if len(extremities_to_request) >= 5:
                 break
 
