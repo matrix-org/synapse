@@ -602,8 +602,8 @@ class EventsWorkerStore(SQLBaseStore):
         """
         # Shortcut: check if we have any events in the *in memory* cache - this function
         # may be called repeatedly for the same event so at this point we cannot reach
-        # out to any external cache for performance reasons, this is done later on in
-        # the `get_missing_events_from_cache_or_db` function below.
+        # out to any external cache for performance reasons. The external cache is
+        # checked later on in the `get_missing_events_from_cache_or_db` function below.
         event_entry_map = self._get_events_from_local_cache(
             event_ids,
         )
@@ -665,7 +665,8 @@ class EventsWorkerStore(SQLBaseStore):
                 #
                 missing_events = {}
                 try:
-                    # Try to fetch from any external cache, in-memory cache checked above
+                    # Try to fetch from any external cache. We already checked the
+                    # in-memory cache above.
                     missing_events = await self._get_events_from_external_cache(
                         missing_events_ids,
                     )
