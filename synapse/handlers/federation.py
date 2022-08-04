@@ -752,6 +752,10 @@ class FederationHandler:
             # If our server is still only partially joined, we can't give a complete
             # response to /make_join, so return a 404 as we would if we weren't in the
             # room at all.
+            # The main reason we can't respond properly is that we need to know about
+            # the auth events for the join event that we would return.
+            # We also should not bother entertaining the /make_join since we cannot
+            # handle the /send_join.
             logger.info(
                 "Rejecting /make_join to %s because it's a partial state room", room_id
             )
