@@ -901,6 +901,11 @@ def trace(func: Callable[P, R]) -> Callable[P, R]:
 def tag_args(func: Callable[P, R]) -> Callable[P, R]:
     """
     Tags all of the args to the active span.
+
+    Args:
+    func: `func` is assumed to be a method taking a `self` parameter, or a
+        `classmethod` taking a `cls` parameter. In either case, a tag is not created
+        for this parameter.
     """
 
     if not opentracing:
