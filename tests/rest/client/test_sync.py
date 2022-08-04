@@ -410,7 +410,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
     @parameterized.expand(
         [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
     )
-    def test_private_read_receipts(self, receipt_type: ReceiptTypes) -> None:
+    def test_private_read_receipts(self, receipt_type: str) -> None:
         # Send a message as the first user
         res = self.helper.send(self.room_id, body="hello", tok=self.tok)
 
@@ -429,9 +429,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
     @parameterized.expand(
         [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
     )
-    def test_public_receipt_can_override_private(
-        self, receipt_type: ReceiptTypes
-    ) -> None:
+    def test_public_receipt_can_override_private(self, receipt_type: str) -> None:
         """
         Sending a public read receipt to the same event which has a private read
         receipt should cause that receipt to become public.
@@ -464,9 +462,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
     @parameterized.expand(
         [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
     )
-    def test_private_receipt_cannot_override_public(
-        self, receipt_type: ReceiptTypes
-    ) -> None:
+    def test_private_receipt_cannot_override_public(self, receipt_type: str) -> None:
         """
         Sending a private read receipt to the same event which has a public read
         receipt should cause no change.
@@ -601,7 +597,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
     @parameterized.expand(
         [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
     )
-    def test_unread_counts(self, receipt_type: ReceiptTypes) -> None:
+    def test_unread_counts(self, receipt_type: str) -> None:
         """Tests that /sync returns the right value for the unread count (MSC2654)."""
 
         # Check that our own messages don't increase the unread count.
@@ -738,7 +734,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             ReceiptTypes.UNSTABLE_READ_PRIVATE,
         ]
     )
-    def test_read_receipts_only_go_down(self, receipt_type: ReceiptTypes) -> None:
+    def test_read_receipts_only_go_down(self, receipt_type: str) -> None:
         # Join the new user
         self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
 

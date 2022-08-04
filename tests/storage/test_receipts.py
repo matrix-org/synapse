@@ -25,7 +25,7 @@ OUR_USER_ID = "@our:test"
 
 
 class ReceiptTestCase(HomeserverTestCase):
-    def prepare(self, reactor, clock, homeserver):
+    def prepare(self, reactor, clock, homeserver) -> None:
         super().prepare(reactor, clock, homeserver)
 
         self.store = homeserver.get_datastores().main
@@ -85,7 +85,7 @@ class ReceiptTestCase(HomeserverTestCase):
             )
         )
 
-    def test_return_empty_with_no_data(self):
+    def test_return_empty_with_no_data(self) -> None:
         res = self.get_success(
             self.store.get_receipts_for_user(
                 OUR_USER_ID,
@@ -126,7 +126,7 @@ class ReceiptTestCase(HomeserverTestCase):
     @parameterized.expand(
         [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
     )
-    def test_get_receipts_for_user(self, receipt_type: ReceiptTypes):
+    def test_get_receipts_for_user(self, receipt_type: str) -> None:
         # Send some events into the first room
         event1_1_id = self.create_and_send_event(
             self.room_id1, UserID.from_string(OTHER_USER_ID)
@@ -200,7 +200,7 @@ class ReceiptTestCase(HomeserverTestCase):
     @parameterized.expand(
         [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
     )
-    def test_get_last_receipt_event_id_for_user(self, receipt_type: ReceiptTypes):
+    def test_get_last_receipt_event_id_for_user(self, receipt_type: str) -> None:
         # Send some events into the first room
         event1_1_id = self.create_and_send_event(
             self.room_id1, UserID.from_string(OTHER_USER_ID)
