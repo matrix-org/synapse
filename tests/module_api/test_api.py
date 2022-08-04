@@ -11,11 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock, patch
 
 from twisted.internet import defer
 
 from synapse.api.constants import EduTypes, EventTypes
+from synapse.api.errors import NotFoundError
 from synapse.events import EventBase
 from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
@@ -26,7 +27,7 @@ from synapse.types import create_requester
 
 from tests.events.test_presence_router import send_presence_update, sync_presence
 from tests.replication._base import BaseMultiWorkerStreamTestCase
-from tests.test_utils import simple_async_mock
+from tests.test_utils import make_awaitable, simple_async_mock
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config
 from tests.utils import USE_POSTGRES_FOR_TESTS
@@ -409,7 +410,8 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         self.assertTrue(found_update)
 
-    def test_update_membership(self):
+    @patch("synapse.handlers.room_member.RoomMemberMasterHandler._remote_join")
+    def test_update_membership(self, mocked_remote_join):
         """Tests that the module API can update the membership of a user in a room."""
         peter = self.register_user("peter", "hackme")
         lesley = self.register_user("lesley", "hackme")
@@ -531,6 +533,38 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertEqual(res["membership"], "invite")
         self.assertEqual(res["displayname"], "simone")
         self.assertIsNone(res["avatar_url"])
+
+        # Check that no remote join attempts have occurred thus far.
+        self.assertFalse(mocked_remote_join.called)
+
+        # Necessary to fake a remote join.
+        fake_stream_id = 1
+        if isinstance(mocked_remote_join, MagicMock):
+            # AyncMock is not supported in this Python version.
+            mocked_remote_join.return_value = make_awaitable(
+                ("fake-event-id", fake_stream_id)
+            )
+        else:
+            mocked_remote_join.return_value = "fake-event-id", fake_stream_id
+        fake_remote_host = f"{self.module_api.server_name}-remote"
+
+        # Given that the join is to be faked, we expect the relevant join event not to
+        # be persisted and the module API method to raise that.
+        self.get_failure(
+            defer.ensureDeferred(
+                self.module_api.update_room_membership(
+                    sender=peter,
+                    target=peter,
+                    room_id=f"!nonexistent:{fake_remote_host}",
+                    new_membership="join",
+                    remote_room_hosts=[fake_remote_host],
+                )
+            ),
+            NotFoundError,
+        )
+
+        # Check that a remote join was attempted.
+        self.assertEqual(mocked_remote_join.call_count, 1)
 
     def test_get_room_state(self):
         """Tests that a module can retrieve the state of a room through the module API."""
