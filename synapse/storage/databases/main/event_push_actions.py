@@ -910,6 +910,8 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         # recalculate the summary.
         for _, room_id, user_id, stream_ordering in rows:
             # Only handle our own read receipts.
+            #
+            # XXX Is this needed, the query filters these out?
             if not self.hs.is_mine_id(user_id):
                 continue
 
