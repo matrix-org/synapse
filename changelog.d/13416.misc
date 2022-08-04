@@ -1,0 +1,1 @@
+Faster Room Joins: prevent Synapse from answering federated join requests for a room which it has not fully joined yet.
