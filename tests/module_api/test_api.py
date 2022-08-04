@@ -21,7 +21,7 @@ from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
 from synapse.handlers.push_rules import InvalidRuleException
 from synapse.rest import admin
-from synapse.rest.client import directory, login, notifications, presence, profile, room
+from synapse.rest.client import login, notifications, presence, profile, room
 from synapse.types import create_requester
 
 from tests.events.test_presence_router import send_presence_update, sync_presence
@@ -40,7 +40,6 @@ class ModuleApiTestCase(HomeserverTestCase):
         presence.register_servlets,
         profile.register_servlets,
         notifications.register_servlets,
-        directory.register_servlets,
     ]
 
     def prepare(self, reactor, clock, homeserver):
