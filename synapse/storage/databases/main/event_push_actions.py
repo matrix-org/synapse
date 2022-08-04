@@ -1016,7 +1016,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         Args:
             txn: The database transaction.
             old_rotate_stream_ordering: The previous maximum event stream ordering.
-            rotate_to_stream_ordering: The new maximum event stream ordering to summarise.
+            rotate_to_stream_ordering: The new maximum event stream ordering to summarize.
 
         Returns whether the archiving process has caught up or not.
         """
@@ -1109,7 +1109,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
     ) -> None:
         """Clear out old push actions that have been summarized."""
 
-        # We want to clear out anything that older than a day that *has* already
+        # We want to clear out anything that is older than a day that *has* already
         # been rotated.
         rotated_upto_stream_ordering = await self.db_pool.simple_select_one_onecol(
             table="event_push_summary_stream_ordering",
@@ -1133,7 +1133,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 SELECT stream_ordering FROM event_push_actions
                 WHERE stream_ordering <= ? AND highlight = 0
                 ORDER BY stream_ordering ASC LIMIT 1 OFFSET ?
-            """,
+                """,
                 (
                     max_stream_ordering_to_delete,
                     batch_size,
