@@ -119,7 +119,8 @@ signedjson = "^1.1.0"
 service-identity = ">=18.1.0"
 # Twisted 18.9 introduces some logger improvements that the structured
 # logger utilises
-treq = ">=15.1"
+twisted = {git = "https://github.com/twisted/twisted.git", rev = "trunk", extras = ["tls"]}
+treq = "22.2.0"
 # Twisted has required pyopenssl 16.0 since about Twisted 16.6.
 pyOpenSSL = ">=16.0.0"
 PyYAML = ">=3.11"
@@ -182,7 +183,6 @@ idna = { version = ">=2.5", optional = true }
 opentelemetry-api = {version = "^1.11.1", optional = true}
 opentelemetry-sdk = {version = "^1.11.1", optional = true}
 opentelemetry-exporter-jaeger = {version = "^1.11.1", optional = true}
-twisted = {git = "https://github.com/twisted/twisted.git", rev = "trunk"}
 
 [tool.poetry.extras]
 # NB: Packages that should be part of `pip install matrix-synapse[all]` need to be specified
