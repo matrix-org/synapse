@@ -2204,20 +2204,18 @@ class DatabasePool:
 
         return txn.rowcount
 
-    async def simple_truncate(self, table: str, desc: str) -> int:
+    async def simple_truncate(self, table: str, desc: str) -> None:
         """Executes a TRUNCATE query on the given table, deleting all rows.
 
         SQLite does not support TRUNCATE, thus a 'DELETE FROM table_name' will
-        be used instead.
+        be used instead. This method does not return the number of rows deleted,
+        as this is not returned by postgres for TRUNCATE commands.
 
         Args:
             table: The name of the table to delete all rows from.
             desc: description of the transaction, for logging and metrics.
-
-        Returns:
-            The number of deleted rows.
         """
-        return await self.runInteraction(
+        await self.runInteraction(
             desc, self._simple_truncate_txn, table, db_autocommit=True
         )
 
@@ -2225,18 +2223,16 @@ class DatabasePool:
     def _simple_truncate_txn(
         txn: LoggingTransaction,
         table: str,
-    ) -> int:
+    ) -> None:
         """Executes a TRUNCATE query on the given table, deleting all rows.
 
         SQLite does not support TRUNCATE, thus a 'DELETE FROM table_name' will
-        be used instead.
+        be used instead.  This method does not return the number of rows deleted,
+        as this is not returned by postgres for TRUNCATE commands.
 
         Args:
             txn: Transaction object
             table: The name of the table to delete all rows from.
-
-        Returns:
-            The number of deleted rows.
         """
         if isinstance(txn.database_engine, PostgresEngine):
             sql = "TRUNCATE %s" % table
@@ -2245,7 +2241,6 @@ class DatabasePool:
             sql = "DELETE FROM %s" % table
 
         txn.execute(sql)
-        return txn.rowcount
 
     def get_cache_dict(
         self,

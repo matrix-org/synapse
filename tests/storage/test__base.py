@@ -196,14 +196,12 @@ class SimpleTruncateTestCase(unittest.HomeserverTestCase):
         self.assertGreater(len(table_rows), 0)
 
         # Attempt to truncate the table
-        number_of_deleted_rows = self.get_success(
+        self.get_success(
             self.storage.db_pool.simple_truncate(
                 table=self.table_name,
                 desc="simple_truncate_test_truncate",
             )
         )
-        # Check that the number of deleted rows is as we expect.
-        self.assertEqual(number_of_deleted_rows, len(table_rows))
 
         # Perform another select and ensure there are no remaining rows.
         table_rows = self.get_success(
