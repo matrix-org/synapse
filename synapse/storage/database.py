@@ -2195,8 +2195,7 @@ class DatabasePool:
             clauses.append("%s = ?" % (key,))
             values.append(value)
 
-        if clauses:
-            sql = "%s WHERE %s" % (sql, " AND ".join(clauses))
+        sql = "%s WHERE %s" % (sql, " AND ".join(clauses))
         txn.execute(sql, values)
 
         return txn.rowcount
