@@ -1013,10 +1013,6 @@ class ModuleApi:
         # Try to retrieve the resulting event.
         event = await self._hs.get_datastores().main.get_event(event_id)
 
-        # update_membership is supposed to always return after the event has been
-        # successfully persisted.
-        assert event is not None
-
         return event
 
     async def create_and_send_event_into_room(self, event_dict: JsonDict) -> EventBase:
