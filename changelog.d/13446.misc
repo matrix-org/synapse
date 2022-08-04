@@ -1,1 +1,1 @@
-Allow dropping all rows from a database table via the `simple_delete` storage method.
+Allow dropping all rows from a database table via the `simple_truncate` storage method.
