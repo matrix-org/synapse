@@ -407,14 +407,17 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         # Join the second user
         self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
 
-    def test_private_read_receipts(self) -> None:
+    @parameterized.expand(
+        [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
+    )
+    def test_private_read_receipts(self, receipt_type: ReceiptTypes) -> None:
         # Send a message as the first user
         res = self.helper.send(self.room_id, body="hello", tok=self.tok)
 
         # Send a private read receipt to tell the server the first user's message was read
         channel = self.make_request(
             "POST",
-            f"/rooms/{self.room_id}/receipt/m.read.private/{res['event_id']}",
+            f"/rooms/{self.room_id}/receipt/{receipt_type}/{res['event_id']}",
             {},
             access_token=self.tok2,
         )
@@ -423,7 +426,12 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         # Test that the first user can't see the other user's private read receipt
         self.assertIsNone(self._get_read_receipt())
 
-    def test_public_receipt_can_override_private(self) -> None:
+    @parameterized.expand(
+        [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
+    )
+    def test_public_receipt_can_override_private(
+        self, receipt_type: ReceiptTypes
+    ) -> None:
         """
         Sending a public read receipt to the same event which has a private read
         receipt should cause that receipt to become public.
@@ -434,7 +442,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         # Send a private read receipt
         channel = self.make_request(
             "POST",
-            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ_PRIVATE}/{res['event_id']}",
+            f"/rooms/{self.room_id}/receipt/{receipt_type}/{res['event_id']}",
             {},
             access_token=self.tok2,
         )
@@ -453,7 +461,12 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         # Test that we did override the private read receipt
         self.assertNotEqual(self._get_read_receipt(), None)
 
-    def test_private_receipt_cannot_override_public(self) -> None:
+    @parameterized.expand(
+        [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
+    )
+    def test_private_receipt_cannot_override_public(
+        self, receipt_type: ReceiptTypes
+    ) -> None:
         """
         Sending a private read receipt to the same event which has a public read
         receipt should cause no change.
@@ -474,7 +487,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         # Send a private read receipt
         channel = self.make_request(
             "POST",
-            f"/rooms/{self.room_id}/receipt/{ReceiptTypes.READ_PRIVATE}/{res['event_id']}",
+            f"/rooms/{self.room_id}/receipt/{receipt_type}/{res['event_id']}",
             {},
             access_token=self.tok2,
         )
@@ -585,7 +598,10 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             tok=self.tok,
         )
 
-    def test_unread_counts(self) -> None:
+    @parameterized.expand(
+        [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
+    )
+    def test_unread_counts(self, receipt_type: ReceiptTypes) -> None:
         """Tests that /sync returns the right value for the unread count (MSC2654)."""
 
         # Check that our own messages don't increase the unread count.
@@ -619,7 +635,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         # Send a read receipt to tell the server we've read the latest event.
         channel = self.make_request(
             "POST",
-            f"/rooms/{self.room_id}/receipt/m.read.private/{res['event_id']}",
+            f"/rooms/{self.room_id}/receipt/{receipt_type}/{res['event_id']}",
             {},
             access_token=self.tok,
         )
@@ -707,15 +723,21 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            f"/rooms/{self.room_id}/receipt/m.read.private/{res2['event_id']}",
+            f"/rooms/{self.room_id}/receipt/{receipt_type}/{res2['event_id']}",
             {},
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
         self._check_unread_count(0)
 
-    # We test for both receipt types that influence notification counts
-    @parameterized.expand([ReceiptTypes.READ, ReceiptTypes.READ_PRIVATE])
+    # We test for all three receipt types that influence notification counts
+    @parameterized.expand(
+        [
+            ReceiptTypes.READ,
+            ReceiptTypes.READ_PRIVATE,
+            ReceiptTypes.UNSTABLE_READ_PRIVATE,
+        ]
+    )
     def test_read_receipts_only_go_down(self, receipt_type: ReceiptTypes) -> None:
         # Join the new user
         self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
@@ -738,7 +760,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         # read receipt go up to an older event
         channel = self.make_request(
             "POST",
-            f"/rooms/{self.room_id}/receipt/m.read.private/{res1['event_id']}",
+            f"/rooms/{self.room_id}/receipt/{receipt_type}/{res1['event_id']}",
             {},
             access_token=self.tok,
         )
