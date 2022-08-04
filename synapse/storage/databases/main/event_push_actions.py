@@ -577,7 +577,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                  ORDER BY ep.stream_ordering DESC LIMIT ?
             """
             args.extend(
-                user_id, user_id, min_stream_ordering, max_stream_ordering, limit
+                (user_id, user_id, min_stream_ordering, max_stream_ordering, limit)
             )
             txn.execute(sql, args)
             return cast(List[Tuple[str, str, int, str, bool, int]], txn.fetchall())
