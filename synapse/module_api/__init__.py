@@ -1461,7 +1461,7 @@ class ModuleApi:
     ) -> Tuple[str, Optional[str]]:
         """Creates a new room.
 
-        Added in Synapse v1.66.0.
+        Added in Synapse v1.65.0.
 
         Args:
             user_id:
