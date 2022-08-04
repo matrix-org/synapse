@@ -780,7 +780,7 @@ class EventsWorkerStore(SQLBaseStore):
             events, update_metrics=update_metrics
         )
 
-        missing_event_ids = {e for e in events if e not in event_map}
+        missing_event_ids = (e for e in events if e not in event_map)
         event_map.update(
             await self._get_events_from_external_cache(
                 events=missing_event_ids,
