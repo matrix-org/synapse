@@ -173,6 +173,7 @@ from typing import (
     Any,
     Callable,
     Collection,
+    ContextManager,
     Dict,
     Generator,
     Iterable,
@@ -823,75 +824,110 @@ def extract_text_map(carrier: Dict[str, str]) -> Optional["opentracing.SpanConte
 # Tracing decorators
 
 
-def trace_with_opname(opname: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
+def _create_decorator(
+    func: Callable[P, R],
+    # TODO: What is the correct type for these `Any`? `P.args, P.kwargs` isn't allowed here
+    wrapping_logic: Callable[[Callable[P, R], Any, Any], ContextManager[None]],
+) -> Callable[P, R]:
     """
-    Decorator to trace a function with a custom opname.
-
-    See the module's doc string for usage examples.
-
+    Creates a decorator that is able to handle sync functions, async functions
+    (coroutines), and inlineDeferred from Twisted.
+    Example usage:
+    ```py
+    # Decorator to time the function and log it out
+    def duration(func: Callable[P, R]) -> Callable[P, R]:
+        @contextlib.contextmanager
+        def _wrapping_logic(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
+            start_ts = time.time()
+            yield
+            end_ts = time.time()
+            duration = end_ts - start_ts
+            logger.info("%s took %s seconds", func.__name__, duration)
+        return _create_decorator(func, _wrapping_logic)
+    ```
+    Args:
+        func: The function to be decorated
+        wrapping_logic: The business logic of your custom decorator.
+            This should be a ContextManager so you are able to run your logic
+            before/after the function as desired.
     """
 
-    def decorator(func: Callable[P, R]) -> Callable[P, R]:
-        if opentracing is None:
-            return func  # type: ignore[unreachable]
-
+    @wraps(func)
+    async def _wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         if inspect.iscoroutinefunction(func):
-
-            @wraps(func)
-            async def _trace_inner(*args: P.args, **kwargs: P.kwargs) -> R:
-                with start_active_span(opname):
-                    return await func(*args, **kwargs)  # type: ignore[misc]
-
+            with wrapping_logic(func, *args, **kwargs):
+                return await func(*args, **kwargs)
         else:
             # The other case here handles both sync functions and those
             # decorated with inlineDeferred.
-            @wraps(func)
-            def _trace_inner(*args: P.args, **kwargs: P.kwargs) -> R:
-                scope = start_active_span(opname)
-                scope.__enter__()
+            scope = wrapping_logic(func, *args, **kwargs)
+            scope.__enter__()
 
-                try:
-                    result = func(*args, **kwargs)
-                    if isinstance(result, defer.Deferred):
+            try:
+                result = func(*args, **kwargs)
+                if isinstance(result, defer.Deferred):
 
-                        def call_back(result: R) -> R:
-                            scope.__exit__(None, None, None)
-                            return result
-
-                        def err_back(result: R) -> R:
-                            scope.__exit__(None, None, None)
-                            return result
-
-                        result.addCallbacks(call_back, err_back)
-
-                    else:
-                        if inspect.isawaitable(result):
-                            logger.error(
-                                "@trace may not have wrapped %s correctly! "
-                                "The function is not async but returned a %s.",
-                                func.__qualname__,
-                                type(result).__name__,
-                            )
-
+                    def call_back(result: R) -> R:
                         scope.__exit__(None, None, None)
+                        return result
 
-                    return result
+                    def err_back(result: R) -> R:
+                        scope.__exit__(None, None, None)
+                        return result
 
-                except Exception as e:
-                    scope.__exit__(type(e), None, e.__traceback__)
-                    raise
+                    result.addCallbacks(call_back, err_back)
 
-        return _trace_inner  # type: ignore[return-value]
+                else:
+                    if inspect.isawaitable(result):
+                        logger.error(
+                            "@trace may not have wrapped %s correctly! "
+                            "The function is not async but returned a %s.",
+                            func.__qualname__,
+                            type(result).__name__,
+                        )
 
-    return decorator
+                    scope.__exit__(None, None, None)
+
+                return result
+
+            except Exception as e:
+                scope.__exit__(type(e), None, e.__traceback__)
+                raise
+
+    return _wrapper  # type: ignore[return-value]
+
+
+def trace_with_opname(opname: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """
+    Decorator to trace a function with a custom opname.
+    See the module's doc string for usage examples.
+    """
+
+    @contextlib.contextmanager
+    def _wrapping_logic(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
+        if opentracing is None:
+            return None
+
+        scope = start_active_span(opname)
+        scope.__enter__()
+        try:
+            yield
+        except Exception as e:
+            scope.__exit__(type(e), None, e.__traceback__)
+            raise
+        finally:
+            scope.__exit__(None, None, None)
+
+    def _decorator(func: Callable[P, R]):
+        return _create_decorator(func, _wrapping_logic)
+
+    return _decorator
 
 
 def trace(func: Callable[P, R]) -> Callable[P, R]:
     """
     Decorator to trace a function.
-
     Sets the operation name to that of the function's name.
-
     See the module's doc string for usage examples.
     """
 
@@ -900,22 +936,22 @@ def trace(func: Callable[P, R]) -> Callable[P, R]:
 
 def tag_args(func: Callable[P, R]) -> Callable[P, R]:
     """
-    Tags all of the args to the active span.
+    Decorator to tag all of the args to the active span.
     """
 
     if not opentracing:
         return func
 
-    @wraps(func)
-    def _tag_args_inner(*args: P.args, **kwargs: P.kwargs) -> R:
+    @contextlib.contextmanager
+    def _wrapping_logic(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
         argspec = inspect.getfullargspec(func)
         for i, arg in enumerate(argspec.args[1:]):
             set_tag("ARG_" + arg, str(args[i]))  # type: ignore[index]
         set_tag("args", str(args[len(argspec.args) :]))  # type: ignore[index]
         set_tag("kwargs", str(kwargs))
-        return func(*args, **kwargs)
+        yield
 
-    return _tag_args_inner
+    return _create_decorator(func, _wrapping_logic)
 
 
 @contextlib.contextmanager
