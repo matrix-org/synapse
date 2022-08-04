@@ -1,0 +1,1 @@
+Fix `@tag_args` being off-by-one with the arguments when tagging a span (tracing).
