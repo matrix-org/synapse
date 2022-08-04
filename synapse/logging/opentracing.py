@@ -826,7 +826,6 @@ def extract_text_map(carrier: Dict[str, str]) -> Optional["opentracing.SpanConte
 
 def _create_decorator(
     func: Callable[P, R],
-    # TODO: What is the correct type for these `Any`? `P.args, P.kwargs` isn't allowed here
     wrapping_logic: Callable[[Callable[P, R], Any, Any], ContextManager[None]],
 ) -> Callable[P, R]:
     """
