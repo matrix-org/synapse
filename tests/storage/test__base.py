@@ -1,5 +1,6 @@
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
+# Copyright 2022 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -152,3 +153,65 @@ class UpdateUpsertManyTests(unittest.HomeserverTestCase):
             set(self._dump_table_to_tuple()),
             {(1, "alice", "aaa!"), (2, "bob", "bbb!"), (3, "charlie", "C")},
         )
+
+
+class SimpleTruncateTestCase(unittest.HomeserverTestCase):
+    """Tests for the DatabasePool.simple_truncate storage method."""
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        """Create and populate a database table to run tests against."""
+        self.storage = hs.get_datastores().main
+        self.table_name = "test_database_table"
+
+        self.get_success(
+            self.storage.db_pool.runInteraction(
+                "simple_truncate_test_create",
+                lambda x, *a: x.execute(*a),
+                "CREATE TABLE %s (id INTEGER, value TEXT)" % self.table_name,
+            )
+        )
+
+        # And add some rows to the table.
+        self.get_success(
+            self.storage.db_pool.simple_insert_many(
+                table=self.table_name,
+                keys=("id", "value"),
+                values=[(1, "A"), (2, "B"), (3, "C")],
+                desc="simple_truncate_test_insert",
+            )
+        )
+
+    def test_simple_truncate_deletes_all_rows(self) -> None:
+        """Test that simple_truncate deletes all rows from a database table."""
+        table_rows = self.get_success(
+            self.storage.db_pool.simple_select_list(
+                table=self.table_name,
+                keyvalues=None,
+                retcols=("id",),
+                desc="simple_truncate_test_select",
+            )
+        )
+
+        # Ensure the table has some rows for us to test deleting.
+        self.assertGreater(len(table_rows), 0)
+
+        # Attempt to truncate the table
+        number_of_deleted_rows = self.get_success(
+            self.storage.db_pool.simple_truncate(
+                table=self.table_name,
+                desc="simple_truncate_test_truncate",
+            )
+        )
+        # Check that the number of deleted rows is as we expect.
+        self.assertEqual(number_of_deleted_rows, len(table_rows))
+
+        # Perform another select and ensure there are no remaining rows.
+        table_rows = self.get_success(
+            self.storage.db_pool.simple_select_list(
+                table=self.table_name,
+                keyvalues=None,
+                retcols=("id",),
+                desc="simple_truncate_test_select",
+            )
+        )
+        self.assertEqual(len(table_rows), 0)
