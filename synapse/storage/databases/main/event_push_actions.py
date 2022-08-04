@@ -956,10 +956,12 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         return len(rows) < limit
 
     def _rotate_notifs_txn(self, txn: LoggingTransaction) -> bool:
-        """Archives older notifications into event_push_summary. Returns whether
-        the archiving process has caught up or not.
+        """Archives older notifications (from event_push_actions) into event_push_summary.
+
+        Returns whether the archiving process has caught up or not.
         """
 
+        # The (inclusive) event stream ordering that was previously summarized.
         old_rotate_stream_ordering = self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="event_push_summary_stream_ordering",
@@ -1000,6 +1002,15 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
     def _rotate_notifs_before_txn(
         self, txn: LoggingTransaction, rotate_to_stream_ordering: int
     ) -> None:
+        """Archives older notifications (from event_push_actions) into event_push_summary.
+
+        Args:
+            txn: The database transaction.
+            rotate_to_stream_ordering: The new maximum event stream ordering to summarise.
+
+        Returns whether the archiving process has caught up or not.
+        """
+
         old_rotate_stream_ordering = self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="event_push_summary_stream_ordering",
