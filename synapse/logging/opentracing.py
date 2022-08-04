@@ -911,16 +911,6 @@ def trace_with_opname(opname: str) -> Callable[[Callable[P, R]], Callable[P, R]]
         with start_active_span(opname):
             yield
 
-        # scope = start_active_span(opname)
-        # scope.__enter__()
-        # try:
-        #     yield
-        # except Exception as e:
-        #     scope.__exit__(type(e), None, e.__traceback__)
-        #     raise
-        # finally:
-        #     scope.__exit__(None, None, None)
-
     def _decorator(func: Callable[P, R]):
         return _create_decorator(func, _wrapping_logic)
 
