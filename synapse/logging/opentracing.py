@@ -903,9 +903,9 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
     Tags all of the args to the active span.
 
     Args:
-    func: `func` is assumed to be a method taking a `self` parameter, or a
-        `classmethod` taking a `cls` parameter. In either case, a tag is not created
-        for this parameter.
+        func: `func` is assumed to be a method taking a `self` parameter, or a
+            `classmethod` taking a `cls` parameter. In either case, a tag is not
+            created for this parameter.
     """
 
     if not opentracing:
@@ -916,8 +916,8 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
         argspec = inspect.getfullargspec(func)
         # We use `[1:]` to skip the `self` object reference and `start=1` to
         # make the index line up with `argspec.args`.
-        for i, arg in enumerate(args[1:], start=1):
-            set_tag("ARG_" + argspec.args[i], str(arg))  # type: ignore[index]
+        for i, arg in enumerate(args[1:], start=1):  # type: ignore[index]
+            set_tag("ARG_" + argspec.args[i], str(arg))
         set_tag("args", str(args[len(argspec.args) :]))  # type: ignore[index]
         set_tag("kwargs", str(kwargs))
         return func(*args, **kwargs)
