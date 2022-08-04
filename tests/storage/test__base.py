@@ -24,7 +24,7 @@ from synapse.util import Clock
 from tests import unittest
 
 
-class UpdateUpsertManyTests(unittest.HomeserverTestCase):
+class UpdateUpsertManyTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.storage = hs.get_datastores().main
 
