@@ -1,0 +1,1 @@
+Make the unit tests responsible for testing the `simple_update` storage method run in CI.
