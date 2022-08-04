@@ -589,8 +589,8 @@ regular expressions:
 
     ^/_matrix/client/(r0|v3|unstable)/keys/upload
 
-If `use_presence` is set to `false` in the homeserver config, it can also handle REST
-endpoints matching the following regular expressions:
+If `use_presence` is set to `false` in the homeserver config, the frontend proxy can also handle REST
+endpoints matching the following regular expression:
 
     ^/_matrix/client/(api/v1|r0|v3|unstable)/presence/[^/]+/status
 
