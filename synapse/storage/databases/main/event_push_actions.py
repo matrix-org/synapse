@@ -265,7 +265,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             counts.notify_count += row[1]
             counts.unread_count += row[2]
 
-        # Next we need to count highlights, which aren't summarized
+        # Next we need to count highlights, which aren't summarised
         sql = """
             SELECT COUNT(*) FROM event_push_actions
             WHERE user_id = ?
@@ -280,7 +280,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
         # Finally we need to count push actions that aren't included in the
         # summary returned above, e.g. recent events that haven't been
-        # summarized yet, or the summary is empty due to a recent read receipt.
+        # summarised yet, or the summary is empty due to a recent read receipt.
         stream_ordering = max(stream_ordering, summary_stream_ordering)
         notify_count, unread_count = self._get_notif_unread_count_for_user_room(
             txn, room_id, user_id, stream_ordering
@@ -885,7 +885,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
         max_receipts_stream_id = self._receipts_id_gen.get_current_token()
 
-        # The (inclusive) event stream ordering that was previously summarized.
+        # The (inclusive) event stream ordering that was previously summarised.
         old_rotate_stream_ordering = self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="event_push_summary_stream_ordering",
@@ -938,7 +938,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             )
 
             # Fetch the notification counts between the stream ordering of the
-            # latest receipt and what was previously summarized.
+            # latest receipt and what was previously summarised.
             notif_count, unread_count = self._get_notif_unread_count_for_user_room(
                 txn, room_id, user_id, stream_ordering, old_rotate_stream_ordering
             )
@@ -981,7 +981,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         Returns whether the archiving process has caught up or not.
         """
 
-        # The (inclusive) event stream ordering that was previously summarized.
+        # The (inclusive) event stream ordering that was previously summarised.
         old_rotate_stream_ordering = self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="event_push_summary_stream_ordering",
@@ -1036,7 +1036,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         Args:
             txn: The database transaction.
             old_rotate_stream_ordering: The previous maximum event stream ordering.
-            rotate_to_stream_ordering: The new maximum event stream ordering to summarize.
+            rotate_to_stream_ordering: The new maximum event stream ordering to summarise.
 
         Returns whether the archiving process has caught up or not.
         """
@@ -1127,7 +1127,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
     async def _remove_old_push_actions_that_have_rotated(
         self,
     ) -> None:
-        """Clear out old push actions that have been summarized."""
+        """Clear out old push actions that have been summarised."""
 
         # We want to clear out anything that is older than a day that *has* already
         # been rotated.
