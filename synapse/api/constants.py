@@ -258,6 +258,7 @@ class GuestAccess:
 class ReceiptTypes:
     READ: Final = "m.read"
     READ_PRIVATE: Final = "m.read.private"
+    UNSTABLE_READ_PRIVATE: Final = "org.matrix.msc2285.read.private"
     FULLY_READ: Final = "m.fully_read"
 
 

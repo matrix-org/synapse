@@ -47,6 +47,7 @@ class ReceiptRestServlet(RestServlet):
         self._known_receipt_types = {
             ReceiptTypes.READ,
             ReceiptTypes.READ_PRIVATE,
+            ReceiptTypes.UNSTABLE_READ_PRIVATE,
             ReceiptTypes.FULLY_READ,
         }
 

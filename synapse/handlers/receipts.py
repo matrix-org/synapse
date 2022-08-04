@@ -163,7 +163,10 @@ class ReceiptsHandler:
         if not is_new:
             return
 
-        if self.federation_sender and receipt_type != ReceiptTypes.READ_PRIVATE:
+        if self.federation_sender and receipt_type not in (
+            ReceiptTypes.READ_PRIVATE,
+            ReceiptTypes.UNSTABLE_READ_PRIVATE,
+        ):
             await self.federation_sender.send_read_receipt(receipt)
 
 
@@ -203,23 +206,37 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
             for event_id, orig_event_content in room.get("content", {}).items():
                 event_content = orig_event_content
                 # If there are private read receipts, additional logic is necessary.
-                if ReceiptTypes.READ_PRIVATE in event_content:
+                if (
+                    ReceiptTypes.READ_PRIVATE in event_content
+                    or ReceiptTypes.UNSTABLE_READ_PRIVATE in event_content
+                ):
                     # Make a copy without private read receipts to avoid leaking
                     # other user's private read receipts..
                     event_content = {
                         receipt_type: receipt_value
                         for receipt_type, receipt_value in event_content.items()
-                        if receipt_type != ReceiptTypes.READ_PRIVATE
+                        if receipt_type
+                        not in (
+                            ReceiptTypes.READ_PRIVATE,
+                            ReceiptTypes.UNSTABLE_READ_PRIVATE,
+                        )
                     }
 
                     # Copy the current user's private read receipt from the
                     # original content, if it exists.
-                    user_private_read_receipt = orig_event_content[
-                        ReceiptTypes.READ_PRIVATE
-                    ].get(user_id, None)
+                    user_private_read_receipt = orig_event_content.get(
+                        ReceiptTypes.READ_PRIVATE, {}
+                    ).get(user_id, None)
                     if user_private_read_receipt:
                         event_content[ReceiptTypes.READ_PRIVATE] = {
                             user_id: user_private_read_receipt
+                        }
+                    user_unstable_private_read_receipt = orig_event_content.get(
+                        ReceiptTypes.UNSTABLE_READ_PRIVATE, {}
+                    ).get(user_id, None)
+                    if user_unstable_private_read_receipt:
+                        event_content[ReceiptTypes.UNSTABLE_READ_PRIVATE] = {
+                            user_id: user_unstable_private_read_receipt
                         }
 
                 # Include the event if there is at least one non-private read

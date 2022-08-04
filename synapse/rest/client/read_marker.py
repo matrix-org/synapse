@@ -44,6 +44,7 @@ class ReadMarkerRestServlet(RestServlet):
             ReceiptTypes.READ,
             ReceiptTypes.FULLY_READ,
             ReceiptTypes.READ_PRIVATE,
+            ReceiptTypes.UNSTABLE_READ_PRIVATE,
         }
 
     async def on_POST(
