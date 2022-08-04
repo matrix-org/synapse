@@ -837,7 +837,7 @@ def _create_decorator(
     # Decorator to time the function and log it out
     def duration(func: Callable[P, R]) -> Callable[P, R]:
         @contextlib.contextmanager
-        def _wrapping_logic(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
+        def _wrapping_logic(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> Generator[None, None, None]:
             start_ts = time.time()
             yield
             end_ts = time.time()
@@ -852,14 +852,18 @@ def _create_decorator(
             before/after the function as desired.
     """
 
-    @wraps(func)
-    async def _wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        if inspect.iscoroutinefunction(func):
+    if inspect.iscoroutinefunction(func):
+
+        @wraps(func)
+        async def _wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             with wrapping_logic(func, *args, **kwargs):
-                return await func(*args, **kwargs)
-        else:
-            # The other case here handles both sync functions and those
-            # decorated with inlineDeferred.
+                return await func(*args, **kwargs)  # type: ignore[misc]
+
+    else:
+        # The other case here handles both sync functions and those
+        # decorated with inlineDeferred.
+        @wraps(func)
+        def _wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             scope = wrapping_logic(func, *args, **kwargs)
             scope.__enter__()
 
@@ -897,21 +901,27 @@ def _create_decorator(
     return _wrapper  # type: ignore[return-value]
 
 
-def trace_with_opname(opname: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
+def trace_with_opname(
+    opname: str,
+    *,
+    tracer: Optional["opentracing.Tracer"] = None,
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """
     Decorator to trace a function with a custom opname.
     See the module's doc string for usage examples.
     """
 
     @contextlib.contextmanager
-    def _wrapping_logic(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
-        if opentracing is None:
-            return None
-
-        with start_active_span(opname):
+    def _wrapping_logic(
+        func: Callable[P, R], *args: P.args, **kwargs: P.kwargs
+    ) -> Generator[None, None, None]:
+        with start_active_span(opname, tracer=tracer):
             yield
 
-    def _decorator(func: Callable[P, R]):
+    def _decorator(func: Callable[P, R]) -> Callable[P, R]:
+        if not opentracing:
+            return func
+
         return _create_decorator(func, _wrapping_logic)
 
     return _decorator
@@ -941,7 +951,9 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
         return func
 
     @contextlib.contextmanager
-    def _wrapping_logic(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
+    def _wrapping_logic(
+        func: Callable[P, R], *args: P.args, **kwargs: P.kwargs
+    ) -> Generator[None, None, None]:
         argspec = inspect.getfullargspec(func)
         # We use `[1:]` to skip the `self` object reference and `start=1` to
         # make the index line up with `argspec.args`.
