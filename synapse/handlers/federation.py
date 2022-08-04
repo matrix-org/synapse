@@ -750,14 +750,14 @@ class FederationHandler:
 
         if await self.store.is_partial_state_room(room_id):
             # If our server is still only partially joined, we can't give a complete
-            # response to make_join, so return a 404 as we would if we weren't in the
+            # response to /make_join, so return a 404 as we would if we weren't in the
             # room at all.
             logger.info(
-                "Rejecting make_join to %s because it's a partial state room", room_id
+                "Rejecting /make_join to %s because it's a partial state room", room_id
             )
             raise SynapseError(
                 404,
-                "Unable to handle make_join right now; this server is not fully joined.",
+                "Unable to handle /make_join right now; this server is not fully joined.",
                 errcode=Codes.NOT_FOUND,
             )
 

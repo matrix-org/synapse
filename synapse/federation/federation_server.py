@@ -848,14 +848,17 @@ class FederationServer(FederationBase):
 
         if await self.store.is_partial_state_room(room_id):
             # If our server is still only partially joined, we can't give a complete
-            # response to send_join, so return a 404 as we would if we weren't in the
-            # room at all.
+            # response to /send_join, /send_knock or /send_leave.
+            # This is because we will not be able to provide the server list (for partial
+            # joins) or the full state (for full joins).
+            # Return a 404 as we would if we weren't in the room at all.
             logger.info(
-                "Rejecting send_join to %s because it's a partial state room", room_id
+                f"Rejecting /send_{membership_type} to %s because it's a partial state room",
+                room_id,
             )
             raise SynapseError(
                 404,
-                "Unable to handle send_join right now; this server is not fully joined.",
+                f"Unable to handle /send_{membership_type} right now; this server is not fully joined.",
                 errcode=Codes.NOT_FOUND,
             )
 
