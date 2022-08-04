@@ -101,6 +101,7 @@ if [ -z "$skip_docker_build" ]; then
     echo_if_github "::group::Build Docker image: matrixdotorg/synapse"
     docker build -t matrixdotorg/synapse \
       --build-arg TEST_ONLY_SKIP_DEP_HASH_VERIFICATION \
+      --build-arg TEST_ONLY_IGNORE_POETRY_LOCKFILE \
       -f "docker/Dockerfile" .
     echo_if_github "::endgroup::"
 

@@ -278,6 +278,10 @@ class StateHandler:
                 flag will be calculated based on `event`'s prev events.
         Returns:
             The event context.
+
+        Raises:
+            RuntimeError if `state_ids_before_event` is not provided and one or more
+                prev events are missing or outliers.
         """
 
         assert not event.internal_metadata.is_outlier()
@@ -432,6 +436,10 @@ class StateHandler:
 
         Returns:
             The resolved state
+
+        Raises:
+            RuntimeError if we don't have a state group for one or more of the events
+               (ie. they are outliers or unknown)
         """
         logger.debug("resolve_state_groups event_ids %s", event_ids)
 

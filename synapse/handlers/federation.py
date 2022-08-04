@@ -59,6 +59,7 @@ from synapse.events.validator import EventValidator
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import nested_logging_context
+from synapse.logging.opentracing import trace
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import NOT_SPAM
 from synapse.replication.http.federation import (
@@ -180,6 +181,7 @@ class FederationHandler:
                 "resume_sync_partial_state_room", self._resume_sync_partial_state_room
             )
 
+    @trace
     async def maybe_backfill(
         self, room_id: str, current_depth: int, limit: int
     ) -> bool:
@@ -546,9 +548,9 @@ class FederationHandler:
             )
 
             if ret.partial_state:
-                # TODO(faster_joins): roll this back if we don't manage to start the
-                #   background resync (eg process_remote_join fails)
-                #   https://github.com/matrix-org/synapse/issues/12998
+                # Mark the room as having partial state.
+                # The background process is responsible for unmarking this flag,
+                # even if the join fails.
                 await self.store.store_partial_state_room(room_id, ret.servers_in_room)
 
             try:
@@ -574,17 +576,21 @@ class FederationHandler:
                     room_id,
                 )
                 raise LimitExceededError(msg=e.msg, errcode=e.errcode, retry_after_ms=0)
-
-            if ret.partial_state:
-                # Kick off the process of asynchronously fetching the state for this
-                # room.
-                run_as_background_process(
-                    desc="sync_partial_state_room",
-                    func=self._sync_partial_state_room,
-                    initial_destination=origin,
-                    other_destinations=ret.servers_in_room,
-                    room_id=room_id,
-                )
+            finally:
+                # Always kick off the background process that asynchronously fetches
+                # state for the room.
+                # If the join failed, the background process is responsible for
+                # cleaning up — including unmarking the room as a partial state room.
+                if ret.partial_state:
+                    # Kick off the process of asynchronously fetching the state for this
+                    # room.
+                    run_as_background_process(
+                        desc="sync_partial_state_room",
+                        func=self._sync_partial_state_room,
+                        initial_destination=origin,
+                        other_destinations=ret.servers_in_room,
+                        room_id=room_id,
+                    )
 
             # We wait here until this instance has seen the events come down
             # replication (if we're using replication) as the below uses caches.
@@ -1539,15 +1545,16 @@ class FederationHandler:
 
         # Make an infinite iterator of destinations to try. Once we find a working
         # destination, we'll stick with it until it flakes.
+        destinations: Collection[str]
         if initial_destination is not None:
             # Move `initial_destination` to the front of the list.
             destinations = list(other_destinations)
             if initial_destination in destinations:
                 destinations.remove(initial_destination)
             destinations = [initial_destination] + destinations
-            destination_iter = itertools.cycle(destinations)
         else:
-            destination_iter = itertools.cycle(other_destinations)
+            destinations = other_destinations
+        destination_iter = itertools.cycle(destinations)
 
         # `destination` is the current remote homeserver we're pulling from.
         destination = next(destination_iter)
