@@ -164,7 +164,7 @@ Matrix ID based on the SSO attributes, or if the user should be allowed to
 choose their own username.</p>
 <p>In the first case - where users are automatically allocated a Matrix ID - it is
 the responsibility of the mapping provider to normalise the SSO attributes and
-map them to a valid Matrix ID. The <a href="https://matrix.org/docs/spec/appendices#user-identifiers">specification for Matrix
+map them to a valid Matrix ID. The <a href="https://spec.matrix.org/latest/appendices/#user-identifiers">specification for Matrix
 IDs</a> has some
 information about what is considered valid.</p>
 <p>If the mapping provider does not assign a Matrix ID, then Synapse will
@@ -176,8 +176,9 @@ as Synapse). The Synapse config is then modified to point to the mapping provide
 (and optionally provide additional configuration for it).</p>
 <h2 id="openid-mapping-providers"><a class="header" href="#openid-mapping-providers">OpenID Mapping Providers</a></h2>
 <p>The OpenID mapping provider can be customized by editing the
-<code>oidc_config.user_mapping_provider.module</code> config option.</p>
-<p><code>oidc_config.user_mapping_provider.config</code> allows you to provide custom
+<a href="usage/configuration/config_documentation.html#oidc_providers"><code>oidc_providers.user_mapping_provider.module</code></a>
+config option.</p>
+<p><code>oidc_providers.user_mapping_provider.config</code> allows you to provide custom
 configuration options to the module. Check with the module's documentation for
 what options it provides (if any). The options listed by default are for the
 user mapping provider built in to Synapse. If using a custom module, you should
@@ -202,7 +203,7 @@ the module here.</li>
 <li>Arguments:
 <ul>
 <li><code>config</code> - A <code>dict</code> representing the parsed content of the
-<code>oidc_config.user_mapping_provider.config</code> homeserver config option.
+<code>oidc_providers.user_mapping_provider.config</code> homeserver config option.
 Runs on homeserver startup. Providers should extract and validate
 any option values they need here.</li>
 </ul>
@@ -272,7 +273,7 @@ further requests to the OpenID provider.</li>
 <p>Returns a dictionary that is suitable to be serialized to JSON. This
 will be returned as part of the response during a successful login.</p>
 <p>Note that care should be taken to not overwrite any of the parameters
-usually returned as part of the <a href="https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-login">login response</a>.</p>
+usually returned as part of the <a href="https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3login">login response</a>.</p>
 </li>
 </ul>
 </li>
@@ -283,7 +284,8 @@ specified in the config. It is located at
 <a href="https://github.com/matrix-org/synapse/blob/develop/synapse/handlers/oidc.py"><code>synapse.handlers.oidc.JinjaOidcMappingProvider</code></a>.</p>
 <h2 id="saml-mapping-providers"><a class="header" href="#saml-mapping-providers">SAML Mapping Providers</a></h2>
 <p>The SAML mapping provider can be customized by editing the
-<code>saml2_config.user_mapping_provider.module</code> config option.</p>
+<a href="docs/usage/configuration/config_documentation.html#saml2_config"><code>saml2_config.user_mapping_provider.module</code></a>
+config option.</p>
 <p><code>saml2_config.user_mapping_provider.config</code> allows you to provide custom
 configuration options to the module. Check with the module's documentation for
 what options it provides (if any). The options listed by default are for the
