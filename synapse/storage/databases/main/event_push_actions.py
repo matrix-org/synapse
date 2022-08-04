@@ -50,7 +50,7 @@ done as a background process. For each receipt we clear the row in
 `event_push_summary` and count the number of notifications in
 `event_push_actions` that happened after the receipt but before S, and insert
 that count into `event_push_summary` (If the receipt happened *after* S then we
-simply clear the `event_push_summary`).
+simply clear the `event_push_summary`.)
 
 Note that its possible that if the read receipt is for an old event the relevant
 `event_push_actions` rows will have been rotated and we get the wrong count
