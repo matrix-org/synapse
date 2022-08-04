@@ -909,8 +909,9 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
     @wraps(func)
     def _tag_args_inner(*args: P.args, **kwargs: P.kwargs) -> R:
         argspec = inspect.getfullargspec(func)
+        # We use `[1:]` to skip the `self` object reference
         for i, arg in enumerate(argspec.args[1:]):
-            set_tag("ARG_" + arg, str(args[i]))  # type: ignore[index]
+            set_tag("ARG_" + arg, str(args[i + 1]))  # type: ignore[index]
         set_tag("args", str(args[len(argspec.args) :]))  # type: ignore[index]
         set_tag("kwargs", str(kwargs))
         return func(*args, **kwargs)
