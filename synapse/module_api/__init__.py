@@ -1468,7 +1468,7 @@ class ModuleApi:
                 The user who requested the room creation.
             config : A dict of configuration options. See "Request body" of:
                 https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3createroom
-            ratelimit: set to False to disable the rate limiter.
+            ratelimit: set to False to disable the rate limiter for this specific join.
 
             creator_join_profile:
                 Set to override the displayname and avatar for the creating
