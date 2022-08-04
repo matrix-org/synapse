@@ -399,7 +399,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             # find rooms that have a read receipt in them and return the next
             # push actions
 
-            sql = f"""(
+            sql = f"""
                 SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,
                    ep.highlight
                  FROM (
