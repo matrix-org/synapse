@@ -654,6 +654,57 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         self.assertEqual(room_id, reference_room_id)
 
+    def test_create_room(self) -> None:
+        """Test that modules can create a room."""
+        # First test user validation (i.e. user is local).
+        self.get_failure(
+            self.module_api.create_room(
+                user_id=f"@user:{self.module_api.server_name}abc",
+                config={},
+                ratelimit=False,
+            ),
+            RuntimeError,
+        )
+
+        # Now do the happy path.
+        user_id = self.register_user("user", "password")
+        access_token = self.login(user_id, "password")
+
+        room_id, room_alias = self.get_success(
+            self.module_api.create_room(
+                user_id=user_id, config={"room_alias_name": "foo-bar"}, ratelimit=False
+            )
+        )
+
+        # Check room creator.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v3/rooms/{room_id}/state/m.room.create",
+            access_token=access_token,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.json_body["creator"], user_id)
+
+        # Check room alias.
+        self.assertEquals(room_alias, f"#foo-bar:{self.module_api.server_name}")
+
+        # Let's try a room with no alias.
+        room_id, room_alias = self.get_success(
+            self.module_api.create_room(user_id=user_id, config={}, ratelimit=False)
+        )
+
+        # Check room creator.
+        channel = self.make_request(
+            "GET",
+            f"/_matrix/client/v3/rooms/{room_id}/state/m.room.create",
+            access_token=access_token,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.json_body["creator"], user_id)
+
+        # Check room alias.
+        self.assertIsNone(room_alias)
+
 
 class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
     """For testing ModuleApi functionality in a multi-worker setup"""
