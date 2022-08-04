@@ -401,24 +401,24 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
 
             sql = f"""
                 SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,
-                   ep.highlight
-                 FROM (
-                   SELECT room_id,
-                       MAX(stream_ordering) as stream_ordering
-                   FROM events
-                   INNER JOIN receipts_linearized USING (room_id, event_id)
-                   WHERE {receipt_types_clause} AND user_id = ?
-                   GROUP BY room_id
+                  ep.highlight
+                FROM (
+                  SELECT room_id,
+                    MAX(stream_ordering) as stream_ordering
+                  FROM events
+                    INNER JOIN receipts_linearized USING (room_id, event_id)
+                    WHERE {receipt_types_clause} AND user_id = ?
+                    GROUP BY room_id
                 ) AS rl,
-                 event_push_actions AS ep
-                 WHERE
-                   ep.room_id = rl.room_id
-                   AND ep.stream_ordering > rl.stream_ordering
-                   AND ep.user_id = ?
-                   AND ep.stream_ordering > ?
-                   AND ep.stream_ordering <= ?
-                   AND ep.notif = 1
-                 ORDER BY ep.stream_ordering ASC LIMIT ?
+                event_push_actions AS ep
+                WHERE
+                  ep.room_id = rl.room_id
+                  AND ep.stream_ordering > rl.stream_ordering
+                  AND ep.user_id = ?
+                  AND ep.stream_ordering > ?
+                  AND ep.stream_ordering <= ?
+                  AND ep.notif = 1
+                ORDER BY ep.stream_ordering ASC LIMIT ?
             """
             args.extend(
                 (user_id, user_id, min_stream_ordering, max_stream_ordering, limit)
@@ -438,20 +438,20 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         ) -> List[Tuple[str, str, int, str, bool]]:
             sql = f"""
                 SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,
-                   ep.highlight
-                 FROM event_push_actions AS ep
-                 INNER JOIN events AS e USING (room_id, event_id)
-                 WHERE
-                   ep.room_id NOT IN (
-                     SELECT room_id FROM receipts_linearized
-                       WHERE {receipt_types_clause} AND user_id = ?
-                       GROUP BY room_id
-                   )
-                   AND ep.user_id = ?
-                   AND ep.stream_ordering > ?
-                   AND ep.stream_ordering <= ?
-                   AND ep.notif = 1
-                 ORDER BY ep.stream_ordering ASC LIMIT ?
+                  ep.highlight
+                FROM event_push_actions AS ep
+                INNER JOIN events AS e USING (room_id, event_id)
+                WHERE
+                  ep.room_id NOT IN (
+                    SELECT room_id FROM receipts_linearized
+                      WHERE {receipt_types_clause} AND user_id = ?
+                      GROUP BY room_id
+                  )
+                  AND ep.user_id = ?
+                  AND ep.stream_ordering > ?
+                  AND ep.stream_ordering <= ?
+                  AND ep.notif = 1
+                ORDER BY ep.stream_ordering ASC LIMIT ?
             """
             args.extend(
                 (user_id, user_id, min_stream_ordering, max_stream_ordering, limit)
@@ -522,26 +522,26 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             txn: LoggingTransaction,
         ) -> List[Tuple[str, str, int, str, bool, int]]:
             sql = f"""
-                "SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,"
-                "  ep.highlight, e.received_ts"
-                " FROM ("
-                "   SELECT room_id,"
-                "       MAX(stream_ordering) as stream_ordering"
-                "   FROM events"
-                "   INNER JOIN receipts_linearized USING (room_id, event_id)"
-                "   WHERE {receipt_types_clause} AND user_id = ?"
-                "   GROUP BY room_id"
-                ") AS rl,"
-                " event_push_actions AS ep"
-                " INNER JOIN events AS e USING (room_id, event_id)"
-                " WHERE"
-                "   ep.room_id = rl.room_id"
-                "   AND ep.stream_ordering > rl.stream_ordering"
-                "   AND ep.user_id = ?"
-                "   AND ep.stream_ordering > ?"
-                "   AND ep.stream_ordering <= ?"
-                "   AND ep.notif = 1"
-                " ORDER BY ep.stream_ordering DESC LIMIT ?"
+                SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,
+                  ep.highlight, e.received_ts
+                FROM (
+                  SELECT room_id,
+                    MAX(stream_ordering) as stream_ordering
+                  FROM events
+                  INNER JOIN receipts_linearized USING (room_id, event_id)
+                  WHERE {receipt_types_clause} AND user_id = ?
+                  GROUP BY room_id
+                ) AS rl,
+                event_push_actions AS ep
+                INNER JOIN events AS e USING (room_id, event_id)
+                WHERE
+                  ep.room_id = rl.room_id
+                  AND ep.stream_ordering > rl.stream_ordering
+                  AND ep.user_id = ?
+                  AND ep.stream_ordering > ?
+                  AND ep.stream_ordering <= ?
+                  AND ep.notif = 1
+                ORDER BY ep.stream_ordering DESC LIMIT ?
             """
             args.extend(
                 (user_id, user_id, min_stream_ordering, max_stream_ordering, limit)
@@ -561,20 +561,20 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
         ) -> List[Tuple[str, str, int, str, bool, int]]:
             sql = f"""
                 SELECT ep.event_id, ep.room_id, ep.stream_ordering, ep.actions,
-                   ep.highlight, e.received_ts
-                 FROM event_push_actions AS ep
-                 INNER JOIN events AS e USING (room_id, event_id)
-                 WHERE
-                   ep.room_id NOT IN (
-                     SELECT room_id FROM receipts_linearized
-                       WHERE {receipt_types_clause} AND user_id = ?
-                       GROUP BY room_id
-                   )
-                   AND ep.user_id = ?
-                   AND ep.stream_ordering > ?
-                   AND ep.stream_ordering <= ?
-                   AND ep.notif = 1
-                 ORDER BY ep.stream_ordering DESC LIMIT ?
+                  ep.highlight, e.received_ts
+                FROM event_push_actions AS ep
+                INNER JOIN events AS e USING (room_id, event_id)
+                WHERE
+                  ep.room_id NOT IN (
+                    SELECT room_id FROM receipts_linearized
+                      WHERE {receipt_types_clause} AND user_id = ?
+                      GROUP BY room_id
+                  )
+                  AND ep.user_id = ?
+                  AND ep.stream_ordering > ?
+                  AND ep.stream_ordering <= ?
+                  AND ep.notif = 1
+                ORDER BY ep.stream_ordering DESC LIMIT ?
             """
             args.extend(
                 (user_id, user_id, min_stream_ordering, max_stream_ordering, limit)
