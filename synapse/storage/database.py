@@ -2112,11 +2112,15 @@ class DatabasePool:
 
         Args:
             table: string giving the table name
-            keyvalues: dict of column names and values to select the row with
+            keyvalues: dict of column names and values to select the row with. If empty,
+                no rows will be deleted.
 
         Returns:
             The number of deleted rows.
         """
+        if not keyvalues:
+            return 0
+
         sql = "DELETE FROM %s WHERE %s" % (
             table,
             " AND ".join("%s = ?" % (k,) for k in keyvalues),
