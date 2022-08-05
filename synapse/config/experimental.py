@@ -32,6 +32,9 @@ class ExperimentalConfig(Config):
         # MSC2716 (importing historical messages)
         self.msc2716_enabled: bool = experimental.get("msc2716_enabled", False)
 
+        # MSC2285 (unstable private read receipts)
+        self.msc2285_enabled: bool = experimental.get("msc2285_enabled", False)
+
         # MSC3244 (room version capabilities)
         self.msc3244_enabled: bool = experimental.get("msc3244_enabled", True)
 
