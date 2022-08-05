@@ -154,8 +154,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
             200,
             channel.code,
             msg=(
-                "Expected to receive a 200 on accessing media: %s"
-                % server_and_media_id
+                "Expected to receive a 200 on accessing media: %s" % server_and_media_id
             ),
         )
 

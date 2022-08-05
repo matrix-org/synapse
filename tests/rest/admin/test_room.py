@@ -1026,9 +1026,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             self.url_status_by_room_id,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(
-            200, channel_room_id.code, msg=channel_room_id.json_body
-        )
+        self.assertEqual(200, channel_room_id.code, msg=channel_room_id.json_body)
         self.assertEqual(1, len(channel_room_id.json_body["results"]))
         self.assertEqual(
             delete_id, channel_room_id.json_body["results"][0]["delete_id"]
