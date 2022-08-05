@@ -918,8 +918,14 @@ class SyncHandler:
 
         with Measure(self.clock, "compute_state_delta"):
             # The memberships needed for events in the timeline.
+            # A dictionary with user IDs as keys and the first event in the timeline
+            # requiring each member as values.
             # Only calculated when `lazy_load_members` is on.
-            members_to_fetch = None
+            members_to_fetch: Optional[Dict[str, Optional[EventBase]]] = None
+
+            # The contribution to the room state from state events in the timeline.
+            # Only contains the last event for any given state key.
+            timeline_state: StateMap[str]
 
             lazy_load_members = sync_config.filter_collection.lazy_load_members()
             include_redundant_members = (
@@ -930,29 +936,38 @@ class SyncHandler:
                 # We only request state for the members needed to display the
                 # timeline:
 
-                members_to_fetch = {
-                    event.sender  # FIXME: we also care about invite targets etc.
-                    for event in batch.events
-                }
+                timeline_state = {}
+
+                members_to_fetch = {}
+                for event in batch.events:
+                    # We need the event's sender, unless their membership was in a
+                    # previous timeline event.
+                    if (
+                        EventTypes.Member,
+                        event.sender,
+                    ) not in timeline_state and event.sender not in members_to_fetch:
+                        members_to_fetch[event.sender] = event
+                    # FIXME: we also care about invite targets etc.
+
+                    if event.is_state():
+                        timeline_state[(event.type, event.state_key)] = event.event_id
 
                 if full_state:
                     # always make sure we LL ourselves so we know we're in the room
                     # (if we are) to fix https://github.com/vector-im/riot-web/issues/7209
                     # We only need apply this on full state syncs given we disabled
                     # LL for incr syncs in #3840.
-                    members_to_fetch.add(sync_config.user.to_string())
+                    members_to_fetch[sync_config.user.to_string()] = None
 
                 state_filter = StateFilter.from_lazy_load_member_list(members_to_fetch)
             else:
-                state_filter = StateFilter.all()
+                timeline_state = {
+                    (event.type, event.state_key): event.event_id
+                    for event in batch.events
+                    if event.is_state()
+                }
 
-            # The contribution to the room state from state events in the timeline.
-            # Only contains the last event for any given state key.
-            timeline_state = {
-                (event.type, event.state_key): event.event_id
-                for event in batch.events
-                if event.is_state()
-            }
+                state_filter = StateFilter.all()
 
             # Now calculate the state to return in the sync response for the room.
             # This is more or less the change in state between the end of the previous
@@ -1087,7 +1102,76 @@ class SyncHandler:
                             await_full_state=False,
                         )
 
-            # FIXME: `state_ids` may be missing memberships for partial state rooms.
+            # If we only have partial state for the room, `state_ids` may be missing the
+            # memberships we wanted. We attempt to find some by digging through the auth
+            # events of timeline events.
+            if lazy_load_members:
+                assert members_to_fetch is not None
+
+                is_partial_state = await self.store.is_partial_state_room(room_id)
+                if is_partial_state:
+                    additional_state_ids: MutableStateMap[str] = {}
+
+                    # Tracks the missing members for logging purposes.
+                    missing_members = {}
+
+                    # Pick out the auth events of timeline events whose sender
+                    # memberships are missing.
+                    auth_event_ids: Set[str] = set()
+                    for member, first_referencing_event in members_to_fetch.items():
+                        if (
+                            first_referencing_event is None
+                            or (EventTypes.Member, member) in state_ids
+                        ):
+                            continue
+
+                        missing_members[member] = first_referencing_event
+                        auth_event_ids.update(first_referencing_event.auth_event_ids())
+
+                    auth_events = await self.store.get_events(auth_event_ids)
+
+                    # Run through the events with missing sender memberships once more,
+                    # picking out the memberships from the pile of auth events we have
+                    # just fetched.
+                    for member, first_referencing_event in members_to_fetch.items():
+                        if (
+                            first_referencing_event is None
+                            or (EventTypes.Member, member) in state_ids
+                        ):
+                            continue
+
+                        # Dig through the auth events to find the sender's membership.
+                        for auth_event_id in first_referencing_event.auth_event_ids():
+                            # We only store events once we have all their auth events,
+                            # so the auth event must be in the pile we have just
+                            # fetched.
+                            auth_event = auth_events[auth_event_id]
+
+                            if (
+                                auth_event.type == EventTypes.Member
+                                and auth_event.state_key == event.sender
+                            ):
+                                missing_members.pop(member)
+                                additional_state_ids[
+                                    (EventTypes.Member, event.sender)
+                                ] = auth_event.event_id
+                                break
+
+                    # Now merge in the state we have scrounged up.
+                    state_ids = {**state_ids, **additional_state_ids}
+
+                    if missing_members:
+                        # There really shouldn't be any missing memberships now.
+                        # For an event to appear in the timeline, we must have its auth
+                        # events, which must include its sender's membership.
+                        logger.error(
+                            "Failed to find memberships for %s in partial state room "
+                            "%s in the auth events of %s.",
+                            list(missing_members.keys()),
+                            room_id,
+                            list(missing_members.values()),
+                        )
+
             # At this point, if `lazy_load_members` is enabled, `state_ids` includes
             # the memberships of all event senders in the timeline. This is because we
             # may not have sent the memberships in a previous sync.
