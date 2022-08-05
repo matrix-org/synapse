@@ -16,6 +16,7 @@ from unittest.mock import Mock
 from twisted.internet import defer
 
 from synapse.api.constants import EduTypes, EventTypes
+from synapse.api.errors import NotFoundError
 from synapse.events import EventBase
 from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
@@ -531,6 +532,34 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertEqual(res["membership"], "invite")
         self.assertEqual(res["displayname"], "simone")
         self.assertIsNone(res["avatar_url"])
+
+    def test_update_room_membership_remote_join(self):
+        """Test that the module API can join a remote room."""
+        # Necessary to fake a remote join.
+        fake_stream_id = 1
+        mocked_remote_join = simple_async_mock(
+            return_value=("fake-event-id", fake_stream_id)
+        )
+        self.hs.get_room_member_handler()._remote_join = mocked_remote_join
+        fake_remote_host = f"{self.module_api.server_name}-remote"
+
+        # Given that the join is to be faked, we expect the relevant join event not to
+        # be persisted and the module API method to raise that.
+        self.get_failure(
+            defer.ensureDeferred(
+                self.module_api.update_room_membership(
+                    sender=f"@user:{self.module_api.server_name}",
+                    target=f"@user:{self.module_api.server_name}",
+                    room_id=f"!nonexistent:{fake_remote_host}",
+                    new_membership="join",
+                    remote_room_hosts=[fake_remote_host],
+                )
+            ),
+            NotFoundError,
+        )
+
+        # Check that a remote join was attempted.
+        self.assertEqual(mocked_remote_join.call_count, 1)
 
     def test_get_room_state(self):
         """Tests that a module can retrieve the state of a room through the module API."""
