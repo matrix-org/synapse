@@ -1047,38 +1047,28 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
                 txn, room_id, user_id, stream_ordering, old_rotate_stream_ordering
             )
 
-            # Updated threads get their notification count and unread count updated.
+            # First mark the summary for all threads in the room as cleared.
+            self.db_pool.simple_update_txn(
+                txn,
+                table="event_push_summary",
+                keyvalues={"user_id": user_id, "room_id": room_id},
+                updatevalues={
+                    "notif_count": 0,
+                    "unread_count": 0,
+                    "stream_ordering": old_rotate_stream_ordering,
+                    "last_receipt_stream_ordering": stream_ordering,
+                },
+            )
+
+            # Then any updated threads get their notification count and unread
+            # count updated.
             self.db_pool.simple_upsert_many_txn(
                 txn,
                 table="event_push_summary",
                 key_names=("room_id", "user_id", "thread_id"),
                 key_values=[(room_id, user_id, row[2]) for row in unread_counts],
-                value_names=(
-                    "notif_count",
-                    "unread_count",
-                    "stream_ordering",
-                    "last_receipt_stream_ordering",
-                ),
-                value_values=[
-                    (row[0], row[1], old_rotate_stream_ordering, stream_ordering)
-                    for row in unread_counts
-                ],
-            )
-
-            # Other threads should be marked as reset at the old stream ordering.
-            txn.execute(
-                """
-                UPDATE event_push_summary SET notif_count = 0, unread_count = 0, stream_ordering = ?, last_receipt_stream_ordering = ?
-                WHERE user_id = ? AND room_id = ? AND
-                stream_ordering <= ?
-                """,
-                (
-                    old_rotate_stream_ordering,
-                    stream_ordering,
-                    user_id,
-                    room_id,
-                    old_rotate_stream_ordering,
-                ),
+                value_names=("notif_count", "unread_count"),
+                value_values=[(row[0], row[1]) for row in unread_counts],
             )
 
         # We always update `event_push_summary_last_receipt_stream_id` to
