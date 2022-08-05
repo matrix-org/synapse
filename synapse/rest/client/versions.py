@@ -95,7 +95,7 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.msc3026.busy_presence": self.config.experimental.msc3026_enabled,
                     # Supports receiving private read receipts as per MSC2285
                     "org.matrix.msc2285.stable": True,  # TODO: Remove when MSC2285 becomes a part of the spec
-                    "org.matrix.msc2285": True,  # TODO: Remove after one release cycle
+                    "org.matrix.msc2285": self.config.experimental.msc2285_enabled,
                     # Supports filtering of /publicRooms by room type as per MSC3827
                     "org.matrix.msc3827.stable": True,
                     # Adds support for importing historical messages as per MSC2716
