@@ -117,7 +117,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 20)
         self.assertNotIn("next_token", channel.json_body)
@@ -134,7 +134,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 5)
         self.assertEqual(channel.json_body["next_token"], 5)
@@ -151,7 +151,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 15)
         self.assertNotIn("next_token", channel.json_body)
@@ -168,7 +168,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(channel.json_body["next_token"], 15)
         self.assertEqual(len(channel.json_body["event_reports"]), 10)
@@ -185,7 +185,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 10)
         self.assertEqual(len(channel.json_body["event_reports"]), 10)
         self.assertNotIn("next_token", channel.json_body)
@@ -205,7 +205,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 10)
         self.assertEqual(len(channel.json_body["event_reports"]), 10)
         self.assertNotIn("next_token", channel.json_body)
@@ -225,7 +225,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 5)
         self.assertEqual(len(channel.json_body["event_reports"]), 5)
         self.assertNotIn("next_token", channel.json_body)
@@ -247,7 +247,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 20)
         report = 1
@@ -265,7 +265,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 20)
         report = 1
@@ -344,7 +344,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 20)
         self.assertNotIn("next_token", channel.json_body)
@@ -357,7 +357,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 20)
         self.assertNotIn("next_token", channel.json_body)
@@ -370,7 +370,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 19)
         self.assertEqual(channel.json_body["next_token"], 19)
@@ -384,7 +384,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["event_reports"]), 1)
         self.assertNotIn("next_token", channel.json_body)
@@ -400,7 +400,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             {"score": -100, "reason": "this makes me sad"},
             access_token=user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
     def _create_event_and_report_without_parameters(
         self, room_id: str, user_tok: str
@@ -415,7 +415,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             {},
             access_token=user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
     def _check_fields(self, content: List[JsonDict]) -> None:
         """Checks that all attributes are present in an event report"""
@@ -502,7 +502,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self._check_fields(channel.json_body)
 
     def test_invalid_report_id(self) -> None:
@@ -594,7 +594,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
             {"score": -100, "reason": "this makes me sad"},
             access_token=user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
     def _check_fields(self, content: JsonDict) -> None:
         """Checks that all attributes are present in a event report"""

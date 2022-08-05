@@ -122,7 +122,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
 
     def test_unknown_device(self) -> None:
         """
-        Tests that a lookup for a device that does not exist returns either HTTPStatus.NOT_FOUND or HTTPStatus.OK.
+        Tests that a lookup for a device that does not exist returns either HTTPStatus.NOT_FOUND or 200.
         """
         url = "/_synapse/admin/v2/users/%s/devices/unknown_device" % urllib.parse.quote(
             self.other_user
@@ -143,7 +143,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         channel = self.make_request(
             "DELETE",
@@ -151,8 +151,8 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        # Delete unknown device returns status HTTPStatus.OK
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        # Delete unknown device returns status 200
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
     def test_update_device_too_long_display_name(self) -> None:
         """
@@ -189,12 +189,12 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("new display", channel.json_body["display_name"])
 
     def test_update_no_display_name(self) -> None:
         """
-        Tests that a update for a device without JSON returns a HTTPStatus.OK
+        Tests that a update for a device without JSON returns a 200
         """
         # Set iniital display name.
         update = {"display_name": "new display"}
@@ -210,7 +210,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Ensure the display name was not updated.
         channel = self.make_request(
@@ -219,7 +219,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("new display", channel.json_body["display_name"])
 
     def test_update_display_name(self) -> None:
@@ -234,7 +234,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             content={"display_name": "new displayname"},
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Check new display_name
         channel = self.make_request(
@@ -243,7 +243,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("new displayname", channel.json_body["display_name"])
 
     def test_get_device(self) -> None:
@@ -256,7 +256,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(self.other_user, channel.json_body["user_id"])
         # Check that all fields are available
         self.assertIn("user_id", channel.json_body)
@@ -281,7 +281,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Ensure that the number of devices is decreased
         res = self.get_success(self.handler.get_devices_by_user(self.other_user))
@@ -379,7 +379,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(0, channel.json_body["total"])
         self.assertEqual(0, len(channel.json_body["devices"]))
 
@@ -399,7 +399,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(number_devices, channel.json_body["total"])
         self.assertEqual(number_devices, len(channel.json_body["devices"]))
         self.assertEqual(self.other_user, channel.json_body["devices"][0]["user_id"])
@@ -494,7 +494,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
 
     def test_unknown_devices(self) -> None:
         """
-        Tests that a remove of a device that does not exist returns HTTPStatus.OK.
+        Tests that a remove of a device that does not exist returns 200.
         """
         channel = self.make_request(
             "POST",
@@ -503,8 +503,8 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
             content={"devices": ["unknown_device1", "unknown_device2"]},
         )
 
-        # Delete unknown devices returns status HTTPStatus.OK
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        # Delete unknown devices returns status 200
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
     def test_delete_devices(self) -> None:
         """
@@ -533,7 +533,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
             content={"devices": device_ids},
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         res = self.get_success(self.handler.get_devices_by_user(self.other_user))
         self.assertEqual(0, len(res))

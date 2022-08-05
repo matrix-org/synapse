@@ -169,7 +169,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         }
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["user_id"])
 
     def test_nonce_reuse(self) -> None:
@@ -192,7 +192,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         }
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["user_id"])
 
         # Now, try and reuse it
@@ -323,11 +323,11 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@bob1:test", channel.json_body["user_id"])
 
         channel = self.make_request("GET", "/profile/@bob1:test/displayname")
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("bob1", channel.json_body["displayname"])
 
         # displayname is None
@@ -347,11 +347,11 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         }
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@bob2:test", channel.json_body["user_id"])
 
         channel = self.make_request("GET", "/profile/@bob2:test/displayname")
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("bob2", channel.json_body["displayname"])
 
         # displayname is empty
@@ -371,7 +371,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         }
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@bob3:test", channel.json_body["user_id"])
 
         channel = self.make_request("GET", "/profile/@bob3:test/displayname")
@@ -394,11 +394,11 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         }
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@bob4:test", channel.json_body["user_id"])
 
         channel = self.make_request("GET", "/profile/@bob4:test/displayname")
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("Bob's Name", channel.json_body["displayname"])
 
     @override_config(
@@ -442,7 +442,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         }
         channel = self.make_request("POST", self.url, body)
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["user_id"])
 
 
@@ -494,7 +494,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(3, len(channel.json_body["users"]))
         self.assertEqual(3, channel.json_body["total"])
 
@@ -508,7 +508,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             expected_user_id: Optional[str],
             search_term: str,
             search_field: Optional[str] = "name",
-            expected_http_code: Optional[int] = HTTPStatus.OK,
+            expected_http_code: Optional[int] = 200,
         ) -> None:
             """Search for a user and check that the returned user's id is a match
 
@@ -530,7 +530,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             )
             self.assertEqual(expected_http_code, channel.code, msg=channel.json_body)
 
-            if expected_http_code != HTTPStatus.OK:
+            if expected_http_code != 200:
                 return
 
             # Check that users were returned
@@ -659,7 +659,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_users)
         self.assertEqual(len(channel.json_body["users"]), 5)
         self.assertEqual(channel.json_body["next_token"], "5")
@@ -680,7 +680,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_users)
         self.assertEqual(len(channel.json_body["users"]), 15)
         self.assertNotIn("next_token", channel.json_body)
@@ -701,7 +701,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_users)
         self.assertEqual(channel.json_body["next_token"], "15")
         self.assertEqual(len(channel.json_body["users"]), 10)
@@ -724,7 +724,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_users)
         self.assertEqual(len(channel.json_body["users"]), number_users)
         self.assertNotIn("next_token", channel.json_body)
@@ -737,7 +737,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_users)
         self.assertEqual(len(channel.json_body["users"]), number_users)
         self.assertNotIn("next_token", channel.json_body)
@@ -750,7 +750,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_users)
         self.assertEqual(len(channel.json_body["users"]), 19)
         self.assertEqual(channel.json_body["next_token"], "19")
@@ -764,7 +764,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_users)
         self.assertEqual(len(channel.json_body["users"]), 1)
         self.assertNotIn("next_token", channel.json_body)
@@ -867,7 +867,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
             url,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], len(expected_user_list))
 
         returned_order = [row["name"] for row in channel.json_body["users"]]
@@ -1017,7 +1017,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(False, channel.json_body["deactivated"])
         self.assertEqual("foo@bar.com", channel.json_body["threepids"][0]["address"])
@@ -1032,7 +1032,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             content={"erase": True},
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Get user
         channel = self.make_request(
@@ -1041,7 +1041,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(True, channel.json_body["deactivated"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
@@ -1066,7 +1066,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"erase": True},
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self._is_erased("@user:test", True)
 
     def test_deactivate_user_erase_false(self) -> None:
@@ -1081,7 +1081,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(False, channel.json_body["deactivated"])
         self.assertEqual("foo@bar.com", channel.json_body["threepids"][0]["address"])
@@ -1096,7 +1096,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             content={"erase": False},
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Get user
         channel = self.make_request(
@@ -1105,7 +1105,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(True, channel.json_body["deactivated"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
@@ -1135,7 +1135,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(False, channel.json_body["deactivated"])
         self.assertEqual("foo@bar.com", channel.json_body["threepids"][0]["address"])
@@ -1150,7 +1150,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             content={"erase": True},
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Get user
         channel = self.make_request(
@@ -1159,7 +1159,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(True, channel.json_body["deactivated"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
@@ -1352,7 +1352,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual("User", channel.json_body["displayname"])
         self._check_fields(channel.json_body)
@@ -1395,7 +1395,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
@@ -1458,7 +1458,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
@@ -1486,7 +1486,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         # before limit of monthly active users is reached
         channel = self.make_request("GET", "/sync", access_token=self.admin_user_tok)
 
-        if channel.code != HTTPStatus.OK:
+        if channel.code != 200:
             raise HttpResponseException(
                 channel.code, channel.result["reason"], channel.result["body"]
             )
@@ -1684,7 +1684,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"password": "hahaha"},
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self._check_fields(channel.json_body)
 
     def test_set_displayname(self) -> None:
@@ -1700,7 +1700,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"displayname": "foobar"},
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual("foobar", channel.json_body["displayname"])
 
@@ -1711,7 +1711,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual("foobar", channel.json_body["displayname"])
 
@@ -1733,7 +1733,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(2, len(channel.json_body["threepids"]))
         # result does not always have the same sort order, therefore it becomes sorted
@@ -1759,7 +1759,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(2, len(channel.json_body["threepids"]))
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
@@ -1775,7 +1775,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(2, len(channel.json_body["threepids"]))
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
@@ -1791,7 +1791,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"threepids": []},
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
         self._check_fields(channel.json_body)
@@ -1818,7 +1818,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(first_user, channel.json_body["name"])
         self.assertEqual(1, len(channel.json_body["threepids"]))
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
@@ -1837,7 +1837,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(1, len(channel.json_body["threepids"]))
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
@@ -1859,7 +1859,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
 
         # other user has this two threepids
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(2, len(channel.json_body["threepids"]))
         # result does not always have the same sort order, therefore it becomes sorted
@@ -1878,7 +1878,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             url_first_user,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(first_user, channel.json_body["name"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
         self._check_fields(channel.json_body)
@@ -1907,7 +1907,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(2, len(channel.json_body["external_ids"]))
         # result does not always have the same sort order, therefore it becomes sorted
@@ -1939,7 +1939,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(2, len(channel.json_body["external_ids"]))
         self.assertEqual(
@@ -1958,7 +1958,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(2, len(channel.json_body["external_ids"]))
         self.assertEqual(
@@ -1977,7 +1977,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"external_ids": []},
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(0, len(channel.json_body["external_ids"]))
 
@@ -2006,7 +2006,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(first_user, channel.json_body["name"])
         self.assertEqual(1, len(channel.json_body["external_ids"]))
         self.assertEqual(
@@ -2032,7 +2032,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             },
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(1, len(channel.json_body["external_ids"]))
         self.assertEqual(
@@ -2075,7 +2075,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(1, len(channel.json_body["external_ids"]))
         self.assertEqual(
@@ -2093,7 +2093,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(first_user, channel.json_body["name"])
         self.assertEqual(1, len(channel.json_body["external_ids"]))
         self.assertEqual(
@@ -2124,7 +2124,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["deactivated"])
         self.assertEqual("foo@bar.com", channel.json_body["threepids"][0]["address"])
@@ -2139,7 +2139,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"deactivated": True},
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertTrue(channel.json_body["deactivated"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
@@ -2158,7 +2158,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertTrue(channel.json_body["deactivated"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
@@ -2188,7 +2188,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"deactivated": True},
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertTrue(channel.json_body["deactivated"])
 
@@ -2204,7 +2204,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"displayname": "Foobar"},
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertTrue(channel.json_body["deactivated"])
         self.assertEqual("Foobar", channel.json_body["displayname"])
@@ -2237,7 +2237,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"deactivated": False, "password": "foo"},
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["deactivated"])
         self._is_erased("@user:test", False)
@@ -2271,7 +2271,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"deactivated": False},
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["deactivated"])
         self._is_erased("@user:test", False)
@@ -2305,7 +2305,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"deactivated": False},
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["deactivated"])
         self._is_erased("@user:test", False)
@@ -2326,7 +2326,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"admin": True},
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertTrue(channel.json_body["admin"])
 
@@ -2337,7 +2337,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertTrue(channel.json_body["admin"])
 
@@ -2354,7 +2354,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"user_type": UserTypes.SUPPORT},
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(UserTypes.SUPPORT, channel.json_body["user_type"])
 
@@ -2365,7 +2365,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(UserTypes.SUPPORT, channel.json_body["user_type"])
 
@@ -2377,7 +2377,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"user_type": None},
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertIsNone(channel.json_body["user_type"])
 
@@ -2388,7 +2388,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertIsNone(channel.json_body["user_type"])
 
@@ -2418,7 +2418,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("bob", channel.json_body["displayname"])
         self.assertEqual(0, channel.json_body["deactivated"])
@@ -2440,7 +2440,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("bob", channel.json_body["displayname"])
 
@@ -2465,7 +2465,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"deactivated": True},
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertTrue(channel.json_body["deactivated"])
         self._is_erased(user_id, False)
         d = self.store.mark_user_erased(user_id)
@@ -2549,7 +2549,7 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(0, channel.json_body["total"])
         self.assertEqual(0, len(channel.json_body["joined_rooms"]))
 
@@ -2565,7 +2565,7 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(0, channel.json_body["total"])
         self.assertEqual(0, len(channel.json_body["joined_rooms"]))
 
@@ -2581,7 +2581,7 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(0, channel.json_body["total"])
         self.assertEqual(0, len(channel.json_body["joined_rooms"]))
 
@@ -2602,7 +2602,7 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(number_rooms, channel.json_body["total"])
         self.assertEqual(number_rooms, len(channel.json_body["joined_rooms"]))
 
@@ -2649,7 +2649,7 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(1, channel.json_body["total"])
         self.assertEqual([local_and_remote_room_id], channel.json_body["joined_rooms"])
 
@@ -2737,7 +2737,7 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(0, channel.json_body["total"])
 
         # Register the pusher
@@ -2769,7 +2769,7 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(1, channel.json_body["total"])
 
         for p in channel.json_body["pushers"]:
@@ -2865,7 +2865,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_media)
         self.assertEqual(len(channel.json_body["media"]), 5)
         self.assertEqual(channel.json_body["next_token"], 5)
@@ -2884,7 +2884,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 5)
         self.assertEqual(len(channel.json_body["deleted_media"]), 5)
 
@@ -2901,7 +2901,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_media)
         self.assertEqual(len(channel.json_body["media"]), 15)
         self.assertNotIn("next_token", channel.json_body)
@@ -2920,7 +2920,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 15)
         self.assertEqual(len(channel.json_body["deleted_media"]), 15)
 
@@ -2937,7 +2937,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_media)
         self.assertEqual(channel.json_body["next_token"], 15)
         self.assertEqual(len(channel.json_body["media"]), 10)
@@ -2956,7 +2956,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 10)
         self.assertEqual(len(channel.json_body["deleted_media"]), 10)
 
@@ -3023,7 +3023,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_media)
         self.assertEqual(len(channel.json_body["media"]), number_media)
         self.assertNotIn("next_token", channel.json_body)
@@ -3036,7 +3036,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_media)
         self.assertEqual(len(channel.json_body["media"]), number_media)
         self.assertNotIn("next_token", channel.json_body)
@@ -3049,7 +3049,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_media)
         self.assertEqual(len(channel.json_body["media"]), 19)
         self.assertEqual(channel.json_body["next_token"], 19)
@@ -3063,7 +3063,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_media)
         self.assertEqual(len(channel.json_body["media"]), 1)
         self.assertNotIn("next_token", channel.json_body)
@@ -3080,7 +3080,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(0, channel.json_body["total"])
         self.assertEqual(0, len(channel.json_body["media"]))
 
@@ -3095,7 +3095,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(0, channel.json_body["total"])
         self.assertEqual(0, len(channel.json_body["deleted_media"]))
 
@@ -3112,7 +3112,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(number_media, channel.json_body["total"])
         self.assertEqual(number_media, len(channel.json_body["media"]))
         self.assertNotIn("next_token", channel.json_body)
@@ -3138,7 +3138,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(number_media, channel.json_body["total"])
         self.assertEqual(number_media, len(channel.json_body["deleted_media"]))
         self.assertCountEqual(channel.json_body["deleted_media"], media_ids)
@@ -3283,7 +3283,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
 
         # Upload some media into the room
         response = self.helper.upload_media(
-            upload_resource, image_data, user_token, filename, expect_code=HTTPStatus.OK
+            upload_resource, image_data, user_token, filename, expect_code=200
         )
 
         # Extract media ID from the response
@@ -3301,10 +3301,10 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.OK,
+            200,
             channel.code,
             msg=(
-                f"Expected to receive a HTTPStatus.OK on accessing media: {server_and_media_id}"
+                f"Expected to receive a 200 on accessing media: {server_and_media_id}"
             ),
         )
 
@@ -3350,7 +3350,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             url,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], len(expected_media_list))
 
         returned_order = [row["media_id"] for row in channel.json_body["media"]]
@@ -3386,7 +3386,7 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST", self.url, b"{}", access_token=self.admin_user_tok
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         return channel.json_body["access_token"]
 
     def test_no_auth(self) -> None:
@@ -3427,7 +3427,7 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET", "devices", b"{}", access_token=self.other_user_tok
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # We should only see the one device (from the login in `prepare`)
         self.assertEqual(len(channel.json_body["devices"]), 1)
@@ -3439,11 +3439,11 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
 
         # Test that we can successfully make a request
         channel = self.make_request("GET", "devices", b"{}", access_token=puppet_token)
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Logout with the puppet token
         channel = self.make_request("POST", "logout", b"{}", access_token=puppet_token)
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # The puppet token should no longer work
         channel = self.make_request("GET", "devices", b"{}", access_token=puppet_token)
@@ -3453,7 +3453,7 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET", "devices", b"{}", access_token=self.other_user_tok
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
     def test_user_logout_all(self) -> None:
         """Tests that the target user calling `/logout/all` does *not* expire
@@ -3464,17 +3464,17 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
 
         # Test that we can successfully make a request
         channel = self.make_request("GET", "devices", b"{}", access_token=puppet_token)
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Logout all with the real user token
         channel = self.make_request(
             "POST", "logout/all", b"{}", access_token=self.other_user_tok
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # The puppet token should still work
         channel = self.make_request("GET", "devices", b"{}", access_token=puppet_token)
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # .. but the real user's tokens shouldn't
         channel = self.make_request(
@@ -3491,13 +3491,13 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
 
         # Test that we can successfully make a request
         channel = self.make_request("GET", "devices", b"{}", access_token=puppet_token)
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Logout all with the admin user token
         channel = self.make_request(
             "POST", "logout/all", b"{}", access_token=self.admin_user_tok
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # The puppet token should no longer work
         channel = self.make_request("GET", "devices", b"{}", access_token=puppet_token)
@@ -3507,7 +3507,7 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "GET", "devices", b"{}", access_token=self.other_user_tok
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
     @unittest.override_config(
         {
@@ -3635,7 +3635,7 @@ class WhoisRestTestCase(unittest.HomeserverTestCase):
             self.url,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(self.other_user, channel.json_body["user_id"])
         self.assertIn("devices", channel.json_body)
 
@@ -3650,7 +3650,7 @@ class WhoisRestTestCase(unittest.HomeserverTestCase):
             self.url,
             access_token=other_user_token,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(self.other_user, channel.json_body["user_id"])
         self.assertIn("devices", channel.json_body)
 
@@ -3715,7 +3715,7 @@ class ShadowBanRestTestCase(unittest.HomeserverTestCase):
         self.assertFalse(result.shadow_banned)
 
         channel = self.make_request("POST", self.url, access_token=self.admin_user_tok)
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual({}, channel.json_body)
 
         # Ensure the user is shadow-banned (and the cache was cleared).
@@ -3727,7 +3727,7 @@ class ShadowBanRestTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "DELETE", self.url, access_token=self.admin_user_tok
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual({}, channel.json_body)
 
         # Ensure the user is no longer shadow-banned (and the cache was cleared).
@@ -3891,7 +3891,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
             self.url,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(0, channel.json_body["messages_per_second"])
         self.assertEqual(0, channel.json_body["burst_count"])
 
@@ -3905,7 +3905,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
             self.url,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertNotIn("messages_per_second", channel.json_body)
         self.assertNotIn("burst_count", channel.json_body)
 
@@ -3916,7 +3916,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"messages_per_second": 10, "burst_count": 11},
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(10, channel.json_body["messages_per_second"])
         self.assertEqual(11, channel.json_body["burst_count"])
 
@@ -3927,7 +3927,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"messages_per_second": 20, "burst_count": 21},
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(20, channel.json_body["messages_per_second"])
         self.assertEqual(21, channel.json_body["burst_count"])
 
@@ -3937,7 +3937,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
             self.url,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(20, channel.json_body["messages_per_second"])
         self.assertEqual(21, channel.json_body["burst_count"])
 
@@ -3947,7 +3947,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
             self.url,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertNotIn("messages_per_second", channel.json_body)
         self.assertNotIn("burst_count", channel.json_body)
 
@@ -3957,7 +3957,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
             self.url,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertNotIn("messages_per_second", channel.json_body)
         self.assertNotIn("burst_count", channel.json_body)
 
@@ -4042,7 +4042,7 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
             self.url,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(
             {"a": 1}, channel.json_body["account_data"]["global"]["m.global"]
         )
