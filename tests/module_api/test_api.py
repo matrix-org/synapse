@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock
 
 from twisted.internet import defer
 
@@ -27,7 +27,7 @@ from synapse.types import create_requester
 
 from tests.events.test_presence_router import send_presence_update, sync_presence
 from tests.replication._base import BaseMultiWorkerStreamTestCase
-from tests.test_utils import make_awaitable, simple_async_mock
+from tests.test_utils import simple_async_mock
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config
 from tests.utils import USE_POSTGRES_FOR_TESTS
@@ -533,17 +533,14 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertEqual(res["displayname"], "simone")
         self.assertIsNone(res["avatar_url"])
 
-    @patch("synapse.handlers.room_member.RoomMemberMasterHandler._remote_join")
-    def test_update_room_membership_remote_join(self, mocked_remote_join):
+    def test_update_room_membership_remote_join(self):
+        """Test that the module API can join a remote room."""
         # Necessary to fake a remote join.
         fake_stream_id = 1
-        if isinstance(mocked_remote_join, MagicMock):
-            # AyncMock is not supported in this Python version.
-            mocked_remote_join.return_value = make_awaitable(
-                ("fake-event-id", fake_stream_id)
-            )
-        else:
-            mocked_remote_join.return_value = "fake-event-id", fake_stream_id
+        mocked_remote_join = simple_async_mock(
+            return_value=("fake-event-id", fake_stream_id)
+        )
+        self.hs.get_room_member_handler()._remote_join = mocked_remote_join
         fake_remote_host = f"{self.module_api.server_name}-remote"
 
         # Given that the join is to be faked, we expect the relevant join event not to
