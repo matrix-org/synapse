@@ -94,3 +94,6 @@ class ExperimentalConfig(Config):
 
         # MSC3848: Introduce errcodes for specific event sending failures
         self.msc3848_enabled: bool = experimental.get("msc3848_enabled", False)
+
+        # MSC3856: Threads list API
+        self.msc3856_enabled: bool = experimental.get("msc3856_enabled", False)

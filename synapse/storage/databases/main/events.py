@@ -1594,7 +1594,7 @@ class PersistEventsStore:
                 )
 
                 # Remove from relations table.
-                self._handle_redact_relations(txn, event.redacts)
+                self._handle_redact_relations(txn, event.room_id, event.redacts)
 
         # Update the event_forward_extremities, event_backward_extremities and
         # event_edges tables.
@@ -1909,6 +1909,7 @@ class PersistEventsStore:
                 self.store.get_thread_participated.invalidate,
                 (relation.parent_id, event.sender),
             )
+            txn.call_after(self.store.get_threads.invalidate, (event.room_id,))
 
     def _handle_insertion_event(
         self, txn: LoggingTransaction, event: EventBase
@@ -2033,13 +2034,14 @@ class PersistEventsStore:
         txn.execute(sql, (batch_id,))
 
     def _handle_redact_relations(
-        self, txn: LoggingTransaction, redacted_event_id: str
+        self, txn: LoggingTransaction, room_id: str, redacted_event_id: str
     ) -> None:
         """Handles receiving a redaction and checking whether the redacted event
         has any relations which must be removed from the database.
 
         Args:
             txn
+            room_id: The room ID of the event that was redacted.
             redacted_event_id: The event that was redacted.
         """
 
@@ -2068,6 +2070,7 @@ class PersistEventsStore:
             self.store._invalidate_cache_and_stream(
                 txn, self.store.get_thread_participated, (redacted_relates_to,)
             )
+            txn.call_after(self.store.get_threads.invalidate, (room_id,))
             self.store._invalidate_cache_and_stream(
                 txn,
                 self.store.get_mutual_event_relations_for_rel_type,
