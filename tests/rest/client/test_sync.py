@@ -38,6 +38,7 @@ from tests.federation.transport.test_knocking import (
     KnockingStrippedStateEventHelperMixin,
 )
 from tests.server import TimedOutException
+from tests.unittest import override_config
 
 
 class FilterTestCase(unittest.HomeserverTestCase):
@@ -407,6 +408,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         # Join the second user
         self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
 
+    @override_config({"experimental_features": {"msc2285_enabled": True}})
     @parameterized.expand(
         [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
     )
@@ -426,6 +428,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         # Test that the first user can't see the other user's private read receipt
         self.assertIsNone(self._get_read_receipt())
 
+    @override_config({"experimental_features": {"msc2285_enabled": True}})
     @parameterized.expand(
         [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
     )
@@ -459,6 +462,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         # Test that we did override the private read receipt
         self.assertNotEqual(self._get_read_receipt(), None)
 
+    @override_config({"experimental_features": {"msc2285_enabled": True}})
     @parameterized.expand(
         [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
     )
@@ -594,6 +598,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             tok=self.tok,
         )
 
+    @override_config({"experimental_features": {"msc2285_enabled": True}})
     @parameterized.expand(
         [ReceiptTypes.READ_PRIVATE, ReceiptTypes.UNSTABLE_READ_PRIVATE]
     )
@@ -727,6 +732,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(0)
 
     # We test for all three receipt types that influence notification counts
+    @override_config({"experimental_features": {"msc2285_enabled": True}})
     @parameterized.expand(
         [
             ReceiptTypes.READ,
