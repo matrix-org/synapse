@@ -10874,11 +10874,11 @@ def generate_mac(nonce, user, password, admin=False, user_type=None):
 <div style="break-before: page; page-break-before: always;"></div><h1 id="registration-tokens"><a class="header" href="#registration-tokens">Registration Tokens</a></h1>
 <p>This API allows you to manage tokens which can be used to authenticate
 registration requests, as proposed in
-<a href="https://github.com/matrix-org/matrix-doc/blob/main/proposals/3231-token-authenticated-registration.md">MSC3231</a>.
+<a href="https://github.com/matrix-org/matrix-doc/blob/main/proposals/3231-token-authenticated-registration.md">MSC3231</a>
+and stabilised in version 1.2 of the Matrix specification.
 To use it, you will need to enable the <code>registration_requires_token</code> config
 option, and authenticate by providing an <code>access_token</code> for a server admin:
-see <a href="usage/administration/admin_api/../../usage/administration/admin_api">Admin API</a>.
-Note that this API is still experimental; not all clients may support it yet.</p>
+see <a href="usage/administration/admin_api/../admin_api">Admin API</a>.</p>
 <h2 id="registration-token-objects"><a class="header" href="#registration-token-objects">Registration token objects</a></h2>
 <p>Most endpoints make use of JSON objects that contain details about tokens.
 These objects have the following fields:</p>
