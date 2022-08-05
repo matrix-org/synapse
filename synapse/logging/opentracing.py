@@ -839,10 +839,12 @@ def _decorate(
         @contextlib.contextmanager
         def _wrapping_logic(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> Generator[None, None, None]:
             start_ts = time.time()
-            yield
-            end_ts = time.time()
-            duration = end_ts - start_ts
-            logger.info("%s took %s seconds", func.__name__, duration)
+            try:
+                yield
+            finally:
+                end_ts = time.time()
+                duration = end_ts - start_ts
+                logger.info("%s took %s seconds", func.__name__, duration)
         return _decorate(func, _wrapping_logic)
     ```
 
