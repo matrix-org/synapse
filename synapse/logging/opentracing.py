@@ -912,7 +912,7 @@ def trace_with_opname(
     See the module's doc string for usage examples.
     """
 
-    # mypy bug: https://github.com/python/mypy/issues/12909
+    # type-ignore: mypy bug, see https://github.com/python/mypy/issues/12909
     @contextlib.contextmanager  # type: ignore[arg-type]
     def _wrapping_logic(
         func: Callable[P, R], *args: P.args, **kwargs: P.kwargs
@@ -952,7 +952,7 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
     if not opentracing:
         return func
 
-    # mypy bug: https://github.com/python/mypy/issues/12909
+    # type-ignore: mypy bug, see https://github.com/python/mypy/issues/12909
     @contextlib.contextmanager  # type: ignore[arg-type]
     def _wrapping_logic(
         func: Callable[P, R], *args: P.args, **kwargs: P.kwargs
