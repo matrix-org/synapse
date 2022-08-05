@@ -233,7 +233,7 @@ class LogContextScopeManagerTestCase(TestCase):
 
             @trace_with_opname("fixture_deferred_func", tracer=self._tracer)
             @tag_args
-            def fixture_deferred_func() -> defer.Deferred[str]:
+            def fixture_deferred_func() -> "defer.Deferred[str]":
                 d1: defer.Deferred[str] = defer.Deferred()
                 d1.callback("foo")
                 return d1
