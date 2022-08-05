@@ -434,7 +434,7 @@ async def _add_event_and_auth_chain_to_graph(
     event_id: str,
     event_map: Dict[str, EventBase],
     state_res_store: StateResolutionStore,
-    auth_diff: Set[str],
+    full_conflicted_set: Set[str],
 ) -> None:
     """Helper function for _reverse_topological_power_sort that add the event
     and its auth chain (that is in the auth diff) to the graph
@@ -445,7 +445,7 @@ async def _add_event_and_auth_chain_to_graph(
         event_id: Event to add to the graph
         event_map
         state_res_store
-        auth_diff: Set of event IDs that are in the auth difference.
+        full_conflicted_set: Set of event IDs that are in the full conflicted set.
     """
 
     state = [event_id]
@@ -455,7 +455,7 @@ async def _add_event_and_auth_chain_to_graph(
 
         event = await _get_event(room_id, eid, event_map, state_res_store)
         for aid in event.auth_event_ids():
-            if aid in auth_diff:
+            if aid in full_conflicted_set:
                 if aid not in graph:
                     state.append(aid)
 
@@ -468,7 +468,7 @@ async def _reverse_topological_power_sort(
     event_ids: Iterable[str],
     event_map: Dict[str, EventBase],
     state_res_store: StateResolutionStore,
-    auth_diff: Set[str],
+    full_conflicted_set: Set[str],
 ) -> List[str]:
     """Returns a list of the event_ids sorted by reverse topological ordering,
     and then by power level and origin_server_ts
@@ -479,7 +479,7 @@ async def _reverse_topological_power_sort(
         event_ids: The events to sort
         event_map
         state_res_store
-        auth_diff: Set of event IDs that are in the auth difference.
+        full_conflicted_set: Set of event IDs that are in the auth difference.
 
     Returns:
         The sorted list
@@ -488,7 +488,7 @@ async def _reverse_topological_power_sort(
     graph: Dict[str, Set[str]] = {}
     for idx, event_id in enumerate(event_ids, start=1):
         await _add_event_and_auth_chain_to_graph(
-            graph, room_id, event_id, event_map, state_res_store, auth_diff
+            graph, room_id, event_id, event_map, state_res_store, full_conflicted_set
         )
 
         # We await occasionally when we're working with large data sets to
