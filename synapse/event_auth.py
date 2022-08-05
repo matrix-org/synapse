@@ -30,7 +30,13 @@ from synapse.api.constants import (
     JoinRules,
     Membership,
 )
-from synapse.api.errors import AuthError, EventSizeError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    EventSizeError,
+    SynapseError,
+    UnstableSpecAuthError,
+)
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
     EventFormatVersions,
@@ -291,7 +297,11 @@ def check_state_dependent_auth_rules(
         invite_level = get_named_level(auth_dict, "invite", 0)
 
         if user_level < invite_level:
-            raise AuthError(403, "You don't have permission to invite users")
+            raise UnstableSpecAuthError(
+                403,
+                "You don't have permission to invite users",
+                errcode=Codes.INSUFFICIENT_POWER,
+            )
         else:
             logger.debug("Allowing! %s", event)
             return
@@ -474,7 +484,11 @@ def _is_membership_change_allowed(
             return
 
         if not caller_in_room:  # caller isn't joined
-            raise AuthError(403, "%s not in room %s." % (event.user_id, event.room_id))
+            raise UnstableSpecAuthError(
+                403,
+                "%s not in room %s." % (event.user_id, event.room_id),
+                errcode=Codes.NOT_JOINED,
+            )
 
     if Membership.INVITE == membership:
         # TODO (erikj): We should probably handle this more intelligently
@@ -484,10 +498,18 @@ def _is_membership_change_allowed(
         if target_banned:
             raise AuthError(403, "%s is banned from the room" % (target_user_id,))
         elif target_in_room:  # the target is already in the room.
-            raise AuthError(403, "%s is already in the room." % target_user_id)
+            raise UnstableSpecAuthError(
+                403,
+                "%s is already in the room." % target_user_id,
+                errcode=Codes.ALREADY_JOINED,
+            )
         else:
             if user_level < invite_level:
-                raise AuthError(403, "You don't have permission to invite users")
+                raise UnstableSpecAuthError(
+                    403,
+                    "You don't have permission to invite users",
+                    errcode=Codes.INSUFFICIENT_POWER,
+                )
     elif Membership.JOIN == membership:
         # Joins are valid iff caller == target and:
         # * They are not banned.
@@ -549,15 +571,27 @@ def _is_membership_change_allowed(
     elif Membership.LEAVE == membership:
         # TODO (erikj): Implement kicks.
         if target_banned and user_level < ban_level:
-            raise AuthError(403, "You cannot unban user %s." % (target_user_id,))
+            raise UnstableSpecAuthError(
+                403,
+                "You cannot unban user %s." % (target_user_id,),
+                errcode=Codes.INSUFFICIENT_POWER,
+            )
         elif target_user_id != event.user_id:
             kick_level = get_named_level(auth_events, "kick", 50)
 
             if user_level < kick_level or user_level <= target_level:
-                raise AuthError(403, "You cannot kick user %s." % target_user_id)
+                raise UnstableSpecAuthError(
+                    403,
+                    "You cannot kick user %s." % target_user_id,
+                    errcode=Codes.INSUFFICIENT_POWER,
+                )
     elif Membership.BAN == membership:
         if user_level < ban_level or user_level <= target_level:
-            raise AuthError(403, "You don't have permission to ban")
+            raise UnstableSpecAuthError(
+                403,
+                "You don't have permission to ban",
+                errcode=Codes.INSUFFICIENT_POWER,
+            )
     elif room_version.msc2403_knocking and Membership.KNOCK == membership:
         if join_rule != JoinRules.KNOCK and (
             not room_version.msc3787_knock_restricted_join_rule
@@ -567,7 +601,11 @@ def _is_membership_change_allowed(
         elif target_user_id != event.user_id:
             raise AuthError(403, "You cannot knock for other users")
         elif target_in_room:
-            raise AuthError(403, "You cannot knock on a room you are already in")
+            raise UnstableSpecAuthError(
+                403,
+                "You cannot knock on a room you are already in",
+                errcode=Codes.ALREADY_JOINED,
+            )
         elif caller_invited:
             raise AuthError(403, "You are already invited to this room")
         elif target_banned:
@@ -638,10 +676,11 @@ def _can_send_event(event: "EventBase", auth_events: StateMap["EventBase"]) -> b
     user_level = get_user_power_level(event.user_id, auth_events)
 
     if user_level < send_level:
-        raise AuthError(
+        raise UnstableSpecAuthError(
             403,
             "You don't have permission to post that to the room. "
             + "user_level (%d) < send_level (%d)" % (user_level, send_level),
+            errcode=Codes.INSUFFICIENT_POWER,
         )
 
     # Check state_key
@@ -716,9 +755,10 @@ def check_historical(
     historical_level = get_named_level(auth_events, "historical", 100)
 
     if user_level < historical_level:
-        raise AuthError(
+        raise UnstableSpecAuthError(
             403,
             'You don\'t have permission to send send historical related events ("insertion", "batch", and "marker")',
+            errcode=Codes.INSUFFICIENT_POWER,
         )
 
 
@@ -739,6 +779,32 @@ def _check_power_levels(
             int(v)
         except Exception:
             raise SynapseError(400, "Not a valid power level: %s" % (v,))
+
+    # Reject events with stringy power levels if required by room version
+    if (
+        event.type == EventTypes.PowerLevels
+        and room_version_obj.msc3667_int_only_power_levels
+    ):
+        for k, v in event.content.items():
+            if k in {
+                "users_default",
+                "events_default",
+                "state_default",
+                "ban",
+                "redact",
+                "kick",
+                "invite",
+            }:
+                if not isinstance(v, int):
+                    raise SynapseError(400, f"{v!r} must be an integer.")
+            if k in {"events", "notifications", "users"}:
+                if not isinstance(v, dict) or not all(
+                    isinstance(v, int) for v in v.values()
+                ):
+                    raise SynapseError(
+                        400,
+                        f"{v!r} must be a dict wherein all the values are integers.",
+                    )
 
     key = (event.type, event.state_key)
     current_state = auth_events.get(key)

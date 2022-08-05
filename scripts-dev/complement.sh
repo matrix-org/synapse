@@ -44,8 +44,14 @@ usage() {
 Usage: $0 [-f] <go test arguments>...
 Run the complement test suite on Synapse.
 
-  -f    Skip rebuilding the docker images, and just use the most recent
-        'complement-synapse:latest' image
+  -f, --fast
+        Skip rebuilding the docker images, and just use the most recent
+        'complement-synapse:latest' image.
+        Conflicts with --build-only.
+
+  --build-only
+        Only build the Docker images. Don't actually run Complement.
+        Conflicts with -f/--fast.
 
 For help on arguments to 'go test', run 'go help testflag'.
 EOF
@@ -53,6 +59,7 @@ EOF
 
 # parse our arguments
 skip_docker_build=""
+skip_complement_run=""
 while [ $# -ge 1 ]; do
     arg=$1
     case "$arg" in
@@ -60,8 +67,11 @@ while [ $# -ge 1 ]; do
             usage
             exit 1
             ;;
-        "-f")
+        "-f"|"--fast")
             skip_docker_build=1
+            ;;
+        "--build-only")
+            skip_complement_run=1
             ;;
         *)
             # unknown arg: presumably an argument to gotest. break the loop.
@@ -91,6 +101,7 @@ if [ -z "$skip_docker_build" ]; then
     echo_if_github "::group::Build Docker image: matrixdotorg/synapse"
     docker build -t matrixdotorg/synapse \
       --build-arg TEST_ONLY_SKIP_DEP_HASH_VERIFICATION \
+      --build-arg TEST_ONLY_IGNORE_POETRY_LOCKFILE \
       -f "docker/Dockerfile" .
     echo_if_github "::endgroup::"
 
@@ -104,6 +115,11 @@ if [ -z "$skip_docker_build" ]; then
     docker build -t complement-synapse \
            -f "docker/complement/Dockerfile" "docker/complement"
     echo_if_github "::endgroup::"
+fi
+
+if [ -n "$skip_complement_run" ]; then
+    echo "Skipping Complement run as requested."
+    exit
 fi
 
 export COMPLEMENT_BASE_IMAGE=complement-synapse

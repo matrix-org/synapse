@@ -86,14 +86,19 @@ class EmailConfig(Config):
         if email_config is None:
             email_config = {}
 
+        self.force_tls = email_config.get("force_tls", False)
         self.email_smtp_host = email_config.get("smtp_host", "localhost")
-        self.email_smtp_port = email_config.get("smtp_port", 25)
+        self.email_smtp_port = email_config.get(
+            "smtp_port", 465 if self.force_tls else 25
+        )
         self.email_smtp_user = email_config.get("smtp_user", None)
         self.email_smtp_pass = email_config.get("smtp_pass", None)
         self.require_transport_security = email_config.get(
             "require_transport_security", False
         )
         self.enable_smtp_tls = email_config.get("enable_tls", True)
+        if self.force_tls and not self.enable_smtp_tls:
+            raise ConfigError("email.force_tls requires email.enable_tls to be true")
         if self.require_transport_security and not self.enable_smtp_tls:
             raise ConfigError(
                 "email.require_transport_security requires email.enable_tls to be true"
@@ -143,8 +148,7 @@ class EmailConfig(Config):
 
         if config.get("trust_identity_server_for_password_resets"):
             raise ConfigError(
-                'The config option "trust_identity_server_for_password_resets" '
-                'has been replaced by "account_threepid_delegate". '
+                'The config option "trust_identity_server_for_password_resets" has been removed.'
                 "Please consult the configuration manual at docs/usage/configuration/config_documentation.md for "
                 "details and update your config file."
             )

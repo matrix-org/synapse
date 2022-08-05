@@ -35,6 +35,7 @@ from typing_extensions import ParamSpec
 from twisted.internet import defer
 from twisted.web.resource import Resource
 
+from synapse.api import errors
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.events.presence_router import (
@@ -1450,6 +1451,81 @@ class ModuleApi:
         return await self._store.get_monthly_active_users_by_service(
             start_timestamp, end_timestamp
         )
+
+    async def lookup_room_alias(self, room_alias: str) -> Tuple[str, List[str]]:
+        """
+        Get the room ID associated with a room alias.
+
+        Added in Synapse v1.65.0.
+
+        Args:
+            room_alias: The alias to look up.
+
+        Returns:
+            A tuple of:
+                The room ID (str).
+                Hosts likely to be participating in the room ([str]).
+
+        Raises:
+            SynapseError if room alias is invalid or could not be found.
+        """
+        alias = RoomAlias.from_string(room_alias)
+        (room_id, hosts) = await self._hs.get_room_member_handler().lookup_room_alias(
+            alias
+        )
+
+        return room_id.to_string(), hosts
+
+    async def create_room(
+        self,
+        user_id: str,
+        config: JsonDict,
+        ratelimit: bool = True,
+        creator_join_profile: Optional[JsonDict] = None,
+    ) -> Tuple[str, Optional[str]]:
+        """Creates a new room.
+
+        Added in Synapse v1.65.0.
+
+        Args:
+            user_id:
+                The user who requested the room creation.
+            config : A dict of configuration options. See "Request body" of:
+                https://spec.matrix.org/latest/client-server-api/#post_matrixclientv3createroom
+            ratelimit: set to False to disable the rate limiter for this specific operation.
+
+            creator_join_profile:
+                Set to override the displayname and avatar for the creating
+                user in this room. If unset, displayname and avatar will be
+                derived from the user's profile. If set, should contain the
+                values to go in the body of the 'join' event (typically
+                `avatar_url` and/or `displayname`.
+
+        Returns:
+                A tuple containing: 1) the room ID (str), 2) if an alias was requested,
+                the room alias (str), otherwise None if no alias was requested.
+
+        Raises:
+            ResourceLimitError if server is blocked to some resource being
+            exceeded.
+            RuntimeError if the user_id does not refer to a local user.
+            SynapseError if the user_id is invalid, room ID couldn't be stored, or
+            something went horribly wrong.
+        """
+        if not self.is_mine(user_id):
+            raise RuntimeError(
+                "Tried to create a room as a user that isn't local to this homeserver",
+            )
+
+        requester = create_requester(user_id)
+        room_id_and_alias, _ = await self._hs.get_room_creation_handler().create_room(
+            requester=requester,
+            config=config,
+            ratelimit=ratelimit,
+            creator_join_profile=creator_join_profile,
+        )
+
+        return room_id_and_alias["room_id"], room_id_and_alias.get("room_alias", None)
 
 
 class PublicRoomListManager:

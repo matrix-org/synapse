@@ -33,7 +33,7 @@ from synapse.api.ratelimiting import Ratelimiter
 from synapse.config import ConfigError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.homeserver import HomeServerConfig
-from synapse.config.ratelimiting import FederationRateLimitConfig
+from synapse.config.ratelimiting import FederationRatelimitSettings
 from synapse.config.server import is_threepid_reserved
 from synapse.handlers.auth import AuthHandler
 from synapse.handlers.ui_auth import UIAuthSessionDataConstants
@@ -142,7 +142,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             assert self.hs.config.registration.account_threepid_delegate_email
 
             # Have the configured identity server handle the request
-            ret = await self.identity_handler.requestEmailToken(
+            ret = await self.identity_handler.request_email_token(
                 self.hs.config.registration.account_threepid_delegate_email,
                 email,
                 client_secret,
@@ -150,17 +150,17 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
                 next_link,
             )
         else:
-            # Send registration emails from Synapse
-            sid = await self.identity_handler.send_threepid_validation(
-                email,
-                client_secret,
-                send_attempt,
-                self.mailer.send_registration_mail,
-                next_link,
-            )
-
-            # Wrap the session id in a JSON object
-            ret = {"sid": sid}
+            # Send registration emails from Synapse,
+            # wrapping the session id in a JSON object.
+            ret = {
+                "sid": await self.identity_handler.send_threepid_validation(
+                    email,
+                    client_secret,
+                    send_attempt,
+                    self.mailer.send_registration_mail,
+                    next_link,
+                )
+            }
 
         threepid_send_requests.labels(type="email", reason="register").observe(
             send_attempt
@@ -325,7 +325,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
         self.registration_handler = hs.get_registration_handler()
         self.ratelimiter = FederationRateLimiter(
             hs.get_clock(),
-            FederationRateLimitConfig(
+            FederationRatelimitSettings(
                 # Time window of 2s
                 window_size=2000,
                 # Artificially delay requests if rate > sleep_limit/window_size

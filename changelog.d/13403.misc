@@ -1,0 +1,1 @@
+Faster Room Joins: don't leave a stuck room partial state flag if the join fails.

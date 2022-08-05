@@ -228,6 +228,7 @@ class PushRulesWorkerStore(
             iterable=user_ids,
             retcols=("*",),
             desc="bulk_get_push_rules",
+            batch_size=1000,
         )
 
         rows.sort(key=lambda row: (-int(row["priority_class"]), -int(row["priority"])))

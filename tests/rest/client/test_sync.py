@@ -606,11 +606,10 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(1)
 
         # Send a read receipt to tell the server we've read the latest event.
-        body = json.dumps({ReceiptTypes.READ: res["event_id"]}).encode("utf8")
         channel = self.make_request(
             "POST",
             f"/rooms/{self.room_id}/read_markers",
-            body,
+            {ReceiptTypes.READ: res["event_id"]},
             access_token=self.tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
@@ -949,3 +948,24 @@ class ExcludeRoomTestCase(unittest.HomeserverTestCase):
 
         self.assertNotIn(self.excluded_room_id, channel.json_body["rooms"]["invite"])
         self.assertIn(self.included_room_id, channel.json_body["rooms"]["invite"])
+
+    def test_incremental_sync(self) -> None:
+        """Tests that activity in the room is properly filtered out of incremental
+        syncs.
+        """
+        channel = self.make_request("GET", "/sync", access_token=self.tok)
+        self.assertEqual(channel.code, 200, channel.result)
+        next_batch = channel.json_body["next_batch"]
+
+        self.helper.send(self.excluded_room_id, tok=self.tok)
+        self.helper.send(self.included_room_id, tok=self.tok)
+
+        channel = self.make_request(
+            "GET",
+            f"/sync?since={next_batch}",
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self.assertNotIn(self.excluded_room_id, channel.json_body["rooms"]["join"])
+        self.assertIn(self.included_room_id, channel.json_body["rooms"]["join"])

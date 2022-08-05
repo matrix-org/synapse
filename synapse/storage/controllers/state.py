@@ -29,6 +29,7 @@ from typing import (
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
+from synapse.logging.opentracing import trace
 from synapse.storage.state import StateFilter
 from synapse.storage.util.partial_state_events_tracker import (
     PartialCurrentStateTracker,
@@ -82,13 +83,15 @@ class StateStorageController:
         return state_group_delta.prev_group, state_group_delta.delta_ids
 
     async def get_state_groups_ids(
-        self, _room_id: str, event_ids: Collection[str]
+        self, _room_id: str, event_ids: Collection[str], await_full_state: bool = True
     ) -> Dict[int, MutableStateMap[str]]:
         """Get the event IDs of all the state for the state groups for the given events
 
         Args:
             _room_id: id of the room for these events
             event_ids: ids of the events
+            await_full_state: if `True`, will block if we do not yet have complete
+               state at these events.
 
         Returns:
             dict of state_group_id -> (dict of (type, state_key) -> event id)
@@ -100,7 +103,9 @@ class StateStorageController:
         if not event_ids:
             return {}
 
-        event_to_groups = await self.get_state_group_for_events(event_ids)
+        event_to_groups = await self.get_state_group_for_events(
+            event_ids, await_full_state=await_full_state
+        )
 
         groups = set(event_to_groups.values())
         group_to_state = await self.stores.state._get_state_for_groups(groups)
@@ -175,6 +180,7 @@ class StateStorageController:
 
         return self.stores.state._get_state_groups_from_groups(groups, state_filter)
 
+    @trace
     async def get_state_for_events(
         self, event_ids: Collection[str], state_filter: Optional[StateFilter] = None
     ) -> Dict[str, StateMap[EventBase]]:
@@ -221,6 +227,7 @@ class StateStorageController:
 
         return {event: event_to_state[event] for event in event_ids}
 
+    @trace
     async def get_state_ids_for_events(
         self,
         event_ids: Collection[str],
@@ -283,6 +290,7 @@ class StateStorageController:
         )
         return state_map[event_id]
 
+    @trace
     async def get_state_ids_for_event(
         self, event_id: str, state_filter: Optional[StateFilter] = None
     ) -> StateMap[str]:
@@ -323,6 +331,7 @@ class StateStorageController:
             groups, state_filter or StateFilter.all()
         )
 
+    @trace
     async def get_state_group_for_events(
         self,
         event_ids: Collection[str],
@@ -334,6 +343,10 @@ class StateStorageController:
             event_ids: events to get state groups for
             await_full_state: if true, will block if we do not yet have complete
                state at these events.
+
+        Raises:
+            RuntimeError if we don't have a state group for one or more of the events
+               (ie. they are outliers or unknown)
         """
         if await_full_state:
             await self._partial_state_events_tracker.await_full_state(event_ids)
@@ -346,7 +359,7 @@ class StateStorageController:
         room_id: str,
         prev_group: Optional[int],
         delta_ids: Optional[StateMap[str]],
-        current_state_ids: StateMap[str],
+        current_state_ids: Optional[StateMap[str]],
     ) -> int:
         """Store a new set of state, returning a newly assigned state group.
 
