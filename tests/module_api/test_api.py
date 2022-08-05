@@ -410,8 +410,7 @@ class ModuleApiTestCase(HomeserverTestCase):
 
         self.assertTrue(found_update)
 
-    @patch("synapse.handlers.room_member.RoomMemberMasterHandler._remote_join")
-    def test_update_membership(self, mocked_remote_join):
+    def test_update_membership(self):
         """Tests that the module API can update the membership of a user in a room."""
         peter = self.register_user("peter", "hackme")
         lesley = self.register_user("lesley", "hackme")
@@ -534,9 +533,8 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.assertEqual(res["displayname"], "simone")
         self.assertIsNone(res["avatar_url"])
 
-        # Check that no remote join attempts have occurred thus far.
-        self.assertFalse(mocked_remote_join.called)
-
+    @patch("synapse.handlers.room_member.RoomMemberMasterHandler._remote_join")
+    def test_update_room_membership_remote_join(self, mocked_remote_join):
         # Necessary to fake a remote join.
         fake_stream_id = 1
         if isinstance(mocked_remote_join, MagicMock):
@@ -553,8 +551,8 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.get_failure(
             defer.ensureDeferred(
                 self.module_api.update_room_membership(
-                    sender=peter,
-                    target=peter,
+                    sender=f"@user:{self.module_api.server_name}",
+                    target=f"@user:{self.module_api.server_name}",
                     room_id=f"!nonexistent:{fake_remote_host}",
                     new_membership="join",
                     remote_room_hosts=[fake_remote_host],
