@@ -910,7 +910,8 @@ def trace_with_opname(
     See the module's doc string for usage examples.
     """
 
-    @contextlib.contextmanager
+    # mypy bug: https://github.com/python/mypy/issues/12909
+    @contextlib.contextmanager  # type: ignore[arg-type]
     def _wrapping_logic(
         func: Callable[P, R], *args: P.args, **kwargs: P.kwargs
     ) -> Generator[None, None, None]:
@@ -949,7 +950,8 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
     if not opentracing:
         return func
 
-    @contextlib.contextmanager
+    # mypy bug: https://github.com/python/mypy/issues/12909
+    @contextlib.contextmanager  # type: ignore[arg-type]
     def _wrapping_logic(
         func: Callable[P, R], *args: P.args, **kwargs: P.kwargs
     ) -> Generator[None, None, None]:
@@ -957,7 +959,7 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
         # We use `[1:]` to skip the `self` object reference and `start=1` to
         # make the index line up with `argspec.args`.
         #
-        # FIXME: We could update this handle any type of function by ignoring the
+        # FIXME: We could update this to handle any type of function by ignoring the
         #   first argument only if it's named `self` or `cls`. This isn't fool-proof
         #   but handles the idiomatic cases.
         for i, arg in enumerate(args[1:], start=1):  # type: ignore[index]
