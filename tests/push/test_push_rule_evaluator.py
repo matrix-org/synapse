@@ -252,6 +252,62 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
             "pattern should not match before a newline",
         )
 
+        # boolean true should match
+        condition = {
+            "kind": "event_match",
+            "key": "content.value",
+            "pattern": "true",
+        }
+        self._assert_matches(
+            condition,
+            {"value": True},
+            "patterns should match and be case-insensitive",
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": False},
+            "pattern should not match opposite boolean value",
+        )
+
+        # boolean false should match
+        condition = {
+            "kind": "event_match",
+            "key": "content.value",
+            "pattern": "false",
+        }
+        self._assert_matches(
+            condition,
+            {"value": False},
+            "patterns should match and be case-insensitive",
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": True},
+            "pattern should not match opposite boolean value",
+        )
+
+        # integers should match
+        condition = {
+            "kind": "event_match",
+            "key": "content.value",
+            "pattern": "123",
+        }
+        self._assert_matches(
+            condition,
+            {"value": 123},
+            "patterns should match and be case-insensitive",
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": 4123},
+            "pattern should only match at the start/end of the value",
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": 1234},
+            "pattern should only match at the start/end of the value",
+        )
+
     def test_no_body(self) -> None:
         """Not having a body shouldn't break the evaluator."""
         evaluator = self._get_evaluator({})

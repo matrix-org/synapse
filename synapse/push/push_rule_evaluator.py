@@ -344,6 +344,10 @@ def _flatten_dict(
     for key, value in d.items():
         if isinstance(value, str):
             result[".".join(prefix + [key])] = value.lower()
+        elif isinstance(value, bool) or isinstance(value, int):
+            # Convert booleans and integers to their string representation
+            # so that they can be matched as well
+            result[".".join(prefix + [key])] = f"{value}".lower()
         elif isinstance(value, Mapping):
             _flatten_dict(value, prefix=(prefix + [key]), result=result)
 
