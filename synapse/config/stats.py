@@ -13,6 +13,9 @@
 # limitations under the License.
 
 import logging
+from typing import Any
+
+from synapse.types import JsonDict
 
 from ._base import Config
 
@@ -36,23 +39,10 @@ class StatsConfig(Config):
 
     section = "stats"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.stats_enabled = True
         stats_config = config.get("stats", None)
         if stats_config:
             self.stats_enabled = stats_config.get("enabled", self.stats_enabled)
         if not self.stats_enabled:
             logger.warning(ROOM_STATS_DISABLED_WARN)
-
-    def generate_config_section(self, config_dir_path, server_name, **kwargs):
-        return """
-        # Settings for local room and user statistics collection. See
-        # https://matrix-org.github.io/synapse/latest/room_and_user_statistics.html.
-        #
-        stats:
-          # Uncomment the following to disable room and user statistics. Note that doing
-          # so may cause certain features (such as the room directory) not to work
-          # correctly.
-          #
-          #enabled: false
-        """

@@ -6,14 +6,14 @@ CWD=$(pwd)
 
 cd "$DIR/.." || exit
 
-mkdir -p demo/etc
+# Do not override PYTHONPATH if we are in a virtual env
+if [ "$VIRTUAL_ENV" = "" ]; then
+    PYTHONPATH=$(readlink -f "$(pwd)")
+    export PYTHONPATH
+	echo "$PYTHONPATH"
+fi
 
-PYTHONPATH=$(readlink -f "$(pwd)")
-export PYTHONPATH
-
-
-echo "$PYTHONPATH"
-
+# Create servers which listen on HTTP at 808x and HTTPS at 848x.
 for port in 8080 8081 8082; do
     echo "Starting server on port $port... "
 
@@ -21,22 +21,29 @@ for port in 8080 8081 8082; do
     mkdir -p demo/$port
     pushd demo/$port || exit
 
-    #rm $DIR/etc/$port.config
+    # Generate the configuration for the homeserver at localhost:848x, note that
+    # the homeserver name needs to match the HTTPS listening port for federation
+    # to properly work..
     python3 -m synapse.app.homeserver \
         --generate-config \
-        -H "localhost:$https_port" \
-        --config-path "$DIR/etc/$port.config" \
+        --server-name "localhost:$https_port" \
+        --config-path "$port.config" \
         --report-stats no
 
-    if ! grep -F "Customisation made by demo/start.sh" -q "$DIR/etc/$port.config"; then
-        # Generate tls keys
-        openssl req -x509 -newkey rsa:4096 -keyout "$DIR/etc/localhost:$https_port.tls.key" -out "$DIR/etc/localhost:$https_port.tls.crt" -days 365 -nodes -subj "/O=matrix"
+    if ! grep -F "Customisation made by demo/start.sh" -q "$port.config"; then
+        # Generate TLS keys.
+        openssl req -x509 -newkey rsa:4096 \
+          -keyout "localhost:$port.tls.key" \
+          -out "localhost:$port.tls.crt" \
+          -days 365 -nodes -subj "/O=matrix"
 
-        # Regenerate configuration
+        # Add customisations to the configuration.
         {
-            printf '\n\n# Customisation made by demo/start.sh\n'
+            printf '\n\n# Customisation made by demo/start.sh\n\n'
             echo "public_baseurl: http://localhost:$port/"
             echo 'enable_registration: true'
+            echo 'enable_registration_without_verification: true'
+            echo ''
 
 			# Warning, this heredoc depends on the interaction of tabs and spaces.
 			# Please don't accidentaly bork me with your fancy settings.
@@ -63,38 +70,34 @@ for port in 8080 8081 8082; do
 
             echo "${listeners}"
 
-            # Disable tls for the servers
-            printf '\n\n# Disable tls on the servers.'
+            # Disable TLS for the servers
+            printf '\n\n# Disable TLS for the servers.'
             echo '# DO NOT USE IN PRODUCTION'
             echo 'use_insecure_ssl_client_just_for_testing_do_not_use: true'
             echo 'federation_verify_certificates: false'
 
-            # Set tls paths
-            echo "tls_certificate_path: \"$DIR/etc/localhost:$https_port.tls.crt\""
-            echo "tls_private_key_path: \"$DIR/etc/localhost:$https_port.tls.key\""
+            # Set paths for the TLS certificates.
+            echo "tls_certificate_path: \"$DIR/$port/localhost:$port.tls.crt\""
+            echo "tls_private_key_path: \"$DIR/$port/localhost:$port.tls.key\""
 
             # Ignore keys from the trusted keys server
             echo '# Ignore keys from the trusted keys server'
             echo 'trusted_key_servers:'
             echo '  - server_name: "matrix.org"'
             echo '    accept_keys_insecurely: true'
+            echo ''
 
-			# Reduce the blacklist
-			blacklist=$(cat <<-BLACK
-			# Set the blacklist so that it doesn't include 127.0.0.1, ::1
-			federation_ip_range_blacklist:
-			  - '10.0.0.0/8'
-			  - '172.16.0.0/12'
-			  - '192.168.0.0/16'
-			  - '100.64.0.0/10'
-			  - '169.254.0.0/16'
-			  - 'fe80::/64'
-			  - 'fc00::/7'
-			BLACK
+			# Allow the servers to communicate over localhost.
+			allow_list=$(cat <<-ALLOW_LIST
+			# Allow the servers to communicate over localhost.
+			ip_range_whitelist:
+			  - '127.0.0.1/8'
+			  - '::1/128'
+			ALLOW_LIST
 			)
 
-            echo "${blacklist}"
-        } >> "$DIR/etc/$port.config"
+            echo "${allow_list}"
+        } >> "$port.config"
     fi
 
     # Check script parameters
@@ -141,19 +144,18 @@ for port in 8080 8081 8082; do
 			    burst_count: 1000
 			RC
 			)
-            echo "${ratelimiting}" >> "$DIR/etc/$port.config"
+            echo "${ratelimiting}" >> "$port.config"
         fi
     fi
 
-    if ! grep -F "full_twisted_stacktraces" -q  "$DIR/etc/$port.config"; then
-        echo "full_twisted_stacktraces: true" >> "$DIR/etc/$port.config"
-    fi
-    if ! grep -F "report_stats" -q  "$DIR/etc/$port.config" ; then
-        echo "report_stats: false" >> "$DIR/etc/$port.config"
+    # Always disable reporting of stats if the option is not there.
+    if ! grep -F "report_stats" -q  "$port.config" ; then
+        echo "report_stats: false" >> "$port.config"
     fi
 
+    # Run the homeserver in the background.
     python3 -m synapse.app.homeserver \
-        --config-path "$DIR/etc/$port.config" \
+        --config-path "$port.config" \
         -D \
 
     popd || exit

@@ -1,1 +1,0 @@
-Remove experimental changes to the default push rules which were introduced in Synapse 1.19.0 but never enabled.

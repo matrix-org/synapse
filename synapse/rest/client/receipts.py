@@ -13,20 +13,16 @@
 # limitations under the License.
 
 import logging
-import re
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.constants import ReadReceiptEventFields, ReceiptTypes
-from synapse.api.errors import Codes, SynapseError
-from synapse.http import get_request_user_agent
+from synapse.api.constants import ReceiptTypes
+from synapse.api.errors import SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.types import JsonDict
 
 from ._base import client_patterns
-
-pattern = re.compile(r"(?:Element|SchildiChat)/1\.[012]\.")
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -43,45 +39,45 @@ class ReceiptRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        self.hs = hs
         self.auth = hs.get_auth()
         self.receipts_handler = hs.get_receipts_handler()
+        self.read_marker_handler = hs.get_read_marker_handler()
         self.presence_handler = hs.get_presence_handler()
+
+        self._known_receipt_types = {ReceiptTypes.READ}
+        if hs.config.experimental.msc2285_enabled:
+            self._known_receipt_types.update(
+                (ReceiptTypes.READ_PRIVATE, ReceiptTypes.FULLY_READ)
+            )
 
     async def on_POST(
         self, request: SynapseRequest, room_id: str, receipt_type: str, event_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
-        if receipt_type != ReceiptTypes.READ:
-            raise SynapseError(400, "Receipt type must be 'm.read'")
-
-        # Do not allow older SchildiChat and Element Android clients (prior to Element/1.[012].x) to send an empty body.
-        user_agent = get_request_user_agent(request)
-        allow_empty_body = False
-        if "Android" in user_agent:
-            if pattern.match(user_agent) or "Riot" in user_agent:
-                allow_empty_body = True
-        body = parse_json_object_from_request(request, allow_empty_body)
-        hidden = body.get(ReadReceiptEventFields.MSC2285_HIDDEN, False)
-
-        if not isinstance(hidden, bool):
+        if receipt_type not in self._known_receipt_types:
             raise SynapseError(
                 400,
-                "Param %s must be a boolean, if given"
-                % ReadReceiptEventFields.MSC2285_HIDDEN,
-                Codes.BAD_JSON,
+                f"Receipt type must be {', '.join(self._known_receipt_types)}",
             )
+
+        parse_json_object_from_request(request, allow_empty_body=False)
 
         await self.presence_handler.bump_presence_active_time(requester.user)
 
-        await self.receipts_handler.received_client_receipt(
-            room_id,
-            receipt_type,
-            user_id=requester.user.to_string(),
-            event_id=event_id,
-            hidden=hidden,
-        )
+        if receipt_type == ReceiptTypes.FULLY_READ:
+            await self.read_marker_handler.received_client_read_marker(
+                room_id,
+                user_id=requester.user.to_string(),
+                event_id=event_id,
+            )
+        else:
+            await self.receipts_handler.received_client_receipt(
+                room_id,
+                receipt_type,
+                user_id=requester.user.to_string(),
+                event_id=event_id,
+            )
 
         return 200, {}
 

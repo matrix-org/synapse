@@ -16,28 +16,36 @@ import shutil
 import tempfile
 from binascii import unhexlify
 from io import BytesIO
-from typing import Optional
+from typing import Any, BinaryIO, Dict, List, Optional, Union
 from unittest.mock import Mock
 from urllib import parse
 
 import attr
 from parameterized import parameterized, parameterized_class
 from PIL import Image as Image
+from typing_extensions import Literal
 
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
+from twisted.test.proto_helpers import MemoryReactor
 
+from synapse.api.errors import Codes
+from synapse.events import EventBase
 from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.logging.context import make_deferred_yieldable
+from synapse.module_api import ModuleApi
 from synapse.rest import admin
 from synapse.rest.client import login
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.filepath import MediaFilePaths
-from synapse.rest.media.v1.media_storage import MediaStorage
+from synapse.rest.media.v1.media_storage import MediaStorage, ReadableFileWrapper
 from synapse.rest.media.v1.storage_provider import FileStorageProviderBackend
+from synapse.server import HomeServer
+from synapse.types import RoomAlias
+from synapse.util import Clock
 
 from tests import unittest
-from tests.server import FakeSite, make_request
+from tests.server import FakeChannel, FakeSite, make_request
 from tests.test_utils import SMALL_PNG
 from tests.utils import default_config
 
@@ -46,7 +54,7 @@ class MediaStorageTests(unittest.HomeserverTestCase):
 
     needs_threadpool = True
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.test_dir = tempfile.mkdtemp(prefix="synapse-tests-")
         self.addCleanup(shutil.rmtree, self.test_dir)
 
@@ -62,7 +70,7 @@ class MediaStorageTests(unittest.HomeserverTestCase):
             hs, self.primary_base_path, self.filepaths, storage_providers
         )
 
-    def test_ensure_media_is_in_local_cache(self):
+    def test_ensure_media_is_in_local_cache(self) -> None:
         media_id = "some_media_id"
         test_body = "Test\n"
 
@@ -94,7 +102,7 @@ class MediaStorageTests(unittest.HomeserverTestCase):
         self.assertTrue(os.path.exists(local_path))
 
         # Asserts the file is under the expected local cache directory
-        self.assertEquals(
+        self.assertEqual(
             os.path.commonprefix([self.primary_base_path, local_path]),
             self.primary_base_path,
         )
@@ -105,7 +113,7 @@ class MediaStorageTests(unittest.HomeserverTestCase):
         self.assertEqual(test_body, body)
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(auto_attribs=True, slots=True, frozen=True)
 class _TestImage:
     """An image for testing thumbnailing with the expected results
 
@@ -118,21 +126,24 @@ class _TestImage:
         expected_scaled: The expected bytes from scaled thumbnailing, or None if
             test should just check for a valid image returned.
         expected_found: True if the file should exist on the server, or False if
-            a 404 is expected.
+            a 404/400 is expected.
+        unable_to_thumbnail: True if we expect the thumbnailing to fail (400), or
+            False if the thumbnailing should succeed or a normal 404 is expected.
     """
 
-    data = attr.ib(type=bytes)
-    content_type = attr.ib(type=bytes)
-    extension = attr.ib(type=bytes)
-    expected_cropped = attr.ib(type=Optional[bytes], default=None)
-    expected_scaled = attr.ib(type=Optional[bytes], default=None)
-    expected_found = attr.ib(default=True, type=bool)
+    data: bytes
+    content_type: bytes
+    extension: bytes
+    expected_cropped: Optional[bytes] = None
+    expected_scaled: Optional[bytes] = None
+    expected_found: bool = True
+    unable_to_thumbnail: bool = False
 
 
 @parameterized_class(
     ("test_image",),
     [
-        # smoll png
+        # small png
         (
             _TestImage(
                 SMALL_PNG,
@@ -184,6 +195,7 @@ class _TestImage:
                 b"image/gif",
                 b".gif",
                 expected_found=False,
+                unable_to_thumbnail=True,
             ),
         ),
     ],
@@ -193,11 +205,17 @@ class MediaRepoTests(unittest.HomeserverTestCase):
     hijack_auth = True
     user_id = "@test:user"
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
 
         self.fetches = []
 
-        def get_file(destination, path, output_stream, args=None, max_size=None):
+        def get_file(
+            destination: str,
+            path: str,
+            output_stream: BinaryIO,
+            args: Optional[Dict[str, Union[str, List[str]]]] = None,
+            max_size: Optional[int] = None,
+        ) -> Deferred:
             """
             Returns tuple[int,dict,str,int] of file length, response headers,
             absolute URI, and response code.
@@ -238,18 +256,19 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
         return hs
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
 
         media_resource = hs.get_media_repository_resource()
         self.download_resource = media_resource.children[b"download"]
         self.thumbnail_resource = media_resource.children[b"thumbnail"]
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.media_repo = hs.get_media_repository()
 
         self.media_id = "example.com/12345"
 
-    def _req(self, content_disposition, include_content_type=True):
-
+    def _req(
+        self, content_disposition: Optional[bytes], include_content_type: bool = True
+    ) -> FakeChannel:
         channel = make_request(
             self.reactor,
             FakeSite(self.download_resource, self.reactor),
@@ -288,7 +307,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
         return channel
 
-    def test_handle_missing_content_type(self):
+    def test_handle_missing_content_type(self) -> None:
         channel = self._req(
             b"inline; filename=out" + self.test_image.extension,
             include_content_type=False,
@@ -299,7 +318,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             headers.getRawHeaders(b"Content-Type"), [b"application/octet-stream"]
         )
 
-    def test_disposition_filename_ascii(self):
+    def test_disposition_filename_ascii(self) -> None:
         """
         If the filename is filename=<ascii> then Synapse will decode it as an
         ASCII string, and use filename= in the response.
@@ -315,7 +334,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             [b"inline; filename=out" + self.test_image.extension],
         )
 
-    def test_disposition_filenamestar_utf8escaped(self):
+    def test_disposition_filenamestar_utf8escaped(self) -> None:
         """
         If the filename is filename=*utf8''<utf8 escaped> then Synapse will
         correctly decode it as the UTF-8 string, and use filename* in the
@@ -335,7 +354,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             [b"inline; filename*=utf-8''" + filename + self.test_image.extension],
         )
 
-    def test_disposition_none(self):
+    def test_disposition_none(self) -> None:
         """
         If there is no filename, one isn't passed on in the Content-Disposition
         of the request.
@@ -348,46 +367,70 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         )
         self.assertEqual(headers.getRawHeaders(b"Content-Disposition"), None)
 
-    def test_thumbnail_crop(self):
+    def test_thumbnail_crop(self) -> None:
         """Test that a cropped remote thumbnail is available."""
         self._test_thumbnail(
-            "crop", self.test_image.expected_cropped, self.test_image.expected_found
+            "crop",
+            self.test_image.expected_cropped,
+            expected_found=self.test_image.expected_found,
+            unable_to_thumbnail=self.test_image.unable_to_thumbnail,
         )
 
-    def test_thumbnail_scale(self):
+    def test_thumbnail_scale(self) -> None:
         """Test that a scaled remote thumbnail is available."""
         self._test_thumbnail(
-            "scale", self.test_image.expected_scaled, self.test_image.expected_found
+            "scale",
+            self.test_image.expected_scaled,
+            expected_found=self.test_image.expected_found,
+            unable_to_thumbnail=self.test_image.unable_to_thumbnail,
         )
 
-    def test_invalid_type(self):
+    def test_invalid_type(self) -> None:
         """An invalid thumbnail type is never available."""
-        self._test_thumbnail("invalid", None, False)
+        self._test_thumbnail(
+            "invalid",
+            None,
+            expected_found=False,
+            unable_to_thumbnail=self.test_image.unable_to_thumbnail,
+        )
 
     @unittest.override_config(
         {"thumbnail_sizes": [{"width": 32, "height": 32, "method": "scale"}]}
     )
-    def test_no_thumbnail_crop(self):
+    def test_no_thumbnail_crop(self) -> None:
         """
         Override the config to generate only scaled thumbnails, but request a cropped one.
         """
-        self._test_thumbnail("crop", None, False)
+        self._test_thumbnail(
+            "crop",
+            None,
+            expected_found=False,
+            unable_to_thumbnail=self.test_image.unable_to_thumbnail,
+        )
 
     @unittest.override_config(
         {"thumbnail_sizes": [{"width": 32, "height": 32, "method": "crop"}]}
     )
-    def test_no_thumbnail_scale(self):
+    def test_no_thumbnail_scale(self) -> None:
         """
         Override the config to generate only cropped thumbnails, but request a scaled one.
         """
-        self._test_thumbnail("scale", None, False)
+        self._test_thumbnail(
+            "scale",
+            None,
+            expected_found=False,
+            unable_to_thumbnail=self.test_image.unable_to_thumbnail,
+        )
 
-    def test_thumbnail_repeated_thumbnail(self):
+    def test_thumbnail_repeated_thumbnail(self) -> None:
         """Test that fetching the same thumbnail works, and deleting the on disk
         thumbnail regenerates it.
         """
         self._test_thumbnail(
-            "scale", self.test_image.expected_scaled, self.test_image.expected_found
+            "scale",
+            self.test_image.expected_scaled,
+            expected_found=self.test_image.expected_found,
+            unable_to_thumbnail=self.test_image.unable_to_thumbnail,
         )
 
         if not self.test_image.expected_found:
@@ -443,7 +486,25 @@ class MediaRepoTests(unittest.HomeserverTestCase):
                 channel.result["body"],
             )
 
-    def _test_thumbnail(self, method, expected_body, expected_found):
+    def _test_thumbnail(
+        self,
+        method: str,
+        expected_body: Optional[bytes],
+        expected_found: bool,
+        unable_to_thumbnail: bool = False,
+    ) -> None:
+        """Test the given thumbnailing method works as expected.
+
+        Args:
+            method: The thumbnailing method to use (crop, scale).
+            expected_body: The expected bytes from thumbnailing, or None if
+                test should just check for a valid image.
+            expected_found: True if the file should exist on the server, or False if
+                a 404/400 is expected.
+            unable_to_thumbnail: True if we expect the thumbnailing to fail (400), or
+                False if the thumbnailing should succeed or a normal 404 is expected.
+        """
+
         params = "?width=32&height=32&method=" + method
         channel = make_request(
             self.reactor,
@@ -466,6 +527,12 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
         if expected_found:
             self.assertEqual(channel.code, 200)
+
+            self.assertEqual(
+                channel.headers.getRawHeaders(b"Cross-Origin-Resource-Policy"),
+                [b"cross-origin"],
+            )
+
             if expected_body is not None:
                 self.assertEqual(
                     channel.result["body"], expected_body, channel.result["body"]
@@ -473,6 +540,16 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             else:
                 # ensure that the result is at least some valid image
                 Image.open(BytesIO(channel.result["body"]))
+        elif unable_to_thumbnail:
+            # A 400 with a JSON body.
+            self.assertEqual(channel.code, 400)
+            self.assertEqual(
+                channel.json_body,
+                {
+                    "errcode": "M_UNKNOWN",
+                    "error": "Cannot find any thumbnails for the requested media ([b'example.com', b'12345']). This might mean the media is not a supported_media_format=(image/jpeg, image/jpg, image/webp, image/gif, image/png) or that thumbnailing failed for some other reason. (Dynamic thumbnails are disabled on this server.)",
+                },
+            )
         else:
             # A 404 with a JSON body.
             self.assertEqual(channel.code, 404)
@@ -485,7 +562,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             )
 
     @parameterized.expand([("crop", 16), ("crop", 64), ("scale", 16), ("scale", 64)])
-    def test_same_quality(self, method, desired_size):
+    def test_same_quality(self, method: str, desired_size: int) -> None:
         """Test that choosing between thumbnails with the same quality rating succeeds.
 
         We are not particular about which thumbnail is chosen."""
@@ -521,7 +598,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             )
         )
 
-    def test_x_robots_tag_header(self):
+    def test_x_robots_tag_header(self) -> None:
         """
         Tests that the `X-Robots-Tag` header is present, which informs web crawlers
         to not index, archive, or follow links in media.
@@ -534,48 +611,73 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             [b"noindex, nofollow, noarchive, noimageindex"],
         )
 
+    def test_cross_origin_resource_policy_header(self) -> None:
+        """
+        Test that the Cross-Origin-Resource-Policy header is set to "cross-origin"
+        allowing web clients to embed media from the downloads API.
+        """
+        channel = self._req(b"inline; filename=out" + self.test_image.extension)
 
-class TestSpamChecker:
+        headers = channel.headers
+
+        self.assertEqual(
+            headers.getRawHeaders(b"Cross-Origin-Resource-Policy"),
+            [b"cross-origin"],
+        )
+
+
+class TestSpamCheckerLegacy:
     """A spam checker module that rejects all media that includes the bytes
     `evil`.
+
+    Uses the legacy Spam-Checker API.
     """
 
-    def __init__(self, config, api):
+    def __init__(self, config: Dict[str, Any], api: ModuleApi) -> None:
         self.config = config
         self.api = api
 
-    def parse_config(config):
+    def parse_config(config: Dict[str, Any]) -> Dict[str, Any]:
         return config
 
-    async def check_event_for_spam(self, foo):
+    async def check_event_for_spam(self, event: EventBase) -> Union[bool, str]:
         return False  # allow all events
 
-    async def user_may_invite(self, inviter_userid, invitee_userid, room_id):
+    async def user_may_invite(
+        self,
+        inviter_userid: str,
+        invitee_userid: str,
+        room_id: str,
+    ) -> bool:
         return True  # allow all invites
 
-    async def user_may_create_room(self, userid):
+    async def user_may_create_room(self, userid: str) -> bool:
         return True  # allow all room creations
 
-    async def user_may_create_room_alias(self, userid, room_alias):
+    async def user_may_create_room_alias(
+        self, userid: str, room_alias: RoomAlias
+    ) -> bool:
         return True  # allow all room aliases
 
-    async def user_may_publish_room(self, userid, room_id):
+    async def user_may_publish_room(self, userid: str, room_id: str) -> bool:
         return True  # allow publishing of all rooms
 
-    async def check_media_file_for_spam(self, file_wrapper, file_info) -> bool:
+    async def check_media_file_for_spam(
+        self, file_wrapper: ReadableFileWrapper, file_info: FileInfo
+    ) -> bool:
         buf = BytesIO()
         await file_wrapper.write_chunks_to(buf.write)
 
         return b"evil" in buf.getvalue()
 
 
-class SpamCheckerTestCase(unittest.HomeserverTestCase):
+class SpamCheckerTestCaseLegacy(unittest.HomeserverTestCase):
     servlets = [
         login.register_servlets,
         admin.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.user = self.register_user("user", "pass")
         self.tok = self.login("user", "pass")
 
@@ -586,14 +688,15 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
 
         load_legacy_spam_checkers(hs)
 
-    def default_config(self):
+    def default_config(self) -> Dict[str, Any]:
         config = default_config("test")
 
         config.update(
             {
                 "spam_checker": [
                     {
-                        "module": TestSpamChecker.__module__ + ".TestSpamChecker",
+                        "module": TestSpamCheckerLegacy.__module__
+                        + ".TestSpamCheckerLegacy",
                         "config": {},
                     }
                 ]
@@ -602,13 +705,13 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
 
         return config
 
-    def test_upload_innocent(self):
+    def test_upload_innocent(self) -> None:
         """Attempt to upload some innocent data that should be allowed."""
         self.helper.upload_media(
             self.upload_resource, SMALL_PNG, tok=self.tok, expect_code=200
         )
 
-    def test_upload_ban(self):
+    def test_upload_ban(self) -> None:
         """Attempt to upload some data that includes bytes "evil", which should
         get rejected by the spam checker.
         """
@@ -617,4 +720,63 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
 
         self.helper.upload_media(
             self.upload_resource, data, tok=self.tok, expect_code=400
+        )
+
+
+EVIL_DATA = b"Some evil data"
+EVIL_DATA_EXPERIMENT = b"Some evil data to trigger the experimental tuple API"
+
+
+class SpamCheckerTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        login.register_servlets,
+        admin.register_servlets,
+    ]
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        self.user = self.register_user("user", "pass")
+        self.tok = self.login("user", "pass")
+
+        # Allow for uploading and downloading to/from the media repo
+        self.media_repo = hs.get_media_repository_resource()
+        self.download_resource = self.media_repo.children[b"download"]
+        self.upload_resource = self.media_repo.children[b"upload"]
+
+        hs.get_module_api().register_spam_checker_callbacks(
+            check_media_file_for_spam=self.check_media_file_for_spam
+        )
+
+    async def check_media_file_for_spam(
+        self, file_wrapper: ReadableFileWrapper, file_info: FileInfo
+    ) -> Union[Codes, Literal["NOT_SPAM"]]:
+        buf = BytesIO()
+        await file_wrapper.write_chunks_to(buf.write)
+
+        if buf.getvalue() == EVIL_DATA:
+            return Codes.FORBIDDEN
+        elif buf.getvalue() == EVIL_DATA_EXPERIMENT:
+            return (Codes.FORBIDDEN, {})
+        else:
+            return "NOT_SPAM"
+
+    def test_upload_innocent(self) -> None:
+        """Attempt to upload some innocent data that should be allowed."""
+        self.helper.upload_media(
+            self.upload_resource, SMALL_PNG, tok=self.tok, expect_code=200
+        )
+
+    def test_upload_ban(self) -> None:
+        """Attempt to upload some data that includes bytes "evil", which should
+        get rejected by the spam checker.
+        """
+
+        self.helper.upload_media(
+            self.upload_resource, EVIL_DATA, tok=self.tok, expect_code=400
+        )
+
+        self.helper.upload_media(
+            self.upload_resource,
+            EVIL_DATA_EXPERIMENT,
+            tok=self.tok,
+            expect_code=400,
         )

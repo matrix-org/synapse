@@ -19,35 +19,39 @@ this document.
     packages](setup/installation.md#prebuilt-packages), you will need to follow the
     normal process for upgrading those packages.
 
+-   If Synapse was installed using pip then upgrade to the latest
+    version by running:
+
+    ```bash
+    pip install --upgrade matrix-synapse
+    ```
+
 -   If Synapse was installed from source, then:
 
-    1.  Activate the virtualenv before upgrading. For example, if
-        Synapse is installed in a virtualenv in `~/synapse/env` then
+    1.  Obtain the latest version of the source code. Git users can run
+        `git pull` to do this.
+
+    2.  If you're running Synapse in a virtualenv, make sure to activate it before
+        upgrading. For example, if Synapse is installed in a virtualenv in `~/synapse/env` then
         run:
 
         ```bash
         source ~/synapse/env/bin/activate
-        ```
-
-    2.  If Synapse was installed using pip then upgrade to the latest
-        version by running:
-
-        ```bash
-        pip install --upgrade matrix-synapse
-        ```
-
-        If Synapse was installed using git then upgrade to the latest
-        version by running:
-
-        ```bash
-        git pull
         pip install --upgrade .
         ```
+        Include any relevant extras between square brackets, e.g. `pip install --upgrade ".[postgres,oidc]"`.
 
-    3.  Restart Synapse:
+    3.  If you're using `poetry` to manage a Synapse installation, run:
+        ```bash
+        poetry install
+        ```
+        Include any relevant extras with `--extras`, e.g. `poetry install --extras postgres --extras oidc`.
+        It's probably easiest to run `poetry install --extras all`.
+
+    4.  Restart Synapse:
 
         ```bash
-        ./synctl restart
+        synctl restart
         ```
 
 To check whether your update was successful, you can check the running
@@ -84,6 +88,459 @@ process, for example:
     wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
+
+# Upgrading to v1.64.0
+
+## Deprecation of the ability to delegate e-mail verification to identity servers
+
+Synapse v1.66.0 will remove the ability to delegate the tasks of verifying email address ownership, and password reset confirmation, to an identity server.
+
+If you require your homeserver to verify e-mail addresses or to support password resets via e-mail, please configure your homeserver with SMTP access so that it can send e-mails on its own behalf.
+[Consult the configuration documentation for more information.](https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html#email)
+
+The option that will be removed is `account_threepid_delegates.email`.
+
+
+## Changes to the event replication streams
+
+Synapse now includes a flag indicating if an event is an outlier when
+replicating it to other workers. This is a forwards- and backwards-incompatible
+change: v1.63 and workers cannot process events replicated by v1.64 workers, and
+vice versa.
+
+Once all workers are upgraded to v1.64 (or downgraded to v1.63), event
+replication will resume as normal.
+
+## frozendict release
+
+[frozendict 2.3.3](https://github.com/Marco-Sulla/python-frozendict/releases/tag/v2.3.3)
+has recently been released, which fixes a memory leak that occurs during `/sync`
+requests. We advise server administrators who installed Synapse via pip to upgrade
+frozendict with `pip install --upgrade frozendict`. The Docker image
+`matrixdotorg/synapse` and the Debian packages from `packages.matrix.org` already
+include the updated library.
+
+# Upgrading to v1.62.0
+
+## New signatures for spam checker callbacks
+
+As a followup to changes in v1.60.0, the following spam-checker callbacks have changed signature:
+
+- `user_may_join_room`
+- `user_may_invite`
+- `user_may_send_3pid_invite`
+- `user_may_create_room`
+- `user_may_create_room_alias`
+- `user_may_publish_room`
+- `check_media_file_for_spam`
+
+For each of these methods, the previous callback signature has been deprecated.
+
+Whereas callbacks used to return `bool`, they should now return `Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes"]`.
+
+For instance, if your module implements `user_may_join_room` as follows:
+
+```python
+async def user_may_join_room(self, user_id: str, room_id: str, is_invited: bool)
+    if ...:
+        # Request is spam
+        return False
+    # Request is not spam
+    return True
+```
+
+you should rewrite it as follows:
+
+```python
+async def user_may_join_room(self, user_id: str, room_id: str, is_invited: bool)
+    if ...:
+        # Request is spam, mark it as forbidden (you may use some more precise error
+        # code if it is useful).
+        return synapse.module_api.errors.Codes.FORBIDDEN
+    # Request is not spam, mark it as such.
+    return synapse.module_api.NOT_SPAM
+```
+
+# Upgrading to v1.61.0
+
+## Removal of deprecated community/groups
+
+This release of Synapse will remove deprecated community/groups from codebase.
+
+### Worker endpoints
+
+For those who have deployed workers, following worker endpoints will no longer
+exist and they can be removed from the reverse proxy configuration:
+
+-   `^/_matrix/federation/v1/get_groups_publicised$`
+-   `^/_matrix/client/(r0|v3|unstable)/joined_groups$`
+-   `^/_matrix/client/(r0|v3|unstable)/publicised_groups$`
+-   `^/_matrix/client/(r0|v3|unstable)/publicised_groups/`
+-   `^/_matrix/federation/v1/groups/`
+-   `^/_matrix/client/(r0|v3|unstable)/groups/`
+
+# Upgrading to v1.60.0
+
+## Adding a new unique index to `state_group_edges` could fail if your database is corrupted
+
+This release of Synapse will add a unique index to the `state_group_edges` table, in order
+to prevent accidentally introducing duplicate information (for example, because a database
+backup was restored multiple times).
+
+Duplicate rows being present in this table could cause drastic performance problems; see
+[issue 11779](https://github.com/matrix-org/synapse/issues/11779) for more details.
+
+If your Synapse database already has had duplicate rows introduced into this table,
+this could fail, with either of these errors:
+
+
+**On Postgres:**
+```
+synapse.storage.background_updates - 623 - INFO - background_updates-0 - Adding index state_group_edges_unique_idx to state_group_edges
+synapse.storage.background_updates - 282 - ERROR - background_updates-0 - Error doing update
+...
+psycopg2.errors.UniqueViolation: could not create unique index "state_group_edges_unique_idx"
+DETAIL:  Key (state_group, prev_state_group)=(2, 1) is duplicated.
+```
+(The numbers may be different.)
+
+**On SQLite:**
+```
+synapse.storage.background_updates - 623 - INFO - background_updates-0 - Adding index state_group_edges_unique_idx to state_group_edges
+synapse.storage.background_updates - 282 - ERROR - background_updates-0 - Error doing update
+...
+sqlite3.IntegrityError: UNIQUE constraint failed: state_group_edges.state_group, state_group_edges.prev_state_group
+```
+
+
+<details>
+<summary><b>Expand this section for steps to resolve this problem</b></summary>
+
+### On Postgres
+
+Connect to your database with `psql`.
+
+```sql
+BEGIN;
+DELETE FROM state_group_edges WHERE (ctid, state_group, prev_state_group) IN (
+  SELECT row_id, state_group, prev_state_group
+  FROM (
+    SELECT
+      ctid AS row_id,
+      MIN(ctid) OVER (PARTITION BY state_group, prev_state_group) AS min_row_id,
+      state_group,
+      prev_state_group
+    FROM state_group_edges
+  ) AS t1
+  WHERE row_id <> min_row_id
+);
+COMMIT;
+```
+
+
+### On SQLite
+
+At the command-line, use `sqlite3 path/to/your-homeserver-database.db`:
+
+```sql
+BEGIN;
+DELETE FROM state_group_edges WHERE (rowid, state_group, prev_state_group) IN (
+  SELECT row_id, state_group, prev_state_group
+  FROM (
+    SELECT
+      rowid AS row_id,
+      MIN(rowid) OVER (PARTITION BY state_group, prev_state_group) AS min_row_id,
+      state_group,
+      prev_state_group
+    FROM state_group_edges
+  )
+  WHERE row_id <> min_row_id
+);
+COMMIT;
+```
+
+
+### For more details
+
+[This comment on issue 11779](https://github.com/matrix-org/synapse/issues/11779#issuecomment-1131545970)
+has queries that can be used to check a database for this problem in advance.
+
+</details>
+
+## New signature for the spam checker callback `check_event_for_spam`
+
+The previous signature has been deprecated.
+
+Whereas `check_event_for_spam` callbacks used to return `Union[str, bool]`, they should now return `Union["synapse.module_api.NOT_SPAM", "synapse.module_api.errors.Codes"]`.
+
+This is part of an ongoing refactoring of the SpamChecker API to make it less ambiguous and more powerful.
+
+If your module implements `check_event_for_spam` as follows:
+
+```python
+async def check_event_for_spam(event):
+    if ...:
+        # Event is spam
+        return True
+    # Event is not spam
+    return False
+```
+
+you should rewrite it as follows:
+
+```python
+async def check_event_for_spam(event):
+    if ...:
+        # Event is spam, mark it as forbidden (you may use some more precise error
+        # code if it is useful).
+        return synapse.module_api.errors.Codes.FORBIDDEN
+    # Event is not spam, mark it as such.
+    return synapse.module_api.NOT_SPAM
+```
+
+# Upgrading to v1.59.0
+
+## Device name lookup over federation has been disabled by default
+
+The names of user devices are no longer visible to users on other homeservers by default.
+Device IDs are unaffected, as these are necessary to facilitate end-to-end encryption.
+
+To re-enable this functionality, set the
+[`allow_device_name_lookup_over_federation`](https://matrix-org.github.io/synapse/v1.59/usage/configuration/config_documentation.html#federation)
+homeserver config option to `true`.
+
+
+## Deprecation of the `synapse.app.appservice` and `synapse.app.user_dir` worker application types
+
+The `synapse.app.appservice` worker application type allowed you to configure a
+single worker to use to notify application services of new events, as long
+as this functionality was disabled on the main process with `notify_appservices: False`.
+Further, the `synapse.app.user_dir` worker application type allowed you to configure
+a single worker to be responsible for updating the user directory, as long as this
+was disabled on the main process with `update_user_directory: False`.
+
+To unify Synapse's worker types, the `synapse.app.appservice` worker application
+type and the `notify_appservices` configuration option have been deprecated.
+The `synapse.app.user_dir` worker application type and `update_user_directory`
+configuration option have also been deprecated.
+
+To get the same functionality as was provided by the deprecated options, it's now recommended that the `synapse.app.generic_worker`
+worker application type is used and that the `notify_appservices_from_worker` and/or
+`update_user_directory_from_worker` options are set to the name of a worker.
+
+For the time being, the old options can be used alongside the new options to make
+it easier to transition between the two configurations, however please note that:
+
+- the options must not contradict each other (otherwise Synapse won't start); and
+- the `notify_appservices` and `update_user_directory` options will be removed in a future release of Synapse.
+
+Please see the [*Notifying Application Services*][v1_59_notify_ases_from] and
+[*Updating the User Directory*][v1_59_update_user_dir] sections of the worker
+documentation for more information.
+
+[v1_59_notify_ases_from]: workers.md#notifying-application-services
+[v1_59_update_user_dir]: workers.md#updating-the-user-directory
+
+
+# Upgrading to v1.58.0
+
+## Groups/communities feature has been disabled by default
+
+The non-standard groups/communities feature in Synapse has been disabled by default
+and will be removed in Synapse v1.61.0.
+
+
+# Upgrading to v1.57.0
+
+## Changes to database schema for application services
+
+Synapse v1.57.0 includes a [change](https://github.com/matrix-org/synapse/pull/12209) to the
+way transaction IDs are managed for application services. If your deployment uses a dedicated
+worker for application service traffic, **it must be stopped** when the database is upgraded
+(which normally happens when the main process is upgraded), to ensure the change is made safely
+without any risk of reusing transaction IDs.
+
+Deployments which do not use separate worker processes can be upgraded as normal. Similarly,
+deployments where no application services are in use can be upgraded as normal.
+
+<details>
+<summary><b>Recovering from an incorrect upgrade</b></summary>
+
+If the database schema is upgraded *without* stopping the worker responsible
+for AS traffic, then the following error may be given when attempting to start
+a Synapse worker or master process:
+
+```
+**********************************************************************************
+ Error during initialisation:
+
+ Postgres sequence 'application_services_txn_id_seq' is inconsistent with associated
+ table 'application_services_txns'. This can happen if Synapse has been downgraded and
+ then upgraded again, or due to a bad migration.
+
+ To fix this error, shut down Synapse (including any and all workers)
+ and run the following SQL:
+
+     SELECT setval('application_services_txn_id_seq', (
+         SELECT GREATEST(MAX(txn_id), 0) FROM application_services_txns
+     ));
+
+ See docs/postgres.md for more information.
+
+ There may be more information in the logs.
+**********************************************************************************
+```
+
+This error may also be seen if Synapse is *downgraded* to an earlier version,
+and then upgraded again to v1.57.0 or later.
+
+In either case:
+
+ 1. Ensure that the worker responsible for AS traffic is stopped.
+ 2. Run the SQL command given in the error message via `psql`.
+
+Synapse should then start correctly.
+</details>
+
+# Upgrading to v1.56.0
+
+## Open registration without verification is now disabled by default
+
+Synapse will refuse to start if registration is enabled without email, captcha, or token-based verification unless the new config
+flag `enable_registration_without_verification` is set to "true".
+
+## Groups/communities feature has been deprecated
+
+The non-standard groups/communities feature in Synapse has been deprecated and will
+be disabled by default in Synapse v1.58.0.
+
+You can test disabling it by adding the following to your homeserver configuration:
+
+```yaml
+experimental_features:
+  groups_enabled: false
+```
+
+## Change in behaviour for PostgreSQL databases with unsafe locale
+
+Synapse now refuses to start when using PostgreSQL with non-`C` values for `COLLATE` and
+`CTYPE` unless the config flag `allow_unsafe_locale`, found in the database section of
+the configuration file, is set to `true`. See the [PostgreSQL documentation](https://matrix-org.github.io/synapse/latest/postgres.html#fixing-incorrect-collate-or-ctype)
+for more information and instructions on how to fix a database with incorrect values.
+
+# Upgrading to v1.55.0
+
+## `synctl` script has been moved
+
+The `synctl` script
+[has been made](https://github.com/matrix-org/synapse/pull/12140) an
+[entry point](https://packaging.python.org/en/latest/specifications/entry-points/)
+and no longer exists at the root of Synapse's source tree. If you wish to use
+`synctl` to manage your homeserver, you should invoke `synctl` directly, e.g.
+`synctl start` instead of `./synctl start` or `/path/to/synctl start`.
+
+You will need to ensure `synctl` is on your `PATH`.
+  - This is automatically the case when using
+    [Debian packages](https://packages.matrix.org/debian/) or
+    [docker images](https://hub.docker.com/r/matrixdotorg/synapse)
+    provided by Matrix.org.
+  - When installing from a wheel, sdist, or PyPI, a `synctl` executable is added
+    to your Python installation's `bin`. This should be on your `PATH`
+    automatically, though you might need to activate a virtual environment
+    depending on how you installed Synapse.
+
+
+## Compatibility dropped for Mjolnir 1.3.1 and earlier
+
+Synapse v1.55.0 drops support for Mjolnir 1.3.1 and earlier.
+If you use the Mjolnir module to moderate your homeserver,
+please upgrade Mjolnir to version 1.3.2 or later before upgrading Synapse.
+
+
+# Upgrading to v1.54.0
+
+## Legacy structured logging configuration removal
+
+This release removes support for the `structured: true` logging configuration
+which was deprecated in Synapse v1.23.0. If your logging configuration contains
+`structured: true` then it should be modified based on the
+[structured logging documentation](https://matrix-org.github.io/synapse/v1.56/structured_logging.html#upgrading-from-legacy-structured-logging-configuration).
+
+# Upgrading to v1.53.0
+
+## Dropping support for `webclient` listeners and non-HTTP(S) `web_client_location`
+
+Per the deprecation notice in Synapse v1.51.0, listeners of type  `webclient`
+are no longer supported and configuring them is a now a configuration error.
+
+Configuring a non-HTTP(S) `web_client_location` configuration is is now a
+configuration error. Since the `webclient` listener is no longer supported, this
+setting only applies to the root path `/` of Synapse's web server and no longer
+the `/_matrix/client/` path.
+
+## Stablisation of MSC3231
+
+The unstable validity-check endpoint for the
+[Registration Tokens](https://spec.matrix.org/v1.2/client-server-api/#get_matrixclientv1registermloginregistration_tokenvalidity)
+feature has been stabilised and moved from:
+
+`/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity`
+
+to:
+
+`/_matrix/client/v1/register/m.login.registration_token/validity`
+
+Please update any relevant reverse proxy or firewall configurations appropriately.
+
+## Time-based cache expiry is now enabled by default
+
+Formerly, entries in the cache were not evicted regardless of whether they were accessed after storing.
+This behavior has now changed. By default entries in the cache are now evicted after 30m of not being accessed.
+To change the default behavior, go to the `caches` section of the config and change the `expire_caches` and
+`cache_entry_ttl` flags as necessary. Please note that these flags replace the `expiry_time` flag in the config.
+The `expiry_time` flag will still continue to work, but it has been deprecated and will be removed in the future.
+
+## Deprecation of `capability` `org.matrix.msc3283.*`
+
+The `capabilities` of MSC3283 from the REST API `/_matrix/client/r0/capabilities`
+becomes stable.
+
+The old `capabilities`
+- `org.matrix.msc3283.set_displayname`,
+- `org.matrix.msc3283.set_avatar_url` and
+- `org.matrix.msc3283.3pid_changes`
+
+are deprecated and scheduled to be removed in Synapse v1.54.0.
+
+The new `capabilities`
+- `m.set_displayname`,
+- `m.set_avatar_url` and
+- `m.3pid_changes`
+
+are now active by default.
+
+## Removal of `user_may_create_room_with_invites`
+
+As announced with the release of [Synapse 1.47.0](#deprecation-of-the-user_may_create_room_with_invites-module-callback),
+the deprecated `user_may_create_room_with_invites` module callback has been removed.
+
+Modules relying on it can instead implement [`user_may_invite`](https://matrix-org.github.io/synapse/latest/modules/spam_checker_callbacks.html#user_may_invite)
+and use the [`get_room_state`](https://github.com/matrix-org/synapse/blob/872f23b95fa980a61b0866c1475e84491991fa20/synapse/module_api/__init__.py#L869-L876)
+module API to infer whether the invite is happening while creating a room (see [this function](https://github.com/matrix-org/synapse-domain-rule-checker/blob/e7d092dd9f2a7f844928771dbfd9fd24c2332e48/synapse_domain_rule_checker/__init__.py#L56-L89)
+as an example). Alternately, modules can also implement [`on_create_room`](https://matrix-org.github.io/synapse/latest/modules/third_party_rules_callbacks.html#on_create_room).
+
+
+# Upgrading to v1.52.0
+
+## Twisted security release
+
+Note that [Twisted 22.1.0](https://github.com/twisted/twisted/releases/tag/twisted-22.1.0)
+has recently been released, which fixes a [security issue](https://github.com/twisted/twisted/security/advisories/GHSA-92x2-jw7w-xvvx)
+within the Twisted library. We do not believe Synapse is affected by this vulnerability,
+though we advise server administrators who installed Synapse via pip to upgrade Twisted
+with `pip install --upgrade Twisted treq` as a matter of good practice. The Docker image
+`matrixdotorg/synapse` and the Debian packages from `packages.matrix.org` are using the
+updated library.
 
 # Upgrading to v1.51.0
 
@@ -624,7 +1081,7 @@ lock down external access to the Admin API endpoints.
 This release deprecates use of the `structured: true` logging
 configuration for structured logging. If your logging configuration
 contains `structured: true` then it should be modified based on the
-[structured logging documentation](structured_logging.md).
+[structured logging documentation](https://matrix-org.github.io/synapse/v1.56/structured_logging.html#upgrading-from-legacy-structured-logging-configuration).
 
 The `structured` and `drains` logging options are now deprecated and
 should be replaced by standard logging configuration of `handlers` and
@@ -1129,8 +1586,7 @@ more details on upgrading your database.
 
 Synapse v1.0 is the first release to enforce validation of TLS
 certificates for the federation API. It is therefore essential that your
-certificates are correctly configured. See the
-[FAQ](MSC1711_certificates_FAQ.md) for more information.
+certificates are correctly configured.
 
 Note, v1.0 installations will also no longer be able to federate with
 servers that have not correctly configured their certificates.
@@ -1194,9 +1650,6 @@ Please be aware that, before Synapse v1.0 is released around March 2019,
 you will need to replace any self-signed certificates with those
 verified by a root CA. Information on how to do so can be found at the
 ACME docs.
-
-For more information on configuring TLS certificates see the
-[FAQ](MSC1711_certificates_FAQ.md).
 
 # Upgrading to v0.34.0
 

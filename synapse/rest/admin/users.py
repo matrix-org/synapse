@@ -66,7 +66,7 @@ class UsersRestServletV2(RestServlet):
     """
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
 
@@ -156,7 +156,7 @@ class UserRestServletV2(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_admin_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth_handler = hs.get_auth_handler()
         self.profile_handler = hs.get_profile_handler()
         self.set_password_handler = hs.get_set_password_handler()
@@ -225,6 +225,13 @@ class UserRestServletV2(RestServlet):
         if password is not None:
             if not isinstance(password, str) or len(password) > 512:
                 raise SynapseError(HTTPStatus.BAD_REQUEST, "Invalid password")
+
+        logout_devices = body.get("logout_devices", True)
+        if not isinstance(logout_devices, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "'logout_devices' parameter is not of type boolean",
+            )
 
         deactivate = body.get("deactivated", False)
         if not isinstance(deactivate, bool):
@@ -305,7 +312,6 @@ class UserRestServletV2(RestServlet):
                     await self.store.set_server_admin(target_user, set_admin_to)
 
             if password is not None:
-                logout_devices = True
                 new_password_hash = await self.auth_handler.hash(password)
 
                 await self.set_password_handler.set_password(
@@ -367,6 +373,7 @@ class UserRestServletV2(RestServlet):
                     if (
                         self.hs.config.email.email_enable_notifs
                         and self.hs.config.email.email_notif_for_new_users
+                        and medium == "email"
                     ):
                         await self.pusher_pool.add_pusher(
                             user_id=user_id,
@@ -588,7 +595,7 @@ class DeactivateAccountRestServlet(RestServlet):
         self._deactivate_account_handler = hs.get_deactivate_account_handler()
         self.auth = hs.get_auth()
         self.is_mine = hs.is_mine
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_POST(
         self, request: SynapseRequest, target_user_id: str
@@ -674,7 +681,7 @@ class ResetPasswordRestServlet(RestServlet):
     PATTERNS = admin_patterns("/reset_password/(?P<target_user_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self._set_password_handler = hs.get_set_password_handler()
@@ -717,7 +724,7 @@ class SearchUsersRestServlet(RestServlet):
     PATTERNS = admin_patterns("/search_users/(?P<target_user_id>[^/]*)$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.is_mine = hs.is_mine
 
@@ -775,7 +782,7 @@ class UserAdminServlet(RestServlet):
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/admin$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.is_mine = hs.is_mine
 
@@ -835,7 +842,7 @@ class UserMembershipRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self.is_mine = hs.is_mine
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
@@ -864,7 +871,7 @@ class PushersRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self.is_mine = hs.is_mine
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_GET(
@@ -905,7 +912,7 @@ class UserTokenRestServlet(RestServlet):
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/login$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.is_mine_id = hs.is_mine_id
@@ -974,7 +981,7 @@ class ShadowBanRestServlet(RestServlet):
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/shadow_ban$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.is_mine_id = hs.is_mine_id
 
@@ -1026,7 +1033,7 @@ class RateLimitRestServlet(RestServlet):
     PATTERNS = admin_patterns("/users/(?P<user_id>[^/]*)/override_ratelimit$")
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
         self.is_mine_id = hs.is_mine_id
 
@@ -1129,7 +1136,7 @@ class AccountDataRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self._auth = hs.get_auth()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
         self._is_mine_id = hs.is_mine_id
 
     async def on_GET(

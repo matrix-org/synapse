@@ -52,11 +52,13 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
             )
         )[0]["room_id"]
 
-        self.store = self.homeserver.get_datastore()
+        self.store = self.homeserver.get_datastores().main
 
         # Figure out what the most recent event is
         most_recent = self.get_success(
-            self.homeserver.get_datastore().get_latest_event_ids_in_room(self.room_id)
+            self.homeserver.get_datastores().main.get_latest_event_ids_in_room(
+                self.room_id
+            )
         )[0]
 
         join_event = make_event_from_dict(
@@ -79,12 +81,8 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         self.handler = self.homeserver.get_federation_handler()
         federation_event_handler = self.homeserver.get_federation_event_handler()
 
-        async def _check_event_auth(
-            origin,
-            event,
-            context,
-        ):
-            return context
+        async def _check_event_auth(origin, event, context):
+            pass
 
         federation_event_handler._check_event_auth = _check_event_auth
         self.client = self.homeserver.get_federation_client()
@@ -185,7 +183,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
 
         # Register a mock on the store so that the incoming update doesn't fail because
         # we don't share a room with the user.
-        store = self.homeserver.get_datastore()
+        store = self.homeserver.get_datastores().main
         store.get_rooms_for_user = Mock(return_value=make_awaitable(["!someroom:test"]))
 
         # Manually inject a fake device list update. We need this update to include at
@@ -231,7 +229,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         # Register mock device list retrieval on the federation client.
         federation_client = self.homeserver.get_federation_client()
         federation_client.query_user_devices = Mock(
-            return_value=succeed(
+            return_value=make_awaitable(
                 {
                     "user_id": remote_user_id,
                     "stream_id": 1,

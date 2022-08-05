@@ -13,9 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any, Optional
+
 import attr
 
-from synapse.python_dependencies import DependencyException, check_requirements
+from synapse.types import JsonDict
+from synapse.util.check_dependencies import check_requirements
 
 from ._base import Config, ConfigError
 
@@ -37,7 +40,7 @@ class MetricsFlags:
 class MetricsConfig(Config):
     section = "metrics"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.enable_metrics = config.get("enable_metrics", False)
         self.report_stats = config.get("report_stats", None)
         self.report_stats_endpoint = config.get(
@@ -54,12 +57,7 @@ class MetricsConfig(Config):
 
         self.sentry_enabled = "sentry" in config
         if self.sentry_enabled:
-            try:
-                check_requirements("sentry")
-            except DependencyException as e:
-                raise ConfigError(
-                    e.message  # noqa: B306, DependencyException.message is a property
-                )
+            check_requirements("sentry")
 
             self.sentry_dsn = config["sentry"].get("dsn")
             if not self.sentry_dsn:
@@ -67,47 +65,11 @@ class MetricsConfig(Config):
                     "sentry.dsn field is required when sentry integration is enabled"
                 )
 
-    def generate_config_section(self, report_stats=None, **kwargs):
-        res = """\
-        ## Metrics ###
-
-        # Enable collection and rendering of performance metrics
-        #
-        #enable_metrics: false
-
-        # Enable sentry integration
-        # NOTE: While attempts are made to ensure that the logs don't contain
-        # any sensitive information, this cannot be guaranteed. By enabling
-        # this option the sentry server may therefore receive sensitive
-        # information, and it in turn may then diseminate sensitive information
-        # through insecure notification channels if so configured.
-        #
-        #sentry:
-        #    dsn: "..."
-
-        # Flags to enable Prometheus metrics which are not suitable to be
-        # enabled by default, either for performance reasons or limited use.
-        #
-        metrics_flags:
-            # Publish synapse_federation_known_servers, a gauge of the number of
-            # servers this homeserver knows about, including itself. May cause
-            # performance problems on large homeservers.
-            #
-            #known_servers: true
-
-        # Whether or not to report anonymized homeserver usage statistics.
-        #
-        """
-
-        if report_stats is None:
-            res += "#report_stats: true|false\n"
+    def generate_config_section(
+        self, report_stats: Optional[bool] = None, **kwargs: Any
+    ) -> str:
+        if report_stats is not None:
+            res = "report_stats: %s\n" % ("true" if report_stats else "false")
         else:
-            res += "report_stats: %s\n" % ("true" if report_stats else "false")
-
-        res += """
-        # The endpoint to report the anonymized homeserver usage statistics to.
-        # Defaults to https://matrix.org/report-usage-stats/push
-        #
-        #report_stats_endpoint: https://example.com/report-usage-stats/push
-        """
+            res = "\n"
         return res

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """ This module contains REST servlets to do with profile: /profile/<paths> """
-
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import Codes, SynapseError
@@ -45,8 +45,12 @@ class ProfileDisplaynameRestServlet(RestServlet):
             requester = await self.auth.get_user_by_req(request)
             requester_user = requester.user
 
-        user = UserID.from_string(user_id)
+        if not UserID.is_valid(user_id):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "Invalid user id", Codes.INVALID_PARAM
+            )
 
+        user = UserID.from_string(user_id)
         await self.profile_handler.check_profile_query_allowed(user, requester_user)
 
         displayname = await self.profile_handler.get_displayname(user)
@@ -98,8 +102,12 @@ class ProfileAvatarURLRestServlet(RestServlet):
             requester = await self.auth.get_user_by_req(request)
             requester_user = requester.user
 
-        user = UserID.from_string(user_id)
+        if not UserID.is_valid(user_id):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "Invalid user id", Codes.INVALID_PARAM
+            )
 
+        user = UserID.from_string(user_id)
         await self.profile_handler.check_profile_query_allowed(user, requester_user)
 
         avatar_url = await self.profile_handler.get_avatar_url(user)
@@ -150,8 +158,12 @@ class ProfileRestServlet(RestServlet):
             requester = await self.auth.get_user_by_req(request)
             requester_user = requester.user
 
-        user = UserID.from_string(user_id)
+        if not UserID.is_valid(user_id):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST, "Invalid user id", Codes.INVALID_PARAM
+            )
 
+        user = UserID.from_string(user_id)
         await self.profile_handler.check_profile_query_allowed(user, requester_user)
 
         displayname = await self.profile_handler.get_displayname(user)

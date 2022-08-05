@@ -19,7 +19,7 @@ from prometheus_client import Counter
 from twisted.internet import defer
 
 import synapse
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EduTypes, EventTypes
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
 from synapse.handlers.presence import format_user_presence_state
@@ -33,7 +33,14 @@ from synapse.metrics.background_process_metrics import (
     wrap_as_background_process,
 )
 from synapse.storage.databases.main.directory import RoomAliasMapping
-from synapse.types import JsonDict, RoomAlias, RoomStreamToken, UserID
+from synapse.types import (
+    DeviceListUpdates,
+    JsonDict,
+    RoomAlias,
+    RoomStreamToken,
+    StreamKeyType,
+    UserID,
+)
 from synapse.util.async_helpers import Linearizer
 from synapse.util.metrics import Measure
 
@@ -47,16 +54,19 @@ events_processed_counter = Counter("synapse_handlers_appservice_events_processed
 
 class ApplicationServicesHandler:
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.is_mine_id = hs.is_mine_id
         self.appservice_api = hs.get_application_service_api()
         self.scheduler = hs.get_application_service_scheduler()
         self.started_scheduler = False
         self.clock = hs.get_clock()
-        self.notify_appservices = hs.config.appservice.notify_appservices
+        self.notify_appservices = hs.config.worker.should_notify_appservices
         self.event_sources = hs.get_event_sources()
         self._msc2409_to_device_messages_enabled = (
             hs.config.experimental.msc2409_to_device_messages_enabled
+        )
+        self._msc3202_transaction_extensions_enabled = (
+            hs.config.experimental.msc3202_transaction_extensions
         )
 
         self.current_max = 0
@@ -94,14 +104,15 @@ class ApplicationServicesHandler:
         with Measure(self.clock, "notify_interested_services"):
             self.is_processing = True
             try:
-                limit = 100
                 upper_bound = -1
                 while upper_bound < self.current_max:
+                    last_token = await self.store.get_appservice_last_pos()
                     (
                         upper_bound,
                         events,
-                    ) = await self.store.get_new_events_for_appservice(
-                        self.current_max, limit
+                        event_to_received_ts,
+                    ) = await self.store.get_all_new_events_stream(
+                        last_token, self.current_max, limit=100, get_prev_content=True
                     )
 
                     events_by_room: Dict[str, List[EventBase]] = {}
@@ -140,7 +151,7 @@ class ApplicationServicesHandler:
                             )
 
                         now = self.clock.time_msec()
-                        ts = await self.store.get_received_ts(event.event_id)
+                        ts = event_to_received_ts[event.event_id]
                         assert ts is not None
 
                         synapse.metrics.event_processing_lag_by_event.labels(
@@ -177,7 +188,7 @@ class ApplicationServicesHandler:
 
                     if events:
                         now = self.clock.time_msec()
-                        ts = await self.store.get_received_ts(events[-1].event_id)
+                        ts = event_to_received_ts[events[-1].event_id]
                         assert ts is not None
 
                         synapse.metrics.event_processing_lag.labels(
@@ -204,9 +215,9 @@ class ApplicationServicesHandler:
         Args:
             stream_key: The stream the event came from.
 
-                `stream_key` can be "typing_key", "receipt_key", "presence_key" or
-                "to_device_key". Any other value for `stream_key` will cause this function
-                to return early.
+                `stream_key` can be StreamKeyType.TYPING, StreamKeyType.RECEIPT, StreamKeyType.PRESENCE,
+                StreamKeyType.TO_DEVICE or StreamKeyType.DEVICE_LIST. Any other value for `stream_key`
+                will cause this function to return early.
 
                 Ephemeral events will only be pushed to appservices that have opted into
                 receiving them by setting `push_ephemeral` to true in their registration
@@ -226,10 +237,11 @@ class ApplicationServicesHandler:
         # Only the following streams are currently supported.
         # FIXME: We should use constants for these values.
         if stream_key not in (
-            "typing_key",
-            "receipt_key",
-            "presence_key",
-            "to_device_key",
+            StreamKeyType.TYPING,
+            StreamKeyType.RECEIPT,
+            StreamKeyType.PRESENCE,
+            StreamKeyType.TO_DEVICE,
+            StreamKeyType.DEVICE_LIST,
         ):
             return
 
@@ -248,8 +260,15 @@ class ApplicationServicesHandler:
 
         # Ignore to-device messages if the feature flag is not enabled
         if (
-            stream_key == "to_device_key"
+            stream_key == StreamKeyType.TO_DEVICE
             and not self._msc2409_to_device_messages_enabled
+        ):
+            return
+
+        # Ignore device lists if the feature flag is not enabled
+        if (
+            stream_key == StreamKeyType.DEVICE_LIST
+            and not self._msc3202_transaction_extensions_enabled
         ):
             return
 
@@ -258,10 +277,25 @@ class ApplicationServicesHandler:
         #
         # Note that whether these events are actually relevant to these appservices
         # is decided later on.
+        services = self.store.get_app_services()
         services = [
             service
-            for service in self.store.get_app_services()
-            if service.supports_ephemeral
+            for service in services
+            # Different stream keys require different support booleans
+            if (
+                stream_key
+                in (
+                    StreamKeyType.TYPING,
+                    StreamKeyType.RECEIPT,
+                    StreamKeyType.PRESENCE,
+                    StreamKeyType.TO_DEVICE,
+                )
+                and service.supports_ephemeral
+            )
+            or (
+                stream_key == StreamKeyType.DEVICE_LIST
+                and service.msc3202_transaction_extensions
+            )
         ]
         if not services:
             # Bail out early if none of the target appservices have explicitly registered
@@ -285,7 +319,7 @@ class ApplicationServicesHandler:
         logger.debug("Checking interested services for %s", stream_key)
         with Measure(self.clock, "notify_interested_services_ephemeral"):
             for service in services:
-                if stream_key == "typing_key":
+                if stream_key == StreamKeyType.TYPING:
                     # Note that we don't persist the token (via set_appservice_stream_type_pos)
                     # for typing_key due to performance reasons and due to their highly
                     # ephemeral nature.
@@ -298,12 +332,10 @@ class ApplicationServicesHandler:
                     continue
 
                 # Since we read/update the stream position for this AS/stream
-                with (
-                    await self._ephemeral_events_linearizer.queue(
-                        (service.id, stream_key)
-                    )
+                async with self._ephemeral_events_linearizer.queue(
+                    (service.id, stream_key)
                 ):
-                    if stream_key == "receipt_key":
+                    if stream_key == StreamKeyType.RECEIPT:
                         events = await self._handle_receipts(service, new_token)
                         self.scheduler.enqueue_for_appservice(service, ephemeral=events)
 
@@ -312,7 +344,7 @@ class ApplicationServicesHandler:
                             service, "read_receipt", new_token
                         )
 
-                    elif stream_key == "presence_key":
+                    elif stream_key == StreamKeyType.PRESENCE:
                         events = await self._handle_presence(service, users, new_token)
                         self.scheduler.enqueue_for_appservice(service, ephemeral=events)
 
@@ -321,7 +353,7 @@ class ApplicationServicesHandler:
                             service, "presence", new_token
                         )
 
-                    elif stream_key == "to_device_key":
+                    elif stream_key == StreamKeyType.TO_DEVICE:
                         # Retrieve a list of to-device message events, as well as the
                         # maximum stream token of the messages we were able to retrieve.
                         to_device_messages = await self._get_to_device_messages(
@@ -334,6 +366,20 @@ class ApplicationServicesHandler:
                         # Persist the latest handled stream token for this appservice
                         await self.store.set_appservice_stream_type_pos(
                             service, "to_device", new_token
+                        )
+
+                    elif stream_key == StreamKeyType.DEVICE_LIST:
+                        device_list_summary = await self._get_device_list_summary(
+                            service, new_token
+                        )
+                        if device_list_summary:
+                            self.scheduler.enqueue_for_appservice(
+                                service, device_list_summary=device_list_summary
+                            )
+
+                        # Persist the latest handled stream token for this appservice
+                        await self.store.set_appservice_stream_type_pos(
+                            service, "device_list", new_token
                         )
 
     async def _handle_typing(
@@ -372,7 +418,7 @@ class ApplicationServicesHandler:
         return typing
 
     async def _handle_receipts(
-        self, service: ApplicationService, new_token: Optional[int]
+        self, service: ApplicationService, new_token: int
     ) -> List[JsonDict]:
         """
         Return the latest read receipts that the given application service should receive.
@@ -403,7 +449,7 @@ class ApplicationServicesHandler:
 
         receipts_source = self.event_sources.sources.receipt
         receipts, _ = await receipts_source.get_new_events_as(
-            service=service, from_key=from_key
+            service=service, from_key=from_key, to_key=new_token
         )
         return receipts
 
@@ -458,7 +504,7 @@ class ApplicationServicesHandler:
             time_now = self.clock.time_msec()
             events.extend(
                 {
-                    "type": "m.presence",
+                    "type": EduTypes.PRESENCE,
                     "sender": event.user_id,
                     "content": format_user_presence_state(
                         event, time_now, include_user_id=False
@@ -542,6 +588,96 @@ class ApplicationServicesHandler:
 
         return message_payload
 
+    async def _get_device_list_summary(
+        self,
+        appservice: ApplicationService,
+        new_key: int,
+    ) -> DeviceListUpdates:
+        """
+        Retrieve a list of users who have changed their device lists.
+
+        Args:
+            appservice: The application service to retrieve device list changes for.
+            new_key: The stream key of the device list change that triggered this method call.
+
+        Returns:
+            A set of device list updates, comprised of users that the appservices needs to:
+                * resync the device list of, and
+                * stop tracking the device list of.
+        """
+        # Fetch the last successfully processed device list update stream ID
+        # for this appservice.
+        from_key = await self.store.get_type_stream_id_for_appservice(
+            appservice, "device_list"
+        )
+
+        # Fetch the users who have modified their device list since then.
+        users_with_changed_device_lists = (
+            await self.store.get_users_whose_devices_changed(from_key, to_key=new_key)
+        )
+
+        # Filter out any users the application service is not interested in
+        #
+        # For each user who changed their device list, we want to check whether this
+        # appservice would be interested in the change.
+        filtered_users_with_changed_device_lists = {
+            user_id
+            for user_id in users_with_changed_device_lists
+            if await self._is_appservice_interested_in_device_lists_of_user(
+                appservice, user_id
+            )
+        }
+
+        # Create a summary of "changed" and "left" users.
+        # TODO: Calculate "left" users.
+        device_list_summary = DeviceListUpdates(
+            changed=filtered_users_with_changed_device_lists
+        )
+
+        return device_list_summary
+
+    async def _is_appservice_interested_in_device_lists_of_user(
+        self,
+        appservice: ApplicationService,
+        user_id: str,
+    ) -> bool:
+        """
+        Returns whether a given application service is interested in the device list
+        updates of a given user.
+
+        The application service is interested in the user's device list updates if any
+        of the following are true:
+            * The user is the appservice's sender localpart user.
+            * The user is in the appservice's user namespace.
+            * At least one member of one room that the user is a part of is in the
+              appservice's user namespace.
+            * The appservice is explicitly (via room ID or alias) interested in at
+              least one room that the user is in.
+
+        Args:
+            appservice: The application service to gauge interest of.
+            user_id: The ID of the user whose device list interest is in question.
+
+        Returns:
+            True if the application service is interested in the user's device lists, False
+            otherwise.
+        """
+        # This method checks against both the sender localpart user as well as if the
+        # user is in the appservice's user namespace.
+        if appservice.is_interested_in_user(user_id):
+            return True
+
+        # Determine whether any of the rooms the user is in justifies sending this
+        # device list update to the application service.
+        room_ids = await self.store.get_rooms_for_user(user_id)
+        for room_id in room_ids:
+            # This method covers checking room members for appservice interest as well as
+            # room ID and alias checks.
+            if await appservice.is_interested_in_room(room_id, self.store):
+                return True
+
+        return False
+
     async def query_user_exists(self, user_id: str) -> bool:
         """Check if any application service knows this user_id exists.
 
@@ -571,7 +707,7 @@ class ApplicationServicesHandler:
         room_alias_str = room_alias.to_string()
         services = self.store.get_app_services()
         alias_query_services = [
-            s for s in services if (s.is_interested_in_alias(room_alias_str))
+            s for s in services if (s.is_room_alias_in_namespace(room_alias_str))
         ]
         for alias_service in alias_query_services:
             is_known_alias = await self.appservice_api.query_alias(
@@ -649,7 +785,7 @@ class ApplicationServicesHandler:
         """Retrieve a list of application services interested in this event.
 
         Args:
-            event: The event to check. Can be None if alias_list is not.
+            event: The event to check.
         Returns:
             A list of services interested in this event based on the service regex.
         """
@@ -660,7 +796,7 @@ class ApplicationServicesHandler:
         # inside of a list comprehension anymore.
         interested_list = []
         for s in services:
-            if await s.is_interested(event, self.store):
+            if await s.is_interested_in_event(event.event_id, event, self.store):
                 interested_list.append(s)
 
         return interested_list

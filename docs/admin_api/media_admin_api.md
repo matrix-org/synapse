@@ -2,6 +2,9 @@
 
 These APIs allow extracting media information from the homeserver.
 
+Details about the format of the `media_id` and storage of the media in the file system
+are documented under [media repository](../media_repository.md).
+
 To use it, you will need to authenticate by providing an `access_token`
 for a server admin: see [Admin API](../usage/administration/admin_api).
 
@@ -286,7 +289,7 @@ POST /_synapse/admin/v1/purge_media_cache?before_ts=<unix_timestamp_in_ms>
 
 URL Parameters
 
-* `unix_timestamp_in_ms`: string representing a positive integer - Unix timestamp in milliseconds.
+* `before_ts`: string representing a positive integer - Unix timestamp in milliseconds.
 All cached media that was last accessed before this timestamp will be removed.
 
 Response:

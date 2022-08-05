@@ -1,0 +1,1 @@
+Rename class `RateLimitConfig` to `RatelimitSettings` and `FederationRateLimitConfig` to `FederationRatelimitSettings`.

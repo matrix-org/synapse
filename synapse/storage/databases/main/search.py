@@ -14,7 +14,7 @@
 
 import logging
 import re
-from typing import TYPE_CHECKING, Collection, Iterable, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Collection, Iterable, List, Optional, Set, Tuple
 
 import attr
 
@@ -27,7 +27,8 @@ from synapse.storage.database import (
     LoggingTransaction,
 )
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
+from synapse.types import JsonDict
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -73,7 +74,7 @@ class SearchWorkerStore(SQLBaseStore):
                 " VALUES (?,?,?,to_tsvector('english', ?),?,?)"
             )
 
-            args = (
+            args1 = (
                 (
                     entry.event_id,
                     entry.room_id,
@@ -85,14 +86,14 @@ class SearchWorkerStore(SQLBaseStore):
                 for entry in entries
             )
 
-            txn.execute_batch(sql, args)
+            txn.execute_batch(sql, args1)
 
         elif isinstance(self.database_engine, Sqlite3Engine):
             sql = (
                 "INSERT INTO event_search (event_id, room_id, key, value)"
                 " VALUES (?,?,?,?)"
             )
-            args = (
+            args2 = (
                 (
                     entry.event_id,
                     entry.room_id,
@@ -101,7 +102,7 @@ class SearchWorkerStore(SQLBaseStore):
                 )
                 for entry in entries
             )
-            txn.execute_batch(sql, args)
+            txn.execute_batch(sql, args2)
 
         else:
             # This should be unreachable.
@@ -112,8 +113,8 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
     EVENT_SEARCH_UPDATE_NAME = "event_search"
     EVENT_SEARCH_ORDER_UPDATE_NAME = "event_search_order"
-    EVENT_SEARCH_USE_GIST_POSTGRES_NAME = "event_search_postgres_gist"
     EVENT_SEARCH_USE_GIN_POSTGRES_NAME = "event_search_postgres_gin"
+    EVENT_SEARCH_DELETE_NON_STRINGS = "event_search_sqlite_delete_non_strings"
 
     def __init__(
         self,
@@ -123,9 +124,6 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
     ):
         super().__init__(database, db_conn, hs)
 
-        if not hs.config.server.enable_search:
-            return
-
         self.db_pool.updates.register_background_update_handler(
             self.EVENT_SEARCH_UPDATE_NAME, self._background_reindex_search
         )
@@ -133,20 +131,17 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
             self.EVENT_SEARCH_ORDER_UPDATE_NAME, self._background_reindex_search_order
         )
 
-        # we used to have a background update to turn the GIN index into a
-        # GIST one; we no longer do that (obviously) because we actually want
-        # a GIN index. However, it's possible that some people might still have
-        # the background update queued, so we register a handler to clear the
-        # background update.
-        self.db_pool.updates.register_noop_background_update(
-            self.EVENT_SEARCH_USE_GIST_POSTGRES_NAME
-        )
-
         self.db_pool.updates.register_background_update_handler(
             self.EVENT_SEARCH_USE_GIN_POSTGRES_NAME, self._background_reindex_gin_search
         )
 
-    async def _background_reindex_search(self, progress, batch_size):
+        self.db_pool.updates.register_background_update_handler(
+            self.EVENT_SEARCH_DELETE_NON_STRINGS, self._background_delete_non_strings
+        )
+
+    async def _background_reindex_search(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
         # we work through the events table from highest stream id to lowest
         target_min_stream_id = progress["target_min_stream_id_inclusive"]
         max_stream_id = progress["max_stream_id_exclusive"]
@@ -154,7 +149,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
         TYPES = ["m.room.name", "m.room.message", "m.room.topic"]
 
-        def reindex_search_txn(txn):
+        def reindex_search_txn(txn: LoggingTransaction) -> int:
             sql = (
                 "SELECT stream_ordering, event_id, room_id, type, json, "
                 " origin_server_ts FROM events"
@@ -237,9 +232,13 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
             return len(event_search_rows)
 
-        result = await self.db_pool.runInteraction(
-            self.EVENT_SEARCH_UPDATE_NAME, reindex_search_txn
-        )
+        if self.hs.config.server.enable_search:
+            result = await self.db_pool.runInteraction(
+                self.EVENT_SEARCH_UPDATE_NAME, reindex_search_txn
+            )
+        else:
+            # Don't index anything if search is not enabled.
+            result = 0
 
         if not result:
             await self.db_pool.updates._end_background_update(
@@ -248,12 +247,14 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
         return result
 
-    async def _background_reindex_gin_search(self, progress, batch_size):
+    async def _background_reindex_gin_search(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
         """This handles old synapses which used GIST indexes, if any;
         converting them back to be GIN as per the actual schema.
         """
 
-        def create_index(conn):
+        def create_index(conn: LoggingDatabaseConnection) -> None:
             conn.rollback()
 
             # we have to set autocommit, because postgres refuses to
@@ -292,7 +293,9 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
         )
         return 1
 
-    async def _background_reindex_search_order(self, progress, batch_size):
+    async def _background_reindex_search_order(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
         target_min_stream_id = progress["target_min_stream_id_inclusive"]
         max_stream_id = progress["max_stream_id_exclusive"]
         rows_inserted = progress.get("rows_inserted", 0)
@@ -300,7 +303,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
         if not have_added_index:
 
-            def create_index(conn):
+            def create_index(conn: LoggingDatabaseConnection) -> None:
                 conn.rollback()
                 conn.set_session(autocommit=True)
                 c = conn.cursor()
@@ -329,7 +332,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
                 pg,
             )
 
-        def reindex_search_txn(txn):
+        def reindex_search_txn(txn: LoggingTransaction) -> Tuple[int, bool]:
             sql = (
                 "UPDATE event_search AS es SET stream_ordering = e.stream_ordering,"
                 " origin_server_ts = e.origin_server_ts"
@@ -371,6 +374,27 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
 
         return num_rows
 
+    async def _background_delete_non_strings(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """Deletes rows with non-string `value`s from `event_search` if using sqlite.
+
+        Prior to Synapse 1.44.0, malformed events received over federation could cause integers
+        to be inserted into the `event_search` table when using sqlite.
+        """
+
+        def delete_non_strings_txn(txn: LoggingTransaction) -> None:
+            txn.execute("DELETE FROM event_search WHERE typeof(value) != 'text'")
+
+        await self.db_pool.runInteraction(
+            self.EVENT_SEARCH_DELETE_NON_STRINGS, delete_non_strings_txn
+        )
+
+        await self.db_pool.updates._end_background_update(
+            self.EVENT_SEARCH_DELETE_NON_STRINGS
+        )
+        return 1
+
 
 class SearchStore(SearchBackgroundUpdateStore):
     def __init__(
@@ -381,23 +405,25 @@ class SearchStore(SearchBackgroundUpdateStore):
     ):
         super().__init__(database, db_conn, hs)
 
-    async def search_msgs(self, room_ids, search_term, keys):
+    async def search_msgs(
+        self, room_ids: Collection[str], search_term: str, keys: Iterable[str]
+    ) -> JsonDict:
         """Performs a full text search over events with given keys.
 
         Args:
-            room_ids (list): List of room ids to search in
-            search_term (str): Search term to search for
-            keys (list): List of keys to search in, currently supports
+            room_ids: List of room ids to search in
+            search_term: Search term to search for
+            keys: List of keys to search in, currently supports
                 "content.body", "content.name", "content.topic"
 
         Returns:
-            list of dicts
+            Dictionary of results
         """
         clauses = []
 
         search_query = _parse_query(self.database_engine, search_term)
 
-        args = []
+        args: List[Any] = []
 
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
@@ -464,11 +490,11 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         results = list(filter(lambda row: row["room_id"] in room_ids, results))
 
-        # We set redact_behaviour to BLOCK here to prevent redacted events being returned in
+        # We set redact_behaviour to block here to prevent redacted events being returned in
         # search results (which is a data leak)
-        events = await self.get_events_as_list(
+        events = await self.get_events_as_list(  # type: ignore[attr-defined]
             [r["event_id"] for r in results],
-            redact_behaviour=EventRedactBehaviour.BLOCK,
+            redact_behaviour=EventRedactBehaviour.block,
         )
 
         event_map = {ev.event_id: ev for ev in events}
@@ -499,10 +525,10 @@ class SearchStore(SearchBackgroundUpdateStore):
         self,
         room_ids: Collection[str],
         search_term: str,
-        keys: List[str],
-        limit,
+        keys: Iterable[str],
+        limit: int,
         pagination_token: Optional[str] = None,
-    ) -> List[dict]:
+    ) -> JsonDict:
         """Performs a full text search over events with given keys.
 
         Args:
@@ -519,7 +545,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         search_query = _parse_query(self.database_engine, search_term)
 
-        args = []
+        args: List[Any] = []
 
         # Make sure we don't explode because the person is in too many rooms.
         # We filter the results below regardless.
@@ -543,9 +569,9 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         if pagination_token:
             try:
-                origin_server_ts, stream = pagination_token.split(",")
-                origin_server_ts = int(origin_server_ts)
-                stream = int(stream)
+                origin_server_ts_str, stream_str = pagination_token.split(",")
+                origin_server_ts = int(origin_server_ts_str)
+                stream = int(stream_str)
             except Exception:
                 raise SynapseError(400, "Invalid pagination token")
 
@@ -614,7 +640,8 @@ class SearchStore(SearchBackgroundUpdateStore):
         else:
             raise Exception("Unrecognized database engine")
 
-        args.append(limit)
+        # mypy expects to append only a `str`, not an `int`
+        args.append(limit)  # type: ignore[arg-type]
 
         results = await self.db_pool.execute(
             "search_rooms", self.db_pool.cursor_to_dict, sql, *args
@@ -622,11 +649,11 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         results = list(filter(lambda row: row["room_id"] in room_ids, results))
 
-        # We set redact_behaviour to BLOCK here to prevent redacted events being returned in
+        # We set redact_behaviour to block here to prevent redacted events being returned in
         # search results (which is a data leak)
-        events = await self.get_events_as_list(
+        events = await self.get_events_as_list(  # type: ignore[attr-defined]
             [r["event_id"] for r in results],
-            redact_behaviour=EventRedactBehaviour.BLOCK,
+            redact_behaviour=EventRedactBehaviour.block,
         )
 
         event_map = {ev.event_id: ev for ev in events}
@@ -675,7 +702,7 @@ class SearchStore(SearchBackgroundUpdateStore):
             A set of strings.
         """
 
-        def f(txn):
+        def f(txn: LoggingTransaction) -> Set[str]:
             highlight_words = set()
             for event in events:
                 # As a hack we simply join values of all possible keys. This is
@@ -729,11 +756,11 @@ class SearchStore(SearchBackgroundUpdateStore):
         return await self.db_pool.runInteraction("_find_highlights", f)
 
 
-def _to_postgres_options(options_dict):
+def _to_postgres_options(options_dict: JsonDict) -> str:
     return "'%s'" % (",".join("%s=%s" % (k, v) for k, v in options_dict.items()),)
 
 
-def _parse_query(database_engine, search_term):
+def _parse_query(database_engine: BaseDatabaseEngine, search_term: str) -> str:
     """Takes a plain unicode string from the user and converts it into a form
     that can be passed to database.
     We use this so that we can add prefix matching, which isn't something

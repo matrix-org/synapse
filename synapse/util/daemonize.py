@@ -20,7 +20,7 @@ import os
 import signal
 import sys
 from types import FrameType, TracebackType
-from typing import NoReturn, Type
+from typing import NoReturn, Optional, Type
 
 
 def daemonize_process(pid_file: str, logger: logging.Logger, chdir: str = "/") -> None:
@@ -100,7 +100,9 @@ def daemonize_process(pid_file: str, logger: logging.Logger, chdir: str = "/") -
     # also catch any other uncaught exceptions before we get that far.)
 
     def excepthook(
-        type_: Type[BaseException], value: BaseException, traceback: TracebackType
+        type_: Type[BaseException],
+        value: BaseException,
+        traceback: Optional[TracebackType],
     ) -> None:
         logger.critical("Unhanded exception", exc_info=(type_, value, traceback))
 
@@ -123,7 +125,7 @@ def daemonize_process(pid_file: str, logger: logging.Logger, chdir: str = "/") -
         sys.exit(1)
 
     # write a log line on SIGTERM.
-    def sigterm(signum: signal.Signals, frame: FrameType) -> NoReturn:
+    def sigterm(signum: int, frame: Optional[FrameType]) -> NoReturn:
         logger.warning("Caught signal %s. Stopping daemon." % signum)
         sys.exit(0)
 

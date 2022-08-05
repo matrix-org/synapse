@@ -21,7 +21,7 @@ from parameterized import parameterized
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, Membership, RoomTypes
 from synapse.api.errors import Codes
 from synapse.handlers.pagination import PaginationHandler
 from synapse.rest.client import directory, events, login, room
@@ -50,7 +50,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         consent_uri_builder.build_user_consent_uri.return_value = "http://example.com"
         self.event_creation_handler._consent_uri_builder = consent_uri_builder
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -465,7 +465,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         consent_uri_builder.build_user_consent_uri.return_value = "http://example.com"
         self.event_creation_handler._consent_uri_builder = consent_uri_builder
 
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -1130,6 +1130,8 @@ class RoomTestCase(unittest.HomeserverTestCase):
             self.assertIn("guest_access", r)
             self.assertIn("history_visibility", r)
             self.assertIn("state_events", r)
+            self.assertIn("room_type", r)
+            self.assertIsNone(r["room_type"])
 
         # Check that the correct number of total rooms was returned
         self.assertEqual(channel.json_body["total_rooms"], total_rooms)
@@ -1229,7 +1231,11 @@ class RoomTestCase(unittest.HomeserverTestCase):
     def test_correct_room_attributes(self) -> None:
         """Test the correct attributes for a room are returned"""
         # Create a test room
-        room_id = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+        room_id = self.helper.create_room_as(
+            self.admin_user,
+            tok=self.admin_user_tok,
+            extra_content={"creation_content": {"type": RoomTypes.SPACE}},
+        )
 
         test_alias = "#test:test"
         test_room_name = "something"
@@ -1306,6 +1312,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(room_id, r["room_id"])
         self.assertEqual(test_room_name, r["name"])
         self.assertEqual(test_alias, r["canonical_alias"])
+        self.assertEqual(RoomTypes.SPACE, r["room_type"])
 
     def test_room_list_sort_order(self) -> None:
         """Test room list sort ordering. alphabetical name versus number of members,
@@ -1579,8 +1586,8 @@ class RoomTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
-        self.assertEqual(room_id, channel.json_body.get("rooms")[0].get("room_id"))
-        self.assertEqual("ж", channel.json_body.get("rooms")[0].get("name"))
+        self.assertEqual(room_id, channel.json_body["rooms"][0].get("room_id"))
+        self.assertEqual("ж", channel.json_body["rooms"][0].get("name"))
 
     def test_single_room(self) -> None:
         """Test that a single room can be requested correctly"""
@@ -1630,7 +1637,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertIn("guest_access", channel.json_body)
         self.assertIn("history_visibility", channel.json_body)
         self.assertIn("state_events", channel.json_body)
-
+        self.assertIn("room_type", channel.json_body)
         self.assertEqual(room_id_1, channel.json_body["room_id"])
 
     def test_single_room_devices(self) -> None:
@@ -1765,6 +1772,21 @@ class RoomTestCase(unittest.HomeserverTestCase):
             tok=admin_user_tok,
         )
 
+    def test_get_joined_members_after_leave_room(self) -> None:
+        """Test that requesting room members after leaving the room raises a 403 error."""
+
+        # create the room
+        user = self.register_user("foo", "pass")
+        user_tok = self.login("foo", "pass")
+        room_id = self.helper.create_room_as(user, tok=user_tok)
+        self.helper.leave(room_id, user, tok=user_tok)
+
+        # delete the rooms and get joined roomed membership
+        url = f"/_matrix/client/r0/rooms/{room_id}/joined_members"
+        channel = self.make_request("GET", url.encode("ascii"), access_token=user_tok)
+        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
 
 class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
 
@@ -1866,7 +1888,10 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
-        self.assertEqual("No known servers", channel.json_body["error"])
+        self.assertEqual(
+            "Can't join remote room because no servers that are in the room have been provided.",
+            channel.json_body["error"],
+        )
 
     def test_room_is_not_valid(self) -> None:
         """
@@ -1909,7 +1934,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/joined_rooms",
             access_token=self.second_tok,
         )
-        self.assertEquals(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(self.public_room_id, channel.json_body["joined_rooms"][0])
 
     def test_join_private_room_if_not_member(self) -> None:
@@ -1957,7 +1982,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/joined_rooms",
             access_token=self.admin_user_tok,
         )
-        self.assertEquals(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
 
         # Join user to room.
@@ -1980,7 +2005,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/joined_rooms",
             access_token=self.second_tok,
         )
-        self.assertEquals(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
 
     def test_join_private_room_if_owner(self) -> None:
@@ -2010,7 +2035,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             "/_matrix/client/r0/joined_rooms",
             access_token=self.second_tok,
         )
-        self.assertEquals(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
         self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
 
     def test_context_as_non_admin(self) -> None:
@@ -2044,7 +2069,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
                 % (room_id, events[midway]["event_id"]),
                 access_token=tok,
             )
-            self.assertEquals(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+            self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
             self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_context_as_admin(self) -> None:
@@ -2074,8 +2099,8 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             % (room_id, events[midway]["event_id"]),
             access_token=self.admin_user_tok,
         )
-        self.assertEquals(HTTPStatus.OK, channel.code, msg=channel.json_body)
-        self.assertEquals(
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(
             channel.json_body["event"]["event_id"], events[midway]["event_id"]
         )
 
@@ -2239,7 +2264,7 @@ class BlockRoomTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -2467,7 +2492,6 @@ PURGE_TABLES = [
     "event_push_actions",
     "event_search",
     "events",
-    "group_rooms",
     "receipts_graph",
     "receipts_linearized",
     "room_aliases",
@@ -2484,9 +2508,9 @@ PURGE_TABLES = [
     "e2e_room_keys",
     "event_push_summary",
     "pusher_throttle",
-    "group_summary_rooms",
     "room_account_data",
     "room_tags",
     # "state_groups",  # Current impl leaves orphaned state groups around.
     "state_groups_state",
+    "federation_inbound_events_staging",
 ]

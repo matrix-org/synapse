@@ -16,7 +16,7 @@
 import logging
 from enum import Enum
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union, cast
 
 from typing_extensions import Counter
 
@@ -108,7 +108,7 @@ class StatsStore(StateDeltasStore):
     ):
         super().__init__(database, db_conn, hs)
 
-        self.server_name = hs.hostname
+        self.server_name: str = hs.hostname
         self.clock = self.hs.get_clock()
         self.stats_enabled = hs.config.stats.stats_enabled
 
@@ -120,11 +120,6 @@ class StatsStore(StateDeltasStore):
         self.db_pool.updates.register_background_update_handler(
             "populate_stats_process_users", self._populate_stats_process_users
         )
-        # we no longer need to perform clean-up, but we will give ourselves
-        # the potential to reintroduce it in the future – so documentation
-        # will still encourage the use of this no-op handler.
-        self.db_pool.updates.register_noop_background_update("populate_stats_cleanup")
-        self.db_pool.updates.register_noop_background_update("populate_stats_prepare")
 
     async def _populate_stats_process_users(
         self, progress: JsonDict, batch_size: int
@@ -243,6 +238,7 @@ class StatsStore(StateDeltasStore):
         * avatar
         * canonical_alias
         * guest_access
+        * room_type
 
         A is_federatable key can also be included with a boolean value.
 
@@ -268,6 +264,7 @@ class StatsStore(StateDeltasStore):
             "avatar",
             "canonical_alias",
             "guest_access",
+            "room_type",
         ):
             field = fields.get(col, sentinel)
             if field is not sentinel and (not isinstance(field, str) or "\0" in field):
@@ -300,6 +297,7 @@ class StatsStore(StateDeltasStore):
             keyvalues={id_col: id},
             retcol="completed_delta_stream_id",
             allow_none=True,
+            desc="get_earliest_token_for_stats",
         )
 
     async def bulk_update_stats_delta(
@@ -576,7 +574,7 @@ class StatsStore(StateDeltasStore):
 
         state_event_map = await self.get_events(event_ids, get_prev_content=False)  # type: ignore[attr-defined]
 
-        room_state = {
+        room_state: Dict[str, Union[None, bool, str]] = {
             "join_rules": None,
             "history_visibility": None,
             "encryption": None,
@@ -585,6 +583,7 @@ class StatsStore(StateDeltasStore):
             "avatar": None,
             "canonical_alias": None,
             "is_federatable": True,
+            "room_type": None,
         }
 
         for event in state_event_map.values():
@@ -608,6 +607,9 @@ class StatsStore(StateDeltasStore):
                 room_state["is_federatable"] = (
                     event.content.get(EventContentFields.FEDERATE, True) is True
                 )
+                room_type = event.content.get(EventContentFields.ROOM_TYPE)
+                if isinstance(room_type, str):
+                    room_state["room_type"] = room_type
 
         await self.update_room_state(room_id, room_state)
 

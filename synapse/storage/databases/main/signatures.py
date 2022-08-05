@@ -26,7 +26,7 @@ from synapse.util.caches.descriptors import cached, cachedList
 
 class SignatureWorkerStore(EventsWorkerStore):
     @cached()
-    def get_event_reference_hash(self, event_id):
+    def get_event_reference_hash(self, event_id: str) -> Dict[str, Dict[str, bytes]]:
         # This is a dummy function to allow get_event_reference_hashes
         # to use its cache
         raise NotImplementedError()
@@ -48,7 +48,7 @@ class SignatureWorkerStore(EventsWorkerStore):
         """
         events = await self.get_events(
             event_ids,
-            redact_behaviour=EventRedactBehaviour.AS_IS,
+            redact_behaviour=EventRedactBehaviour.as_is,
             allow_rejected=True,
         )
 

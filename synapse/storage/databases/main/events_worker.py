@@ -14,6 +14,8 @@
 
 import logging
 import threading
+import weakref
+from enum import Enum, auto
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -22,7 +24,7 @@ from typing import (
     Dict,
     Iterable,
     List,
-    NoReturn,
+    MutableMapping,
     Optional,
     Set,
     Tuple,
@@ -31,7 +33,6 @@ from typing import (
 )
 
 import attr
-from constantly import NamedConstant, Names
 from prometheus_client import Gauge
 from typing_extensions import Literal
 
@@ -76,9 +77,9 @@ from synapse.storage.util.id_generators import (
 from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import JsonDict, get_domain_from_id
 from synapse.util import unwrapFirstError
-from synapse.util.async_helpers import ObservableDeferred
+from synapse.util.async_helpers import ObservableDeferred, delay_cancellation
 from synapse.util.caches.descriptors import cached, cachedList
-from synapse.util.caches.lrucache import LruCache
+from synapse.util.caches.lrucache import AsyncLruCache
 from synapse.util.iterutils import batch_iter
 from synapse.util.metrics import Measure
 
@@ -151,14 +152,14 @@ class _EventRow:
     outlier: bool
 
 
-class EventRedactBehaviour(Names):
+class EventRedactBehaviour(Enum):
     """
     What to do when retrieving a redacted event from the database.
     """
 
-    AS_IS = NamedConstant()
-    REDACT = NamedConstant()
-    BLOCK = NamedConstant()
+    as_is = auto()
+    redact = auto()
+    block = auto()
 
 
 class EventsWorkerStore(SQLBaseStore):
@@ -237,7 +238,9 @@ class EventsWorkerStore(SQLBaseStore):
                 5 * 60 * 1000,
             )
 
-        self._get_event_cache: LruCache[Tuple[str], EventCacheEntry] = LruCache(
+        self._get_event_cache: AsyncLruCache[
+            Tuple[str], EventCacheEntry
+        ] = AsyncLruCache(
             cache_name="*getEvent*",
             max_size=hs.config.caches.event_cache_size,
         )
@@ -248,6 +251,12 @@ class EventsWorkerStore(SQLBaseStore):
         self._current_event_fetches: Dict[
             str, ObservableDeferred[Dict[str, EventCacheEntry]]
         ] = {}
+
+        # We keep track of the events we have currently loaded in memory so that
+        # we can reuse them even if they've been evicted from the cache. We only
+        # track events that don't need redacting in here (as then we don't need
+        # to track redaction status).
+        self._event_ref: MutableMapping[str, EventBase] = weakref.WeakValueDictionary()
 
         self._event_fetch_lock = threading.Condition()
         self._event_fetch_list: List[
@@ -285,24 +294,23 @@ class EventsWorkerStore(SQLBaseStore):
 
         super().process_replication_rows(stream_name, instance_name, token, rows)
 
-    async def get_received_ts(self, event_id: str) -> Optional[int]:
-        """Get received_ts (when it was persisted) for the event.
-
-        Raises an exception for unknown events.
+    async def have_censored_event(self, event_id: str) -> bool:
+        """Check if an event has been censored, i.e. if the content of the event has been erased
+        from the database due to a redaction.
 
         Args:
-            event_id: The event ID to query.
+            event_id: The event ID that was redacted.
 
         Returns:
-            Timestamp in milliseconds, or None for events that were persisted
-            before received_ts was implemented.
+            True if the event has been censored, False otherwise.
         """
-        return await self.db_pool.simple_select_one_onecol(
-            table="events",
-            keyvalues={"event_id": event_id},
-            retcol="received_ts",
-            desc="get_received_ts",
+        censored_redactions_list = await self.db_pool.simple_select_onecol(
+            table="redactions",
+            keyvalues={"redacts": event_id},
+            retcol="have_censored",
+            desc="get_have_censored",
         )
+        return any(censored_redactions_list)
 
     # Inform mypy that if allow_none is False (the default) then get_event
     # always returns an EventBase.
@@ -310,7 +318,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_event(
         self,
         event_id: str,
-        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.REDACT,
+        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.redact,
         get_prev_content: bool = ...,
         allow_rejected: bool = ...,
         allow_none: Literal[False] = ...,
@@ -322,7 +330,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_event(
         self,
         event_id: str,
-        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.REDACT,
+        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.redact,
         get_prev_content: bool = ...,
         allow_rejected: bool = ...,
         allow_none: Literal[True] = ...,
@@ -333,7 +341,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_event(
         self,
         event_id: str,
-        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.REDACT,
+        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.redact,
         get_prev_content: bool = False,
         allow_rejected: bool = False,
         allow_none: bool = False,
@@ -345,9 +353,9 @@ class EventsWorkerStore(SQLBaseStore):
             event_id: The event_id of the event to fetch
 
             redact_behaviour: Determine what to do with a redacted event. Possible values:
-                * AS_IS - Return the full event body with no redacted content
-                * REDACT - Return the event but with a redacted body
-                * DISALLOW - Do not return redacted events (behave as per allow_none
+                * as_is - Return the full event body with no redacted content
+                * redact - Return the event but with a redacted body
+                * block - Do not return redacted events (behave as per allow_none
                     if the event is redacted)
 
             get_prev_content: If True and event is a state event,
@@ -389,7 +397,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_events(
         self,
         event_ids: Collection[str],
-        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.REDACT,
+        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.redact,
         get_prev_content: bool = False,
         allow_rejected: bool = False,
     ) -> Dict[str, EventBase]:
@@ -400,15 +408,15 @@ class EventsWorkerStore(SQLBaseStore):
 
             redact_behaviour: Determine what to do with a redacted event. Possible
                 values:
-                * AS_IS - Return the full event body with no redacted content
-                * REDACT - Return the event but with a redacted body
-                * DISALLOW - Do not return redacted events (omit them from the response)
+                * as_is - Return the full event body with no redacted content
+                * redact - Return the event but with a redacted body
+                * block - Do not return redacted events (omit them from the response)
 
             get_prev_content: If True and event is a state event,
                 include the previous states content in the unsigned field.
 
             allow_rejected: If True, return rejected events. Otherwise,
-                omits rejeted events from the response.
+                omits rejected events from the response.
 
         Returns:
             A mapping from event_id to event.
@@ -425,7 +433,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_events_as_list(
         self,
         event_ids: Collection[str],
-        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.REDACT,
+        redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.redact,
         get_prev_content: bool = False,
         allow_rejected: bool = False,
     ) -> List[EventBase]:
@@ -438,9 +446,9 @@ class EventsWorkerStore(SQLBaseStore):
             event_ids: The event_ids of the events to fetch
 
             redact_behaviour: Determine what to do with a redacted event. Possible values:
-                * AS_IS - Return the full event body with no redacted content
-                * REDACT - Return the event but with a redacted body
-                * DISALLOW - Do not return redacted events (omit them from the response)
+                * as_is - Return the full event body with no redacted content
+                * redact - Return the event but with a redacted body
+                * block - Do not return redacted events (omit them from the response)
 
             get_prev_content: If True and event is a state event,
                 include the previous states content in the unsigned field.
@@ -551,10 +559,10 @@ class EventsWorkerStore(SQLBaseStore):
             event = entry.event
 
             if entry.redacted_event:
-                if redact_behaviour == EventRedactBehaviour.BLOCK:
+                if redact_behaviour == EventRedactBehaviour.block:
                     # Skip this event
                     continue
-                elif redact_behaviour == EventRedactBehaviour.REDACT:
+                elif redact_behaviour == EventRedactBehaviour.redact:
                     event = entry.redacted_event
 
             events.append(event)
@@ -592,7 +600,11 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             map from event id to result
         """
-        event_entry_map = self._get_events_from_cache(
+        # Shortcut: check if we have any events in the *in memory* cache - this function
+        # may be called repeatedly for the same event so at this point we cannot reach
+        # out to any external cache for performance reasons. The external cache is
+        # checked later on in the `get_missing_events_from_cache_or_db` function below.
+        event_entry_map = self._get_events_from_local_cache(
             event_ids,
         )
 
@@ -623,42 +635,67 @@ class EventsWorkerStore(SQLBaseStore):
         missing_events_ids.difference_update(already_fetching_ids)
 
         if missing_events_ids:
-            log_ctx = current_context()
-            log_ctx.record_event_fetch(len(missing_events_ids))
 
-            # Add entries to `self._current_event_fetches` for each event we're
-            # going to pull from the DB. We use a single deferred that resolves
-            # to all the events we pulled from the DB (this will result in this
-            # function returning more events than requested, but that can happen
-            # already due to `_get_events_from_db`).
-            fetching_deferred: ObservableDeferred[
-                Dict[str, EventCacheEntry]
-            ] = ObservableDeferred(defer.Deferred(), consumeErrors=True)
-            for event_id in missing_events_ids:
-                self._current_event_fetches[event_id] = fetching_deferred
+            async def get_missing_events_from_cache_or_db() -> Dict[
+                str, EventCacheEntry
+            ]:
+                """Fetches the events in `missing_event_ids` from the database.
 
-            # Note that _get_events_from_db is also responsible for turning db rows
-            # into FrozenEvents (via _get_event_from_row), which involves seeing if
-            # the events have been redacted, and if so pulling the redaction event out
-            # of the database to check it.
-            #
-            try:
-                missing_events = await self._get_events_from_db(
-                    missing_events_ids,
-                )
+                Also creates entries in `self._current_event_fetches` to allow
+                concurrent `_get_events_from_cache_or_db` calls to reuse the same fetch.
+                """
+                log_ctx = current_context()
+                log_ctx.record_event_fetch(len(missing_events_ids))
 
-                event_entry_map.update(missing_events)
-            except Exception as e:
-                with PreserveLoggingContext():
-                    fetching_deferred.errback(e)
-                raise e
-            finally:
-                # Ensure that we mark these events as no longer being fetched.
+                # Add entries to `self._current_event_fetches` for each event we're
+                # going to pull from the DB. We use a single deferred that resolves
+                # to all the events we pulled from the DB (this will result in this
+                # function returning more events than requested, but that can happen
+                # already due to `_get_events_from_db`).
+                fetching_deferred: ObservableDeferred[
+                    Dict[str, EventCacheEntry]
+                ] = ObservableDeferred(defer.Deferred(), consumeErrors=True)
                 for event_id in missing_events_ids:
-                    self._current_event_fetches.pop(event_id, None)
+                    self._current_event_fetches[event_id] = fetching_deferred
 
-            with PreserveLoggingContext():
-                fetching_deferred.callback(missing_events)
+                # Note that _get_events_from_db is also responsible for turning db rows
+                # into FrozenEvents (via _get_event_from_row), which involves seeing if
+                # the events have been redacted, and if so pulling the redaction event
+                # out of the database to check it.
+                #
+                missing_events = {}
+                try:
+                    # Try to fetch from any external cache. We already checked the
+                    # in-memory cache above.
+                    missing_events = await self._get_events_from_external_cache(
+                        missing_events_ids,
+                    )
+                    # Now actually fetch any remaining events from the DB
+                    db_missing_events = await self._get_events_from_db(
+                        missing_events_ids - missing_events.keys(),
+                    )
+                    missing_events.update(db_missing_events)
+                except Exception as e:
+                    with PreserveLoggingContext():
+                        fetching_deferred.errback(e)
+                    raise e
+                finally:
+                    # Ensure that we mark these events as no longer being fetched.
+                    for event_id in missing_events_ids:
+                        self._current_event_fetches.pop(event_id, None)
+
+                with PreserveLoggingContext():
+                    fetching_deferred.callback(missing_events)
+
+                return missing_events
+
+            # We must allow the database fetch to complete in the presence of
+            # cancellations, since multiple `_get_events_from_cache_or_db` calls can
+            # reuse the same fetch.
+            missing_events: Dict[str, EventCacheEntry] = await delay_cancellation(
+                get_missing_events_from_cache_or_db()
+            )
+            event_entry_map.update(missing_events)
 
         if already_fetching_deferreds:
             # Wait for the other event requests to finish and add their results
@@ -689,13 +726,74 @@ class EventsWorkerStore(SQLBaseStore):
 
         return event_entry_map
 
-    def _invalidate_get_event_cache(self, event_id: str) -> None:
-        self._get_event_cache.invalidate((event_id,))
+    def invalidate_get_event_cache_after_txn(
+        self, txn: LoggingTransaction, event_id: str
+    ) -> None:
+        """
+        Prepares a database transaction to invalidate the get event cache for a given
+        event ID when executed successfully. This is achieved by attaching two callbacks
+        to the transaction, one to invalidate the async cache and one for the in memory
+        sync cache (importantly called in that order).
 
-    def _get_events_from_cache(
+        Arguments:
+            txn: the database transaction to attach the callbacks to
+            event_id: the event ID to be invalidated from caches
+        """
+
+        txn.async_call_after(self._invalidate_async_get_event_cache, event_id)
+        txn.call_after(self._invalidate_local_get_event_cache, event_id)
+
+    async def _invalidate_async_get_event_cache(self, event_id: str) -> None:
+        """
+        Invalidates an event in the asyncronous get event cache, which may be remote.
+
+        Arguments:
+            event_id: the event ID to invalidate
+        """
+
+        await self._get_event_cache.invalidate((event_id,))
+
+    def _invalidate_local_get_event_cache(self, event_id: str) -> None:
+        """
+        Invalidates an event in local in-memory get event caches.
+
+        Arguments:
+            event_id: the event ID to invalidate
+        """
+
+        self._get_event_cache.invalidate_local((event_id,))
+        self._event_ref.pop(event_id, None)
+        self._current_event_fetches.pop(event_id, None)
+
+    async def _get_events_from_cache(
         self, events: Iterable[str], update_metrics: bool = True
     ) -> Dict[str, EventCacheEntry]:
-        """Fetch events from the caches.
+        """Fetch events from the caches, both in memory and any external.
+
+        May return rejected events.
+
+        Args:
+            events: list of event_ids to fetch
+            update_metrics: Whether to update the cache hit ratio metrics
+        """
+        event_map = self._get_events_from_local_cache(
+            events, update_metrics=update_metrics
+        )
+
+        missing_event_ids = (e for e in events if e not in event_map)
+        event_map.update(
+            await self._get_events_from_external_cache(
+                events=missing_event_ids,
+                update_metrics=update_metrics,
+            )
+        )
+
+        return event_map
+
+    async def _get_events_from_external_cache(
+        self, events: Iterable[str], update_metrics: bool = True
+    ) -> Dict[str, EventCacheEntry]:
+        """Fetch events from any configured external cache.
 
         May return rejected events.
 
@@ -706,13 +804,52 @@ class EventsWorkerStore(SQLBaseStore):
         event_map = {}
 
         for event_id in events:
-            ret = self._get_event_cache.get(
+            ret = await self._get_event_cache.get_external(
                 (event_id,), None, update_metrics=update_metrics
             )
-            if not ret:
+            if ret:
+                event_map[event_id] = ret
+
+        return event_map
+
+    def _get_events_from_local_cache(
+        self, events: Iterable[str], update_metrics: bool = True
+    ) -> Dict[str, EventCacheEntry]:
+        """Fetch events from the local, in memory, caches.
+
+        May return rejected events.
+
+        Args:
+            events: list of event_ids to fetch
+            update_metrics: Whether to update the cache hit ratio metrics
+        """
+        event_map = {}
+
+        for event_id in events:
+            # First check if it's in the event cache
+            ret = self._get_event_cache.get_local(
+                (event_id,), None, update_metrics=update_metrics
+            )
+            if ret:
+                event_map[event_id] = ret
                 continue
 
-            event_map[event_id] = ret
+            # Otherwise check if we still have the event in memory.
+            event = self._event_ref.get(event_id)
+            if event:
+                # Reconstruct an event cache entry
+
+                cache_entry = EventCacheEntry(
+                    event=event,
+                    # We don't cache weakrefs to redacted events, so we know
+                    # this is None.
+                    redacted_event=None,
+                )
+                event_map[event_id] = cache_entry
+
+                # We add the entry back into the cache as we want to keep
+                # recently queried events in the cache.
+                self._get_event_cache.set_local((event_id,), cache_entry)
 
         return event_map
 
@@ -906,7 +1043,13 @@ class EventsWorkerStore(SQLBaseStore):
                 }
 
                 row_dict = self.db_pool.new_transaction(
-                    conn, "do_fetch", [], [], self._fetch_event_rows, events_to_fetch
+                    conn,
+                    "do_fetch",
+                    [],
+                    [],
+                    [],
+                    self._fetch_event_rows,
+                    events_to_fetch,
                 )
 
                 # We only want to resolve deferreds from the main thread
@@ -1062,6 +1205,18 @@ class EventsWorkerStore(SQLBaseStore):
             original_ev.internal_metadata.stream_ordering = row.stream_ordering
             original_ev.internal_metadata.outlier = row.outlier
 
+            # Consistency check: if the content of the event has been modified in the
+            # database, then the calculated event ID will not match the event id in the
+            # database.
+            if original_ev.event_id != event_id:
+                # it's difficult to see what to do here. Pretty much all bets are off
+                # if Synapse cannot rely on the consistency of its database.
+                raise RuntimeError(
+                    f"Database corruption: Event {event_id} in room {d['room_id']} "
+                    f"from the database appears to have been modified (calculated "
+                    f"event id {original_ev.event_id})"
+                )
+
             event_map[event_id] = original_ev
 
         # finally, we can decide whether each one needs redacting, and build
@@ -1077,8 +1232,12 @@ class EventsWorkerStore(SQLBaseStore):
                 event=original_ev, redacted_event=redacted_event
             )
 
-            self._get_event_cache.set((event_id,), cache_entry)
+            await self._get_event_cache.set((event_id,), cache_entry)
             result_map[event_id] = cache_entry
+
+            if not redacted_event:
+                # We only cache references to unredacted events.
+                self._event_ref[event_id] = original_ev
 
         return result_map
 
@@ -1281,14 +1440,23 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             The set of events we have already seen.
         """
-        res = await self._have_seen_events_dict(
-            (room_id, event_id) for event_id in event_ids
-        )
-        return {eid for ((_rid, eid), have_event) in res.items() if have_event}
 
-    @cachedList("have_seen_event", "keys")
+        # @cachedList chomps lots of memory if you call it with a big list, so
+        # we break it down. However, each batch requires its own index scan, so we make
+        # the batches as big as possible.
+
+        results: Set[str] = set()
+        for chunk in batch_iter(event_ids, 500):
+            r = await self._have_seen_events_dict(
+                [(room_id, event_id) for event_id in chunk]
+            )
+            results.update(eid for ((_rid, eid), have_event) in r.items() if have_event)
+
+        return results
+
+    @cachedList(cached_method_name="have_seen_event", list_name="keys")
     async def _have_seen_events_dict(
-        self, keys: Iterable[Tuple[str, str]]
+        self, keys: Collection[Tuple[str, str]]
     ) -> Dict[Tuple[str, str], bool]:
         """Helper for have_seen_events
 
@@ -1298,13 +1466,16 @@ class EventsWorkerStore(SQLBaseStore):
         # if the event cache contains the event, obviously we've seen it.
 
         cache_results = {
-            (rid, eid) for (rid, eid) in keys if self._get_event_cache.contains((eid,))
+            (rid, eid)
+            for (rid, eid) in keys
+            if await self._get_event_cache.contains((eid,))
         }
-        results = {x: True for x in cache_results}
+        results = dict.fromkeys(cache_results, True)
+        remaining = [k for k in keys if k not in cache_results]
+        if not remaining:
+            return results
 
-        def have_seen_events_txn(
-            txn: LoggingTransaction, chunk: Tuple[Tuple[str, str], ...]
-        ) -> None:
+        def have_seen_events_txn(txn: LoggingTransaction) -> None:
             # we deliberately do *not* query the database for room_id, to make the
             # query an index-only lookup on `events_event_id_key`.
             #
@@ -1312,28 +1483,23 @@ class EventsWorkerStore(SQLBaseStore):
 
             sql = "SELECT event_id FROM events AS e WHERE "
             clause, args = make_in_list_sql_clause(
-                txn.database_engine, "e.event_id", [eid for (_rid, eid) in chunk]
+                txn.database_engine, "e.event_id", [eid for (_rid, eid) in remaining]
             )
             txn.execute(sql + clause, args)
             found_events = {eid for eid, in txn}
 
-            # ... and then we can update the results for each row in the batch
-            results.update({(rid, eid): (eid in found_events) for (rid, eid) in chunk})
-
-        # each batch requires its own index scan, so we make the batches as big as
-        # possible.
-        for chunk in batch_iter((k for k in keys if k not in cache_results), 500):
-            await self.db_pool.runInteraction(
-                "have_seen_events", have_seen_events_txn, chunk
+            # ... and then we can update the results for each key
+            results.update(
+                {(rid, eid): (eid in found_events) for (rid, eid) in remaining}
             )
 
+        await self.db_pool.runInteraction("have_seen_events", have_seen_events_txn)
         return results
 
     @cached(max_entries=100000, tree=True)
-    async def have_seen_event(self, room_id: str, event_id: str) -> NoReturn:
-        # this only exists for the benefit of the @cachedList descriptor on
-        # _have_seen_events_dict
-        raise NotImplementedError()
+    async def have_seen_event(self, room_id: str, event_id: str) -> bool:
+        res = await self._have_seen_events_dict(((room_id, event_id),))
+        return res[(room_id, event_id)]
 
     def _get_current_state_event_counts_txn(
         self, txn: LoggingTransaction, room_id: str
@@ -1385,7 +1551,7 @@ class EventsWorkerStore(SQLBaseStore):
 
     async def get_all_new_forward_event_rows(
         self, instance_name: str, last_id: int, current_id: int, limit: int
-    ) -> List[Tuple[int, str, str, str, str, str, str, str, str]]:
+    ) -> List[Tuple[int, str, str, str, str, str, str, str, bool, bool]]:
         """Returns new events, for the Events replication stream
 
         Args:
@@ -1401,10 +1567,11 @@ class EventsWorkerStore(SQLBaseStore):
 
         def get_all_new_forward_event_rows(
             txn: LoggingTransaction,
-        ) -> List[Tuple[int, str, str, str, str, str, str, str, str]]:
+        ) -> List[Tuple[int, str, str, str, str, str, str, str, bool, bool]]:
             sql = (
                 "SELECT e.stream_ordering, e.event_id, e.room_id, e.type,"
-                " se.state_key, redacts, relates_to_id, membership, rejections.reason IS NOT NULL"
+                " se.state_key, redacts, relates_to_id, membership, rejections.reason IS NOT NULL,"
+                " e.outlier"
                 " FROM events AS e"
                 " LEFT JOIN redactions USING (event_id)"
                 " LEFT JOIN state_events AS se USING (event_id)"
@@ -1418,7 +1585,8 @@ class EventsWorkerStore(SQLBaseStore):
             )
             txn.execute(sql, (last_id, current_id, instance_name, limit))
             return cast(
-                List[Tuple[int, str, str, str, str, str, str, str, str]], txn.fetchall()
+                List[Tuple[int, str, str, str, str, str, str, str, bool, bool]],
+                txn.fetchall(),
             )
 
         return await self.db_pool.runInteraction(
@@ -1427,7 +1595,7 @@ class EventsWorkerStore(SQLBaseStore):
 
     async def get_ex_outlier_stream_rows(
         self, instance_name: str, last_id: int, current_id: int
-    ) -> List[Tuple[int, str, str, str, str, str, str, str, str]]:
+    ) -> List[Tuple[int, str, str, str, str, str, str, str, bool, bool]]:
         """Returns de-outliered events, for the Events replication stream
 
         Args:
@@ -1442,11 +1610,14 @@ class EventsWorkerStore(SQLBaseStore):
 
         def get_ex_outlier_stream_rows_txn(
             txn: LoggingTransaction,
-        ) -> List[Tuple[int, str, str, str, str, str, str, str, str]]:
+        ) -> List[Tuple[int, str, str, str, str, str, str, str, bool, bool]]:
             sql = (
                 "SELECT event_stream_ordering, e.event_id, e.room_id, e.type,"
-                " se.state_key, redacts, relates_to_id, membership, rejections.reason IS NOT NULL"
+                " se.state_key, redacts, relates_to_id, membership, rejections.reason IS NOT NULL,"
+                " e.outlier"
                 " FROM events AS e"
+                # NB: the next line (inner join) is what makes this query different from
+                # get_all_new_forward_event_rows.
                 " INNER JOIN ex_outlier_stream AS out USING (event_id)"
                 " LEFT JOIN redactions USING (event_id)"
                 " LEFT JOIN state_events AS se USING (event_id)"
@@ -1461,7 +1632,8 @@ class EventsWorkerStore(SQLBaseStore):
 
             txn.execute(sql, (last_id, current_id, instance_name))
             return cast(
-                List[Tuple[int, str, str, str, str, str, str, str, str]], txn.fetchall()
+                List[Tuple[int, str, str, str, str, str, str, str, bool, bool]],
+                txn.fetchall(),
             )
 
         return await self.db_pool.runInteraction(
@@ -1848,23 +2020,6 @@ class EventsWorkerStore(SQLBaseStore):
                 LIMIT 1
             """
 
-            # Check to see whether the event in question is already referenced
-            # by another event. If we don't see any edges, we're next to a
-            # forward gap.
-            forward_edge_query = """
-                SELECT 1 FROM event_edges
-                /* Check to make sure the event referencing our event in question is not rejected */
-                LEFT JOIN rejections ON event_edges.event_id == rejections.event_id
-                WHERE
-                    event_edges.room_id = ?
-                    AND event_edges.prev_event_id = ?
-                    /* It's not a valid edge if the event referencing our event in
-                     * question is rejected.
-                     */
-                    AND rejections.event_id IS NULL
-                LIMIT 1
-            """
-
             # We consider any forward extremity as the latest in the room and
             # not a forward gap.
             #
@@ -1874,16 +2029,30 @@ class EventsWorkerStore(SQLBaseStore):
             # is useless. The new latest messages will just be federated as
             # usual.
             txn.execute(forward_extremity_query, (event.room_id, event.event_id))
-            forward_extremities = txn.fetchall()
-            if len(forward_extremities):
+            if txn.fetchone():
                 return False
+
+            # Check to see whether the event in question is already referenced
+            # by another event. If we don't see any edges, we're next to a
+            # forward gap.
+            forward_edge_query = """
+                SELECT 1 FROM event_edges
+                /* Check to make sure the event referencing our event in question is not rejected */
+                LEFT JOIN rejections ON event_edges.event_id = rejections.event_id
+                WHERE
+                    event_edges.prev_event_id = ?
+                    /* It's not a valid edge if the event referencing our event in
+                     * question is rejected.
+                     */
+                    AND rejections.event_id IS NULL
+                LIMIT 1
+            """
 
             # If there are no forward edges to the event in question (another
             # event hasn't referenced this event in their prev_events), then we
             # assume there is a forward gap in the history.
-            txn.execute(forward_edge_query, (event.room_id, event.event_id))
-            forward_edges = txn.fetchall()
-            if not len(forward_edges):
+            txn.execute(forward_edge_query, (event.event_id,))
+            if not txn.fetchone():
                 return True
 
             return False
@@ -1953,3 +2122,81 @@ class EventsWorkerStore(SQLBaseStore):
             "get_event_id_for_timestamp_txn",
             get_event_id_for_timestamp_txn,
         )
+
+    @cachedList(cached_method_name="is_partial_state_event", list_name="event_ids")
+    async def get_partial_state_events(
+        self, event_ids: Collection[str]
+    ) -> Dict[str, bool]:
+        """Checks which of the given events have partial state
+
+        Args:
+            event_ids: the events we want to check for partial state.
+
+        Returns:
+            a dict mapping from event id to partial-stateness. We return True for
+            any of the events which are unknown (or are outliers).
+        """
+        result = await self.db_pool.simple_select_many_batch(
+            table="partial_state_events",
+            column="event_id",
+            iterable=event_ids,
+            retcols=["event_id"],
+            desc="get_partial_state_events",
+        )
+        # convert the result to a dict, to make @cachedList work
+        partial = {r["event_id"] for r in result}
+        return {e_id: e_id in partial for e_id in event_ids}
+
+    @cached()
+    async def is_partial_state_event(self, event_id: str) -> bool:
+        """Checks if the given event has partial state"""
+        result = await self.db_pool.simple_select_one_onecol(
+            table="partial_state_events",
+            keyvalues={"event_id": event_id},
+            retcol="1",
+            allow_none=True,
+            desc="is_partial_state_event",
+        )
+        return result is not None
+
+    async def get_partial_state_events_batch(self, room_id: str) -> List[str]:
+        """Get a list of events in the given room that have partial state"""
+        return await self.db_pool.runInteraction(
+            "get_partial_state_events_batch",
+            self._get_partial_state_events_batch_txn,
+            room_id,
+        )
+
+    @staticmethod
+    def _get_partial_state_events_batch_txn(
+        txn: LoggingTransaction, room_id: str
+    ) -> List[str]:
+        # we want to work through the events from oldest to newest, so
+        # we only want events whose prev_events do *not* have partial state - hence
+        # the 'NOT EXISTS' clause in the below.
+        #
+        # This is necessary because ordering by stream ordering isn't quite enough
+        # to ensure that we work from oldest to newest event (in particular,
+        # if an event is initially persisted as an outlier and later de-outliered,
+        # it can end up with a lower stream_ordering than its prev_events).
+        #
+        # Typically this means we'll only return one event per batch, but that's
+        # hard to do much about.
+        #
+        # See also: https://github.com/matrix-org/synapse/issues/13001
+        txn.execute(
+            """
+            SELECT event_id FROM partial_state_events AS pse
+                JOIN events USING (event_id)
+            WHERE pse.room_id = ? AND
+               NOT EXISTS(
+                  SELECT 1 FROM event_edges AS ee
+                     JOIN partial_state_events AS prev_pse ON (prev_pse.event_id=ee.prev_event_id)
+                     WHERE ee.event_id=pse.event_id
+               )
+            ORDER BY events.stream_ordering
+            LIMIT 100
+            """,
+            (room_id,),
+        )
+        return [row[0] for row in txn]

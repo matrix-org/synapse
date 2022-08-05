@@ -17,13 +17,7 @@ from typing import TYPE_CHECKING, Tuple
 
 from twisted.web.server import Request
 
-from synapse.api.errors import (
-    AuthError,
-    Codes,
-    InvalidClientCredentialsError,
-    NotFoundError,
-    SynapseError,
-)
+from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -47,11 +41,13 @@ class ClientDirectoryServer(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.directory_handler = hs.get_directory_handler()
         self.auth = hs.get_auth()
 
     async def on_GET(self, request: Request, room_alias: str) -> Tuple[int, JsonDict]:
+        if not RoomAlias.is_valid(room_alias):
+            raise SynapseError(400, "Room alias invalid", errcode=Codes.INVALID_PARAM)
         room_alias_obj = RoomAlias.from_string(room_alias)
 
         res = await self.directory_handler.get_association(room_alias_obj)
@@ -61,6 +57,8 @@ class ClientDirectoryServer(RestServlet):
     async def on_PUT(
         self, request: SynapseRequest, room_alias: str
     ) -> Tuple[int, JsonDict]:
+        if not RoomAlias.is_valid(room_alias):
+            raise SynapseError(400, "Room alias invalid", errcode=Codes.INVALID_PARAM)
         room_alias_obj = RoomAlias.from_string(room_alias)
 
         content = parse_json_object_from_request(request)
@@ -95,31 +93,30 @@ class ClientDirectoryServer(RestServlet):
     async def on_DELETE(
         self, request: SynapseRequest, room_alias: str
     ) -> Tuple[int, JsonDict]:
+        if not RoomAlias.is_valid(room_alias):
+            raise SynapseError(400, "Room alias invalid", errcode=Codes.INVALID_PARAM)
         room_alias_obj = RoomAlias.from_string(room_alias)
+        requester = await self.auth.get_user_by_req(request)
 
-        try:
-            service = self.auth.get_appservice_by_req(request)
+        if requester.app_service:
             await self.directory_handler.delete_appservice_association(
-                service, room_alias_obj
+                requester.app_service, room_alias_obj
             )
+
             logger.info(
                 "Application service at %s deleted alias %s",
-                service.url,
+                requester.app_service.url,
                 room_alias_obj.to_string(),
             )
-            return 200, {}
-        except InvalidClientCredentialsError:
-            # fallback to default user behaviour if they aren't an AS
-            pass
 
-        requester = await self.auth.get_user_by_req(request)
-        user = requester.user
+        else:
+            await self.directory_handler.delete_association(requester, room_alias_obj)
 
-        await self.directory_handler.delete_association(requester, room_alias_obj)
-
-        logger.info(
-            "User %s deleted alias %s", user.to_string(), room_alias_obj.to_string()
-        )
+            logger.info(
+                "User %s deleted alias %s",
+                requester.user.to_string(),
+                room_alias_obj.to_string(),
+            )
 
         return 200, {}
 
@@ -129,7 +126,7 @@ class ClientDirectoryListServer(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.directory_handler = hs.get_directory_handler()
         self.auth = hs.get_auth()
 
@@ -154,17 +151,6 @@ class ClientDirectoryListServer(RestServlet):
 
         return 200, {}
 
-    async def on_DELETE(
-        self, request: SynapseRequest, room_id: str
-    ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-
-        await self.directory_handler.edit_published_room_list(
-            requester, room_id, "private"
-        )
-
-        return 200, {}
-
 
 class ClientAppserviceDirectoryListServer(RestServlet):
     PATTERNS = client_patterns(
@@ -173,7 +159,7 @@ class ClientAppserviceDirectoryListServer(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.directory_handler = hs.get_directory_handler()
         self.auth = hs.get_auth()
 

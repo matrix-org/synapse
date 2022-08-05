@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, MSC3244_CAPABILITIES
@@ -54,6 +55,15 @@ class CapabilitiesRestServlet(RestServlet):
                     },
                 },
                 "m.change_password": {"enabled": change_password},
+                "m.set_displayname": {
+                    "enabled": self.config.registration.enable_set_displayname
+                },
+                "m.set_avatar_url": {
+                    "enabled": self.config.registration.enable_set_avatar_url
+                },
+                "m.3pid_changes": {
+                    "enabled": self.config.registration.enable_3pid_changes
+                },
             }
         }
 
@@ -62,21 +72,12 @@ class CapabilitiesRestServlet(RestServlet):
                 "org.matrix.msc3244.room_capabilities"
             ] = MSC3244_CAPABILITIES
 
-        if self.config.experimental.msc3283_enabled:
-            response["capabilities"]["org.matrix.msc3283.set_displayname"] = {
-                "enabled": self.config.registration.enable_set_displayname
-            }
-            response["capabilities"]["org.matrix.msc3283.set_avatar_url"] = {
-                "enabled": self.config.registration.enable_set_avatar_url
-            }
-            response["capabilities"]["org.matrix.msc3283.3pid_changes"] = {
-                "enabled": self.config.registration.enable_3pid_changes
+        if self.config.experimental.msc3720_enabled:
+            response["capabilities"]["org.matrix.msc3720.account_status"] = {
+                "enabled": True,
             }
 
-        if self.config.experimental.msc3440_enabled:
-            response["capabilities"]["io.element.thread"] = {"enabled": True}
-
-        return 200, response
+        return HTTPStatus.OK, response
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:

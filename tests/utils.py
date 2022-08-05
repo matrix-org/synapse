@@ -15,17 +15,17 @@
 
 import atexit
 import os
-from unittest.mock import Mock, patch
-from urllib import parse as urlparse
+from typing import Any, Callable, Dict, List, Tuple, Union, overload
 
-from twisted.internet import defer
+import attr
+from typing_extensions import Literal, ParamSpec
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import CodeMessageException, cs_error
 from synapse.api.room_versions import RoomVersions
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import DEFAULT_ROOM_VERSION
 from synapse.logging.context import current_context, set_current_context
+from synapse.server import HomeServer
 from synapse.storage.database import LoggingDatabaseConnection
 from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
@@ -40,6 +40,11 @@ LEAVE_DB = os.environ.get("SYNAPSE_LEAVE_DB", False)
 POSTGRES_USER = os.environ.get("SYNAPSE_POSTGRES_USER", None)
 POSTGRES_HOST = os.environ.get("SYNAPSE_POSTGRES_HOST", None)
 POSTGRES_PASSWORD = os.environ.get("SYNAPSE_POSTGRES_PASSWORD", None)
+POSTGRES_PORT = (
+    int(os.environ["SYNAPSE_POSTGRES_PORT"])
+    if "SYNAPSE_POSTGRES_PORT" in os.environ
+    else None
+)
 POSTGRES_BASE_DB = "_synapse_unit_tests_base_%s" % (os.getpid(),)
 
 # When debugging a specific test, it's occasionally useful to write the
@@ -50,20 +55,20 @@ SQLITE_PERSIST_DB = os.environ.get("SYNAPSE_TEST_PERSIST_SQLITE_DB") is not None
 POSTGRES_DBNAME_FOR_INITIAL_CREATE = "postgres"
 
 
-def setupdb():
+def setupdb() -> None:
     # If we're using PostgreSQL, set up the db once
     if USE_POSTGRES_FOR_TESTS:
         # create a PostgresEngine
         db_engine = create_engine({"name": "psycopg2", "args": {}})
-
         # connect to postgres to create the base database.
         db_conn = db_engine.module.connect(
             user=POSTGRES_USER,
             host=POSTGRES_HOST,
+            port=POSTGRES_PORT,
             password=POSTGRES_PASSWORD,
             dbname=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
         )
-        db_conn.autocommit = True
+        db_engine.attempt_to_set_autocommit(db_conn, autocommit=True)
         cur = db_conn.cursor()
         cur.execute("DROP DATABASE IF EXISTS %s;" % (POSTGRES_BASE_DB,))
         cur.execute(
@@ -78,20 +83,22 @@ def setupdb():
             database=POSTGRES_BASE_DB,
             user=POSTGRES_USER,
             host=POSTGRES_HOST,
+            port=POSTGRES_PORT,
             password=POSTGRES_PASSWORD,
         )
-        db_conn = LoggingDatabaseConnection(db_conn, db_engine, "tests")
-        prepare_database(db_conn, db_engine, None)
-        db_conn.close()
+        logging_conn = LoggingDatabaseConnection(db_conn, db_engine, "tests")
+        prepare_database(logging_conn, db_engine, None)
+        logging_conn.close()
 
-        def _cleanup():
+        def _cleanup() -> None:
             db_conn = db_engine.module.connect(
                 user=POSTGRES_USER,
                 host=POSTGRES_HOST,
+                port=POSTGRES_PORT,
                 password=POSTGRES_PASSWORD,
                 dbname=POSTGRES_DBNAME_FOR_INITIAL_CREATE,
             )
-            db_conn.autocommit = True
+            db_engine.attempt_to_set_autocommit(db_conn, autocommit=True)
             cur = db_conn.cursor()
             cur.execute("DROP DATABASE IF EXISTS %s;" % (POSTGRES_BASE_DB,))
             cur.close()
@@ -100,7 +107,19 @@ def setupdb():
         atexit.register(_cleanup)
 
 
-def default_config(name, parse=False):
+@overload
+def default_config(name: str, parse: Literal[False] = ...) -> Dict[str, object]:
+    ...
+
+
+@overload
+def default_config(name: str, parse: Literal[True]) -> HomeServerConfig:
+    ...
+
+
+def default_config(
+    name: str, parse: bool = False
+) -> Union[Dict[str, object], HomeServerConfig]:
     """
     Create a reasonable test config.
     """
@@ -148,6 +167,7 @@ def default_config(name, parse=False):
             "local": {"per_second": 10000, "burst_count": 10000},
             "remote": {"per_second": 10000, "burst_count": 10000},
         },
+        "rc_joins_per_room": {"per_second": 10000, "burst_count": 10000},
         "rc_invites": {
             "per_room": {"per_second": 10000, "burst_count": 10000},
             "per_user": {"per_second": 10000, "burst_count": 10000},
@@ -166,7 +186,7 @@ def default_config(name, parse=False):
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.
         "update_user_directory": False,
-        "caches": {"global_factor": 1},
+        "caches": {"global_factor": 1, "sync_response_cache_duration": 0},
         "listeners": [{"port": 0, "type": "http"}],
     }
 
@@ -178,196 +198,123 @@ def default_config(name, parse=False):
     return config_dict
 
 
-def mock_getRawHeaders(headers=None):
+def mock_getRawHeaders(headers=None):  # type: ignore[no-untyped-def]
     headers = headers if headers is not None else {}
 
-    def getRawHeaders(name, default=None):
+    def getRawHeaders(name, default=None):  # type: ignore[no-untyped-def]
+        # If the requested header is present, the real twisted function returns
+        # List[str] if name is a str and List[bytes] if name is a bytes.
+        # This mock doesn't support that behaviour.
+        # Fortunately, none of the current callers of mock_getRawHeaders() provide a
+        # headers dict, so we don't encounter this discrepancy in practice.
         return headers.get(name, default)
 
     return getRawHeaders
 
 
-# This is a mock /resource/ not an entire server
-class MockHttpResource:
-    def __init__(self, prefix=""):
-        self.callbacks = []  # 3-tuple of method/pattern/function
-        self.prefix = prefix
-
-    def trigger_get(self, path):
-        return self.trigger(b"GET", path, None)
-
-    @patch("twisted.web.http.Request")
-    @defer.inlineCallbacks
-    def trigger(
-        self, http_method, path, content, mock_request, federation_auth_origin=None
-    ):
-        """Fire an HTTP event.
-
-        Args:
-            http_method : The HTTP method
-            path : The HTTP path
-            content : The HTTP body
-            mock_request : Mocked request to pass to the event so it can get
-                           content.
-            federation_auth_origin (bytes|None): domain to authenticate as, for federation
-        Returns:
-            A tuple of (code, response)
-        Raises:
-            KeyError If no event is found which will handle the path.
-        """
-        path = self.prefix + path
-
-        # annoyingly we return a twisted http request which has chained calls
-        # to get at the http content, hence mock it here.
-        mock_content = Mock()
-        config = {"read.return_value": content}
-        mock_content.configure_mock(**config)
-        mock_request.content = mock_content
-
-        mock_request.method = http_method.encode("ascii")
-        mock_request.uri = path.encode("ascii")
-
-        mock_request.getClientIP.return_value = "-"
-
-        headers = {}
-        if federation_auth_origin is not None:
-            headers[b"Authorization"] = [
-                b"X-Matrix origin=%s,key=,sig=" % (federation_auth_origin,)
-            ]
-        mock_request.requestHeaders.getRawHeaders = mock_getRawHeaders(headers)
-
-        # return the right path if the event requires it
-        mock_request.path = path
-
-        # add in query params to the right place
-        try:
-            mock_request.args = urlparse.parse_qs(path.split("?")[1])
-            mock_request.path = path.split("?")[0]
-            path = mock_request.path
-        except Exception:
-            pass
-
-        if isinstance(path, bytes):
-            path = path.decode("utf8")
-
-        for (method, pattern, func) in self.callbacks:
-            if http_method != method:
-                continue
-
-            matcher = pattern.match(path)
-            if matcher:
-                try:
-                    args = [urlparse.unquote(u) for u in matcher.groups()]
-
-                    (code, response) = yield defer.ensureDeferred(
-                        func(mock_request, *args)
-                    )
-                    return code, response
-                except CodeMessageException as e:
-                    return e.code, cs_error(e.msg, code=e.errcode)
-
-        raise KeyError("No event can handle %s" % path)
-
-    def register_paths(self, method, path_patterns, callback, servlet_name):
-        for path_pattern in path_patterns:
-            self.callbacks.append((method, path_pattern, callback))
+P = ParamSpec("P")
 
 
-class MockKey:
-    alg = "mock_alg"
-    version = "mock_version"
-    signature = b"\x9a\x87$"
+@attr.s(slots=True, auto_attribs=True)
+class Timer:
+    absolute_time: float
+    callback: Callable[[], None]
+    expired: bool
 
-    @property
-    def verify_key(self):
-        return self
 
-    def sign(self, message):
-        return self
-
-    def verify(self, message, sig):
-        assert sig == b"\x9a\x87$"
-
-    def encode(self):
-        return b"<fake_encoded_key>"
+# TODO: Make this generic over a ParamSpec?
+@attr.s(slots=True, auto_attribs=True)
+class Looper:
+    func: Callable[..., Any]
+    interval: float  # seconds
+    last: float
+    args: Tuple[object, ...]
+    kwargs: Dict[str, object]
 
 
 class MockClock:
-    now = 1000
+    now = 1000.0
 
-    def __init__(self):
-        # list of lists of [absolute_time, callback, expired] in no particular
-        # order
-        self.timers = []
-        self.loopers = []
+    def __init__(self) -> None:
+        # Timers in no particular order
+        self.timers: List[Timer] = []
+        self.loopers: List[Looper] = []
 
-    def time(self):
+    def time(self) -> float:
         return self.now
 
-    def time_msec(self):
-        return self.time() * 1000
+    def time_msec(self) -> int:
+        return int(self.time() * 1000)
 
-    def call_later(self, delay, callback, *args, **kwargs):
+    def call_later(
+        self,
+        delay: float,
+        callback: Callable[P, object],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> Timer:
         ctx = current_context()
 
-        def wrapped_callback():
+        def wrapped_callback() -> None:
             set_current_context(ctx)
             callback(*args, **kwargs)
 
-        t = [self.now + delay, wrapped_callback, False]
+        t = Timer(self.now + delay, wrapped_callback, False)
         self.timers.append(t)
 
         return t
 
-    def looping_call(self, function, interval, *args, **kwargs):
-        self.loopers.append([function, interval / 1000.0, self.now, args, kwargs])
+    def looping_call(
+        self,
+        function: Callable[P, object],
+        interval: float,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> None:
+        # This type-ignore should be redundant once we use a mypy release with
+        # https://github.com/python/mypy/pull/12668.
+        self.loopers.append(Looper(function, interval / 1000.0, self.now, args, kwargs))  # type: ignore[arg-type]
 
-    def cancel_call_later(self, timer, ignore_errs=False):
-        if timer[2]:
+    def cancel_call_later(self, timer: Timer, ignore_errs: bool = False) -> None:
+        if timer.expired:
             if not ignore_errs:
                 raise Exception("Cannot cancel an expired timer")
 
-        timer[2] = True
+        timer.expired = True
         self.timers = [t for t in self.timers if t != timer]
 
     # For unit testing
-    def advance_time(self, secs):
+    def advance_time(self, secs: float) -> None:
         self.now += secs
 
         timers = self.timers
         self.timers = []
 
         for t in timers:
-            time, callback, expired = t
-
-            if expired:
+            if t.expired:
                 raise Exception("Timer already expired")
 
-            if self.now >= time:
-                t[2] = True
-                callback()
+            if self.now >= t.absolute_time:
+                t.expired = True
+                t.callback()
             else:
                 self.timers.append(t)
 
         for looped in self.loopers:
-            func, interval, last, args, kwargs = looped
-            if last + interval < self.now:
-                func(*args, **kwargs)
-                looped[2] = self.now
+            if looped.last + looped.interval < self.now:
+                looped.func(*looped.args, **looped.kwargs)
+                looped.last = self.now
 
-    def advance_time_msec(self, ms):
+    def advance_time_msec(self, ms: float) -> None:
         self.advance_time(ms / 1000.0)
 
-    def time_bound_deferred(self, d, *args, **kwargs):
-        # We don't bother timing things out for now.
-        return d
 
-
-async def create_room(hs, room_id: str, creator_id: str):
+async def create_room(hs: HomeServer, room_id: str, creator_id: str) -> None:
     """Creates and persist a creation event for the given room"""
 
-    persistence_store = hs.get_storage().persistence
-    store = hs.get_datastore()
+    persistence_store = hs.get_storage_controllers().persistence
+    assert persistence_store is not None
+    store = hs.get_datastores().main
     event_builder_factory = hs.get_event_builder_factory()
     event_creation_handler = hs.get_event_creation_handler()
 

@@ -12,10 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import nacl.signing
-import signedjson.types
-from unpaddedbase64 import decode_base64
+from signedjson.key import decode_signing_key_base64
+from signedjson.types import SigningKey
 
 from synapse.api.room_versions import RoomVersions
 from synapse.crypto.event_signing import add_hashes_and_signatures
@@ -25,25 +23,20 @@ from tests import unittest
 
 # Perform these tests using given secret key so we get entirely deterministic
 # signatures output that we can test against.
-SIGNING_KEY_SEED = decode_base64("YJDBA9Xnr2sVqXD9Vj7XVUnmFZcZrlw8Md7kMW+3XA1")
+SIGNING_KEY_SEED = "YJDBA9Xnr2sVqXD9Vj7XVUnmFZcZrlw8Md7kMW+3XA1"
 
 KEY_ALG = "ed25519"
-KEY_VER = 1
-KEY_NAME = "%s:%d" % (KEY_ALG, KEY_VER)
+KEY_VER = "1"
+KEY_NAME = "%s:%s" % (KEY_ALG, KEY_VER)
 
 HOSTNAME = "domain"
 
 
 class EventSigningTestCase(unittest.TestCase):
     def setUp(self):
-        # NB: `signedjson` expects `nacl.signing.SigningKey` instances which have been
-        # monkeypatched to include new `alg` and `version` attributes. This is captured
-        # by the `signedjson.types.SigningKey` protocol.
-        self.signing_key: signedjson.types.SigningKey = nacl.signing.SigningKey(
-            SIGNING_KEY_SEED
+        self.signing_key: SigningKey = decode_signing_key_base64(
+            KEY_ALG, KEY_VER, SIGNING_KEY_SEED
         )
-        self.signing_key.alg = KEY_ALG
-        self.signing_key.version = KEY_VER
 
     def test_sign_minimal(self):
         event_dict = {
@@ -63,14 +56,14 @@ class EventSigningTestCase(unittest.TestCase):
 
         self.assertTrue(hasattr(event, "hashes"))
         self.assertIn("sha256", event.hashes)
-        self.assertEquals(
+        self.assertEqual(
             event.hashes["sha256"], "6tJjLpXtggfke8UxFhAKg82QVkJzvKOVOOSjUDK4ZSI"
         )
 
         self.assertTrue(hasattr(event, "signatures"))
         self.assertIn(HOSTNAME, event.signatures)
         self.assertIn(KEY_NAME, event.signatures["domain"])
-        self.assertEquals(
+        self.assertEqual(
             event.signatures[HOSTNAME][KEY_NAME],
             "2Wptgo4CwmLo/Y8B8qinxApKaCkBG2fjTWB7AbP5Uy+"
             "aIbygsSdLOFzvdDjww8zUVKCmI02eP9xtyJxc/cLiBA",
@@ -97,14 +90,14 @@ class EventSigningTestCase(unittest.TestCase):
 
         self.assertTrue(hasattr(event, "hashes"))
         self.assertIn("sha256", event.hashes)
-        self.assertEquals(
+        self.assertEqual(
             event.hashes["sha256"], "onLKD1bGljeBWQhWZ1kaP9SorVmRQNdN5aM2JYU2n/g"
         )
 
         self.assertTrue(hasattr(event, "signatures"))
         self.assertIn(HOSTNAME, event.signatures)
         self.assertIn(KEY_NAME, event.signatures["domain"])
-        self.assertEquals(
+        self.assertEqual(
             event.signatures[HOSTNAME][KEY_NAME],
             "Wm+VzmOUOz08Ds+0NTWb1d4CZrVsJSikkeRxh6aCcUw"
             "u6pNC78FunoD7KNWzqFn241eYHYMGCA5McEiVPdhzBA",

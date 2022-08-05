@@ -410,7 +410,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         even if the MAU limit is reached.
         """
         handler = self.hs.get_registration_handler()
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
 
         # Set monthly active users to the limit
         store.get_monthly_active_count = Mock(
@@ -455,7 +455,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
     url = "/_synapse/admin/v2/users"
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -913,7 +913,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -1050,6 +1050,25 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
 
         self._is_erased("@user:test", True)
 
+    @override_config({"max_avatar_size": 1234})
+    def test_deactivate_user_erase_true_avatar_nonnull_but_empty(self) -> None:
+        """Check we can erase a user whose avatar is the empty string.
+
+        Reproduces #12257.
+        """
+        # Patch `self.other_user` to have an empty string as their avatar.
+        self.get_success(self.store.set_profile_avatar_url("user", ""))
+
+        # Check we can still erase them.
+        channel = self.make_request(
+            "POST",
+            self.url,
+            access_token=self.admin_user_tok,
+            content={"erase": True},
+        )
+        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self._is_erased("@user:test", True)
+
     def test_deactivate_user_erase_false(self) -> None:
         """
         Test deactivating a user and set `erase` to `false`
@@ -1167,7 +1186,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth_handler = hs.get_auth_handler()
 
         # create users and get access tokens
@@ -1360,7 +1379,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content=body,
         )
 
-        self.assertEqual(201, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
@@ -1415,7 +1434,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content=body,
         )
 
-        self.assertEqual(201, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
@@ -1469,7 +1488,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         if channel.code != HTTPStatus.OK:
             raise HttpResponseException(
-                channel.code, channel.result["reason"], channel.json_body
+                channel.code, channel.result["reason"], channel.result["body"]
             )
 
         # Set monthly active users to the limit
@@ -1493,7 +1512,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"password": "abc123", "admin": False},
         )
 
-        self.assertEqual(201, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["admin"])
 
@@ -1531,7 +1550,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
 
         # Admin user is not blocked by mau anymore
-        self.assertEqual(201, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["admin"])
 
@@ -1566,15 +1585,14 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content=body,
         )
 
-        self.assertEqual(201, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
 
-        pushers = self.get_success(
-            self.store.get_pushers_by({"user_name": "@bob:test"})
+        pushers = list(
+            self.get_success(self.store.get_pushers_by({"user_name": "@bob:test"}))
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         self.assertEqual("@bob:test", pushers[0].user_name)
 
@@ -1608,16 +1626,50 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content=body,
         )
 
-        self.assertEqual(201, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
 
-        pushers = self.get_success(
-            self.store.get_pushers_by({"user_name": "@bob:test"})
+        pushers = list(
+            self.get_success(self.store.get_pushers_by({"user_name": "@bob:test"}))
         )
-        pushers = list(pushers)
         self.assertEqual(len(pushers), 0)
+
+    @override_config(
+        {
+            "email": {
+                "enable_notifs": True,
+                "notif_for_new_users": True,
+                "notif_from": "test@example.com",
+            },
+            "public_baseurl": "https://example.com",
+        }
+    )
+    def test_create_user_email_notif_for_new_users_with_msisdn_threepid(self) -> None:
+        """
+        Check that a new regular user is created successfully when they have a msisdn
+        threepid and email notif_for_new_users is set to True.
+        """
+        url = self.url_prefix % "@bob:test"
+
+        # Create user
+        body = {
+            "password": "abc123",
+            "threepids": [{"medium": "msisdn", "address": "1234567890"}],
+        }
+
+        channel = self.make_request(
+            "PUT",
+            url,
+            access_token=self.admin_user_tok,
+            content=body,
+        )
+
+        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual("msisdn", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual("1234567890", channel.json_body["threepids"][0]["address"])
 
     def test_set_password(self) -> None:
         """
@@ -2125,6 +2177,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         # is in user directory
         profile = self.get_success(self.store.get_user_in_directory(self.other_user))
+        assert profile is not None
         self.assertTrue(profile["display_name"] == "User")
 
         # Deactivate user
@@ -2354,7 +2407,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"password": "abc123"},
         )
 
-        self.assertEqual(201, channel.code, msg=channel.json_body)
+        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("bob", channel.json_body["displayname"])
 
@@ -2561,7 +2614,7 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
         other_user_tok = self.login("user", "pass")
         event_builder_factory = self.hs.get_event_builder_factory()
         event_creation_handler = self.hs.get_event_creation_handler()
-        storage = self.hs.get_storage()
+        storage_controllers = self.hs.get_storage_controllers()
 
         # Create two rooms, one with a local user only and one with both a local
         # and remote user.
@@ -2586,7 +2639,7 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
             event_creation_handler.create_new_client_event(builder)
         )
 
-        self.get_success(storage.persistence.persist_event(event, context))
+        self.get_success(storage_controllers.persistence.persist_event(event, context))
 
         # Now get rooms
         url = "/_synapse/admin/v1/users/@joiner:remote_hs/joined_rooms"
@@ -2609,7 +2662,7 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -2692,6 +2745,7 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
         user_tuple = self.get_success(
             self.store.get_user_by_access_token(other_user_token)
         )
+        assert user_tuple is not None
         token_id = user_tuple.token_id
 
         self.get_success(
@@ -2737,7 +2791,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.media_repo = hs.get_media_repository_resource()
         self.filepaths = MediaFilePaths(hs.config.media.media_store_path)
 
@@ -3317,7 +3371,7 @@ class UserTokenRestTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -3609,7 +3663,7 @@ class ShadowBanRestTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -3657,6 +3711,7 @@ class ShadowBanRestTestCase(unittest.HomeserverTestCase):
         # The user starts off as not shadow-banned.
         other_user_token = self.login("user", "pass")
         result = self.get_success(self.store.get_user_by_access_token(other_user_token))
+        assert result is not None
         self.assertFalse(result.shadow_banned)
 
         channel = self.make_request("POST", self.url, access_token=self.admin_user_tok)
@@ -3665,6 +3720,7 @@ class ShadowBanRestTestCase(unittest.HomeserverTestCase):
 
         # Ensure the user is shadow-banned (and the cache was cleared).
         result = self.get_success(self.store.get_user_by_access_token(other_user_token))
+        assert result is not None
         self.assertTrue(result.shadow_banned)
 
         # Un-shadow-ban the user.
@@ -3676,6 +3732,7 @@ class ShadowBanRestTestCase(unittest.HomeserverTestCase):
 
         # Ensure the user is no longer shadow-banned (and the cache was cleared).
         result = self.get_success(self.store.get_user_by_access_token(other_user_token))
+        assert result is not None
         self.assertFalse(result.shadow_banned)
 
 
@@ -3687,7 +3744,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -3913,7 +3970,7 @@ class AccountDataTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")

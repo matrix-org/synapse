@@ -32,12 +32,11 @@ from twisted.logger import (
     globalLogBeginner,
 )
 
-import synapse
-from synapse.logging._structured import setup_structured_logging
 from synapse.logging.context import LoggingContextFilter
 from synapse.logging.filter import MetadataFilter
-from synapse.util.versionstring import get_version_string
+from synapse.types import JsonDict
 
+from ..util import SYNAPSE_VERSION
 from ._base import Config, ConfigError
 
 if TYPE_CHECKING:
@@ -111,13 +110,6 @@ loggers:
         # information such as access tokens.
         level: INFO
 
-    twisted:
-        # We send the twisted logging directly to the file handler,
-        # to work around https://github.com/matrix-org/synapse/issues/3471
-        # when using "buffer" logger. Use "console" to log to stderr instead.
-        handlers: [file]
-        propagate: false
-
 root:
     level: INFO
 
@@ -139,25 +131,28 @@ Support for the log_file configuration option and --log-file command-line option
 removed in Synapse 1.3.0. You should instead set up a separate log configuration file.
 """
 
+STRUCTURED_ERROR = """\
+Support for the structured configuration option was removed in Synapse 1.54.0.
+You should instead use the standard logging configuration. See
+https://matrix-org.github.io/synapse/v1.54/structured_logging.html
+"""
+
 
 class LoggingConfig(Config):
     section = "logging"
 
-    def read_config(self, config, **kwargs) -> None:
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         if config.get("log_file"):
             raise ConfigError(LOG_FILE_ERROR)
         self.log_config = self.abspath(config.get("log_config"))
         self.no_redirect_stdio = config.get("no_redirect_stdio", False)
 
-    def generate_config_section(self, config_dir_path, server_name, **kwargs) -> str:
+    def generate_config_section(
+        self, config_dir_path: str, server_name: str, **kwargs: Any
+    ) -> str:
         log_config = os.path.join(config_dir_path, server_name + ".log.config")
         return (
             """\
-        ## Logging ##
-
-        # A yaml python logging config file as described by
-        # https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
-        #
         log_config: "%(log_config)s"
         """
             % locals()
@@ -293,10 +288,9 @@ def _load_logging_config(log_config_path: str) -> None:
     if not log_config:
         logging.warning("Loaded a blank logging config?")
 
-    # If the old structured logging configuration is being used, convert it to
-    # the new style configuration.
+    # If the old structured logging configuration is being used, raise an error.
     if "structured" in log_config and log_config.get("structured"):
-        log_config = setup_structured_logging(log_config)
+        raise ConfigError(STRUCTURED_ERROR)
 
     logging.config.dictConfig(log_config)
 
@@ -347,6 +341,10 @@ def setup_logging(
 
     # Log immediately so we can grep backwards.
     logging.warning("***** STARTING SERVER *****")
-    logging.warning("Server %s version %s", sys.argv[0], get_version_string(synapse))
+    logging.warning(
+        "Server %s version %s",
+        sys.argv[0],
+        SYNAPSE_VERSION,
+    )
     logging.info("Server hostname: %s", config.server.server_name)
     logging.info("Instance name: %s", hs.get_instance_name())

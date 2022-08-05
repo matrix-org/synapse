@@ -20,7 +20,6 @@ import platform
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Optional, Tuple
 
-import synapse
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.server import HttpServer, JsonResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -46,7 +45,6 @@ from synapse.rest.admin.federation import (
     DestinationRestServlet,
     ListDestinationsRestServlet,
 )
-from synapse.rest.admin.groups import DeleteGroupAdminRestServlet
 from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
 from synapse.rest.admin.registration_tokens import (
     ListRegistrationTokensRestServlet,
@@ -88,7 +86,7 @@ from synapse.rest.admin.users import (
     WhoisRestServlet,
 )
 from synapse.types import JsonDict, RoomStreamToken
-from synapse.util.versionstring import get_version_string
+from synapse.util import SYNAPSE_VERSION
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -101,7 +99,7 @@ class VersionServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self.res = {
-            "server_version": get_version_string(synapse),
+            "server_version": SYNAPSE_VERSION,
             "python_version": platform.python_version(),
         }
 
@@ -116,7 +114,7 @@ class PurgeHistoryRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self.pagination_handler = hs.get_pagination_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
         self.auth = hs.get_auth()
 
     async def on_POST(
@@ -293,7 +291,6 @@ def register_servlets_for_client_rest_resource(
     ResetPasswordRestServlet(hs).register(http_server)
     SearchUsersRestServlet(hs).register(http_server)
     UserRegisterServlet(hs).register(http_server)
-    DeleteGroupAdminRestServlet(hs).register(http_server)
     AccountValidityRenewServlet(hs).register(http_server)
 
     # Load the media repo ones if we're using them. Otherwise load the servlets which

@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Dict, Optional, cast
 
 from typing_extensions import Literal
 
@@ -45,7 +45,7 @@ class E2eRoomKeysHandler:
     """
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
 
         # Used to lock whenever a client is uploading key data.  This prevents collisions
         # between clients trying to upload the details of a new session, given all
@@ -83,7 +83,7 @@ class E2eRoomKeysHandler:
 
         # we deliberately take the lock to get keys so that changing the version
         # works atomically
-        with (await self._upload_linearizer.queue(user_id)):
+        async with self._upload_linearizer.queue(user_id):
             # make sure the backup version exists
             try:
                 await self.store.get_e2e_room_keys_version_info(user_id, version)
@@ -97,7 +97,7 @@ class E2eRoomKeysHandler:
                 user_id, version, room_id, session_id
             )
 
-            log_kv(results)
+            log_kv(cast(JsonDict, results))
             return results
 
     @trace
@@ -126,7 +126,7 @@ class E2eRoomKeysHandler:
         """
 
         # lock for consistency with uploading
-        with (await self._upload_linearizer.queue(user_id)):
+        async with self._upload_linearizer.queue(user_id):
             # make sure the backup version exists
             try:
                 version_info = await self.store.get_e2e_room_keys_version_info(
@@ -187,7 +187,7 @@ class E2eRoomKeysHandler:
         # TODO: Validate the JSON to make sure it has the right keys.
 
         # XXX: perhaps we should use a finer grained lock here?
-        with (await self._upload_linearizer.queue(user_id)):
+        async with self._upload_linearizer.queue(user_id):
 
             # Check that the version we're trying to upload is the current version
             try:
@@ -332,7 +332,7 @@ class E2eRoomKeysHandler:
         # TODO: Validate the JSON to make sure it has the right keys.
 
         # lock everyone out until we've switched version
-        with (await self._upload_linearizer.queue(user_id)):
+        async with self._upload_linearizer.queue(user_id):
             new_version = await self.store.create_e2e_room_keys_version(
                 user_id, version_info
             )
@@ -359,7 +359,7 @@ class E2eRoomKeysHandler:
         }
         """
 
-        with (await self._upload_linearizer.queue(user_id)):
+        async with self._upload_linearizer.queue(user_id):
             try:
                 res = await self.store.get_e2e_room_keys_version_info(user_id, version)
             except StoreError as e:
@@ -383,7 +383,7 @@ class E2eRoomKeysHandler:
             NotFoundError: if this backup version doesn't exist
         """
 
-        with (await self._upload_linearizer.queue(user_id)):
+        async with self._upload_linearizer.queue(user_id):
             try:
                 await self.store.delete_e2e_room_keys_version(user_id, version)
             except StoreError as e:
@@ -413,7 +413,7 @@ class E2eRoomKeysHandler:
             raise SynapseError(
                 400, "Version in body does not match", Codes.INVALID_PARAM
             )
-        with (await self._upload_linearizer.queue(user_id)):
+        async with self._upload_linearizer.queue(user_id):
             try:
                 old_info = await self.store.get_e2e_room_keys_version_info(
                     user_id, version

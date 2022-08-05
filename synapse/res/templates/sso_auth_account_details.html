@@ -130,22 +130,22 @@
   </head>
   <body>
     <header>
-      <h1>Your account is nearly ready</h1>
-      <p>Check your details before creating an account on {{ server_name }}</p>
+      <h1>Create your account</h1>
+      <p>This is required. Continue to create your account on {{ server_name }}. You can't change this later.</p>
     </header>
     <main>
       <form method="post" class="form__input" id="form">
         <div class="username_input" id="username_input">
-          <label for="field-username">Username</label>
+          <label for="field-username">Username (required)</label>
           <div class="prefix">@</div>
-          <input type="text" name="username" id="field-username" autofocus>
+          <input type="text" name="username" id="field-username" value="{{ user_attributes.localpart }}" autofocus autocorrect="off" autocapitalize="none">
           <div class="postfix">:{{ server_name }}</div>
         </div>
         <output for="username_input" id="field-username-output"></output>
         <input type="submit" value="Continue" class="primary-button">
         {% if user_attributes.avatar_url or user_attributes.display_name or user_attributes.emails %}
         <section class="idp-pick-details">
-          <h2>{% if idp.idp_icon %}<img src="{{ idp.idp_icon | mxc_to_http(24, 24) }}"/>{% endif %}Information from {{ idp.idp_name }}</h2>
+          <h2>{% if idp.idp_icon %}<img src="{{ idp.idp_icon | mxc_to_http(24, 24) }}"/>{% endif %}Optional data from {{ idp.idp_name }}</h2>
           {% if user_attributes.avatar_url %}
           <label class="idp-detail idp-avatar" for="idp-avatar">
             <div class="check-row">

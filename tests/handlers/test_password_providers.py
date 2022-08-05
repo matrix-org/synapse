@@ -14,27 +14,26 @@
 
 """Tests for the password_auth_provider interface"""
 
+from http import HTTPStatus
 from typing import Any, Type, Union
 from unittest.mock import Mock
 
-from twisted.internet import defer
-
 import synapse
 from synapse.api.constants import LoginType
+from synapse.api.errors import Codes
 from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.module_api import ModuleApi
-from synapse.rest.client import devices, login, logout, register
+from synapse.rest.client import account, devices, login, logout, register
 from synapse.types import JsonDict, UserID
 
 from tests import unittest
 from tests.server import FakeChannel
+from tests.test_utils import make_awaitable
 from tests.unittest import override_config
 
-# (possibly experimental) login flows we expect to appear in the list after the normal
-# ones
+# Login flows we expect to appear in the list after the normal ones.
 ADDITIONAL_LOGIN_FLOWS = [
     {"type": "m.login.application_service"},
-    {"type": "uk.half-shot.msc2778.login.application_service"},
 ]
 
 # a mock instance which the dummy auth providers delegate to, so we can see what's going
@@ -82,7 +81,7 @@ class CustomAuthProvider:
 
     def __init__(self, config, api: ModuleApi):
         api.register_password_auth_provider_callbacks(
-            auth_checkers={("test.login_type", ("test_field",)): self.check_auth},
+            auth_checkers={("test.login_type", ("test_field",)): self.check_auth}
         )
 
     def check_auth(self, *args):
@@ -120,9 +119,8 @@ class PasswordCustomAuthProvider:
             auth_checkers={
                 ("test.login_type", ("test_field",)): self.check_auth,
                 ("m.login.password", ("password",)): self.check_auth,
-            },
+            }
         )
-        pass
 
     def check_auth(self, *args):
         return mock_password_provider.check_auth(*args)
@@ -158,7 +156,11 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         devices.register_servlets,
         logout.register_servlets,
         register.register_servlets,
+        account.register_servlets,
     ]
+
+    CALLBACK_USERNAME = "get_username_for_registration"
+    CALLBACK_DISPLAYNAME = "get_displayname_for_registration"
 
     def setUp(self):
         # we use a global mock device, so make sure we are starting with a clean slate
@@ -185,16 +187,16 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.assertEqual(flows, [{"type": "m.login.password"}] + ADDITIONAL_LOGIN_FLOWS)
 
         # check_password must return an awaitable
-        mock_password_provider.check_password.return_value = defer.succeed(True)
+        mock_password_provider.check_password.return_value = make_awaitable(True)
         channel = self._send_password_login("u", "p")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         self.assertEqual("@u:test", channel.json_body["user_id"])
         mock_password_provider.check_password.assert_called_once_with("@u:test", "p")
         mock_password_provider.reset_mock()
 
         # login with mxid should work too
         channel = self._send_password_login("@u:bz", "p")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         self.assertEqual("@u:bz", channel.json_body["user_id"])
         mock_password_provider.check_password.assert_called_once_with("@u:bz", "p")
         mock_password_provider.reset_mock()
@@ -203,7 +205,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         # in these cases, but at least we can guard against the API changing
         # unexpectedly
         channel = self._send_password_login(" USER🙂NAME ", " pASS\U0001F622word ")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         self.assertEqual("@ USER🙂NAME :test", channel.json_body["user_id"])
         mock_password_provider.check_password.assert_called_once_with(
             "@ USER🙂NAME :test", " pASS😢word "
@@ -221,13 +223,13 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.get_success(module_api.register_user("u"))
 
         # log in twice, to get two devices
-        mock_password_provider.check_password.return_value = defer.succeed(True)
+        mock_password_provider.check_password.return_value = make_awaitable(True)
         tok1 = self.login("u", "p")
         self.login("u", "p", device_id="dev2")
         mock_password_provider.reset_mock()
 
         # have the auth provider deny the request to start with
-        mock_password_provider.check_password.return_value = defer.succeed(False)
+        mock_password_provider.check_password.return_value = make_awaitable(False)
 
         # make the initial request which returns a 401
         session = self._start_delete_device_session(tok1, "dev2")
@@ -241,7 +243,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         mock_password_provider.reset_mock()
 
         # Finally, check the request goes through when we allow it
-        mock_password_provider.check_password.return_value = defer.succeed(True)
+        mock_password_provider.check_password.return_value = make_awaitable(True)
         channel = self._authed_delete_device(tok1, "dev2", session, "u", "p")
         self.assertEqual(channel.code, 200)
         mock_password_provider.check_password.assert_called_once_with("@u:test", "p")
@@ -255,12 +257,12 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.register_user("localuser", "localpass")
 
         # check_password must return an awaitable
-        mock_password_provider.check_password.return_value = defer.succeed(False)
+        mock_password_provider.check_password.return_value = make_awaitable(False)
         channel = self._send_password_login("u", "p")
-        self.assertEqual(channel.code, 403, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.FORBIDDEN, channel.result)
 
         channel = self._send_password_login("localuser", "localpass")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         self.assertEqual("@localuser:test", channel.json_body["user_id"])
 
     @override_config(legacy_providers_config(LegacyPasswordOnlyAuthProvider))
@@ -272,7 +274,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.register_user("localuser", "localpass")
 
         # have the auth provider deny the request
-        mock_password_provider.check_password.return_value = defer.succeed(False)
+        mock_password_provider.check_password.return_value = make_awaitable(False)
 
         # log in twice, to get two devices
         tok1 = self.login("localuser", "localpass")
@@ -315,7 +317,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.register_user("localuser", "localpass")
 
         # check_password must return an awaitable
-        mock_password_provider.check_password.return_value = defer.succeed(False)
+        mock_password_provider.check_password.return_value = make_awaitable(False)
         channel = self._send_password_login("localuser", "localpass")
         self.assertEqual(channel.code, 403)
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
@@ -337,7 +339,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.register_user("localuser", "localpass")
 
         # allow login via the auth provider
-        mock_password_provider.check_password.return_value = defer.succeed(True)
+        mock_password_provider.check_password.return_value = make_awaitable(True)
 
         # log in twice, to get two devices
         tok1 = self.login("localuser", "p")
@@ -354,7 +356,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         mock_password_provider.check_password.assert_not_called()
 
         # now try deleting with the local password
-        mock_password_provider.check_password.return_value = defer.succeed(False)
+        mock_password_provider.check_password.return_value = make_awaitable(False)
         channel = self._authed_delete_device(
             tok1, "dev2", session, "localuser", "localpass"
         )
@@ -381,7 +383,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
         # login shouldn't work and should be rejected with a 400 ("unknown login type")
         channel = self._send_password_login("u", "p")
-        self.assertEqual(channel.code, 400, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
         mock_password_provider.check_password.assert_not_called()
 
     @override_config(legacy_providers_config(LegacyCustomAuthProvider))
@@ -405,14 +407,14 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
         # login with missing param should be rejected
         channel = self._send_login("test.login_type", "u")
-        self.assertEqual(channel.code, 400, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
         mock_password_provider.check_auth.assert_not_called()
 
-        mock_password_provider.check_auth.return_value = defer.succeed(
+        mock_password_provider.check_auth.return_value = make_awaitable(
             ("@user:bz", None)
         )
         channel = self._send_login("test.login_type", "u", test_field="y")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         self.assertEqual("@user:bz", channel.json_body["user_id"])
         mock_password_provider.check_auth.assert_called_once_with(
             "u", "test.login_type", {"test_field": "y"}
@@ -422,11 +424,11 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         # try a weird username. Again, it's unclear what we *expect* to happen
         # in these cases, but at least we can guard against the API changing
         # unexpectedly
-        mock_password_provider.check_auth.return_value = defer.succeed(
+        mock_password_provider.check_auth.return_value = make_awaitable(
             ("@ MALFORMED! :bz", None)
         )
         channel = self._send_login("test.login_type", " USER🙂NAME ", test_field=" abc ")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         self.assertEqual("@ MALFORMED! :bz", channel.json_body["user_id"])
         mock_password_provider.check_auth.assert_called_once_with(
             " USER🙂NAME ", "test.login_type", {"test_field": " abc "}
@@ -472,7 +474,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         mock_password_provider.reset_mock()
 
         # right params, but authing as the wrong user
-        mock_password_provider.check_auth.return_value = defer.succeed(
+        mock_password_provider.check_auth.return_value = make_awaitable(
             ("@user:bz", None)
         )
         body["auth"]["test_field"] = "foo"
@@ -485,7 +487,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         mock_password_provider.reset_mock()
 
         # and finally, succeed
-        mock_password_provider.check_auth.return_value = defer.succeed(
+        mock_password_provider.check_auth.return_value = make_awaitable(
             ("@localuser:test", None)
         )
         channel = self._delete_device(tok1, "dev2", body)
@@ -503,13 +505,13 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         self.custom_auth_provider_callback_test_body()
 
     def custom_auth_provider_callback_test_body(self):
-        callback = Mock(return_value=defer.succeed(None))
+        callback = Mock(return_value=make_awaitable(None))
 
-        mock_password_provider.check_auth.return_value = defer.succeed(
+        mock_password_provider.check_auth.return_value = make_awaitable(
             ("@user:bz", callback)
         )
         channel = self._send_login("test.login_type", "u", test_field="y")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         self.assertEqual("@user:bz", channel.json_body["user_id"])
         mock_password_provider.check_auth.assert_called_once_with(
             "u", "test.login_type", {"test_field": "y"}
@@ -548,7 +550,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
         # login shouldn't work and should be rejected with a 400 ("unknown login type")
         channel = self._send_password_login("localuser", "localpass")
-        self.assertEqual(channel.code, 400, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
         mock_password_provider.check_auth.assert_not_called()
 
     @override_config(
@@ -583,7 +585,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
         # login shouldn't work and should be rejected with a 400 ("unknown login type")
         channel = self._send_password_login("localuser", "localpass")
-        self.assertEqual(channel.code, 400, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
         mock_password_provider.check_auth.assert_not_called()
 
     @override_config(
@@ -614,7 +616,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
 
         # login shouldn't work and should be rejected with a 400 ("unknown login type")
         channel = self._send_password_login("localuser", "localpass")
-        self.assertEqual(channel.code, 400, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
         mock_password_provider.check_auth.assert_not_called()
         mock_password_provider.check_password.assert_not_called()
 
@@ -641,17 +643,17 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         login is disabled"""
         # register the user and log in twice via the test login type to get two devices,
         self.register_user("localuser", "localpass")
-        mock_password_provider.check_auth.return_value = defer.succeed(
+        mock_password_provider.check_auth.return_value = make_awaitable(
             ("@localuser:test", None)
         )
         channel = self._send_login("test.login_type", "localuser", test_field="")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         tok1 = channel.json_body["access_token"]
 
         channel = self._send_login(
             "test.login_type", "localuser", test_field="", device_id="dev2"
         )
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
 
         # make the initial request which returns a 401
         channel = self._delete_device(tok1, "dev2")
@@ -720,7 +722,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         # password login shouldn't work and should be rejected with a 400
         # ("unknown login type")
         channel = self._send_password_login("localuser", "localpass")
-        self.assertEqual(channel.code, 400, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.BAD_REQUEST, channel.result)
 
     def test_on_logged_out(self):
         """Tests that the on_logged_out callback is called when the user logs out."""
@@ -751,7 +753,9 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         """Tests that the get_username_for_registration callback can define the username
         of a user when registering.
         """
-        self._setup_get_username_for_registration()
+        self._setup_get_name_for_registration(
+            callback_name=self.CALLBACK_USERNAME,
+        )
 
         username = "rin"
         channel = self.make_request(
@@ -774,10 +778,160 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         """Tests that the get_username_for_registration callback is only called at the
         end of the UIA flow.
         """
-        m = self._setup_get_username_for_registration()
+        m = self._setup_get_name_for_registration(
+            callback_name=self.CALLBACK_USERNAME,
+        )
 
-        # Initiate the UIA flow.
         username = "rin"
+        res = self._do_uia_assert_mock_not_called(username, m)
+
+        mxid = res["user_id"]
+        self.assertEqual(UserID.from_string(mxid).localpart, username + "-foo")
+
+        # Check that the callback has been called.
+        m.assert_called_once()
+
+    # Set some email configuration so the test doesn't fail because of its absence.
+    @override_config({"email": {"notif_from": "noreply@test"}})
+    def test_3pid_allowed(self):
+        """Tests that an is_3pid_allowed_callbacks forbidding a 3PID makes Synapse refuse
+        to bind the new 3PID, and that one allowing a 3PID makes Synapse accept to bind
+        the 3PID. Also checks that the module is passed a boolean indicating whether the
+        user to bind this 3PID to is currently registering.
+        """
+        self._test_3pid_allowed("rin", False)
+        self._test_3pid_allowed("kitay", True)
+
+    def test_displayname(self):
+        """Tests that the get_displayname_for_registration callback can define the
+        display name of a user when registering.
+        """
+        self._setup_get_name_for_registration(
+            callback_name=self.CALLBACK_DISPLAYNAME,
+        )
+
+        username = "rin"
+        channel = self.make_request(
+            "POST",
+            "/register",
+            {
+                "username": username,
+                "password": "bar",
+                "auth": {"type": LoginType.DUMMY},
+            },
+        )
+        self.assertEqual(channel.code, 200)
+
+        # Our callback takes the username and appends "-foo" to it, check that's what we
+        # have.
+        user_id = UserID.from_string(channel.json_body["user_id"])
+        display_name = self.get_success(
+            self.hs.get_profile_handler().get_displayname(user_id)
+        )
+
+        self.assertEqual(display_name, username + "-foo")
+
+    def test_displayname_uia(self):
+        """Tests that the get_displayname_for_registration callback is only called at the
+        end of the UIA flow.
+        """
+        m = self._setup_get_name_for_registration(
+            callback_name=self.CALLBACK_DISPLAYNAME,
+        )
+
+        username = "rin"
+        res = self._do_uia_assert_mock_not_called(username, m)
+
+        user_id = UserID.from_string(res["user_id"])
+        display_name = self.get_success(
+            self.hs.get_profile_handler().get_displayname(user_id)
+        )
+
+        self.assertEqual(display_name, username + "-foo")
+
+        # Check that the callback has been called.
+        m.assert_called_once()
+
+    def _test_3pid_allowed(self, username: str, registration: bool):
+        """Tests that the "is_3pid_allowed" module callback is called correctly, using
+        either /register or /account URLs depending on the arguments.
+
+        Args:
+            username: The username to use for the test.
+            registration: Whether to test with registration URLs.
+        """
+        self.hs.get_identity_handler().send_threepid_validation = Mock(
+            return_value=make_awaitable(0),
+        )
+
+        m = Mock(return_value=make_awaitable(False))
+        self.hs.get_password_auth_provider().is_3pid_allowed_callbacks = [m]
+
+        self.register_user(username, "password")
+        tok = self.login(username, "password")
+
+        if registration:
+            url = "/register/email/requestToken"
+        else:
+            url = "/account/3pid/email/requestToken"
+
+        channel = self.make_request(
+            "POST",
+            url,
+            {
+                "client_secret": "foo",
+                "email": "foo@test.com",
+                "send_attempt": 0,
+            },
+            access_token=tok,
+        )
+        self.assertEqual(channel.code, HTTPStatus.FORBIDDEN, channel.result)
+        self.assertEqual(
+            channel.json_body["errcode"],
+            Codes.THREEPID_DENIED,
+            channel.json_body,
+        )
+
+        m.assert_called_once_with("email", "foo@test.com", registration)
+
+        m = Mock(return_value=make_awaitable(True))
+        self.hs.get_password_auth_provider().is_3pid_allowed_callbacks = [m]
+
+        channel = self.make_request(
+            "POST",
+            url,
+            {
+                "client_secret": "foo",
+                "email": "bar@test.com",
+                "send_attempt": 0,
+            },
+            access_token=tok,
+        )
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
+        self.assertIn("sid", channel.json_body)
+
+        m.assert_called_once_with("email", "bar@test.com", registration)
+
+    def _setup_get_name_for_registration(self, callback_name: str) -> Mock:
+        """Registers either a get_username_for_registration callback or a
+        get_displayname_for_registration callback that appends "-foo" to the username the
+        client is trying to register.
+        """
+
+        async def callback(uia_results, params):
+            self.assertIn(LoginType.DUMMY, uia_results)
+            username = params["username"]
+            return username + "-foo"
+
+        m = Mock(side_effect=callback)
+
+        password_auth_provider = self.hs.get_password_auth_provider()
+        getattr(password_auth_provider, callback_name + "_callbacks").append(m)
+
+        return m
+
+    def _do_uia_assert_mock_not_called(self, username: str, m: Mock) -> JsonDict:
+        # Initiate the UIA flow.
         channel = self.make_request(
             "POST",
             "register",
@@ -796,33 +950,12 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
             "register",
             {"auth": {"session": session, "type": LoginType.DUMMY}},
         )
-        self.assertEqual(channel.code, 200, channel.json_body)
-        mxid = channel.json_body["user_id"]
-        self.assertEqual(UserID.from_string(mxid).localpart, username + "-foo")
-
-        # Check that the callback has been called.
-        m.assert_called_once()
-
-    def _setup_get_username_for_registration(self) -> Mock:
-        """Registers a get_username_for_registration callback that appends "-foo" to the
-        username the client is trying to register.
-        """
-
-        async def get_username_for_registration(uia_results, params):
-            self.assertIn(LoginType.DUMMY, uia_results)
-            username = params["username"]
-            return username + "-foo"
-
-        m = Mock(side_effect=get_username_for_registration)
-
-        password_auth_provider = self.hs.get_password_auth_provider()
-        password_auth_provider.get_username_for_registration_callbacks.append(m)
-
-        return m
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
+        return channel.json_body
 
     def _get_login_flows(self) -> JsonDict:
         channel = self.make_request("GET", "/_matrix/client/r0/login")
-        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         return channel.json_body["flows"]
 
     def _send_password_login(self, user: str, password: str) -> FakeChannel:

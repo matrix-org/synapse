@@ -13,11 +13,15 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
+
+from twisted.web.server import Request
 
 from synapse.api.errors import SynapseError
+from synapse.http.server import HttpServer
 from synapse.http.servlet import parse_integer
 from synapse.replication.http._base import ReplicationEndpoint
+from synapse.types import JsonDict
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -57,10 +61,14 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
         self.streams = hs.get_replication_streams()
 
     @staticmethod
-    async def _serialize_payload(stream_name, from_token, upto_token):
+    async def _serialize_payload(  # type: ignore[override]
+        stream_name: str, from_token: int, upto_token: int
+    ) -> JsonDict:
         return {"from_token": from_token, "upto_token": upto_token}
 
-    async def _handle_request(self, request, stream_name):
+    async def _handle_request(  # type: ignore[override]
+        self, request: Request, stream_name: str
+    ) -> Tuple[int, JsonDict]:
         stream = self.streams.get(stream_name)
         if stream is None:
             raise SynapseError(400, "Unknown stream")
@@ -78,5 +86,5 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
         )
 
 
-def register_servlets(hs: "HomeServer", http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ReplicationGetStreamUpdates(hs).register(http_server)

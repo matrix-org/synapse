@@ -28,6 +28,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.appservice import ApplicationService
+from synapse.module_api import NOT_SPAM
 from synapse.storage.databases.main.directory import RoomAliasMapping
 from synapse.types import JsonDict, Requester, RoomAlias, UserID, get_domain_from_id
 
@@ -44,7 +45,8 @@ class DirectoryHandler:
         self.state = hs.get_state_handler()
         self.appservice_handler = hs.get_application_service_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastores().main
+        self._storage_controllers = hs.get_storage_controllers()
         self.config = hs.config
         self.enable_room_list_search = hs.config.roomdirectory.enable_room_list_search
         self.require_membership = hs.config.server.require_membership_for_aliases
@@ -70,6 +72,9 @@ class DirectoryHandler:
         for wchar in string.whitespace:
             if wchar in room_alias.localpart:
                 raise SynapseError(400, "Invalid characters in room alias")
+
+        if ":" in room_alias.localpart:
+            raise SynapseError(400, "Invalid character in room alias localpart: ':'.")
 
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
@@ -119,7 +124,7 @@ class DirectoryHandler:
 
         service = requester.app_service
         if service:
-            if not service.is_interested_in_alias(room_alias_str):
+            if not service.is_room_alias_in_namespace(room_alias_str):
                 raise SynapseError(
                     400,
                     "This application service has not reserved this kind of alias.",
@@ -137,10 +142,16 @@ class DirectoryHandler:
                         403, "You must be in the room to create an alias for it"
                     )
 
-            if not await self.spam_checker.user_may_create_room_alias(
+            spam_check = await self.spam_checker.user_may_create_room_alias(
                 user_id, room_alias
-            ):
-                raise AuthError(403, "This user is not permitted to create this alias")
+            )
+            if spam_check != self.spam_checker.NOT_SPAM:
+                raise AuthError(
+                    403,
+                    "This user is not permitted to create this alias",
+                    errcode=spam_check[0],
+                    additional_fields=spam_check[1],
+                )
 
             if not self.config.roomdirectory.is_alias_creation_allowed(
                 user_id, room_id, room_alias_str
@@ -221,7 +232,7 @@ class DirectoryHandler:
     async def delete_appservice_association(
         self, service: ApplicationService, room_alias: RoomAlias
     ) -> None:
-        if not service.is_interested_in_alias(room_alias.to_string()):
+        if not service.is_room_alias_in_namespace(room_alias.to_string()):
             raise SynapseError(
                 400,
                 "This application service has not reserved this kind of alias",
@@ -316,7 +327,7 @@ class DirectoryHandler:
         Raises:
             ShadowBanError if the requester has been shadow-banned.
         """
-        alias_event = await self.state.get_current_state(
+        alias_event = await self._storage_controllers.state.get_current_state_event(
             room_id, EventTypes.CanonicalAlias, ""
         )
 
@@ -376,7 +387,7 @@ class DirectoryHandler:
         # non-exclusive locks on the alias (or there are no interested services)
         services = self.store.get_app_services()
         interested_services = [
-            s for s in services if s.is_interested_in_alias(alias.to_string())
+            s for s in services if s.is_room_alias_in_namespace(alias.to_string())
         ]
 
         for service in interested_services:
@@ -426,9 +437,13 @@ class DirectoryHandler:
         """
         user_id = requester.user.to_string()
 
-        if not await self.spam_checker.user_may_publish_room(user_id, room_id):
+        spam_check = await self.spam_checker.user_may_publish_room(user_id, room_id)
+        if spam_check != NOT_SPAM:
             raise AuthError(
-                403, "This user is not permitted to publish rooms to the room list"
+                403,
+                "This user is not permitted to publish rooms to the room list",
+                errcode=spam_check[0],
+                additional_fields=spam_check[1],
             )
 
         if requester.is_guest:
@@ -460,7 +475,11 @@ class DirectoryHandler:
         making_public = visibility == "public"
         if making_public:
             room_aliases = await self.store.get_aliases_for_room(room_id)
-            canonical_alias = await self.store.get_canonical_alias_for_room(room_id)
+            canonical_alias = (
+                await self._storage_controllers.state.get_canonical_alias_for_room(
+                    room_id
+                )
+            )
             if canonical_alias:
                 room_aliases.append(canonical_alias)
 

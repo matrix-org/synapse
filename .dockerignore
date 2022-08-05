@@ -3,11 +3,9 @@
 
 # things to include
 !docker
-!scripts
 !synapse
-!MANIFEST.in
 !README.rst
-!setup.py
-!synctl
+!pyproject.toml
+!poetry.lock
 
 **/__pycache__

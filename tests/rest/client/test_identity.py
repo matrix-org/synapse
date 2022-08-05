@@ -12,10 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
+from http import HTTPStatus
+
+from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
+from synapse.util import Clock
 
 from tests import unittest
 
@@ -28,7 +32,7 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
+    def make_homeserver(self, reactor: MemoryReactor, clock: Clock) -> HomeServer:
 
         config = self.default_config()
         config["enable_3pid_lookup"] = False
@@ -36,24 +40,23 @@ class IdentityTestCase(unittest.HomeserverTestCase):
 
         return self.hs
 
-    def test_3pid_lookup_disabled(self):
+    def test_3pid_lookup_disabled(self) -> None:
         self.hs.config.registration.enable_3pid_lookup = False
 
         self.register_user("kermit", "monkey")
         tok = self.login("kermit", "monkey")
 
         channel = self.make_request(b"POST", "/createRoom", b"{}", access_token=tok)
-        self.assertEquals(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.code, HTTPStatus.OK, channel.result)
         room_id = channel.json_body["room_id"]
 
-        params = {
+        request_data = {
             "id_server": "testis",
             "medium": "email",
             "address": "test@example.com",
         }
-        request_data = json.dumps(params)
         request_url = ("/rooms/%s/invite" % (room_id)).encode("ascii")
         channel = self.make_request(
             b"POST", request_url, request_data, access_token=tok
         )
-        self.assertEquals(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.code, HTTPStatus.FORBIDDEN, channel.result)

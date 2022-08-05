@@ -79,63 +79,32 @@ server {
 }
 ```
 
-### Caddy v1
-
-```
-matrix.example.com {
-  proxy /_matrix http://localhost:8008 {
-    transparent
-  }
-
-  proxy /_synapse/client http://localhost:8008 {
-    transparent
-  }
-}
-
-example.com:8448 {
-  proxy / http://localhost:8008 {
-    transparent
-  }
-}
-```
-
 ### Caddy v2
 
 ```
 matrix.example.com {
-  reverse_proxy /_matrix/* http://localhost:8008
-  reverse_proxy /_synapse/client/* http://localhost:8008
+  reverse_proxy /_matrix/* localhost:8008
+  reverse_proxy /_synapse/client/* localhost:8008
 }
 
 example.com:8448 {
-  reverse_proxy http://localhost:8008
+  reverse_proxy localhost:8008
 }
 ```
+
 [Delegation](delegate.md) example:
+
 ```
-(matrix-well-known-header) {
-    # Headers
-    header Access-Control-Allow-Origin "*"
-    header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-    header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
-    header Content-Type "application/json"
-}
-
 example.com {
-    handle /.well-known/matrix/server {
-        import matrix-well-known-header
-        respond `{"m.server":"matrix.example.com:443"}`
-    }
-
-    handle /.well-known/matrix/client {
-        import matrix-well-known-header
-        respond `{"m.homeserver":{"base_url":"https://matrix.example.com"},"m.identity_server":{"base_url":"https://identity.example.com"}}`
-    }
+	header /.well-known/matrix/* Content-Type application/json
+	header /.well-known/matrix/* Access-Control-Allow-Origin *
+	respond /.well-known/matrix/server `{"m.server": "matrix.example.com:443"}`
+	respond /.well-known/matrix/client `{"m.homeserver":{"base_url":"https://matrix.example.com"},"m.identity_server":{"base_url":"https://identity.example.com"}}`
 }
 
 matrix.example.com {
-    reverse_proxy /_matrix/* http://localhost:8008
-    reverse_proxy /_synapse/client/* http://localhost:8008
+    reverse_proxy /_matrix/* localhost:8008
+    reverse_proxy /_synapse/client/* localhost:8008
 }
 ```
 
@@ -182,7 +151,7 @@ matrix.example.com {
 
 ```
 frontend https
-  bind :::443 v4v6 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
+  bind *:443,[::]:443 ssl crt /etc/ssl/haproxy/ strict-sni alpn h2,http/1.1
   http-request set-header X-Forwarded-Proto https if { ssl_fc }
   http-request set-header X-Forwarded-Proto http if !{ ssl_fc }
   http-request set-header X-Forwarded-For %[src]
@@ -195,7 +164,7 @@ frontend https
   use_backend matrix if matrix-host matrix-path
 
 frontend matrix-federation
-  bind :::8448 v4v6 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1
+  bind *:8448,[::]:8448 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1
   http-request set-header X-Forwarded-Proto https if { ssl_fc }
   http-request set-header X-Forwarded-Proto http if !{ ssl_fc }
   http-request set-header X-Forwarded-For %[src]
@@ -204,6 +173,28 @@ frontend matrix-federation
 
 backend matrix
   server matrix 127.0.0.1:8008
+```
+
+
+[Delegation](delegate.md) example:
+```
+frontend https
+  acl matrix-well-known-client-path path /.well-known/matrix/client
+  acl matrix-well-known-server-path path /.well-known/matrix/server
+  use_backend matrix-well-known-client if matrix-well-known-client-path
+  use_backend matrix-well-known-server if matrix-well-known-server-path
+ 
+backend matrix-well-known-client
+  http-after-response set-header Access-Control-Allow-Origin "*"
+  http-after-response set-header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+  http-after-response set-header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+  http-request return status 200 content-type application/json string '{"m.homeserver":{"base_url":"https://matrix.example.com"},"m.identity_server":{"base_url":"https://identity.example.com"}}'
+
+backend matrix-well-known-server
+  http-after-response set-header Access-Control-Allow-Origin "*"
+  http-after-response set-header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+  http-after-response set-header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+  http-request return status 200 content-type application/json string '{"m.server":"matrix.example.com:443"}'
 ```
 
 ### Relayd

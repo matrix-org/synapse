@@ -13,10 +13,9 @@
 # limitations under the License.
 from typing import Dict
 
-from synapse.api.constants import ReceiptTypes
 from synapse.events import EventBase
 from synapse.push.presentable_names import calculate_room_name, name_from_member_event
-from synapse.storage import Storage
+from synapse.storage.controllers import StorageControllers
 from synapse.storage.databases.main import DataStore
 
 
@@ -24,33 +23,29 @@ async def get_badge_count(store: DataStore, user_id: str, group_by_room: bool) -
     invites = await store.get_invited_rooms_for_local_user(user_id)
     joins = await store.get_rooms_for_user(user_id)
 
-    my_receipts_by_room = await store.get_receipts_for_user(user_id, ReceiptTypes.READ)
-
     badge = len(invites)
 
     for room_id in joins:
-        if room_id in my_receipts_by_room:
-            last_unread_event_id = my_receipts_by_room[room_id]
-
-            notifs = await (
-                store.get_unread_event_push_actions_by_room_for_user(
-                    room_id, user_id, last_unread_event_id
-                )
+        notifs = await (
+            store.get_unread_event_push_actions_by_room_for_user(
+                room_id,
+                user_id,
             )
-            if notifs.notify_count == 0:
-                continue
+        )
+        if notifs.notify_count == 0:
+            continue
 
-            if group_by_room:
-                # return one badge count per conversation
-                badge += 1
-            else:
-                # increment the badge count by the number of unread messages in the room
-                badge += notifs.notify_count
+        if group_by_room:
+            # return one badge count per conversation
+            badge += 1
+        else:
+            # increment the badge count by the number of unread messages in the room
+            badge += notifs.notify_count
     return badge
 
 
 async def get_context_for_event(
-    storage: Storage, ev: EventBase, user_id: str
+    storage: StorageControllers, ev: EventBase, user_id: str
 ) -> Dict[str, str]:
     ctx = {}
 

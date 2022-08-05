@@ -16,18 +16,19 @@
 import gc
 import hashlib
 import hmac
-import inspect
 import logging
 import secrets
 import time
 from typing import (
     Any,
-    AnyStr,
+    Awaitable,
     Callable,
     ClassVar,
     Dict,
+    Generic,
     Iterable,
     List,
+    NoReturn,
     Optional,
     Tuple,
     Type,
@@ -36,9 +37,12 @@ from typing import (
 )
 from unittest.mock import Mock, patch
 
-from canonicaljson import json
+import canonicaljson
+import signedjson.key
+import unpaddedbase64
+from typing_extensions import Concatenate, ParamSpec, Protocol
 
-from twisted.internet.defer import Deferred, ensureDeferred, succeed
+from twisted.internet.defer import Deferred, ensureDeferred
 from twisted.python.failure import Failure
 from twisted.python.threadpool import ThreadPool
 from twisted.test.proto_helpers import MemoryReactor
@@ -47,10 +51,12 @@ from twisted.web.resource import Resource
 from twisted.web.server import Request
 
 from synapse import events
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.config.homeserver import HomeServerConfig
-from synapse.config.ratelimiting import FederationRateLimitConfig
-from synapse.federation.transport import server as federation_server
+from synapse.config.server import DEFAULT_ROOM_VERSION
+from synapse.crypto.event_signing import add_hashes_and_signatures
+from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import (
@@ -61,12 +67,18 @@ from synapse.logging.context import (
 )
 from synapse.rest import RegisterServletsFunc
 from synapse.server import HomeServer
-from synapse.types import JsonDict, UserID, create_requester
+from synapse.storage.keys import FetchKeyResult
+from synapse.types import JsonDict, Requester, UserID, create_requester
 from synapse.util import Clock
 from synapse.util.httpresourcetree import create_resource_tree
-from synapse.util.ratelimitutils import FederationRateLimiter
 
-from tests.server import FakeChannel, get_clock, make_request, setup_test_homeserver
+from tests.server import (
+    CustomHeaderType,
+    FakeChannel,
+    get_clock,
+    make_request,
+    setup_test_homeserver,
+)
 from tests.test_utils import event_injection, setup_awaitable_errors
 from tests.test_utils.logging_setup import setup_logging
 from tests.utils import default_config, setupdb
@@ -74,8 +86,23 @@ from tests.utils import default_config, setupdb
 setupdb()
 setup_logging()
 
+TV = TypeVar("TV")
+_ExcType = TypeVar("_ExcType", bound=BaseException, covariant=True)
 
-def around(target):
+P = ParamSpec("P")
+R = TypeVar("R")
+S = TypeVar("S")
+
+
+class _TypedFailure(Generic[_ExcType], Protocol):
+    """Extension to twisted.Failure, where the 'value' has a certain type."""
+
+    @property
+    def value(self) -> _ExcType:
+        ...
+
+
+def around(target: TV) -> Callable[[Callable[Concatenate[S, P], R]], None]:
     """A CLOS-style 'around' modifier, which wraps the original method of the
     given instance with another piece of code.
 
@@ -84,11 +111,11 @@ def around(target):
         return orig(*args, **kwargs)
     """
 
-    def _around(code):
+    def _around(code: Callable[Concatenate[S, P], R]) -> None:
         name = code.__name__
         orig = getattr(target, name)
 
-        def new(*args, **kwargs):
+        def new(*args: P.args, **kwargs: P.kwargs) -> R:
             return code(orig, *args, **kwargs)
 
         setattr(target, name, new)
@@ -109,7 +136,7 @@ class TestCase(unittest.TestCase):
         level = getattr(method, "loglevel", getattr(self, "loglevel", None))
 
         @around(self)
-        def setUp(orig):
+        def setUp(orig: Callable[[], R]) -> R:
             # if we're not starting in the sentinel logcontext, then to be honest
             # all future bets are off.
             if current_context():
@@ -122,7 +149,7 @@ class TestCase(unittest.TestCase):
             if level is not None and old_level != level:
 
                 @around(self)
-                def tearDown(orig):
+                def tearDown(orig: Callable[[], R]) -> R:
                     ret = orig()
                     logging.getLogger().setLevel(old_level)
                     return ret
@@ -136,7 +163,7 @@ class TestCase(unittest.TestCase):
             return orig()
 
         @around(self)
-        def tearDown(orig):
+        def tearDown(orig: Callable[[], R]) -> R:
             ret = orig()
             # force a GC to workaround problems with deferreds leaking logcontexts when
             # they are GCed (see the logcontext docs)
@@ -145,55 +172,55 @@ class TestCase(unittest.TestCase):
 
             return ret
 
-    def assertObjectHasAttributes(self, attrs, obj):
+    def assertObjectHasAttributes(self, attrs: Dict[str, object], obj: object) -> None:
         """Asserts that the given object has each of the attributes given, and
-        that the value of each matches according to assertEquals."""
+        that the value of each matches according to assertEqual."""
         for key in attrs.keys():
             if not hasattr(obj, key):
                 raise AssertionError("Expected obj to have a '.%s'" % key)
             try:
-                self.assertEquals(attrs[key], getattr(obj, key))
+                self.assertEqual(attrs[key], getattr(obj, key))
             except AssertionError as e:
                 raise (type(e))(f"Assert error for '.{key}':") from e
 
-    def assert_dict(self, required, actual):
+    def assert_dict(self, required: dict, actual: dict) -> None:
         """Does a partial assert of a dict.
 
         Args:
-            required (dict): The keys and value which MUST be in 'actual'.
-            actual (dict): The test result. Extra keys will not be checked.
+            required: The keys and value which MUST be in 'actual'.
+            actual: The test result. Extra keys will not be checked.
         """
         for key in required:
-            self.assertEquals(
+            self.assertEqual(
                 required[key], actual[key], msg="%s mismatch. %s" % (key, actual)
             )
 
 
-def DEBUG(target):
+def DEBUG(target: TV) -> TV:
     """A decorator to set the .loglevel attribute to logging.DEBUG.
     Can apply to either a TestCase or an individual test method."""
-    target.loglevel = logging.DEBUG
+    target.loglevel = logging.DEBUG  # type: ignore[attr-defined]
     return target
 
 
-def INFO(target):
+def INFO(target: TV) -> TV:
     """A decorator to set the .loglevel attribute to logging.INFO.
     Can apply to either a TestCase or an individual test method."""
-    target.loglevel = logging.INFO
+    target.loglevel = logging.INFO  # type: ignore[attr-defined]
     return target
 
 
-def logcontext_clean(target):
+def logcontext_clean(target: TV) -> TV:
     """A decorator which marks the TestCase or method as 'logcontext_clean'
 
     ... ie, any logcontext errors should cause a test failure
     """
 
-    def logcontext_error(msg):
+    def logcontext_error(msg: str) -> NoReturn:
         raise AssertionError("logcontext error: %s" % (msg))
 
     patcher = patch("synapse.logging.context.logcontext_error", new=logcontext_error)
-    return patcher(target)
+    return patcher(target)  # type: ignore[call-overload]
 
 
 class HomeserverTestCase(TestCase):
@@ -233,7 +260,7 @@ class HomeserverTestCase(TestCase):
         method = getattr(self, methodName)
         self._extra_config = getattr(method, "_extra_config", None)
 
-    def setUp(self):
+    def setUp(self) -> None:
         """
         Set up the TestCase by calling the homeserver constructor, optionally
         hijacking the authentication system to return a fixed user, and then
@@ -262,7 +289,7 @@ class HomeserverTestCase(TestCase):
             config=self.hs.config.server.listeners[0],
             resource=self.resource,
             server_version_string="1",
-            max_request_body_size=1234,
+            max_request_body_size=4096,
             reactor=self.reactor,
         )
 
@@ -272,10 +299,11 @@ class HomeserverTestCase(TestCase):
 
         if hasattr(self, "user_id"):
             if self.hijack_auth:
+                assert self.helper.auth_user_id is not None
 
                 # We need a valid token ID to satisfy foreign key constraints.
                 token_id = self.get_success(
-                    self.hs.get_datastore().add_access_token_to_user(
+                    self.hs.get_datastores().main.add_access_token_to_user(
                         self.helper.auth_user_id,
                         "some_fake_token",
                         None,
@@ -283,14 +311,22 @@ class HomeserverTestCase(TestCase):
                     )
                 )
 
-                async def get_user_by_access_token(token=None, allow_guest=False):
+                async def get_user_by_access_token(
+                    token: Optional[str] = None, allow_guest: bool = False
+                ) -> JsonDict:
+                    assert self.helper.auth_user_id is not None
                     return {
                         "user": UserID.from_string(self.helper.auth_user_id),
                         "token_id": token_id,
                         "is_guest": False,
                     }
 
-                async def get_user_by_req(request, allow_guest=False, rights="access"):
+                async def get_user_by_req(
+                    request: SynapseRequest,
+                    allow_guest: bool = False,
+                    allow_expired: bool = False,
+                ) -> Requester:
+                    assert self.helper.auth_user_id is not None
                     return create_requester(
                         UserID.from_string(self.helper.auth_user_id),
                         token_id,
@@ -307,18 +343,18 @@ class HomeserverTestCase(TestCase):
                 )
 
         if self.needs_threadpool:
-            self.reactor.threadpool = ThreadPool()
+            self.reactor.threadpool = ThreadPool()  # type: ignore[assignment]
             self.addCleanup(self.reactor.threadpool.stop)
             self.reactor.threadpool.start()
 
         if hasattr(self, "prepare"):
             self.prepare(self.reactor, self.clock, self.hs)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         # Reset to not use frozen dicts.
         events.USE_FROZEN_DICTS = False
 
-    def wait_on_thread(self, deferred, timeout=10):
+    def wait_on_thread(self, deferred: Deferred, timeout: int = 10) -> None:
         """
         Wait until a Deferred is done, where it's waiting on a real thread.
         """
@@ -332,7 +368,7 @@ class HomeserverTestCase(TestCase):
 
     def wait_for_background_updates(self) -> None:
         """Block until all background database updates have completed."""
-        store = self.hs.get_datastore()
+        store = self.hs.get_datastores().main
         while not self.get_success(
             store.db_pool.updates.has_completed_background_updates()
         ):
@@ -349,7 +385,7 @@ class HomeserverTestCase(TestCase):
             clock (synapse.util.Clock): The Clock, associated with the reactor.
 
         Returns:
-            A homeserver (synapse.server.HomeServer) suitable for testing.
+            A homeserver suitable for testing.
 
         Function to be overridden in subclasses.
         """
@@ -383,7 +419,7 @@ class HomeserverTestCase(TestCase):
             "/_synapse/admin": servlet_resource,
         }
 
-    def default_config(self):
+    def default_config(self) -> JsonDict:
         """
         Get a default HomeServer config dict.
         """
@@ -396,7 +432,9 @@ class HomeserverTestCase(TestCase):
 
         return config
 
-    def prepare(self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer):
+    def prepare(
+        self, reactor: MemoryReactor, clock: Clock, homeserver: HomeServer
+    ) -> None:
         """
         Prepare for the test.  This involves things like mocking out parts of
         the homeserver, or building test data common across the whole test
@@ -422,7 +460,7 @@ class HomeserverTestCase(TestCase):
         federation_auth_origin: Optional[bytes] = None,
         content_is_form: bool = False,
         await_result: bool = True,
-        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
+        custom_headers: Optional[Iterable[CustomHeaderType]] = None,
         client_ip: str = "127.0.0.1",
     ) -> FakeChannel:
         """
@@ -494,12 +532,12 @@ class HomeserverTestCase(TestCase):
         config_obj.parse_config_dict(config, "", "")
         kwargs["config"] = config_obj
 
-        async def run_bg_updates():
+        async def run_bg_updates() -> None:
             with LoggingContext("run_bg_updates"):
                 self.get_success(stor.db_pool.updates.run_background_updates(False))
 
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
-        stor = hs.get_datastore()
+        stor = hs.get_datastores().main
 
         # Run the database background updates, when running against "master".
         if hs.__class__.__name__ == "TestHomeServer":
@@ -507,40 +545,32 @@ class HomeserverTestCase(TestCase):
 
         return hs
 
-    def pump(self, by=0.0):
+    def pump(self, by: float = 0.0) -> None:
         """
         Pump the reactor enough that Deferreds will fire.
         """
         self.reactor.pump([by] * 100)
 
-    def get_success(self, d, by=0.0):
-        if inspect.isawaitable(d):
-            d = ensureDeferred(d)
-        if not isinstance(d, Deferred):
-            return d
+    def get_success(self, d: Awaitable[TV], by: float = 0.0) -> TV:
+        deferred: Deferred[TV] = ensureDeferred(d)  # type: ignore[arg-type]
         self.pump(by=by)
-        return self.successResultOf(d)
+        return self.successResultOf(deferred)
 
-    def get_failure(self, d, exc):
+    def get_failure(
+        self, d: Awaitable[Any], exc: Type[_ExcType]
+    ) -> _TypedFailure[_ExcType]:
         """
         Run a Deferred and get a Failure from it. The failure must be of the type `exc`.
         """
-        if inspect.isawaitable(d):
-            d = ensureDeferred(d)
-        if not isinstance(d, Deferred):
-            return d
+        deferred: Deferred[Any] = ensureDeferred(d)  # type: ignore[arg-type]
         self.pump()
-        return self.failureResultOf(d, exc)
+        return self.failureResultOf(deferred, exc)
 
-    def get_success_or_raise(self, d, by=0.0):
+    def get_success_or_raise(self, d: Awaitable[TV], by: float = 0.0) -> TV:
         """Drive deferred to completion and return result or raise exception
         on failure.
         """
-
-        if inspect.isawaitable(d):
-            deferred = ensureDeferred(d)
-        if not isinstance(deferred, Deferred):
-            return d
+        deferred: Deferred[TV] = ensureDeferred(d)  # type: ignore[arg-type]
 
         results: list = []
         deferred.addBoth(results.append)
@@ -597,20 +627,16 @@ class HomeserverTestCase(TestCase):
         want_mac.update(nonce.encode("ascii") + b"\x00" + nonce_str)
         want_mac_digest = want_mac.hexdigest()
 
-        body = json.dumps(
-            {
-                "nonce": nonce,
-                "username": username,
-                "displayname": displayname,
-                "password": password,
-                "admin": admin,
-                "mac": want_mac_digest,
-                "inhibit_login": True,
-            }
-        )
-        channel = self.make_request(
-            "POST", "/_synapse/admin/v1/register", body.encode("utf8")
-        )
+        body = {
+            "nonce": nonce,
+            "username": username,
+            "displayname": displayname,
+            "password": password,
+            "admin": admin,
+            "mac": want_mac_digest,
+            "inhibit_login": True,
+        }
+        channel = self.make_request("POST", "/_synapse/admin/v1/register", body)
         self.assertEqual(channel.code, 200, channel.json_body)
 
         user_id = channel.json_body["user_id"]
@@ -648,15 +674,13 @@ class HomeserverTestCase(TestCase):
 
     def login(
         self,
-        username,
-        password,
-        device_id=None,
-        custom_headers: Optional[Iterable[Tuple[AnyStr, AnyStr]]] = None,
-    ):
+        username: str,
+        password: str,
+        device_id: Optional[str] = None,
+        custom_headers: Optional[Iterable[CustomHeaderType]] = None,
+    ) -> str:
         """
-        Log in a user, and get an access token. Requires the Login API be
-        registered.
-
+        Log in a user, and get an access token. Requires the Login API be registered.
         """
         body = {"type": "m.login.password", "user": username, "password": password}
         if device_id:
@@ -665,7 +689,7 @@ class HomeserverTestCase(TestCase):
         channel = self.make_request(
             "POST",
             "/_matrix/client/r0/login",
-            json.dumps(body).encode("utf8"),
+            body,
             custom_headers=custom_headers,
         )
         self.assertEqual(channel.code, 200, channel.result)
@@ -674,18 +698,22 @@ class HomeserverTestCase(TestCase):
         return access_token
 
     def create_and_send_event(
-        self, room_id, user, soft_failed=False, prev_event_ids=None
-    ):
+        self,
+        room_id: str,
+        user: UserID,
+        soft_failed: bool = False,
+        prev_event_ids: Optional[List[str]] = None,
+    ) -> str:
         """
         Create and send an event.
 
         Args:
-            soft_failed (bool): Whether to create a soft failed event or not
-            prev_event_ids (list[str]|None): Explicitly set the prev events,
+            soft_failed: Whether to create a soft failed event or not
+            prev_event_ids: Explicitly set the prev events,
                 or if None just use the default
 
         Returns:
-            str: The new event's ID.
+            The new event's ID.
         """
         event_creator = self.hs.get_event_creation_handler()
         requester = create_requester(user)
@@ -712,32 +740,7 @@ class HomeserverTestCase(TestCase):
 
         return event.event_id
 
-    def add_extremity(self, room_id, event_id):
-        """
-        Add the given event as an extremity to the room.
-        """
-        self.get_success(
-            self.hs.get_datastore().db_pool.simple_insert(
-                table="event_forward_extremities",
-                values={"room_id": room_id, "event_id": event_id},
-                desc="test_add_extremity",
-            )
-        )
-
-        self.hs.get_datastore().get_latest_event_ids_in_room.invalidate((room_id,))
-
-    def attempt_wrong_password_login(self, username, password):
-        """Attempts to login as the user with the given password, asserting
-        that the attempt *fails*.
-        """
-        body = {"type": "m.login.password", "user": username, "password": password}
-
-        channel = self.make_request(
-            "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
-        )
-        self.assertEqual(channel.code, 403, channel.result)
-
-    def inject_room_member(self, room: str, user: str, membership: Membership) -> None:
+    def inject_room_member(self, room: str, user: str, membership: str) -> None:
         """
         Inject a membership event into a room.
 
@@ -755,45 +758,137 @@ class HomeserverTestCase(TestCase):
 
 class FederatingHomeserverTestCase(HomeserverTestCase):
     """
-    A federating homeserver that authenticates incoming requests as `other.example.com`.
+    A federating homeserver, set up to validate incoming federation requests
     """
+
+    OTHER_SERVER_NAME = "other.example.com"
+    OTHER_SERVER_SIGNATURE_KEY = signedjson.key.generate_signing_key("test")
+
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
+        super().prepare(reactor, clock, hs)
+
+        # poke the other server's signing key into the key store, so that we don't
+        # make requests for it
+        verify_key = signedjson.key.get_verify_key(self.OTHER_SERVER_SIGNATURE_KEY)
+        verify_key_id = "%s:%s" % (verify_key.alg, verify_key.version)
+
+        self.get_success(
+            hs.get_datastores().main.store_server_verify_keys(
+                from_server=self.OTHER_SERVER_NAME,
+                ts_added_ms=clock.time_msec(),
+                verify_keys=[
+                    (
+                        self.OTHER_SERVER_NAME,
+                        verify_key_id,
+                        FetchKeyResult(
+                            verify_key=verify_key,
+                            valid_until_ts=clock.time_msec() + 10000,
+                        ),
+                    )
+                ],
+            )
+        )
 
     def create_resource_dict(self) -> Dict[str, Resource]:
         d = super().create_resource_dict()
-        d["/_matrix/federation"] = TestTransportLayerServer(self.hs)
+        d["/_matrix/federation"] = TransportLayerServer(self.hs)
         return d
 
+    def make_signed_federation_request(
+        self,
+        method: str,
+        path: str,
+        content: Optional[JsonDict] = None,
+        await_result: bool = True,
+        custom_headers: Optional[Iterable[CustomHeaderType]] = None,
+        client_ip: str = "127.0.0.1",
+    ) -> FakeChannel:
+        """Make an inbound signed federation request to this server
 
-class TestTransportLayerServer(JsonResource):
-    """A test implementation of TransportLayerServer
+        The request is signed as if it came from "other.example.com", which our HS
+        already has the keys for.
+        """
 
-    authenticates incoming requests as `other.example.com`.
-    """
+        if custom_headers is None:
+            custom_headers = []
+        else:
+            custom_headers = list(custom_headers)
 
-    def __init__(self, hs):
-        super().__init__(hs)
-
-        class Authenticator:
-            def authenticate_request(self, request, content):
-                return succeed("other.example.com")
-
-        authenticator = Authenticator()
-
-        ratelimiter = FederationRateLimiter(
-            hs.get_clock(),
-            FederationRateLimitConfig(
-                window_size=1,
-                sleep_limit=1,
-                sleep_delay=1,
-                reject_limit=1000,
-                concurrent=1000,
-            ),
+        custom_headers.append(
+            (
+                "Authorization",
+                _auth_header_for_request(
+                    origin=self.OTHER_SERVER_NAME,
+                    destination=self.hs.hostname,
+                    signing_key=self.OTHER_SERVER_SIGNATURE_KEY,
+                    method=method,
+                    path=path,
+                    content=content,
+                ),
+            )
         )
 
-        federation_server.register_servlets(hs, self, authenticator, ratelimiter)
+        return make_request(
+            self.reactor,
+            self.site,
+            method=method,
+            path=path,
+            content=content if content is not None else "",
+            shorthand=False,
+            await_result=await_result,
+            custom_headers=custom_headers,
+            client_ip=client_ip,
+        )
+
+    def add_hashes_and_signatures_from_other_server(
+        self,
+        event_dict: JsonDict,
+        room_version: RoomVersion = KNOWN_ROOM_VERSIONS[DEFAULT_ROOM_VERSION],
+    ) -> JsonDict:
+        """Adds hashes and signatures to the given event dict
+
+        Returns:
+             The modified event dict, for convenience
+        """
+        add_hashes_and_signatures(
+            room_version,
+            event_dict,
+            signature_name=self.OTHER_SERVER_NAME,
+            signing_key=self.OTHER_SERVER_SIGNATURE_KEY,
+        )
+        return event_dict
 
 
-def override_config(extra_config):
+def _auth_header_for_request(
+    origin: str,
+    destination: str,
+    signing_key: signedjson.key.SigningKey,
+    method: str,
+    path: str,
+    content: Optional[JsonDict],
+) -> str:
+    """Build a suitable Authorization header for an outgoing federation request"""
+    request_description: JsonDict = {
+        "method": method,
+        "uri": path,
+        "destination": destination,
+        "origin": origin,
+    }
+    if content is not None:
+        request_description["content"] = content
+    signature_base64 = unpaddedbase64.encode_base64(
+        signing_key.sign(
+            canonicaljson.encode_canonical_json(request_description)
+        ).signature
+    )
+    return (
+        f"X-Matrix origin={origin},"
+        f"key={signing_key.alg}:{signing_key.version},"
+        f"sig={signature_base64}"
+    )
+
+
+def override_config(extra_config: JsonDict) -> Callable[[TV], TV]:
     """A decorator which can be applied to test functions to give additional HS config
 
     For use
@@ -806,18 +901,16 @@ def override_config(extra_config):
                 ...
 
     Args:
-        extra_config(dict): Additional config settings to be merged into the default
+        extra_config: Additional config settings to be merged into the default
             config dict before instantiating the test homeserver.
     """
 
-    def decorator(func):
-        func._extra_config = extra_config
+    def decorator(func: TV) -> TV:
+        # This attribute is being defined.
+        func._extra_config = extra_config  # type: ignore[attr-defined]
         return func
 
     return decorator
-
-
-TV = TypeVar("TV")
 
 
 def skip_unless(condition: bool, reason: str) -> Callable[[TV], TV]:

@@ -35,7 +35,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, hs, reactor, clock):
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
 
     def test_insert_new_client_ip(self):
         self.reactor.advance(12345678)
@@ -666,7 +666,7 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, hs, reactor, clock):
-        self.store = self.hs.get_datastore()
+        self.store = self.hs.get_datastores().main
         self.user_id = self.register_user("bob", "abc123", True)
 
     def test_request_with_xforwarded(self):

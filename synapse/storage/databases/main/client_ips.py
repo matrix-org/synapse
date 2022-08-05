@@ -25,7 +25,9 @@ from synapse.storage.database import (
     LoggingTransaction,
     make_tuple_comparison_clause,
 )
-from synapse.storage.databases.main.monthly_active_users import MonthlyActiveUsersStore
+from synapse.storage.databases.main.monthly_active_users import (
+    MonthlyActiveUsersWorkerStore,
+)
 from synapse.types import JsonDict, UserID
 from synapse.util.caches.lrucache import LruCache
 
@@ -397,7 +399,7 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
         return updated
 
 
-class ClientIpWorkerStore(ClientIpBackgroundUpdateStore):
+class ClientIpWorkerStore(ClientIpBackgroundUpdateStore, MonthlyActiveUsersWorkerStore):
     def __init__(
         self,
         database: DatabasePool,
@@ -406,10 +408,39 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore):
     ):
         super().__init__(database, db_conn, hs)
 
+        if hs.config.redis.redis_enabled:
+            # If we're using Redis, we can shift this update process off to
+            # the background worker
+            self._update_on_this_worker = hs.config.worker.run_background_tasks
+        else:
+            # If we're NOT using Redis, this must be handled by the master
+            self._update_on_this_worker = hs.get_instance_name() == "master"
+
         self.user_ips_max_age = hs.config.server.user_ips_max_age
+
+        # (user_id, access_token, ip,) -> last_seen
+        self.client_ip_last_seen = LruCache[Tuple[str, str, str], int](
+            cache_name="client_ip_last_seen", max_size=50000
+        )
 
         if hs.config.worker.run_background_tasks and self.user_ips_max_age:
             self._clock.looping_call(self._prune_old_user_ips, 5 * 1000)
+
+        if self._update_on_this_worker:
+            # This is the designated worker that can write to the client IP
+            # tables.
+
+            # (user_id, access_token, ip,) -> (user_agent, device_id, last_seen)
+            self._batch_row_update: Dict[
+                Tuple[str, str, str], Tuple[str, Optional[str], int]
+            ] = {}
+
+            self._client_ip_looper = self._clock.looping_call(
+                self._update_client_ips_batch, 5 * 1000
+            )
+            self.hs.get_reactor().addSystemEventTrigger(
+                "before", "shutdown", self._update_client_ips_batch
+            )
 
     @wrap_as_background_process("prune_old_user_ips")
     async def _prune_old_user_ips(self) -> None:
@@ -456,7 +487,7 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore):
             "_prune_old_user_ips", _prune_old_user_ips_txn
         )
 
-    async def get_last_client_ip_by_device(
+    async def _get_last_client_ip_by_device_from_database(
         self, user_id: str, device_id: Optional[str]
     ) -> Dict[Tuple[str, str], DeviceLastConnectionInfo]:
         """For each device_id listed, give the user_ip it was last seen on.
@@ -487,7 +518,7 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore):
 
         return {(d["user_id"], d["device_id"]): d for d in res}
 
-    async def get_user_ip_and_agents(
+    async def _get_user_ip_and_agents_from_database(
         self, user: UserID, since_ts: int = 0
     ) -> List[LastConnectionInfo]:
         """Fetch the IPs and user agents for a user since the given timestamp.
@@ -539,34 +570,6 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore):
             for access_token, ip, user_agent, last_seen in rows
         ]
 
-
-class ClientIpStore(ClientIpWorkerStore, MonthlyActiveUsersStore):
-    def __init__(
-        self,
-        database: DatabasePool,
-        db_conn: LoggingDatabaseConnection,
-        hs: "HomeServer",
-    ):
-
-        # (user_id, access_token, ip,) -> last_seen
-        self.client_ip_last_seen = LruCache[Tuple[str, str, str], int](
-            cache_name="client_ip_last_seen", max_size=50000
-        )
-
-        super().__init__(database, db_conn, hs)
-
-        # (user_id, access_token, ip,) -> (user_agent, device_id, last_seen)
-        self._batch_row_update: Dict[
-            Tuple[str, str, str], Tuple[str, Optional[str], int]
-        ] = {}
-
-        self._client_ip_looper = self._clock.looping_call(
-            self._update_client_ips_batch, 5 * 1000
-        )
-        self.hs.get_reactor().addSystemEventTrigger(
-            "before", "shutdown", self._update_client_ips_batch
-        )
-
     async def insert_client_ip(
         self,
         user_id: str,
@@ -584,17 +587,27 @@ class ClientIpStore(ClientIpWorkerStore, MonthlyActiveUsersStore):
             last_seen = self.client_ip_last_seen.get(key)
         except KeyError:
             last_seen = None
-        await self.populate_monthly_active_users(user_id)
+
         # Rate-limited inserts
         if last_seen is not None and (now - last_seen) < LAST_SEEN_GRANULARITY:
             return
 
         self.client_ip_last_seen.set(key, now)
 
-        self._batch_row_update[key] = (user_agent, device_id, now)
+        if self._update_on_this_worker:
+            await self.populate_monthly_active_users(user_id)
+            self._batch_row_update[key] = (user_agent, device_id, now)
+        else:
+            # We are not the designated writer-worker, so stream over replication
+            self.hs.get_replication_command_handler().send_user_ip(
+                user_id, access_token, ip, user_agent, device_id, now
+            )
 
     @wrap_as_background_process("update_client_ips")
     async def _update_client_ips_batch(self) -> None:
+        assert (
+            self._update_on_this_worker
+        ), "This worker is not designated to update client IPs"
 
         # If the DB pool has already terminated, don't try updating
         if not self.db_pool.is_running():
@@ -603,51 +616,57 @@ class ClientIpStore(ClientIpWorkerStore, MonthlyActiveUsersStore):
         to_update = self._batch_row_update
         self._batch_row_update = {}
 
-        await self.db_pool.runInteraction(
-            "_update_client_ips_batch", self._update_client_ips_batch_txn, to_update
-        )
+        if to_update:
+            await self.db_pool.runInteraction(
+                "_update_client_ips_batch", self._update_client_ips_batch_txn, to_update
+            )
 
     def _update_client_ips_batch_txn(
         self,
         txn: LoggingTransaction,
         to_update: Mapping[Tuple[str, str, str], Tuple[str, Optional[str], int]],
     ) -> None:
-        if "user_ips" in self.db_pool._unsafe_to_upsert_tables or (
-            not self.database_engine.can_native_upsert
-        ):
-            self.database_engine.lock_table(txn, "user_ips")
+        assert (
+            self._update_on_this_worker
+        ), "This worker is not designated to update client IPs"
+
+        # Keys and values for the `user_ips` upsert.
+        user_ips_keys = []
+        user_ips_values = []
+
+        # Keys and values for the `devices` update.
+        devices_keys = []
+        devices_values = []
 
         for entry in to_update.items():
             (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
-
-            self.db_pool.simple_upsert_txn(
-                txn,
-                table="user_ips",
-                keyvalues={"user_id": user_id, "access_token": access_token, "ip": ip},
-                values={
-                    "user_agent": user_agent,
-                    "device_id": device_id,
-                    "last_seen": last_seen,
-                },
-                lock=False,
-            )
+            user_ips_keys.append((user_id, access_token, ip))
+            user_ips_values.append((user_agent, device_id, last_seen))
 
             # Technically an access token might not be associated with
             # a device so we need to check.
             if device_id:
-                # this is always an update rather than an upsert: the row should
-                # already exist, and if it doesn't, that may be because it has been
-                # deleted, and we don't want to re-create it.
-                self.db_pool.simple_update_txn(
-                    txn,
-                    table="devices",
-                    keyvalues={"user_id": user_id, "device_id": device_id},
-                    updatevalues={
-                        "user_agent": user_agent,
-                        "last_seen": last_seen,
-                        "ip": ip,
-                    },
-                )
+                devices_keys.append((user_id, device_id))
+                devices_values.append((user_agent, last_seen, ip))
+
+        self.db_pool.simple_upsert_many_txn(
+            txn,
+            table="user_ips",
+            key_names=("user_id", "access_token", "ip"),
+            key_values=user_ips_keys,
+            value_names=("user_agent", "device_id", "last_seen"),
+            value_values=user_ips_values,
+        )
+
+        if devices_values:
+            self.db_pool.simple_update_many_txn(
+                txn,
+                table="devices",
+                key_names=("user_id", "device_id"),
+                key_values=devices_keys,
+                value_names=("user_agent", "last_seen", "ip"),
+                value_values=devices_values,
+            )
 
     async def get_last_client_ip_by_device(
         self, user_id: str, device_id: Optional[str]
@@ -662,7 +681,12 @@ class ClientIpStore(ClientIpWorkerStore, MonthlyActiveUsersStore):
             A dictionary mapping a tuple of (user_id, device_id) to dicts, with
             keys giving the column names from the devices table.
         """
-        ret = await super().get_last_client_ip_by_device(user_id, device_id)
+        ret = await self._get_last_client_ip_by_device_from_database(user_id, device_id)
+
+        if not self._update_on_this_worker:
+            # Only the writing-worker has additional in-memory data to enhance
+            # the result
+            return ret
 
         # Update what is retrieved from the database with data which is pending
         # insertion, as if it has already been stored in the database.
@@ -707,9 +731,16 @@ class ClientIpStore(ClientIpWorkerStore, MonthlyActiveUsersStore):
             Only the latest user agent for each access token and IP address combination
             is available.
         """
+        rows_from_db = await self._get_user_ip_and_agents_from_database(user, since_ts)
+
+        if not self._update_on_this_worker:
+            # Only the writing-worker has additional in-memory data to enhance
+            # the result
+            return rows_from_db
+
         results: Dict[Tuple[str, str], LastConnectionInfo] = {
             (connection["access_token"], connection["ip"]): connection
-            for connection in await super().get_user_ip_and_agents(user, since_ts)
+            for connection in rows_from_db
         }
 
         # Overlay data that is pending insertion on top of the results from the

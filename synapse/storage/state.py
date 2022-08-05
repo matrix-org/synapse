@@ -1,4 +1,5 @@
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2022 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +15,7 @@
 import logging
 from typing import (
     TYPE_CHECKING,
-    Awaitable,
+    Callable,
     Collection,
     Dict,
     Iterable,
@@ -30,14 +31,11 @@ import attr
 from frozendict import frozendict
 
 from synapse.api.constants import EventTypes
-from synapse.events import EventBase
 from synapse.types import MutableStateMap, StateKey, StateMap
 
 if TYPE_CHECKING:
     from typing import FrozenSet  # noqa: used within quoted type hint; flake8 sad
 
-    from synapse.server import HomeServer
-    from synapse.storage.databases import Databases
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +59,7 @@ class StateFilter:
     types: "frozendict[str, Optional[FrozenSet[str]]]"
     include_others: bool = False
 
-    def __attrs_post_init__(self):
+    def __attrs_post_init__(self) -> None:
         # If `include_others` is set we canonicalise the filter by removing
         # wildcards from the types dictionary
         if self.include_others:
@@ -137,7 +135,9 @@ class StateFilter:
         )
 
     @staticmethod
-    def freeze(types: Mapping[str, Optional[Collection[str]]], include_others: bool):
+    def freeze(
+        types: Mapping[str, Optional[Collection[str]]], include_others: bool
+    ) -> "StateFilter":
         """
         Returns a (frozen) StateFilter with the same contents as the parameters
         specified here, which can be made of mutable types.
@@ -204,13 +204,16 @@ class StateFilter:
         if get_all_members:
             # We want to return everything.
             return StateFilter.all()
-        else:
+        elif EventTypes.Member in self.types:
             # We want to return all non-members, but only particular
             # memberships
             return StateFilter(
                 types=frozendict({EventTypes.Member: self.types[EventTypes.Member]}),
                 include_others=True,
             )
+        else:
+            # We want to return all non-members
+            return _ALL_NON_MEMBER_STATE_FILTER
 
     def make_sql_filter_clause(self) -> Tuple[str, List[str]]:
         """Converts the filter to an SQL clause.
@@ -526,262 +529,48 @@ class StateFilter:
             new_all, new_excludes, new_wildcards, new_concrete_keys
         )
 
+    def must_await_full_state(self, is_mine_id: Callable[[str], bool]) -> bool:
+        """Check if we need to wait for full state to complete to calculate this state
+
+        If we have a state filter which is completely satisfied even with partial
+        state, then we don't need to await_full_state before we can return it.
+
+        Args:
+            is_mine_id: a callable which confirms if a given state_key matches a mxid
+               of a local user
+        """
+
+        # TODO(faster_joins): it's not entirely clear that this is safe. In particular,
+        #  there may be circumstances in which we return a piece of state that, once we
+        #  resync the state, we discover is invalid. For example: if it turns out that
+        #  the sender of a piece of state wasn't actually in the room, then clearly that
+        #  state shouldn't have been returned.
+        #  We should at least add some tests around this to see what happens.
+        #  https://github.com/matrix-org/synapse/issues/13006
+
+        # if we haven't requested membership events, then it depends on the value of
+        # 'include_others'
+        if EventTypes.Member not in self.types:
+            return self.include_others
+
+        # if we're looking for *all* membership events, then we have to wait
+        member_state_keys = self.types[EventTypes.Member]
+        if member_state_keys is None:
+            return True
+
+        # otherwise, consider whose membership we are looking for. If it's entirely
+        # local users, then we don't need to wait.
+        for state_key in member_state_keys:
+            if not is_mine_id(state_key):
+                # remote user
+                return True
+
+        # local users only
+        return False
+
 
 _ALL_STATE_FILTER = StateFilter(types=frozendict(), include_others=True)
+_ALL_NON_MEMBER_STATE_FILTER = StateFilter(
+    types=frozendict({EventTypes.Member: frozenset()}), include_others=True
+)
 _NONE_STATE_FILTER = StateFilter(types=frozendict(), include_others=False)
-
-
-class StateGroupStorage:
-    """High level interface to fetching state for event."""
-
-    def __init__(self, hs: "HomeServer", stores: "Databases"):
-        self.stores = stores
-
-    async def get_state_group_delta(
-        self, state_group: int
-    ) -> Tuple[Optional[int], Optional[StateMap[str]]]:
-        """Given a state group try to return a previous group and a delta between
-        the old and the new.
-
-        Args:
-            state_group: The state group used to retrieve state deltas.
-
-        Returns:
-            A tuple of the previous group and a state map of the event IDs which
-            make up the delta between the old and new state groups.
-        """
-
-        state_group_delta = await self.stores.state.get_state_group_delta(state_group)
-        return state_group_delta.prev_group, state_group_delta.delta_ids
-
-    async def get_state_groups_ids(
-        self, _room_id: str, event_ids: Iterable[str]
-    ) -> Dict[int, MutableStateMap[str]]:
-        """Get the event IDs of all the state for the state groups for the given events
-
-        Args:
-            _room_id: id of the room for these events
-            event_ids: ids of the events
-
-        Returns:
-            dict of state_group_id -> (dict of (type, state_key) -> event id)
-        """
-        if not event_ids:
-            return {}
-
-        event_to_groups = await self.stores.main._get_state_group_for_events(event_ids)
-
-        groups = set(event_to_groups.values())
-        group_to_state = await self.stores.state._get_state_for_groups(groups)
-
-        return group_to_state
-
-    async def get_state_ids_for_group(self, state_group: int) -> StateMap[str]:
-        """Get the event IDs of all the state in the given state group
-
-        Args:
-            state_group: A state group for which we want to get the state IDs.
-
-        Returns:
-            Resolves to a map of (type, state_key) -> event_id
-        """
-        group_to_state = await self._get_state_for_groups((state_group,))
-
-        return group_to_state[state_group]
-
-    async def get_state_groups(
-        self, room_id: str, event_ids: Iterable[str]
-    ) -> Dict[int, List[EventBase]]:
-        """Get the state groups for the given list of event_ids
-
-        Args:
-            room_id: ID of the room for these events.
-            event_ids: The event IDs to retrieve state for.
-
-        Returns:
-            dict of state_group_id -> list of state events.
-        """
-        if not event_ids:
-            return {}
-
-        group_to_ids = await self.get_state_groups_ids(room_id, event_ids)
-
-        state_event_map = await self.stores.main.get_events(
-            [
-                ev_id
-                for group_ids in group_to_ids.values()
-                for ev_id in group_ids.values()
-            ],
-            get_prev_content=False,
-        )
-
-        return {
-            group: [
-                state_event_map[v]
-                for v in event_id_map.values()
-                if v in state_event_map
-            ]
-            for group, event_id_map in group_to_ids.items()
-        }
-
-    def _get_state_groups_from_groups(
-        self, groups: List[int], state_filter: StateFilter
-    ) -> Awaitable[Dict[int, StateMap[str]]]:
-        """Returns the state groups for a given set of groups, filtering on
-        types of state events.
-
-        Args:
-            groups: list of state group IDs to query
-            state_filter: The state filter used to fetch state
-                from the database.
-
-        Returns:
-            Dict of state group to state map.
-        """
-
-        return self.stores.state._get_state_groups_from_groups(groups, state_filter)
-
-    async def get_state_for_events(
-        self, event_ids: Iterable[str], state_filter: Optional[StateFilter] = None
-    ) -> Dict[str, StateMap[EventBase]]:
-        """Given a list of event_ids and type tuples, return a list of state
-        dicts for each event.
-
-        Args:
-            event_ids: The events to fetch the state of.
-            state_filter: The state filter used to fetch state.
-
-        Returns:
-            A dict of (event_id) -> (type, state_key) -> [state_events]
-        """
-        event_to_groups = await self.stores.main._get_state_group_for_events(event_ids)
-
-        groups = set(event_to_groups.values())
-        group_to_state = await self.stores.state._get_state_for_groups(
-            groups, state_filter or StateFilter.all()
-        )
-
-        state_event_map = await self.stores.main.get_events(
-            [ev_id for sd in group_to_state.values() for ev_id in sd.values()],
-            get_prev_content=False,
-        )
-
-        event_to_state = {
-            event_id: {
-                k: state_event_map[v]
-                for k, v in group_to_state[group].items()
-                if v in state_event_map
-            }
-            for event_id, group in event_to_groups.items()
-        }
-
-        return {event: event_to_state[event] for event in event_ids}
-
-    async def get_state_ids_for_events(
-        self, event_ids: Iterable[str], state_filter: Optional[StateFilter] = None
-    ) -> Dict[str, StateMap[str]]:
-        """
-        Get the state dicts corresponding to a list of events, containing the event_ids
-        of the state events (as opposed to the events themselves)
-
-        Args:
-            event_ids: events whose state should be returned
-            state_filter: The state filter used to fetch state from the database.
-
-        Returns:
-            A dict from event_id -> (type, state_key) -> event_id
-        """
-        event_to_groups = await self.stores.main._get_state_group_for_events(event_ids)
-
-        groups = set(event_to_groups.values())
-        group_to_state = await self.stores.state._get_state_for_groups(
-            groups, state_filter or StateFilter.all()
-        )
-
-        event_to_state = {
-            event_id: group_to_state[group]
-            for event_id, group in event_to_groups.items()
-        }
-
-        return {event: event_to_state[event] for event in event_ids}
-
-    async def get_state_for_event(
-        self, event_id: str, state_filter: Optional[StateFilter] = None
-    ) -> StateMap[EventBase]:
-        """
-        Get the state dict corresponding to a particular event
-
-        Args:
-            event_id: event whose state should be returned
-            state_filter: The state filter used to fetch state from the database.
-
-        Returns:
-            A dict from (type, state_key) -> state_event
-        """
-        state_map = await self.get_state_for_events(
-            [event_id], state_filter or StateFilter.all()
-        )
-        return state_map[event_id]
-
-    async def get_state_ids_for_event(
-        self, event_id: str, state_filter: Optional[StateFilter] = None
-    ) -> StateMap[str]:
-        """
-        Get the state dict corresponding to a particular event
-
-        Args:
-            event_id: event whose state should be returned
-            state_filter: The state filter used to fetch state from the database.
-
-        Returns:
-            A dict from (type, state_key) -> state_event_id
-        """
-        state_map = await self.get_state_ids_for_events(
-            [event_id], state_filter or StateFilter.all()
-        )
-        return state_map[event_id]
-
-    def _get_state_for_groups(
-        self, groups: Iterable[int], state_filter: Optional[StateFilter] = None
-    ) -> Awaitable[Dict[int, MutableStateMap[str]]]:
-        """Gets the state at each of a list of state groups, optionally
-        filtering by type/state_key
-
-        Args:
-            groups: list of state groups for which we want to get the state.
-            state_filter: The state filter used to fetch state.
-                from the database.
-
-        Returns:
-            Dict of state group to state map.
-        """
-        return self.stores.state._get_state_for_groups(
-            groups, state_filter or StateFilter.all()
-        )
-
-    async def store_state_group(
-        self,
-        event_id: str,
-        room_id: str,
-        prev_group: Optional[int],
-        delta_ids: Optional[StateMap[str]],
-        current_state_ids: StateMap[str],
-    ) -> int:
-        """Store a new set of state, returning a newly assigned state group.
-
-        Args:
-            event_id: The event ID for which the state was calculated.
-            room_id: ID of the room for which the state was calculated.
-            prev_group: A previous state group for the room, optional.
-            delta_ids: The delta between state at `prev_group` and
-                `current_state_ids`, if `prev_group` was given. Same format as
-                `current_state_ids`.
-            current_state_ids: The state to store. Map of (type, state_key)
-                to event_id.
-
-        Returns:
-            The state group ID
-        """
-        return await self.stores.state.store_state_group(
-            event_id, room_id, prev_group, delta_ids, current_state_ids
-        )

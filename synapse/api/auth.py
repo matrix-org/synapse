@@ -20,23 +20,25 @@ from netaddr import IPAddress
 from twisted.web.server import Request
 
 from synapse import event_auth
-from synapse.api.auth_blocking import AuthBlocking
 from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
     InvalidClientTokenError,
     MissingClientTokenError,
+    UnstableSpecAuthError,
 )
 from synapse.appservice import ApplicationService
-from synapse.events import EventBase
 from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
-from synapse.logging.opentracing import active_span, force_tracing, start_active_span
+from synapse.logging.opentracing import (
+    active_span,
+    force_tracing,
+    start_active_span,
+    trace,
+)
 from synapse.storage.databases.main.registration import TokenLookupResult
-from synapse.types import Requester, StateMap, UserID, create_requester
-from synapse.util.caches.lrucache import LruCache
-from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
+from synapse.types import Requester, UserID, create_requester
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -48,10 +50,6 @@ logger = logging.getLogger(__name__)
 GUEST_DEVICE_ID = "guest_device"
 
 
-class _InvalidMacaroonException(Exception):
-    pass
-
-
 class Auth:
     """
     This class contains functions for authenticating users of our client-server API.
@@ -60,28 +58,21 @@ class Auth:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
-        self.state = hs.get_state_handler()
+        self.store = hs.get_datastores().main
         self._account_validity_handler = hs.get_account_validity_handler()
-
-        self.token_cache: LruCache[str, Tuple[str, bool]] = LruCache(
-            10000, "token_cache"
-        )
-
-        self._auth_blocking = AuthBlocking(self.hs)
+        self._storage_controllers = hs.get_storage_controllers()
+        self._macaroon_generator = hs.get_macaroon_generator()
 
         self._track_appservice_user_ips = hs.config.appservice.track_appservice_user_ips
         self._track_puppeted_user_ips = hs.config.api.track_puppeted_user_ips
-        self._macaroon_secret_key = hs.config.key.macaroon_secret_key
         self._force_tracing_for_users = hs.config.tracing.force_tracing_for_users
 
     async def check_user_in_room(
         self,
         room_id: str,
         user_id: str,
-        current_state: Optional[StateMap[EventBase]] = None,
         allow_departed_users: bool = False,
-    ) -> EventBase:
+    ) -> Tuple[str, Optional[str]]:
         """Check if the user is in the room, or was at some point.
         Args:
             room_id: The room to check.
@@ -99,37 +90,38 @@ class Auth:
         Raises:
             AuthError if the user is/was not in the room.
         Returns:
-            Membership event for the user if the user was in the
-            room. This will be the join event if they are currently joined to
-            the room. This will be the leave event if they have left the room.
+            The current membership of the user in the room and the
+            membership event ID of the user.
         """
-        if current_state:
-            member = current_state.get((EventTypes.Member, user_id), None)
-        else:
-            member = await self.state.get_current_state(
-                room_id=room_id, event_type=EventTypes.Member, state_key=user_id
-            )
 
-        if member:
-            membership = member.membership
+        (
+            membership,
+            member_event_id,
+        ) = await self.store.get_local_current_membership_for_user_in_room(
+            user_id=user_id,
+            room_id=room_id,
+        )
 
+        if membership:
             if membership == Membership.JOIN:
-                return member
+                return membership, member_event_id
 
             # XXX this looks totally bogus. Why do we not allow users who have been banned,
             # or those who were members previously and have been re-invited?
             if allow_departed_users and membership == Membership.LEAVE:
                 forgot = await self.store.did_forget(user_id, room_id)
                 if not forgot:
-                    return member
-
-        raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
+                    return membership, member_event_id
+        raise UnstableSpecAuthError(
+            403,
+            "User %s not in room %s" % (user_id, room_id),
+            errcode=Codes.NOT_JOINED,
+        )
 
     async def get_user_by_req(
         self,
         request: SynapseRequest,
         allow_guest: bool = False,
-        rights: str = "access",
         allow_expired: bool = False,
     ) -> Requester:
         """Get a registered user's ID.
@@ -138,7 +130,6 @@ class Auth:
             request: An HTTP request with an access_token query parameter.
             allow_guest: If False, will raise an AuthError if the user making the
                 request is a guest.
-            rights: The operation being performed; the access token must allow this
             allow_expired: If True, allow the request through even if the account
                 is expired, or session token lifetime has ended. Note that
                 /login will deliver access tokens regardless of expiration.
@@ -153,7 +144,7 @@ class Auth:
         parent_span = active_span()
         with start_active_span("get_user_by_req"):
             requester = await self._wrapped_get_user_by_req(
-                request, allow_guest, rights, allow_expired
+                request, allow_guest, allow_expired
             )
 
             if parent_span:
@@ -179,7 +170,6 @@ class Auth:
         self,
         request: SynapseRequest,
         allow_guest: bool,
-        rights: str,
         allow_expired: bool,
     ) -> Requester:
         """Helper for get_user_by_req
@@ -187,7 +177,7 @@ class Auth:
         Once get_user_by_req has set up the opentracing span, this does the actual work.
         """
         try:
-            ip_addr = request.getClientIP()
+            ip_addr = request.getClientAddress().host
             user_agent = get_request_user_agent(request)
 
             access_token = self.get_access_token_from_request(request)
@@ -217,7 +207,7 @@ class Auth:
                 return requester
 
             user_info = await self.get_user_by_access_token(
-                access_token, rights, allow_expired=allow_expired
+                access_token, allow_expired=allow_expired
             )
             token_id = user_info.token_id
             is_guest = user_info.is_guest
@@ -356,7 +346,7 @@ class Auth:
             return None, None, None
 
         if app_service.ip_range_whitelist:
-            ip_address = IPAddress(request.getClientIP())
+            ip_address = IPAddress(request.getClientAddress().host)
             if ip_address not in app_service.ip_range_whitelist:
                 return None, None, None
 
@@ -397,15 +387,12 @@ class Auth:
     async def get_user_by_access_token(
         self,
         token: str,
-        rights: str = "access",
         allow_expired: bool = False,
     ) -> TokenLookupResult:
         """Validate access token and get user_id from it
 
         Args:
             token: The access token to get the user by
-            rights: The operation being performed; the access token must
-                allow this
             allow_expired: If False, raises an InvalidClientTokenError
                 if the token is expired
 
@@ -416,149 +403,65 @@ class Auth:
                 is invalid
         """
 
-        if rights == "access":
-            # first look in the database
-            r = await self.store.get_user_by_access_token(token)
-            if r:
-                valid_until_ms = r.valid_until_ms
-                if (
-                    not allow_expired
-                    and valid_until_ms is not None
-                    and valid_until_ms < self.clock.time_msec()
-                ):
-                    # there was a valid access token, but it has expired.
-                    # soft-logout the user.
-                    raise InvalidClientTokenError(
-                        msg="Access token has expired", soft_logout=True
-                    )
-
-                return r
-
-        # otherwise it needs to be a valid macaroon
-        try:
-            user_id, guest = self._parse_and_validate_macaroon(token, rights)
-
-            if rights == "access":
-                if not guest:
-                    # non-guest access tokens must be in the database
-                    logger.warning("Unrecognised access token - not in store.")
-                    raise InvalidClientTokenError()
-
-                # Guest access tokens are not stored in the database (there can
-                # only be one access token per guest, anyway).
-                #
-                # In order to prevent guest access tokens being used as regular
-                # user access tokens (and hence getting around the invalidation
-                # process), we look up the user id and check that it is indeed
-                # a guest user.
-                #
-                # It would of course be much easier to store guest access
-                # tokens in the database as well, but that would break existing
-                # guest tokens.
-                stored_user = await self.store.get_user_by_id(user_id)
-                if not stored_user:
-                    raise InvalidClientTokenError("Unknown user_id %s" % user_id)
-                if not stored_user["is_guest"]:
-                    raise InvalidClientTokenError(
-                        "Guest access token used for regular user"
-                    )
-
-                ret = TokenLookupResult(
-                    user_id=user_id,
-                    is_guest=True,
-                    # all guests get the same device id
-                    device_id=GUEST_DEVICE_ID,
+        # First look in the database to see if the access token is present
+        # as an opaque token.
+        r = await self.store.get_user_by_access_token(token)
+        if r:
+            valid_until_ms = r.valid_until_ms
+            if (
+                not allow_expired
+                and valid_until_ms is not None
+                and valid_until_ms < self.clock.time_msec()
+            ):
+                # there was a valid access token, but it has expired.
+                # soft-logout the user.
+                raise InvalidClientTokenError(
+                    msg="Access token has expired", soft_logout=True
                 )
-            elif rights == "delete_pusher":
-                # We don't store these tokens in the database
 
-                ret = TokenLookupResult(user_id=user_id, is_guest=False)
-            else:
-                raise RuntimeError("Unknown rights setting %s", rights)
-            return ret
+            return r
+
+        # If the token isn't found in the database, then it could still be a
+        # macaroon for a guest, so we check that here.
+        try:
+            user_id = self._macaroon_generator.verify_guest_token(token)
+
+            # Guest access tokens are not stored in the database (there can
+            # only be one access token per guest, anyway).
+            #
+            # In order to prevent guest access tokens being used as regular
+            # user access tokens (and hence getting around the invalidation
+            # process), we look up the user id and check that it is indeed
+            # a guest user.
+            #
+            # It would of course be much easier to store guest access
+            # tokens in the database as well, but that would break existing
+            # guest tokens.
+            stored_user = await self.store.get_user_by_id(user_id)
+            if not stored_user:
+                raise InvalidClientTokenError("Unknown user_id %s" % user_id)
+            if not stored_user["is_guest"]:
+                raise InvalidClientTokenError(
+                    "Guest access token used for regular user"
+                )
+
+            return TokenLookupResult(
+                user_id=user_id,
+                is_guest=True,
+                # all guests get the same device id
+                device_id=GUEST_DEVICE_ID,
+            )
         except (
-            _InvalidMacaroonException,
             pymacaroons.exceptions.MacaroonException,
             TypeError,
             ValueError,
         ) as e:
-            logger.warning("Invalid macaroon in auth: %s %s", type(e), e)
-            raise InvalidClientTokenError("Invalid macaroon passed.")
-
-    def _parse_and_validate_macaroon(
-        self, token: str, rights: str = "access"
-    ) -> Tuple[str, bool]:
-        """Takes a macaroon and tries to parse and validate it. This is cached
-        if and only if rights == access and there isn't an expiry.
-
-        On invalid macaroon raises _InvalidMacaroonException
-
-        Returns:
-            (user_id, is_guest)
-        """
-        if rights == "access":
-            cached = self.token_cache.get(token, None)
-            if cached:
-                return cached
-
-        try:
-            macaroon = pymacaroons.Macaroon.deserialize(token)
-        except Exception:  # deserialize can throw more-or-less anything
-            # doesn't look like a macaroon: treat it as an opaque token which
-            # must be in the database.
-            # TODO: it would be nice to get rid of this, but apparently some
-            # people use access tokens which aren't macaroons
-            raise _InvalidMacaroonException()
-
-        try:
-            user_id = get_value_from_macaroon(macaroon, "user_id")
-
-            guest = False
-            for caveat in macaroon.caveats:
-                if caveat.caveat_id == "guest = true":
-                    guest = True
-
-            self.validate_macaroon(macaroon, rights, user_id=user_id)
-        except (
-            pymacaroons.exceptions.MacaroonException,
-            KeyError,
-            TypeError,
-            ValueError,
-        ):
-            raise InvalidClientTokenError("Invalid macaroon passed.")
-
-        if rights == "access":
-            self.token_cache[token] = (user_id, guest)
-
-        return user_id, guest
-
-    def validate_macaroon(
-        self, macaroon: pymacaroons.Macaroon, type_string: str, user_id: str
-    ) -> None:
-        """
-        validate that a Macaroon is understood by and was signed by this server.
-
-        Args:
-            macaroon: The macaroon to validate
-            type_string: The kind of token required (e.g. "access", "delete_pusher")
-            user_id: The user_id required
-        """
-        v = pymacaroons.Verifier()
-
-        # the verifier runs a test for every caveat on the macaroon, to check
-        # that it is met for the current request. Each caveat must match at
-        # least one of the predicates specified by satisfy_exact or
-        # specify_general.
-        v.satisfy_exact("gen = 1")
-        v.satisfy_exact("type = " + type_string)
-        v.satisfy_exact("user_id = %s" % user_id)
-        v.satisfy_exact("guest = true")
-        satisfy_expiry(v, self.clock.time_msec)
-
-        # access_tokens include a nonce for uniqueness: any value is acceptable
-        v.satisfy_general(lambda c: c.startswith("nonce = "))
-
-        v.verify(macaroon, self._macaroon_secret_key)
+            logger.warning(
+                "Invalid access token in auth: %s %s.",
+                type(e),
+                e,
+            )
+            raise InvalidClientTokenError("Invalid access token passed.")
 
     def get_appservice_by_req(self, request: SynapseRequest) -> ApplicationService:
         token = self.get_access_token_from_request(request)
@@ -599,8 +502,11 @@ class Auth:
         # We currently require the user is a "moderator" in the room. We do this
         # by checking if they would (theoretically) be able to change the
         # m.room.canonical_alias events
-        power_level_event = await self.state.get_current_state(
-            room_id, EventTypes.PowerLevels, ""
+
+        power_level_event = (
+            await self._storage_controllers.state.get_current_state_event(
+                room_id, EventTypes.PowerLevels, ""
+            )
         )
 
         auth_events = {}
@@ -666,6 +572,7 @@ class Auth:
 
             return query_params[0].decode("ascii")
 
+    @trace
     async def check_user_in_room_or_world_readable(
         self, room_id: str, user_id: str, allow_departed_users: bool = False
     ) -> Tuple[str, Optional[str]]:
@@ -690,12 +597,11 @@ class Auth:
             #  * The user is a non-guest user, and was ever in the room
             #  * The user is a guest user, and has joined the room
             # else it will throw.
-            member_event = await self.check_user_in_room(
+            return await self.check_user_in_room(
                 room_id, user_id, allow_departed_users=allow_departed_users
             )
-            return member_event.membership, member_event.event_id
         except AuthError:
-            visibility = await self.state.get_current_state(
+            visibility = await self._storage_controllers.state.get_current_state_event(
                 room_id, EventTypes.RoomHistoryVisibility, ""
             )
             if (
@@ -704,19 +610,9 @@ class Auth:
                 == HistoryVisibility.WORLD_READABLE
             ):
                 return Membership.JOIN, None
-            raise AuthError(
+            raise UnstableSpecAuthError(
                 403,
                 "User %s not in room %s, and room previews are disabled"
                 % (user_id, room_id),
+                errcode=Codes.NOT_JOINED,
             )
-
-    async def check_auth_blocking(
-        self,
-        user_id: Optional[str] = None,
-        threepid: Optional[dict] = None,
-        user_type: Optional[str] = None,
-        requester: Optional[Requester] = None,
-    ) -> None:
-        await self._auth_blocking.check_auth_blocking(
-            user_id=user_id, threepid=threepid, user_type=user_type, requester=requester
-        )

@@ -115,18 +115,20 @@ URL parameters:
 Body parameters:
 
 - `password` - string, optional. If provided, the user's password is updated and all
-  devices are logged out.
+  devices are logged out, unless `logout_devices` is set to `false`.
+- `logout_devices` - bool, optional, defaults to `true`. If set to false, devices aren't
+  logged out even when `password` is provided.
 - `displayname` - string, optional, defaults to the value of `user_id`.
 - `threepids` - array, optional, allows setting the third-party IDs (email, msisdn)
   - `medium` - string. Kind of third-party ID, either `email` or `msisdn`.
   - `address` - string. Value of third-party ID.
   belonging to a user.
 - `external_ids` - array, optional. Allow setting the identifier of the external identity
-  provider for SSO (Single sign-on). Details in
-  [Sample Configuration File](../usage/configuration/homeserver_sample_config.html)
-  section `sso` and `oidc_providers`.
+  provider for SSO (Single sign-on). Details in the configuration manual under the
+  sections [sso](../usage/configuration/config_documentation.md#sso) and [oidc_providers](../usage/configuration/config_documentation.md#oidc_providers).
   - `auth_provider` - string. ID of the external identity provider. Value of `idp_id`
-    in homeserver configuration.
+    in the homeserver configuration. Note that no error is raised if the provided
+    value is not in the homeserver configuration.
   - `external_id` - string, user ID in the external identity provider.
 - `avatar_url` - string, optional, must be a
   [MXC URI](https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris).
@@ -331,7 +333,7 @@ An empty body may be passed for backwards compatibility.
 
 The following actions are performed when deactivating an user:
 
-- Try to unpind 3PIDs from the identity server
+- Try to unbind 3PIDs from the identity server
 - Remove all 3PIDs from the homeserver
 - Delete all devices and E2EE keys
 - Delete all access tokens
@@ -539,6 +541,11 @@ The following fields are returned in the JSON response body:
 
 ### List media uploaded by a user
 Gets a list of all local media that a specific `user_id` has created.
+These are media that the user has uploaded themselves
+([local media](../media_repository.md#local-media)), as well as
+[URL preview images](../media_repository.md#url-previews) requested by the user if the
+[feature is enabled](../usage/configuration/config_documentation.md#url_preview_enabled).
+
 By default, the response is ordered by descending creation date and ascending media ID.
 The newest media is on top. You can change the order with parameters
 `order_by` and `dir`.
@@ -635,7 +642,9 @@ The following fields are returned in the JSON response body:
   Media objects contain the following fields:
   - `created_ts` - integer - Timestamp when the content was uploaded in ms.
   - `last_access_ts` - integer - Timestamp when the content was last accessed in ms.
-  - `media_id` - string - The id used to refer to the media.
+  - `media_id` - string - The id used to refer to the media. Details about the format
+    are documented under
+    [media repository](../media_repository.md).
   - `media_length` - integer - Length of the media in bytes.
   - `media_type` - string - The MIME-type of the media.
   - `quarantined_by` - string - The user ID that initiated the quarantine request
@@ -796,7 +805,7 @@ POST /_synapse/admin/v2/users/<user_id>/delete_devices
   "devices": [
     "QBUAZIFURK",
     "AUIECTSRND"
-  ],
+  ]
 }
 ```
 

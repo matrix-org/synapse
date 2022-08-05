@@ -133,6 +133,11 @@ class ExpiringCache(Generic[KT, VT]):
                 raise KeyError(key)
             return default
 
+        if self.iterable:
+            self.metrics.inc_evictions(EvictionReason.invalidation, len(value.value))
+        else:
+            self.metrics.inc_evictions(EvictionReason.invalidation)
+
         return value.value
 
     def __contains__(self, key: KT) -> bool:

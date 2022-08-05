@@ -16,6 +16,7 @@ import logging
 from typing import Any, Dict, List, Tuple
 
 from synapse.config import ConfigError
+from synapse.types import JsonDict
 from synapse.util.module_loader import load_module
 
 from ._base import Config
@@ -25,15 +26,15 @@ logger = logging.getLogger(__name__)
 LEGACY_SPAM_CHECKER_WARNING = """
 This server is using a spam checker module that is implementing the deprecated spam
 checker interface. Please check with the module's maintainer to see if a new version
-supporting Synapse's generic modules system is available.
-For more information, please see https://matrix-org.github.io/synapse/latest/modules.html
+supporting Synapse's generic modules system is available. For more information, please
+see https://matrix-org.github.io/synapse/latest/modules/index.html
 ---------------------------------------------------------------------------------------"""
 
 
 class SpamCheckerConfig(Config):
     section = "spamchecker"
 
-    def read_config(self, config, **kwargs):
+    def read_config(self, config: JsonDict, **kwargs: Any) -> None:
         self.spam_checkers: List[Tuple[Any, Dict]] = []
 
         spam_checkers = config.get("spam_checker") or []

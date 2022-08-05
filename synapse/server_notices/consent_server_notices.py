@@ -32,7 +32,7 @@ class ConsentServerNotices:
 
     def __init__(self, hs: "HomeServer"):
         self._server_notices_manager = hs.get_server_notices_manager()
-        self._store = hs.get_datastore()
+        self._store = hs.get_datastores().main
 
         self._users_in_progress: Set[str] = set()
 

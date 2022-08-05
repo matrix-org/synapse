@@ -298,7 +298,6 @@ class Responder:
         Returns:
             Resolves once the response has finished being written
         """
-        pass
 
     def __enter__(self) -> None:
         pass

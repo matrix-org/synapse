@@ -147,7 +147,7 @@ python -m synapse.app.homeserver --generate-keys -c "$SQLITE_CONFIG"
 
 # Make sure the SQLite3 database is using the latest schema and has no pending background update.
 echo "Running db background jobs..."
-scripts/update_synapse_database --database-config --run-background-updates "$SQLITE_CONFIG"
+synapse/_scripts/update_synapse_database.py --database-config --run-background-updates "$SQLITE_CONFIG"
 
 # Create the PostgreSQL database.
 echo "Creating postgres database..."
@@ -156,10 +156,10 @@ createdb --lc-collate=C --lc-ctype=C --template=template0 "$POSTGRES_DB_NAME"
 echo "Copying data from SQLite3 to Postgres with synapse_port_db..."
 if [ -z "$COVERAGE" ]; then
   # No coverage needed
-  scripts/synapse_port_db --sqlite-database "$SQLITE_DB" --postgres-config "$POSTGRES_CONFIG"
+  synapse/_scripts/synapse_port_db.py --sqlite-database "$SQLITE_DB" --postgres-config "$POSTGRES_CONFIG"
 else
   # Coverage desired
-  coverage run scripts/synapse_port_db --sqlite-database "$SQLITE_DB" --postgres-config "$POSTGRES_CONFIG"
+  coverage run synapse/_scripts/synapse_port_db.py --sqlite-database "$SQLITE_DB" --postgres-config "$POSTGRES_CONFIG"
 fi
 
 # Delete schema_version, applied_schema_deltas and applied_module_schemas tables
