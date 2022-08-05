@@ -824,13 +824,13 @@ def extract_text_map(carrier: Dict[str, str]) -> Optional["opentracing.SpanConte
 # Tracing decorators
 
 
-def _decorate(
+def _custom_sync_async_decorator(
     func: Callable[P, R],
     wrapping_logic: Callable[[Callable[P, R], Any, Any], ContextManager[None]],
 ) -> Callable[P, R]:
     """
     Decorates a function that is sync or async (coroutines), or that returns a Twisted
-    `Deferred`.
+    `Deferred`. The custom business logic of the decorator goes in `wrapping_logic`.
 
     Example usage:
     ```py
@@ -845,7 +845,7 @@ def _decorate(
                 end_ts = time.time()
                 duration = end_ts - start_ts
                 logger.info("%s took %s seconds", func.__name__, duration)
-        return _decorate(func, _wrapping_logic)
+        return _custom_sync_async_decorator(func, _wrapping_logic)
     ```
 
     Args:
@@ -926,7 +926,7 @@ def trace_with_opname(
         if not opentracing:
             return func
 
-        return _decorate(func, _wrapping_logic)
+        return _custom_sync_async_decorator(func, _wrapping_logic)
 
     return _decorator
 
@@ -972,7 +972,7 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
         set_tag("kwargs", str(kwargs))
         yield
 
-    return _decorate(func, _wrapping_logic)
+    return _custom_sync_async_decorator(func, _wrapping_logic)
 
 
 @contextlib.contextmanager
