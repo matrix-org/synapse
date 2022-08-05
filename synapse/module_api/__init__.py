@@ -947,7 +947,7 @@ class ModuleApi:
                 https://spec.matrix.org/unstable/client-server-api/#mroommember for the
                 list of allowed values.
             content: Additional values to include in the resulting event's content.
-            remote_room_hosts: Remote servers to send the update to.
+            remote_room_hosts: Remote servers to use for remote joins/knocks/etc.
 
         Returns:
             The newly created membership event.
