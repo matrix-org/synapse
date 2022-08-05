@@ -829,8 +829,8 @@ def _decorate(
     wrapping_logic: Callable[[Callable[P, R], Any, Any], ContextManager[None]],
 ) -> Callable[P, R]:
     """
-    Decorates a function that is able to handle sync functions, async functions
-    (coroutines), and inlineDeferred from Twisted.
+    Decorates a function that is sync or async (coroutines), or that returns a Twisted
+    `Deferred`.
 
     Example usage:
     ```py
