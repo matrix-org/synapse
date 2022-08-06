@@ -59,7 +59,13 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.logging.context import nested_logging_context
-from synapse.logging.tracing import trace, tag_args, set_attribute, SynapseTags
+from synapse.logging.tracing import (
+    SynapseTags,
+    start_active_span,
+    set_attribute,
+    tag_args,
+    trace,
+)
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (
@@ -1491,7 +1497,7 @@ class FederationEventHandler:
 
         set_attribute(
             SynapseTags.FUNC_ARG_PREFIX + "event_ids",
-            event_map.keys(),
+            str(event_map.keys()),
         )
 
         # filter out any events we have already seen. This might happen because
@@ -2033,7 +2039,6 @@ class FederationEventHandler:
             await self._store.remove_push_actions_from_staging(event.event_id)
             raise
 
-    @trace
     async def persist_events_and_notify(
         self,
         room_id: str,
@@ -2097,8 +2102,13 @@ class FederationEventHandler:
                     self._message_handler.maybe_schedule_expiry(event)
 
             if not backfilled:  # Never notify for backfilled events
-                for event in events:
-                    await self._notify_persisted_event(event, max_stream_token)
+                with start_active_span("notify_persisted_events"):
+                    set_attribute(
+                        SynapseTags.FUNC_ARG_PREFIX + "event_ids",
+                        str([ev.event_id for ev in events]),
+                    )
+                    for event in events:
+                        await self._notify_persisted_event(event, max_stream_token)
 
             return max_stream_token.stream
 

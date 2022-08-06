@@ -48,11 +48,11 @@ from synapse.events.snapshot import EventContext
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.logging.tracing import (
     Link,
+    SynapseTags,
     get_active_span,
     set_attribute,
     start_active_span,
     trace,
-    SynapseTags,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.controllers.state import StateStorageController
@@ -392,7 +392,7 @@ class EventsPersistenceStorageController:
         """
         set_attribute(
             SynapseTags.FUNC_ARG_PREFIX + "event_ids",
-            [e.event_id for e, _ in events_and_contexts],
+            str([e.event_id for e, _ in events_and_contexts]),
         )
         set_attribute(SynapseTags.FUNC_ARG_PREFIX + "backfilled", str(backfilled))
 
