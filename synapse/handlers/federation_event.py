@@ -737,6 +737,11 @@ class FederationEventHandler:
             backfilled: True if this is part of a historical batch of events (inhibits
                 notification to clients, and validation of device keys.)
         """
+        set_attribute(
+            SynapseTags.FUNC_ARG_PREFIX + f"event_ids ({len(events)})",
+            str([event.event_id for event in events]),
+        )
+        set_attribute(SynapseTags.FUNC_ARG_PREFIX + "backfilled", str(backfilled))
         logger.debug(
             "processing pulled backfilled=%s events=%s",
             backfilled,
@@ -1495,9 +1500,10 @@ class FederationEventHandler:
         """
         event_map = {event.event_id: event for event in events}
 
+        event_ids = event_map.keys()
         set_attribute(
-            SynapseTags.FUNC_ARG_PREFIX + "event_ids",
-            str(event_map.keys()),
+            SynapseTags.FUNC_ARG_PREFIX + f"event_ids ({len(event_ids)})",
+            str(event_ids),
         )
 
         # filter out any events we have already seen. This might happen because
@@ -2104,7 +2110,7 @@ class FederationEventHandler:
             if not backfilled:  # Never notify for backfilled events
                 with start_active_span("notify_persisted_events"):
                     set_attribute(
-                        SynapseTags.FUNC_ARG_PREFIX + "event_ids",
+                        SynapseTags.FUNC_ARG_PREFIX + f"event_ids ({len(events)})",
                         str([ev.event_id for ev in events]),
                     )
                     for event in events:
