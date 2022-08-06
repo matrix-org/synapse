@@ -54,6 +54,7 @@ from synapse.logging.context import (
     current_context,
     make_deferred_yieldable,
 )
+from synapse.logging.tracing import trace, tag_args
 from synapse.metrics.background_process_metrics import (
     run_as_background_process,
     wrap_as_background_process,
@@ -394,6 +395,8 @@ class EventsWorkerStore(SQLBaseStore):
 
         return event
 
+    @trace
+    @tag_args
     async def get_events(
         self,
         event_ids: Collection[str],
@@ -1363,6 +1366,8 @@ class EventsWorkerStore(SQLBaseStore):
 
         return {r["event_id"] for r in rows}
 
+    @trace
+    @tag_args
     async def have_seen_events(
         self, room_id: str, event_ids: Iterable[str]
     ) -> Set[str]:

@@ -281,6 +281,16 @@ class SynapseTags:
     # The name of the external cache
     CACHE_NAME = "cache.name"
 
+    # Used to tag function arguments
+    #
+    # Tag a named arg. The name of the argument should be appended to this
+    # prefix
+    FUNC_ARG_PREFIX = "ARG."
+    # Tag extra variadic number of positional arguments (`def foo(first, second, *extras)`)
+    FUNC_ARGS = "args"
+    # Tag keyword args
+    FUNC_KWARGS = "kwargs"
+
 
 class SynapseBaggage:
     FORCE_TRACING = "synapse-force-tracing"
@@ -790,30 +800,28 @@ def extract_text_map(
 # Tracing decorators
 
 
-def create_decorator(
+def _custom_sync_async_decorator(
     func: Callable[P, R],
-    # TODO: What is the correct type for these `Any`? `P.args, P.kwargs` isn't allowed here
     wrapping_logic: Callable[[Callable[P, R], Any, Any], ContextManager[None]],
 ) -> Callable[P, R]:
     """
-    Creates a decorator that is able to handle sync functions, async functions
-    (coroutines), and inlineDeferred from Twisted.
-
+    Decorates a function that is sync or async (coroutines), or that returns a Twisted
+    `Deferred`. The custom business logic of the decorator goes in `wrapping_logic`.
     Example usage:
     ```py
-    # Decorator to time the functiona and log it out
+    # Decorator to time the function and log it out
     def duration(func: Callable[P, R]) -> Callable[P, R]:
         @contextlib.contextmanager
-        def _wrapping_logic(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
+        def _wrapping_logic(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> Generator[None, None, None]:
             start_ts = time.time()
-            yield
-            end_ts = time.time()
-            duration = end_ts - start_ts
-            logger.info("%s took %s seconds", func.__name__, duration)
-
-        return create_decorator(func, _wrapping_logic)
+            try:
+                yield
+            finally:
+                end_ts = time.time()
+                duration = end_ts - start_ts
+                logger.info("%s took %s seconds", func.__name__, duration)
+        return _custom_sync_async_decorator(func, _wrapping_logic)
     ```
-
     Args:
         func: The function to be decorated
         wrapping_logic: The business logic of your custom decorator.
@@ -821,14 +829,18 @@ def create_decorator(
             before/after the function as desired.
     """
 
-    @wraps(func)
-    async def _wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        if inspect.iscoroutinefunction(func):
+    if inspect.iscoroutinefunction(func):
+
+        @wraps(func)
+        async def _wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             with wrapping_logic(func, *args, **kwargs):
-                return await func(*args, **kwargs)
-        else:
-            # The other case here handles both sync functions and those
-            # decorated with inlineDeferred.
+                return await func(*args, **kwargs)  # type: ignore[misc]
+
+    else:
+        # The other case here handles both sync functions and those
+        # decorated with inlineDeferred.
+        @wraps(func)
+        def _wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             scope = wrapping_logic(func, *args, **kwargs)
             scope.__enter__()
 
@@ -866,7 +878,11 @@ def create_decorator(
     return _wrapper  # type: ignore[return-value]
 
 
-def trace_with_opname(opname: str) -> Callable[[Callable[P, R]], Callable[P, R]]:
+def trace_with_opname(
+    opname: str,
+    *,
+    tracer: Optional["opentelemetry.trace.Tracer"] = None,
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """
     Decorator to trace a function with a custom opname.
 
@@ -875,21 +891,14 @@ def trace_with_opname(opname: str) -> Callable[[Callable[P, R]], Callable[P, R]]
 
     @contextlib.contextmanager
     def _wrapping_logic(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
-        if opentelemetry is None:
-            return None
-
-        scope = start_active_span(opname)
-        scope.__enter__()
-        try:
+        with start_active_span(opname, tracer=tracer):
             yield
-        except Exception as e:
-            scope.__exit__(type(e), None, e.__traceback__)
-            raise
-        finally:
-            scope.__exit__(None, None, None)
 
     def _decorator(func: Callable[P, R]):
-        return create_decorator(func, _wrapping_logic)
+        if not opentelemetry:
+            return func
+
+        return _custom_sync_async_decorator(func, _wrapping_logic)
 
     return _decorator
 
@@ -918,12 +927,12 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
     def _wrapping_logic(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
         argspec = inspect.getfullargspec(func)
         for i, arg in enumerate(args[1:]):
-            set_attribute("ARG_" + argspec.args[i + 1], str(arg))  # type: ignore[index]
-        set_attribute("args", str(args[len(argspec.args) :]))  # type: ignore[index]
-        set_attribute("kwargs", str(kwargs))
+            set_attribute(SynapseTags.FUNC_ARG_PREFIX + argspec.args[i + 1], str(arg))  # type: ignore[index]
+        set_attribute(SynapseTags.FUNC_ARGS, str(args[len(argspec.args) :]))  # type: ignore[index]
+        set_attribute(SynapseTags.FUNC_KWARGS, str(kwargs))
         yield
 
-    return create_decorator(func, _wrapping_logic)
+    return _custom_sync_async_decorator(func, _wrapping_logic)
 
 
 @contextlib.contextmanager
