@@ -54,7 +54,7 @@ from synapse.logging.context import (
     current_context,
     make_deferred_yieldable,
 )
-from synapse.logging.tracing import tag_args, trace
+from synapse.logging.tracing import start_active_span, tag_args, trace
 from synapse.metrics.background_process_metrics import (
     run_as_background_process,
     wrap_as_background_process,
@@ -395,8 +395,6 @@ class EventsWorkerStore(SQLBaseStore):
 
         return event
 
-    @trace
-    @tag_args
     async def get_events(
         self,
         event_ids: Collection[str],
@@ -433,6 +431,8 @@ class EventsWorkerStore(SQLBaseStore):
 
         return {e.event_id: e for e in events}
 
+    @trace
+    @tag_args
     async def get_events_as_list(
         self,
         event_ids: Collection[str],
@@ -1034,6 +1034,11 @@ class EventsWorkerStore(SQLBaseStore):
         fetched_events: Dict[str, _EventRow] = {}
         events_to_fetch = event_ids
 
+        is_recording_redaction_trace = False
+        fetching_redactions_tracing_span_cm = start_active_span(
+            "recursively fetching redactions"
+        )
+
         while events_to_fetch:
             row_map = await self._enqueue_events(events_to_fetch)
 
@@ -1049,6 +1054,14 @@ class EventsWorkerStore(SQLBaseStore):
             events_to_fetch = redaction_ids.difference(fetched_event_ids)
             if events_to_fetch:
                 logger.debug("Also fetching redaction events %s", events_to_fetch)
+                # Start tracing how long it takes for us to get all of the redactions
+                if not is_recording_redaction_trace:
+                    fetching_redactions_tracing_span_cm.__enter__()
+                    is_recording_redaction_trace = True
+
+        # Only stop recording if we were recording in the first place
+        if is_recording_redaction_trace:
+            fetching_redactions_tracing_span_cm.__exit__(None, None, None)
 
         # build a map from event_id to EventBase
         event_map: Dict[str, EventBase] = {}

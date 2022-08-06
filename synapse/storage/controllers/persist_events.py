@@ -390,15 +390,18 @@ class EventsPersistenceStorageController:
             PartialStateConflictError: if attempting to persist a partial state event in
                 a room that has been un-partial stated.
         """
-        set_attribute(
-            SynapseTags.FUNC_ARG_PREFIX + f"event_ids ({len(events_and_contexts)})",
-            str([e.event_id for e, _ in events_and_contexts]),
-        )
-        set_attribute(SynapseTags.FUNC_ARG_PREFIX + "backfilled", str(backfilled))
 
+        event_ids: List[str] = []
         partitioned: Dict[str, List[Tuple[EventBase, EventContext]]] = {}
         for event, ctx in events_and_contexts:
             partitioned.setdefault(event.room_id, []).append((event, ctx))
+            event_ids.append(event.event_id)
+
+        set_attribute(
+            SynapseTags.FUNC_ARG_PREFIX + f"event_ids ({len(event_ids)})",
+            str(event_ids),
+        )
+        set_attribute(SynapseTags.FUNC_ARG_PREFIX + "backfilled", str(backfilled))
 
         async def enqueue(
             item: Tuple[str, List[Tuple[EventBase, EventContext]]]

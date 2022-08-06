@@ -61,8 +61,8 @@ from synapse.federation.federation_client import InvalidResponseError
 from synapse.logging.context import nested_logging_context
 from synapse.logging.tracing import (
     SynapseTags,
-    start_active_span,
     set_attribute,
+    start_active_span,
     tag_args,
     trace,
 )
@@ -722,7 +722,7 @@ class FederationEventHandler:
 
     @trace
     async def _process_pulled_events(
-        self, origin: str, events: Iterable[EventBase], backfilled: bool
+        self, origin: str, events: List[EventBase], backfilled: bool
     ) -> None:
         """Process a batch of events we have pulled from a remote server
 
@@ -1662,7 +1662,7 @@ class FederationEventHandler:
             origin, event
         )
         set_attribute(
-            "claimed_auth_events", [ev.event_id for ev in claimed_auth_events]
+            "claimed_auth_events", str([ev.event_id for ev in claimed_auth_events])
         )
 
         # ... and check that the event passes auth at those auth events.
