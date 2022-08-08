@@ -28,7 +28,7 @@ class AuthenticationData(BaseModel):
 
 class EmailRequestTokenBody(BaseModel):
     if TYPE_CHECKING:
-        client_secret: str
+        client_secret: StrictStr
     else:
         # See also assert_valid_client_secret()
         client_secret: constr(

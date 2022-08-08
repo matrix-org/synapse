@@ -148,7 +148,7 @@ class PasswordRestServlet(RestServlet):
         logout_devices: StrictBool = True
         if TYPE_CHECKING:
             # workaround for https://github.com/samuelcolvin/pydantic/issues/156
-            new_password: Optional[str] = None
+            new_password: Optional[StrictStr] = None
         else:
             new_password: Optional[constr(max_length=512)] = None
 
