@@ -46,7 +46,7 @@ class EmailRequestTokenBody(SynapseBaseModel):
 
     @validator("id_access_token", always=True)
     def token_required_for_identity_server(
-        cls: Type, token: Optional[str], values: Dict[str, object]
+        cls, token: Optional[str], values: Dict[str, object]
     ) -> Optional[str]:
         if values.get("id_server") is not None and token is None:
             raise ValueError("id_access_token is required if an id_server is supplied.")
