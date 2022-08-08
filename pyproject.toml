@@ -158,6 +158,9 @@ packaging = ">=16.1"
 # At the time of writing, we only use functions from the version `importlib.metadata`
 # which shipped in Python 3.8. This corresponds to version 1.4 of the backport.
 importlib_metadata = { version = ">=1.4", python = "<3.8" }
+# This is the most recent version of Pydantic with available on common distros.
+pydantic = ">=1.7.4"
+
 
 
 # Optional Dependencies
@@ -182,7 +185,6 @@ hiredis = { version = "*", optional = true }
 Pympler = { version = "*", optional = true }
 parameterized = { version = ">=0.7.4", optional = true }
 idna = { version = ">=2.5", optional = true }
-pydantic = ">=1.9.0"
 
 [tool.poetry.extras]
 # NB: Packages that should be part of `pip install matrix-synapse[all]` need to be specified

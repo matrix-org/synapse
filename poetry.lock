@@ -1578,7 +1578,7 @@ url_preview = ["lxml"]
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.7.1"
-content-hash = "b3cb4f0789eaa2bbba032e87a173bf7e790db2964f96556ea68d311bfe76715f"
+content-hash = "7de518bf27967b3547eab8574342cfb67f87d6b47b4145c13de11112141dbf2d"
 
 [metadata.files]
 attrs = [
