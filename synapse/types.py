@@ -35,6 +35,7 @@ from typing import (
 
 import attr
 from frozendict import frozendict
+from pydantic import BaseModel, Extra
 from signedjson.key import decode_verify_key_bytes
 from signedjson.types import VerifyKey
 from typing_extensions import Final, TypedDict
@@ -920,3 +921,21 @@ class UserProfile(TypedDict):
 class RetentionPolicy:
     min_lifetime: Optional[int] = None
     max_lifetime: Optional[int] = None
+
+
+class SynapseBaseModel(BaseModel):
+    """A custom version of Pydantic's BaseModel.
+
+    This
+     - ignores unknown fields and
+     - does not allow fields to be overwritten after construction,
+    but otherwise uses Pydantic's default behaviour.
+
+    Subclassing in this way is recommended by
+    https://pydantic-docs.helpmanual.io/usage/model_config/#change-behaviour-globally
+    """
+    class Config:
+        # By default, ignore fields that we don't recognise.
+        extra = Extra.ignore
+        # By default, don't allow fields to be reassigned after parsing.
+        allow_mutation = False

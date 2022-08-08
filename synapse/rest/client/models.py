@@ -13,12 +13,13 @@
 # limitations under the License.
 from typing import TYPE_CHECKING, Dict, Optional, Type
 
-from pydantic import BaseModel, Extra, StrictInt, StrictStr, constr, validator
+from pydantic import Extra, StrictInt, StrictStr, constr, validator
 
+from synapse.types import SynapseBaseModel
 from synapse.util.threepids import validate_email
 
 
-class AuthenticationData(BaseModel):
+class AuthenticationData(SynapseBaseModel):
     class Config:
         extra = Extra.allow
 
@@ -26,7 +27,7 @@ class AuthenticationData(BaseModel):
     type: Optional[StrictStr] = None
 
 
-class EmailRequestTokenBody(BaseModel):
+class EmailRequestTokenBody(SynapseBaseModel):
     if TYPE_CHECKING:
         client_secret: StrictStr
     else:
