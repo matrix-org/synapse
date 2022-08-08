@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Dict, Optional, Type
 
 from pydantic import BaseModel, Extra, StrictInt, StrictStr, constr, validator
 
@@ -38,10 +38,18 @@ class EmailRequestTokenBody(BaseModel):
             strict=True,
         )
     email: StrictStr
-    id_access_token: Optional[StrictStr]
     id_server: Optional[StrictStr]
+    id_access_token: Optional[StrictStr]
     next_link: Optional[StrictStr]
     send_attempt: StrictInt
+
+    @validator("id_access_token", always=True)
+    def token_required_for_identity_server(
+        cls: Type, token: Optional[str], values: Dict[str, object]
+    ) -> Optional[str]:
+        if values.get("id_server") is not None and token is None:
+            raise ValueError("id_access_token is required if an id_server is supplied.")
+        return token
 
     # Canonicalise the email address. The addresses are all stored canonicalised
     # in the database. This allows the user to reset his password without having to
