@@ -1039,8 +1039,8 @@ class SyncHandler:
                             ),
                         )
 
-            # At this point, `state_ids` includes the memberships of all event senders
-            # in the timeline when `lazy_load_members` is enabled. This is because we
+            # At this point, if `lazy_load_members` is enabled, `state_ids` includes
+            # the memberships of all event senders in the timeline. This is because we
             # may not have sent the memberships in a previous sync.
 
             # When `include_redundant_members` is on, we send all the lazy-loaded
