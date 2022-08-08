@@ -1044,8 +1044,8 @@ class SyncHandler:
             # may not have sent the memberships in a previous sync.
 
             # When `include_redundant_members` is on, we send all the lazy-loaded
-            # memberships of event senders. Otherwise we make an effort to prune the set
-            # of memberships we send:
+            # memberships of event senders. Otherwise we make an effort to limit the set
+            # of memberships we send to those that we have not already sent to this client.
             if lazy_load_members and not include_redundant_members:
                 cache_key = (sync_config.user.to_string(), sync_config.device_id)
                 cache = self.get_lazy_loaded_members_cache(cache_key)
