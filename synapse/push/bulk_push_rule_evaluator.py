@@ -131,6 +131,13 @@ class BulkPushRuleEvaluator:
 
         local_users = await self.store.get_local_users_in_room(event.room_id)
 
+        # Filter out appservice users.
+        local_users = [
+            u
+            for u in local_users
+            if not self.store.get_if_app_services_interested_in_user(u)
+        ]
+
         # if this event is an invite event, we may need to run rules for the user
         # who's been invited, otherwise they won't get told they've been invited
         if event.type == EventTypes.Member and event.membership == Membership.INVITE:

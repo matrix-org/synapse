@@ -1,0 +1,1 @@
+Prevent unnecessary lookups to any external `get_event` cache. Contributed by Nick @ Beeper (@fizzadar).

@@ -79,6 +79,7 @@ from synapse.types import JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import AwakenableSleeper, timeout_deferred
 from synapse.util.metrics import Measure
+from synapse.util.stringutils import parse_and_validate_server_name
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -479,6 +480,14 @@ class MatrixFederationHttpClient:
             RequestSendFailed: If there were problems connecting to the
                 remote, due to e.g. DNS failures, connection timeouts etc.
         """
+        # Validate server name and log if it is an invalid destination, this is
+        # partially to help track down code paths where we haven't validated before here
+        try:
+            parse_and_validate_server_name(request.destination)
+        except ValueError:
+            logger.exception(f"Invalid destination: {request.destination}.")
+            raise FederationDeniedError(request.destination)
+
         if timeout:
             _sec_timeout = timeout / 1000
         else:

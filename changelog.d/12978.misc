@@ -1,0 +1,1 @@
+Extend the release script to automatically push a new SyTest branch, rather than having that be a manual process.
