@@ -934,6 +934,7 @@ class SynapseBaseModel(BaseModel):
     Subclassing in this way is recommended by
     https://pydantic-docs.helpmanual.io/usage/model_config/#change-behaviour-globally
     """
+
     class Config:
         # By default, ignore fields that we don't recognise.
         extra = Extra.ignore
