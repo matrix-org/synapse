@@ -1003,9 +1003,8 @@ class SyncHandler:
                         )
                     )
                 else:
-                    # Its not clear how we get here, but empirically we do
-                    # (#5407). Logging has been added elsewhere to try and
-                    # figure out where this state comes from.
+                    # We can get here if the user has ignored the senders of all
+                    # the recent events.
                     state_at_timeline_end = await self.get_state_at(
                         room_id, stream_position=now_token, state_filter=state_filter
                     )
