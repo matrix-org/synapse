@@ -2242,10 +2242,10 @@ class DatabasePool:
             table: The name of the table to delete all rows from.
         """
         if isinstance(txn.database_engine, PostgresEngine):
-            sql = "TRUNCATE %s" % table
+            sql = f"TRUNCATE {table}"
         else:
             # SQLite does not support the TRUNCATE command
-            sql = "DELETE FROM %s" % table
+            sql = f"DELETE FROM {table}"
 
         txn.execute(sql)
 
