@@ -2108,18 +2108,25 @@ class DatabasePool:
     ) -> int:
         """Executes a DELETE query on the named table.
 
-        Filters rows by the key-value pairs.
+        Filter rows by the key-value pairs.
 
         Args:
             table: string giving the table name
-            keyvalues: dict of column names and values to select the row with. If empty,
-                no rows will be deleted.
+            keyvalues: dict of column names and values to select the row with. Must
+                not be empty.
 
         Returns:
             The number of deleted rows.
+
+        Raises:
+            ValueError: if keyvalues was a falsey value, such as an empty dict.
         """
         if not keyvalues:
-            return 0
+            raise ValueError(
+                "'keyvalues' arg to simple_delete_txn was falsey. If you were trying to "
+                "delete all rows from a database, perhaps try "
+                "DatabasePool.simple_truncate instead?"
+            )
 
         sql = "DELETE FROM %s WHERE %s" % (
             table,
