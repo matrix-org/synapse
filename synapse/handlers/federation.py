@@ -59,7 +59,7 @@ from synapse.events.validator import EventValidator
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import nested_logging_context
-from synapse.logging.opentracing import trace
+from synapse.logging.opentracing import SynapseTags, set_tag, trace
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import NOT_SPAM
 from synapse.replication.http.federation import (
@@ -369,6 +369,11 @@ class FederationHandler:
 
         logger.debug(
             "_maybe_backfill_inner: extremities_to_request %s", extremities_to_request
+        )
+        set_tag(
+            SynapseTags.RESULT_PREFIX
+            + f"extremities_to_request {len(extremities_to_request)}",
+            str(extremities_to_request),
         )
 
         # Now we need to decide which hosts to hit first.
