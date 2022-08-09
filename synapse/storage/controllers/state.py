@@ -29,7 +29,7 @@ from typing import (
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.logging.tracing import trace
+from synapse.logging.tracing import tag_args, trace
 from synapse.storage.state import StateFilter
 from synapse.storage.util.partial_state_events_tracker import (
     PartialCurrentStateTracker,
@@ -228,6 +228,7 @@ class StateStorageController:
         return {event: event_to_state[event] for event in event_ids}
 
     @trace
+    @tag_args
     async def get_state_ids_for_events(
         self,
         event_ids: Collection[str],
@@ -332,6 +333,7 @@ class StateStorageController:
         )
 
     @trace
+    @tag_args
     async def get_state_group_for_events(
         self,
         event_ids: Collection[str],

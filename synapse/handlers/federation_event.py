@@ -1025,10 +1025,10 @@ class FederationEventHandler:
         logger.debug("Fetching %i events from cache/store", len(desired_events))
         have_events = await self._store.have_seen_events(room_id, desired_events)
 
-        missing_desired_events = desired_events - have_events
+        missing_desired_event_ids = desired_events - have_events
         logger.debug(
             "We are missing %i events (got %i)",
-            len(missing_desired_events),
+            len(missing_desired_event_ids),
             len(have_events),
         )
 
@@ -1040,13 +1040,24 @@ class FederationEventHandler:
         #   already have a bunch of the state events. It would be nice if the
         #   federation api gave us a way of finding out which we actually need.
 
-        missing_auth_events = set(auth_event_ids) - have_events
-        missing_auth_events.difference_update(
-            await self._store.have_seen_events(room_id, missing_auth_events)
+        missing_auth_event_ids = set(auth_event_ids) - have_events
+        missing_auth_event_ids.difference_update(
+            await self._store.have_seen_events(room_id, missing_auth_event_ids)
         )
-        logger.debug("We are also missing %i auth events", len(missing_auth_events))
+        logger.debug("We are also missing %i auth events", len(missing_auth_event_ids))
 
-        missing_events = missing_desired_events | missing_auth_events
+        missing_event_ids = missing_desired_event_ids | missing_auth_event_ids
+
+        set_attribute(
+            SynapseTags.RESULT_PREFIX
+            + f"missing_auth_event_ids ({len(missing_auth_event_ids)})",
+            str(missing_auth_event_ids),
+        )
+        set_attribute(
+            SynapseTags.RESULT_PREFIX
+            + f"missing_desired_event_ids ({len(missing_desired_event_ids)})",
+            str(missing_desired_event_ids),
+        )
 
         # Making an individual request for each of 1000s of events has a lot of
         # overhead. On the other hand, we don't really want to fetch all of the events
@@ -1057,13 +1068,13 @@ class FederationEventHandler:
         #
         # TODO: might it be better to have an API which lets us do an aggregate event
         #   request
-        if (len(missing_events) * 10) >= len(auth_event_ids) + len(state_event_ids):
+        if (len(missing_event_ids) * 10) >= len(auth_event_ids) + len(state_event_ids):
             logger.debug("Requesting complete state from remote")
             await self._get_state_and_persist(destination, room_id, event_id)
         else:
-            logger.debug("Fetching %i events from remote", len(missing_events))
+            logger.debug("Fetching %i events from remote", len(missing_event_ids))
             await self._get_events_and_persist(
-                destination=destination, room_id=room_id, event_ids=missing_events
+                destination=destination, room_id=room_id, event_ids=missing_event_ids
             )
 
         # We now need to fill out the state map, which involves fetching the
@@ -1120,6 +1131,11 @@ class FederationEventHandler:
                 event_id,
                 failed_to_fetch,
             )
+
+        set_attribute(
+            SynapseTags.RESULT_PREFIX + f"failed_to_fetch ({len(failed_to_fetch)})",
+            str(failed_to_fetch),
+        )
 
         if remote_event.is_state() and remote_event.rejected_reason is None:
             state_map[
@@ -1662,7 +1678,9 @@ class FederationEventHandler:
             origin, event
         )
         set_attribute(
-            "claimed_auth_events", str([ev.event_id for ev in claimed_auth_events])
+            SynapseTags.RESULT_PREFIX
+            + f"claimed_auth_events ({len(claimed_auth_events)})",
+            str([ev.event_id for ev in claimed_auth_events]),
         )
 
         # ... and check that the event passes auth at those auth events.
@@ -2110,7 +2128,7 @@ class FederationEventHandler:
             if not backfilled:  # Never notify for backfilled events
                 with start_active_span("notify_persisted_events"):
                     set_attribute(
-                        SynapseTags.FUNC_ARG_PREFIX + f"event_ids ({len(events)})",
+                        SynapseTags.RESULT_PREFIX + f"event_ids ({len(events)})",
                         str([ev.event_id for ev in events]),
                     )
                     for event in events:

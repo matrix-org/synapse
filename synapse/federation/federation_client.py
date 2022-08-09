@@ -61,7 +61,7 @@ from synapse.federation.federation_base import (
 )
 from synapse.federation.transport.client import SendJoinResponse
 from synapse.http.types import QueryParams
-from synapse.logging.tracing import tag_args, trace
+from synapse.logging.tracing import SynapseTags, set_attribute, tag_args, trace
 from synapse.types import JsonDict, UserID, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -451,6 +451,8 @@ class FederationClient(FederationBase):
 
         return event_copy
 
+    @trace
+    @tag_args
     async def get_room_state_ids(
         self, destination: str, room_id: str, event_id: str
     ) -> Tuple[List[str], List[str]]:
@@ -469,6 +471,15 @@ class FederationClient(FederationBase):
 
         state_event_ids = result["pdu_ids"]
         auth_event_ids = result.get("auth_chain_ids", [])
+
+        set_attribute(
+            SynapseTags.RESULT_PREFIX + f"state_event_ids ({len(state_event_ids)})",
+            str(state_event_ids),
+        )
+        set_attribute(
+            SynapseTags.RESULT_PREFIX + f"auth_event_ids ({len(auth_event_ids)})",
+            str(auth_event_ids),
+        )
 
         if not isinstance(state_event_ids, list) or not isinstance(
             auth_event_ids, list

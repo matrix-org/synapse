@@ -59,7 +59,7 @@ from synapse.events.validator import EventValidator
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import nested_logging_context
-from synapse.logging.tracing import set_attribute, trace
+from synapse.logging.tracing import SynapseTags, set_attribute, trace
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import NOT_SPAM
 from synapse.replication.http.federation import (
@@ -323,7 +323,9 @@ class FederationHandler:
             if len(extremities_to_request) >= 5:
                 break
 
-            set_attribute("backfill_point" + str(i), str(bp))
+            set_attribute(
+                SynapseTags.RESULT_PREFIX + "backfill_point" + str(i), str(bp)
+            )
 
             # For regular backwards extremities, we don't have the extremity events
             # themselves, so we need to actually check the events that reference them -

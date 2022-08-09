@@ -166,7 +166,6 @@ from functools import wraps
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
     Callable,
     ContextManager,
     Dict,
@@ -290,6 +289,9 @@ class SynapseTags:
     FUNC_ARGS = "args"
     # Tag keyword args
     FUNC_KWARGS = "kwargs"
+
+    # Some intermediate result that's interesting to the function
+    RESULT_PREFIX = "RESULT."
 
 
 class SynapseBaggage:
