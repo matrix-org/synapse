@@ -354,9 +354,11 @@ and aims to follow supported upstream versions. See the
 Troubleshooting
 ===============
 
-Need help? Join our community support room on Matrix:
-`#synapse:matrix.org <https://matrix.to/#/#synapse:matrix.org>`_
+The `Admin FAQ <https://matrix-org.github.io/synapse/latest/development/contributing_guide.html>`_
+includes tips on dealing with some common problems.
 
+If that doesn't help, join our community support room on Matrix:
+`#synapse:matrix.org <https://matrix.to/#/#synapse:matrix.org>`_.
 
 
 .. |support| image:: https://img.shields.io/matrix/synapse:matrix.org?label=support&logo=matrix
