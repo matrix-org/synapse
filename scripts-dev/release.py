@@ -90,6 +90,10 @@ def cli() -> None:
 
 @cli.command()
 def prepare() -> None:
+    _prepare()
+
+
+def _prepare() -> None:
     """Do the initial stages of creating a release, including creating release
     branch, updating changelog and pushing to GitHub.
     """
@@ -284,6 +288,10 @@ def prepare() -> None:
 @cli.command()
 @click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"])
 def tag(gh_token: Optional[str]) -> None:
+    _tag(gh_token)
+
+
+def _tag(gh_token: Optional[str]) -> None:
     """Tags the release and generates a draft GitHub release"""
 
     # Make sure we're in a git repo.
@@ -374,6 +382,10 @@ def tag(gh_token: Optional[str]) -> None:
 @cli.command()
 @click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=True)
 def publish(gh_token: str) -> None:
+    _publish(gh_token)
+
+
+def _publish(gh_token: str) -> None:
     """Publish release on GitHub."""
 
     # Make sure we're in a git repo.
@@ -411,6 +423,10 @@ def publish(gh_token: str) -> None:
 
 @cli.command()
 def upload() -> None:
+    _upload()
+
+
+def _upload() -> None:
     """Upload release to pypi."""
 
     current_version = get_package_version()
@@ -481,6 +497,10 @@ def _merge_into(repo: Repo, source: str, target: str) -> None:
 
 @cli.command()
 def merge_back() -> None:
+    _merge_back()
+
+
+def _merge_back() -> None:
     """Merge the release branch back into the appropriate branches.
     All branches will be automatically pulled from the remote and the results
     will be pushed to the remote."""
@@ -519,6 +539,10 @@ def merge_back() -> None:
 
 @cli.command()
 def announce() -> None:
+    _announce()
+
+
+def _announce() -> None:
     """Generate markdown to announce the release."""
 
     current_version = get_package_version()
