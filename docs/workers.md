@@ -597,7 +597,7 @@ endpoints matching the following regular expression:
 This "stub" presence handler will pass through `GET` request but make the
 `PUT` effectively a no-op.
 
-It will proxy not cached requests to the main synapse instance. It
+It will proxy uncached requests to the main synapse instance. It
 must therefore be configured with the location of the main instance, via
 the `worker_main_http_uri` setting in the `frontend_proxy` worker configuration
 file. For example:
