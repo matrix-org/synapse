@@ -4001,20 +4001,20 @@ on this homeserver.</p>
 </code></pre>
 <hr />
 <h2 id="caching"><a class="header" href="#caching">Caching</a></h2>
-<p>Options related to caching</p>
+<p>Options related to caching.</p>
 <hr />
 <h3 id="event_cache_size"><a class="header" href="#event_cache_size"><code>event_cache_size</code></a></h3>
 <p>The number of events to cache in memory. Not affected by
-<code>caches.global_factor</code>. Defaults to 10K.</p>
+<code>caches.global_factor</code> and is not part of the <code>caches</code> section. Defaults to 10K.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">event_cache_size: 15K
 </code></pre>
 <hr />
-<h3 id="cache-and-associated-values"><a class="header" href="#cache-and-associated-values"><code>cache</code> and associated values</a></h3>
+<h3 id="caches-and-associated-values"><a class="header" href="#caches-and-associated-values"><code>caches</code> and associated values</a></h3>
 <p>A cache 'factor' is a multiplier that can be applied to each of
 Synapse's caches in order to increase or decrease the maximum
 number of entries that can be stored.</p>
-<p>Caching can be configured through the following sub-options:</p>
+<p><code>caches</code> can be configured through the following sub-options:</p>
 <ul>
 <li>
 <p><code>global_factor</code>: Controls the global cache factor, which is the default cache factor
@@ -4079,7 +4079,8 @@ from being emptied while Synapse is evicting due to memory. There is no default 
 </li>
 </ul>
 <p>Example configuration:</p>
-<pre><code class="language-yaml">caches:
+<pre><code class="language-yaml">event_cache_size: 15K
+caches:
   global_factor: 1.0
   per_cache_factors:
     get_users_who_share_room_with_user: 2.0
