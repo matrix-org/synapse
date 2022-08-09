@@ -43,6 +43,28 @@ response_timer = Histogram(
     "synapse_http_server_response_time_seconds",
     "sec",
     ["method", "servlet", "tag", "code"],
+    buckets=(
+        0.005,
+        0.01,
+        0.025,
+        0.05,
+        0.075,
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        1.0,
+        2.5,
+        5.0,
+        7.5,
+        10.0,
+        30.0,
+        60.0,
+        120.0,
+        180.0,
+        200.0,
+        "+Inf",
+    ),
 )
 
 response_ru_utime = Counter(
