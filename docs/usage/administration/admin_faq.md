@@ -117,3 +117,18 @@ LIMIT 10;
 
 You can also use the [List Room API](../../admin_api/rooms.md#list-room-api)
 and `order_by` `state_events`.
+
+
+People can't accept room invitations from me
+---
+
+The typical failure mode here is that you send an invitation to someone
+to join a room or direct chat, but when they go to accept it, they get an
+error (typically along the lines of "Invalid signature"). They might see
+something like the following in their logs:
+
+    2019-09-11 19:32:04,271 - synapse.federation.transport.server - 288 - WARNING - GET-11752 - authenticate_request failed: 401: Invalid signature for server <server> with key ed25519:a_EqML: Unable to verify signature for <server>
+
+This is normally caused by a misconfiguration in your reverse-proxy. See [the reverse proxy docs](docs/reverse_proxy.md) and double-check that your settings are correct.
+
+
