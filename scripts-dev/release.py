@@ -633,7 +633,9 @@ Announce the release in
 - #homeowners:matrix.org (Synapse Announcements), bumping the version in the topic
 - #synapse:matrix.org (Synapse Admins), bumping the version in the topic
 - #synapse-dev:matrix.org
-- #synapse-package-maintainers:matrix.org"""
+- #synapse-package-maintainers:matrix.org
+
+Ask the designated people to do the blog and tweets."""
         )
 
 
