@@ -76,7 +76,7 @@ class Auth:
         Args:
             room_id: The room to check.
 
-            user_id: The user to check.
+            requester: The user making the request, according to the access token.
 
             current_state: Optional map of the current state of the room.
                 If provided then that map is used to check whether they are a
@@ -457,7 +457,7 @@ class Auth:
         """Check if the given user is a local server admin.
 
         Args:
-            requester: user to check
+            requester: The user making the request, according to the access token.
 
         Returns:
             True if the user is an admin
@@ -471,8 +471,8 @@ class Auth:
         published room list.
 
         Args:
-            room_id
-            user
+            room_id: The room to check.
+            requester: The user making the request, according to the access token.
         """
 
         is_admin = await self.is_server_admin(requester)
@@ -564,10 +564,10 @@ class Auth:
         readable. If it isn't then an exception is raised.
 
         Args:
-            room_id: room to check
-            user_id: user to check
-            allow_departed_users: if True, accept users that were previously
-                members but have now departed
+            room_id: The room to check.
+            requester: The user making the request, according to the access token.
+            allow_departed_users: If True, accept users that were previously
+                members but have now departed.
 
         Returns:
             Resolves to the current membership of the user in the room and the

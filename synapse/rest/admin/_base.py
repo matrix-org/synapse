@@ -56,7 +56,7 @@ async def assert_user_is_admin(auth: Auth, requester: Requester) -> None:
 
     Args:
         auth: Auth singleton
-        user_id: user to check
+        requester: The user making the request, according to the access token.
 
     Raises:
         AuthError if the user is not a server admin
