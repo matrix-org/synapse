@@ -320,9 +320,10 @@ class FederationHandler:
 
         extremities_to_request: List[str] = []
         for i, bp in enumerate(sorted_backfill_points):
-            set_attribute("backfill_point" + str(i), str(bp))
             if len(extremities_to_request) >= 5:
                 break
+
+            set_attribute("backfill_point" + str(i), str(bp))
 
             # For regular backwards extremities, we don't have the extremity events
             # themselves, so we need to actually check the events that reference them -
