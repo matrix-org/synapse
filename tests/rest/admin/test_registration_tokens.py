@@ -75,7 +75,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
         """Try to create a token without authentication."""
         channel = self.make_request("POST", self.url + "/new", {})
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -390,7 +390,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {},
         )
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -606,7 +606,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {},
         )
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -667,7 +667,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {},
         )
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -729,7 +729,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
         """Try to list tokens without authentication."""
         channel = self.make_request("GET", self.url, {})
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )

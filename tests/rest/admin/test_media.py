@@ -60,7 +60,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("DELETE", url, b"{}")
 
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -231,7 +231,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("POST", self.url, b"{}")
 
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -668,7 +668,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -801,7 +801,7 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("POST", self.url % (action, self.media_id), b"{}")
 
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -894,7 +894,7 @@ class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("POST", self.url, b"{}")
 
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )

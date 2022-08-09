@@ -57,7 +57,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("POST", self.url)
 
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )

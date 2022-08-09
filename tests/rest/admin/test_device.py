@@ -58,7 +58,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(method, self.url, b"{}")
 
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -312,7 +312,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", self.url, b"{}")
 
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -438,7 +438,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("POST", self.url, b"{}")
 
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
