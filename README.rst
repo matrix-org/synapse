@@ -15,22 +15,6 @@ Matrix project <https://matrix.org/docs/guides/introduction>`_, and the `formal 
 .. contents::
 
 
-Support
-=======
-
-For support installing or managing Synapse, please join |room|_ (from a matrix.org
-account if necessary) and ask questions there. We do not use GitHub issues for
-support requests, only for bug reports and feature requests.
-
-Synapse's documentation is `nicely rendered on GitHub Pages <https://matrix-org.github.io/synapse>`_,
-with its source available in |docs|_.
-
-.. |room| replace:: ``#synapse:matrix.org``
-.. _room: https://matrix.to/#/#synapse:matrix.org
-
-.. |docs| replace:: ``docs``
-.. _docs: docs
-
 Synapse Installation
 ====================
 
@@ -152,6 +136,23 @@ Matrix clients without needing to run Synapse with root privileges.
 
 For information on configuring one, see `<docs/reverse_proxy.md>`_.
 
+Troubleshooting and support
+===========================
+
+The `Admin FAQ <https://matrix-org.github.io/synapse/latest/usage/administration/admin_faq.html>`_
+includes tips on dealing with some common problems. For more details, see
+`Synapse's wider documentation <https://matrix-org.github.io/synapse/latest/>`_.
+
+For additional support installing or managing Synapse, please ask in the community
+support room |room|_ (from a matrix.org account if necessary). We do not use GitHub
+issues for support requests, only for bug reports and feature requests.
+
+.. |room| replace:: ``#synapse:matrix.org``
+.. _room: https://matrix.to/#/#synapse:matrix.org
+
+.. |docs| replace:: ``docs``
+.. _docs: docs
+
 Identity Servers
 ================
 
@@ -207,16 +208,6 @@ Platform dependencies
 Synapse uses a number of platform dependencies such as Python and PostgreSQL,
 and aims to follow supported upstream versions. See the
 `<docs/deprecation_policy.md>`_ document for more details.
-
-
-Troubleshooting
-===============
-
-The `Admin FAQ <https://matrix-org.github.io/synapse/latest/development/contributing_guide.html>`_
-includes tips on dealing with some common problems.
-
-If that doesn't help, join our community support room on Matrix:
-`#synapse:matrix.org <https://matrix.to/#/#synapse:matrix.org>`_.
 
 
 .. |support| image:: https://img.shields.io/matrix/synapse:matrix.org?label=support&logo=matrix
