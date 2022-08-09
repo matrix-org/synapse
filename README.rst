@@ -242,26 +242,6 @@ an email address with your account, or send an invite to another user via their
 email address.
 
 
-Password reset
-==============
-
-Users can reset their password through their client. Alternatively, a server admin
-can reset a users password using the `admin API <docs/admin_api/user_admin_api.md#reset-password>`_
-or by directly editing the database as shown below.
-
-First calculate the hash of the new password::
-
-    $ ~/synapse/env/bin/hash_password
-    Password:
-    Confirm password:
-    $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-
-Then update the ``users`` table in the database::
-
-    UPDATE users SET password_hash='$2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-        WHERE name='@test:test.com';
-
-
 Synapse Development
 ===================
 

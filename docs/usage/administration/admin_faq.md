@@ -32,9 +32,25 @@ What users are registered on my server?
 SELECT NAME from users;
 ```
 
-Manually resetting passwords:
+Manually resetting passwords
 ---
-See https://github.com/matrix-org/synapse/blob/master/README.rst#password-reset
+Users can reset their password through their client. Alternatively, a server admin
+can reset a user's password using the [admin API](../../admin_api/user_admin_api.md#reset-password)
+or by directly editing the database as shown below.
+
+First calculate the hash of the new password:
+
+    $ ~/synapse/env/bin/hash_password
+    Password:
+    Confirm password:
+    $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+Then update the ``users`` table in the database:
+
+    UPDATE users SET password_hash='$2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+        WHERE name='@test:test.com';
+
+
 
 I have a problem with my server. Can I just delete my database and start again?
 ---
