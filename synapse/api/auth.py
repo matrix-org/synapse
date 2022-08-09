@@ -287,14 +287,13 @@ class Auth:
              Must use `org.matrix.msc3202.device_id` in place of `device_id` for now.
 
         Returns:
-            the application service ``Requester`` of that request
+            the application service `Requester` of that request
 
         Postconditions:
-        - If an application service is returned, so is a user ID
-        - A user ID is never returned without an application service
-        - A device ID is never returned without a user ID or an application service
-        - The returned application service, if present, is permitted to control the
-          returned user ID.
+        - The `app_service` field in the returned `Requester` is set
+        - The `user_id` field in the returned `Requester` is either the application
+          service sender or the controlled user set by the `user_id` URI parameter
+        - The returned application service is permitted to control the returned user ID.
         - The returned device ID, if present, has been checked to be a valid device ID
           for the returned user ID.
         """

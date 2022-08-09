@@ -1438,7 +1438,8 @@ class AuthHandler:
         token = await self.store.get_user_by_access_token(access_token)
         if not token:
             # At this point, the token should already have been fetched once by
-            # the caller, so this should not happen
+            # the caller, so this should not happen, unless of a race condition
+            # between two delete requests
             raise SynapseError(HTTPStatus.UNAUTHORIZED, "Unrecognised access token")
         await self.store.delete_access_token(access_token)
 
