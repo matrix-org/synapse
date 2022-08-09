@@ -172,3 +172,28 @@ indicate that your server is also issuing far more outgoing federation
 requests than can be accounted for by your users' activity, this is a
 likely cause. The misbehavior can be worked around by disabling presence
 in the Synapse config file: [see here](../configuration/config_documentation.md#presence).
+
+
+Running out of File Handles
+---------------------------
+
+If Synapse runs out of file handles, it typically fails badly - live-locking
+at 100% CPU, and/or failing to accept new TCP connections (blocking the
+connecting client).  Matrix currently can legitimately use a lot of file handles,
+thanks to busy rooms like `#matrix:matrix.org` containing hundreds of participating
+servers.  The first time a server talks in a room it will try to connect
+simultaneously to all participating servers, which could exhaust the available
+file descriptors between DNS queries & HTTPS sockets, especially if DNS is slow
+to respond. (We need to improve the routing algorithm used to be better than
+full mesh, but as of March 2019 this hasn't happened yet).
+
+If you hit this failure mode, we recommend increasing the maximum number of
+open file handles to be at least 4096 (assuming a default of 1024 or 256).
+This is typically done by editing ``/etc/security/limits.conf``
+
+Separately, Synapse may leak file handles if inbound HTTP requests get stuck
+during processing - e.g. blocked behind a lock or talking to a remote server etc.
+This is best diagnosed by matching up the 'Received request' and 'Processed request'
+log lines and looking for any 'Processed request' lines which take more than
+a few seconds to execute. Please let us know at [`#synapse:matrix.org`](https://matrix.to/#/#synapse-dev:matrix.org) if
+you see this failure mode so we can help debug it, however.
