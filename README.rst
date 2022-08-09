@@ -96,7 +96,7 @@ Synapse Installation
 
 .. _federation:
 
-* For details on how to install synapse, see
+* For details on how to install Synapse, see
   `Installation Instructions <https://matrix-org.github.io/synapse/latest/setup/installation.html>`_.
 * For specific details on how to configure Synapse for federation see `docs/federate.md <docs/federate.md>`_
 
@@ -190,9 +190,9 @@ impact to other applications will be minimal.
 Upgrading an existing Synapse
 =============================
 
-The instructions for upgrading synapse are in `the upgrade notes`_.
+The instructions for upgrading Synapse are in `the upgrade notes`_.
 Please check these instructions as upgrading may require extra steps for some
-versions of synapse.
+versions of Synapse.
 
 .. _the upgrade notes: https://matrix-org.github.io/synapse/develop/upgrade.html
 
@@ -248,8 +248,8 @@ Synapse Development
 The best place to get started is our
 `guide for contributors <https://matrix-org.github.io/synapse/latest/development/contributing_guide.html>`_.
 This is part of our larger `documentation <https://matrix-org.github.io/synapse/latest>`_, which includes
-information for synapse developers as well as synapse administrators.
 
+information for Synapse developers as well as Synapse administrators.
 Developers might be particularly interested in:
 
 * `Synapse's database schema <https://matrix-org.github.io/synapse/latest/development/database_schema.html>`_,
@@ -360,7 +360,7 @@ Need help? Join our community support room on Matrix:
 Running out of File Handles
 ---------------------------
 
-If synapse runs out of file handles, it typically fails badly - live-locking
+If Synapse runs out of file handles, it typically fails badly - live-locking
 at 100% CPU, and/or failing to accept new TCP connections (blocking the
 connecting client).  Matrix currently can legitimately use a lot of file handles,
 thanks to busy rooms like #matrix:matrix.org containing hundreds of participating
