@@ -24,6 +24,14 @@ Synapse Installation
   `Installation Instructions <https://matrix-org.github.io/synapse/latest/setup/installation.html>`_.
 * For specific details on how to configure Synapse for federation see `docs/federate.md <docs/federate.md>`_
 
+Platform dependencies
+---------------------
+
+Synapse uses a number of platform dependencies such as Python and PostgreSQL,
+and aims to follow supported upstream versions. See the
+`deprecation policy <https://matrix-org.github.io/synapse/latest/deprecation_policy.html>`_
+for more details.
+
 
 Connecting to Synapse from a client
 ===================================
@@ -200,14 +208,6 @@ Developers might be particularly interested in:
 
 Alongside all that, join our developer community on Matrix:
 `#synapse-dev:matrix.org <https://matrix.to/#/#synapse-dev:matrix.org>`_, featuring real humans!
-
-
-Platform dependencies
-=====================
-
-Synapse uses a number of platform dependencies such as Python and PostgreSQL,
-and aims to follow supported upstream versions. See the
-`<docs/deprecation_policy.md>`_ document for more details.
 
 
 .. |support| image:: https://img.shields.io/matrix/synapse:matrix.org?label=support&logo=matrix
