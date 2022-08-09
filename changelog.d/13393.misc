@@ -1,1 +1,0 @@
-Add a `merge-back` command to the release script, which automates merging the correct branches after a release.
