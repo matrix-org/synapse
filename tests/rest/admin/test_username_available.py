@@ -64,10 +64,6 @@ class UsernameAvailableTestCase(unittest.HomeserverTestCase):
         url = "%s?username=%s" % (self.url, "disallowed")
         channel = self.make_request("GET", url, access_token=self.admin_user_tok)
 
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], "M_USER_IN_USE")
         self.assertEqual(channel.json_body["error"], "User ID already taken.")

@@ -80,11 +80,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
             access_token=self.other_user_token,
         )
 
-        self.assertEqual(
-            403,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_media_does_not_exist(self) -> None:
@@ -229,11 +225,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request("POST", self.url, b"{}")
 
-        self.assertEqual(
-            401,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_requester_is_no_admin(self) -> None:
@@ -249,11 +241,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             access_token=self.other_user_token,
         )
 
-        self.assertEqual(
-            403,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_media_is_not_local(self) -> None:
@@ -281,11 +269,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_PARAM, channel.json_body["errcode"])
         self.assertEqual(
             "Missing integer query parameter 'before_ts'", channel.json_body["error"]
@@ -301,11 +285,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
             "Query parameter before_ts must be a positive integer.",
@@ -318,11 +298,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
             "Query parameter before_ts you provided is from the year 1970. "
@@ -336,11 +312,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
             "Query parameter size_gt must be a string representing a positive integer.",
@@ -353,11 +325,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
             "Boolean query parameter 'keep_profiles' must be one of ['true', 'false']",
@@ -666,11 +634,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
             b"{}",
         )
 
-        self.assertEqual(
-            401,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     @parameterized.expand(["quarantine", "unquarantine"])
@@ -687,11 +651,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
             access_token=self.other_user_token,
         )
 
-        self.assertEqual(
-            403,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_quarantine_media(self) -> None:
@@ -799,11 +759,7 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request("POST", self.url % (action, self.media_id), b"{}")
 
-        self.assertEqual(
-            401,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     @parameterized.expand(["protect", "unprotect"])
@@ -820,11 +776,7 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
             access_token=self.other_user_token,
         )
 
-        self.assertEqual(
-            403,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_protect_media(self) -> None:
@@ -912,11 +864,7 @@ class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
             access_token=self.other_user_token,
         )
 
-        self.assertEqual(
-            403,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_invalid_parameter(self) -> None:
@@ -929,11 +877,7 @@ class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
             "Query parameter before_ts must be a positive integer.",
@@ -946,11 +890,7 @@ class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.INVALID_PARAM, channel.json_body["errcode"])
         self.assertEqual(
             "Query parameter before_ts you provided is from the year 1970. "

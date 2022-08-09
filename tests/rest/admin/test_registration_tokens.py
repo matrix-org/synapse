@@ -73,11 +73,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
     def test_create_no_auth(self) -> None:
         """Try to create a token without authentication."""
         channel = self.make_request("POST", self.url + "/new", {})
-        self.assertEqual(
-            401,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_create_requester_not_admin(self) -> None:
@@ -88,11 +84,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {},
             access_token=self.other_user_tok,
         )
-        self.assertEqual(
-            403,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_create_using_defaults(self) -> None:
@@ -167,11 +159,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
 
     def test_create_token_invalid_chars(self) -> None:
@@ -187,11 +175,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
 
     def test_create_token_already_exists(self) -> None:
@@ -274,11 +258,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {"uses_allowed": 1.5},
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
 
     def test_create_expiry_time(self) -> None:
@@ -290,11 +270,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {"expiry_time": self.clock.time_msec() - 10000},
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
 
         # Should fail with float
@@ -304,11 +280,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {"expiry_time": self.clock.time_msec() + 1000000.5},
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
 
     def test_create_length(self) -> None:
@@ -330,11 +302,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {"length": 0},
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
 
         # Should fail with a negative integer
@@ -344,11 +312,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {"length": -5},
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
 
         # Should fail with a float
@@ -358,11 +322,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {"length": 8.5},
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
 
         # Should fail with 65
@@ -372,11 +332,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {"length": 65},
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
 
     # UPDATING
@@ -388,11 +344,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             self.url + "/1234",  # Token doesn't exist but that doesn't matter
             {},
         )
-        self.assertEqual(
-            401,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_update_requester_not_admin(self) -> None:
@@ -403,11 +355,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {},
             access_token=self.other_user_tok,
         )
-        self.assertEqual(
-            403,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_update_non_existent(self) -> None:
@@ -419,11 +367,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            404,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.NOT_FOUND)
 
     def test_update_uses_allowed(self) -> None:
@@ -471,11 +415,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {"uses_allowed": 1.5},
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
 
         # Should fail with a negative integer
@@ -485,11 +425,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {"uses_allowed": -5},
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
 
     def test_update_expiry_time(self) -> None:
@@ -528,11 +464,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {"expiry_time": past_time},
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
 
         # Should fail a float
@@ -542,11 +474,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {"expiry_time": new_expiry_time + 0.5},
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
 
     def test_update_both(self) -> None:
@@ -588,11 +516,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
 
     # DELETING
@@ -604,11 +528,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             self.url + "/1234",  # Token doesn't exist but that doesn't matter
             {},
         )
-        self.assertEqual(
-            401,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_delete_requester_not_admin(self) -> None:
@@ -619,11 +539,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {},
             access_token=self.other_user_tok,
         )
-        self.assertEqual(
-            403,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_delete_non_existent(self) -> None:
@@ -635,11 +551,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            404,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.NOT_FOUND)
 
     def test_delete(self) -> None:
@@ -665,11 +577,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             self.url + "/1234",  # Token doesn't exist but that doesn't matter
             {},
         )
-        self.assertEqual(
-            401,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_get_requester_not_admin(self) -> None:
@@ -696,11 +604,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            404,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["errcode"], Codes.NOT_FOUND)
 
     def test_get(self) -> None:
@@ -727,11 +631,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
     def test_list_no_auth(self) -> None:
         """Try to list tokens without authentication."""
         channel = self.make_request("GET", self.url, {})
-        self.assertEqual(
-            401,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_list_requester_not_admin(self) -> None:
@@ -742,11 +642,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             {},
             access_token=self.other_user_tok,
         )
-        self.assertEqual(
-            403,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_list_all(self) -> None:
@@ -779,11 +675,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(
-            400,
-            channel.code,
-            msg=channel.json_body,
-        )
+        self.assertEqual(400, channel.code, msg=channel.json_body)
 
     def _test_list_query_parameter(self, valid: str) -> None:
         """Helper used to test both valid=true and valid=false."""
