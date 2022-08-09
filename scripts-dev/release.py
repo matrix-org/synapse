@@ -18,10 +18,12 @@
 """
 
 import glob
+import json
 import os
 import re
 import subprocess
 import sys
+import time
 import urllib.request
 from os import path
 from tempfile import TemporaryDirectory
@@ -493,6 +495,65 @@ def _merge_into(repo: Repo, source: str, target: str) -> None:
     # Push result.
     click.echo("Pushing...")
     repo.remote().push()
+
+
+@cli.command()
+def wait_for_actions() -> None:
+    _wait_for_actions()
+
+
+def _wait_for_actions() -> None:
+    # Find out the version and tag name.
+    current_version = get_package_version()
+    tag_name = f"v{current_version}"
+
+    # Authentication is optional on this endpoint.
+    url = f"https://api.github.com/repos/matrix-org/synapse/actions/runs?branch={tag_name}"
+
+    req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"})
+
+    time.sleep(10 * 60)
+    while True:
+        time.sleep(5 * 60)
+        response = urllib.request.urlopen(req)
+        resp = json.loads(response.read())
+
+        if len(resp["workflow_runs"]) == 0:
+            continue
+
+        if all(
+            workflow["status"] != "in_progress" for workflow in resp["workflow_runs"]
+        ):
+            success = (
+                workflow["status"] == "completed" for workflow in resp["workflow_runs"]
+            )
+            if success:
+                _notify("Workflows successful. You can now continue the release.")
+            else:
+                _notify("Workflows failed.")
+                click.confirm("Continue anyway?", abort=True)
+
+            break
+
+
+def _notify(message: str) -> None:
+    # Send a bell character. Most terminals will play a sound or show a notification
+    # for this.
+    click.echo(f"\a{message}")
+
+    # Try and run notify-send, but don't raise an Exception if this fails
+    # (This is best-effort)
+    # TODO Support other platforms?
+    subprocess.run(
+        [
+            "notify-send",
+            "--app-name",
+            "Synapse Release Script",
+            "--expire-time",
+            "3600000",
+            message,
+        ]
+    )
 
 
 @cli.command()
