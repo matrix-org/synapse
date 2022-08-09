@@ -73,17 +73,20 @@ def cli() -> None:
 
         ./scripts-dev/release.py tag
 
-        # ... wait for assets to build ...
+        # wait for assets to build, either manually or with:
+        ./scripts-dev/release.py wait-for-actions
 
         ./scripts-dev/release.py publish
 
         ./scripts-dev/release.py upload
 
-        # Optional: generate some nice links for the announcement
-
         ./scripts-dev/release.py merge-back
 
+        # Optional: generate some nice links for the announcement
         ./scripts-dev/release.py announce
+
+    Alternatively, `./scripts-dev/release.py full` will do all the above
+    as well as guiding you through the manual steps.
 
     If the env var GH_TOKEN (or GITHUB_TOKEN) is set, or passed into the
     `tag`/`publish` command, then a new draft release will be created/published.
