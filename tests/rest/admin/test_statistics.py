@@ -52,7 +52,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", self.url, b"{}")
 
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -60,7 +60,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
 
     def test_requester_is_no_admin(self) -> None:
         """
-        If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
+        If the user is not a server admin, an error 403 is returned.
         """
         channel = self.make_request(
             "GET",
@@ -70,7 +70,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg=channel.json_body,
         )
@@ -204,7 +204,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 10)
         self.assertEqual(len(channel.json_body["users"]), 5)
         self.assertEqual(channel.json_body["next_token"], 5)
@@ -222,7 +222,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(len(channel.json_body["users"]), 15)
         self.assertNotIn("next_token", channel.json_body)
@@ -240,7 +240,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
         self.assertEqual(channel.json_body["next_token"], 15)
         self.assertEqual(len(channel.json_body["users"]), 10)
@@ -262,7 +262,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_users)
         self.assertEqual(len(channel.json_body["users"]), number_users)
         self.assertNotIn("next_token", channel.json_body)
@@ -275,7 +275,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_users)
         self.assertEqual(len(channel.json_body["users"]), number_users)
         self.assertNotIn("next_token", channel.json_body)
@@ -288,7 +288,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_users)
         self.assertEqual(len(channel.json_body["users"]), 19)
         self.assertEqual(channel.json_body["next_token"], 19)
@@ -301,7 +301,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], number_users)
         self.assertEqual(len(channel.json_body["users"]), 1)
         self.assertNotIn("next_token", channel.json_body)
@@ -318,7 +318,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(0, channel.json_body["total"])
         self.assertEqual(0, len(channel.json_body["users"]))
 
@@ -415,7 +415,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             self.url,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["users"][0]["media_count"], 3)
 
         # filter media starting at `ts1` after creating first media
@@ -425,7 +425,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             self.url + "?from_ts=%s" % (ts1,),
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 0)
 
         self._create_media(self.other_user_tok, 3)
@@ -440,7 +440,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             self.url + "?from_ts=%s&until_ts=%s" % (ts1, ts2),
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["users"][0]["media_count"], 3)
 
         # filter media until `ts2` and earlier
@@ -449,7 +449,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             self.url + "?until_ts=%s" % (ts2,),
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["users"][0]["media_count"], 6)
 
     def test_search_term(self) -> None:
@@ -461,7 +461,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             self.url,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 20)
 
         # filter user 1 and 10-19 by `user_id`
@@ -470,7 +470,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             self.url + "?search_term=foo_user_1",
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 11)
 
         # filter on this user in `displayname`
@@ -479,7 +479,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             self.url + "?search_term=bar_user_10",
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["users"][0]["displayname"], "bar_user_10")
         self.assertEqual(channel.json_body["total"], 1)
 
@@ -489,7 +489,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             self.url + "?search_term=foobar",
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], 0)
 
     def _create_users_with_media(self, number_users: int, media_per_user: int) -> None:
@@ -515,7 +515,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         for _ in range(number_media):
             # Upload some media into the room
             self.helper.upload_media(
-                upload_resource, SMALL_PNG, tok=user_token, expect_code=HTTPStatus.OK
+                upload_resource, SMALL_PNG, tok=user_token, expect_code=200
             )
 
     def _check_fields(self, content: List[JsonDict]) -> None:
@@ -549,7 +549,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             url.encode("ascii"),
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.OK, channel.code, msg=channel.json_body)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], len(expected_user_list))
 
         returned_order = [row["user_id"] for row in channel.json_body["users"]]
