@@ -2,78 +2,18 @@
 Synapse |support| |development| |documentation| |license| |pypi| |python|
 =========================================================================
 
+Synapse is an open-source `Matrix <https://matrix.org/>`_ homeserver written and
+maintained by the Matrix.org Foundation. We began rapid development began in 2014,
+reaching v1.0.0 in 2019. Development on Synapse and the Matrix protocol itself continues
+in earnest today.
+
+Briefly, Matrix is an open standard for communications on the internet, supporting
+federation, encryption and VoIP. Matrix.org has more to say about the `goals of the
+Matrix project <https://matrix.org/docs/guides/introduction>`_, and the `formal specification
+<https://spec.matrix.org/>`_ describes the technical details.
+
 .. contents::
 
-Introduction
-============
-
-Matrix is an ambitious new ecosystem for open federated Instant Messaging and
-VoIP.  The basics you need to know to get up and running are:
-
-- Everything in Matrix happens in a room.  Rooms are distributed and do not
-  exist on any single server.  Rooms can be located using convenience aliases
-  like ``#matrix:matrix.org`` or ``#test:localhost:8448``.
-
-- Matrix user IDs look like ``@matthew:matrix.org`` (although in the future
-  you will normally refer to yourself and others using a third party identifier
-  (3PID): email address, phone number, etc rather than manipulating Matrix user IDs)
-
-The overall architecture is::
-
-      client <----> homeserver <=====================> homeserver <----> client
-             https://somewhere.org/_matrix      https://elsewhere.net/_matrix
-
-``#matrix:matrix.org`` is the official support room for Matrix, and can be
-accessed by any client from https://matrix.org/docs/projects/try-matrix-now.html or
-via IRC bridge at irc://irc.libera.chat/matrix.
-
-Synapse is currently in rapid development, but as of version 0.5 we believe it
-is sufficiently stable to be run as an internet-facing service for real usage!
-
-About Matrix
-============
-
-Matrix specifies a set of pragmatic RESTful HTTP JSON APIs as an open standard,
-which handle:
-
-- Creating and managing fully distributed chat rooms with no
-  single points of control or failure
-- Eventually-consistent cryptographically secure synchronisation of room
-  state across a global open network of federated servers and services
-- Sending and receiving extensible messages in a room with (optional)
-  end-to-end encryption
-- Inviting, joining, leaving, kicking, banning room members
-- Managing user accounts (registration, login, logout)
-- Using 3rd Party IDs (3PIDs) such as email addresses, phone numbers,
-  Facebook accounts to authenticate, identify and discover users on Matrix.
-- Placing 1:1 VoIP and Video calls
-
-These APIs are intended to be implemented on a wide range of servers, services
-and clients, letting developers build messaging and VoIP functionality on top
-of the entirely open Matrix ecosystem rather than using closed or proprietary
-solutions. The hope is for Matrix to act as the building blocks for a new
-generation of fully open and interoperable messaging and VoIP apps for the
-internet.
-
-Synapse is a Matrix "homeserver" implementation developed by the matrix.org core
-team, written in Python 3/Twisted.
-
-In Matrix, every user runs one or more Matrix clients, which connect through to
-a Matrix homeserver. The homeserver stores all their personal chat history and
-user account information - much as a mail client connects through to an
-IMAP/SMTP server. Just like email, you can either run your own Matrix
-homeserver and control and own your own communications and history or use one
-hosted by someone else (e.g. matrix.org) - there is no single point of control
-or mandatory service provider in Matrix, unlike WhatsApp, Facebook, Hangouts,
-etc.
-
-We'd like to invite you to join #matrix:matrix.org (via
-https://matrix.org/docs/projects/try-matrix-now.html), run a homeserver, take a look
-at the `Matrix spec <https://matrix.org/docs/spec>`_, and experiment with the
-`APIs <https://matrix.org/docs/api>`_ and `Client SDKs
-<https://matrix.org/docs/projects/try-matrix-now.html#client-sdks>`_.
-
-Thanks for using Matrix!
 
 Support
 =======
