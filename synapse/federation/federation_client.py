@@ -61,6 +61,7 @@ from synapse.federation.federation_base import (
 )
 from synapse.federation.transport.client import SendJoinResponse
 from synapse.http.types import QueryParams
+from synapse.logging.opentracing import trace
 from synapse.types import JsonDict, UserID, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -233,6 +234,7 @@ class FederationClient(FederationBase):
             destination, content, timeout
         )
 
+    @trace
     async def backfill(
         self, dest: str, room_id: str, limit: int, extremities: Collection[str]
     ) -> Optional[List[EventBase]]:
@@ -403,9 +405,9 @@ class FederationClient(FederationBase):
                         # Prime the cache
                         self._get_pdu_cache[event.event_id] = event
 
-                        # FIXME: We should add a `break` here to avoid calling every
-                        # destination after we already found a PDU (will follow-up
-                        # in a separate PR)
+                        # Now that we have an event, we can break out of this
+                        # loop and stop asking other destinations.
+                        break
 
                 except SynapseError as e:
                     logger.info(
@@ -725,6 +727,12 @@ class FederationClient(FederationBase):
         if failover_errcodes is None:
             failover_errcodes = ()
 
+        if not destinations:
+            # Give a bit of a clearer message if no servers were specified at all.
+            raise SynapseError(
+                502, f"Failed to {description} via any server: No servers specified."
+            )
+
         for destination in destinations:
             if destination == self.server_name:
                 continue
@@ -774,7 +782,7 @@ class FederationClient(FederationBase):
                     "Failed to %s via %s", description, destination, exc_info=True
                 )
 
-        raise SynapseError(502, "Failed to %s via any server" % (description,))
+        raise SynapseError(502, f"Failed to {description} via any server")
 
     async def make_membership_event(
         self,

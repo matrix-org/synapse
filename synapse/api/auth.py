@@ -26,11 +26,17 @@ from synapse.api.errors import (
     Codes,
     InvalidClientTokenError,
     MissingClientTokenError,
+    UnstableSpecAuthError,
 )
 from synapse.appservice import ApplicationService
 from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
-from synapse.logging.opentracing import active_span, force_tracing, start_active_span
+from synapse.logging.opentracing import (
+    active_span,
+    force_tracing,
+    start_active_span,
+    trace,
+)
 from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import Requester, UserID, create_requester
 
@@ -106,8 +112,11 @@ class Auth:
                 forgot = await self.store.did_forget(user_id, room_id)
                 if not forgot:
                     return membership, member_event_id
-
-        raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
+        raise UnstableSpecAuthError(
+            403,
+            "User %s not in room %s" % (user_id, room_id),
+            errcode=Codes.NOT_JOINED,
+        )
 
     async def get_user_by_req(
         self,
@@ -563,6 +572,7 @@ class Auth:
 
             return query_params[0].decode("ascii")
 
+    @trace
     async def check_user_in_room_or_world_readable(
         self, room_id: str, user_id: str, allow_departed_users: bool = False
     ) -> Tuple[str, Optional[str]]:
@@ -600,8 +610,9 @@ class Auth:
                 == HistoryVisibility.WORLD_READABLE
             ):
                 return Membership.JOIN, None
-            raise AuthError(
+            raise UnstableSpecAuthError(
                 403,
                 "User %s not in room %s, and room previews are disabled"
                 % (user_id, room_id),
+                errcode=Codes.NOT_JOINED,
             )

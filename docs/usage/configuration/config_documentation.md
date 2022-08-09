@@ -72,49 +72,6 @@ apply if you want your config file to be read properly. A few helpful things to 
   In addition, each setting has an example of its usage, with the proper indentation
   shown.
 
-## Contents
-[Modules](#modules)
-
-[Server](#server)
-
-[Homeserver Blocking](#homeserver-blocking)
-
-[TLS](#tls)
-
-[Federation](#federation)
-
-[Caching](#caching)
-
-[Database](#database)
-
-[Logging](#logging)
-
-[Ratelimiting](#ratelimiting)
-
-[Media Store](#media-store)
-
-[Captcha](#captcha)
-
-[TURN](#turn)
-
-[Registration](#registration)
-
-[API Configuration](#api-configuration)
-
-[Signing Keys](#signing-keys)
-
-[Single Sign On Integration](#single-sign-on-integration)
-
-[Push](#push)
-
-[Rooms](#rooms)
-
-[Opentracing](#opentracing)
-
-[Workers](#workers)
-
-[Background Updates](#background-updates)
-
 ## Modules
 
 Server admins can expand Synapse's functionality with external modules.
@@ -486,7 +443,8 @@ Sub-options for each listener include:
 
    * `names`: a list of names of HTTP resources. See below for a list of valid resource names.
 
-   * `compress`: set to true to enable HTTP compression for this resource.
+   * `compress`: set to true to enable gzip compression on HTTP bodies for this resource. This is currently only supported with the
+     `client`, `consent` and `metrics` resources.
 
 * `additional_resources`: Only valid for an 'http' listener. A map of
    additional endpoints which should be loaded via dynamic modules.
@@ -1098,26 +1056,26 @@ allow_device_name_lookup_over_federation: true
 ---
 ## Caching ##
 
-Options related to caching
+Options related to caching.
 
 ---
 ### `event_cache_size`
 
 The number of events to cache in memory. Not affected by
-`caches.global_factor`. Defaults to 10K.
+`caches.global_factor` and is not part of the `caches` section. Defaults to 10K.
 
 Example configuration:
 ```yaml
 event_cache_size: 15K
 ```
 ---
-### `cache` and associated values
+### `caches` and associated values
 
 A cache 'factor' is a multiplier that can be applied to each of
 Synapse's caches in order to increase or decrease the maximum
 number of entries that can be stored.
 
-Caching can be configured through the following sub-options:
+`caches` can be configured through the following sub-options:
 
 * `global_factor`: Controls the global cache factor, which is the default cache factor
   for all caches if a specific factor for that cache is not otherwise
@@ -1179,6 +1137,7 @@ Caching can be configured through the following sub-options:
 
 Example configuration:
 ```yaml
+event_cache_size: 15K
 caches:
   global_factor: 1.0
   per_cache_factors:
@@ -1858,7 +1817,7 @@ Example configuration:
 max_spider_size: 8M
 ```
 ---
-### `url_preview_language`
+### `url_preview_accept_language`
 
 A list of values for the Accept-Language HTTP header used when
 downloading webpages during URL preview generation. This allows
@@ -2537,9 +2496,13 @@ track_appservice_user_ips: true
 ---
 ### `macaroon_secret_key`
 
-A secret which is used to sign access tokens. If none is specified,
-the `registration_shared_secret` is used, if one is given; otherwise,
-a secret key is derived from the signing key.
+A secret which is used to sign
+- access token for guest users,
+- short-term login token used during SSO logins (OIDC or SAML2) and
+- token used for unsubscribing from email notifications.
+
+If none is specified, the `registration_shared_secret` is used, if one is given;
+otherwise, a secret key is derived from the signing key.
 
 Example configuration:
 ```yaml

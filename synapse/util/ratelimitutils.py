@@ -21,7 +21,7 @@ from typing import Any, DefaultDict, Iterator, List, Set
 from twisted.internet import defer
 
 from synapse.api.errors import LimitExceededError
-from synapse.config.ratelimiting import FederationRateLimitConfig
+from synapse.config.ratelimiting import FederationRatelimitSettings
 from synapse.logging.context import (
     PreserveLoggingContext,
     make_deferred_yieldable,
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 class FederationRateLimiter:
-    def __init__(self, clock: Clock, config: FederationRateLimitConfig):
+    def __init__(self, clock: Clock, config: FederationRatelimitSettings):
         def new_limiter() -> "_PerHostRatelimiter":
             return _PerHostRatelimiter(clock=clock, config=config)
 
@@ -63,7 +63,7 @@ class FederationRateLimiter:
 
 
 class _PerHostRatelimiter:
-    def __init__(self, clock: Clock, config: FederationRateLimitConfig):
+    def __init__(self, clock: Clock, config: FederationRatelimitSettings):
         """
         Args:
             clock

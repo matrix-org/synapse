@@ -41,6 +41,7 @@ from synapse.api.errors import (
     NotFoundError,
     ShadowBanError,
     SynapseError,
+    UnstableSpecAuthError,
     UnsupportedRoomVersionError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
@@ -51,6 +52,7 @@ from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.handlers.directory import DirectoryHandler
+from synapse.logging import opentracing
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
@@ -149,7 +151,11 @@ class MessageHandler:
                 "Attempted to retrieve data from a room for a user that has never been in it. "
                 "This should not have happened."
             )
-            raise SynapseError(403, "User not in room", errcode=Codes.FORBIDDEN)
+            raise UnstableSpecAuthError(
+                403,
+                "User not in room",
+                errcode=Codes.NOT_JOINED,
+            )
 
         return data
 
@@ -319,8 +325,10 @@ class MessageHandler:
                 room_id, user_id, allow_departed_users=True
             )
             if membership != Membership.JOIN:
-                raise NotImplementedError(
-                    "Getting joined members after leaving is not implemented"
+                raise SynapseError(
+                    code=403,
+                    errcode=Codes.FORBIDDEN,
+                    msg="Getting joined members while not being a current member of the room is forbidden.",
                 )
 
         users_with_profile = await self.store.get_users_in_room_with_profiles(room_id)
@@ -334,7 +342,11 @@ class MessageHandler:
                     break
             else:
                 # Loop fell through, AS has no interested users in room
-                raise AuthError(403, "Appservice not in room")
+                raise UnstableSpecAuthError(
+                    403,
+                    "Appservice not in room",
+                    errcode=Codes.NOT_JOINED,
+                )
 
         return {
             user_id: {
@@ -1135,6 +1147,10 @@ class EventCreationHandler:
             context = await self.state.compute_event_context(
                 event,
                 state_ids_before_event=state_map_for_event,
+                # TODO(faster_joins): check how MSC2716 works and whether we can have
+                #   partial state here
+                #   https://github.com/matrix-org/synapse/issues/13003
+                partial_state=False,
             )
         else:
             context = await self.state.compute_event_context(event)
@@ -1359,9 +1375,10 @@ class EventCreationHandler:
         # and `state_groups` because they have `prev_events` that aren't persisted yet
         # (historical messages persisted in reverse-chronological order).
         if not event.internal_metadata.is_historical():
-            await self._bulk_push_rule_evaluator.action_for_event_by_user(
-                event, context
-            )
+            with opentracing.start_active_span("calculate_push_actions"):
+                await self._bulk_push_rule_evaluator.action_for_event_by_user(
+                    event, context
+                )
 
         try:
             # If we're a worker we need to hit out to the master.
@@ -1448,9 +1465,10 @@ class EventCreationHandler:
             state = await state_entry.get_state(
                 self._storage_controllers.state, StateFilter.all()
             )
-            joined_hosts = await self.store.get_joined_hosts(
-                event.room_id, state, state_entry
-            )
+            with opentracing.start_active_span("get_joined_hosts"):
+                joined_hosts = await self.store.get_joined_hosts(
+                    event.room_id, state, state_entry
+                )
 
             # Note that the expiry times must be larger than the expiry time in
             # _external_cache_joined_hosts_updates.

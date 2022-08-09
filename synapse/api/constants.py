@@ -257,7 +257,8 @@ class GuestAccess:
 
 class ReceiptTypes:
     READ: Final = "m.read"
-    READ_PRIVATE: Final = "org.matrix.msc2285.read.private"
+    READ_PRIVATE: Final = "m.read.private"
+    UNSTABLE_READ_PRIVATE: Final = "org.matrix.msc2285.read.private"
     FULLY_READ: Final = "m.fully_read"
 
 
@@ -268,4 +269,4 @@ class PublicRoomsFilterFields:
     """
 
     GENERIC_SEARCH_TERM: Final = "generic_search_term"
-    ROOM_TYPES: Final = "org.matrix.msc3827.room_types"
+    ROOM_TYPES: Final = "room_types"
