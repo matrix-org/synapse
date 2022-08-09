@@ -1169,8 +1169,6 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             txn: The database transaction.
             old_rotate_stream_ordering: The previous maximum event stream ordering.
             rotate_to_stream_ordering: The new maximum event stream ordering to summarise.
-
-        Returns whether the archiving process has caught up or not.
         """
 
         # Calculate the new counts that should be upserted into event_push_summary
@@ -1256,9 +1254,7 @@ class EventPushActionsWorkerStore(ReceiptsWorkerStore, StreamWorkerStore, SQLBas
             (rotate_to_stream_ordering,),
         )
 
-    async def _remove_old_push_actions_that_have_rotated(
-        self,
-    ) -> None:
+    async def _remove_old_push_actions_that_have_rotated(self) -> None:
         """Clear out old push actions that have been summarised."""
 
         # We want to clear out anything that is older than a day that *has* already
