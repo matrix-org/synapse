@@ -82,7 +82,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", self.url, b"{}")
 
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -90,7 +90,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
     def test_requester_is_no_admin(self) -> None:
         """
-        If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
+        If the user is not a server admin, an error 403 is returned.
         """
 
         channel = self.make_request(
@@ -100,7 +100,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg=channel.json_body,
         )
@@ -467,7 +467,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", self.url, b"{}")
 
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -475,7 +475,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
 
     def test_requester_is_no_admin(self) -> None:
         """
-        If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
+        If the user is not a server admin, an error 403 is returned.
         """
 
         channel = self.make_request(
@@ -485,7 +485,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg=channel.json_body,
         )
@@ -566,7 +566,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
 
     def test_report_id_not_found(self) -> None:
         """
-        Testing that a not existing `report_id` returns a HTTPStatus.NOT_FOUND.
+        Testing that a not existing `report_id` returns a 404.
         """
 
         channel = self.make_request(
@@ -576,7 +576,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.NOT_FOUND,
+            404,
             channel.code,
             msg=channel.json_body,
         )

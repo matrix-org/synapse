@@ -52,7 +52,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", self.url, b"{}")
 
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -60,7 +60,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
 
     def test_requester_is_no_admin(self) -> None:
         """
-        If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
+        If the user is not a server admin, an error 403 is returned.
         """
         channel = self.make_request(
             "GET",
@@ -70,7 +70,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg=channel.json_body,
         )

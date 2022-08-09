@@ -68,7 +68,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
     def test_requester_is_no_admin(self) -> None:
         """
-        If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
+        If the user is not a server admin, an error 403 is returned.
         """
 
         channel = self.make_request(
@@ -78,7 +78,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             access_token=self.other_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_room_does_not_exist(self) -> None:
@@ -319,7 +319,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             self.room_id,
             body="foo",
             tok=self.other_user_tok,
-            expect_code=HTTPStatus.FORBIDDEN,
+            expect_code=403,
         )
 
         # Test that room is not purged
@@ -398,7 +398,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         self._has_no_members(self.room_id)
 
         # Assert we can no longer peek into the room
-        self._assert_peek(self.room_id, expect_code=HTTPStatus.FORBIDDEN)
+        self._assert_peek(self.room_id, expect_code=403)
 
     def _is_blocked(self, room_id: str, expect: bool = True) -> None:
         """Assert that the room is blocked or not"""
@@ -494,7 +494,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
     )
     def test_requester_is_no_admin(self, method: str, url: str) -> None:
         """
-        If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
+        If the user is not a server admin, an error 403 is returned.
         """
 
         channel = self.make_request(
@@ -504,7 +504,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.other_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_room_does_not_exist(self) -> None:
@@ -696,7 +696,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     def test_delete_same_room_twice(self) -> None:
@@ -858,7 +858,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
             self.room_id,
             body="foo",
             tok=self.other_user_tok,
-            expect_code=HTTPStatus.FORBIDDEN,
+            expect_code=403,
         )
 
         # Test that room is not purged
@@ -955,7 +955,7 @@ class DeleteRoomV2TestCase(unittest.HomeserverTestCase):
         self._has_no_members(self.room_id)
 
         # Assert we can no longer peek into the room
-        self._assert_peek(self.room_id, expect_code=HTTPStatus.FORBIDDEN)
+        self._assert_peek(self.room_id, expect_code=403)
 
     def _is_blocked(self, room_id: str, expect: bool = True) -> None:
         """Assert that the room is blocked or not"""
@@ -1782,7 +1782,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # delete the rooms and get joined roomed membership
         url = f"/_matrix/client/r0/rooms/{room_id}/joined_members"
         channel = self.make_request("GET", url.encode("ascii"), access_token=user_tok)
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
 
@@ -1811,7 +1811,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
 
     def test_requester_is_no_admin(self) -> None:
         """
-        If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned.
+        If the user is not a server admin, an error 403 is returned.
         """
 
         channel = self.make_request(
@@ -1821,7 +1821,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             access_token=self.second_tok,
         )
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_invalid_parameter(self) -> None:
@@ -1841,7 +1841,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
 
     def test_local_user_does_not_exist(self) -> None:
         """
-        Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND
+        Tests that a lookup for a user that does not exist returns a 404
         """
 
         channel = self.make_request(
@@ -1851,7 +1851,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     def test_remote_user(self) -> None:
@@ -1874,7 +1874,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
 
     def test_room_does_not_exist(self) -> None:
         """
-        Check that unknown rooms/server return error HTTPStatus.NOT_FOUND.
+        Check that unknown rooms/server return error 404.
         """
         url = "/_synapse/admin/v1/join/!unknown:test"
 
@@ -1885,7 +1885,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(
             "Can't join remote room because no servers that are in the room have been provided.",
             channel.json_body["error"],
@@ -1952,7 +1952,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_join_private_room_if_member(self) -> None:
@@ -2067,7 +2067,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
                 % (room_id, events[midway]["event_id"]),
                 access_token=tok,
             )
-            self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+            self.assertEqual(403, channel.code, msg=channel.json_body)
             self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_context_as_admin(self) -> None:
@@ -2277,7 +2277,7 @@ class BlockRoomTestCase(unittest.HomeserverTestCase):
 
     @parameterized.expand([("PUT",), ("GET",)])
     def test_requester_is_no_admin(self, method: str) -> None:
-        """If the user is not a server admin, an error HTTPStatus.FORBIDDEN is returned."""
+        """If the user is not a server admin, an error 403 is returned."""
 
         channel = self.make_request(
             method,
@@ -2286,7 +2286,7 @@ class BlockRoomTestCase(unittest.HomeserverTestCase):
             access_token=self.other_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.FORBIDDEN, channel.code, msg=channel.json_body)
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     @parameterized.expand([("PUT",), ("GET",)])

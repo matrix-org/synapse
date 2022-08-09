@@ -57,7 +57,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("POST", self.url)
 
         self.assertEqual(
-            HTTPStatus.UNAUTHORIZED,
+            401,
             channel.code,
             msg=channel.json_body,
         )
@@ -72,7 +72,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg=channel.json_body,
         )
@@ -80,7 +80,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
 
     @override_config({"server_notices": {"system_mxid_localpart": "notices"}})
     def test_user_does_not_exist(self) -> None:
-        """Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND"""
+        """Tests that a lookup for a user that does not exist returns a 404"""
         channel = self.make_request(
             "POST",
             self.url,
@@ -88,7 +88,7 @@ class ServerNoticeTestCase(unittest.HomeserverTestCase):
             content={"user_id": "@unknown_person:test", "content": ""},
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     @override_config({"server_notices": {"system_mxid_localpart": "notices"}})
