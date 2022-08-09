@@ -2064,7 +2064,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
 
         # must fail
-        self.assertEqual(HTTPStatus.CONFLICT, channel.code, msg=channel.json_body)
+        self.assertEqual(409, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
         self.assertEqual("External id is already in use.", channel.json_body["error"])
 
