@@ -1379,7 +1379,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content=body,
         )
 
-        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
@@ -1434,7 +1434,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content=body,
         )
 
-        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
@@ -1512,7 +1512,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"password": "abc123", "admin": False},
         )
 
-        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["admin"])
 
@@ -1550,7 +1550,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
 
         # Admin user is not blocked by mau anymore
-        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["admin"])
 
@@ -1585,7 +1585,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content=body,
         )
 
-        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
@@ -1626,7 +1626,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content=body,
         )
 
-        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
@@ -1666,7 +1666,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content=body,
         )
 
-        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("msisdn", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("1234567890", channel.json_body["threepids"][0]["address"])
@@ -2407,7 +2407,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"password": "abc123"},
         )
 
-        self.assertEqual(HTTPStatus.CREATED, channel.code, msg=channel.json_body)
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("bob", channel.json_body["displayname"])
 
