@@ -33,51 +33,6 @@ and aims to follow supported upstream versions. See the
 for more details.
 
 
-Connecting to Synapse from a client
-===================================
-
-The easiest way to try out your new Synapse installation is by connecting to it
-from a web client.
-
-Unless you are running a test instance of Synapse on your local machine, in
-general, you will need to enable TLS support before you can successfully
-connect from a client: see
-`TLS certificates <https://matrix-org.github.io/synapse/latest/setup/installation.html#tls-certificates>`_.
-
-An easy way to get started is to login or register via Element at
-https://app.element.io/#/login or https://app.element.io/#/register respectively.
-You will need to change the server you are logging into from ``matrix.org``
-and instead specify a Homeserver URL of ``https://<server_name>:8448``
-(or just ``https://<server_name>`` if you are using a reverse proxy).
-If you prefer to use another client, refer to our
-`client breakdown <https://matrix.org/docs/projects/clients-matrix>`_.
-
-If all goes well you should at least be able to log in, create a room, and
-start sending messages.
-
-.. _`client-user-reg`:
-
-Registering a new user from a client
-------------------------------------
-
-By default, registration of new users via Matrix clients is disabled. To enable
-it, specify ``enable_registration: true`` in ``homeserver.yaml``. (It is then
-recommended to also set up CAPTCHA - see `<docs/CAPTCHA_SETUP.md>`_.)
-
-Once ``enable_registration`` is set to ``true``, it is possible to register a
-user via a Matrix client.
-
-Your new user name will be formed partly from the ``server_name``, and partly
-from a localpart you specify when you create the account. Your name will take
-the form of::
-
-    @localpart:my.domain.name
-
-(pronounced "at localpart on my dot domain dot name").
-
-As when logging in, you will need to specify a "Custom server".  Specify your
-desired ``localpart`` in the 'User name' box.
-
 Security note
 =============
 
@@ -143,6 +98,52 @@ doing so is that it means that you can expose the default https port (443) to
 Matrix clients without needing to run Synapse with root privileges.
 For information on configuring one, see `the reverse proxy docs
 <https://matrix-org.github.io/synapse/latest/reverse_proxy.html>`_.
+
+Testing a new installation
+==========================
+
+The easiest way to try out your new Synapse installation is by connecting to it
+from a web client.
+
+Unless you are running a test instance of Synapse on your local machine, in
+general, you will need to enable TLS support before you can successfully
+connect from a client: see
+`TLS certificates <https://matrix-org.github.io/synapse/latest/setup/installation.html#tls-certificates>`_.
+
+An easy way to get started is to login or register via Element at
+https://app.element.io/#/login or https://app.element.io/#/register respectively.
+You will need to change the server you are logging into from ``matrix.org``
+and instead specify a Homeserver URL of ``https://<server_name>:8448``
+(or just ``https://<server_name>`` if you are using a reverse proxy).
+If you prefer to use another client, refer to our
+`client breakdown <https://matrix.org/docs/projects/clients-matrix>`_.
+
+If all goes well you should at least be able to log in, create a room, and
+start sending messages.
+
+.. _`client-user-reg`:
+
+Registering a new user from a client
+------------------------------------
+
+By default, registration of new users via Matrix clients is disabled. To enable
+it, specify ``enable_registration: true`` in ``homeserver.yaml``. (It is then
+recommended to also `set up a CAPTCHA
+<https://matrix-org.github.io/synapse/latest/CAPTCHA_SETUP.html>`_.)
+
+Once ``enable_registration`` is set to ``true``, it is possible to register a
+user via a Matrix client.
+
+Your new user name will be formed partly from the ``server_name``, and partly
+from a localpart you specify when you create the account. Your name will take
+the form of::
+
+    @localpart:my.domain.name
+
+(pronounced "at localpart on my dot domain dot name").
+
+As when logging in, you will need to specify a "Custom server".  Specify your
+desired ``localpart`` in the 'User name' box.
 
 Troubleshooting and support
 ===========================
