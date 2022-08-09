@@ -14,15 +14,20 @@ Matrix project <https://matrix.org/docs/guides/introduction>`_, and the `formal 
 
 .. contents::
 
+Installing and configuration
+============================
 
-Synapse Installation
-====================
+The Synapse documentation describes `how to install Synapse <https://matrix-org.github.io/synapse/latest/setup/installation.html>`_. We recommend using
+`Docker images <https://matrix-org.github.io/synapse/latest/setup/installation.html#docker-images-and-ansible-playbooks>`_ or `Debian packages from Matrix.org
+<https://matrix-org.github.io/synapse/latest/setup/installation.html#matrixorg-packages>`_.
 
 .. _federation:
 
-* For details on how to install Synapse, see
-  `Installation Instructions <https://matrix-org.github.io/synapse/latest/setup/installation.html>`_.
-* For specific details on how to configure Synapse for federation see `docs/federate.md <docs/federate.md>`_
+Synapse has a variety of `config options
+<https://matrix-org.github.io/synapse/latest/usage/configuration/config_documentation.html>`_
+which can be used to customise its behaviour after installation.
+There are additional details on how to `configure Synapse for federation here
+<https://matrix-org.github.io/synapse/latest/federate.html>`_.
 
 Upgrading an existing Synapse
 -----------------------------
@@ -44,7 +49,7 @@ for more details.
 
 
 Security note
-=============
+-------------
 
 Matrix serves raw, user-supplied data in some APIs -- specifically the `content
 repository endpoints`_.
