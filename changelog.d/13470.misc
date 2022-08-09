@@ -1,2 +1,0 @@
-Update the version of matrix-ldap-3 included in the matrixdotorg/synapse DockerHub images and the Debian packages
-hosted on packages.matrix.org to 0.2.2. This version fixes a regression in the plugin.
