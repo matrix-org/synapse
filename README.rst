@@ -182,9 +182,10 @@ an email address with your account, or send an invite to another user via their
 email address.
 
 
-Synapse Development
-===================
+Development
+===========
 
+We welcome contributions to Synapse from the community!
 The best place to get started is our
 `guide for contributors <https://matrix-org.github.io/synapse/latest/development/contributing_guide.html>`_.
 This is part of our larger `documentation <https://matrix-org.github.io/synapse/latest>`_, which includes
