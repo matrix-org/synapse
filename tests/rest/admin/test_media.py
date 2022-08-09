@@ -82,7 +82,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg=channel.json_body,
         )
@@ -90,7 +90,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
 
     def test_media_does_not_exist(self) -> None:
         """
-        Tests that a lookup for a media that does not exist returns a HTTPStatus.NOT_FOUND
+        Tests that a lookup for a media that does not exist returns a 404
         """
         url = "/_synapse/admin/v1/media/%s/%s" % (self.server_name, "12345")
 
@@ -100,7 +100,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     def test_media_is_not_local(self) -> None:
@@ -188,10 +188,10 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(
-            HTTPStatus.NOT_FOUND,
+            404,
             channel.code,
             msg=(
-                "Expected to receive a HTTPStatus.NOT_FOUND on accessing deleted media: %s"
+                "Expected to receive a 404 on accessing deleted media: %s"
                 % server_and_media_id
             ),
         )
@@ -251,7 +251,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg=channel.json_body,
         )
@@ -612,10 +612,10 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             self.assertTrue(os.path.exists(local_path))
         else:
             self.assertEqual(
-                HTTPStatus.NOT_FOUND,
+                404,
                 channel.code,
                 msg=(
-                    "Expected to receive a HTTPStatus.NOT_FOUND on accessing deleted media: %s"
+                    "Expected to receive a 404 on accessing deleted media: %s"
                     % (server_and_media_id)
                 ),
             )
@@ -689,7 +689,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg=channel.json_body,
         )
@@ -822,7 +822,7 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg=channel.json_body,
         )
@@ -914,7 +914,7 @@ class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg=channel.json_body,
         )

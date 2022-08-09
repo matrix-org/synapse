@@ -76,7 +76,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg=channel.json_body,
         )
@@ -85,7 +85,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
     @parameterized.expand(["GET", "PUT", "DELETE"])
     def test_user_does_not_exist(self, method: str) -> None:
         """
-        Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND
+        Tests that a lookup for a user that does not exist returns a 404
         """
         url = (
             "/_synapse/admin/v2/users/@unknown_person:test/devices/%s"
@@ -98,7 +98,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     @parameterized.expand(["GET", "PUT", "DELETE"])
@@ -122,7 +122,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
 
     def test_unknown_device(self) -> None:
         """
-        Tests that a lookup for a device that does not exist returns either HTTPStatus.NOT_FOUND or 200.
+        Tests that a lookup for a device that does not exist returns either 404 or 200.
         """
         url = "/_synapse/admin/v2/users/%s/devices/unknown_device" % urllib.parse.quote(
             self.other_user
@@ -134,7 +134,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
         channel = self.make_request(
@@ -331,7 +331,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg=channel.json_body,
         )
@@ -339,7 +339,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
 
     def test_user_does_not_exist(self) -> None:
         """
-        Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND
+        Tests that a lookup for a user that does not exist returns a 404
         """
         url = "/_synapse/admin/v2/users/@unknown_person:test/devices"
         channel = self.make_request(
@@ -348,7 +348,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     def test_user_is_not_local(self) -> None:
@@ -457,7 +457,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.FORBIDDEN,
+            403,
             channel.code,
             msg=channel.json_body,
         )
@@ -465,7 +465,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
 
     def test_user_does_not_exist(self) -> None:
         """
-        Tests that a lookup for a user that does not exist returns a HTTPStatus.NOT_FOUND
+        Tests that a lookup for a user that does not exist returns a 404
         """
         url = "/_synapse/admin/v2/users/@unknown_person:test/delete_devices"
         channel = self.make_request(
@@ -474,7 +474,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.NOT_FOUND, channel.code, msg=channel.json_body)
+        self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     def test_user_is_not_local(self) -> None:
