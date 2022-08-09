@@ -13,7 +13,6 @@
 # limitations under the License.
 import random
 import string
-from http import HTTPStatus
 from typing import Optional
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -169,7 +168,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -189,7 +188,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -215,7 +214,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             data,
             access_token=self.admin_user_tok,
         )
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel2.code, msg=channel2.json_body)
+        self.assertEqual(400, channel2.code, msg=channel2.json_body)
         self.assertEqual(channel2.json_body["errcode"], Codes.INVALID_PARAM)
 
     def test_create_unable_to_generate_token(self) -> None:
@@ -262,7 +261,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -276,7 +275,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -292,7 +291,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -306,7 +305,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -332,7 +331,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -346,7 +345,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -360,7 +359,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -374,7 +373,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -473,7 +472,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -487,7 +486,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -530,7 +529,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -544,7 +543,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -590,7 +589,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -781,7 +780,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )

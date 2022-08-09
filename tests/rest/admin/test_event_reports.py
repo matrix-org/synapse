@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from http import HTTPStatus
 from typing import List
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -278,7 +277,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
     def test_invalid_search_order(self) -> None:
         """
-        Testing that a invalid search order returns a HTTPStatus.BAD_REQUEST
+        Testing that a invalid search order returns a 400
         """
 
         channel = self.make_request(
@@ -288,7 +287,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -297,7 +296,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
     def test_limit_is_negative(self) -> None:
         """
-        Testing that a negative limit parameter returns a HTTPStatus.BAD_REQUEST
+        Testing that a negative limit parameter returns a 400
         """
 
         channel = self.make_request(
@@ -307,7 +306,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -315,7 +314,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
 
     def test_from_is_negative(self) -> None:
         """
-        Testing that a negative from parameter returns a HTTPStatus.BAD_REQUEST
+        Testing that a negative from parameter returns a 400
         """
 
         channel = self.make_request(
@@ -325,7 +324,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -507,7 +506,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
 
     def test_invalid_report_id(self) -> None:
         """
-        Testing that an invalid `report_id` returns a HTTPStatus.BAD_REQUEST.
+        Testing that an invalid `report_id` returns a 400.
         """
 
         # `report_id` is negative
@@ -518,7 +517,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -536,7 +535,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -554,7 +553,7 @@ class EventReportDetailTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )

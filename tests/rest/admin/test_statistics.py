@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from http import HTTPStatus
 from typing import List, Optional
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -88,7 +87,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -102,7 +101,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -116,7 +115,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -130,7 +129,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -144,7 +143,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -158,7 +157,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -172,7 +171,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -186,7 +185,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )

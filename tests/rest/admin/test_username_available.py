@@ -11,9 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from http import HTTPStatus
-
 from twisted.test.proto_helpers import MemoryReactor
 
 import synapse.rest.admin
@@ -40,7 +37,7 @@ class UsernameAvailableTestCase(unittest.HomeserverTestCase):
             if username == "allowed":
                 return True
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "User ID already taken.",
                 errcode=Codes.USER_IN_USE,
             )
@@ -68,7 +65,7 @@ class UsernameAvailableTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", url, access_token=self.admin_user_tok)
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )

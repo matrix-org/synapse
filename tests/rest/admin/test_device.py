@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import urllib.parse
-from http import HTTPStatus
 
 from parameterized import parameterized
 
@@ -104,7 +103,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
     @parameterized.expand(["GET", "PUT", "DELETE"])
     def test_user_is_not_local(self, method: str) -> None:
         """
-        Tests that a lookup for a user that is not a local returns a HTTPStatus.BAD_REQUEST
+        Tests that a lookup for a user that is not a local returns a 400
         """
         url = (
             "/_synapse/admin/v2/users/@unknown_person:unknown_domain/devices/%s"
@@ -117,7 +116,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only lookup local users", channel.json_body["error"])
 
     def test_unknown_device(self) -> None:
@@ -179,7 +178,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             content=update,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.TOO_LARGE, channel.json_body["errcode"])
 
         # Ensure the display name was not updated.
@@ -353,7 +352,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
 
     def test_user_is_not_local(self) -> None:
         """
-        Tests that a lookup for a user that is not a local returns a HTTPStatus.BAD_REQUEST
+        Tests that a lookup for a user that is not a local returns a 400
         """
         url = "/_synapse/admin/v2/users/@unknown_person:unknown_domain/devices"
 
@@ -363,7 +362,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only lookup local users", channel.json_body["error"])
 
     def test_user_has_no_devices(self) -> None:
@@ -479,7 +478,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
 
     def test_user_is_not_local(self) -> None:
         """
-        Tests that a lookup for a user that is not a local returns a HTTPStatus.BAD_REQUEST
+        Tests that a lookup for a user that is not a local returns a 400
         """
         url = "/_synapse/admin/v2/users/@unknown_person:unknown_domain/delete_devices"
 
@@ -489,7 +488,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only lookup local users", channel.json_body["error"])
 
     def test_unknown_devices(self) -> None:

@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
-from http import HTTPStatus
 
 from parameterized import parameterized
 
@@ -105,7 +104,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
 
     def test_media_is_not_local(self) -> None:
         """
-        Tests that a lookup for a media that is not a local returns a HTTPStatus.BAD_REQUEST
+        Tests that a lookup for a media that is not a local returns a 400
         """
         url = "/_synapse/admin/v1/media/%s/%s" % ("unknown_domain", "12345")
 
@@ -115,7 +114,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only delete local media", channel.json_body["error"])
 
     def test_delete_media(self) -> None:
@@ -259,7 +258,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
     def test_media_is_not_local(self) -> None:
         """
-        Tests that a lookup for media that is not local returns a HTTPStatus.BAD_REQUEST
+        Tests that a lookup for media that is not local returns a 400
         """
         url = "/_synapse/admin/v1/media/%s/delete" % "unknown_domain"
 
@@ -269,7 +268,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(HTTPStatus.BAD_REQUEST, channel.code, msg=channel.json_body)
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual("Can only delete local media", channel.json_body["error"])
 
     def test_missing_parameter(self) -> None:
@@ -283,7 +282,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -303,7 +302,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -320,7 +319,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -338,7 +337,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -355,7 +354,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -931,7 +930,7 @@ class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
@@ -948,7 +947,7 @@ class PurgeMediaCacheTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(
-            HTTPStatus.BAD_REQUEST,
+            400,
             channel.code,
             msg=channel.json_body,
         )
