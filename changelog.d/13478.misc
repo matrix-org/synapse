@@ -1,0 +1,1 @@
+Fix the `synapse_http_server_response_time_seconds` metric not having buckets big enough for requests that take more than 10s.
