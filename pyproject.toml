@@ -54,7 +54,7 @@ skip_gitignore = true
 
 [tool.poetry]
 name = "matrix-synapse"
-version = "1.64.0"
+version = "1.65.0rc1"
 description = "Homeserver for the Matrix decentralised comms protocol"
 authors = ["Matrix.org Team and Contributors <packages@matrix.org>"]
 license = "Apache-2.0"
@@ -120,7 +120,7 @@ service-identity = ">=18.1.0"
 # Twisted 18.9 introduces some logger improvements that the structured
 # logger utilises
 twisted = {git = "https://github.com/twisted/twisted.git", rev = "trunk", extras = ["tls"]}
-treq = ">=15.1"
+treq = "22.2.0"
 # Twisted has required pyopenssl 16.0 since about Twisted 16.6.
 pyOpenSSL = ">=16.0.0"
 PyYAML = ">=3.11"

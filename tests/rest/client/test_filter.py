@@ -43,7 +43,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
             self.EXAMPLE_FILTER_JSON,
         )
 
-        self.assertEqual(channel.result["code"], b"200")
+        self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body, {"filter_id": "0"})
         filter = self.get_success(
             self.store.get_user_filter(user_localpart="apple", filter_id=0)
@@ -58,7 +58,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
             self.EXAMPLE_FILTER_JSON,
         )
 
-        self.assertEqual(channel.result["code"], b"403")
+        self.assertEqual(channel.code, 403)
         self.assertEqual(channel.json_body["errcode"], Codes.FORBIDDEN)
 
     def test_add_filter_non_local_user(self) -> None:
@@ -71,7 +71,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
         )
 
         self.hs.is_mine = _is_mine
-        self.assertEqual(channel.result["code"], b"403")
+        self.assertEqual(channel.code, 403)
         self.assertEqual(channel.json_body["errcode"], Codes.FORBIDDEN)
 
     def test_get_filter(self) -> None:
@@ -85,7 +85,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
             "GET", "/_matrix/client/r0/user/%s/filter/%s" % (self.user_id, filter_id)
         )
 
-        self.assertEqual(channel.result["code"], b"200")
+        self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body, self.EXAMPLE_FILTER)
 
     def test_get_filter_non_existant(self) -> None:
@@ -93,7 +93,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
             "GET", "/_matrix/client/r0/user/%s/filter/12382148321" % (self.user_id)
         )
 
-        self.assertEqual(channel.result["code"], b"404")
+        self.assertEqual(channel.code, 404)
         self.assertEqual(channel.json_body["errcode"], Codes.NOT_FOUND)
 
     # Currently invalid params do not have an appropriate errcode
@@ -103,7 +103,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
             "GET", "/_matrix/client/r0/user/%s/filter/foobar" % (self.user_id)
         )
 
-        self.assertEqual(channel.result["code"], b"400")
+        self.assertEqual(channel.code, 400)
 
     # No ID also returns an invalid_id error
     def test_get_filter_no_id(self) -> None:
@@ -111,4 +111,4 @@ class FilterTestCase(unittest.HomeserverTestCase):
             "GET", "/_matrix/client/r0/user/%s/filter/" % (self.user_id)
         )
 
-        self.assertEqual(channel.result["code"], b"400")
+        self.assertEqual(channel.code, 400)

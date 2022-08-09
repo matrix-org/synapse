@@ -885,16 +885,17 @@ def trace_with_opname(
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """
     Decorator to trace a function with a custom opname.
-
     See the module's doc string for usage examples.
     """
-
-    @contextlib.contextmanager
-    def _wrapping_logic(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
+    # type-ignore: mypy bug, see https://github.com/python/mypy/issues/12909
+    @contextlib.contextmanager  # type: ignore[arg-type]
+    def _wrapping_logic(
+        func: Callable[P, R], *args: P.args, **kwargs: P.kwargs
+    ) -> Generator[None, None, None]:
         with start_active_span(opname, tracer=tracer):
             yield
 
-    def _decorator(func: Callable[P, R]):
+    def _decorator(func: Callable[P, R]) -> Callable[P, R]:
         if not opentelemetry:
             return func
 
@@ -906,9 +907,7 @@ def trace_with_opname(
 def trace(func: Callable[P, R]) -> Callable[P, R]:
     """
     Decorator to trace a function.
-
     Sets the operation name to that of the function's name.
-
     See the module's doc string for usage examples.
     """
 
@@ -917,19 +916,28 @@ def trace(func: Callable[P, R]) -> Callable[P, R]:
 
 def tag_args(func: Callable[P, R]) -> Callable[P, R]:
     """
-    Decorator to tag all of the args to the active span.
+    Tags all of the args to the active span.
     """
 
     if not opentelemetry:
         return func
 
-    @contextlib.contextmanager
-    def _wrapping_logic(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs):
+    # type-ignore: mypy bug, see https://github.com/python/mypy/issues/12909
+    @contextlib.contextmanager  # type: ignore[arg-type]
+    def _wrapping_logic(
+        func: Callable[P, R], *args: P.args, **kwargs: P.kwargs
+    ) -> Generator[None, None, None]:
         argspec = inspect.getfullargspec(func)
-        for i, arg in enumerate(args[1:]):
-            set_attribute(SynapseTags.FUNC_ARG_PREFIX + argspec.args[i + 1], str(arg))  # type: ignore[index]
-        set_attribute(SynapseTags.FUNC_ARGS, str(args[len(argspec.args) :]))  # type: ignore[index]
-        set_attribute(SynapseTags.FUNC_KWARGS, str(kwargs))
+        # We use `[1:]` to skip the `self` object reference and `start=1` to
+        # make the index line up with `argspec.args`.
+        #
+        # FIXME: We could update this to handle any type of function by ignoring the
+        #   first argument only if it's named `self` or `cls`. This isn't fool-proof
+        #   but handles the idiomatic cases.
+        for i, arg in enumerate(args[1:], start=1):  # type: ignore[index]
+            set_attribute("ARG_" + argspec.args[i], str(arg))
+        set_attribute("args", str(args[len(argspec.args) :]))  # type: ignore[index]
+        set_attribute("kwargs", str(kwargs))
         yield
 
     return _custom_sync_async_decorator(func, _wrapping_logic)

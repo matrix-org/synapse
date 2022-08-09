@@ -16,7 +16,7 @@ from twisted.internet import defer
 from twisted.test.proto_helpers import MemoryReactorClock
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
-from synapse.logging.tracing import start_active_span
+from synapse.logging.tracing import start_active_span, trace_with_opname, tag_args
 from synapse.util import Clock
 
 from tests.unittest import TestCase
@@ -179,4 +179,76 @@ class TracingTestCase(TestCase):
         self.assertListEqual(
             [span.name for span in self._exporter.get_finished_spans()],
             ["task1", "task2", "root_span"],
+        )
+
+    def test_trace_decorator_sync(self) -> None:
+        """
+        Test whether we can use `@trace_with_opname` (`@trace`) and `@tag_args`
+        with sync functions
+        """
+
+        @trace_with_opname("fixture_sync_func", tracer=self._tracer)
+        @tag_args
+        def fixture_sync_func() -> str:
+            return "foo"
+
+        result = fixture_sync_func()
+        self.assertEqual(result, "foo")
+
+        # the span should have been reported
+        self.assertEqual(
+            [span.name for span in self._exporter.get_finished_spans()],
+            ["fixture_sync_func"],
+        )
+
+    def test_trace_decorator_deferred(self) -> None:
+        """
+        Test whether we can use `@trace_with_opname` (`@trace`) and `@tag_args`
+        with functions that return deferreds
+        """
+        reactor = MemoryReactorClock()
+
+        @trace_with_opname("fixture_deferred_func", tracer=self._tracer)
+        @tag_args
+        def fixture_deferred_func() -> "defer.Deferred[str]":
+            d1: defer.Deferred[str] = defer.Deferred()
+            d1.callback("foo")
+            return d1
+
+        result_d1 = fixture_deferred_func()
+
+        # let the tasks complete
+        reactor.pump((2,) * 8)
+
+        self.assertEqual(self.successResultOf(result_d1), "foo")
+
+        # the span should have been reported
+        self.assertEqual(
+            [span.name for span in self._exporter.get_finished_spans()],
+            ["fixture_deferred_func"],
+        )
+
+    def test_trace_decorator_async(self) -> None:
+        """
+        Test whether we can use `@trace_with_opname` (`@trace`) and `@tag_args`
+        with async functions
+        """
+        reactor = MemoryReactorClock()
+
+        @trace_with_opname("fixture_async_func", tracer=self._tracer)
+        @tag_args
+        async def fixture_async_func() -> str:
+            return "foo"
+
+        d1 = defer.ensureDeferred(fixture_async_func())
+
+        # let the tasks complete
+        reactor.pump((2,) * 8)
+
+        self.assertEqual(self.successResultOf(d1), "foo")
+
+        # the span should have been reported
+        self.assertEqual(
+            [span.name for span in self._exporter.get_finished_spans()],
+            ["fixture_async_func"],
         )

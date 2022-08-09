@@ -1,1 +1,0 @@
-Faster room joins: avoid blocking when pulling events with partially missing prev events.

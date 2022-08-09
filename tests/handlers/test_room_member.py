@@ -1,4 +1,3 @@
-from http import HTTPStatus
 from unittest.mock import Mock, patch
 
 from twisted.test.proto_helpers import MemoryReactor
@@ -260,7 +259,7 @@ class TestReplicatedJoinsLimitedByPerRoomRateLimiter(RedisMultiWorkerStreamTestC
             f"/_matrix/client/v3/rooms/{self.room_id}/join",
             access_token=self.bob_token,
         )
-        self.assertEqual(channel.code, HTTPStatus.OK, channel.json_body)
+        self.assertEqual(channel.code, 200, channel.json_body)
 
         # wait for join to arrive over replication
         self.replicate()
