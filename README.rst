@@ -133,8 +133,8 @@ It is recommended to put a reverse proxy such as
 `relayd <https://man.openbsd.org/relayd.8>`_ in front of Synapse. One advantage of
 doing so is that it means that you can expose the default https port (443) to
 Matrix clients without needing to run Synapse with root privileges.
-
-For information on configuring one, see `<docs/reverse_proxy.md>`_.
+For information on configuring one, see `the reverse proxy docs
+<https://matrix-org.github.io/synapse/latest/reverse_proxy.html>`_.
 
 Troubleshooting and support
 ===========================
