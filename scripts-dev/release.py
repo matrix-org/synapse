@@ -639,6 +639,49 @@ Ask the designated people to do the blog and tweets."""
         )
 
 
+@cli.command()
+@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=True)
+def full(gh_token: str) -> None:
+    click.echo("1. If this is a security release, read the security wiki page.")
+    click.echo("2. Check for any release blockers before proceeding.")
+    click.echo("    https://github.com/matrix-org/synapse/labels/X-Release-Blocker")
+
+    click.confirm("Ready?", abort=True)
+
+    click.echo("\n*** prepare ***")
+    _prepare()
+
+    click.echo("Deploy to matrix.org and ensure that it hasn't fallen over.")
+    click.echo("Remember to silence the alerts to prevent alert spam.")
+    click.confirm("Deployed?", abort=True)
+
+    click.echo("\n*** tag ***")
+    _tag(gh_token)
+
+    click.echo("\n*** wait for actions ***")
+    _wait_for_actions()
+
+    click.echo("\n*** publish ***")
+    _publish(gh_token)
+
+    click.echo("\nUpdate the Debian repository")
+    click.confirm("Started updating Debian repository?", abort=True)
+
+    click.echo("\n*** upload ***")
+    _upload()
+
+    click.echo("\nWait for all release methods to be ready.")
+    # Docker should be ready because it was done by the workflows earlier
+    # PyPI should be ready because we just ran upload().
+    click.confirm("Debs ready?", abort=True)
+
+    click.echo("\n*** merge back ***")
+    _merge_back()
+
+    click.echo("\n*** announce ***")
+    _announce()
+
+
 def get_package_version() -> version.Version:
     version_string = subprocess.check_output(["poetry", "version", "--short"]).decode(
         "utf-8"
