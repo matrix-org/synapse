@@ -21,6 +21,7 @@ from typing import Any, DefaultDict, Iterator, List, Set
 from twisted.internet import defer
 
 from synapse.api.errors import LimitExceededError
+from synapse.logging.tracing import start_active_span
 from synapse.config.ratelimiting import FederationRatelimitSettings
 from synapse.logging.context import (
     PreserveLoggingContext,
@@ -110,6 +111,9 @@ class _PerHostRatelimiter:
     def _on_enter(self, request_id: object) -> "defer.Deferred[None]":
         time_now = self.clock.time_msec()
 
+        wait_span_cm = start_active_span("ratelimit wait")
+        wait_span_cm.__enter__()
+
         # remove any entries from request_times which aren't within the window
         self.request_times[:] = [
             r for r in self.request_times if time_now - r < self.window_size
@@ -162,6 +166,7 @@ class _PerHostRatelimiter:
 
         def on_start(r: object) -> object:
             logger.debug("Ratelimit [%s]: Processing req", id(request_id))
+            wait_span_cm.__exit__(None, None, None)
             self.current_processing.add(request_id)
             return r
 

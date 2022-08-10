@@ -190,6 +190,8 @@ password_config:
 tracing:
   enabled: true
   sample_rate: 1
+  homeserver_whitelist:
+    - ".*"
   jaeger_exporter_config:
     agent_host_name: host.docker.internal
     agent_port: 6831
