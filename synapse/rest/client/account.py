@@ -42,8 +42,9 @@ from synapse.http.servlet import (
 from synapse.http.site import SynapseRequest
 from synapse.metrics import threepid_send_requests
 from synapse.push.mailer import Mailer
+from synapse.rest import RequestBodyModel
 from synapse.rest.client.models import AuthenticationData, EmailRequestTokenBody
-from synapse.types import JsonDict, SynapseBaseModel
+from synapse.types import JsonDict
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import assert_valid_client_secret, random_string
 from synapse.util.threepids import check_3pid_allowed, validate_email
@@ -159,7 +160,7 @@ class PasswordRestServlet(RestServlet):
         self.password_policy_handler = hs.get_password_policy_handler()
         self._set_password_handler = hs.get_set_password_handler()
 
-    class PostBody(SynapseBaseModel):
+    class PostBody(RequestBodyModel):
         auth: Optional[AuthenticationData] = None
         logout_devices: StrictBool = True
         if TYPE_CHECKING:
@@ -293,7 +294,7 @@ class DeactivateAccountRestServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
         self._deactivate_account_handler = hs.get_deactivate_account_handler()
 
-    class PostBody(SynapseBaseModel):
+    class PostBody(RequestBodyModel):
         auth: Optional[AuthenticationData] = None
         id_server: Optional[StrictStr] = None
         # Not specced, see https://github.com/matrix-org/matrix-spec/issues/297

@@ -15,11 +15,20 @@ from typing import TYPE_CHECKING, Dict, Optional
 
 from pydantic import Extra, StrictInt, StrictStr, constr, validator
 
-from synapse.types import SynapseBaseModel
+from synapse.rest import RequestBodyModel
 from synapse.util.threepids import validate_email
 
 
-class AuthenticationData(SynapseBaseModel):
+class AuthenticationData(RequestBodyModel):
+    """
+    Data used during user-interactive authentication.
+
+    (The name "Authentication Data" is taken directly from the spec.)
+
+    Additional keys will be present, depending on the `type` field. Use `.dict()` to
+    access them.
+    """
+
     class Config:
         extra = Extra.allow
 
@@ -27,7 +36,7 @@ class AuthenticationData(SynapseBaseModel):
     type: Optional[StrictStr] = None
 
 
-class EmailRequestTokenBody(SynapseBaseModel):
+class EmailRequestTokenBody(RequestBodyModel):
     if TYPE_CHECKING:
         client_secret: StrictStr
     else:
