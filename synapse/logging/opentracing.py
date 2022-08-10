@@ -981,9 +981,9 @@ def tag_args(func: Callable[P, R]) -> Callable[P, R]:
         #   first argument only if it's named `self` or `cls`. This isn't fool-proof
         #   but handles the idiomatic cases.
         for i, arg in enumerate(args[1:], start=1):  # type: ignore[index]
-            set_tag("ARG_" + argspec.args[i], str(arg))
-        set_tag("args", str(args[len(argspec.args) :]))  # type: ignore[index]
-        set_tag("kwargs", str(kwargs))
+            set_tag(SynapseTags.FUNC_ARG_PREFIX + argspec.args[i], str(arg))
+        set_tag(SynapseTags.FUNC_ARGS, str(args[len(argspec.args) :]))  # type: ignore[index]
+        set_tag(SynapseTags.FUNC_KWARGS, str(kwargs))
         yield
 
     return _custom_sync_async_decorator(func, _wrapping_logic)
