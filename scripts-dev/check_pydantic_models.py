@@ -35,9 +35,10 @@ import textwrap
 import traceback
 import unittest.mock
 from contextlib import contextmanager
-from typing import Generator, TypeVar, Callable, Set
+from typing import Callable, Generator, Set, Type, TypeVar
 
-from pydantic import confloat, conint, conbytes, constr
+from parameterized import parameterized
+from pydantic import BaseModel as PydanticBaseModel, conbytes, confloat, conint, constr
 from typing_extensions import ParamSpec
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,14 @@ CONSTRAINED_TYPE_FACTORIES_WITH_STRICT_FLAG = [
     conbytes,
     conint,
     confloat,
+]
+
+TYPES_THAT_PYDANTIC_WILL_COERCE_TO = [
+    str,
+    bytes,
+    int,
+    float,
+    bool,
 ]
 
 
@@ -70,9 +79,23 @@ def make_wrapper(factory: Callable[P, R]) -> Callable[P, R]:
     return wrapper
 
 
+class BaseModel(PydanticBaseModel):
+    @classmethod
+    def __init_subclass__(cls: Type[PydanticBaseModel], **kwargs):
+        for field in cls.__fields__.values():
+            if field.type_ in TYPES_THAT_PYDANTIC_WILL_COERCE_TO:
+                raise NonStrictTypeError()
+        # breakpoint()
+        # print(cls, kwargs)
+
+
 @contextmanager
 def monkeypatch_pydantic() -> Generator[None, None, None]:
     with contextlib.ExitStack() as patches:
+        patch_basemodel1 = unittest.mock.patch("pydantic.BaseModel", new=BaseModel)
+        patch_basemodel2 = unittest.mock.patch("pydantic.main.BaseModel", new=BaseModel)
+        patches.enter_context(patch_basemodel1)
+        patches.enter_context(patch_basemodel2)
         for factory in CONSTRAINED_TYPE_FACTORIES_WITH_STRICT_FLAG:
             wrapper = make_wrapper(factory)
             patch1 = unittest.mock.patch(f"pydantic.{factory.__name__}", new=wrapper)
@@ -105,14 +128,14 @@ def do_lint() -> Set[str]:
         try:
             synapse = importlib.import_module("synapse")
         except NonStrictTypeError as e:
-            logger.warning(f"Bad annotation from importing synapse")
+            logger.warning("Bad annotation found when importing synapse")
             failures.add(format_error(e))
             return failures
 
         try:
             modules = list(pkgutil.walk_packages(synapse.__path__, "synapse."))
         except NonStrictTypeError as e:
-            logger.warning(f"Bad annotation when looking for modules to import")
+            logger.warning("Bad annotation found when looking for modules to import")
             failures.add(format_error(e))
             return failures
 
@@ -121,7 +144,7 @@ def do_lint() -> Set[str]:
             try:
                 importlib.import_module(module.name)
             except NonStrictTypeError as e:
-                logger.warning(f"Bad annotation from importing {module.name}")
+                logger.warning(f"Bad annotation found when importing {module.name}")
                 failures.add(format_error(e))
 
     return failures
@@ -129,17 +152,17 @@ def do_lint() -> Set[str]:
 
 def run_test_snippet(source: str) -> None:
     # To emulate `source` being called at the top level of the module,
-    # the globals and locals we provide have to be the same mapping.
+    # the globals and locals we provide apparently have to be the same mapping.
     #
     # > Remember that at the module level, globals and locals are the same dictionary.
     # > If exec gets two separate objects as globals and locals, the code will be
     # > executed as if it were embedded in a class definition.
-    g = l = {}
-    exec(textwrap.dedent(source), g, l)
+    globals_ = locals_ = {}
+    exec(textwrap.dedent(source), globals_, locals_)
 
 
 class TestConstrainedTypesPatch(unittest.TestCase):
-    def test_expression_without_strict_raises(self):
+    def test_expression_without_strict_raises(self) -> None:
         with monkeypatch_pydantic(), self.assertRaises(NonStrictTypeError):
             run_test_snippet(
                 """
@@ -148,7 +171,7 @@ class TestConstrainedTypesPatch(unittest.TestCase):
                 """
             )
 
-    def test_called_as_module_attribute_raises(self):
+    def test_called_as_module_attribute_raises(self) -> None:
         with monkeypatch_pydantic(), self.assertRaises(NonStrictTypeError):
             run_test_snippet(
                 """
@@ -157,7 +180,7 @@ class TestConstrainedTypesPatch(unittest.TestCase):
                 """
             )
 
-    def test_alternative_import_raises(self):
+    def test_alternative_import_raises(self) -> None:
         with monkeypatch_pydantic(), self.assertRaises(NonStrictTypeError):
             run_test_snippet(
                 """
@@ -166,7 +189,7 @@ class TestConstrainedTypesPatch(unittest.TestCase):
                 """
             )
 
-    def test_alternative_import_attribute_raises(self):
+    def test_alternative_import_attribute_raises(self) -> None:
         with monkeypatch_pydantic(), self.assertRaises(NonStrictTypeError):
             run_test_snippet(
                 """
@@ -175,7 +198,7 @@ class TestConstrainedTypesPatch(unittest.TestCase):
                 """
             )
 
-    def test_kwarg_but_no_strict_raises(self):
+    def test_kwarg_but_no_strict_raises(self) -> None:
         with monkeypatch_pydantic(), self.assertRaises(NonStrictTypeError):
             run_test_snippet(
                 """
@@ -184,7 +207,7 @@ class TestConstrainedTypesPatch(unittest.TestCase):
                 """
             )
 
-    def test_kwarg_strict_False_raises(self):
+    def test_kwarg_strict_False_raises(self) -> None:
         with monkeypatch_pydantic(), self.assertRaises(NonStrictTypeError):
             run_test_snippet(
                 """
@@ -193,7 +216,7 @@ class TestConstrainedTypesPatch(unittest.TestCase):
                 """
             )
 
-    def test_kwarg_strict_True_doesnt_raise(self):
+    def test_kwarg_strict_True_doesnt_raise(self) -> None:
         with monkeypatch_pydantic():
             run_test_snippet(
                 """
@@ -202,7 +225,7 @@ class TestConstrainedTypesPatch(unittest.TestCase):
                 """
             )
 
-    def test_annotation_without_strict_raises(self):
+    def test_annotation_without_strict_raises(self) -> None:
         with monkeypatch_pydantic(), self.assertRaises(NonStrictTypeError):
             run_test_snippet(
                 """
@@ -211,13 +234,44 @@ class TestConstrainedTypesPatch(unittest.TestCase):
                 """
             )
 
-    def test_field_annotation_without_strict_raises(self):
+    def test_field_annotation_without_strict_raises(self) -> None:
         with monkeypatch_pydantic(), self.assertRaises(NonStrictTypeError):
             run_test_snippet(
                 """
                 from pydantic import BaseModel, conint
                 class C:
                     x: conint()
+                """
+            )
+
+
+class TestMetaclassPatch(unittest.TestCase):
+    @parameterized.expand(
+        [
+            ("str",),
+            ("bytes"),
+            ("int",),
+            ("float",),
+            ("bool"),
+        ]
+    )
+    def test_field_holding_plain_value_type_raises(self, type_name: str) -> None:
+        with monkeypatch_pydantic(), self.assertRaises(NonStrictTypeError):
+            run_test_snippet(
+                f"""
+                from pydantic import BaseModel
+                class C(BaseModel):
+                    f: {type_name}
+                """
+            )
+
+    def test_field_holding_str_raises_with_alternative_import(self) -> None:
+        with monkeypatch_pydantic(), self.assertRaises(NonStrictTypeError):
+            run_test_snippet(
+                """
+                from pydantic.main import BaseModel
+                class C(BaseModel):
+                    f: str
                 """
             )
 
