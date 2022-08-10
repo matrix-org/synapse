@@ -130,4 +130,3 @@ class ClientRestResource(JsonResource):
 
         # unstable
         mutual_rooms.register_servlets(hs, client_resource)
-
