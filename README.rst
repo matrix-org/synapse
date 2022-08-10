@@ -24,6 +24,16 @@ Synapse Installation
   `Installation Instructions <https://matrix-org.github.io/synapse/latest/setup/installation.html>`_.
 * For specific details on how to configure Synapse for federation see `docs/federate.md <docs/federate.md>`_
 
+Upgrading an existing Synapse
+-----------------------------
+
+The instructions for upgrading Synapse are in `the upgrade notes`_.
+Please check these instructions as upgrading may require extra steps for some
+versions of Synapse.
+
+.. _the upgrade notes: https://matrix-org.github.io/synapse/develop/upgrade.html
+
+
 Platform dependencies
 ---------------------
 
@@ -72,16 +82,6 @@ mentioned in MXIDs hosted on that server.
 
 Following this advice ensures that even if an XSS is found in Synapse, the
 impact to other applications will be minimal.
-
-
-Upgrading an existing Synapse
-=============================
-
-The instructions for upgrading Synapse are in `the upgrade notes`_.
-Please check these instructions as upgrading may require extra steps for some
-versions of Synapse.
-
-.. _the upgrade notes: https://matrix-org.github.io/synapse/develop/upgrade.html
 
 .. _reverse-proxy:
 
