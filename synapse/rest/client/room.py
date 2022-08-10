@@ -799,6 +799,7 @@ class RoomForgetRestServlet(TransactionRestServlet):
         super().__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
+        self.store = hs.get_datastores().main
 
     def register(self, http_server: HttpServer) -> None:
         PATTERNS = "/rooms/(?P<room_id>[^/]*)/forget"
@@ -809,7 +810,7 @@ class RoomForgetRestServlet(TransactionRestServlet):
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
 
-        await self.room_member_handler.forget(user=requester.user, room_id=room_id)
+        await self.room_member_handler.forget(requester=requester, room_id=room_id)
 
         return 200, {}
 

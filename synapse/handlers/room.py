@@ -1812,7 +1812,7 @@ class RoomShutdownHandler:
                     stream_id,
                 )
 
-                await self.room_member_handler.forget(target_requester.user, room_id)
+                await self.room_member_handler.forget(target_requester, room_id)
 
                 # Join users to new room
                 if new_room_user_id:

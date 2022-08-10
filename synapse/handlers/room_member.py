@@ -261,7 +261,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    async def forget(self, user: UserID, room_id: str) -> None:
+    async def forget(self, requester: Requester, room_id: str) -> None:
         raise NotImplementedError()
 
     async def ratelimit_multiple_invites(
@@ -1909,19 +1909,25 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         """Implements RoomMemberHandler._user_left_room"""
         user_left_room(self.distributor, target, room_id)
 
-    async def forget(self, user: UserID, room_id: str) -> None:
-        user_id = user.to_string()
+    async def forget(self, requester: Requester, room_id: str) -> None:
+        user_id = requester.user.to_string()
 
         member = await self._storage_controllers.state.get_current_state_event(
             room_id=room_id, event_type=EventTypes.Member, state_key=user_id
         )
         membership = member.membership if member else None
 
-        if membership is not None and membership not in [
+        if membership and membership not in [
             Membership.LEAVE,
             Membership.BAN,
         ]:
-            raise SynapseError(400, "User %s in room %s" % (user_id, room_id))
+            # Have the user leave the room.
+            await self.update_membership(
+                requester=requester,
+                target=requester.user,
+                room_id=room_id,
+                action=Membership.LEAVE,
+            )
 
         if membership:
             await self.store.forget(user_id, room_id)

@@ -137,5 +137,5 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
             user_id=target.to_string(), room_id=room_id, change="left"
         )
 
-    async def forget(self, target: UserID, room_id: str) -> None:
+    async def forget(self, target: Requester, room_id: str) -> None:
         raise RuntimeError("Cannot forget rooms on workers.")
