@@ -312,7 +312,7 @@ class SynapseTags:
 
     # Used to tag function arguments
     #
-    # Tag a named arg. The name of the argument should be appended to this
+    # Tag a named arg. The name of the argument should be appended to this.
     # prefix
     FUNC_ARG_PREFIX = "ARG."
     # Tag extra variadic number of positional arguments (`def foo(first, second, *extras)`)
@@ -320,7 +320,8 @@ class SynapseTags:
     # Tag keyword args
     FUNC_KWARGS = "kwargs"
 
-    # Some intermediate result that's interesting to the function
+    # Some intermediate result that's interesting to the function. The label for
+    # the result should be appended to this.
     RESULT_PREFIX = "RESULT."
 
 
