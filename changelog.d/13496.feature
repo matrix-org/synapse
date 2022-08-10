@@ -1,0 +1,1 @@
+Leave the room if a user is still in said room upon trying to forget it.
