@@ -655,6 +655,8 @@ class EventsPersistenceStorageController:
                         with Measure(
                             self._clock, "persist_events.get_new_state_after_events"
                         ):
+                            logger.debug("old extremities: %r", latest_event_ids)
+                            logger.debug("new extremities: %r", new_latest_event_ids)
                             res = await self._get_new_state_after_events(
                                 room_id,
                                 ev_ctx_rm,
@@ -662,6 +664,11 @@ class EventsPersistenceStorageController:
                                 new_latest_event_ids,
                             )
                             current_state, delta_ids, new_latest_event_ids = res
+                            logger.debug(
+                                "delta IDs: %r, new latest event IDs: %r",
+                                delta_ids,
+                                new_latest_event_ids,
+                            )
 
                             # there should always be at least one forward extremity.
                             # (except during the initial persistence of the send_join

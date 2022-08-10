@@ -209,14 +209,19 @@ class PersistEventsStore:
             for (event, _), stream in zip(events_and_contexts, stream_orderings):
                 event.internal_metadata.stream_ordering = stream
 
-            await self.db_pool.runInteraction(
-                "persist_events",
-                self._persist_events_txn,
-                events_and_contexts=events_and_contexts,
-                inhibit_local_membership_updates=inhibit_local_membership_updates,
-                state_delta_for_room=state_delta_for_room,
-                new_forward_extremities=new_forward_extremities,
-            )
+            try:
+                await self.db_pool.runInteraction(
+                    "persist_events",
+                    self._persist_events_txn,
+                    events_and_contexts=events_and_contexts,
+                    inhibit_local_membership_updates=inhibit_local_membership_updates,
+                    state_delta_for_room=state_delta_for_room,
+                    new_forward_extremities=new_forward_extremities,
+                )
+            except Exception:
+                logger.debug("events_and_contexts: %r", events_and_contexts)
+                logger.debug("state_delta_for_room: %r", state_delta_for_room)
+                raise
             persist_event_counter.inc(len(events_and_contexts))
 
             if not use_negative_stream_ordering:
