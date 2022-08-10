@@ -29,6 +29,22 @@ which can be used to customise its behaviour after installation.
 There are additional details on how to `configure Synapse for federation here
 <https://matrix-org.github.io/synapse/latest/federate.html>`_.
 
+.. _reverse-proxy:
+
+Using a reverse proxy with Synapse
+----------------------------------
+
+It is recommended to put a reverse proxy such as
+`nginx <https://nginx.org/en/docs/http/ngx_http_proxy_module.html>`_,
+`Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_,
+`Caddy <https://caddyserver.com/docs/quick-starts/reverse-proxy>`_,
+`HAProxy <https://www.haproxy.org/>`_ or
+`relayd <https://man.openbsd.org/relayd.8>`_ in front of Synapse. One advantage of
+doing so is that it means that you can expose the default https port (443) to
+Matrix clients without needing to run Synapse with root privileges.
+For information on configuring one, see `the reverse proxy docs
+<https://matrix-org.github.io/synapse/latest/reverse_proxy.html>`_.
+
 Upgrading an existing Synapse
 -----------------------------
 
@@ -88,21 +104,6 @@ mentioned in MXIDs hosted on that server.
 Following this advice ensures that even if an XSS is found in Synapse, the
 impact to other applications will be minimal.
 
-.. _reverse-proxy:
-
-Using a reverse proxy with Synapse
-==================================
-
-It is recommended to put a reverse proxy such as
-`nginx <https://nginx.org/en/docs/http/ngx_http_proxy_module.html>`_,
-`Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_,
-`Caddy <https://caddyserver.com/docs/quick-starts/reverse-proxy>`_,
-`HAProxy <https://www.haproxy.org/>`_ or
-`relayd <https://man.openbsd.org/relayd.8>`_ in front of Synapse. One advantage of
-doing so is that it means that you can expose the default https port (443) to
-Matrix clients without needing to run Synapse with root privileges.
-For information on configuring one, see `the reverse proxy docs
-<https://matrix-org.github.io/synapse/latest/reverse_proxy.html>`_.
 
 Testing a new installation
 ==========================
