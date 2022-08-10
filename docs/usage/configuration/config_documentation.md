@@ -845,7 +845,11 @@ which are older than the room's maximum retention period. Synapse will also
 filter events received over federation so that events that should have been
 purged are ignored and not stored again.
 
-The message retention policies feature is disabled by default.
+The message retention policies feature is disabled by default. Please be advised 
+that enabling this feature carries some risk, as it is possible to corrupt your database 
+due to insufficient cache invalidation. Setting retention to delete older history
+is less risky than deleting newer history (ie deleting 3-year-old history is safer than history from
+yesterday), but in general caution is advised when enabling this feature.
 
 This setting has the following sub-options:
 * `default_policy`: Default retention policy. If set, Synapse will apply it to rooms that lack the
