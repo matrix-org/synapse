@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Dict, Optional
 
 from pydantic import Extra, StrictInt, StrictStr, constr, validator
 
-from synapse.rest import RequestBodyModel
+from synapse.rest.models import RequestBodyModel
 from synapse.util.threepids import validate_email
 
 
