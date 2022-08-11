@@ -653,7 +653,7 @@ class SyncHandler:
         self,
         event_id: str,
         state_filter: Optional[StateFilter] = None,
-        await_full_state: Optional[bool] = None,
+        await_full_state: bool = True,
     ) -> StateMap[str]:
         """
         Get the room state after the given event
@@ -662,8 +662,8 @@ class SyncHandler:
             event_id: event of interest
             state_filter: The state filter used to fetch state from the database.
             await_full_state: if `True`, will block if we do not yet have complete state
-                at the event. Defaults to `True` unless `state_filter` can be completely
-                satisfied with partial state.
+                at the event and `state_filter` is not satisfied by partial state.
+                Defaults to `True`.
         """
         state_ids = await self._state_storage_controller.get_state_ids_for_event(
             event_id,
@@ -691,7 +691,7 @@ class SyncHandler:
         room_id: str,
         stream_position: StreamToken,
         state_filter: Optional[StateFilter] = None,
-        await_full_state: Optional[bool] = None,
+        await_full_state: bool = True,
     ) -> StateMap[str]:
         """Get the room state at a particular stream position
 
@@ -700,9 +700,8 @@ class SyncHandler:
             stream_position: point at which to get state
             state_filter: The state filter used to fetch state from the database.
             await_full_state: if `True`, will block if we do not yet have complete state
-                at the last event in the room before `stream_position`. Defaults to
-                `True` unless `state_filter` can be completely satisfied with partial
-                state.
+                at the last event in the room before `stream_position` and
+                `state_filter` is not satisfied by partial state. Defaults to `True`.
         """
         # FIXME: This gets the state at the latest event before the stream ordering,
         # which might not be the same as the "current state" of the room at the time

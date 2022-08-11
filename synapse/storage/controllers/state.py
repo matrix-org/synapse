@@ -232,7 +232,7 @@ class StateStorageController:
         self,
         event_ids: Collection[str],
         state_filter: Optional[StateFilter] = None,
-        await_full_state: Optional[bool] = None,
+        await_full_state: bool = True,
     ) -> Dict[str, StateMap[str]]:
         """
         Get the state dicts corresponding to a list of events, containing the event_ids
@@ -242,8 +242,8 @@ class StateStorageController:
             event_ids: events whose state should be returned
             state_filter: The state filter used to fetch state from the database.
             await_full_state: if `True`, will block if we do not yet have complete state
-                at these events. Defaults to `True` unless `state_filter` can be
-                completely satisfied with partial state.
+                at these events and `state_filter` is not satisfied by partial state.
+                Defaults to `True`.
 
         Returns:
             A dict from event_id -> (type, state_key) -> event_id
@@ -252,13 +252,13 @@ class StateStorageController:
             RuntimeError if we don't have a state group for one or more of the events
                 (ie they are outliers or unknown)
         """
-        if await_full_state is None:
-            if state_filter and not state_filter.must_await_full_state(
-                self._is_mine_id
-            ):
-                await_full_state = False
-            else:
-                await_full_state = True
+        if (
+            await_full_state
+            and state_filter
+            and not state_filter.must_await_full_state(self._is_mine_id)
+        ):
+            # Full state is not required if the state filter is restrictive enough.
+            await_full_state = False
 
         event_to_groups = await self.get_state_group_for_events(
             event_ids, await_full_state=await_full_state
@@ -303,7 +303,7 @@ class StateStorageController:
         self,
         event_id: str,
         state_filter: Optional[StateFilter] = None,
-        await_full_state: Optional[bool] = None,
+        await_full_state: bool = True,
     ) -> StateMap[str]:
         """
         Get the state dict corresponding to a particular event
@@ -312,8 +312,8 @@ class StateStorageController:
             event_id: event whose state should be returned
             state_filter: The state filter used to fetch state from the database.
             await_full_state: if `True`, will block if we do not yet have complete state
-                at the event. Defaults to `True` unless `state_filter` can be completely
-                satisfied with partial state.
+                at the event and `state_filter` is not satisfied by partial state.
+                Defaults to `True`.
 
         Returns:
             A dict from (type, state_key) -> state_event_id
