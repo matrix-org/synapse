@@ -1,3 +1,12 @@
+Synapse 1.65.0rc2 (2022-08-11)
+==============================
+
+Internal Changes
+----------------
+
+- Revert 'Remove the unspecced `room_id` field in the `/hierarchy` response. ([\#13365](https://github.com/matrix-org/synapse/issues/13365))' to give more time for clients to update. ([\#13501](https://github.com/matrix-org/synapse/issues/13501))
+
+
 Synapse 1.65.0rc1 (2022-08-09)
 ==============================
 
@@ -5,21 +14,22 @@ Features
 --------
 
 - Add support for stable prefixes for [MSC2285 (private read receipts)](https://github.com/matrix-org/matrix-spec-proposals/pull/2285). ([\#13273](https://github.com/matrix-org/synapse/issues/13273))
-- Add new unstable error codes `ORG.MATRIX.MSC3848.ALREADY_JOINED`, `ORG.MATRIX.MSC3848.NOT_JOINED`, and `ORG.MATRIX.MSC3848.INSUFFICIENT_POWER` described in MSC3848. ([\#13343](https://github.com/matrix-org/synapse/issues/13343))
+- Add new unstable error codes `ORG.MATRIX.MSC3848.ALREADY_JOINED`, `ORG.MATRIX.MSC3848.NOT_JOINED`, and `ORG.MATRIX.MSC3848.INSUFFICIENT_POWER` described in [MSC3848](https://github.com/matrix-org/matrix-spec-proposals/pull/3848). ([\#13343](https://github.com/matrix-org/synapse/issues/13343))
 - Use stable prefixes for [MSC3827](https://github.com/matrix-org/matrix-spec-proposals/pull/3827). ([\#13370](https://github.com/matrix-org/synapse/issues/13370))
-- Add a module API method to translate a room alias into a room ID. ([\#13428](https://github.com/matrix-org/synapse/issues/13428))
-- Add a module API method to create a room. ([\#13429](https://github.com/matrix-org/synapse/issues/13429))
+- Add a new module API method to translate a room alias into a room ID. ([\#13428](https://github.com/matrix-org/synapse/issues/13428))
+- Add a new module API method to create a room. ([\#13429](https://github.com/matrix-org/synapse/issues/13429))
 - Add remote join capability to the module API's `update_room_membership` method (in a backwards compatible manner). ([\#13441](https://github.com/matrix-org/synapse/issues/13441))
 
 
 Bugfixes
 --------
 
-- Fix a bug in the experimental faster-room-joins support which could cause it to get stuck in an infinite loop. ([\#13353](https://github.com/matrix-org/synapse/issues/13353))
+- Update the version of the LDAP3 auth provider module included in the `matrixdotorg/synapse` DockerHub images and the Debian packages hosted on packages.matrix.org to 0.2.2. This version fixes a regression in the module. ([\#13470](https://github.com/matrix-org/synapse/issues/13470))
 - Fix a bug introduced in Synapse v1.41.0 where the `/hierarchy` API returned non-standard information (a `room_id` field under each entry in `children_state`). ([\#13365](https://github.com/matrix-org/synapse/issues/13365))
 - Fix a bug introduced in Synapse 0.24.0 that would respond with the wrong error status code to `/joined_members` requests when the requester is not a current member of the room. Contributed by @andrewdoh. ([\#13374](https://github.com/matrix-org/synapse/issues/13374))
 - Fix bug in handling of typing events for appservices. Contributed by Nick @ Beeper (@fizzadar). ([\#13392](https://github.com/matrix-org/synapse/issues/13392))
 - Fix a bug introduced in Synapse 1.57.0 where rooms listed in `exclude_rooms_from_sync` in the configuration file would not be properly excluded from incremental syncs. ([\#13408](https://github.com/matrix-org/synapse/issues/13408))
+- Fix a bug in the experimental faster-room-joins support which could cause it to get stuck in an infinite loop. ([\#13353](https://github.com/matrix-org/synapse/issues/13353))
 - Faster room joins: fix a bug which caused rejected events to become un-rejected during state syncing. ([\#13413](https://github.com/matrix-org/synapse/issues/13413))
 - Faster room joins: fix error when running out of servers to sync partial state with, so that Synapse raises the intended error instead. ([\#13432](https://github.com/matrix-org/synapse/issues/13432))
 
@@ -69,8 +79,6 @@ Internal Changes
 - Update type of `EventContext.rejected`. ([\#13460](https://github.com/matrix-org/synapse/issues/13460))
 - Use literals in place of `HTTPStatus` constants in tests. ([\#13463](https://github.com/matrix-org/synapse/issues/13463), [\#13469](https://github.com/matrix-org/synapse/issues/13469))
 - Correct a misnamed argument in state res v2 internals. ([\#13467](https://github.com/matrix-org/synapse/issues/13467))
-- Update the version of the LDAP3 auth provider module included in the `matrixdotorg/synapse` DockerHub images and the Debian packages
-  hosted on packages.matrix.org to 0.2.2. This version fixes a regression in the module. ([\#13470](https://github.com/matrix-org/synapse/issues/13470))
 
 
 Synapse 1.64.0 (2022-08-02)
