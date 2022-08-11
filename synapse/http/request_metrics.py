@@ -54,7 +54,6 @@ response_timer = Histogram(
         1.0,
         2.5,
         5.0,
-        7.5,
         10.0,
         30.0,
         60.0,
