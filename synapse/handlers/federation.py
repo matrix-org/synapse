@@ -371,9 +371,12 @@ class FederationHandler:
             "_maybe_backfill_inner: extremities_to_request %s", extremities_to_request
         )
         set_tag(
-            SynapseTags.RESULT_PREFIX
-            + f"extremities_to_request {len(extremities_to_request)}",
+            SynapseTags.RESULT_PREFIX + "extremities_to_request",
             str(extremities_to_request),
+        )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "extremities_to_request.length",
+            str(len(extremities_to_request)),
         )
 
         # Now we need to decide which hosts to hit first.

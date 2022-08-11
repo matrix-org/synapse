@@ -473,12 +473,20 @@ class FederationClient(FederationBase):
         auth_event_ids = result.get("auth_chain_ids", [])
 
         set_tag(
-            SynapseTags.RESULT_PREFIX + f"state_event_ids ({len(state_event_ids)})",
+            SynapseTags.RESULT_PREFIX + "state_event_ids",
             str(state_event_ids),
         )
         set_tag(
-            SynapseTags.RESULT_PREFIX + f"auth_event_ids ({len(auth_event_ids)})",
+            SynapseTags.RESULT_PREFIX + "state_event_ids.length",
+            str(len(state_event_ids)),
+        )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "auth_event_ids",
             str(auth_event_ids),
+        )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "auth_event_ids.length",
+            str(len(auth_event_ids)),
         )
 
         if not isinstance(state_event_ids, list) or not isinstance(

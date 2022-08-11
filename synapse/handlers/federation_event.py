@@ -738,8 +738,12 @@ class FederationEventHandler:
                 notification to clients, and validation of device keys.)
         """
         set_tag(
-            SynapseTags.FUNC_ARG_PREFIX + f"event_ids ({len(events)})",
+            SynapseTags.FUNC_ARG_PREFIX + "event_ids",
             str([event.event_id for event in events]),
+        )
+        set_tag(
+            SynapseTags.FUNC_ARG_PREFIX + "event_ids.length",
+            str(len(events)),
         )
         set_tag(SynapseTags.FUNC_ARG_PREFIX + "backfilled", str(backfilled))
         logger.debug(
@@ -1049,14 +1053,20 @@ class FederationEventHandler:
         missing_event_ids = missing_desired_event_ids | missing_auth_event_ids
 
         set_tag(
-            SynapseTags.RESULT_PREFIX
-            + f"missing_auth_event_ids ({len(missing_auth_event_ids)})",
+            SynapseTags.RESULT_PREFIX + "missing_auth_event_ids",
             str(missing_auth_event_ids),
         )
         set_tag(
-            SynapseTags.RESULT_PREFIX
-            + f"missing_desired_event_ids ({len(missing_desired_event_ids)})",
+            SynapseTags.RESULT_PREFIX + "missing_auth_event_ids.length",
+            str(len(missing_auth_event_ids)),
+        )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "missing_desired_event_ids",
             str(missing_desired_event_ids),
+        )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "missing_desired_event_ids.length",
+            str(len(missing_desired_event_ids)),
         )
 
         # Making an individual request for each of 1000s of events has a lot of
@@ -1132,8 +1142,12 @@ class FederationEventHandler:
                 failed_to_fetch,
             )
             set_tag(
-                SynapseTags.RESULT_PREFIX + f"failed_to_fetch ({len(failed_to_fetch)})",
+                SynapseTags.RESULT_PREFIX + "failed_to_fetch",
                 str(failed_to_fetch),
+            )
+            set_tag(
+                SynapseTags.RESULT_PREFIX + "failed_to_fetch.length",
+                str(len(failed_to_fetch)),
             )
 
         if remote_event.is_state() and remote_event.rejected_reason is None:
@@ -1517,8 +1531,12 @@ class FederationEventHandler:
 
         event_ids = event_map.keys()
         set_tag(
-            SynapseTags.FUNC_ARG_PREFIX + f"event_ids ({len(event_ids)})",
+            SynapseTags.FUNC_ARG_PREFIX + "event_ids",
             str(event_ids),
+        )
+        set_tag(
+            SynapseTags.FUNC_ARG_PREFIX + "event_ids",
+            str(len(event_ids)),
         )
 
         # filter out any events we have already seen. This might happen because
@@ -1677,9 +1695,12 @@ class FederationEventHandler:
             origin, event
         )
         set_tag(
-            SynapseTags.RESULT_PREFIX
-            + f"claimed_auth_events ({len(claimed_auth_events)})",
+            SynapseTags.RESULT_PREFIX + "claimed_auth_events",
             str([ev.event_id for ev in claimed_auth_events]),
+        )
+        set_tag(
+            SynapseTags.RESULT_PREFIX + "claimed_auth_events.length",
+            str(len(claimed_auth_events)),
         )
 
         # ... and check that the event passes auth at those auth events.
@@ -2127,8 +2148,12 @@ class FederationEventHandler:
             if not backfilled:  # Never notify for backfilled events
                 with start_active_span("notify_persisted_events"):
                     set_tag(
-                        SynapseTags.RESULT_PREFIX + f"event_ids ({len(events)})",
+                        SynapseTags.RESULT_PREFIX + "event_ids",
                         str([ev.event_id for ev in events]),
+                    )
+                    set_tag(
+                        SynapseTags.RESULT_PREFIX + "event_ids.length",
+                        str(len(events)),
                     )
                     for event in events:
                         await self._notify_persisted_event(event, max_stream_token)
