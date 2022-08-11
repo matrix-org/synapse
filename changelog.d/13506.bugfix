@@ -1,0 +1,1 @@
+Re-introduce the spec compliance fix that removes the unspecced `room_id` field in the `/hierarchy` response.
