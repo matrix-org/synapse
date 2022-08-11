@@ -3770,6 +3770,9 @@ using Synapse's media repository.</p>
 <h3 id="redaction_retention_period"><a class="header" href="#redaction_retention_period"><code>redaction_retention_period</code></a></h3>
 <p>How long to keep redacted events in unredacted form in the database. After
 this period redacted events get replaced with their redacted form in the DB.</p>
+<p>Synapse will check whether the rentention period has concluded for redacted
+events every 5 minutes. Thus, even if this option is set to <code>0</code>, Synapse may
+still take up to 5 minutes to purge redacted events from the database.</p>
 <p>Defaults to <code>7d</code>. Set to <code>null</code> to disable.</p>
 <p>Example configuration:</p>
 <pre><code class="language-yaml">redaction_retention_period: 28d
