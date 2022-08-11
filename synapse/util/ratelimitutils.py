@@ -21,13 +21,13 @@ from typing import Any, DefaultDict, Iterator, List, Set
 from twisted.internet import defer
 
 from synapse.api.errors import LimitExceededError
-from synapse.logging.tracing import start_active_span
 from synapse.config.ratelimiting import FederationRatelimitSettings
 from synapse.logging.context import (
     PreserveLoggingContext,
     make_deferred_yieldable,
     run_in_background,
 )
+from synapse.logging.tracing import start_active_span
 from synapse.util import Clock
 
 if typing.TYPE_CHECKING:

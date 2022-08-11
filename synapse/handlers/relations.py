@@ -19,7 +19,7 @@ import attr
 from synapse.api.constants import RelationTypes
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase, relation_from_event
-from synapse.logging.tracing import trace
+from synapse.logging.tracing import SynapseTags, set_attribute, trace
 from synapse.storage.databases.main.relations import _RelatedEvent
 from synapse.types import JsonDict, Requester, StreamToken, UserID
 from synapse.visibility import filter_events_for_client
@@ -166,6 +166,7 @@ class RelationsHandler:
 
         return return_value
 
+    @trace
     async def get_relations_for_event(
         self,
         event_id: str,
@@ -200,6 +201,7 @@ class RelationsHandler:
 
         return related_events, next_token
 
+    @trace
     async def get_annotations_for_event(
         self,
         event_id: str,
@@ -245,6 +247,7 @@ class RelationsHandler:
 
         return filtered_results
 
+    @trace
     async def _get_threads_for_events(
         self,
         events_by_id: Dict[str, EventBase],
@@ -405,6 +408,11 @@ class RelationsHandler:
 
             # The event should get bundled aggregations.
             events_by_id[event.event_id] = event
+
+        set_attribute(
+            SynapseTags.FUNC_ARG_PREFIX + f"event_ids ({len(events_by_id)})",
+            str(events_by_id.keys()),
+        )
 
         # event ID -> bundled aggregation in non-serialized form.
         results: Dict[str, BundledAggregations] = {}

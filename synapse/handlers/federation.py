@@ -59,7 +59,13 @@ from synapse.events.validator import EventValidator
 from synapse.federation.federation_client import InvalidResponseError
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import nested_logging_context
-from synapse.logging.tracing import SynapseTags, set_attribute, trace, tag_args
+from synapse.logging.tracing import (
+    SynapseTags,
+    set_attribute,
+    start_active_span,
+    tag_args,
+    trace,
+)
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import NOT_SPAM
 from synapse.replication.http.federation import (
@@ -380,13 +386,16 @@ class FederationHandler:
         # First we try hosts that are already in the room
         # TODO: HEURISTIC ALERT.
 
-        curr_state = await self._storage_controllers.state.get_current_state(room_id)
+        with start_active_span("getting likely_domains"):
+            curr_state = await self._storage_controllers.state.get_current_state(
+                room_id
+            )
 
-        curr_domains = get_domains_from_state(curr_state)
+            curr_domains = get_domains_from_state(curr_state)
 
-        likely_domains = [
-            domain for domain, depth in curr_domains if domain != self.server_name
-        ]
+            likely_domains = [
+                domain for domain, depth in curr_domains if domain != self.server_name
+            ]
 
         async def try_backfill(domains: List[str]) -> bool:
             # TODO: Should we try multiple of these at a time?
