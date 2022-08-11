@@ -1100,25 +1100,34 @@ class EventsWorkerStore(SQLBaseStore):
             "recursively fetching redactions"
         )
 
-        while events_to_fetch:
-            row_map = await self._enqueue_events(events_to_fetch)
+        try:
+            while events_to_fetch:
+                row_map = await self._enqueue_events(events_to_fetch)
 
-            # we need to recursively fetch any redactions of those events
-            redaction_ids: Set[str] = set()
-            for event_id in events_to_fetch:
-                row = row_map.get(event_id)
-                fetched_event_ids.add(event_id)
-                if row:
-                    fetched_events[event_id] = row
-                    redaction_ids.update(row.redactions)
+                # we need to recursively fetch any redactions of those events
+                redaction_ids: Set[str] = set()
+                for event_id in events_to_fetch:
+                    row = row_map.get(event_id)
+                    fetched_event_ids.add(event_id)
+                    if row:
+                        fetched_events[event_id] = row
+                        redaction_ids.update(row.redactions)
 
-            events_to_fetch = redaction_ids.difference(fetched_event_ids)
-            if events_to_fetch:
-                logger.debug("Also fetching redaction events %s", events_to_fetch)
-                # Start tracing how long it takes for us to get all of the redactions
-                if not is_recording_redaction_trace:
-                    fetching_redactions_tracing_span_cm.__enter__()
-                    is_recording_redaction_trace = True
+                events_to_fetch = redaction_ids.difference(fetched_event_ids)
+                if events_to_fetch:
+                    logger.debug("Also fetching redaction events %s", events_to_fetch)
+                    # Start tracing how long it takes for us to get all of the redactions.
+                    # Only start the span once while we recurse over and over.
+                    if not is_recording_redaction_trace:
+                        fetching_redactions_tracing_span_cm.__enter__()
+                        is_recording_redaction_trace = True
+        except Exception as e:
+            # Only record the exception if we were recording in the first place
+            if is_recording_redaction_trace:
+                fetching_redactions_tracing_span_cm.__exit__(
+                    type(e), None, e.__traceback__
+                )
+            raise
 
         # Only stop recording if we were recording in the first place
         if is_recording_redaction_trace:
