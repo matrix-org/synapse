@@ -1225,7 +1225,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         sql = """
             SELECT count(*) FROM local_current_membership
             INNER JOIN room_memberships USING (room_id, event_id)
-            WHERE 
+            WHERE
                 room_id = ?
                 AND forgotten = 0;
         """
