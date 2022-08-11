@@ -1231,7 +1231,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         """
 
         rows = await self.db_pool.execute(
-            "is_forgotten_room", None, sql, room_id,
+            "is_forgotten_room", None, sql, room_id
         )
 
         # `count(*)` returns always an integer

@@ -206,6 +206,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
             self.get_success(self.store.is_locally_forgotten_room(self.room))
         )
 
+
 class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastores().main
