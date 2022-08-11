@@ -16,12 +16,13 @@
 A script which enforces that Synapse always uses strict types when defining a Pydantic
 model.
 
-Pydantic does not yet offer a strict mode (), but it is expected for V2. See
+Pydantic does not yet offer a strict mode, but it is planned for pydantic v2. See
+
     https://github.com/pydantic/pydantic/issues/1098
     https://pydantic-docs.helpmanual.io/blog/pydantic-v2/#strict-mode
 
-until then, this script stops us from introducing type coersion bugs like stringy power
-levels.
+until then, this script is a best effort to stop us from introducing type coersion bugs
+(like the infamous stringy power levels fixed in room version 10).
 """
 import argparse
 import contextlib
@@ -35,15 +36,16 @@ import textwrap
 import traceback
 import unittest.mock
 from contextlib import contextmanager
-from typing import Callable, Generator, Set, Type, TypeVar
+from typing import Any, Callable, Generator, Set, Type, TypeVar, List, Dict
 
 from parameterized import parameterized
 from pydantic import BaseModel as PydanticBaseModel, conbytes, confloat, conint, constr
+from pydantic.typing import get_args
 from typing_extensions import ParamSpec
 
 logger = logging.getLogger(__name__)
 
-CONSTRAINED_TYPE_FACTORIES_WITH_STRICT_FLAG = [
+CONSTRAINED_TYPE_FACTORIES_WITH_STRICT_FLAG: List[Callable] = [
     constr,
     conbytes,
     conint,
@@ -70,34 +72,55 @@ class NonStrictTypeError(Exception):
 def make_wrapper(factory: Callable[P, R]) -> Callable[P, R]:
     @functools.wraps(factory)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-        if "strict" not in kwargs:
+        # type-ignore: should be redundant once we can use https://github.com/python/mypy/pull/12668
+        if "strict" not in kwargs:  # type: ignore[attr-defined]
             raise NonStrictTypeError()
-        if not kwargs["strict"]:
+        if not kwargs["strict"]:  # type: ignore[index]
             raise NonStrictTypeError()
         return factory(*args, **kwargs)
 
     return wrapper
 
 
-class BaseModel(PydanticBaseModel):
+def field_type_unwanted(type_: Any) -> bool:
+    logger.debug("Is %s unwanted?")
+    if type_ in TYPES_THAT_PYDANTIC_WILL_COERCE_TO:
+        logger.debug("yes")
+        return True
+    logger.debug("Maybe. Subargs are %s", get_args(type_))
+    rv = any(field_type_unwanted(t) for t in get_args(type_))
+    logger.debug("Conclusion: %s %s unwanted", type_, "is" if rv else "is not")
+    return rv
+
+
+class PatchedBaseModel(PydanticBaseModel):
+    """Try to detect fields whose
+
+    ModelField.type_ is presumably private, so this is likely to be very brittle.
+    """
+
     @classmethod
-    def __init_subclass__(cls: Type[PydanticBaseModel], **kwargs):
+    def __init_subclass__(cls: Type[PydanticBaseModel], **kwargs: object):
         for field in cls.__fields__.values():
-            if field.type_ in TYPES_THAT_PYDANTIC_WILL_COERCE_TO:
+            # Note that field.type_ and field.outer_type are computed based on the
+            # annotation type, see pydantic.fields.ModelField._type_analysis
+            if field_type_unwanted(field.outer_type_):
                 raise NonStrictTypeError()
-        # breakpoint()
-        # print(cls, kwargs)
 
 
 @contextmanager
 def monkeypatch_pydantic() -> Generator[None, None, None]:
     with contextlib.ExitStack() as patches:
-        patch_basemodel1 = unittest.mock.patch("pydantic.BaseModel", new=BaseModel)
-        patch_basemodel2 = unittest.mock.patch("pydantic.main.BaseModel", new=BaseModel)
+        patch_basemodel1 = unittest.mock.patch(
+            "pydantic.BaseModel", new=PatchedBaseModel
+        )
+        patch_basemodel2 = unittest.mock.patch(
+            "pydantic.main.BaseModel", new=PatchedBaseModel
+        )
         patches.enter_context(patch_basemodel1)
         patches.enter_context(patch_basemodel2)
         for factory in CONSTRAINED_TYPE_FACTORIES_WITH_STRICT_FLAG:
-            wrapper = make_wrapper(factory)
+            wrapper: Callable = make_wrapper(factory)
             patch1 = unittest.mock.patch(f"pydantic.{factory.__name__}", new=wrapper)
             patch2 = unittest.mock.patch(
                 f"pydantic.types.{factory.__name__}", new=wrapper
@@ -157,6 +180,8 @@ def run_test_snippet(source: str) -> None:
     # > Remember that at the module level, globals and locals are the same dictionary.
     # > If exec gets two separate objects as globals and locals, the code will be
     # > executed as if it were embedded in a class definition.
+    globals_: Dict[str, object]
+    locals_: Dict[str, object]
     globals_ = locals_ = {}
     exec(textwrap.dedent(source), globals_, locals_)
 
@@ -177,6 +202,15 @@ class TestConstrainedTypesPatch(unittest.TestCase):
                 """
                 import pydantic
                 pydantic.constr()
+                """
+            )
+
+    def test_wildcard_import_raises(self) -> None:
+        with monkeypatch_pydantic(), self.assertRaises(NonStrictTypeError):
+            run_test_snippet(
+                """
+                from pydantic import *
+                constr()
                 """
             )
 
@@ -245,7 +279,7 @@ class TestConstrainedTypesPatch(unittest.TestCase):
             )
 
 
-class TestMetaclassPatch(unittest.TestCase):
+class TestFieldTypeInspection(unittest.TestCase):
     @parameterized.expand(
         [
             ("str",),
@@ -253,15 +287,50 @@ class TestMetaclassPatch(unittest.TestCase):
             ("int",),
             ("float",),
             ("bool"),
+            ("Optional[str]",),
+            ("Union[None, str]",),
+            ("List[str]",),
+            ("List[List[str]]",),
+            ("Dict[StrictStr, str]",),
+            ("Dict[str, StrictStr]",),
+            ("TypedDict('D', x=int)",),
         ]
     )
-    def test_field_holding_plain_value_type_raises(self, type_name: str) -> None:
+    def test_field_holding_unwanted_type_raises(self, annotation: str) -> None:
         with monkeypatch_pydantic(), self.assertRaises(NonStrictTypeError):
             run_test_snippet(
                 f"""
-                from pydantic import BaseModel
+                from typing import *
+                from pydantic import *
                 class C(BaseModel):
-                    f: {type_name}
+                    f: {annotation}
+                """
+            )
+
+    @parameterized.expand(
+        [
+            ("StrictStr",),
+            ("StrictBytes"),
+            ("StrictInt",),
+            ("StrictFloat",),
+            ("StrictBool"),
+            ("constr(strict=True, min_length=10)",),
+            ("Optional[StrictStr]",),
+            ("Union[None, StrictStr]",),
+            ("List[StrictStr]",),
+            ("List[List[StrictStr]]",),
+            ("Dict[StrictStr, StrictStr]",),
+            ("TypedDict('D', x=StrictInt)",),
+        ]
+    )
+    def test_field_holding_accepted_type_raises(self, annotation: str) -> None:
+        with monkeypatch_pydantic():
+            run_test_snippet(
+                f"""
+                from typing import *
+                from pydantic import *
+                class C(BaseModel):
+                    f: {annotation}
                 """
             )
 
@@ -277,7 +346,7 @@ class TestMetaclassPatch(unittest.TestCase):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("mode", choices=["lint", "test"])
+parser.add_argument("mode", choices=["lint", "test"], default="lint")
 parser.add_argument("-v", "--verbose", action="store_true")
 
 
