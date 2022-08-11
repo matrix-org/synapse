@@ -1,0 +1,1 @@
+Revert 'Remove the unspecced `room_id` field in the `/hierarchy` response. (#13365)' to give more time for clients to update.
