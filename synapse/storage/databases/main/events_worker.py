@@ -2255,7 +2255,7 @@ class EventsWorkerStore(SQLBaseStore):
         #   end to call _invalidate_local_get_event_cache() rather than (just)
         #   _get_event_cache.invalidate().
         #
-        #   One solution might be to (somehow) get the workers to call 
+        #   One solution might be to (somehow) get the workers to call
         #   _invalidate_caches_for_event() (though that will invalidate more than
         #   strictly necessary).
         #
