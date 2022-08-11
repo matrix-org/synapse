@@ -17,7 +17,7 @@ from collections import OrderedDict
 from typing import Hashable, Optional, Tuple
 
 from synapse.api.errors import LimitExceededError
-from synapse.config.ratelimiting import RateLimitConfig
+from synapse.config.ratelimiting import RatelimitSettings
 from synapse.storage.databases.main import DataStore
 from synapse.types import Requester
 from synapse.util import Clock
@@ -314,8 +314,8 @@ class RequestRatelimiter:
         self,
         store: DataStore,
         clock: Clock,
-        rc_message: RateLimitConfig,
-        rc_admin_redaction: Optional[RateLimitConfig],
+        rc_message: RatelimitSettings,
+        rc_admin_redaction: Optional[RatelimitSettings],
     ):
         self.store = store
         self.clock = clock

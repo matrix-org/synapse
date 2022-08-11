@@ -1,1 +1,0 @@
-Remove old base slaved store and de-duplicate cache ID generators. Contributed by Nick @ Beeper (@fizzadar).

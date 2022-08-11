@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Tuple
 from twisted.web.server import Request
 
 from synapse.api.errors import ThreepidValidationError
+from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.server import DirectServeHtmlResource
 from synapse.http.servlet import parse_string
 from synapse.util.stringutils import assert_valid_client_secret
@@ -45,6 +46,9 @@ class PasswordResetSubmitTokenResource(DirectServeHtmlResource):
         self.clock = hs.get_clock()
         self.store = hs.get_datastores().main
 
+        self._local_threepid_handling_disabled_due_to_email_config = (
+            hs.config.email.local_threepid_handling_disabled_due_to_email_config
+        )
         self._confirmation_email_template = (
             hs.config.email.email_password_reset_template_confirmation_html
         )
@@ -55,8 +59,8 @@ class PasswordResetSubmitTokenResource(DirectServeHtmlResource):
             hs.config.email.email_password_reset_template_failure_html
         )
 
-        # This resource should only be mounted if email validation is enabled
-        assert hs.config.email.can_verify_email
+        # This resource should not be mounted if threepid behaviour is not LOCAL
+        assert hs.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL
 
     async def _async_render_GET(self, request: Request) -> Tuple[int, bytes]:
         sid = parse_string(request, "sid", required=True)
