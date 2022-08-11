@@ -1223,7 +1223,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         """
 
         sql = """
-            SELECT count(*) FROM local_current_membership
+            SELECT count(*) > 0 FROM local_current_membership
             INNER JOIN room_memberships USING (room_id, event_id)
             WHERE
                 room_id = ?
