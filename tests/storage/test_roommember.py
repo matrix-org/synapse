@@ -175,13 +175,13 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         )
 
         # first user forgets the room, room is not forgotten
-        self.assertNoResult(self.store.forget(self.u_alice, self.room))
+        self.get_success(self.store.forget(self.u_alice, self.room))
         self.assertFalse(
             self.get_success(self.store.is_locally_forgotten_room(self.room))
         )
 
         # second (last local) user forgets the room and the room is forgotten
-        self.assertNoResult(self.store.forget(self.u_bob, self.room))
+        self.get_success(self.store.forget(self.u_bob, self.room))
         self.assertTrue(
             self.get_success(self.store.is_locally_forgotten_room(self.room))
         )
@@ -195,7 +195,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
 
         # after leaving and forget the room, it is forgotten
         self.inject_room_member(self.room, self.u_alice, Membership.LEAVE)
-        self.assertNoResult(self.store.forget(self.u_alice, self.room))
+        self.get_success(self.store.forget(self.u_alice, self.room))
         self.assertTrue(
             self.get_success(self.store.is_locally_forgotten_room(self.room))
         )
