@@ -125,7 +125,7 @@ from synapse.types import (
 )
 from synapse.util import Clock
 from synapse.util.async_helpers import maybe_awaitable
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import CachedFunction, cached
 from synapse.util.frozenutils import freeze
 
 if TYPE_CHECKING:
@@ -834,6 +834,20 @@ class ModuleApi:
         # type-ignore: See https://github.com/python/mypy/issues/8862
         return defer.ensureDeferred(
             self._store.db_pool.runInteraction(desc, func, *args, **kwargs)  # type: ignore[arg-type]
+        )
+
+    async def invalidate_cache(
+        self, cached_func: CachedFunction, keys: Tuple[Any, ...]
+    ) -> None:
+        cached_func.invalidate(keys)
+        await self._store.send_invalidation_to_replication(
+            cached_func.__qualname__,
+            keys,
+        )
+
+    def register_cached_function(self, cached_func: CachedFunction) -> None:
+        self._store.register_external_cached_function(
+            cached_func.__qualname__, cached_func
         )
 
     def complete_sso_login(

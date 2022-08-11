@@ -95,7 +95,7 @@ class SQLBaseStore(metaclass=ABCMeta):
 
     def _attempt_to_invalidate_cache(
         self, cache_name: str, key: Optional[Collection[Any]]
-    ) -> None:
+    ) -> bool:
         """Attempts to invalidate the cache of the given name, ignoring if the
         cache doesn't exist. Mainly used for invalidating caches on workers,
         where they may not have the cache.
@@ -115,7 +115,7 @@ class SQLBaseStore(metaclass=ABCMeta):
         except AttributeError:
             # We probably haven't pulled in the cache in this worker,
             # which is fine.
-            return
+            return False
 
         if key is None:
             cache.invalidate_all()
@@ -124,6 +124,8 @@ class SQLBaseStore(metaclass=ABCMeta):
             # cache must be be done before this.
             invalidate_method = getattr(cache, "invalidate_local", cache.invalidate)
             invalidate_method(tuple(key))
+
+        return True
 
 
 def db_to_json(db_content: Union[memoryview, bytes, bytearray, str]) -> Any:

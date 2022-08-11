@@ -33,6 +33,8 @@ class MockAccountValidityStore:
     ):
         self._api = api
 
+        api.register_cached_function(self.is_user_expired)
+
     async def create_db(self):
         def create_table_txn(txn: LoggingTransaction):
             txn.execute(
@@ -88,12 +90,12 @@ class MockAccountValidityStore:
                 ),
             )
 
-            txn.call_after(self.is_user_expired.invalidate, (user_id,))
-
         await self._api.run_db_interaction(
             "account_validity_set_expired_user",
             set_expired_user_txn,
         )
+
+        await self._api.invalidate_cache(self.is_user_expired, (user_id,))
 
 
 class MockAccountValidity:
