@@ -1230,9 +1230,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 AND forgotten = 0;
         """
 
-        rows = await self.db_pool.execute(
-            "is_forgotten_room", None, sql, room_id
-        )
+        rows = await self.db_pool.execute("is_forgotten_room", None, sql, room_id)
 
         # `count(*)` returns always an integer
         # If any rows still exist it means someone has not forgotten this room yet
