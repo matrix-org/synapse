@@ -157,6 +157,54 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         # Check that alice's display name is now None
         self.assertEqual(row[0]["display_name"], None)
 
+    def test_room_is_locally_forgotten(self):
+        """Test that when the last local user has forgotten a room it is known as forgotten."""
+        # join two local and one remote user
+        self.room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
+        self.inject_room_member(self.room, self.u_bob, Membership.JOIN)
+        self.inject_room_member(self.room, self.u_charlie.to_string(), Membership.JOIN)
+        self.assertFalse(
+            self.get_success(self.store.is_locally_forgotten_room(self.room))
+        )
+
+        # local users leave the room and the room is not forgotten
+        self.inject_room_member(self.room, self.u_alice, Membership.LEAVE)
+        self.inject_room_member(self.room, self.u_bob, Membership.LEAVE)
+        self.assertFalse(
+            self.get_success(self.store.is_locally_forgotten_room(self.room))
+        )
+
+        # first user forgets the room, room is not forgotten
+        self.assertNoResult(self.store.forget(self.u_alice, self.room))
+        self.assertFalse(
+            self.get_success(self.store.is_locally_forgotten_room(self.room))
+        )
+
+        # second (last local) user forgets the room and the room is forgotten
+        self.assertNoResult(self.store.forget(self.u_bob, self.room))
+        self.assertTrue(
+            self.get_success(self.store.is_locally_forgotten_room(self.room))
+        )
+
+    def test_join_locally_forgotten_room(self):
+        """Tests if a user joins a forgotten room the room is not forgotten anymore."""
+        self.room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
+        self.assertFalse(
+            self.get_success(self.store.is_locally_forgotten_room(self.room))
+        )
+
+        # after leaving and forget the room, it is forgotten
+        self.inject_room_member(self.room, self.u_alice, Membership.LEAVE)
+        self.assertNoResult(self.store.forget(self.u_alice, self.room))
+        self.assertTrue(
+            self.get_success(self.store.is_locally_forgotten_room(self.room))
+        )
+
+        # after rejoin the room is not forgotten anymore
+        self.inject_room_member(self.room, self.u_alice, Membership.JOIN)
+        self.assertFalse(
+            self.get_success(self.store.is_locally_forgotten_room(self.room))
+        )
 
 class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
