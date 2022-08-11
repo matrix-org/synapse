@@ -397,7 +397,7 @@ class EventsPersistenceStorageController:
             str(event_ids),
         )
         set_tag(
-            SynapseTags.FUNC_ARG_PREFIX + "event_ids",
+            SynapseTags.FUNC_ARG_PREFIX + "event_ids.length",
             str(len(event_ids)),
         )
         set_tag(SynapseTags.FUNC_ARG_PREFIX + "backfilled", str(backfilled))
