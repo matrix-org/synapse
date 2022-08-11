@@ -641,8 +641,10 @@ class RoomWorkerStore(CacheInvalidationWorkerStore):
                         "version": room[5],
                         "creator": room[6],
                         "encryption": room[7],
-                        "federatable": room[8],
-                        "public": room[9],
+                        # room_stats_state.federatable is an integer on sqlite.
+                        "federatable": bool(room[8]),
+                        # rooms.is_public is an integer on sqlite.
+                        "public": bool(room[9]),
                         "join_rules": room[10],
                         "guest_access": room[11],
                         "history_visibility": room[12],

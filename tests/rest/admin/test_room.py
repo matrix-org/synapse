@@ -1080,7 +1080,9 @@ class RoomTestCase(unittest.HomeserverTestCase):
         room_ids = []
         for _ in range(total_rooms):
             room_id = self.helper.create_room_as(
-                self.admin_user, tok=self.admin_user_tok
+                self.admin_user,
+                tok=self.admin_user_tok,
+                is_public=True,
             )
             room_ids.append(room_id)
 
@@ -1119,8 +1121,8 @@ class RoomTestCase(unittest.HomeserverTestCase):
             self.assertIn("version", r)
             self.assertIn("creator", r)
             self.assertIn("encryption", r)
-            self.assertIn("federatable", r)
-            self.assertIn("public", r)
+            self.assertIs(r["federatable"], True)
+            self.assertIs(r["public"], True)
             self.assertIn("join_rules", r)
             self.assertIn("guest_access", r)
             self.assertIn("history_visibility", r)
@@ -1587,8 +1589,12 @@ class RoomTestCase(unittest.HomeserverTestCase):
     def test_single_room(self) -> None:
         """Test that a single room can be requested correctly"""
         # Create two test rooms
-        room_id_1 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
-        room_id_2 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+        room_id_1 = self.helper.create_room_as(
+            self.admin_user, tok=self.admin_user_tok, is_public=True
+        )
+        room_id_2 = self.helper.create_room_as(
+            self.admin_user, tok=self.admin_user_tok, is_public=False
+        )
 
         room_name_1 = "something"
         room_name_2 = "else"
@@ -1633,7 +1639,10 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertIn("history_visibility", channel.json_body)
         self.assertIn("state_events", channel.json_body)
         self.assertIn("room_type", channel.json_body)
+
         self.assertEqual(room_id_1, channel.json_body["room_id"])
+        self.assertIs(True, channel.json_body["federatable"])
+        self.assertIs(True, channel.json_body["public"])
 
     def test_single_room_devices(self) -> None:
         """Test that `joined_local_devices` can be requested correctly"""
