@@ -66,10 +66,12 @@ R = TypeVar("R")
 
 
 class NonStrictTypeError(Exception):
-    ...
+    """Dummy exception. Allows us to detect unwanted types during a module import."""
 
 
 def make_wrapper(factory: Callable[P, R]) -> Callable[P, R]:
+    """We patch `constr` and friends with wrappers that enforce strict=True. """
+
     @functools.wraps(factory)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         # type-ignore: should be redundant once we can use https://github.com/python/mypy/pull/12668
@@ -83,6 +85,10 @@ def make_wrapper(factory: Callable[P, R]) -> Callable[P, R]:
 
 
 def field_type_unwanted(type_: Any) -> bool:
+    """Very rough attempt to detect if a type is unwanted as a Pydantic annotation.
+
+    At present, we exclude types which will coerce, or any generic type involving types
+    which will coerce."""
     logger.debug("Is %s unwanted?")
     if type_ in TYPES_THAT_PYDANTIC_WILL_COERCE_TO:
         logger.debug("yes")
@@ -94,9 +100,11 @@ def field_type_unwanted(type_: Any) -> bool:
 
 
 class PatchedBaseModel(PydanticBaseModel):
-    """Try to detect fields whose
+    """A patched version of BaseModel that inspects fields after models are defined.
 
-    ModelField.type_ is presumably private, so this is likely to be very brittle.
+    We complain loudly if we see an unwanted type.
+
+    Beware: ModelField.type_ is presumably private; this is likely to be very brittle.
     """
 
     @classmethod
@@ -110,6 +118,12 @@ class PatchedBaseModel(PydanticBaseModel):
 
 @contextmanager
 def monkeypatch_pydantic() -> Generator[None, None, None]:
+    """Patch pydantic with our snooping versions of BaseModel and the con* functions.
+
+    Most Synapse code ought to import the patched objects directly from `pydantic`.
+    But we include their containing models `pydantic.main` and `pydantic.types` for
+    completeness.
+    """
     with contextlib.ExitStack() as patches:
         patch_basemodel1 = unittest.mock.patch(
             "pydantic.BaseModel", new=PatchedBaseModel
@@ -130,12 +144,16 @@ def monkeypatch_pydantic() -> Generator[None, None, None]:
         yield
 
 
-def format_error(e: Exception) -> str:
+def format_error(e: NonStrictTypeError) -> str:
+    """Work out which line of code caused e. Format the line in a human-friendly way."""
     frame_summary = traceback.extract_tb(e.__traceback__)[-2]
     return traceback.format_list([frame_summary])[0].lstrip()
 
 
 def lint() -> int:
+    """Try to import all of Synapse and see if we spot any Pydantic type coercions.
+
+    Print any problems, then return a status code suitable for sys.exit."""
     failures = do_lint()
     if failures:
         print(f"Found {len(failures)} problem(s)")
@@ -145,6 +163,7 @@ def lint() -> int:
 
 
 def do_lint() -> Set[str]:
+    """Try to import all of Synapse and see if we spot any Pydantic type coercions."""
     failures = set()
 
     with monkeypatch_pydantic():
@@ -174,6 +193,7 @@ def do_lint() -> Set[str]:
 
 
 def run_test_snippet(source: str) -> None:
+    """Exec a snippet of source code in an isolated environment."""
     # To emulate `source` being called at the top level of the module,
     # the globals and locals we provide apparently have to be the same mapping.
     #
