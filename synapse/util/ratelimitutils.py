@@ -111,9 +111,6 @@ class _PerHostRatelimiter:
     def _on_enter(self, request_id: object) -> "defer.Deferred[None]":
         time_now = self.clock.time_msec()
 
-        wait_span_scope = start_active_span("ratelimit wait")
-        wait_span_scope.__enter__()
-
         # remove any entries from request_times which aren't within the window
         self.request_times[:] = [
             r for r in self.request_times if time_now - r < self.window_size
@@ -166,7 +163,6 @@ class _PerHostRatelimiter:
 
         def on_start(r: object) -> object:
             logger.debug("Ratelimit [%s]: Processing req", id(request_id))
-            wait_span_scope.__exit__(None, None, None)
             self.current_processing.add(request_id)
             return r
 
@@ -181,8 +177,11 @@ class _PerHostRatelimiter:
             # Ensure that we've properly cleaned up.
             self.sleeping_requests.discard(request_id)
             self.ready_request_queue.pop(request_id, None)
+            wait_span_scope.__exit__(None, None, None)
             return r
 
+        wait_span_scope = start_active_span("ratelimit wait")
+        wait_span_scope.__enter__()
         ret_defer.addCallbacks(on_start, on_err)
         ret_defer.addBoth(on_both)
         return make_deferred_yieldable(ret_defer)
