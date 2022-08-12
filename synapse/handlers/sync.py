@@ -19,6 +19,7 @@ from typing import (
     Dict,
     FrozenSet,
     List,
+    Mapping,
     Optional,
     Sequence,
     Set,
@@ -1119,66 +1120,15 @@ class SyncHandler:
             # If we only have partial state for the room, `state_ids` may be missing the
             # memberships we wanted. We attempt to find some by digging through the auth
             # events of timeline events.
-            if lazy_load_members:
+            if lazy_load_members and await self.store.is_partial_state_room(room_id):
                 assert members_to_fetch is not None
 
-                is_partial_state = await self.store.is_partial_state_room(room_id)
-                if is_partial_state:
-                    additional_state_ids: MutableStateMap[str] = {}
-
-                    # Tracks the missing members for logging purposes.
-                    missing_members = {}
-
-                    # Pick out the auth events of timeline events whose sender
-                    # memberships are missing.
-                    auth_event_ids: Set[str] = set()
-                    for member, first_referencing_event in members_to_fetch.items():
-                        if (EventTypes.Member, member) in state_ids:
-                            continue
-
-                        missing_members[member] = first_referencing_event
-                        auth_event_ids.update(first_referencing_event.auth_event_ids())
-
-                    auth_events = await self.store.get_events(auth_event_ids)
-
-                    # Run through the events with missing sender memberships once more,
-                    # picking out the memberships from the pile of auth events we have
-                    # just fetched.
-                    for member, first_referencing_event in members_to_fetch.items():
-                        if (EventTypes.Member, member) in state_ids:
-                            continue
-
-                        # Dig through the auth events to find the sender's membership.
-                        for auth_event_id in first_referencing_event.auth_event_ids():
-                            # We only store events once we have all their auth events,
-                            # so the auth event must be in the pile we have just
-                            # fetched.
-                            auth_event = auth_events[auth_event_id]
-
-                            if (
-                                auth_event.type == EventTypes.Member
-                                and auth_event.state_key == event.sender
-                            ):
-                                missing_members.pop(member)
-                                additional_state_ids[
-                                    (EventTypes.Member, event.sender)
-                                ] = auth_event.event_id
-                                break
-
-                    # Now merge in the state we have scrounged up.
-                    state_ids = {**state_ids, **additional_state_ids}
-
-                    if missing_members:
-                        # There really shouldn't be any missing memberships now.
-                        # For an event to appear in the timeline, we must have its auth
-                        # events, which must include its sender's membership.
-                        logger.error(
-                            "Failed to find memberships for %s in partial state room "
-                            "%s in the auth events of %s.",
-                            list(missing_members.keys()),
-                            room_id,
-                            list(missing_members.values()),
-                        )
+                additional_state_ids = (
+                    await self._find_missing_partial_state_memberships(
+                        room_id, members_to_fetch, state_ids
+                    )
+                )
+                state_ids = {**state_ids, **additional_state_ids}
 
             # At this point, if `lazy_load_members` is enabled, `state_ids` includes
             # the memberships of all event senders in the timeline. This is because we
@@ -1227,6 +1177,87 @@ class SyncHandler:
             )
             if e.type != EventTypes.Aliases  # until MSC2261 or alternative solution
         }
+
+    async def _find_missing_partial_state_memberships(
+        self,
+        room_id: str,
+        members_to_fetch: Mapping[str, EventBase],
+        found_state_ids: StateMap[str],
+    ) -> StateMap[str]:
+        """Finds missing memberships from a set of auth events and returns them as a
+        state map.
+
+        Args:
+            room_id: The partial state room to find the remaining memberships for.
+            members_to_fetch: The memberships to find. A dictionary whose keys are
+                user IDs and whose values are events whose auth events are known to
+                contain the desired memberships.
+            found_state_ids: A dict from (type, state_key) -> state_event_id, containing
+                memberships that have been previously found. Entries in
+                `members_to_fetch` that have a membership in `found_state_ids` are
+                ignored.
+
+        Returns:
+            A dict from ("m.room.member", state_key) -> state_event_id, containing the
+            memberships missing from `found_state_ids`.
+        """
+        additional_state_ids: MutableStateMap[str] = {}
+
+        # Tracks the missing members for logging purposes.
+        missing_members = {}
+
+        # Identify memberships missing from `found_state_ids` and pick out the auth
+        # events in which to look for them.
+        auth_event_ids: Set[str] = set()
+        for member, event_with_membership_auth in members_to_fetch.items():
+            if (EventTypes.Member, member) in found_state_ids:
+                continue
+
+            missing_members[member] = event_with_membership_auth
+            auth_event_ids.update(event_with_membership_auth.auth_event_ids())
+
+        auth_events = await self.store.get_events(auth_event_ids)
+
+        # Run through the missing memberships once more, picking out the memberships
+        # from the pile of auth events we have just fetched.
+        for member, event_with_membership_auth in members_to_fetch.items():
+            if (EventTypes.Member, member) in found_state_ids:
+                continue
+
+            # Dig through the auth events to find the desired membership.
+            for auth_event_id in event_with_membership_auth.auth_event_ids():
+                # We only store events once we have all their auth events,
+                # so the auth event must be in the pile we have just
+                # fetched.
+                auth_event = auth_events[auth_event_id]
+
+                if (
+                    auth_event.type == EventTypes.Member
+                    and auth_event.state_key == member
+                ):
+                    missing_members.pop(member)
+                    additional_state_ids[
+                        (EventTypes.Member, member)
+                    ] = auth_event.event_id
+                    break
+
+        if missing_members:
+            # There really shouldn't be any missing memberships now. Either:
+            #  * we couldn't find an auth event, which shouldn't happen because we do
+            #    not persist events with persisting their auth events first, or
+            #  * the set of auth events did not contain a membership we wanted, which
+            #    means our caller didn't compute the events in `members_to_fetch`
+            #    correctly, or we somehow accepted an event whose auth events were
+            #    dodgy.
+            logger.error(
+                "Failed to find memberships for %s in partial state room "
+                "%s in the auth events of %s.",
+                list(missing_members.keys()),
+                room_id,
+                list(missing_members.values()),
+            )
+
+        return additional_state_ids
 
     async def unread_notifs_for_room_id(
         self, room_id: str, sync_config: SyncConfig
