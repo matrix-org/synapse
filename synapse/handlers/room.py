@@ -1040,9 +1040,7 @@ class RoomCreationHandler:
         """
 
         creator_id = creator.user.to_string()
-
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
-
         depth = 1
         last_sent_event_id: Optional[str] = None
 
@@ -1068,7 +1066,7 @@ class RoomCreationHandler:
                 prev_event_ids=[last_sent_event_id] if last_sent_event_id else [],
                 depth=depth,
             )
-
+            depth += 1
             return event, context
 
         async def send(
@@ -1077,7 +1075,6 @@ class RoomCreationHandler:
             creator: Requester,
         ) -> int:
             nonlocal last_sent_event_id
-            nonlocal depth
             assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
                 event.sender,
             )
@@ -1091,7 +1088,6 @@ class RoomCreationHandler:
             )
 
             last_sent_event_id = ev.event_id
-            depth += 1
 
             # we know it was persisted, so must have a stream ordering
             assert ev.internal_metadata.stream_ordering
@@ -1126,6 +1122,7 @@ class RoomCreationHandler:
             depth=depth,
         )
         last_sent_event_id = member_event_id
+        depth += 1
 
         # We treat the power levels override specially as this needs to be one
         # of the first events that get sent into a room.
@@ -1183,31 +1180,27 @@ class RoomCreationHandler:
             )
             last_sent_stream_id = await send(pl_event, pl_context, creator)
 
+        events_to_send = []
         if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
             room_alias_event, room_alias_context = await create_event(
                 etype=EventTypes.CanonicalAlias,
                 content={"alias": room_alias.to_string()},
             )
-            last_sent_stream_id = await send(
-                room_alias_event, room_alias_context, creator
-            )
+            events_to_send.append((room_alias_event, room_alias_context))
 
         if (EventTypes.JoinRules, "") not in initial_state:
             join_rules_event, join_rules_context = await create_event(
                 etype=EventTypes.JoinRules, content={"join_rule": config["join_rules"]}
             )
-            last_sent_stream_id = await send(
-                join_rules_event, join_rules_context, creator
-            )
+
+            events_to_send.append((join_rules_event, join_rules_context))
 
         if (EventTypes.RoomHistoryVisibility, "") not in initial_state:
             visibility_event, visibility_context = await create_event(
                 etype=EventTypes.RoomHistoryVisibility,
                 content={"history_visibility": config["history_visibility"]},
             )
-            last_sent_stream_id = await send(
-                visibility_event, visibility_context, creator
-            )
+            events_to_send.append((visibility_event, visibility_context))
 
         if config["guest_can_join"]:
             if (EventTypes.GuestAccess, "") not in initial_state:
@@ -1215,18 +1208,13 @@ class RoomCreationHandler:
                     etype=EventTypes.GuestAccess,
                     content={EventContentFields.GUEST_ACCESS: GuestAccess.CAN_JOIN},
                 )
-                last_sent_stream_id = await send(
-                    guest_access_event, guest_access_context, creator
-                )
+                events_to_send.append((guest_access_event, guest_access_context))
 
-        events = []
         for (etype, state_key), content in initial_state.items():
             event, context = await create_event(
                 etype=etype, state_key=state_key, content=content
             )
-            events.append((event, context))
-        for event, context in events:
-            last_sent_stream_id = await send(event, context, creator)
+            events_to_send.append((event, context))
 
         if config["encrypted"]:
             encryption_event, encryption_context = await create_event(
@@ -1234,10 +1222,10 @@ class RoomCreationHandler:
                 state_key="",
                 content={"algorithm": RoomEncryptionAlgorithms.DEFAULT},
             )
-            last_sent_stream_id = await send(
-                encryption_event, encryption_context, creator
-            )
+            events_to_send.append((encryption_event, encryption_context))
 
+        for event, context in events_to_send:
+            last_sent_stream_id = await send(event, context, creator)
         return last_sent_stream_id, last_sent_event_id, depth
 
     def _generate_room_id(self) -> str:
