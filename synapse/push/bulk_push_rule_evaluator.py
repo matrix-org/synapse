@@ -15,7 +15,19 @@
 
 import itertools
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 
 from prometheus_client import Counter
 
@@ -254,7 +266,7 @@ class BulkPushRuleEvaluator:
         count_as_unread = _should_count_as_unread(event, context)
 
         rules_by_user = await self._get_rules_for_event(event)
-        actions_by_user: Dict[str, List[Union[dict, str]]] = {}
+        actions_by_user: Dict[str, Collection[Union[Mapping, str]]] = {}
 
         room_member_count = await self.store.get_number_joined_users_in_room(
             event.room_id
