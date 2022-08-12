@@ -31,7 +31,12 @@ from synapse.api.errors import (
 from synapse.appservice import ApplicationService
 from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
-from synapse.logging.opentracing import active_span, force_tracing, start_active_span
+from synapse.logging.opentracing import (
+    active_span,
+    force_tracing,
+    start_active_span,
+    trace,
+)
 from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import Requester, UserID, create_requester
 
@@ -567,6 +572,7 @@ class Auth:
 
             return query_params[0].decode("ascii")
 
+    @trace
     async def check_user_in_room_or_world_readable(
         self, room_id: str, user_id: str, allow_departed_users: bool = False
     ) -> Tuple[str, Optional[str]]:

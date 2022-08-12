@@ -1,1 +1,0 @@
-Faster room joins: fix a bug which caused rejected events to become un-rejected during state syncing.

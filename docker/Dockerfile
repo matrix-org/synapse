@@ -40,7 +40,8 @@ FROM docker.io/python:${PYTHON_VERSION}-slim as requirements
 RUN \
    --mount=type=cache,target=/var/cache/apt,sharing=locked \
    --mount=type=cache,target=/var/lib/apt,sharing=locked \
- apt-get update -qq && apt-get install -yqq git \
+    apt-get update -qq && apt-get install -yqq \
+      build-essential cargo git libffi-dev libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # We install poetry in its own build stage to avoid its dependencies conflicting with
