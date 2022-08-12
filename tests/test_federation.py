@@ -46,10 +46,9 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         user_id = UserID("us", "test")
         our_user = create_requester(user_id)
         room_creator = self.homeserver.get_room_creation_handler()
+        config = {"preset": "public_chat"}
         self.room_id = self.get_success(
-            room_creator.create_room(
-                our_user, room_creator._presets_dict["public_chat"], ratelimit=False
-            )
+            room_creator.create_room(our_user, config, ratelimit=False)
         )[0]["room_id"]
 
         self.store = self.homeserver.get_datastores().main
@@ -99,10 +98,8 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         )
 
         # Make sure we actually joined the room
-        self.assertEqual(
-            self.get_success(self.store.get_latest_event_ids_in_room(self.room_id))[0],
-            "$join:test.serv",
-        )
+        res = self.get_success(self.store.get_latest_event_ids_in_room(self.room_id))
+        assert "$join:test.serv" in res
 
     def test_cant_hide_direct_ancestors(self):
         """

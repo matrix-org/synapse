@@ -222,9 +222,10 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         )
         self.assertEqual(len(alice_sync_result.joined), 1)
         self.assertEqual(alice_sync_result.joined[0].room_id, room_id)
-        last_room_creation_event_id = (
-            alice_sync_result.joined[0].timeline.events[-1].event_id
-        )
+        last_room_creation_event_ids = [
+            alice_sync_result.joined[0].timeline.events[-1].event_id,
+            alice_sync_result.joined[0].timeline.events[-2].event_id,
+        ]
 
         # Eve, a ne'er-do-well, registers.
         eve = self.register_user("eve", "password")
@@ -250,7 +251,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
             self.hs.get_datastores().main,
             "get_prev_events_for_room",
             new_callable=MagicMock,
-            return_value=make_awaitable([last_room_creation_event_id]),
+            return_value=make_awaitable(last_room_creation_event_ids),
         )
         with mocked_get_prev_events:
             self.helper.join(room_id, eve, tok=eve_token)
