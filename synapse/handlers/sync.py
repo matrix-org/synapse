@@ -919,8 +919,10 @@ class SyncHandler:
             # The memberships needed for events in the timeline.
             # A dictionary with user IDs as keys and the first event in the timeline
             # requiring each member as values.
+            # The syncing user's own membership is always implicitly required for
+            # `full_state` syncs and may not be present in the dictionary.
             # Only calculated when `lazy_load_members` is on.
-            members_to_fetch: Optional[Dict[str, Optional[EventBase]]] = None
+            members_to_fetch: Optional[Dict[str, EventBase]] = None
 
             # The contribution to the room state from state events in the timeline.
             # Only contains the last event for any given state key.
@@ -956,9 +958,15 @@ class SyncHandler:
                     # (if we are) to fix https://github.com/vector-im/riot-web/issues/7209
                     # We only need apply this on full state syncs given we disabled
                     # LL for incr syncs in #3840.
-                    members_to_fetch[sync_config.user.to_string()] = None
-
-                state_filter = StateFilter.from_lazy_load_member_list(members_to_fetch)
+                    state_filter = StateFilter.from_lazy_load_member_list(
+                        itertools.chain(
+                            members_to_fetch.keys(), [sync_config.user.to_string()]
+                        )
+                    )
+                else:
+                    state_filter = StateFilter.from_lazy_load_member_list(
+                        members_to_fetch
+                    )
 
                 # We are happy to use partial state to compute the `/sync` response.
                 # Since partial state may not include the lazy-loaded memberships we
@@ -1125,10 +1133,7 @@ class SyncHandler:
                     # memberships are missing.
                     auth_event_ids: Set[str] = set()
                     for member, first_referencing_event in members_to_fetch.items():
-                        if (
-                            first_referencing_event is None
-                            or (EventTypes.Member, member) in state_ids
-                        ):
+                        if (EventTypes.Member, member) in state_ids:
                             continue
 
                         missing_members[member] = first_referencing_event
@@ -1140,10 +1145,7 @@ class SyncHandler:
                     # picking out the memberships from the pile of auth events we have
                     # just fetched.
                     for member, first_referencing_event in members_to_fetch.items():
-                        if (
-                            first_referencing_event is None
-                            or (EventTypes.Member, member) in state_ids
-                        ):
+                        if (EventTypes.Member, member) in state_ids:
                             continue
 
                         # Dig through the auth events to find the sender's membership.
