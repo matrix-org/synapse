@@ -959,6 +959,12 @@ class SyncHandler:
                     members_to_fetch[sync_config.user.to_string()] = None
 
                 state_filter = StateFilter.from_lazy_load_member_list(members_to_fetch)
+
+                # We are happy to use partial state to compute the `/sync` response.
+                # Since partial state may not include the lazy-loaded memberships we
+                # require, we fix up the state response afterwards with memberships from
+                # auth events.
+                await_full_state = False
             else:
                 timeline_state = {
                     (event.type, event.state_key): event.event_id
@@ -967,6 +973,7 @@ class SyncHandler:
                 }
 
                 state_filter = StateFilter.all()
+                await_full_state = True
 
             # Now calculate the state to return in the sync response for the room.
             # This is more or less the change in state between the end of the previous
@@ -980,7 +987,7 @@ class SyncHandler:
                         await self._state_storage_controller.get_state_ids_for_event(
                             batch.events[-1].event_id,
                             state_filter=state_filter,
-                            await_full_state=not lazy_load_members,
+                            await_full_state=await_full_state,
                         )
                     )
 
@@ -988,7 +995,7 @@ class SyncHandler:
                         await self._state_storage_controller.get_state_ids_for_event(
                             batch.events[0].event_id,
                             state_filter=state_filter,
-                            await_full_state=not lazy_load_members,
+                            await_full_state=await_full_state,
                         )
                     )
 
@@ -997,7 +1004,7 @@ class SyncHandler:
                         room_id,
                         stream_position=now_token,
                         state_filter=state_filter,
-                        await_full_state=not lazy_load_members,
+                        await_full_state=await_full_state,
                     )
 
                     state_at_timeline_start = state_at_timeline_end
@@ -1015,7 +1022,7 @@ class SyncHandler:
                         await self._state_storage_controller.get_state_ids_for_event(
                             batch.events[0].event_id,
                             state_filter=state_filter,
-                            await_full_state=not lazy_load_members,
+                            await_full_state=await_full_state,
                         )
                     )
                 else:
@@ -1025,7 +1032,7 @@ class SyncHandler:
                         room_id,
                         stream_position=now_token,
                         state_filter=state_filter,
-                        await_full_state=not lazy_load_members,
+                        await_full_state=await_full_state,
                     )
 
                 # for now, we disable LL for gappy syncs - see
@@ -1050,7 +1057,7 @@ class SyncHandler:
                     room_id,
                     stream_position=since_token,
                     state_filter=state_filter,
-                    await_full_state=not lazy_load_members,
+                    await_full_state=await_full_state,
                 )
 
                 if batch:
@@ -1058,7 +1065,7 @@ class SyncHandler:
                         await self._state_storage_controller.get_state_ids_for_event(
                             batch.events[-1].event_id,
                             state_filter=state_filter,
-                            await_full_state=not lazy_load_members,
+                            await_full_state=await_full_state,
                         )
                     )
                 else:
@@ -1068,7 +1075,7 @@ class SyncHandler:
                         room_id,
                         stream_position=now_token,
                         state_filter=state_filter,
-                        await_full_state=not lazy_load_members,
+                        await_full_state=await_full_state,
                     )
 
                 state_ids = _calculate_state(
