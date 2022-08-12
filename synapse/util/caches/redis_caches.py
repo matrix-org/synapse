@@ -55,11 +55,18 @@ class RedisLruCache(AsyncLruCache, Generic[KT, VT]):
         if local_value is not default:
             return local_value
 
-        redis_value = await self.redis_shard_cache.get(self.cache_name, _redis_key(key))
-        if redis_value:
-            await super().set(key, redis_value)
-            return redis_value
+        return await self.get_external(key, default, update_metrics=update_metrics)
 
+    async def get_external(
+        self,
+        key: KT,
+        default: Optional[T] = None,
+        update_metrics: bool = True,
+    ) -> Union[None, VT, T]:
+        value = await self.redis_shard_cache.get(self.cache_name, _redis_key(key))
+        if value is not default:
+            self.set_local(key, value)
+            return value
         return default
 
     async def set(self, key: KT, value: Any) -> None:
